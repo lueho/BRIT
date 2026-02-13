@@ -93,6 +93,13 @@ class CollectionViewSetTestCase(APITestCase):
         self.factory = APIRequestFactory()
         self.viewset = CollectionViewSet()
 
+    def _get_collection_cache_key(self, params=None, user=None):
+        """Build a CollectionViewSet cache key from request query params."""
+        request = self.factory.get("/", params or {})
+        request.query_params = request.GET
+        request.user = user or self.regular_user
+        return self.viewset.get_cache_key(request)
+
     def test_geojson_endpoint_with_published_scope(self):
         """Should return only published collections for 'published' scope."""
         self.client.force_login(self.regular_user)
@@ -202,6 +209,65 @@ class CollectionViewSetTestCase(APITestCase):
             key_user1,
             key_user2,
             "Cache keys for published scope should be shared across users",
+        )
+
+    def test_published_scope_cache_key_normalization_and_externalities(self):
+        """Ensure published scope is normalized while other key dimensions remain intact.
+
+        Fix 1 target:
+        - `scope=published` should map to the same cache key as omitting scope.
+
+        Externalities:
+        - warmup key should match request-time published key
+        - non-scope filters must still affect the key
+        - private/review scope keys must remain distinct from published
+        """
+        from maps.utils import build_collection_cache_key
+
+        published_default_key = self._get_collection_cache_key()
+        published_explicit_key = self._get_collection_cache_key({"scope": "published"})
+        self.assertEqual(
+            published_default_key,
+            published_explicit_key,
+            "Explicit scope=published should not create a different cache key",
+        )
+
+        warmup_key = build_collection_cache_key(scope="published")
+        self.assertEqual(
+            published_default_key,
+            warmup_key,
+            "Published request cache key must match warmup cache key",
+        )
+
+        filtered_without_scope = self._get_collection_cache_key({"collector": "1"})
+        filtered_with_scope = self._get_collection_cache_key(
+            {"collector": "1", "scope": "published"}
+        )
+        filtered_other = self._get_collection_cache_key(
+            {"collector": "2", "scope": "published"}
+        )
+        self.assertEqual(
+            filtered_without_scope,
+            filtered_with_scope,
+            "Adding scope=published must not alter filtered cache keys",
+        )
+        self.assertNotEqual(
+            filtered_with_scope,
+            filtered_other,
+            "Non-scope filter changes must still produce a different cache key",
+        )
+
+        private_key = self._get_collection_cache_key({"scope": "private"})
+        review_key = self._get_collection_cache_key({"scope": "review"})
+        self.assertNotEqual(
+            published_default_key,
+            private_key,
+            "Private scope must stay isolated from published cache entries",
+        )
+        self.assertNotEqual(
+            published_default_key,
+            review_key,
+            "Review scope must stay isolated from published cache entries",
         )
 
     def test_private_scope_data_isolation(self):
