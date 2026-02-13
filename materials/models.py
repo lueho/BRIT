@@ -447,8 +447,14 @@ class MaterialPropertyGroup(NamedUserCreatedObject):
         unique_together = [["name", "owner"]]
 
 
-class MaterialPropertyValue(NamedUserCreatedObject):
+class MaterialPropertyValue(UserCreatedObject):
     property = models.ForeignKey(MaterialProperty, on_delete=models.PROTECT)
+    unit = models.ForeignKey(
+        Unit,
+        on_delete=models.PROTECT,
+        default=get_default_unit_pk,
+        help_text="Unit for the measured value.",
+    )
     analytical_method = models.ForeignKey(
         AnalyticalMethod,
         on_delete=models.PROTECT,
@@ -468,6 +474,7 @@ class MaterialPropertyValue(NamedUserCreatedObject):
         duplicate = MaterialPropertyValue.objects.create(
             owner=creator,
             property=self.property,
+            unit=self.unit,
             analytical_method=self.analytical_method,
             average=self.average,
             standard_deviation=self.standard_deviation,

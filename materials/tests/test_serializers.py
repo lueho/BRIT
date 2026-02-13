@@ -7,6 +7,7 @@ from factory.django import mute_signals
 
 from bibliography.models import Source
 from distributions.models import Timestep
+from utils.properties.models import Unit
 
 from ..models import (
     Composition,
@@ -32,9 +33,11 @@ from ..serializers import (
 class MaterialPropertySerializerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        prop = MaterialProperty.objects.create(name="Test Property", unit="Test Unit")
+        prop = MaterialProperty.objects.create(name="Test Property", unit="g/kg")
+        unit = Unit.objects.create(name="mg/kg")
         MaterialPropertyValue.objects.create(
             property=prop,
+            unit=unit,
             average=Decimal("123.321"),
             standard_deviation=Decimal("0.1337"),
         )
@@ -55,6 +58,8 @@ class MaterialPropertySerializerTestCase(TestCase):
         self.assertIn("average", data)
         self.assertIn("standard_deviation", data)
         self.assertIn("unit", data)
+        self.assertEqual(data["unit"], self.value.unit.name)
+        self.assertNotEqual(data["unit"], self.value.property.unit)
 
 
 class SampleSeriesModelSerializerTestCase(TestCase):

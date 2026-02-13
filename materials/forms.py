@@ -28,6 +28,7 @@ from utils.forms import (
     SourcesFieldMixin,
     UserCreatedObjectFormMixin,
 )
+from utils.properties.models import Unit, get_default_unit_pk
 
 from .models import (
     AnalyticalMethod,
@@ -97,15 +98,54 @@ class MaterialPropertyModalModelForm(ModalModelFormMixin, MaterialPropertyModelF
 class MaterialPropertyValueModelForm(
     UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
 ):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["unit"].required = False
+
     class Meta:
         model = MaterialPropertyValue
         fields = (
             "property",
+            "unit",
             "analytical_method",
             "sources",
             "average",
             "standard_deviation",
         )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        property_obj = cleaned_data.get("property")
+        unit = cleaned_data.get("unit")
+        if property_obj and not unit:
+            unit = property_obj.allowed_units.first()
+            if unit is None and property_obj.unit:
+                unit = Unit.objects.filter(
+                    owner=property_obj.owner, name=property_obj.unit
+                ).first()
+            if unit is None and property_obj.unit:
+                unit = Unit.objects.filter(name=property_obj.unit).first()
+            if unit is None:
+                unit = Unit.objects.filter(pk=get_default_unit_pk()).first()
+            cleaned_data["unit"] = unit
+
+        if not property_obj or not unit:
+            return cleaned_data
+
+        allowed_units = property_obj.allowed_units.all()
+        if allowed_units.exists() and not allowed_units.filter(pk=unit.pk).exists():
+            self.add_error(
+                "unit",
+                "Selected unit is not allowed for this property.",
+            )
+        return cleaned_data
+
+    def save(self, commit=True):
+        value = super().save(commit=commit)
+        if value.property_id and value.unit_id:
+            if not value.property.allowed_units.filter(pk=value.unit_id).exists():
+                value.property.allowed_units.add(value.unit)
+        return value
 
 
 class MaterialPropertyValueModalModelForm(
