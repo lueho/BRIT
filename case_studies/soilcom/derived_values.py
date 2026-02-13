@@ -313,11 +313,14 @@ def _prune_duplicate_derived_rows(cpv, target_property_id):
     return deleted_count
 
 
-def create_or_update_derived_cpv(cpv):
+def create_or_update_derived_cpv(cpv, *, owner=None, publication_status=None):
     """Create or update the derived counterpart for a single CPV.
 
     Skips if the CPV is itself derived (prevents infinite loops) or if
     a non-derived (manually entered) counterpart already exists.
+
+    *owner* and *publication_status* override the values copied from the
+    source CPV when provided (useful for batch backfills).
 
     Returns ``(derived_instance, action)`` where action is one of:
     ``"created"``, ``"updated"``, ``"skipped"``.
@@ -367,7 +370,12 @@ def create_or_update_derived_cpv(cpv):
             "name": f"derived from {cpv.property.name}",
             "average": computed_avg,
             "unit_id": target_unit_id,
-            "owner": cpv.owner,
+            "owner": owner if owner is not None else cpv.owner,
+            "publication_status": (
+                publication_status
+                if publication_status is not None
+                else cpv.publication_status
+            ),
         },
     )
     action = "Created" if created else "Updated"
@@ -413,13 +421,17 @@ def delete_derived_cpv(cpv):
     return count
 
 
-def backfill_derived_values(dry_run=False):
+def backfill_derived_values(dry_run=False, owner=None, publication_status=None):
     """Compute derived counterparts for all existing CPV records.
 
     Iterates over all non-derived CPV records for the configured
     specific and total waste properties,
     creating or updating derived counterparts where the counterpart
     does not already exist as a manual entry.
+
+    *owner* and *publication_status* are forwarded to
+    ``create_or_update_derived_cpv`` to override the values that would
+    otherwise be copied from each source CPV.
 
     Returns a dict with counts: ``{created: int, updated: int, skipped: int}``.
     """
@@ -463,7 +475,9 @@ def backfill_derived_values(dry_run=False):
             continue
 
         with transaction.atomic():
-            _derived, action = create_or_update_derived_cpv(cpv)
+            _derived, action = create_or_update_derived_cpv(
+                cpv, owner=owner, publication_status=publication_status
+            )
         stats[action] += 1
 
         if i % 1000 == 0:
