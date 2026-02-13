@@ -1,3 +1,4 @@
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import (
     Case,
     CharField,
@@ -13,6 +14,10 @@ from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from case_studies.soilcom.derived_values import (
+    convert_total_to_specific,
+    get_derived_property_config,
+)
 from case_studies.soilcom.models import (
     AggregatedCollectionPropertyValue,
     Collection,
@@ -66,6 +71,14 @@ _COLLECTION_SYSTEM_PRIORITY = {
 # Attribute IDs for population data (maps_attribute table)
 POPULATION_ATTRIBUTE_ID = 3
 POPULATION_DENSITY_ATTRIBUTE_ID = 2
+
+
+def _resolved_population_attribute_id():
+    """Return the configured population attribute ID with a legacy fallback."""
+    try:
+        return get_derived_property_config().population_attribute_id
+    except ImproperlyConfigured:
+        return POPULATION_ATTRIBUTE_ID
 
 
 def _parse_country_year(request):
@@ -649,9 +662,6 @@ class CombinedFeeSystemViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-# Property IDs (properties_property table)
-_SPECIFIC_WASTE_PROPERTY_ID = 1  # "specific waste collected" (kg/person/a)
-
 # For the 2022 atlas version the actual 2022 amounts were not yet
 # available, so the average of 2020 and 2021 is used instead.
 _2022_AMOUNT_YEARS = (2020, 2021)
@@ -718,7 +728,7 @@ def _get_collection_amount(country, year, waste_categories):
     if year == 2022:
         amounts = _amounts_for_2022(all_collection_ids, col_to_cid)
     else:
-        amounts = _amounts_for_2024(year, all_collection_ids, col_to_cid)
+        amounts = _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids)
 
     # ------------------------------------------------------------------
     # Step 4: build result list
@@ -739,10 +749,11 @@ def _get_collection_amount(country, year, waste_categories):
 
 def _amounts_for_2022(all_collection_ids, col_to_cid):
     """Average of *specific waste collected* over 2020–2021 per catchment."""
+    cfg = get_derived_property_config()
     cpv_qs = (
         CollectionPropertyValue.objects.filter(
             collection_id__in=all_collection_ids,
-            property_id=_SPECIFIC_WASTE_PROPERTY_ID,
+            property_id=cfg.specific_property_id,
             year__in=_2022_AMOUNT_YEARS,
         )
         .exclude(average=0)
@@ -762,7 +773,7 @@ def _amounts_for_2022(all_collection_ids, col_to_cid):
         agg_qs = (
             AggregatedCollectionPropertyValue.objects.filter(
                 collections__id__in=missing_cols,
-                property_id=_SPECIFIC_WASTE_PROPERTY_ID,
+                property_id=cfg.specific_property_id,
                 year__in=_2022_AMOUNT_YEARS,
             )
             .exclude(average=0)
@@ -776,17 +787,20 @@ def _amounts_for_2022(all_collection_ids, col_to_cid):
     return {cid: sum(vals) / len(vals) for cid, vals in cpv_by_catchment.items()}
 
 
-def _amounts_for_2024(year, all_collection_ids, col_to_cid):
-    """Specific waste collected for *year* directly.
+def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
+    """Specific waste collected for *year*, with total/population fallback.
 
     Derived CPV records (computed from total waste / population) are
     stored in the database with ``is_derived=True`` and are picked up
-    by this query automatically.
+    by this query automatically. For environments where backfill was not
+    run yet, this function also computes a read-time fallback from
+    ``total waste collected`` and population.
     """
+    cfg = get_derived_property_config()
     cpv_qs = (
         CollectionPropertyValue.objects.filter(
             collection_id__in=all_collection_ids,
-            property_id=_SPECIFIC_WASTE_PROPERTY_ID,
+            property_id=cfg.specific_property_id,
             year=year,
         )
         .exclude(average=0)
@@ -797,6 +811,57 @@ def _amounts_for_2024(year, all_collection_ids, col_to_cid):
         cid = col_to_cid.get(col_id)
         if cid is not None and cid not in result:
             result[cid] = avg
+
+    # Runtime fallback for missing catchments: total_Mg * 1000 / population.
+    missing_cids = [cid for cid in catchment_ids if cid not in result]
+    if not missing_cids:
+        return result
+
+    missing_cid_set = set(missing_cids)
+    missing_cols = {
+        col_id for col_id, cid in col_to_cid.items() if cid in missing_cid_set
+    }
+    total_qs = (
+        CollectionPropertyValue.objects.filter(
+            collection_id__in=missing_cols,
+            property_id=cfg.total_property_id,
+            year=year,
+        )
+        .exclude(average=0)
+        .values_list("collection_id", "average")
+    )
+    total_by_catchment: dict[int, float] = {}
+    for col_id, avg in total_qs:
+        cid = col_to_cid.get(col_id)
+        if cid is not None and cid not in total_by_catchment:
+            total_by_catchment[cid] = avg
+
+    if not total_by_catchment:
+        return result
+
+    pop_qs = (
+        RegionAttributeValue.objects.filter(
+            region__catchment__id__in=list(total_by_catchment.keys()),
+            attribute_id=_resolved_population_attribute_id(),
+        )
+        .order_by("region_id", "-date")
+        .distinct("region_id")
+        .values_list("region_id", "value")
+    )
+    region_pop: dict[int, float] = dict(pop_qs)
+
+    catchment_regions = dict(
+        CollectionCatchment.objects.filter(
+            id__in=list(total_by_catchment.keys()),
+        ).values_list("id", "region_id")
+    )
+    for cid, total_mg in total_by_catchment.items():
+        region_id = catchment_regions.get(cid)
+        if region_id is None:
+            continue
+        pop = region_pop.get(region_id)
+        if pop and pop > 0:
+            result[cid] = convert_total_to_specific(total_mg, pop, ndigits=1)
     return result
 
 
@@ -1161,6 +1226,7 @@ class CatchmentPopulationViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, population, population_density}."""
         country, year = _parse_country_year(request)
+        population_attribute_id = _resolved_population_attribute_id()
 
         qs = (
             CollectionCatchment.objects.filter(
@@ -1174,7 +1240,7 @@ class CatchmentPopulationViewSet(viewsets.ViewSet):
         # Subqueries for population and population density
         pop_sq = RegionAttributeValue.objects.filter(
             region_id=OuterRef("region_id"),
-            attribute_id=POPULATION_ATTRIBUTE_ID,
+            attribute_id=population_attribute_id,
             date__year=year,
         ).values("value")[:1]
 
