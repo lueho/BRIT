@@ -938,6 +938,20 @@ class CollectionPropertyValue(PropertyValue):
         help_text="True when this value was computed from another property (e.g. total ↔ specific via population).",
     )
 
+    class Meta(PropertyValue.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                fields=["collection", "property", "year"],
+                condition=Q(is_derived=True),
+                name="soilcom_unique_derived_cpv_per_key",
+            ),
+            models.UniqueConstraint(
+                fields=["collection", "property"],
+                condition=Q(is_derived=True, year__isnull=True),
+                name="soilcom_unique_derived_cpv_per_key_null_year",
+            ),
+        ]
+
 
 class AggregatedCollectionPropertyValue(PropertyValue):
     collections = models.ManyToManyField(Collection)

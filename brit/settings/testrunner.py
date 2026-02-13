@@ -75,3 +75,11 @@ LOGGING = {
 CRISPY_FAIL_SILENTLY = False
 
 TEST_RUNNER = "utils.tests.testrunner.SerialAwareTestRunner"
+
+# Use canonical soilcom IDs in tests to avoid repeated dynamic lookup failures
+# in signal handlers before initial data is fully populated.
+SOILCOM_SPECIFIC_WASTE_PROPERTY_ID = 1
+SOILCOM_TOTAL_WASTE_PROPERTY_ID = 9
+SOILCOM_SPECIFIC_WASTE_UNIT_ID = 2
+SOILCOM_TOTAL_WASTE_UNIT_ID = 8
+SOILCOM_POPULATION_ATTRIBUTE_ID = 3

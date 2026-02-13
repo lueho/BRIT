@@ -22,7 +22,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--dry-run",
             action="store_true",
-            help="Show what would be created without writing to the database.",
+            help="Show what would be created/updated without writing to the database.",
         )
 
     def handle(self, *args, **options):

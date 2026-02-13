@@ -2,6 +2,7 @@ import logging
 
 from django.conf import settings
 from django.core.cache import caches
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
@@ -100,20 +101,27 @@ def invalidate_collection_geojson_cache(sender, instance, **kwargs):
 # Derived CollectionPropertyValue (specific ↔ total waste collected)
 # ---------------------------------------------------------------------------
 
-_CONVERTIBLE_PROPERTY_IDS = frozenset({1, 9})  # specific / total waste
-
 
 def sync_derived_cpv_on_save(sender, instance, **kwargs):
     """Create or update the derived counterpart when a source CPV is saved."""
-    if instance.is_derived:
-        return
-    if instance.property_id not in _CONVERTIBLE_PROPERTY_IDS:
-        return
-
-    from .derived_values import create_or_update_derived_cpv
-
     try:
+        from .derived_values import (
+            create_or_update_derived_cpv,
+            is_convertible_property,
+        )
+
+        if instance.is_derived:
+            return
+        if not is_convertible_property(instance.property_id):
+            return
+
         create_or_update_derived_cpv(instance)
+    except ImproperlyConfigured as exc:
+        logger.debug(
+            "Skipping derived CPV sync for CollectionPropertyValue id=%s: %s",
+            instance.pk,
+            exc,
+        )
     except Exception:
         logger.exception(
             "Failed to sync derived CPV for CollectionPropertyValue id=%s",
@@ -123,15 +131,21 @@ def sync_derived_cpv_on_save(sender, instance, **kwargs):
 
 def sync_derived_cpv_on_delete(sender, instance, **kwargs):
     """Delete derived counterparts when a source CPV is deleted."""
-    if instance.is_derived:
-        return
-    if instance.property_id not in _CONVERTIBLE_PROPERTY_IDS:
-        return
-
-    from .derived_values import delete_derived_cpv
-
     try:
+        from .derived_values import delete_derived_cpv, is_convertible_property
+
+        if instance.is_derived:
+            return
+        if not is_convertible_property(instance.property_id):
+            return
+
         delete_derived_cpv(instance)
+    except ImproperlyConfigured as exc:
+        logger.debug(
+            "Skipping derived CPV delete sync for CollectionPropertyValue id=%s: %s",
+            instance.pk,
+            exc,
+        )
     except Exception:
         logger.exception(
             "Failed to delete derived CPV for CollectionPropertyValue id=%s",
