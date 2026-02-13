@@ -577,6 +577,17 @@ class CatchmentPrivateFilterView(PrivateObjectFilterView):
 class CatchmentDetailView(MapMixin, UserCreatedObjectDetailView):
     model = Catchment
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        region = self.object.region
+        if region is not None:
+            context["region_attribute_values"] = (
+                RegionAttributeValue.objects.filter(region=region)
+                .select_related("attribute")
+                .order_by("attribute__name", "-date")
+            )
+        return context
+
 
 class CatchmentCreateView(CreateUserObjectMixin, TemplateView):
     template_name = "catchment_create_method_select.html"
