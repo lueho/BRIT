@@ -12,9 +12,12 @@ def ensure_initial_data(stdout=None):
     from .models import Unit
 
     owner = get_default_owner()
-    no_unit, _ = Unit.objects.get_or_create(
+    no_unit, created = Unit.objects.get_or_create(
         owner=owner, name="No unit", defaults={"dimensionless": True}
     )
+    if not created and not no_unit.dimensionless:
+        no_unit.dimensionless = True
+        no_unit.save(update_fields=["dimensionless"])
     if stdout:
         print(
             f"Ensured unit 'No unit' for owner '{owner.username}' exists.", file=stdout
