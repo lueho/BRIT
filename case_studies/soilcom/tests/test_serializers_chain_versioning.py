@@ -94,8 +94,12 @@ class CollectionFlatSerializerChainAwareStatsTestCase(TestCase):
         # From CPV
         self.assertIn("specific_waste_collected_2022", data)
         self.assertEqual(data["specific_waste_collected_2022"], 12.5)
+        self.assertIn("specific_waste_collected_2022_unit", data)
+        self.assertEqual(data["specific_waste_collected_2022_unit"], str(self.unit))
         # From aggregated fallback
         self.assertIn("connection_rate_2021", data)
         self.assertEqual(data["connection_rate_2021"], 88.1)
+        self.assertIn("connection_rate_2021_unit", data)
+        self.assertEqual(data["connection_rate_2021_unit"], str(self.unit))
         # Aggregated flag is set when aggregated values are present
         self.assertTrue(data.get("aggregated", False))

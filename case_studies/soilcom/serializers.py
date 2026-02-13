@@ -293,10 +293,11 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
         required=False, allow_null=True
     )
     connection_type = serializers.CharField(required=False, allow_null=True)
-    population = serializers.SerializerMethodField()
-    population_density = serializers.SerializerMethodField()
     comments = serializers.SerializerMethodField(source="description", label="Comments")
-    sources = serializers.SerializerMethodField(label="Sources")
+    flyer_urls = serializers.SerializerMethodField(label="Flyer URLs")
+    bibliography_sources = serializers.SerializerMethodField(
+        label="Bibliography Sources"
+    )
     created_at = serializers.DateTimeField(label="Created at")
 
     class Meta:
@@ -316,10 +317,9 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
             "min_bin_size",
             "required_bin_capacity",
             "required_bin_capacity_reference",
-            "population",
-            "population_density",
             "comments",
-            "sources",
+            "flyer_urls",
+            "bibliography_sources",
             "valid_from",
             "valid_until",
             "created_at",
@@ -339,32 +339,12 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
         )
 
     @staticmethod
-    def get_population(obj):
-        try:
-            qs = obj.catchment.region.regionattributevalue_set.filter(
-                attribute__name="Population"
-            ).order_by("-date")
-            if qs.exists():
-                return int(qs[0].value)
-            else:
-                return None
-        except AttributeError:
-            return None
-
-    @staticmethod
-    def get_population_density(obj):
-        qs = obj.catchment.region.regionattributevalue_set.filter(
-            attribute__name="Population density"
-        ).order_by("-date")
-        if qs.exists():
-            pd = qs[0]
-            return pd.value
-        else:
-            return None
-
-    @staticmethod
-    def get_sources(obj):
+    def get_flyer_urls(obj):
         return ", ".join([f.url for f in obj.flyers.all() if f.url])
+
+    @staticmethod
+    def get_bibliography_sources(obj):
+        return ", ".join([str(s) for s in obj.sources.all()])
 
     @staticmethod
     def get_comments(obj):
@@ -398,6 +378,28 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
         ) in self.Meta.fields:  # Assuming self.Meta.fields contains the desired order
             ordered_representation[field] = representation.get(field, None)
 
+        # --- Region attribute values (population, population density, …) ---
+        region_attributes = ["Population", "Population density"]
+        try:
+            region = instance.catchment.region
+        except AttributeError:
+            region = None
+        if region is not None:
+            for attr_name in region_attributes:
+                col_prefix = attr_name.lower().replace(" ", "_")
+                rav_qs = (
+                    region.regionattributevalue_set.filter(attribute__name=attr_name)
+                    .select_related("attribute")
+                    .order_by("date")
+                )
+                for rav in rav_qs:
+                    year = rav.date.year if rav.date else None
+                    col = f"{col_prefix}_{year}" if year else col_prefix
+                    ordered_representation[col] = rav.value
+                    unit = rav.attribute.unit
+                    ordered_representation[f"{col}_unit"] = unit if unit else ""
+
+        # --- Collection property values (specific waste, connection rate, …) ---
         additional_properties = ["specific waste collected", "Connection rate"]
         user = (
             getattr(self.context.get("request"), "user", None) if self.context else None
@@ -428,6 +430,9 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
             for value in values:
                 column_name = f"{property_name.lower().replace(' ', '_')}_{value.year}"
                 ordered_representation[column_name] = value.average
+                ordered_representation[f"{column_name}_unit"] = (
+                    str(value.unit) if value.unit else ""
+                )
                 if is_aggregated:
                     ordered_representation["aggregated"] = True
 

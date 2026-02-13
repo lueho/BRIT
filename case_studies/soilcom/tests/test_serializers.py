@@ -198,9 +198,17 @@ class CollectionFlatSerializerTestCase(TestCase):
         population_density = Attribute.objects.create(
             name="Population density", unit="1/km"
         )
-        RegionAttributeValue(region=nutsregion, attribute=population, value=123321)
-        RegionAttributeValue(
-            region=nutsregion, attribute=population_density, value=123.5
+        RegionAttributeValue.objects.create(
+            region=nutsregion.region_ptr,
+            attribute=population,
+            date=date(2020, 1, 1),
+            value=123321,
+        )
+        RegionAttributeValue.objects.create(
+            region=nutsregion.region_ptr,
+            attribute=population_density,
+            date=date(2020, 1, 1),
+            value=123.5,
         )
         catchment1 = CollectionCatchment.objects.create(
             name="Test Catchment", region=nutsregion.region_ptr
@@ -242,7 +250,7 @@ class CollectionFlatSerializerTestCase(TestCase):
 
     def test_serializer_data_contains_all_fields(self):
         serializer = CollectionFlatSerializer(self.collection_nuts)
-        keys = {
+        static_keys = {
             "catchment",
             "nuts_or_lau_id",
             "collector",
@@ -257,16 +265,15 @@ class CollectionFlatSerializerTestCase(TestCase):
             "min_bin_size",
             "required_bin_capacity",
             "required_bin_capacity_reference",
-            "population",
-            "population_density",
             "comments",
-            "sources",
+            "flyer_urls",
+            "bibliography_sources",
             "valid_from",
             "valid_until",
             "created_at",
             "lastmodified_at",
         }
-        self.assertSetEqual(keys, set(serializer.data.keys()))
+        self.assertTrue(static_keys.issubset(set(serializer.data.keys())))
 
     def test_serializer_gets_information_from_foreign_keys_correctly(self):
         serializer = CollectionFlatSerializer(self.collection_nuts)
@@ -285,7 +292,7 @@ class CollectionFlatSerializerTestCase(TestCase):
         self.assertEqual("Test Frequency", serializer.data["frequency"])
         self.assertEqual(
             "https://www.test-flyer.org, https://www.best-flyer.org",
-            serializer.data["sources"],
+            serializer.data["flyer_urls"],
         )
 
     def test_nuts_id_is_read_correctly(self):
@@ -303,6 +310,17 @@ class CollectionFlatSerializerTestCase(TestCase):
     def test_country_is_read_correctly_from_lauregion(self):
         serializer = CollectionFlatSerializer(self.collection_lau)
         self.assertEqual("UK", serializer.data["country"])
+
+    def test_region_attribute_values_exported_as_dynamic_columns(self):
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        data = serializer.data
+        self.assertIn("population_2020", data)
+        self.assertEqual(data["population_2020"], 123321)
+        self.assertIn("population_2020_unit", data)
+        self.assertIn("population_density_2020", data)
+        self.assertEqual(data["population_density_2020"], 123.5)
+        self.assertIn("population_density_2020_unit", data)
+        self.assertEqual(data["population_density_2020_unit"], "1/km")
 
     def test_newline_characters_are_replaced_with_semicolons_in_comments(self):
         self.collection_nuts.description = (
