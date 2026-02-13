@@ -1,113 +1,79 @@
 from utils.file_export.renderers import BaseCSVRenderer, BaseXLSXRenderer
 
 
-class CollectionXLSXRenderer(BaseXLSXRenderer):
-    labels = {
-        "catchment": "Catchment",
-        "nuts_or_lau_id": "NUTS/LAU Id",
-        "collector": "Collector",
-        "collection_system": "Collection System",
-        "country": "Country",
-        "waste_category": "Waste Category",
-        "connection_type": "Connection type",
-        "allowed_materials": "Allowed Materials",
-        "forbidden_materials": "Forbidden Materials",
-        "fee_system": "Fee System",
-        "frequency": "Frequency",
-        "min_bin_size": "Minimum bin size (L)",
-        "required_bin_capacity": "Required bin capacity per unit (L)",
-        "required_bin_capacity_reference": "Required bin capacity reference unit",
-        "population": "Population",
-        "population_density": "Population Density",
-        "connection_rate_2019": "Connection Rate 2019 [%]",
-        "connection_rate_2020": "Connection Rate 2020 [%]",
-        "connection_rate_2021": "Connection Rate 2021 [%]",
-        "specific_waste_collected_2015": "Specific waste collected in 2015 [kg/(cap*year)]",
-        "specific_waste_collected_2016": "Specific waste collected in 2016 [kg/(cap*year)]",
-        "specific_waste_collected_2017": "Specific waste collected in 2017 [kg/(cap*year)]",
-        "specific_waste_collected_2018": "Specific waste collected in 2018 [kg/(cap*year)]",
-        "specific_waste_collected_2019": "Specific waste collected in 2019 [kg/(cap*year)]",
-        "specific_waste_collected_2020": "Specific waste collected in 2020 [kg/(cap*year)]",
-        "specific_waste_collected_2021": "Specific waste collected in 2021 [kg/(cap*year)]",
-        "comments": "Comments",
-        "sources": "Sources",
-        "valid_from": "Valid from",
-        "valid_until": "Valid until",
-        "created_at": "Created at",
-        "lastmodified_at": "Last modified at",
-    }
+def _discover_dynamic_columns(data, static_keys):
+    """Collect column keys from data rows that are not in the static label set."""
+    dynamic = []
+    seen = set(static_keys)
+    for row in data:
+        for key in row:
+            if key not in seen:
+                dynamic.append(key)
+                seen.add(key)
+    return dynamic
 
+
+def _label_for_dynamic_key(key):
+    """Generate a human-readable label for a dynamic column key."""
+    return key.replace("_", " ").title()
+
+
+# Static labels shared by both renderers.
+_STATIC_LABELS = {
+    "catchment": "Catchment",
+    "nuts_or_lau_id": "NUTS/LAU Id",
+    "country": "Country",
+    "collector": "Collector",
+    "collection_system": "Collection System",
+    "waste_category": "Waste Category",
+    "connection_type": "Connection type",
+    "allowed_materials": "Allowed Materials",
+    "forbidden_materials": "Forbidden Materials",
+    "fee_system": "Fee System",
+    "frequency": "Frequency",
+    "min_bin_size": "Minimum bin size (L)",
+    "required_bin_capacity": "Required bin capacity per unit (L)",
+    "required_bin_capacity_reference": "Required bin capacity reference unit",
+    "comments": "Comments",
+    "flyer_urls": "Flyer URLs",
+    "bibliography_sources": "Bibliography Sources",
+    "valid_from": "Valid from",
+    "valid_until": "Valid until",
+    "created_at": "Created at",
+    "lastmodified_at": "Last modified at",
+}
+
+
+class CollectionXLSXRenderer(BaseXLSXRenderer):
+    labels = dict(_STATIC_LABELS)
     workbook_options = {"constant_memory": True, "strings_to_urls": False}
+
+    def render(self, file, data, *args, **kwargs):
+        """Extend column list with dynamic property-value columns found in data."""
+        labels = dict(_STATIC_LABELS)
+        if data:
+            dynamic = _discover_dynamic_columns(data, labels)
+            for key in dynamic:
+                labels[key] = _label_for_dynamic_key(key)
+            self.column_order = list(_STATIC_LABELS.keys()) + dynamic
+        self.labels = labels
+        super().render(file, data, *args, **kwargs)
 
 
 class CollectionCSVRenderer(BaseCSVRenderer):
     writer_opts = {"delimiter": "\t"}
-    header = [
-        "catchment",
-        "country",
-        "nuts_or_lau_id",
-        "collector",
-        "collection_system",
-        "waste_category",
-        "connection_type",
-        "allowed_materials",
-        "forbidden_materials",
-        "fee_system",
-        "frequency",
-        "min_bin_size",
-        "required_bin_capacity",
-        "required_bin_capacity_reference",
-        "population",
-        "population_density",
-        "connection_rate_2019",
-        "connection_rate_2020",
-        "connection_rate_2021",
-        "specific_waste_collected_2015",
-        "specific_waste_collected_2016",
-        "specific_waste_collected_2017",
-        "specific_waste_collected_2018",
-        "specific_waste_collected_2019",
-        "specific_waste_collected_2020",
-        "specific_waste_collected_2021",
-        "comments",
-        "sources",
-        "valid_from",
-        "valid_until",
-        "created_at",
-        "lastmodified_at",
-    ]
+    header = list(_STATIC_LABELS.keys())
+    labels = dict(_STATIC_LABELS)
 
-    labels = {
-        "catchment": "Catchment",
-        "nuts_or_lau_id": "NUTS/LAU Id",
-        "collector": "Collector",
-        "collection_system": "Collection System",
-        "country": "Country",
-        "waste_category": "Waste Category",
-        "allowed_materials": "Allowed Materials",
-        "forbidden_materials": "Forbidden Materials",
-        "fee_system": "Fee System",
-        "frequency": "Frequency",
-        "connection_type": "Connection type",
-        "min_bin_size": "Minimum bin size (L)",
-        "required_bin_capacity": "Required bin capacity per unit (L)",
-        "required_bin_capacity_reference": "Required bin capacity reference unit",
-        "population": "Population",
-        "population_density": "Population Density",
-        "connection_rate_2019": "Connection Rate 2019 [%]",
-        "connection_rate_2020": "Connection Rate 2020 [%]",
-        "connection_rate_2021": "Connection Rate 2021 [%]",
-        "specific_waste_collected_2015": "Specific waste collected in 2015 [kg/(cap*year)]",
-        "specific_waste_collected_2016": "Specific waste collected in 2016 [kg/(cap*year)]",
-        "specific_waste_collected_2017": "Specific waste collected in 2017 [kg/(cap*year)]",
-        "specific_waste_collected_2018": "Specific waste collected in 2018 [kg/(cap*year)]",
-        "specific_waste_collected_2019": "Specific waste collected in 2019 [kg/(cap*year)]",
-        "specific_waste_collected_2020": "Specific waste collected in 2020 [kg/(cap*year)]",
-        "specific_waste_collected_2021": "Specific waste collected in 2021 [kg/(cap*year)]",
-        "comments": "Comments",
-        "sources": "Sources",
-        "valid_from": "Valid from",
-        "valid_until": "Valid until",
-        "created_at": "Created at",
-        "lastmodified_at": "Last modified at",
-    }
+    def render(self, file, data, *args, **kwargs):
+        """Extend header with dynamic property-value columns found in data."""
+        header = list(_STATIC_LABELS.keys())
+        labels = dict(_STATIC_LABELS)
+        if data:
+            dynamic = _discover_dynamic_columns(data, labels)
+            for key in dynamic:
+                labels[key] = _label_for_dynamic_key(key)
+            header.extend(dynamic)
+        self.header = header
+        self.labels = labels
+        super().render(file, data, *args, **kwargs)
