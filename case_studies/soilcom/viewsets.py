@@ -103,7 +103,9 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         id_list = params.getlist("id") if hasattr(params, "getlist") else []
 
         # Build filter dict, excluding transient or non-data keys
-        exclude_keys = {"csrfmiddlewaretoken", "page", "next", "dv"}
+        # `scope` is already encoded in dataset version (`dv`) via build_collection_cache_key.
+        # Excluding it here avoids duplicate cache key variants for equivalent published requests.
+        exclude_keys = {"csrfmiddlewaretoken", "page", "next", "dv", "scope"}
         filters = {}
         for key in params.keys():
             if key in exclude_keys:
