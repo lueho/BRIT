@@ -3,7 +3,7 @@ import logging
 from django.conf import settings
 from django.core.cache import caches
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models.signals import post_delete, post_save
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
 from maps.signals import clear_geojson_cache_pattern
@@ -62,6 +62,41 @@ def _schedule_cache_warmup():
             cache.delete(lock_key)
 
 
+def _published_cache_might_change(instance, *, created=False, is_delete=False):
+    """Return True when a collection change can affect the published dataset."""
+    current_status = getattr(instance, "publication_status", None)
+    previous_status = getattr(instance, "_previous_publication_status", None)
+
+    if is_delete:
+        return current_status == Collection.STATUS_PUBLISHED
+    if created:
+        return current_status == Collection.STATUS_PUBLISHED
+    return (
+        current_status == Collection.STATUS_PUBLISHED
+        or previous_status == Collection.STATUS_PUBLISHED
+    )
+
+
+@receiver(pre_save, sender=Collection)
+def capture_previous_collection_publication_status(sender, instance, **kwargs):
+    """Store previous publication_status so post_save can detect status transitions."""
+    if not instance.pk:
+        instance._previous_publication_status = None
+        return
+
+    update_fields = kwargs.get("update_fields")
+    if update_fields and "publication_status" not in update_fields:
+        # publication_status cannot change in this save call
+        instance._previous_publication_status = instance.publication_status
+        return
+
+    instance._previous_publication_status = (
+        sender.objects.filter(pk=instance.pk)
+        .values_list("publication_status", flat=True)
+        .first()
+    )
+
+
 @receiver(post_save, sender=Collection)
 @receiver(post_delete, sender=Collection)
 def invalidate_collection_geojson_cache(sender, instance, **kwargs):
@@ -74,12 +109,27 @@ def invalidate_collection_geojson_cache(sender, instance, **kwargs):
     Skips cache invalidation for updates that only affect non-GeoJSON fields (e.g., name).
     After invalidation, schedules a cache warm-up task to prevent H12 timeouts.
     """
-    update_fields = kwargs.get("update_fields")
-    if update_fields and set(update_fields) <= _NON_GEOJSON_FIELDS:
+    is_delete = "created" not in kwargs
+    created = kwargs.get("created", False)
+
+    if not is_delete:
+        update_fields = kwargs.get("update_fields")
+        if update_fields and set(update_fields) <= _NON_GEOJSON_FIELDS:
+            logger.debug(
+                "Skipping cache invalidation for Collection id=%s (non-GeoJSON update: %s)",
+                getattr(instance, "id", None),
+                update_fields,
+            )
+            return
+
+    if not _published_cache_might_change(
+        instance, created=created, is_delete=is_delete
+    ):
         logger.debug(
-            "Skipping cache invalidation for Collection id=%s (non-GeoJSON update: %s)",
+            "Skipping published cache invalidation for Collection id=%s (status=%s, previous=%s)",
             getattr(instance, "id", None),
-            update_fields,
+            getattr(instance, "publication_status", None),
+            getattr(instance, "_previous_publication_status", None),
         )
         return
 

@@ -144,30 +144,70 @@ class InvalidateCollectionCacheSignalTestCase(TestCase):
         cls.waste_stream = WasteStream.objects.create(
             name="Stream", category=cls.category
         )
-        cls.collection = Collection.objects.create(
+        cls.private_collection = Collection.objects.create(
             catchment=cls.catchment,
             collector=cls.collector,
             collection_system=cls.system,
             waste_stream=cls.waste_stream,
             valid_from=date(2024, 1, 1),
+            publication_status="private",
+        )
+        cls.published_collection = Collection.objects.create(
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.system,
+            waste_stream=cls.waste_stream,
+            valid_from=date(2024, 2, 1),
+            publication_status="published",
         )
 
     @patch("case_studies.soilcom.signals.clear_geojson_cache_pattern")
-    def test_cache_cleared_on_full_collection_save(self, mock_clear):
-        """Verify cache is invalidated on full save."""
-        self.collection.description = "Updated description"
-        self.collection.save()
+    @patch("case_studies.soilcom.signals._schedule_cache_warmup")
+    def test_cache_not_cleared_on_private_full_collection_save(
+        self, mock_warmup, mock_clear
+    ):
+        """Private-only saves should not invalidate published GeoJSON cache."""
+        self.private_collection.description = "Updated description"
+        self.private_collection.save()
 
-        mock_clear.assert_called_once_with("collection_geojson:*")
+        mock_clear.assert_not_called()
+        mock_warmup.assert_not_called()
 
     @patch("case_studies.soilcom.signals.clear_geojson_cache_pattern")
-    def test_cache_cleared_on_save_with_geojson_affecting_field(self, mock_clear):
-        """Verify cache is invalidated when GeoJSON-affecting fields change."""
-        self.collection.description = "Updated description"
-        self.collection.save(update_fields=["description"])
+    @patch("case_studies.soilcom.signals._schedule_cache_warmup")
+    def test_cache_cleared_on_published_full_collection_save(
+        self, mock_warmup, mock_clear
+    ):
+        """Published saves must invalidate and warm the collection GeoJSON cache."""
+        self.published_collection.description = "Updated description"
+        self.published_collection.save()
 
-        # Cache should be cleared for fields that affect GeoJSON
         mock_clear.assert_called_once_with("collection_geojson:*")
+        mock_warmup.assert_called_once()
+
+    @patch("case_studies.soilcom.signals.clear_geojson_cache_pattern")
+    @patch("case_studies.soilcom.signals._schedule_cache_warmup")
+    def test_cache_cleared_when_status_changes_from_published_to_private(
+        self, mock_warmup, mock_clear
+    ):
+        """Transition away from published must invalidate published cache entries."""
+        self.published_collection.publication_status = "private"
+        self.published_collection.save(update_fields=["publication_status"])
+
+        mock_clear.assert_called_once_with("collection_geojson:*")
+        mock_warmup.assert_called_once()
+
+    @patch("case_studies.soilcom.signals.clear_geojson_cache_pattern")
+    @patch("case_studies.soilcom.signals._schedule_cache_warmup")
+    def test_cache_not_cleared_on_private_save_with_geojson_affecting_field(
+        self, mock_warmup, mock_clear
+    ):
+        """Private GeoJSON-affecting updates should not flush global published cache."""
+        self.private_collection.description = "Updated description"
+        self.private_collection.save(update_fields=["description"])
+
+        mock_clear.assert_not_called()
+        mock_warmup.assert_not_called()
 
     @patch("case_studies.soilcom.signals.clear_geojson_cache_pattern")
     def test_cache_not_cleared_on_valid_until_update(self, mock_clear):
@@ -175,8 +215,8 @@ class InvalidateCollectionCacheSignalTestCase(TestCase):
 
         valid_until is a non-GeoJSON field used for predecessor updates.
         """
-        self.collection.valid_until = date(2024, 12, 31)
-        self.collection.save(update_fields=["valid_until"])
+        self.published_collection.valid_until = date(2024, 12, 31)
+        self.published_collection.save(update_fields=["valid_until"])
 
         # Cache should NOT be cleared for valid_until-only updates
         mock_clear.assert_not_called()
@@ -188,8 +228,8 @@ class InvalidateCollectionCacheSignalTestCase(TestCase):
         Name changes don't affect GeoJSON representation, so cache
         invalidation is skipped for performance optimization.
         """
-        self.collection.name = "New Name"
-        self.collection.save(update_fields=["name"])
+        self.published_collection.name = "New Name"
+        self.published_collection.save(update_fields=["name"])
 
         # Cache should NOT be cleared for name-only updates
         mock_clear.assert_not_called()
