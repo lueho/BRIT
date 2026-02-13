@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
@@ -309,6 +311,36 @@ class CollectionViewSetTestCase(APITestCase):
             0,
             "Private collections should not be shared between users",
         )
+
+    @patch("case_studies.soilcom.filters.ConnectionRateFilter.set_min_max")
+    def test_version_endpoint_skips_filter_min_max_initialization(
+        self, mock_set_min_max
+    ):
+        """Version endpoint should avoid expensive range-widget min/max queries."""
+        self.client.force_login(self.regular_user)
+        response = self.client.get(reverse("api-waste-collection-version"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_set_min_max.assert_not_called()
+
+    @patch("case_studies.soilcom.filters.ConnectionRateFilter.set_min_max")
+    def test_geojson_endpoint_skips_filter_min_max_initialization(
+        self, mock_set_min_max
+    ):
+        """GeoJSON endpoint should avoid expensive range-widget min/max queries."""
+        self.client.force_login(self.regular_user)
+        response = self.client.get(reverse("api-waste-collection-geojson"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_set_min_max.assert_not_called()
+
+    @patch("case_studies.soilcom.filters.ConnectionRateFilter.set_min_max")
+    def test_collection_filterset_still_initializes_min_max_by_default(
+        self, mock_set_min_max
+    ):
+        """Default CollectionFilterSet initialization should still prepare form widgets."""
+        from case_studies.soilcom.filters import CollectionFilterSet
+
+        CollectionFilterSet(queryset=Collection.objects.all())
+        mock_set_min_max.assert_called_once()
 
     def test_geojson_uses_simplified_geometry_annotation(self):
         """Verify that GeoJSON serializer uses simplified_geom annotation when present.

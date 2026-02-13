@@ -601,6 +601,7 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         form_helper = CollectionFilterFormHelper
 
     def __init__(self, *args, **kwargs):
+        skip_min_max = kwargs.pop("skip_min_max", False)
         data = kwargs.get("data")
         if data:
             data = data.copy()
@@ -612,11 +613,12 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
                     data.pop("catchment", None)
             kwargs["data"] = data
         super().__init__(*args, **kwargs)
-        self.filters["connection_rate"].set_min_max()
-        self.filters["collections_per_year"].set_min_max()
-        self.filters["spec_waste_collected"].set_min_max()
-        self.filters["required_bin_capacity"].set_min_max()
-        self.filters["min_bin_size"].set_min_max()
+        if not skip_min_max:
+            self.filters["connection_rate"].set_min_max()
+            self.filters["collections_per_year"].set_min_max()
+            self.filters["spec_waste_collected"].set_min_max()
+            self.filters["required_bin_capacity"].set_min_max()
+            self.filters["min_bin_size"].set_min_max()
 
         # Only show publication_status filter when scope is private ("My collections")
         try:

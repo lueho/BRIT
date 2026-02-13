@@ -20,6 +20,17 @@ from maps.utils import build_collection_cache_key
 from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 
+class CollectionDjangoFilterBackend(rf_filters.DjangoFilterBackend):
+    """DjangoFilterBackend variant that accepts extra view-provided kwargs."""
+
+    def get_filterset_kwargs(self, request, queryset, view):
+        kwargs = super().get_filterset_kwargs(request, queryset, view)
+        get_extra_kwargs = getattr(view, "get_filterset_kwargs", None)
+        if callable(get_extra_kwargs):
+            kwargs.update(get_extra_kwargs())
+        return kwargs
+
+
 class GeoJSONAnonThrottle(AnonRateThrottle):
     """Rate limit for anonymous users on GeoJSON endpoints."""
 
@@ -44,7 +55,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     queryset = Collection.objects.all()
     serializer_class = CollectionFlatSerializer
     geojson_serializer_class = WasteCollectionGeometrySerializer
-    filter_backends = (rf_filters.DjangoFilterBackend,)
+    filter_backends = (CollectionDjangoFilterBackend,)
     filterset_class = CollectionFilterSet
 
     def get_geojson_queryset(self):
@@ -84,6 +95,16 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     # Ensure CachedGeoJSONMixin uses the GeoJSON serializer class
     def get_geojson_serializer_class(self):
         return WasteCollectionGeometrySerializer
+
+    def get_filterset_kwargs(self):
+        """Pass lightweight filter kwargs for API-only actions.
+
+        GeoJSON/version endpoints do not render filter widgets, so they can skip
+        expensive min/max slider calculations performed during filterset init.
+        """
+        if getattr(self, "action", None) in {"geojson", "version"}:
+            return {"skip_min_max": True}
+        return {}
 
     def get_cache_key(self, request):
         """Build a deterministic cache key including filters and dataset version.
