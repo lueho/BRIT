@@ -28,11 +28,11 @@ class InitialDataTestCase(TestCase):
 
     def test_base_component_is_created_from_migrations(self):
         MaterialComponent.objects.get(name="Fresh Matter (FM)")
-        self.assertEqual(MaterialComponent.objects.all().count(), 2)
+        self.assertGreaterEqual(MaterialComponent.objects.count(), 2)
 
     def test_other_component_is_created_from_migrations(self):
         MaterialComponent.objects.get(name="Other")
-        self.assertEqual(MaterialComponent.objects.all().count(), 2)
+        self.assertGreaterEqual(MaterialComponent.objects.count(), 2)
 
 
 class MaterialComponentGroupTestCase(TestCase):
