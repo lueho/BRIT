@@ -9,7 +9,7 @@ from maps.serializers import (
     PolygonSerializer,
     RegionModelSerializer,
 )
-from processes.models import ProcessType
+from processes.views import MOCK_PROCESS_TYPES
 
 from .models import BiogasPlantsSweden
 
@@ -31,6 +31,7 @@ class ShowcaseFlatSerializer(ModelSerializer):
         fields = ["id", "name", "region", "description", "involved_processes"]
 
     def get_involved_processes(self, obj):
+        # Hybrid mock: Showcase name to involved process names (keep in sync with view)
         SHOWCASE_PROCESS_MAP = {
             "Municipality & farms 1": ["Anaerobic Digestion", "Composting"],
             "Agricultural Education": [
@@ -39,20 +40,25 @@ class ShowcaseFlatSerializer(ModelSerializer):
                 "Composting",
             ],
         }
+        request = getattr(self, "request", None)
+        user = getattr(request, "user", None)
+        # If no request or user, treat as anonymous (no permission)
+        if not (user and user.has_perm("processes.access_app_feature")):
+            return []
         showcase_name = getattr(obj, "name", None)
         involved_processes = []
         if showcase_name in SHOWCASE_PROCESS_MAP:
             process_names = SHOWCASE_PROCESS_MAP[showcase_name]
-            for pt in ProcessType.objects.filter(
-                name__in=process_names, publication_status="published"
-            ):
-                involved_processes.append(
-                    {
-                        "name": pt.name,
-                        "id": pt.pk,
-                        "url": pt.get_absolute_url(),
-                    }
-                )
+            for pname in process_names:
+                proc = next((p for p in MOCK_PROCESS_TYPES if p["name"] == pname), None)
+                if proc:
+                    involved_processes.append(
+                        {
+                            "name": proc["name"],
+                            "id": proc["id"],
+                            "url": f"/processes/types/{proc['id']}/",
+                        }
+                    )
         return involved_processes
 
 
