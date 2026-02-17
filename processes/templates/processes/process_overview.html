@@ -2,111 +2,110 @@
 {% load static %}
 
 {% block title %}
-BRIT | Process Overview: Pulping
+  BRIT | Process Overview: Pulping (Mock)
 {% endblock title %}
 
 {% block content %}
-<div class="container-fluid">
+  <div class="container-fluid">
 
-  <div class="card o-hidden border-0 shadow-lg my-5">
-    <div class="card-body p-0">
-      <div class="p-5">
-        <div class="text-center">
-          <h1 class="h4 text-gray-900 mb-4">Process Overview: Pulping</h1>
-          <p class="lead">Disintegration of biomass into individual fibres suitable for paper and packaging.</p>
-        </div>
-
-        <hr>
-
-        <div class="row mb-4">
-          <div class="col-md-8">
-            <h5>Description</h5>
-            <p>
-              For TBN the available lignin-containing biomass (e.g. wood and agricultural residues) is usually of lower
-              quality compared to industrial pulpwood grades. Fibre production from these biomasses can be performed
-              using a thermo-chemical disintegration or a chemical delignification process. In most cases, the resulting
-              fibres contain lignin and have low brightness or a brown colour. These grades can be used for packaging
-              papers, e.g. corrugated board, in combination with fibres from waste paper recycling. Fibres with low
-              lignin content can be further bleached to produce white fibres with high brightness, suitable for graphic
-              papers. In this case the technology is more complex and requires larger facilities, often not compatible
-              with TBN.
-            </p>
-            <p>
-              Pulping is a general process for converting raw biomass like wood or straw into pulp, a key input for
-              paper and other fibre-based products. It involves breaking down the fibrous material through mechanical,
-              chemical, or semi-chemical means to separate the fibres. The resulting pulp can then be processed into
-              various grades for different applications. This overview provides access to specific pulping technologies
-              and related information.
-            </p>
-
-            <div class="mt-4">
-              <h5>Process Flowsheets</h5>
-              <ul class="list-group">
-                <li class="list-group-item">
-                  <a href="{% url 'pulping-straw-infocard' %}"><i class="fas fa-fw fa-chart-bar"></i> Pulping of
-                    Straw</a>
-                </li>
-                <li class="list-group-item disabled" aria-disabled="true">
-                  <a href="#" class="text-muted" tabindex="-1"><i class="fas fa-fw fa-chart-bar"></i> Pulping of Wood
-                    (coming soon)</a>
-                </li>
-              </ul>
-            </div>
-
+    <div class="card o-hidden border-0 shadow-lg my-5">
+      <div class="card-body p-0">
+        <div class="p-5">
+          <div class="text-center">
+            <h1 class="h4 text-gray-900 mb-4">Process Overview: Pulping (Mock)</h1>
+            <p class="lead">Disintegration of biomass into individual fibres suitable for paper and packaging.</p>
           </div>
-          <div class="col-md-4">
-            <div class="card">
-              <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                <h5 class="mb-0">Parameters</h5>
+
+          <hr>
+
+          <div class="row mb-4">
+            <div class="col-md-8">
+              <h5>Description</h5>
+              <p>
+                For TBN the available lignin-containing biomass (e.g. wood and agricultural residues) is usually of lower quality compared to industrial pulpwood grades. Fibre production from these biomasses can be performed using a thermo-chemical disintegration or a chemical delignification process. In most cases, the resulting fibres contain lignin and have low brightness or a brown colour. These grades can be used for packaging papers, e.g. corrugated board, in combination with fibres from waste paper recycling. Fibres with low lignin content can be further bleached to produce white fibres with high brightness, suitable for graphic papers. In this case the technology is more complex and requires larger facilities, often not compatible with TBN.
+              </p>
+              <p>
+                Pulping is a general process for converting raw biomass like wood or straw into pulp, a key input for paper and other fibre-based products. It involves breaking down the fibrous material through mechanical, chemical, or semi-chemical means to separate the fibres. The resulting pulp can then be processed into various grades for different applications. This overview provides access to specific pulping technologies and related information.
+              </p>
+
+              <div class="mt-4">
+                <h5>Info Charts</h5>
+                <ul class="list-group">
+                  <li class="list-group-item">
+                    <a href="{% url 'processes:pulping_straw_info' %}"><i class="fas fa-fw fa-chart-bar"></i> Pulping of Straw</a>
+                  </li>
+                  <li class="list-group-item disabled" aria-disabled="true">
+                    <a href="#" class="text-muted" tabindex="-1"><i class="fas fa-fw fa-chart-bar"></i> Pulping of Wood (coming soon)</a>
+                  </li>
+                </ul>
               </div>
-              <div class="card-body">
-                <dl>
-                  <dt>Mechanism</dt>
-                  <dd>Physico-chemical or chemical reactions</dd>
-                  <dt>Temperature</dt>
-                  <dd>130–190 °C</dd>
-                  <dt>Yield</dt>
-                  <dd>40–90 %</dd>
-                </dl>
-              </div>
+
             </div>
-          </div>
-        </div>
-
-        <h3 class="text-center mt-5 mb-4">Available Process Technologies</h3>
-
-        <div class="row">
-          {% for tech in technologies %}
-          <div class="col-md-4 mb-4">
-            <div class="card h-100 shadow-sm">
-              {% if 'steam' in tech.name|lower %}
-              <img src="{% static 'img/steam_reactor.jpg' %}" class="card-img-top" alt="{{ tech.name }}"
-                style="height: 220px; object-fit: contain; background: #f8f9fa;">
-              {% elif 'horizontal tube' in tech.name|lower %}
-              <img src="{% static 'img/horizontal_tube_reactor.jpg' %}" class="card-img-top" alt="{{ tech.name }}"
-                style="height: 220px; object-fit: contain; background: #f8f9fa;">
-              {% elif 'liquor circulation' in tech.name|lower %}
-              <img src="{% static 'img/liquor_circulation_reactor.jpg' %}" class="card-img-top" alt="{{ tech.name }}"
-                style="height: 220px; object-fit: contain; background: #f8f9fa;">
-              {% else %}
-              <img src="{% static 'img/processes_cover_card.png' %}" class="card-img-top" alt="{{ tech.name }}"
-                style="height: 220px; object-fit: contain; background: #f8f9fa;">
-              {% endif %}
-              <div class="card-body d-flex flex-column">
-                <h5 class="card-title">{{ tech.name }}</h5>
-                <p class="card-text small flex-grow-1">{{ tech.short_description }}</p>
-                <div class="text-center mt-auto">
-                  <a href="{{ tech.get_absolute_url }}" class="btn btn-primary">View Details</a>
+            <div class="col-md-4">
+              <div class="card">
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                  <h5 class="mb-0">Parameters</h5>
+                </div>
+                <div class="card-body">
+                  <dl>
+                    <dt>Mechanism</dt>
+                    <dd>
+                      physico-chemical or chemical reactions
+                    </dd>
+                    <dt>Temperature</dt>
+                    <dd>
+                      130-190 °C
+                    </dd>
+                    <dt>Yield</dt>
+                    <dd>
+                      40-90%
+                    </dd>
+                  </dl>
                 </div>
               </div>
             </div>
           </div>
-          {% endfor %}
-        </div>
 
+          <h3 class="text-center mt-5 mb-4">Available Process Technologies</h3>
+
+          <div class="row">
+            <!-- Technology Cards: Generated Dynamically -->
+            {% for tech in technologies %}
+              <div class="col-md-4 mb-4">
+                <div class="card h-100 shadow-sm">
+                  {% if 'steam' in tech.name|lower %}
+                    <img src="{% static 'img/steam_reactor.jpg' %}"
+                         class="card-img-top"
+                         alt="{{ tech.name }}" width="768" height="768">
+                  {% elif 'horizontal tube' in tech.name|lower %}
+                    <img src="{% static 'img/horizontal_tube_reactor.jpg' %}"
+                         class="card-img-top"
+                         alt="{{ tech.name }}" width="768" height="768">
+                  {% elif 'liquor circulation' in tech.name|lower %}
+                    <img src="{% static 'img/liquor_circulation_reactor.jpg' %}"
+                         class="card-img-top"
+                         alt="{{ tech.name }}" width="768" height="768">
+                  {% else %}
+                    <img src="{% static 'img/processes_cover_card.png' %}"
+                         class="card-img-top"
+                         alt="{{ tech.name }}" width="768" height="768">
+                  {% endif %}
+                  <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">{{ tech.name }}</h5>
+                    <p class="card-text small flex-grow-1">{{ tech.short_description }}</p>
+                    <div class="text-center mt-auto">
+                      <a href="{% url 'processes:type_detail' tech.id %}"
+                         class="btn btn-primary">View Details</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+
+        </div>
       </div>
     </div>
-  </div>
 
-</div>
+  </div>
 {% endblock content %}

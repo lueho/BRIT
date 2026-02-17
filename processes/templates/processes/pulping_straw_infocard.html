@@ -2,42 +2,31 @@
 {% load static %}
 
 {% block custom_style %}
-<style>
-  body {
-    background: #fff;
-    margin: 0;
-    font-family: 'Segoe UI', Arial, sans-serif;
-    color: #143413;
-  }
+  <style>
+  body { background: #fff; margin: 0; font-family: 'Segoe UI', Arial, sans-serif; color: #143413;}
 
   /* Popups for citations */
   .popup-citation {
     display: none;
     position: fixed;
-    left: 0;
-    top: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.34);
+    left: 0; top: 0; width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.34);
     z-index: 9000;
     align-items: center;
     justify-content: center;
   }
-
   .popup-citation.active {
     display: flex;
   }
-
   .popup-content {
     background: #fff;
     border-radius: 13px;
     padding: 1.5em 2em 1.3em 2em;
     max-width: 520px;
-    box-shadow: 0 4px 32px rgba(41, 64, 43, 0.14);
+    box-shadow: 0 4px 32px rgba(41,64,43,0.14);
     font-size: 1.05em;
     position: relative;
   }
-
   .close-popup {
     position: absolute;
     top: 0.4em;
@@ -54,14 +43,12 @@
     stroke: #143413;
     stroke-width: 2;
   }
-
   .axis-text {
     font-size: 1.1em;
     font-weight: 600;
     fill: #143413;
     text-anchor: middle;
   }
-
   .graph-line {
     fill: none;
     stroke: #2a6f97;
@@ -74,45 +61,13 @@
     display: block;
     font-family: 'Segoe UI', Arial, sans-serif;
   }
-
-  .diagram-box {
-    stroke: #143413;
-    stroke-width: 1.7;
-    fill: #fff;
-  }
-
-  .main-title {
-    font-size: 14px;
-    font-weight: 700;
-    fill: #18351c;
-  }
-
-  .sub-title {
-    font-size: 13px;
-    font-weight: 400;
-    fill: #41534a;
-  }
-
-  .arrow {
-    stroke: #88b197;
-    stroke-width: 7;
-    marker-end: url(#arrowhead);
-  }
-
-  .clickable {
-    cursor: pointer;
-  }
-
-  .clickable:hover {
-    opacity: 0.85;
-  }
-
-  .citation-text {
-    fill: #2476de;
-    font-weight: 400;
-    cursor: pointer;
-    user-select: none;
-  }
+  .diagram-box { stroke: #143413; stroke-width: 1.7; fill: #fff; }
+  .main-title { font-size: 14px; font-weight: 700; fill: #18351c; }
+  .sub-title { font-size: 13px; font-weight: 400; fill: #41534a; }
+  .arrow { stroke: #88b197; stroke-width: 7; marker-end: url(#arrowhead); }
+  .clickable { cursor: pointer; }
+  .clickable:hover { opacity: 0.85; }
+  .citation-text { fill: #2476de; font-weight: 400; cursor: pointer; user-select: none; }
 
   /* Smooth transition for box hover */
   .process-link rect {
@@ -127,156 +82,160 @@
     filter: drop-shadow(0 0 6px #007bff33);
     cursor: pointer;
   }
-</style>
+
+  </style>
 {% endblock custom_style %}
 
 {% block title %}
-BRIT | Straw and Wood Infocard
+  BRIT | Straw and Wood Infocard
 {% endblock title %}
 
 {% block content %}
-<div class="container-fluid">
+  <div class="container-fluid">
 
-  <div class="text-end mb-3">
-    <a href="{% static 'docs/process_info_chart_pulping_straw.pdf' %}" class="btn btn-primary"
-      download="process_info_chart_pulping_straw.pdf">
-      <i class="fas fa-download fa-sm text-white-50"></i> Download as PDF
-    </a>
-  </div>
+    <div class="text-end mb-3">
+      <a href="{% static 'docs/process_info_chart_pulping_straw.pdf' %}"
+         class="btn btn-primary"
+         download="process_info_chart_pulping_straw.pdf">
+        <i class="fas fa-download fa-sm text-white-50"></i> Download as PDF
+      </a>
+    </div>
 
-  <div class="card o-hidden border-0 shadow-lg my-5">
-    <div class="card-body p-0">
-      <div class="p-5">
-        <div class="text-center">
-          <h1 class="h2 text-gray-900 mb-4">Straw</h1>
-          <p class="lead">and other lignified agricultural residues</p>
-        </div>
+    <div class="card o-hidden border-0 shadow-lg my-5">
+      <div class="card-body p-0">
+        <div class="p-5">
+          <div class="text-center">
+            <h1 class="h2 text-gray-900 mb-4">Straw</h1>
+            <p class="lead">and other lignified agricultural residues</p>
+          </div>
 
-        <hr>
+          <hr>
 
-        <!-- ########## START OF NEW SVG DIAGRAM ########## -->
-        <svg viewBox="0 0 900 1050" class="diagram-svg">
-          <defs>
-            <marker id="arrowhead" markerWidth="3" markerHeight="4" refX="2.5" refY="2" orient="auto"
-              markerUnits="strokeWidth">
-              <polygon points="0,0 3,2 0,4" fill="#88b197" />
+          <!-- ########## START OF NEW SVG DIAGRAM ########## -->
+          <svg viewBox="0 0 900 1050" class="diagram-svg">
+            <defs>
+            <marker id="arrowhead" markerWidth="3" markerHeight="4" refX="2.5" refY="2" orient="auto" markerUnits="strokeWidth">
+            <polygon points="0,0 3,2 0,4" fill="#88b197" />
             </marker>
-            <marker id="axis-arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
-              orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#143413" />
+            <marker id="axis-arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#143413" />
             </marker>
-            <marker id="graph-line-arrowhead-1" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="2.5"
-              markerHeight="1.5" orient="auto-start-reverse" markerUnits="strokeWidth">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#b7e4c7" />
+            <marker id="graph-line-arrowhead-1" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="2.5" markerHeight="1.5" orient="auto-start-reverse" markerUnits="strokeWidth">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#b7e4c7" />
             </marker>
-            <marker id="graph-line-arrowhead-2" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="2.5"
-              markerHeight="1.5" orient="auto" markerUnits="strokeWidth">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#90d8a0" />
+            <marker id="graph-line-arrowhead-2" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="2.5" markerHeight="1.5" orient="auto" markerUnits="strokeWidth">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#90d8a0" />
             </marker>
-            <marker id="graph-line-arrowhead-3" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="2.5"
-              markerHeight="1.5" orient="auto" markerUnits="strokeWidth">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#6ac279" />
+            <marker id="graph-line-arrowhead-3" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="2.5" markerHeight="1.5" orient="auto" markerUnits="strokeWidth">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#6ac279" />
             </marker>
-            <marker id="graph-line-arrowhead-4" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="2.5"
-              markerHeight="1.5" orient="auto" markerUnits="strokeWidth">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#4d9a5a" />
+            <marker id="graph-line-arrowhead-4" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="2.5" markerHeight="1.5" orient="auto" markerUnits="strokeWidth">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#4d9a5a" />
             </marker>
-          </defs>
+            </defs>
 
-          <!-- ROW 1: Fibers -->
-          <g transform="translate(150, 10)">
-            <image href="{% static 'img/straw_fiber_brown_transparent.png' %}" x="0" y="0" width="150" height="92" />
-            <text x="75" y="112" text-anchor="middle" class="main-title">Brown fibers</text>
-            <text x="75" y="132" text-anchor="middle" class="sub-title">for corrugated board &amp; packaging</text>
-          </g>
-          <g transform="translate(600, 10)">
-            <image href="{% static 'img/straw_fiber_white_transparent.png' %}" x="0" y="0" width="150" height="92" />
-            <text x="75" y="112" text-anchor="middle" class="main-title">White fibers</text>
-            <text x="75" y="132" text-anchor="middle" class="sub-title">for graphic papers</text>
-          </g>
+            <!-- ROW 1: Fibers -->
+            <a xlink:href="{% url 'processes:mock_material_detail' 207 %}">
+              <g class="clickable" transform="translate(150, 10)">
+              <image href="{% static 'img/straw_fiber_brown_transparent.png' %}"
+                     x="0"
+                     y="0"
+                     width="150"
+                     height="92" />
+              <text x="75" y="112" text-anchor="middle" class="main-title">Brown fibers</text>
+              <text x="75" y="132" text-anchor="middle" class="sub-title">for corrugated board &amp; packaging</text>
+              </g>
+            </a>
+            <a xlink:href="{% url 'processes:mock_material_detail' 206 %}">
+              <g class="clickable" transform="translate(600, 10)">
+              <image href="{% static 'img/straw_fiber_white_transparent.png' %}"
+                     x="0"
+                     y="0"
+                     width="150"
+                     height="92" />
+              <text x="75" y="112" text-anchor="middle" class="main-title">White fibers</text>
+              <text x="75" y="132" text-anchor="middle" class="sub-title">for graphic papers</text>
+              </g>
+            </a>
 
-          <!-- ROW 2: Processes -->
-          <a xlink:href="{% url 'processtype-detail' 7 %}">
-            <g class="clickable process-link" transform="translate(0, 180)">
+            <!-- ROW 2: Processes -->
+            <a xlink:href="{% url 'processes:type_detail' 7 %}">
+              <g class="clickable process-link" transform="translate(0, 180)">
               <rect class="diagram-box" x="0" y="0" width="413" height="60" rx="7" />
               <text x="15" y="27" class="main-title">Steam processes</text>
               <text x="15" y="47" class="sub-title">(steam explosion/refining)</text>
-            </g>
-          </a>
-          <a xlink:href="{% url 'processtype-detail' 10 %}">
-            <g class="clickable process-link" transform="translate(323, 200)">
+              </g>
+            </a>
+            <a xlink:href="{% url 'processes:type_detail' 10 %}">
+              <g class="clickable process-link" transform="translate(323, 200)">
               <rect class="diagram-box" x="0" y="0" width="577" height="60" rx="7" />
               <text x="15" y="35" class="main-title">Horizontal tube digester</text>
-            </g>
-          </a>
+              </g>
+            </a>
 
-          <!-- ROW 3: Pathways -->
-          <g transform="translate(0, 310)">
+            <!-- ROW 3: Pathways -->
+            <g transform="translate(0, 310)">
             <rect class="diagram-box" x="0" y="0" width="180" height="60" rx="7" />
             <text x="90" y="27" text-anchor="middle" class="main-title">No chemicals</text>
             <text x="90" y="47" text-anchor="middle" class="citation-text" onclick="showCitation(3)">(3)</text>
-          </g>
-          <g transform="translate(233, 310)">
+            </g>
+            <g transform="translate(233, 310)">
             <rect class="diagram-box" x="0" y="0" width="180" height="60" rx="7" />
             <text x="90" y="27" text-anchor="middle" class="main-title">Na₂CO₃</text>
             <text x="90" y="47" text-anchor="middle">
-              <tspan class="citation-text" onclick="showCitation(2)">(2,</tspan>
-              <tspan class="citation-text" onclick="showCitation(3)" dx="2">3)</tspan>
+            <tspan class="citation-text" onclick="showCitation(2)">(2,</tspan><tspan class="citation-text" onclick="showCitation(3)" dx="2">3)</tspan>
             </text>
-          </g>
-          <g transform="translate(466, 310)">
+            </g>
+            <g transform="translate(466, 310)">
             <rect class="diagram-box" x="0" y="0" width="180" height="60" rx="7" />
             <text x="90" y="27" text-anchor="middle" class="main-title">Na₂CO₃ &amp; O₂</text>
             <text x="90" y="47" text-anchor="middle" class="citation-text" onclick="showCitation(2)">(2)</text>
-          </g>
-          <g transform="translate(678, 310)">
+            </g>
+            <g transform="translate(678, 310)">
             <rect class="diagram-box" x="0" y="0" width="222" height="60" rx="7" />
             <text x="111" y="27" text-anchor="middle" class="main-title">NaOH</text>
             <text x="111" y="47" text-anchor="middle" class="citation-text" onclick="showCitation(1)">(1)</text>
-          </g>
+            </g>
 
-          <!-- Arrows from Processes to Pathways -->
-          <path class="arrow" d="M 90 240 V 305" />
-          <path class="arrow" d="M 290 240 V 305" />
-          <path class="arrow" d="M 356 260 V 305" />
-          <path class="arrow" d="M 556 260 V 305" />
-          <path class="arrow" d="M 789 260 V 305" />
+            <!-- Arrows from Processes to Pathways -->
+            <path class="arrow" d="M 90 240 V 305" />
+            <path class="arrow" d="M 290 240 V 305" />
+            <path class="arrow" d="M 356 260 V 305" />
+            <path class="arrow" d="M 556 260 V 305" />
+            <path class="arrow" d="M 789 260 V 305" />
 
-          <!-- ROW 4: Brown Grades -->
-          <g transform="translate(0, 440)">
+            <!-- ROW 4: Brown Grades -->
+            <g transform="translate(0, 440)">
             <rect class="diagram-box" x="0" y="0" width="900" height="60" rx="7" />
             <text x="450" y="27" text-anchor="middle" class="main-title">Brown grades</text>
-            <text x="450" y="47" text-anchor="middle" class="sub-title">for board and packaging (e.g. corrugated
-              board)</text>
-          </g>
+            <text x="450" y="47" text-anchor="middle" class="sub-title">for board and packaging (e.g. corrugated board)</text>
+            </g>
 
-          <!-- Arrows from Pathways to Brown Grades -->
-          <path class="arrow" d="M 90 370 V 435" />
-          <path class="arrow" d="M 323 370 V 435" />
-          <path class="arrow" d="M 556 370 V 435" />
-          <path class="arrow" d="M 789 370 V 435" />
+            <!-- Arrows from Pathways to Brown Grades -->
+            <path class="arrow" d="M 90 370 V 435" />
+            <path class="arrow" d="M 323 370 V 435" />
+            <path class="arrow" d="M 556 370 V 435" />
+            <path class="arrow" d="M 789 370 V 435" />
 
-          <!-- Bleaching Column -->
-          <g transform="translate(466, 570)">
+            <!-- Bleaching Column -->
+            <g transform="translate(466, 570)">
             <rect class="diagram-box" x="0" y="0" width="434" height="80" rx="7" />
             <text x="217" y="20" text-anchor="middle" class="main-title">Bleaching</text>
-            <text x="217" y="40" text-anchor="middle" class="sub-title" font-size="12px">(e.g. O₂, O₂ &amp; NaOH → A:
-              acid wash (H₂SO₄)</text>
-            <text x="217" y="58" text-anchor="middle" class="sub-title" font-size="12px">→ P: hydrogen peroxide &amp;
-              NaOH)</text>
-          </g>
+            <text x="217" y="40" text-anchor="middle" class="sub-title" font-size="12px">(e.g. O₂, O₂ &amp; NaOH → A: acid wash (H₂SO₄)</text>
+            <text x="217" y="58" text-anchor="middle" class="sub-title" font-size="12px">→ P: hydrogen peroxide &amp; NaOH)</text>
+            </g>
 
-          <path class="arrow" d="M 789 500 V 565" />
-          <path class="arrow" d="M 789 650 V 705" />
+            <path class="arrow" d="M 789 500 V 565" />
+            <path class="arrow" d="M 789 650 V 705" />
 
-          <g transform="translate(466, 710)">
+            <g transform="translate(466, 710)">
             <rect class="diagram-box" x="0" y="0" width="434" height="60" rx="7" />
             <text x="217" y="27" text-anchor="middle" class="main-title">White grades</text>
             <text x="217" y="47" text-anchor="middle" class="sub-title">for graphic papers and tissue</text>
-          </g>
+            </g>
 
-          <!-- ########## START OF CAPACITY GRAPH ########## -->
-          <g id="capacity-graph" transform="translate(0, 790)">
+            <!-- ########## START OF CAPACITY GRAPH ########## -->
+            <g id="capacity-graph" transform="translate(0, 790)">
             <!-- Y-Axis -->
             <line class="axis-line" x1="60" y1="10" x2="60" y2="200" marker-start="url(#axis-arrowhead)"></line>
             <text class="axis-text" transform="translate(25, 125) rotate(-90)">Process complexity</text>
@@ -287,61 +246,52 @@ BRIT | Straw and Wood Infocard
             <!-- Graph Line -->
             <polyline class="graph-line" points="90,172 323,142 556,92 789,32"></polyline>
             <!-- Line Arrows -->
-            <line x1="90" y1="200" x2="90" y2="190" stroke="#b7e4c7" stroke-width="12"
-              marker-end="url(#graph-line-arrowhead-1)" />
-            <line x1="323" y1="200" x2="323" y2="160" stroke="#90d8a0" stroke-width="12"
-              marker-end="url(#graph-line-arrowhead-2)" />
-            <line x1="556" y1="200" x2="556" y2="110" stroke="#6ac279" stroke-width="12"
-              marker-end="url(#graph-line-arrowhead-3)" />
-            <line x1="789" y1="200" x2="789" y2="50" stroke="#4d9a5a" stroke-width="12"
-              marker-end="url(#graph-line-arrowhead-4)" />
+            <line x1="90" y1="200" x2="90" y2="190" stroke="#b7e4c7" stroke-width="12" marker-end="url(#graph-line-arrowhead-1)" />
+            <line x1="323" y1="200" x2="323" y2="160" stroke="#90d8a0" stroke-width="12" marker-end="url(#graph-line-arrowhead-2)" />
+            <line x1="556" y1="200" x2="556" y2="110" stroke="#6ac279" stroke-width="12" marker-end="url(#graph-line-arrowhead-3)" />
+            <line x1="789" y1="200" x2="789" y2="50" stroke="#4d9a5a" stroke-width="12" marker-end="url(#graph-line-arrowhead-4)" />
             <!-- Labels -->
-            <text class="axis-text" style="font-size: 1em; font-weight: 600;" x="90" y="225" text-anchor="middle">5000
-              t/a</text>
-            <text class="axis-text" style="font-size: 1em; font-weight: 600;" x="789" y="225" text-anchor="middle">30000
-              t/a</text>
-          </g>
-          <!-- ########## END OF CAPACITY GRAPH ########## -->
+            <text class="axis-text" style="font-size: 1em; font-weight: 600;" x="90" y="225" text-anchor="middle">5000 t/a</text>
+            <text class="axis-text" style="font-size: 1em; font-weight: 600;" x="789" y="225" text-anchor="middle">30000 t/a</text>
+            </g>
+            <!-- ########## END OF CAPACITY GRAPH ########## -->
 
-        </svg>
-        <!-- ########## END OF NEW SVG DIAGRAM ########## -->
+          </svg>
+          <!-- ########## END OF NEW SVG DIAGRAM ########## -->
 
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Citation Popups -->
-  <div id="popup-1" class="popup-citation" onclick="closeAllPopups()">
-    <div class="popup-content" onclick="event.stopPropagation()">
-      <button class="close-popup" onclick="closeAllPopups()">×</button>
-      <b>1)</b> Salehi, K.; Kordsachia, O.; Patt, R. (2014) Comparison of ME/AQ, soda and soda/AQ pulping of wheat and
-      rye straw. Industrial Crops and Products, 52, 603–610.
-      <a href="https://doi.org/10.1016/j.indcrop.2013.11.014" target="_blank">DOI: 10.1016/j.indcrop.2013.11.014</a>
+    <!-- Citation Popups -->
+    <div id="popup-1" class="popup-citation" onclick="closeAllPopups()">
+      <div class="popup-content" onclick="event.stopPropagation()">
+        <button class="close-popup" onclick="closeAllPopups()">×</button>
+        <b>1)</b> Salehi, K.; Kordsachia, O.; Patt, R. (2014) Comparison of ME/AQ, soda and soda/AQ pulping of wheat and rye straw. Industrial Crops and Products, 52, 603–610.
+        <a href="https://doi.org/10.1016/j.indcrop.2013.11.014" target="_blank">DOI: 10.1016/j.indcrop.2013.11.014</a>
+      </div>
     </div>
-  </div>
-  <div id="popup-2" class="popup-citation" onclick="closeAllPopups()">
-    <div class="popup-content" onclick="event.stopPropagation()">
-      <button class="close-popup" onclick="closeAllPopups()">×</button>
-      <b>2)</b> Steffen, F.; Kordsachia, T.; Heizmann, T.; Eckardt, M. P.; Chen, Y. (2024) Sodium Carbonate Pulping of
-      Wheat Straw—An Alternative Fiber Source for Various Paper Applications. Agronomy, 14, 162.
-      <a href="https://doi.org/10.3390/agronomy14010162" target="_blank">DOI: 10.3390/agronomy14010162</a>
+    <div id="popup-2" class="popup-citation" onclick="closeAllPopups()">
+      <div class="popup-content" onclick="event.stopPropagation()">
+        <button class="close-popup" onclick="closeAllPopups()">×</button>
+        <b>2)</b> Steffen, F.; Kordsachia, T.; Heizmann, T.; Eckardt, M. P.; Chen, Y. (2024) Sodium Carbonate Pulping of Wheat Straw—An Alternative Fiber Source for Various Paper Applications. Agronomy, 14, 162.
+        <a href="https://doi.org/10.3390/agronomy14010162" target="_blank">DOI: 10.3390/agronomy14010162</a>
+      </div>
     </div>
-  </div>
-  <div id="popup-3" class="popup-citation" onclick="closeAllPopups()">
-    <div class="popup-content" onclick="event.stopPropagation()">
-      <button class="close-popup" onclick="closeAllPopups()">×</button>
-      <b>3)</b> Hagel, S.; Schütt, F. (2024) Reinforcement Fiber Production from Wheat Straw for Wastepaper-Based
-      Packaging Using Steam Refining with Sodium Carbonate. Clean Technol. 2024, 6, 322–338.
-      <a href="https://doi.org/10.3390/cleantechnol6010016" target="_blank">DOI: 10.3390/cleantechnol6010016</a>
+    <div id="popup-3" class="popup-citation" onclick="closeAllPopups()">
+      <div class="popup-content" onclick="event.stopPropagation()">
+        <button class="close-popup" onclick="closeAllPopups()">×</button>
+        <b>3)</b> Hagel, S.; Schütt, F. (2024) Reinforcement Fiber Production from Wheat Straw for Wastepaper-Based Packaging Using Steam Refining with Sodium Carbonate. Clean Technol. 2024, 6, 322–338.
+        <a href="https://doi.org/10.3390/cleantechnol6010016" target="_blank">DOI: 10.3390/cleantechnol6010016</a>
+      </div>
     </div>
-  </div>
 
-</div>
+  </div>
 {% endblock content %}
 
 {% block javascript %}
-{{ block.super }}
-<script>
+  {{ block.super }}
+  <script>
   function showCitation(id) {
     closeAllPopups(); // Close any open popups first
     const popup = document.getElementById(`popup-${id}`);
@@ -355,10 +305,10 @@ BRIT | Straw and Wood Infocard
   }
 
   // Close popup with Escape key
-  document.addEventListener('keydown', function (event) {
+  document.addEventListener('keydown', function(event) {
     if (event.key === "Escape") {
       closeAllPopups();
     }
   });
-</script>
+  </script>
 {% endblock javascript %}
