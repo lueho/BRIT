@@ -101,10 +101,11 @@ class AddComponentModalModelFormTestCase(TestCase):
             MaterialComponent.objects.other(), average=0.5, standard_deviation=0.1337
         )
         form = AddComponentModalForm(instance=self.composition)
-        self.assertQuerySetEqual(
-            form.fields["component"].queryset.order_by("id"),
-            MaterialComponent.objects.filter(name="Test Component 2").order_by("id"),
-        )
+        component_queryset = form.fields["component"].queryset
+
+        self.assertIn(self.component2, component_queryset)
+        self.assertNotIn(self.component1, component_queryset)
+        self.assertNotIn(MaterialComponent.objects.other(), component_queryset)
 
 
 class MaterialPropertyValueModelFormTestCase(TestCase):

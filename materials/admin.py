@@ -116,14 +116,14 @@ class MaterialPropertyGroupAdmin(admin.ModelAdmin):
 @admin.register(MaterialPropertyValue)
 class MaterialPropertyValueAdmin(admin.ModelAdmin):
     list_display = (
-        "name",
+        "__str__",
         "property",
         "average",
         "standard_deviation",
         "owner",
         "publication_status",
     )
-    search_fields = ("name",)
+    search_fields = ("property__name",)
     list_filter = ("publication_status",)
     ordering = ("property__name",)
     autocomplete_fields = ("sources",)
