@@ -128,6 +128,10 @@ class MaterialsExplorerView(TemplateView):
         return context
 
 
+class MaterialsDiagramView(TemplateView):
+    template_name = "materials_diagram.html"
+
+
 # ----------- Material Category CRUD ----------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------------------------------------
 
@@ -180,6 +184,10 @@ class MaterialCategoryModalUpdateView(UserCreatedObjectModalUpdateView):
 
 
 class MaterialCategoryModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = MaterialCategory
+
+
+class MaterialCategoryAutocompleteView(UserCreatedObjectAutocompleteView):
     model = MaterialCategory
 
 
@@ -361,6 +369,10 @@ class MaterialComponentGroupModalDeleteView(UserCreatedObjectModalDeleteView):
     model = MaterialComponentGroup
 
 
+class MaterialComponentGroupAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = MaterialComponentGroup
+
+
 # ----------- Material Property CRUD -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -411,6 +423,10 @@ class MaterialPropertyModalUpdateView(UserCreatedObjectModalUpdateView):
 
 
 class MaterialPropertyModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = MaterialProperty
+
+
+class MaterialPropertyAutocompleteView(UserCreatedObjectAutocompleteView):
     model = MaterialProperty
 
 
@@ -467,6 +483,10 @@ class AnalyticalMethodUpdateView(UserCreatedObjectUpdateView):
 
 
 class AnalyticalMethodModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = AnalyticalMethod
+
+
+class AnalyticalMethodAutocompleteView(UserCreatedObjectAutocompleteView):
     model = AnalyticalMethod
 
 

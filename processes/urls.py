@@ -13,8 +13,12 @@ from .views import (
 app_name = "processes"
 urlpatterns = [
     path("dashboard/", ProcessDashboard.as_view(), name="dashboard"),
+    path("dashboard/", ProcessDashboard.as_view(), name="processes-dashboard"),
+    path("explorer/", ProcessTypeList.as_view(), name="processes-explorer"),
     path("types/", ProcessTypeList.as_view(), name="type_list"),
+    path("types/", ProcessTypeList.as_view(), name="processtype-list"),
     path("types/<int:pk>/", ProcessTypeDetail.as_view(), name="type_detail"),
+    path("types/<int:pk>/", ProcessTypeDetail.as_view(), name="processtype-detail"),
     path(
         "types/<int:pk>/overview/",
         ProcessOverview.as_view(),
