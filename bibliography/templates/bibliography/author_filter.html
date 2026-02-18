@@ -4,43 +4,44 @@
 {% load moderation_tags %}
 
 {% block title %}
-BRIT | Bibliography | Authors
+    BRIT | Bibliography | Authors
 {% endblock title %}
 
 {% block list_card_header %}
-<strong>Authors</strong>
+    <strong>Authors</strong>
 {% endblock list_card_header %}
 
 {% block list_table %}
-<div class="collection-list-min-height">
-    <div class="table-responsive">
-        <table class="table modern-table">
-            <thead>
-                <tr>
-                    <th>Author</th>
-                    {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for object in object_list %}
-                <tr>
-                    <td data-label="Author" class="ps-3">
-                        <a href="{% detail_or_review_url object %}" class="text-decoration-none">
-                            <strong class="d-block">{{ object }}</strong>
-                            {% if object.preferred_citation %}<span class="text-muted small">{{
-                                object.preferred_citation|truncatewords:15 }}</span>{% endif %}
-                        </a>
-                    </td>
-                    {% if object_list.model|is_user_created %}
-                    <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html"
-                        %}</td>
-                    {% endif %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="collection-list-min-height">
+        <div class="table-responsive">
+            <table class="table modern-table">
+                <thead>
+                    <tr>
+                        <th>Author</th>
+                        {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for object in object_list %}
+                        <tr>
+                            <td data-label="Author" class="ps-3">
+                                <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                                    <strong class="d-block">{{ object }}</strong>
+                                    {% if object.preferred_citation %}
+                                        <span class="text-muted small">{{
+                                        object.preferred_citation|truncatewords:15 }}</span>
+                                    {% endif %}
+                                </a>
+                            </td>
+                            {% if object_list.model|is_user_created %}
+                                <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
 {% endblock list_table %}
 
 {% block learning_tab_button %}
