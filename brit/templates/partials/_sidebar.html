@@ -46,7 +46,7 @@
         Sources
       </a>
       <a class="nav-link {% if '/processes/' in request.path %}active{% endif %}"
-         href="{% url 'processes:processtype-list' %}">
+         href="{% url 'processes:dashboard' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-flask"></i>
         </div>
@@ -65,21 +65,6 @@
           <i class="fas fa-book"></i>
         </div>
         Bibliography
-      </a>
-      <div class="sb-sidenav-menu-heading">Case Studies</div>
-      <a class="nav-link {% if '/waste_collection/' in request.path %}active{% endif %}"
-         href="{% url 'collection-list' %}">
-        <div class="sb-nav-link-icon">
-          <i class="fas fa-recycle"></i>
-        </div>
-        Waste Collection
-      </a>
-      <a class="nav-link {% if '/closecycle/' in request.path %}active{% endif %}"
-         href="{% url 'showcase-list' %}">
-        <div class="sb-nav-link-icon">
-          <i class="fas fa-sync-alt"></i>
-        </div>
-        CLOSECYCLE
       </a>
       <div class="sb-sidenav-menu-heading">Sites</div>
       <a class="nav-link {% if '/learning/' in request.path %}active{% endif %}"
