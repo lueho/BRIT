@@ -12,9 +12,6 @@
 {% endblock list_card_header %}
 
 {% block list_table %}
-    <p class="text-muted small mb-2">
-        Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
-    </p>
     <div class="collection-list-min-height">
         <div class="table-responsive">
             <table class="table modern-table">
@@ -30,7 +27,10 @@
                             <td data-label="Component" class="ps-3">
                                 <a href="{% detail_or_review_url object %}" class="text-decoration-none">
                                     <strong class="d-block">{{ object.name }}</strong>
-                                    <span class="text-muted small">{{ object.get_component_kind_display }}{% if object.abbreviation %} · {{ object.abbreviation }}{% endif %}{% if object.description %} · {{ object.description|truncatewords:12 }}{% endif %}</span>
+                                    <span class="text-muted small">{{ object.get_component_kind_display }}
+                                        {% if object.abbreviation %}· {{ object.abbreviation }}{% endif %}
+                                        {% if object.description %}· {{ object.description|truncatewords:12 }}{% endif %}
+                                    </span>
                                 </a>
                             </td>
                             {% if object_list.model|is_user_created %}
@@ -63,7 +63,9 @@
     <form method="get">
         {% crispy filter.form %}
         <div class="d-flex justify-content-end gap-2 mt-2">
-            <button id="btn-filter" class="btn btn-sm btn-primary submit-filter" type="submit">Filter</button>
+            <button id="btn-filter"
+                    class="btn btn-sm btn-primary submit-filter"
+                    type="submit">Filter</button>
             <a class="btn btn-sm btn-outline-secondary"
                href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}"
                aria-label="Reset filters">Reset</a>
