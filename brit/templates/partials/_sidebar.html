@@ -38,7 +38,7 @@
         </div>
         Materials
       </a>
-      <a class="nav-link {% if '/sources/' in request.path %}active{% endif %}"
+      <a class="nav-link {% if request.path|slice:":9" == '/sources/' %}active{% endif %}"
          href="{% url 'sources-list' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-expand-arrows-alt"></i>
@@ -60,7 +60,7 @@
         Inventories
       </a>
       <a class="nav-link {% if '/bibliography/' in request.path %}active{% endif %}"
-         href="{% url 'source-list' %}">
+         href="{% url 'bibliography-explorer' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-book"></i>
         </div>
