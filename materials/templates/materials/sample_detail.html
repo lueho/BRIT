@@ -123,6 +123,40 @@
   {% endwith %}
 {% endblock detail_body %}
 
+{% block detail_header_primary_actions %}
+  <div class="btn-group me-2" role="group">
+    {% with back_url=request.GET.back %}
+      {% if back_url %}
+        <a class="btn btn-sm btn-outline-secondary"
+           href="{{ back_url }}"
+           title="Back to results">
+          <i class="fas fa-arrow-left"></i>
+          <span class="d-none d-md-inline">Back to results</span>
+        </a>
+      {% endif %}
+    {% endwith %}
+    {% if object.list_url %}
+      <a class="btn btn-sm btn-outline-secondary"
+         href="{{ object.list_url }}"
+         title="List">
+        <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">List</span>
+      </a>
+    {% else %}
+      <a class="btn btn-sm btn-outline-secondary"
+         href="{% url 'sample-list' %}"
+         title="List">
+        <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">List</span>
+      </a>
+    {% endif %}
+    <a class="btn btn-sm btn-outline-secondary"
+       href="{% url 'materials-explorer' %}"
+       title="Open Explorer (dashboard)">
+      <i class="fas fa-table-cells-large"></i> <span class="d-none d-md-inline">Explorer</span>
+    </a>
+  </div>
+  {{ block.super }}
+{% endblock detail_header_primary_actions %}
+
 {% block options_primary_actions %}
   {% object_policy object as policy %}
   {% if policy.can_edit %}
@@ -144,22 +178,6 @@
     </a>
   {% endif %}
 {% endblock options_primary_actions %}
-
-{% block options_secondary_actions %}
-  <hr class="my-2">
-  <a class="btn btn-outline-secondary w-100 mb-2"
-     href="{% url 'sample-list' %}">
-    <i class="fas fa-list"></i> Public Samples
-  </a>
-  <a class="btn btn-outline-secondary w-100 mb-2"
-     href="{% url 'sample-list-owned' %}">
-    <i class="fas fa-list"></i> My Samples
-  </a>
-  <a class="btn btn-outline-secondary w-100 mb-2"
-     href="{% url 'materials-explorer' %}">
-    <i class="fas fa-table-cells-large"></i> Explorer
-  </a>
-{% endblock options_secondary_actions %}
 
 {% block options_export %}
   {% if component_measurements %}

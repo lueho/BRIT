@@ -3,93 +3,119 @@
 {% load moderation_tags %}
 
 {% block title %}
-BRIT | Sample Series: {{ object.name }}
+  BRIT | Sample Series: {{ object.name }}
 {% endblock title %}
 
 {% block detail_header %}
-{{ object.material.name }}: {{ object.name }}
+  {{ object.material.name }}: {{ object.name }}
 {% endblock detail_header %}
 
 {% block detail_top_image %}
-{% if object.image %}
-<div class="card-img-top">
-  <img class="w-100 m-0" src="{{ object.image.url }}" alt="Image of {{ object.material.name }}"
-    style="max-height: 300px; object-fit: cover;">
-</div>
-{% endif %}
+  {% if object.image %}
+    <div class="card-img-top">
+      <img class="w-100 m-0"
+           src="{{ object.image.url }}"
+           alt="Image of {{ object.material.name }}"
+           style="max-height: 300px;
+                  object-fit: cover">
+    </div>
+  {% endif %}
 {% endblock detail_top_image %}
 
 {% block detail_body %}
-{% if object.name %}
-<p class="card-text">
-  <strong>Series name:</strong><br>
-  {{ object.name }}
-</p>
-{% endif %}
-<p class="card-text">
-  <strong>Material:</strong><br>
-  <a href="{% url 'material-detail-modal' object.material.pk %}" class="modal-link">{{ object.material.name }}</a>
-</p>
-{% if object.material.description %}
-<p class="card-text">
-  <strong>Description:</strong><br>
-  {{ object.material.description }}
-</p>
-{% endif %}
+  {% if object.name %}
+    <p class="card-text">
+      <strong>Series name:</strong>
+      <br>
+      {{ object.name }}
+    </p>
+  {% endif %}
+  <p class="card-text">
+    <strong>Material:</strong>
+    <br>
+    <a href="{% url 'material-detail-modal' object.material.pk %}"
+       class="modal-link">{{ object.material.name }}</a>
+  </p>
+  {% if object.material.description %}
+    <p class="card-text">
+      <strong>Description:</strong>
+      <br>
+      {{ object.material.description }}
+    </p>
+  {% endif %}
 {% endblock detail_body %}
 
+{% block detail_header_primary_actions %}
+  <div class="btn-group me-2" role="group">
+    <a class="btn btn-sm btn-outline-secondary"
+       href="{% url 'sampleseries-list' %}"
+       title="Public Series">
+      <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">Public Series</span>
+    </a>
+    <a class="btn btn-sm btn-outline-secondary"
+       href="{% url 'sampleseries-list-owned' %}"
+       title="My Series">
+      <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">My Series</span>
+    </a>
+    <a class="btn btn-sm btn-outline-secondary"
+       href="{% url 'materials-explorer' %}"
+       title="Explorer">
+      <i class="fas fa-table-cells-large"></i> <span class="d-none d-md-inline">Explorer</span>
+    </a>
+  </div>
+  {{ block.super }}
+{% endblock detail_header_primary_actions %}
+
 {% block options_primary_actions %}
-{% object_policy object as policy %}
-{% if policy.can_edit %}
-<a class="btn btn-outline-primary w-100 mb-2"
-  href="{% url 'sampleseries-update' object.pk %}?next={{ request.get_full_path|urlencode }}">
-  <i class="fas fa-pen-to-square"></i> Edit
-</a>
-{% endif %}
-{% if policy.can_duplicate %}
-<a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'sampleseries-duplicate' object.pk %}">
-  <i class="fas fa-copy"></i> Duplicate
-</a>
-{% endif %}
-{% if policy.can_delete %}
-<a class="btn btn-outline-danger w-100 mb-2 modal-link"
-  href="{% url 'sampleseries-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">
-  <i class="fas fa-trash"></i> Delete
-</a>
-{% endif %}
+  {% object_policy object as policy %}
+  {% if policy.can_edit %}
+    <a class="btn btn-outline-primary w-100 mb-2"
+       href="{% url 'sampleseries-update' object.pk %}?next={{ request.get_full_path|urlencode }}">
+      <i class="fas fa-pen-to-square"></i> Edit
+    </a>
+  {% endif %}
+  {% if policy.can_duplicate %}
+    <a class="btn btn-outline-secondary w-100 mb-2"
+       href="{% url 'sampleseries-duplicate' object.pk %}">
+      <i class="fas fa-copy"></i> Duplicate
+    </a>
+  {% endif %}
+  {% if policy.can_delete %}
+    <a class="btn btn-outline-danger w-100 mb-2 modal-link"
+       href="{% url 'sampleseries-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">
+      <i class="fas fa-trash"></i> Delete
+    </a>
+  {% endif %}
 {% endblock options_primary_actions %}
 
 {% block options_secondary_actions %}
-{% object_policy object as policy %}
-<hr class="my-2">
-{% if policy.can_manage_samples %}
-<a class="btn btn-outline-secondary w-100 mb-2 modal-link"
-  href="{% url 'sampleseries-add-distribution-modal' object.pk %}">
-  <i class="fas fa-circle-plus"></i> Add distribution
-</a>
-{% endif %}
-<a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'materials-explorer' %}">
-  <i class="fas fa-table-cells-large"></i> Explorer
-</a>
+  {% object_policy object as policy %}
+  {% if policy.can_manage_samples %}
+    <hr class="my-2">
+    <a class="btn btn-outline-secondary w-100 mb-2 modal-link"
+       href="{% url 'sampleseries-add-distribution-modal' object.pk %}">
+      <i class="fas fa-circle-plus"></i> Add distribution
+    </a>
+  {% endif %}
 {% endblock options_secondary_actions %}
 
 {% block second_row %}
-{% for distribution in data.distributions %}
-<div class="col col-12 col-md-6 col-lg-4">
-  <div class="card shadow h-100">
-    <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-      <h5 class="mb-0">{{ distribution.name }}</h5>
+  {% for distribution in data.distributions %}
+    <div class="col col-12 col-md-6 col-lg-4">
+      <div class="card shadow h-100">
+        <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+          <h5 class="mb-0">{{ distribution.name }}</h5>
+        </div>
+        <div class="card-body">
+          {% if distribution.description %}<p class="card-text">{{ distribution.description }}</p>{% endif %}
+          <p class="card-text">
+            <strong>Timesteps:</strong>
+          </p>
+          {% for sample in distribution.samples %}
+            <a href="{% url 'sample-detail' sample.id %}">{{ sample.timestep }}</a>
+          {% endfor %}
+        </div>
+      </div>
     </div>
-    <div class="card-body">
-      {% if distribution.description %}
-      <p class="card-text">{{ distribution.description }}</p>
-      {% endif %}
-      <p class="card-text"><strong>Timesteps:</strong></p>
-      {% for sample in distribution.samples %}
-      <a href="{% url 'sample-detail' sample.id %}">{{ sample.timestep }}</a>
-      {% endfor %}
-    </div>
-  </div>
-</div>
-{% endfor %}
+  {% endfor %}
 {% endblock second_row %}

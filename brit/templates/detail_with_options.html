@@ -2,219 +2,240 @@
 {% load i18n %}
 {% load moderation_tags %}
 {% block title %}
-BRIT | {{ object.name }} details
+  BRIT | {{ object.name }} details
 {% endblock title %}
 {% block content %}
-{# Obsolete rejection card removed: owners of declined items are redirected to the review feedback view #}
-<div class="row my-4">
-  <div class="col-lg-8">
-    <div class="card shadow">
-      <div class="card-header d-flex justify-content-between align-items-center bg-body-tertiary border-bottom-0 py-3">
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-          <h5 class="mb-0">
-            {% block detail_header %}
-            {{ object.verbose_name|capfirst }} {% trans "details" %}
-            {% endblock detail_header %}
-          </h5>
+  {# Obsolete rejection card removed: owners of declined items are redirected to the review feedback view #}
+  <div class="row my-4">
+    <div class="col-lg-8">
+      <div class="card shadow">
+        <div class="card-header d-flex justify-content-between align-items-center bg-body-tertiary border-bottom-0 py-3 gap-2 flex-wrap">
+          <div class="d-flex align-items-center gap-2 flex-shrink-1 overflow-hidden">
+            <h5 class="mb-0 text-truncate">
+              {% block detail_header %}
+                {{ object.verbose_name|capfirst }} {% trans "details" %}
+              {% endblock detail_header %}
+            </h5>
+          </div>
+          <div class="d-flex align-items-center gap-2 flex-wrap flex-shrink-0">
+            {% block detail_header_badge %}
+              {% include "object_management/review_status_badge.html" with object=object %}
+            {% endblock detail_header_badge %}
+            {% block detail_header_actions %}
+              {% block detail_header_primary_actions %}
+                {% object_policy object as policy %}
+                {% block detail_header_review_actions %}
+                  {% if policy.can_view_review_feedback %}
+                    <a class="btn btn-sm btn-outline-danger"
+                       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}"
+                       title="Review feedback">
+                      <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review feedback</span>
+                    </a>
+                  {% elif policy.is_in_review %}
+                    {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
+                      <a class="btn btn-sm btn-outline-secondary"
+                         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}"
+                         title="Review view">
+                        <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
+                      </a>
+                    {% endif %}
+                  {% elif policy.is_declined and policy.is_staff %}
+                    <a class="btn btn-sm btn-outline-secondary"
+                       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}"
+                       title="Review view">
+                      <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
+                    </a>
+                  {% elif policy.is_declined and policy.is_moderator %}
+                    <a class="btn btn-sm btn-outline-secondary"
+                       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}"
+                       title="Review view">
+                      <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
+                    </a>
+                  {% endif %}
+                {% endblock detail_header_review_actions %}
+              {% endblock detail_header_primary_actions %}
+            {% endblock detail_header_actions %}
+          </div>
         </div>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-          {% block detail_header_badge %}
-          {% include "object_management/review_status_badge.html" with object=object %}
-          {% endblock detail_header_badge %}
-          {% block detail_header_actions %}
-          {% block detail_header_primary_actions %}
-          {% object_policy object as policy %}
-          {% block detail_header_review_actions %}
-          {% if policy.can_view_review_feedback %}
-          <a class="btn btn-sm btn-outline-danger"
-            href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}"
-            title="Review feedback">
-            <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review feedback</span>
-          </a>
-          {% elif policy.is_in_review %}
-          {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
-          <a class="btn btn-sm btn-outline-secondary"
-            href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}"
-            title="Review view">
-            <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
-          </a>
+        {% block detail_top_image %}
+        {% endblock detail_top_image %}
+        <div class="card-body">
+          {% if show_review_panel %}
+            {% include "object_management/review_panel.html" with object=object %}
           {% endif %}
-          {% elif policy.is_declined and policy.is_staff %}
-          <a class="btn btn-sm btn-outline-secondary"
-            href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}"
-            title="Review view">
-            <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
-          </a>
-          {% elif policy.is_declined and policy.is_moderator %}
-          <a class="btn btn-sm btn-outline-secondary"
-            href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}"
-            title="Review view">
-            <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
-          </a>
-          {% endif %}
-          {% endblock detail_header_review_actions %}
-          {% endblock detail_header_primary_actions %}
-          {% endblock detail_header_actions %}
+          {% block detail_body %}
+            <p class="card-text">
+              <strong>{% trans "Name" %}:</strong>
+              <br>
+              {{ object.name }}
+            </p>
+            {% if object.owner %}
+              <p class="card-text">
+                <strong>{% trans "Owner" %}:</strong>
+                <br>
+                {{ object.owner.username|default:object.owner }}
+              </p>
+            {% endif %}
+            {% if object.description %}
+              <p class="card-text">
+                <strong>{% trans "Description" %}:</strong>
+                <br>
+                {{ object.description }}
+              </p>
+            {% endif %}
+          {% endblock detail_body %}
         </div>
-      </div>
-      {% block detail_top_image %}
-      {% endblock detail_top_image %}
-      <div class="card-body">
-        {% if show_review_panel %}
-        {% include "object_management/review_panel.html" with object=object %}
-        {% endif %}
-        {% block detail_body %}
-        <p class="card-text">
-          <strong>{% trans "Name" %}:</strong>
-          <br>
-          {{ object.name }}
-        </p>
-        {% if object.owner %}
-        <p class="card-text">
-          <strong>{% trans "Owner" %}:</strong>
-          <br>
-          {{ object.owner.username|default:object.owner }}
-        </p>
-        {% endif %}
-        {% if object.description %}
-        <p class="card-text">
-          <strong>{% trans "Description" %}:</strong>
-          <br>
-          {{ object.description }}
-        </p>
-        {% endif %}
-        {% endblock detail_body %}
-      </div>
-      <div class="card-footer d-flex">
-        {% block detail_card_footer %}
-        {% block detail_footer_left %}
-        {% endblock detail_footer_left %}
-        {% block detail_footer_right %}
-        {% endblock detail_footer_right %}
-        {% endblock detail_card_footer %}
+        <div class="card-footer d-flex">
+          {% block detail_card_footer %}
+            {% block detail_footer_left %}
+            {% endblock detail_footer_left %}
+            {% block detail_footer_right %}
+            {% endblock detail_footer_right %}
+          {% endblock detail_card_footer %}
+        </div>
       </div>
     </div>
-  </div>
-  <div class="col-lg-4">
-    <div class="card shadow filter-sticky">
-      <div class="card-header p-0 border-0 bg-body-tertiary">
-        <ul class="nav nav-pills sidebar-tabs px-3 pt-3 pb-2" id="detailSidebarTabs" role="tablist">
-          <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="options-tab" data-bs-toggle="tab" data-bs-target="#options-pane"
-              type="button" role="tab" aria-controls="options-pane" aria-selected="true">
-              <i class="fas fa-gear"></i>
-              {% block options_tab_title %}
-              {% trans "Options" %}
-              {% endblock options_tab_title %}
-            </button>
-          </li>
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" id="learning-tab" data-bs-toggle="tab" data-bs-target="#learning-pane"
-              type="button" role="tab" aria-controls="learning-pane" aria-selected="false">
-              <i class="fas fa-graduation-cap"></i>
-              {% block learning_tab_title %}
-              {% trans "Learning" %}
-              {% endblock learning_tab_title %}
-            </button>
-          </li>
-          {% block extra_tabs %}
-          {% endblock extra_tabs %}
-        </ul>
-      </div>
-      <div class="card-body">
-        <div class="tab-content">
-          <div class="tab-pane fade show active" id="options-pane" role="tabpanel" aria-labelledby="options-tab"
-            tabindex="0">
-            {% block options_pane %}
-            {% object_policy object as policy %}
-            {% block options_primary_actions %}
-            {# Generic Edit button: staff always; owners if not published; never when archived #}
-            {% if policy.can_edit %}
-            {% if object.update_url %}
-            <a class="btn btn-outline-primary w-100 mb-2"
-              href="{{ object.update_url }}?next={{ request.get_full_path|urlencode }}">
-              <i class="fas fa-pen-to-square"></i> {% trans "Edit" %}
-            </a>
-            {% endif %}
-            {% endif %}
-
-            {% comment %}Generic Delete button: published → staff only; private/review/declined → owner or staff;
-            archived → staff{% endcomment %}
-            {% if policy.can_delete %}
-            {% if object.delete_url %}
-            <a class="btn btn-outline-danger w-100 mb-2"
-              href="{{ object.delete_url }}?next={{ request.get_full_path|urlencode }}">
-              <i class="fas fa-trash"></i> {% trans "Delete" %}
-            </a>
-            {% else %}
-            {% if object.modal_delete_url %}
-            <a class="btn btn-outline-danger w-100 mb-2 modal-link"
-              href="{{ object.modal_delete_url }}?next={{ request.get_full_path|urlencode }}">
-              <i class="fas fa-trash"></i> {% trans "Delete" %}
-            </a>
-            {% endif %}
-            {% endif %}
-            {% endif %}
-
-            {% endblock options_primary_actions %}
-            {% block options_secondary_actions %}
-            {% endblock options_secondary_actions %}
-            {% block options_review_actions %}
-            {# Owner: show Submit for Review when the object is private #}
-            {% if policy.is_private and policy.can_submit_review %}
-            <form method="post"
-              action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}"
-              class="mb-2">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-primary w-100">
-                <i class="fas fa-paper-plane"></i> Submit for Review
+    <div class="col-lg-4">
+      <div class="card shadow filter-sticky">
+        <div class="card-header p-0 border-0 bg-body-tertiary">
+          <ul class="nav nav-pills sidebar-tabs px-3 pt-3 pb-2"
+              id="detailSidebarTabs"
+              role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active"
+                      id="options-tab"
+                      data-bs-toggle="tab"
+                      data-bs-target="#options-pane"
+                      type="button"
+                      role="tab"
+                      aria-controls="options-pane"
+                      aria-selected="true">
+                <i class="fas fa-gear"></i>
+                {% block options_tab_title %}
+                  {% trans "Options" %}
+                {% endblock options_tab_title %}
               </button>
-            </form>
-            {% endif %}
-            {# Link to open the Review view when item is in review #}
-            {% if policy.is_in_review and not review_mode %}
-            {% if policy.is_owner %}
-            <a class="btn btn-outline-secondary w-100 mb-2"
-              href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
-              <i class="fas fa-clipboard-check"></i> Review view
-            </a>
-            {% else %}
-            {% if policy.is_staff or policy.is_moderator %}
-            <a class="btn btn-outline-secondary w-100 mb-2"
-              href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
-              <i class="fas fa-clipboard-check"></i> Review view
-            </a>
-            {% endif %}
-            {% endif %}
-            {% endif %}
-            {% endblock options_review_actions %}
-            {% block options_export %}
-            {% endblock options_export %}
-            {% block options_custom_panels %}
-            {% endblock options_custom_panels %}
-            {% endblock options_pane %}
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link"
+                      id="learning-tab"
+                      data-bs-toggle="tab"
+                      data-bs-target="#learning-pane"
+                      type="button"
+                      role="tab"
+                      aria-controls="learning-pane"
+                      aria-selected="false">
+                <i class="fas fa-graduation-cap"></i>
+                {% block learning_tab_title %}
+                  {% trans "Learning" %}
+                {% endblock learning_tab_title %}
+              </button>
+            </li>
+            {% block extra_tabs %}
+            {% endblock extra_tabs %}
+          </ul>
+        </div>
+        <div class="card-body">
+          <div class="tab-content">
+            <div class="tab-pane fade show active"
+                 id="options-pane"
+                 role="tabpanel"
+                 aria-labelledby="options-tab"
+                 tabindex="0">
+              {% block options_pane %}
+                {% object_policy object as policy %}
+                {% block options_primary_actions %}
+                  {# Generic Edit button: staff always; owners if not published; never when archived #}
+                  {% if policy.can_edit %}
+                    {% if object.update_url %}
+                      <a class="btn btn-outline-primary w-100 mb-2"
+                         href="{{ object.update_url }}?next={{ request.get_full_path|urlencode }}">
+                        <i class="fas fa-pen-to-square"></i> {% trans "Edit" %}
+                      </a>
+                    {% endif %}
+                  {% endif %}
+
+                  {% comment %}Generic Delete button: published → staff only; private/review/declined → owner or staff;
+                  archived → staff{% endcomment %}
+                  {% if policy.can_delete %}
+                    {% if object.delete_url %}
+                      <a class="btn btn-outline-danger w-100 mb-2"
+                         href="{{ object.delete_url }}?next={{ request.get_full_path|urlencode }}">
+                        <i class="fas fa-trash"></i> {% trans "Delete" %}
+                      </a>
+                    {% else %}
+                      {% if object.modal_delete_url %}
+                        <a class="btn btn-outline-danger w-100 mb-2 modal-link"
+                           href="{{ object.modal_delete_url }}?next={{ request.get_full_path|urlencode }}">
+                          <i class="fas fa-trash"></i> {% trans "Delete" %}
+                        </a>
+                      {% endif %}
+                    {% endif %}
+                  {% endif %}
+
+                {% endblock options_primary_actions %}
+                {% block options_secondary_actions %}
+                {% endblock options_secondary_actions %}
+                {% block options_review_actions %}
+                  {# Owner: show Submit for Review when the object is private #}
+                  {% if policy.is_private and policy.can_submit_review %}
+                    <form method="post"
+                          action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}"
+                          class="mb-2">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-paper-plane"></i> Submit for Review
+                      </button>
+                    </form>
+                  {% endif %}
+                  {# Link to open the Review view when item is in review #}
+                  {% if policy.is_in_review and not review_mode %}
+                    {% if policy.is_owner %}
+                      <a class="btn btn-outline-secondary w-100 mb-2"
+                         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+                        <i class="fas fa-clipboard-check"></i> Review view
+                      </a>
+                    {% else %}
+                      {% if policy.is_staff or policy.is_moderator %}
+                        <a class="btn btn-outline-secondary w-100 mb-2"
+                           href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+                          <i class="fas fa-clipboard-check"></i> Review view
+                        </a>
+                      {% endif %}
+                    {% endif %}
+                  {% endif %}
+                {% endblock options_review_actions %}
+                {% block options_export %}
+                {% endblock options_export %}
+                {% block options_custom_panels %}
+                {% endblock options_custom_panels %}
+              {% endblock options_pane %}
+            </div>
+            <div class="tab-pane fade"
+                 id="learning-pane"
+                 role="tabpanel"
+                 aria-labelledby="learning-tab"
+                 tabindex="0">
+              {% block learning_content %}
+              {% endblock learning_content %}
+            </div>
+            {% block extra_tab_panes %}
+            {% endblock extra_tab_panes %}
           </div>
-          <div class="tab-pane fade" id="learning-pane" role="tabpanel" aria-labelledby="learning-tab" tabindex="0">
-            {% block learning_content %}
-            {% endblock learning_content %}
-          </div>
-          {% block extra_tab_panes %}
-          {% endblock extra_tab_panes %}
         </div>
       </div>
     </div>
   </div>
-</div>
-<div class="row mb-4">
-  {% block second_row %}
-  {% endblock second_row %}
-</div>
+  <div class="row mb-4">
+    {% block second_row %}
+    {% endblock second_row %}
+  </div>
 {% endblock content %}
 {% block javascript %}
-{{ block.super }}
-{% block detail_with_options_scripts %}
-{% endblock detail_with_options_scripts %}
-<script type="text/javascript">
+  {{ block.super }}
+  {% block detail_with_options_scripts %}
+  {% endblock detail_with_options_scripts %}
+  <script type="text/javascript">
   // Hide the Learning tab and pane if the pane has no visible content
   (function () {
     const pane = document.getElementById('learning-pane');
@@ -239,5 +260,5 @@ BRIT | {{ object.name }} details
       }
     }
   })();
-</script>
+  </script>
 {% endblock javascript %}
