@@ -34,6 +34,7 @@ from .views import (
     SourceModalDetailView,
     SourcePrivateFilterView,
     SourcePublishedFilterView,
+    SourceQuickCreateView,
     SourceUpdateView,
 )
 
@@ -162,6 +163,11 @@ urlpatterns = [
         "sources/autocomplete/",
         SourceAutocompleteView.as_view(),
         name="source-autocomplete",
+    ),
+    path(
+        "sources/quick-create/",
+        SourceQuickCreateView.as_view(),
+        name="source-quick-create",
     ),
     path("api/", include(router.urls)),
 ]

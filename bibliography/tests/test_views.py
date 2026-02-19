@@ -1,3 +1,5 @@
+import json
+
 from django.contrib.auth.models import Permission
 from django.db.models.signals import post_save
 from django.urls import reverse
@@ -402,3 +404,50 @@ class SourceListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
         request_url = f"{reverse('source-list-check-urls')}?url_valid=False&page=1"
         response = self.client.get(request_url)
         self.assertEqual(200, response.status_code)
+
+
+class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ["add_source"]
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        response = self.client.post(
+            reverse("source-quick-create"),
+            data=json.dumps({"title": "Inline source"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_authenticated_without_permission(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(
+            reverse("source-quick-create"),
+            data=json.dumps({"title": "Inline source"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_400_bad_request_when_title_is_blank(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("source-quick-create"),
+            data=json.dumps({"title": "   "}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_post_http_201_creates_source_for_member(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("source-quick-create"),
+            data=json.dumps({"title": "Inline source"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        source = Source.objects.get(pk=payload["id"])
+
+        self.assertEqual(source.title, "Inline source")
+        self.assertEqual(source.owner, self.member)
+        self.assertEqual(source.type, "custom")
+        self.assertEqual(payload["title"], "Inline source")

@@ -3,7 +3,7 @@ import json
 from celery.result import AsyncResult
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import TemplateView
@@ -251,6 +251,42 @@ class SourceModalDeleteView(UserCreatedObjectModalDeleteView):
 
 # ----------- Source utils ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
+
+
+class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    """Create a minimal Source object for inline source selectors.
+
+    This endpoint is used by SourceListWidget to create a new bibliography source
+    directly from form contexts (for example waste collection creation) without
+    navigating away to the bibliography module.
+    """
+
+    permission_required = "bibliography.add_source"
+
+    def post(self, request, *args, **kwargs):
+        """Create a Source from a JSON payload and return option data as JSON."""
+        try:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            payload = {}
+
+        title = str(payload.get("title", "")).strip()
+        if not title:
+            return JsonResponse(
+                {"error": "A non-empty title is required to create a source."},
+                status=400,
+            )
+
+        source = Source.objects.create(owner=request.user, title=title, type="custom")
+        return JsonResponse(
+            {
+                "id": source.pk,
+                "title": source.title,
+                "text": source.title,
+                "label": source.title,
+            },
+            status=201,
+        )
 
 
 class SourceCheckUrlView(LoginRequiredMixin, View):

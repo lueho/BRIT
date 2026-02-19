@@ -277,4 +277,4 @@ class SourceListWidget(SelectMultiple):
 
     class Media:
         css = {"all": ("utils/css/source_list_widget.min.css",)}
-        js = ("utils/js/source_list_widget.min.js",)
+        js = ("utils/js/source_list_widget.js",)
