@@ -2,125 +2,140 @@
 {% load moderation_tags %}
 
 {% block detail_header_badge %}
-{% include "object_management/review_status_badge.html" with object=object %}
+    {% include "object_management/review_status_badge.html" with object=object %}
 {% endblock detail_header_badge %}
 
 {% block detail_header_actions %}
-<div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
-    <div class="btn-group me-2" role="group">
-        <a class="btn btn-sm btn-outline-secondary" href="{{ object.collection.get_absolute_url }}" title="Collection">
-            <i class="fas fa-arrow-left"></i>
-            <span class="d-none d-md-inline">Collection</span>
-        </a>
-        {% if object.list_url %}
-        <a class="btn btn-sm btn-outline-secondary" href="{{ object.list_url }}" title="List">
-            <i class="fas fa-list-ul"></i>
-            <span class="d-none d-md-inline">List</span>
-        </a>
-        {% endif %}
+    <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
+        <div class="btn-group me-2" role="group">
+            {% with back_url=request.GET.back %}
+                {% if back_url %}
+                    <a class="btn btn-sm btn-outline-secondary"
+                       href="{{ back_url }}"
+                       title="Back to results">
+                        <i class="fas fa-arrow-left"></i>
+                        <span class="d-none d-md-inline">Back to results</span>
+                    </a>
+                {% endif %}
+            {% endwith %}
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{{ object.collection.get_absolute_url }}"
+               title="Collection">
+                <i class="fas fa-arrow-left"></i>
+                <span class="d-none d-md-inline">Collection</span>
+            </a>
+            {% if object.list_url %}
+                <a class="btn btn-sm btn-outline-secondary"
+                   href="{{ object.list_url }}"
+                   title="List">
+                    <i class="fas fa-list-ul"></i>
+                    <span class="d-none d-md-inline">List</span>
+                </a>
+            {% endif %}
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{% url 'wastecollection-explorer' %}"
+               title="Open Explorer (dashboard)">
+                <i class="fas fa-table-cells-large"></i>
+                <span class="d-none d-md-inline">Explorer</span>
+            </a>
+        </div>
+        {{ block.super }}
     </div>
-    {{ block.super }}
-</div>
 {% endblock detail_header_actions %}
 
 {% block detail_body %}
-<p class="card-text">
-    <strong>Collection:</strong>
-    <br>
-    <a href="{{ object.collection.get_absolute_url }}">{{ object.collection }}</a>
-</p>
-{% with anchor=object.collection.version_anchor %}
-{% if anchor and anchor.pk != object.collection.pk %}
-<p class="card-text">
-    <strong>Anchor collection:</strong>
-    <br>
-    <a href="{{ anchor.get_absolute_url }}">{{ anchor }}</a>
-</p>
-{% endif %}
-{% endwith %}
-<p class="card-text">
-    <strong>Property:</strong>
-    <br>
-    {{ object.property }}
-</p>
-<p class="card-text">
-    <strong>Year:</strong>
-    <br>
-    {{ object.year }}
-</p>
-{% if object.standard_deviation %}
-<p class="card-text">
-    <strong>Value:</strong>
-    <br>
-    {{ object.average }}
-    ± {{ object.standard_deviation }} {{ object.unit }}
-</p>
-{% else %}
-<p class="card-text">
-    <strong>Value:</strong>
-    <br>
-    {{ object.average }} {{ object.unit }}
-</p>
-{% endif %}
-{% if object.sources.exists %}
-<p class="card-text">
-    <strong>Sources:</strong>
-</p>
-<ul>
-    {% for source in object.sources.all %}
-    <li>
-        {% if source.type == "waste_flyer" %}
-        {# Waste flyer: Display as clickable URL with document icon #}
-        <i class="fas fa-file-alt text-muted"></i>
-        <span class="badge bg-secondary text-white me-2">Waste Flyer</span>
-        <a href="{{ source.url }}" target="_blank" rel="noopener noreferrer" class="text-break">
-            {{ source.url }}
-            <i class="fas fa-external-link-alt ms-1 small"></i>
-        </a>
-        {% else %}
-        {# Regular bibliographic source #}
-        <a href="{{ source.get_absolute_url }}">{{ source.abbreviation }}</a>
-        {% if source.title %}- {{ source.title }}{% endif %}
-        {% if source.year %}({{ source.year }}){% endif %}
-        {% if source.url %}
+    <p class="card-text">
+        <strong>Collection:</strong>
         <br>
-        <span class="text-muted small">
-            <a href="{{ source.url }}" target="_blank" rel="noopener noreferrer">
-                <i class="fas fa-external-link-alt"></i> {{ source.url }}
-            </a>
-        </span>
+        <a href="{{ object.collection.get_absolute_url }}">{{ object.collection }}</a>
+    </p>
+    {% with anchor=object.collection.version_anchor %}
+        {% if anchor and anchor.pk != object.collection.pk %}
+            <p class="card-text">
+                <strong>Anchor collection:</strong>
+                <br>
+                <a href="{{ anchor.get_absolute_url }}">{{ anchor }}</a>
+            </p>
         {% endif %}
-        {% endif %}
-    </li>
-    {% endfor %}
-</ul>
-{% endif %}
-
-<p class="card-text">
-    <strong>Owner:</strong>
-    <br>
-    {{ object.owner }}
-</p>
-{% if object.publication_status != 'published' %}
-<p class="card-text text-muted small">
-    {% if object.publication_status == 'private' %}
-    Visible only to you (owner) and moderators until submitted.
-    {% elif object.publication_status == 'review' %}
-    Awaiting moderator review.
-    {% elif object.publication_status == 'declined' %}
-    Changes were declined; update and resubmit after addressing feedback.
+    {% endwith %}
+    <p class="card-text">
+        <strong>Property:</strong>
+        <br>
+        {{ object.property }}
+    </p>
+    <p class="card-text">
+        <strong>Year:</strong>
+        <br>
+        {{ object.year }}
+    </p>
+    {% if object.standard_deviation %}
+        <p class="card-text">
+            <strong>Value:</strong>
+            <br>
+            {{ object.average }}
+            ± {{ object.standard_deviation }} {{ object.unit }}
+        </p>
+    {% else %}
+        <p class="card-text">
+            <strong>Value:</strong>
+            <br>
+            {{ object.average }} {{ object.unit }}
+        </p>
     {% endif %}
-</p>
-{% endif %}
+    {% if object.sources.exists %}
+        <p class="card-text">
+            <strong>Sources:</strong>
+        </p>
+        <ul>
+            {% for source in object.sources.all %}
+                <li>
+                    {% if source.type == "waste_flyer" %}
+                        {# Waste flyer: Display as clickable URL with document icon #}
+                        <i class="fas fa-file-alt text-muted"></i>
+                        <span class="badge bg-secondary text-white me-2">Waste Flyer</span>
+                        <a href="{{ source.url }}"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="text-break">
+                            {{ source.url }}
+                            <i class="fas fa-external-link-alt ms-1 small"></i>
+                        </a>
+                    {% else %}
+                        {# Regular bibliographic source #}
+                        <a href="{{ source.get_absolute_url }}">{{ source.abbreviation }}</a>
+                        {% if source.title %}- {{ source.title }}{% endif %}
+                        {% if source.year %}({{ source.year }}){% endif %}
+                        {% if source.url %}
+                            <br>
+                            <span class="text-muted small">
+                                <a href="{{ source.url }}" target="_blank" rel="noopener noreferrer">
+                                    <i class="fas fa-external-link-alt"></i> {{ source.url }}
+                                </a>
+                            </span>
+                        {% endif %}
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <p class="card-text">
+        <strong>Owner:</strong>
+        <br>
+        {{ object.owner }}
+    </p>
+    {% if object.publication_status != 'published' %}
+        <p class="card-text text-muted small">
+            {% if object.publication_status == 'private' %}
+                Visible only to you (owner) and moderators until submitted.
+            {% elif object.publication_status == 'review' %}
+                Awaiting moderator review.
+            {% elif object.publication_status == 'declined' %}
+                Changes were declined; update and resubmit after addressing feedback.
+            {% endif %}
+        </p>
+    {% endif %}
 {% endblock detail_body %}
 
 {% block detail_card_footer %}
-<a href="{{ object.collection.get_absolute_url }}" onclick="history.back(); return false;" class="nowrap">
-    <i class="fas fa-fw fa-arrow-left"></i> back
-</a>
-{% if object.list_url %}
-<a href="{{ object.list_url }}" class="ms-3">
-    <i class="fas fa-fw fa-list"></i> See all
-</a>
-{% endif %}
 {% endblock detail_card_footer %}

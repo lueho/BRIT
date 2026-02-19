@@ -16,8 +16,8 @@
       <img class="w-100 m-0"
            src="{{ object.image.url }}"
            alt="Image of {{ object.material.name }}"
-           style="max-height: 300px;
-                  object-fit: cover">
+           width="1200"
+           height="300">
     </div>
   {% endif %}
 {% endblock detail_top_image %}
@@ -47,19 +47,32 @@
 
 {% block detail_header_primary_actions %}
   <div class="btn-group me-2" role="group">
-    <a class="btn btn-sm btn-outline-secondary"
-       href="{% url 'sampleseries-list' %}"
-       title="Public Series">
-      <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">Public Series</span>
-    </a>
-    <a class="btn btn-sm btn-outline-secondary"
-       href="{% url 'sampleseries-list-owned' %}"
-       title="My Series">
-      <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">My Series</span>
-    </a>
+    {% with back_url=request.GET.back %}
+      {% if back_url %}
+        <a class="btn btn-sm btn-outline-secondary"
+           href="{{ back_url }}"
+           title="Back to results">
+          <i class="fas fa-arrow-left"></i>
+          <span class="d-none d-md-inline">Back to results</span>
+        </a>
+      {% endif %}
+    {% endwith %}
+    {% if object.list_url %}
+      <a class="btn btn-sm btn-outline-secondary"
+         href="{{ object.list_url }}"
+         title="List">
+        <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">List</span>
+      </a>
+    {% else %}
+      <a class="btn btn-sm btn-outline-secondary"
+         href="{% url 'sampleseries-list' %}"
+         title="List">
+        <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">List</span>
+      </a>
+    {% endif %}
     <a class="btn btn-sm btn-outline-secondary"
        href="{% url 'materials-explorer' %}"
-       title="Explorer">
+       title="Open Explorer (dashboard)">
       <i class="fas fa-table-cells-large"></i> <span class="d-none d-md-inline">Explorer</span>
     </a>
   </div>

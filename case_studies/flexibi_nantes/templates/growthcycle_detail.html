@@ -1,11 +1,30 @@
 {% extends "detail_with_options.html" %}
 
 {% block detail_body %}
-{% include "growthcycle_table.html" %}
+    {% include "growthcycle_table.html" %}
 {% endblock detail_body %}
 
+{% block detail_header_primary_actions %}
+    <div class="btn-group me-2" role="group">
+        {% with back_url=request.GET.back %}
+            {% if back_url %}
+                <a class="btn btn-sm btn-outline-secondary"
+                   href="{{ back_url }}"
+                   title="Back to results">
+                    <i class="fas fa-arrow-left"></i>
+                    <span class="d-none d-md-inline">Back to results</span>
+                </a>
+            {% endif %}
+        {% endwith %}
+        <a class="btn btn-sm btn-outline-secondary"
+           href="{% url 'greenhouse-detail' object.greenhouse.pk %}"
+           title="Greenhouse">
+            <i class="fas fa-arrow-left"></i>
+            <span class="d-none d-md-inline">Greenhouse</span>
+        </a>
+    </div>
+    {{ block.super }}
+{% endblock detail_header_primary_actions %}
+
 {% block detail_card_footer %}
-<a href="{% url 'greenhouse-detail' object.greenhouse.pk %}" class="nowrap">
-    <i class="fas fa-fw fa-arrow-left"></i> back to greenhouse
-</a>
 {% endblock detail_card_footer %}

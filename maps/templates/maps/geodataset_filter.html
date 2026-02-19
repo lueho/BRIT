@@ -1,14 +1,28 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
 
-{% block title %}BRIT | Maps{% endblock title %}
+{% block title %}
+    BRIT | Maps
+{% endblock title %}
 
 {% block content %}
 
     <div class="row">
         <div class="col col-12 col-md-6 mb-4">
             <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0"><i class="fas fa-fw fa-globe-europe"></i> Maps</h5></div>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <h5 class="mb-0">
+                            <i class="fas fa-fw fa-globe-europe"></i> Maps
+                        </h5>
+                        <a class="btn btn-sm btn-outline-secondary"
+                           href="{% url 'maps-dashboard' %}"
+                           title="Open Explorer (dashboard)">
+                            <i class="fas fa-table-cells-large"></i>
+                            <span class="d-none d-md-inline">Explorer</span>
+                        </a>
+                    </div>
+                </div>
                 <div class="card-body">
                     <p class="card-text">
                         This section contains maps with geodata that represents sources for any type of geodata.
@@ -18,23 +32,21 @@
                         that reveal the potential in catchment areas that are of interest for you.
                     </p>
                 </div>
-                <div class="card-footer">
-                    <a href="{% url 'maps-dashboard' %}" class="nowrap me-3">
-                        <nobr><i class="fas fa-fw fa-th-large"></i> Explorer</nobr>
-                    </a>
-                </div>
             </div>
         </div>
         <div class="col col-12 col-md-6 mb-4">
             <div class="card shadow h-100">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><i class="fas fa-fw fa-graduation-cap"></i> Learning Material</h5>
+                    <h5 class="mb-0">
+                        <i class="fas fa-fw fa-graduation-cap"></i> Learning Material
+                    </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
                         To learn more about the use of geodata in bioresource management, check out the Lectures for
                         Future series "Sustainable Urban Bioresource Management" of the Hamburg Open Online University.
-                        Recommended lecture for this topic:<br>
+                        Recommended lecture for this topic:
+                        <br>
                         <a href="https://www.hoou.de/projects/lff/pages/sustainable-urban-bioresource-management"
                            target="_blank">"Geoinformation Systems: The Use of Geodata for Bioresource Management and
                             Biorefinery Planning"
@@ -47,9 +59,7 @@
 
     <div class="row">
         {% for map in object_list %}
-            <div class="col col-12 col-md-6 col-lg-3 mb-4">
-                {% include 'maps_card.html' %}
-            </div>
+            <div class="col col-12 col-md-6 col-lg-3 mb-4">{% include "maps_card.html" %}</div>
         {% endfor %}
     </div>
 

@@ -10,6 +10,16 @@
 {% block detail_header_actions %}
     <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
         <div class="btn-group me-2" role="group">
+            {% with back_url=request.GET.back %}
+                {% if back_url %}
+                    <a class="btn btn-sm btn-outline-secondary"
+                       href="{{ back_url }}"
+                       title="Back to results">
+                        <i class="fas fa-arrow-left"></i>
+                        <span class="d-none d-md-inline">Back to results</span>
+                    </a>
+                {% endif %}
+            {% endwith %}
             {% with first_collection=object.collections.all|first %}
                 {% if first_collection %}
                     <a class="btn btn-sm btn-outline-secondary"
@@ -28,6 +38,12 @@
                     <span class="d-none d-md-inline">List</span>
                 </a>
             {% endif %}
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{% url 'wastecollection-explorer' %}"
+               title="Open Explorer (dashboard)">
+                <i class="fas fa-table-cells-large"></i>
+                <span class="d-none d-md-inline">Explorer</span>
+            </a>
         </div>
         {{ block.super }}
     </div>

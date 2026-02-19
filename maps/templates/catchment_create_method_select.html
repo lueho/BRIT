@@ -1,18 +1,35 @@
-{% extends 'base_single_card.html' %}
+{% extends "base_single_card.html" %}
 
-{% block card_header %}<strong>Create new catchment</strong>{% endblock %}
+{% block card_header %}
+    <strong>Create new catchment</strong>
+{% endblock card_header %}
 
 {% block card_body %}
     <div class="card-text d-flex flex-column align-items-center">
-        <p><strong>Please select creation method:</strong></p>
-        <p><a class="btn btn-primary" href="{% url 'catchment-create-select-region' %}">Select existing region</a></p>
-        <p><a class="btn btn-primary" href="{% url 'catchment-create-merge-lau' %}">Merge LAU regions</a></p>
-        <p><a class="btn btn-primary" href="{% url 'catchment-create-draw-custom' %}">Draw custom borders</a></p>
+        <p class="w-100 d-flex justify-content-end mb-3">
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{% url 'maps-dashboard' %}"
+               title="Open Explorer (dashboard)">
+                <i class="fas fa-table-cells-large"></i>
+                <span class="d-none d-md-inline">Explorer</span>
+            </a>
+        </p>
+        <p>
+            <strong>Please select creation method:</strong>
+        </p>
+        <p>
+            <a class="btn btn-primary"
+               href="{% url 'catchment-create-select-region' %}">Select existing region</a>
+        </p>
+        <p>
+            <a class="btn btn-primary" href="{% url 'catchment-create-merge-lau' %}">Merge LAU regions</a>
+        </p>
+        <p>
+            <a class="btn btn-primary"
+               href="{% url 'catchment-create-draw-custom' %}">Draw custom borders</a>
+        </p>
     </div>
 {% endblock card_body %}
 
 {% block card_footer %}
-    <a href="{% url 'maps-dashboard' %}" class="nowrap me-3">
-        <nobr><i class="fas fa-fw fa-th-large"></i> Explorer</nobr>
-    </a>
-{% endblock %}
+{% endblock card_footer %}

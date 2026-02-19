@@ -1,10 +1,17 @@
 {% extends "filtered_map.html" %}
 {% load static %}
 
-{% block map_card_footer %}
-    <a href="{% url 'showcase-list' %}" class="mr-3">
-        <i class="fas fa-fw fa-list"></i> View as list
+{% block map_card_header_actions %}
+    <a class="btn btn-sm btn-outline-secondary"
+       href="{% url 'showcase-list' %}"
+       title="List">
+        <i class="fas fa-list-ul"></i>
+        <span class="d-none d-md-inline">List</span>
     </a>
+    {{ block.super }}
+{% endblock map_card_header_actions %}
+
+{% block map_card_footer %}
 {% endblock map_card_footer %}
 
 {% block filter_form_card %}

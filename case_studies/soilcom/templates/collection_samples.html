@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
 
@@ -8,49 +8,83 @@
         <div class="col">
             <div class="card shadow">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0">Manage waste samples</h5>
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <h5 class="mb-0">Manage waste samples</h5>
+                        <div class="btn-group" role="group">
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="{{ object.get_absolute_url }}"
+                               title="Collection">
+                                <i class="fas fa-arrow-left"></i>
+                                <span class="d-none d-md-inline">Collection</span>
+                            </a>
+                            {% if object.list_url %}
+                                <a class="btn btn-sm btn-outline-secondary"
+                                   href="{{ object.list_url }}"
+                                   title="List">
+                                    <i class="fas fa-list-ul"></i>
+                                    <span class="d-none d-md-inline">List</span>
+                                </a>
+                            {% endif %}
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="{% url 'wastecollection-explorer' %}"
+                               title="Open Explorer (dashboard)">
+                                <i class="fas fa-table-cells-large"></i>
+                                <span class="d-none d-md-inline">Explorer</span>
+                            </a>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
-                        <strong>Collection:</strong><br>
+                        <strong>Collection:</strong>
+                        <br>
                         <a href="{{ object.get_absolute_url }}">{{ object.name }}</a>
                     </p>
                     <p class="card-text">
-                        <strong>Samples</strong><br>
+                        <strong>Samples</strong>
+                        <br>
                         {% if object.samples.exists %}
                             <ul>
                                 {% for sample in object.samples.all %}
-                                    <li><a href="{{ sample.get_absolute_url }}">{{ sample.name }}</a></li>
+                                    <li>
+                                        <a href="{{ sample.get_absolute_url }}">{{ sample.name }}</a>
+                                    </li>
                                 {% endfor %}
                             </ul>
                         {% else %}
                             No connected samples
                         {% endif %}
                     </p>
-                    <p class="card-text"><strong>Add sample</strong><br>
-                    <div id="form-container">
-                        <form method="post">
-                            {% crispy form_add %}
-                            <input type="submit" name="submit" value="Add" class="btn btn-primary"
+                    <p class="card-text">
+                        <strong>Add sample</strong>
+                        <br>
+                        <div id="form-container">
+                            <form method="post">
+                                {% crispy form_add %}
+                                <input type="submit"
+                                       name="submit"
+                                       value="Add"
+                                       class="btn btn-primary"
                                        id="submit-id-submit">
-                        </form>
-                    </div>
+                            </form>
+                        </div>
                     </p>
-                    <p class="card-text"><strong>Remove sample</strong></p>
+                    <p class="card-text">
+                        <strong>Remove sample</strong>
+                    </p>
                     <div id="form-container-2">
                         <form method="post">
                             {% crispy form_remove %}
-                            <input type="submit" name="submit" value="Remove" class="btn btn-primary"
-                                       id="submit-id-submit">
+                            <input type="submit"
+                                   name="submit"
+                                   value="Remove"
+                                   class="btn btn-primary"
+                                   id="submit-id-submit">
                         </form>
                     </div>
-                </div>
-                <div class="card-footer">
-                    <a href="{{ object.get_absolute_url }}"><i class="fas fa-fw fa-arrow-left"></i> back to collection</a>
                 </div>
             </div>
         </div>
     </div>
 
-{% endblock %}
-
+{% endblock content %}

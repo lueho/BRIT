@@ -1,23 +1,28 @@
-{% extends 'filtered_map.html' %}
+{% extends "filtered_map.html" %}
 {% load crispy_forms_tags %}
 
-{% block map_card_footer %}
-    <a class="me-3 text-nowrap"
-       href="javascript:void(0)"
+{% block map_card_header_actions %}
+    <a class="btn btn-sm btn-outline-secondary"
+       href="{% url 'region-list' %}"
        id="link-regions-as-list"
        data-href-template="/maps/regions/"
-       onclick="clickedListLink()">
-        <i class="fa fa-fw fa-list"></i>
-        View as list
+       title="List"
+       onclick="clickedListLink(); return false;">
+        <i class="fas fa-list-ul"></i>
+        <span class="d-none d-md-inline">List</span>
     </a>
     {% if 'maps.add_region' in perms %}
-        <a class="me-3 text-nowrap"
+        <a class="btn btn-sm btn-outline-secondary"
            href="{% url 'region-create' %}">
-            <i class="fa fa-fw fa-plus"></i>
-            Create region
+            <i class="fas fa-circle-plus"></i>
+            <span class="d-none d-md-inline">Create region</span>
         </a>
     {% endif %}
-{% endblock %}
+    {{ block.super }}
+{% endblock map_card_header_actions %}
+
+{% block map_card_footer %}
+{% endblock map_card_footer %}
 
 {% block javascript %}
     {{ block.super }}
