@@ -3,58 +3,62 @@
 {% load user_created_object_tags %}
 {% load moderation_tags %}
 
-{% block title %}BRIT | Waste Collection Flyers{% endblock title %}
+{% block title %}
+    BRIT | Waste Collection Flyers
+{% endblock title %}
 
-{% block list_card_header %}<strong>Flyers</strong>{% endblock list_card_header %}
+{% block list_card_header %}
+    <strong>Flyers</strong>
+{% endblock list_card_header %}
 
 {% block list_table %}
-<div class="collection-list-min-height">
-    <div class="table-responsive">
-        <table class="table modern-table">
-            <thead>
-                <tr>
-                    <th>Flyer</th>
-                    {% if object_list.model|is_user_created %}
-                    <th class="actions-column">Status/Actions</th>
-                    {% endif %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for object in object_list %}
-                <tr>
-                    <td data-label="Flyer" class="ps-3">
-                        <a href="{% detail_or_review_url object %}" class="text-decoration-none">
-                            <strong class="d-block text-truncate" style="max-width: 500px;">{{ object.url }}</strong>
-                            <span class="text-muted small">Valid: {{ object.url_valid }}{% if object.url_checked %}
-                                &middot; Checked: {{ object.url_checked|date:'d.m.Y' }}{% endif %}</span>
-                        </a>
-                    </td>
-                    {% if object_list.model|is_user_created %}
-                    <td class="actions-column mobile-no-label">
-                        {% include "object_management/status_actions_cell.html" %}
-                    </td>
-                    {% endif %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="collection-list-min-height">
+        <div class="table-responsive">
+            <table class="table modern-table">
+                <thead>
+                    <tr>
+                        <th>Flyer</th>
+                        {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for object in object_list %}
+                        <tr>
+                            <td data-label="Flyer" class="ps-3">
+                                <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                                    <strong class="d-block text-truncate" style="max-width: 500px;">{{ object.url }}</strong>
+                                    <span class="text-muted small">Valid: {{ object.url_valid }}
+                                        {% if object.url_checked %}· Checked: {{ object.url_checked|date:'d.m.Y' }}{% endif %}
+                                    </span>
+                                </a>
+                            </td>
+                            {% if object_list.model|is_user_created %}
+                                <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
 {% endblock list_table %}
 
 {% block list_card_options_dropdown_additional_links %}
-{% if private_list_owner == user or user.is_staff %}
-<a id="check_url" class="btn btn-outline-secondary w-100 mb-2" href="javascript:void(0)" onclick="check_url()">
-    <i class="fas fa-fw fa-check-circle"></i>
-    <span>Check URLs</span>
-</a>
-{% endif %}
+    {% if private_list_owner == user or user.is_staff %}
+        <a id="check_url"
+           class="btn btn-outline-secondary w-100 mb-2"
+           href="javascript:void(0)"
+           onclick="check_url()">
+            <i class="fas fa-fw fa-check-circle"></i>
+            <span>Check URLs</span>
+        </a>
+    {% endif %}
 {% endblock list_card_options_dropdown_additional_links %}
 
 {% block javascript %}
-{{ block.super }}
+    {{ block.super }}
 
-<script type="text/javascript">
+    <script type="text/javascript">
 
     async function monitor_task_progress(url, count = 0) {
         const response = await fetch(url);
@@ -95,6 +99,6 @@
         monitor_task_progress(url);
     }
 
-</script>
+    </script>
 
 {% endblock javascript %}

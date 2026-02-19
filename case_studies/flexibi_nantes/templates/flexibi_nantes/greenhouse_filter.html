@@ -3,75 +3,91 @@
 {% load user_created_object_tags %}
 {% load moderation_tags %}
 
-{% block title %}BRIT | Greenhouse Types{% endblock title %}
+{% block title %}
+    BRIT | Greenhouse Types
+{% endblock title %}
 
-{% block list_card_header %}<strong>Greenhouse Types</strong>{% endblock list_card_header %}
+{% block list_card_header %}
+    <strong>Greenhouse Types</strong>
+{% endblock list_card_header %}
 
 {% block list_table %}
-<div class="collection-list-min-height">
-    <div class="table-responsive">
-        <table class="table modern-table">
-            <thead>
-                <tr>
-                    <th>Greenhouse</th>
-                    {% if object_list.model|is_user_created %}
-                    <th class="actions-column">Status/Actions</th>
-                    {% endif %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for object in object_list %}
-                <tr>
-                    <td data-label="Greenhouse" class="ps-3">
-                        <a href="{% detail_or_review_url object %}" class="text-decoration-none">
-                            <strong class="d-block">{{ object.name }}</strong>
-                            <span class="text-muted small">
-                                {% if object.heated %}Heated{% else %}Unheated{% endif %}
-                                &middot;
-                                {% if object.lighted %}Lighted{% else %}No lighting{% endif %}
-                                &middot;
-                                {% if object.above_ground %}Above ground{% else %}On ground{% endif %}
-                                &middot;
-                                {% if object.high_wire %}High-wire{% else %}Classic{% endif %}
-                            </span>
-                        </a>
-                    </td>
-                    {% if object_list.model|is_user_created %}
-                    <td class="actions-column mobile-no-label">
-                        {% include "object_management/status_actions_cell.html" %}
-                    </td>
-                    {% endif %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="collection-list-min-height">
+        <div class="table-responsive">
+            <table class="table modern-table">
+                <thead>
+                    <tr>
+                        <th>Greenhouse</th>
+                        {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for object in object_list %}
+                        <tr>
+                            <td data-label="Greenhouse" class="ps-3">
+                                <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                                    <strong class="d-block">{{ object.name }}</strong>
+                                    <span class="text-muted small">
+                                        {% if object.heated %}
+                                            Heated
+                                        {% else %}
+                                            Unheated
+                                        {% endif %}
+                                        ·
+                                        {% if object.lighted %}
+                                            Lighted
+                                        {% else %}
+                                            No lighting
+                                        {% endif %}
+                                        ·
+                                        {% if object.above_ground %}
+                                            Above ground
+                                        {% else %}
+                                            On ground
+                                        {% endif %}
+                                        ·
+                                        {% if object.high_wire %}
+                                            High-wire
+                                        {% else %}
+                                            Classic
+                                        {% endif %}
+                                    </span>
+                                </a>
+                            </td>
+                            {% if object_list.model|is_user_created %}
+                                <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
 {% endblock list_table %}
 
 {% block learning_pane_body %}
-<div class="resource-feature p-3 rounded-3 shadow-sm">
-    <div class="d-flex align-items-start gap-3">
-        <span class="text-primary fs-3" aria-hidden="true"><i class="fas fa-seedling"></i></span>
-        <div class="flex-grow-1">
-            <div class="d-flex align-items-center justify-content-between">
-                <strong>Lectures for Future: Sustainability in Agriculture</strong>
-                <span class="resource-badges">
-                    <span class="badge rounded-pill">Lecture</span>
-                    <span class="badge rounded-pill">External</span>
-                </span>
-            </div>
-            <div class="text-muted small mt-1">
-                "Sustainability in Agriculture: Nitrogen as Valuable Resource and Pollutant" — Hamburg Open Online
-                University.
-            </div>
-            <div class="mt-2">
-                <a href="https://learn.hoou.de/course/view.php?id=469&section=5" class="btn btn-sm btn-outline-primary"
-                    target="_blank" rel="noopener">
-                    Open lecture
-                </a>
+    <div class="resource-feature p-3 rounded-3 shadow-sm">
+        <div class="d-flex align-items-start gap-3">
+            <span class="text-primary fs-3" aria-hidden="true"><i class="fas fa-seedling"></i></span>
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center justify-content-between">
+                    <strong>Lectures for Future: Sustainability in Agriculture</strong>
+                    <span class="resource-badges">
+                        <span class="badge rounded-pill">Lecture</span>
+                        <span class="badge rounded-pill">External</span>
+                    </span>
+                </div>
+                <div class="text-muted small mt-1">
+                    "Sustainability in Agriculture: Nitrogen as Valuable Resource and Pollutant" — Hamburg Open Online
+                    University.
+                </div>
+                <div class="mt-2">
+                    <a href="https://learn.hoou.de/course/view.php?id=469&section=5"
+                       class="btn btn-sm btn-outline-primary"
+                       target="_blank"
+                       rel="noopener">Open lecture</a>
+                </div>
             </div>
         </div>
     </div>
-</div>
 {% endblock learning_pane_body %}
