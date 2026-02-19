@@ -237,9 +237,14 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         if not request.user or not request.user.is_authenticated:
             return False
 
+        try:
+            publication_status = getattr(obj, "publication_status", None)
+        except AttributeError:
+            return False
+
         return (
             self._is_moderator(request.user, obj)
-            and obj.publication_status == UserCreatedObject.STATUS_REVIEW
+            and publication_status == UserCreatedObject.STATUS_REVIEW
             and obj.owner
             != request.user  # Four eyes principle: can't approve own objects
         )
@@ -254,9 +259,14 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         if not request.user or not request.user.is_authenticated:
             return False
 
+        try:
+            publication_status = getattr(obj, "publication_status", None)
+        except AttributeError:
+            return False
+
         return (
             self._is_moderator(request.user, obj)
-            and obj.publication_status == UserCreatedObject.STATUS_REVIEW
+            and publication_status == UserCreatedObject.STATUS_REVIEW
             and obj.owner
             != request.user  # Four eyes principle: can't reject own objects
         )

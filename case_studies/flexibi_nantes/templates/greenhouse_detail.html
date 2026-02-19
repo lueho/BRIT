@@ -51,7 +51,9 @@
                             <h5 class="mb-0">Add growth cycle</h5>
                         </div>
                         <div class="card-body">
-                            <a href="{% url 'greenhousegrowthcycle-create' object.id %}?next={{ request.path }}">
+                            <a href="javascript:void(0);"
+                               class="modal-link"
+                               data-link="{% url 'greenhousegrowthcycle-create' object.id %}?next={{ request.path }}">
                                 <i class="fas fa-fw fa-plus"></i> Add growth cycle
                             </a>
                         </div>

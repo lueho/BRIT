@@ -12,8 +12,10 @@
 function wireModalLinks() {
     document.querySelectorAll('.modal-link:not(.bmf-bound)').forEach(link => {
         link.classList.add('bmf-bound');
+        // Prefer data-link attribute, fall back to href for compatibility
+        const formURL = link.getAttribute('data-link') || link.getAttribute('href');
         modalForm(link, {
-            formURL: link.getAttribute('href'),
+            formURL: formURL,
             modalID: '#modal',
             errorClass: '.is-invalid'
         });
