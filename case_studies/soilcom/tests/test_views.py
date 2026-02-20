@@ -265,6 +265,16 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         response = self.client.get(self.get_detail_url(self.published_object.pk))
         self.assertNotContains(response, "Check URLs")
 
+    @patch("case_studies.soilcom.views.check_wasteflyer_url")
+    def test_check_url_view_dispatches_wasteflyer_task(self, mock_task):
+        mock_task.delay.return_value.task_id = "fake-task-id"
+        self.client.force_login(self.owner_user)
+        response = self.client.get(
+            reverse("wasteflyer-check-url", kwargs={"pk": self.published_object.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        mock_task.delay.assert_called_once_with(self.published_object.pk)
+
 
 # ----------- Collection Frequency CRUD --------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------

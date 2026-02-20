@@ -118,7 +118,7 @@ from .models import (
     WasteComponent,
     WasteFlyer,
 )
-from .tasks import check_wasteflyer_urls
+from .tasks import check_wasteflyer_url, check_wasteflyer_urls
 
 
 class CollectionExplorerView(TemplateView):
@@ -472,6 +472,20 @@ class WasteFlyerModalDeleteView(SourceModalDeleteView):
 class WasteFlyerCheckUrlView(SourceCheckUrlView):
     model = WasteFlyer
     permission_required = "soilcom.change_wasteflyer"
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.model.objects.get(pk=kwargs.get("pk"))
+        policy = get_object_policy(request.user, self.object, request=request)
+        if not (
+            policy.get("is_owner")
+            or policy.get("is_staff")
+            or policy.get("is_moderator")
+        ):
+            raise PermissionDenied
+
+        task = check_wasteflyer_url.delay(self.object.pk)
+        response_data = {"task_id": task.task_id}
+        return HttpResponse(json.dumps(response_data), content_type="application/json")
 
 
 class WasteFlyerCheckUrlProgressView(LoginRequiredMixin, View):

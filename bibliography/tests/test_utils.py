@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
-from ..utils import check_url
+from ..utils import _REQUEST_HEADERS, check_url, find_wayback_snapshot_for_year
 
 
 @patch("requests.get")
@@ -10,12 +10,7 @@ from ..utils import check_url
 class SourceCheckUrlTestCase(SimpleTestCase):
     def setUp(self):
         self.url = "https://www.flyer-test-url.org"
-        self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20200101 Firefox/84.0",
-            "Accept-Language": "en-GB,en;q=0.5",
-            "Referer": "https://www.wikipedia.org",
-            "DNT": "1",
-        }
+        self.headers = _REQUEST_HEADERS
 
     def test_request_with_http_status_200_returns_true(self, mock_head, mock_get):
         mock_head.return_value.status_code = 200
@@ -38,3 +33,48 @@ class SourceCheckUrlTestCase(SimpleTestCase):
         mock_get.assert_called_once_with(
             self.url, headers=self.headers, allow_redirects=True
         )
+
+
+@patch("requests.get")
+class FindWaybackSnapshotForYearTestCase(SimpleTestCase):
+    def setUp(self):
+        self.url = "https://example.com/flyer"
+
+    def test_returns_latest_snapshot_in_requested_year(self, mock_get):
+        mock_get.return_value.raise_for_status.return_value = None
+        mock_get.return_value.json.return_value = [
+            ["timestamp", "original", "statuscode"],
+            ["20210101120000", self.url, "200"],
+            ["20211230153000", self.url, "200"],
+            ["20210615101010", self.url, "200"],
+        ]
+
+        result = find_wayback_snapshot_for_year(self.url, 2021)
+
+        self.assertEqual(
+            result,
+            "https://web.archive.org/web/20211230153000/https://example.com/flyer",
+        )
+        mock_get.assert_called_once_with(
+            "https://web.archive.org/cdx/search/cdx",
+            params={
+                "url": self.url,
+                "from": "20210101",
+                "to": "20211231",
+                "output": "json",
+                "fl": "timestamp,original,statuscode",
+                "filter": "statuscode:200",
+            },
+            headers=_REQUEST_HEADERS,
+            timeout=10,
+        )
+
+    def test_returns_none_when_year_has_no_snapshots(self, mock_get):
+        mock_get.return_value.raise_for_status.return_value = None
+        mock_get.return_value.json.return_value = [
+            ["timestamp", "original", "statuscode"]
+        ]
+
+        result = find_wayback_snapshot_for_year(self.url, 2021)
+
+        self.assertIsNone(result)

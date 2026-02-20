@@ -1,4 +1,5 @@
 from collections import namedtuple
+from datetime import date
 from unittest.mock import patch
 
 from celery import chord
@@ -8,6 +9,7 @@ from django.test import TestCase
 from factory.django import mute_signals
 
 from ..models import (
+    Collection,
     WasteFlyer,
 )
 from ..tasks import (
@@ -70,3 +72,47 @@ class CheckWasteFlyerUrlsTestCase(TestCase):
         ]
         result = chord(header)(callback)
         self.assertEqual(result.task_id, "fake_task_id")
+
+
+@patch("case_studies.soilcom.tasks.find_wayback_snapshot_for_year")
+@patch("case_studies.soilcom.tasks.check_url")
+class CheckWasteFlyerUrlWaybackFallbackTestCase(TestCase):
+    def setUp(self):
+        with mute_signals(signals.post_save):
+            self.flyer = WasteFlyer.objects.create(
+                title="Waste flyer",
+                abbreviation="WF",
+                url="https://example.com/dead-flyer.pdf",
+            )
+
+        self.collection = Collection.objects.create(valid_from=date(2021, 1, 1))
+        self.collection.flyers.add(self.flyer)
+
+    def test_replaces_broken_url_with_year_snapshot(self, mock_check_url, mock_wayback):
+        original_url = self.flyer.url
+        mock_check_url.return_value = False
+        mock_wayback.return_value = (
+            "https://web.archive.org/web/20211230153000/"
+            "https://example.com/dead-flyer.pdf"
+        )
+
+        check_wasteflyer_url(self.flyer.pk)
+
+        self.flyer.refresh_from_db()
+        self.assertTrue(self.flyer.url_valid)
+        self.assertEqual(self.flyer.url, mock_wayback.return_value)
+        mock_wayback.assert_called_once_with(original_url, 2021)
+
+    def test_keeps_original_url_when_no_snapshot_exists(
+        self, mock_check_url, mock_wayback
+    ):
+        original_url = self.flyer.url
+        mock_check_url.return_value = False
+        mock_wayback.return_value = None
+
+        check_wasteflyer_url(self.flyer.pk)
+
+        self.flyer.refresh_from_db()
+        self.assertFalse(self.flyer.url_valid)
+        self.assertEqual(self.flyer.url, original_url)
+        mock_wayback.assert_called_once_with(original_url, 2021)
