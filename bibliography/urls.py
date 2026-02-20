@@ -11,6 +11,7 @@ from .views import (
     AuthorModalUpdateView,
     AuthorPrivateListView,
     AuthorPublishedListView,
+    AuthorQuickCreateView,
     AuthorUpdateView,
     BibliographyExplorerView,
     LicenceAutocompleteView,
@@ -72,6 +73,11 @@ urlpatterns = [
         "authors/autocomplete/",
         AuthorAutocompleteView.as_view(),
         name="author-autocomplete",
+    ),
+    path(
+        "authors/quick-create/",
+        AuthorQuickCreateView.as_view(),
+        name="author-quick-create",
     ),
     path(
         "authors/<int:pk>/delete/modal/",

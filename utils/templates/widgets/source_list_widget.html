@@ -35,9 +35,32 @@
                    value=""
                    data-autocomplete-url="{% url widget.autocomplete_url %}"
                    data-quick-create-url="{% url 'source-quick-create' %}"
+                   data-author-autocomplete-url="{% url 'author-autocomplete' %}"
+                   data-author-quick-create-url="{% url 'author-quick-create' %}"
                    data-label-field="{{ widget.label_field }}"
                    data-target-select="{{ widget.attrs.id }}">
             <p class="text-muted small mt-2 mb-0">Can't find a source? Type a title and press Enter to create it.</p>
+            <details class="mt-2">
+                <summary class="small text-muted">Optional: add authors and year</summary>
+                <div class="mt-2">
+                    <label class="form-label small mb-1" for="{{ widget.attrs.id }}_authors">Authors</label>
+                    <input type="text"
+                           id="{{ widget.attrs.id }}_authors"
+                           class="form-control form-control-sm source-author-tomselect-add"
+                           placeholder="Search or type author and press Enter"
+                           data-author-autocomplete-url="{% url 'author-autocomplete' %}"
+                           data-author-quick-create-url="{% url 'author-quick-create' %}">
+                </div>
+                <div class="mt-2">
+                    <label class="form-label small mb-1" for="{{ widget.attrs.id }}_year">Year</label>
+                    <input type="number"
+                           id="{{ widget.attrs.id }}_year"
+                           class="form-control form-control-sm source-year-input"
+                           min="0"
+                           step="1"
+                           placeholder="e.g. 2024">
+                </div>
+            </details>
             <p class="text-danger small mt-2 mb-0 d-none"
                id="{{ widget.attrs.id }}_feedback"></p>
         </div>

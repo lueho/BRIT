@@ -120,11 +120,55 @@ function clearFeedback(feedbackElement) {
 }
 
 /**
- * Create a new source from typed input and return the created source payload.
+ * Parse a typed author string into first and last names.
  */
-async function createSourceFromInput(title, quickCreateUrl, feedbackElement) {
-    const trimmedTitle = (title || '').trim();
-    if (!trimmedTitle) {
+function parseAuthorInput(rawInput) {
+    const trimmedInput = (rawInput || '').trim();
+    if (!trimmedInput) {
+        return null;
+    }
+
+    if (trimmedInput.includes(',')) {
+        const [lastNamesPart, firstNamesPart = ''] = trimmedInput.split(',', 2);
+        const lastNames = lastNamesPart.trim();
+        const firstNames = firstNamesPart.trim();
+        if (!lastNames) {
+            return null;
+        }
+        return {
+            first_names: firstNames,
+            last_names: lastNames
+        };
+    }
+
+    const nameParts = trimmedInput.split(/\s+/).filter(Boolean);
+    if (!nameParts.length) {
+        return null;
+    }
+
+    if (nameParts.length === 1) {
+        return {
+            first_names: '',
+            last_names: nameParts[0]
+        };
+    }
+
+    return {
+        first_names: nameParts.slice(0, -1).join(' '),
+        last_names: nameParts[nameParts.length - 1]
+    };
+}
+
+/**
+ * Create a new author from typed input and return the created author payload.
+ */
+async function createAuthorFromInput(authorInput, quickCreateUrl, feedbackElement) {
+    const parsedName = parseAuthorInput(authorInput);
+    if (!parsedName || !parsedName.last_names) {
+        showFeedback(
+            feedbackElement,
+            'Author needs at least a last name. Use "Last, First" or "First Last".'
+        );
         return null;
     }
 
@@ -135,7 +179,49 @@ async function createSourceFromInput(title, quickCreateUrl, feedbackElement) {
             'X-CSRFToken': getCookie('csrftoken'),
             'X-Requested-With': 'XMLHttpRequest'
         },
-        body: JSON.stringify({ title: trimmedTitle })
+        body: JSON.stringify(parsedName)
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        showFeedback(
+            feedbackElement,
+            payload.error || 'Could not create author. Please try again.'
+        );
+        return null;
+    }
+
+    clearFeedback(feedbackElement);
+    return payload;
+}
+
+/**
+ * Create a new source from typed input and return the created source payload.
+ */
+async function createSourceFromInput(title, quickCreateUrl, feedbackElement, metadata = {}) {
+    const trimmedTitle = (title || '').trim();
+    if (!trimmedTitle) {
+        return null;
+    }
+
+    const requestPayload = { title: trimmedTitle };
+
+    if (metadata.year !== undefined && metadata.year !== null && String(metadata.year).trim()) {
+        requestPayload.year = String(metadata.year).trim();
+    }
+
+    if (Array.isArray(metadata.authors) && metadata.authors.length) {
+        requestPayload.authors = metadata.authors;
+    }
+
+    const response = await fetch(quickCreateUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(requestPayload)
     });
 
     const payload = await response.json().catch(() => ({}));
@@ -149,6 +235,86 @@ async function createSourceFromInput(title, quickCreateUrl, feedbackElement) {
 
     clearFeedback(feedbackElement);
     return payload;
+}
+
+/**
+ * Initialize author TomSelect for optional source metadata input.
+ */
+function initAuthorTomSelect(authorInput, feedbackElement) {
+    if (!authorInput) {
+        return null;
+    }
+
+    const authorAutocompleteUrl = authorInput.dataset.authorAutocompleteUrl;
+    const authorQuickCreateUrl = authorInput.dataset.authorQuickCreateUrl;
+
+    if (!authorAutocompleteUrl) {
+        return null;
+    }
+
+    if (authorInput.tomselect) {
+        authorInput.tomselect.destroy();
+    }
+
+    const createAuthorHandler = authorQuickCreateUrl ? function (userInput, callback) {
+        createAuthorFromInput(userInput, authorQuickCreateUrl, feedbackElement)
+            .then(createdAuthor => {
+                if (!createdAuthor || !createdAuthor.id) {
+                    callback();
+                    return;
+                }
+
+                callback({
+                    id: String(createdAuthor.id),
+                    first_names: createdAuthor.first_names || '',
+                    last_names: createdAuthor.last_names || '',
+                    label: createdAuthor.label || createdAuthor.text || userInput,
+                    text: createdAuthor.text || createdAuthor.label || userInput
+                });
+            })
+            .catch(() => {
+                showFeedback(
+                    feedbackElement,
+                    'Could not create author. Please try again.'
+                );
+                callback();
+            });
+    } : false;
+
+    return new TomSelect(authorInput, {
+        valueField: 'id',
+        labelField: 'label',
+        searchField: ['label', 'last_names', 'first_names'],
+        maxItems: null,
+        maxOptions: 25,
+        loadThrottle: 300,
+        create: createAuthorHandler,
+        persist: false,
+        createFilter: function (userInput) {
+            return !!(userInput && userInput.trim());
+        },
+        load: function (query, callback) {
+            const url = authorAutocompleteUrl + (query ? '?q=' + encodeURIComponent(query) : '');
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    callback(data.results || data);
+                })
+                .catch(() => {
+                    callback();
+                });
+        },
+        render: {
+            option: function (data, escape) {
+                return '<div class="option">' + escape(data.label || data.text || '') + '</div>';
+            },
+            item: function (data, escape) {
+                return '<div>' + escape(data.label || data.text || '') + '</div>';
+            }
+        },
+        placeholder: authorInput.getAttribute('placeholder') || 'Add authors...',
+        plugins: ['remove_button']
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -169,18 +335,56 @@ document.addEventListener('DOMContentLoaded', function () {
         const autocompleteUrl = input.dataset.autocompleteUrl;
         const quickCreateUrl = input.dataset.quickCreateUrl;
         const labelField = input.dataset.labelField;
+        const authorsInput = document.getElementById(targetSelectId + '_authors');
+        const yearInput = document.getElementById(targetSelectId + '_year');
 
         // Destroy any existing TomSelect instance
         if (input.tomselect) {
             input.tomselect.destroy();
         }
 
+        const authorTomSelect = initAuthorTomSelect(authorsInput, feedbackElement);
+
+        const buildAuthorMetadata = function () {
+            if (!authorTomSelect || !authorTomSelect.items.length) {
+                return [];
+            }
+
+            return authorTomSelect.items
+                .map(function (authorId) {
+                    const option = authorTomSelect.options[authorId];
+                    if (!option) {
+                        return null;
+                    }
+
+                    return {
+                        id: String(authorId),
+                        first_names: option.first_names || '',
+                        last_names: option.last_names || ''
+                    };
+                })
+                .filter(Boolean);
+        };
+
         const createHandler = quickCreateUrl ? function (userInput, callback) {
-            createSourceFromInput(userInput, quickCreateUrl, feedbackElement)
+            const yearValue = yearInput ? yearInput.value : '';
+            const selectedAuthors = buildAuthorMetadata();
+
+            createSourceFromInput(userInput, quickCreateUrl, feedbackElement, {
+                year: yearValue,
+                authors: selectedAuthors
+            })
                 .then(createdSource => {
                     if (!createdSource || !createdSource.id) {
                         callback();
                         return;
+                    }
+
+                    if (authorTomSelect) {
+                        authorTomSelect.clear(true);
+                    }
+                    if (yearInput) {
+                        yearInput.value = '';
                     }
 
                     const optionLabel =

@@ -3,6 +3,7 @@ import json
 from celery.result import AsyncResult
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.urls import reverse_lazy
 from django.views import View
@@ -253,6 +254,54 @@ class SourceModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class AuthorQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    """Create a minimal Author object for inline source creation workflows."""
+
+    permission_required = "bibliography.add_author"
+
+    def post(self, request, *args, **kwargs):
+        """Create or return an Author from a JSON payload."""
+        try:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            payload = {}
+
+        first_names = " ".join(str(payload.get("first_names", "")).split())
+        last_names = " ".join(str(payload.get("last_names", "")).split())
+
+        if not last_names:
+            return JsonResponse(
+                {"error": "A non-empty last name is required to create an author."},
+                status=400,
+            )
+
+        author = Author.objects.filter(
+            first_names__iexact=first_names,
+            last_names__iexact=last_names,
+        ).first()
+
+        created = False
+        if author is None:
+            author = Author.objects.create(
+                owner=request.user,
+                first_names=first_names,
+                last_names=last_names,
+            )
+            created = True
+
+        label = f"{author.last_names}, {author.first_names}".strip(", ")
+        return JsonResponse(
+            {
+                "id": author.pk,
+                "first_names": author.first_names,
+                "last_names": author.last_names,
+                "label": label,
+                "text": label,
+            },
+            status=201 if created else 200,
+        )
+
+
 class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
     """Create a minimal Source object for inline source selectors.
 
@@ -262,6 +311,66 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
     """
 
     permission_required = "bibliography.add_source"
+
+    @staticmethod
+    def _normalize_name_part(value):
+        """Normalize whitespace for name parts in request payloads."""
+        return " ".join(str(value or "").split())
+
+    def _resolve_authors(self, request, payload):
+        """Resolve payload authors to Author objects preserving payload order."""
+        raw_authors = payload.get("authors", [])
+        if not isinstance(raw_authors, list):
+            return [], None
+
+        resolved_authors = []
+        resolved_ids = set()
+
+        for raw_author in raw_authors:
+            if not isinstance(raw_author, dict):
+                continue
+
+            author = None
+            raw_author_id = raw_author.get("id")
+            if raw_author_id not in (None, ""):
+                try:
+                    author = Author.objects.get(pk=int(raw_author_id))
+                except (Author.DoesNotExist, TypeError, ValueError):
+                    author = None
+            else:
+                first_names = self._normalize_name_part(raw_author.get("first_names"))
+                last_names = self._normalize_name_part(raw_author.get("last_names"))
+                if not last_names:
+                    continue
+
+                author = Author.objects.filter(
+                    first_names__iexact=first_names,
+                    last_names__iexact=last_names,
+                ).first()
+
+                if author is None:
+                    if not request.user.has_perm("bibliography.add_author"):
+                        return [], JsonResponse(
+                            {
+                                "error": (
+                                    "You need permission to create authors "
+                                    "for inline source creation."
+                                )
+                            },
+                            status=403,
+                        )
+
+                    author = Author.objects.create(
+                        owner=request.user,
+                        first_names=first_names,
+                        last_names=last_names,
+                    )
+
+            if author and author.pk not in resolved_ids:
+                resolved_authors.append(author)
+                resolved_ids.add(author.pk)
+
+        return resolved_authors, None
 
     def post(self, request, *args, **kwargs):
         """Create a Source from a JSON payload and return option data as JSON."""
@@ -277,13 +386,42 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 status=400,
             )
 
-        source = Source.objects.create(owner=request.user, title=title, type="custom")
+        raw_year = payload.get("year")
+        year = None
+        if raw_year not in (None, ""):
+            try:
+                year = int(raw_year)
+            except (TypeError, ValueError):
+                return JsonResponse(
+                    {"error": "Year must be a valid integer."},
+                    status=400,
+                )
+
+        authors, author_error = self._resolve_authors(request, payload)
+        if author_error is not None:
+            return author_error
+
+        with transaction.atomic():
+            source = Source.objects.create(
+                owner=request.user,
+                title=title,
+                type="custom",
+                year=year,
+            )
+            for position, author in enumerate(authors, start=1):
+                source.sourceauthors.create(author=author, position=position)
+
+        author_part = "; ".join(author.abbreviated_full_name for author in authors)
+        formatted_label = (
+            f"{author_part}. {source.title}" if author_part else source.title
+        )
+
         return JsonResponse(
             {
                 "id": source.pk,
                 "title": source.title,
-                "text": source.title,
-                "label": source.title,
+                "text": formatted_label,
+                "label": formatted_label,
             },
             status=201,
         )
@@ -370,7 +508,7 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
             ),
         ).order_by("type_priority", "-has_authors", "title")
 
-        return qs
+        return qs.distinct()
 
     def hook_prepare_results(self, results):
         from bibliography.models import SourceAuthor

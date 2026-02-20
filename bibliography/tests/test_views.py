@@ -88,6 +88,71 @@ class AuthorAutoCompleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertDictEqual(expected_result, response.json()["results"][0])
 
 
+class AuthorQuickCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ["add_author"]
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        response = self.client.post(
+            reverse("author-quick-create"),
+            data=json.dumps({"first_names": "Ada", "last_names": "Lovelace"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_authenticated_without_permission(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(
+            reverse("author-quick-create"),
+            data=json.dumps({"first_names": "Ada", "last_names": "Lovelace"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_400_bad_request_when_last_name_is_blank(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("author-quick-create"),
+            data=json.dumps({"first_names": "Ada", "last_names": "   "}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_post_http_201_creates_author_for_member(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("author-quick-create"),
+            data=json.dumps({"first_names": "Ada", "last_names": "Lovelace"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        author = Author.objects.get(pk=payload["id"])
+
+        self.assertEqual(author.first_names, "Ada")
+        self.assertEqual(author.last_names, "Lovelace")
+        self.assertEqual(author.owner, self.member)
+
+    def test_post_http_200_returns_existing_author(self):
+        self.client.force_login(self.member)
+        existing = Author.objects.create(
+            owner=self.member,
+            first_names="Ada",
+            last_names="Lovelace",
+        )
+
+        response = self.client.post(
+            reverse("author-quick-create"),
+            data=json.dumps({"first_names": "Ada", "last_names": "Lovelace"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["id"], existing.pk)
+        self.assertEqual(Author.objects.filter(last_names="Lovelace").count(), 1)
+
+
 # ----------- Licence CRUD ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -363,6 +428,55 @@ class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(200, response.status_code)
 
 
+class SourceAutocompleteViewTestCase(ViewWithPermissionsTestCase):
+    def test_owner_review_source_is_returned_when_many_author_join_duplicates_exist(
+        self,
+    ):
+        self.client.force_login(self.member)
+
+        author_1 = Author.objects.create(
+            first_names="Alice",
+            last_names="Autocomplete",
+            publication_status="published",
+        )
+        author_2 = Author.objects.create(
+            first_names="Bob",
+            last_names="Autocomplete",
+            publication_status="published",
+        )
+
+        # Create enough published sources with two authors each so a non-distinct
+        # author JOIN would produce more than one page of rows (page_size=10).
+        for idx in range(6):
+            source = Source.objects.create(
+                owner=self.outsider,
+                title=f"Query Published {idx}",
+                abbreviation=f"QP{idx}",
+                publication_status="published",
+            )
+            SourceAuthor.objects.create(source=source, author=author_1, position=1)
+            SourceAuthor.objects.create(source=source, author=author_2, position=2)
+
+        target_source = Source.objects.create(
+            owner=self.member,
+            title="Query Review Target",
+            abbreviation="QRT",
+            publication_status="review",
+        )
+
+        response = self.client.get(reverse("source-autocomplete"), {"q": "Query"})
+
+        self.assertEqual(response.status_code, 200)
+        results = response.json()["results"]
+        returned_ids = [result["id"] for result in results]
+
+        # Regression assertions:
+        # 1) no duplicate rows from M2M author joins,
+        # 2) owner's in-review source remains discoverable on first page.
+        self.assertEqual(len(returned_ids), len(set(returned_ids)))
+        self.assertIn(target_source.pk, returned_ids)
+
+
 class SourceListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ["change_source"]
 
@@ -451,3 +565,82 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(source.owner, self.member)
         self.assertEqual(source.type, "custom")
         self.assertEqual(payload["title"], "Inline source")
+
+    def test_post_http_400_when_year_is_invalid(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("source-quick-create"),
+            data=json.dumps({"title": "Inline source", "year": "not-a-year"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_post_http_403_when_new_author_payload_without_add_author_permission(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("source-quick-create"),
+            data=json.dumps(
+                {
+                    "title": "Inline source",
+                    "authors": [{"first_names": "Ada", "last_names": "Lovelace"}],
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_201_creates_source_with_existing_author_and_year(self):
+        self.client.force_login(self.member)
+        author = Author.objects.create(
+            owner=self.member,
+            first_names="Ada",
+            last_names="Lovelace",
+        )
+
+        response = self.client.post(
+            reverse("source-quick-create"),
+            data=json.dumps(
+                {
+                    "title": "Inline source",
+                    "year": 2024,
+                    "authors": [{"id": author.pk}],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        source = Source.objects.get(pk=payload["id"])
+
+        self.assertEqual(source.year, 2024)
+        self.assertEqual(source.sourceauthors.count(), 1)
+        source_author = source.sourceauthors.first()
+        self.assertEqual(source_author.author_id, author.pk)
+        self.assertEqual(source_author.position, 1)
+        self.assertEqual(payload["label"], "Lovelace, A.. Inline source")
+
+    def test_post_http_201_creates_source_and_new_author_when_permitted(self):
+        add_author_permission = Permission.objects.get(codename="add_author")
+        self.member.user_permissions.add(add_author_permission)
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("source-quick-create"),
+            data=json.dumps(
+                {
+                    "title": "Inline source",
+                    "authors": [{"first_names": "Ada", "last_names": "Lovelace"}],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        source = Source.objects.get(pk=payload["id"])
+
+        self.assertEqual(source.sourceauthors.count(), 1)
+        created_author = source.sourceauthors.first().author
+        self.assertEqual(created_author.first_names, "Ada")
+        self.assertEqual(created_author.last_names, "Lovelace")
