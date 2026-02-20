@@ -1004,17 +1004,17 @@ class PublishedObjectFilterView(
 class AddReviewCommentView(BaseReviewActionView):
     """Add a free-text review comment linked to an object."""
 
+    permission_method = "has_comment_permission"
+    permission_denied_message = "You don't have permission to comment on this item."
+
     def post(self, request, *args, **kwargs):
         self.object = self.get_object(request, *args, **kwargs)
+        self.ensure_permission(request, self.object)
         obj = self.object
 
         # Must be authenticated
         if not request.user.is_authenticated:
             raise PermissionDenied("Authentication required.")
-
-        policy = get_object_policy(request.user, obj, request=request)
-        if not (policy["is_owner"] or policy["is_staff"] or policy["is_moderator"]):
-            raise PermissionDenied("You don't have permission to comment on this item.")
 
         message = (request.POST.get("message") or "").strip()
         if not message:

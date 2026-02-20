@@ -12,7 +12,7 @@ from factory.django import mute_signals
 
 from case_studies.soilcom.models import Collection
 from case_studies.soilcom.views import CollectionDetailView
-from utils.object_management.models import UserCreatedObject
+from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.properties.models import Property
 
 from ..views import FilterDefaultsMixin, PublishedObjectFilterView
@@ -223,6 +223,53 @@ class ReviewWorkflowViewTests(TestCase):
         self.client.force_login(self.moderator)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
+
+    def test_add_review_comment_view_moderator_can_comment(self):
+        """Moderator can add a review comment to an item."""
+        url = reverse(
+            "object_management:add_review_comment",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.review_collection.id,
+            },
+        )
+
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data={"message": "Looks good"})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            ReviewAction.objects.filter(
+                content_type_id=self.content_type_id,
+                object_id=self.review_collection.id,
+                action=ReviewAction.ACTION_COMMENT,
+                user=self.moderator,
+                comment="Looks good",
+            ).exists()
+        )
+
+    def test_add_review_comment_view_regular_user_forbidden(self):
+        """Regular users cannot add a review comment to someone else's item."""
+        url = reverse(
+            "object_management:add_review_comment",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.review_collection.id,
+            },
+        )
+
+        self.client.force_login(self.regular_user)
+        response = self.client.post(url, data={"message": "I should not post this"})
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            ReviewAction.objects.filter(
+                content_type_id=self.content_type_id,
+                object_id=self.review_collection.id,
+                action=ReviewAction.ACTION_COMMENT,
+                user=self.regular_user,
+            ).exists()
+        )
 
 
 class ReviewDetailAccessTests(TestCase):
