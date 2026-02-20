@@ -14,6 +14,7 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from factory.django import mute_signals
 
+from bibliography.models import Source
 from case_studies.soilcom.models import (
     Collection,
     CollectionCatchment,
@@ -548,6 +549,45 @@ class CollectionPropertyValueCRUDViewsTestCase(
             "WasteFlyer should be linked to CPV",
         )
 
+    def test_update_preserves_bibliographic_sources_when_adding_waste_flyer(self):
+        """Test that CPV update keeps bibliographic sources alongside WasteFlyers."""
+        self.client.force_login(self.owner_user)
+        bibliographic_source = Source.objects.create(
+            owner=self.owner_user,
+            type="article",
+            title="Bibliographic Source",
+            abbreviation="BibSource",
+            publication_status="published",
+        )
+
+        url = reverse(
+            "collectionpropertyvalue-update", kwargs={"pk": self.unpublished_object.pk}
+        )
+        data = {
+            "collection": self.related_objects["collection"].pk,
+            "property": self.related_objects["property"].pk,
+            "unit": self.related_objects["unit"].pk,
+            "year": 2022,
+            "average": 42,
+            "standard_deviation": "",
+            "sources": [bibliographic_source.pk],
+            "form-TOTAL_FORMS": "1",
+            "form-INITIAL_FORMS": "0",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-url": "http://example.com/flyer-preserve.pdf",
+        }
+
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 302)
+
+        self.unpublished_object.refresh_from_db()
+        flyer = WasteFlyer.objects.get(url="http://example.com/flyer-preserve.pdf")
+        self.assertSetEqual(
+            set(self.unpublished_object.sources.values_list("pk", flat=True)),
+            {bibliographic_source.pk, flyer.pk},
+        )
+
 
 # ----------- AggregatedCollectionPropertyValue CRUD -------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -621,6 +661,48 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(
         base_url = reverse("collection-list")
         query_string = urlencode([("id", rid) for rid in related_ids])
         return f"{base_url}?{query_string}"
+
+    def test_update_preserves_bibliographic_sources_when_adding_waste_flyer(self):
+        """Test that ACPV update keeps bibliographic sources alongside WasteFlyers."""
+        self.client.force_login(self.owner_user)
+        bibliographic_source = Source.objects.create(
+            owner=self.owner_user,
+            type="article",
+            title="Aggregated Bibliographic Source",
+            abbreviation="AggBibSource",
+            publication_status="published",
+        )
+
+        url = reverse(
+            "aggregatedcollectionpropertyvalue-update",
+            kwargs={"pk": self.unpublished_object.pk},
+        )
+        data = {
+            "collections": [collection.pk for collection in self.related_collections],
+            "property": self.related_objects["property"].pk,
+            "unit": self.related_objects["unit"].pk,
+            "year": 2025,
+            "average": 77,
+            "standard_deviation": "",
+            "sources": [bibliographic_source.pk],
+            "form-TOTAL_FORMS": "1",
+            "form-INITIAL_FORMS": "0",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-url": "http://example.com/aggregated-flyer-preserve.pdf",
+        }
+
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 302)
+
+        self.unpublished_object.refresh_from_db()
+        flyer = WasteFlyer.objects.get(
+            url="http://example.com/aggregated-flyer-preserve.pdf"
+        )
+        self.assertSetEqual(
+            set(self.unpublished_object.sources.values_list("pk", flat=True)),
+            {bibliographic_source.pk, flyer.pk},
+        )
 
 
 # ----------- Collection Catchment CRUD --------------------------------------------------------------------------------
