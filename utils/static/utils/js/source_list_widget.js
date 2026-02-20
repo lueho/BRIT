@@ -121,6 +121,14 @@ function clearFeedback(feedbackElement) {
 
 /**
  * Parse a typed author string into first and last names.
+ *
+ * Rules:
+ *  - If the input contains a comma: everything before the first comma is
+ *    last_names, everything after is first_names.  This is the standard
+ *    bibliographic "Last, First" format.
+ *  - If there is NO comma: the entire string is treated as last_names with
+ *    an empty first_names.  This correctly handles organisation names like
+ *    "European Environment Agency" or "Federal Statistical Office".
  */
 function parseAuthorInput(rawInput) {
     const trimmedInput = (rawInput || '').trim();
@@ -129,34 +137,16 @@ function parseAuthorInput(rawInput) {
     }
 
     if (trimmedInput.includes(',')) {
-        const [lastNamesPart, firstNamesPart = ''] = trimmedInput.split(',', 2);
-        const lastNames = lastNamesPart.trim();
-        const firstNames = firstNamesPart.trim();
+        const commaIndex = trimmedInput.indexOf(',');
+        const lastNames = trimmedInput.slice(0, commaIndex).trim();
+        const firstNames = trimmedInput.slice(commaIndex + 1).trim();
         if (!lastNames) {
             return null;
         }
-        return {
-            first_names: firstNames,
-            last_names: lastNames
-        };
+        return { first_names: firstNames, last_names: lastNames };
     }
 
-    const nameParts = trimmedInput.split(/\s+/).filter(Boolean);
-    if (!nameParts.length) {
-        return null;
-    }
-
-    if (nameParts.length === 1) {
-        return {
-            first_names: '',
-            last_names: nameParts[0]
-        };
-    }
-
-    return {
-        first_names: nameParts.slice(0, -1).join(' '),
-        last_names: nameParts[nameParts.length - 1]
-    };
+    return { first_names: '', last_names: trimmedInput };
 }
 
 /**
@@ -317,28 +307,84 @@ function initAuthorTomSelect(authorInput, feedbackElement) {
     });
 }
 
+/**
+ * Delete a quick-created source from the database via the quick-create endpoint.
+ * Silently ignores failures (e.g. network errors) since the source may already
+ * have been saved as part of the parent form.
+ */
+async function deleteQuickCreatedSource(sourceId, quickCreateUrl) {
+    if (!sourceId || !quickCreateUrl) {
+        return;
+    }
+    try {
+        await fetch(quickCreateUrl, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ id: sourceId })
+        });
+    } catch (_) {
+        // Silently ignore network errors — the source will remain but that is
+        // preferable to blocking the user.
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     // Initialize all source list widgets on the page
     document.querySelectorAll('input.source-tomselect-add').forEach(function (input) {
-        // Validate element type
+        if (input.dataset.sourceListWidgetInitialized === 'true') {
+            return;
+        }
+
         if (input.tagName !== 'INPUT') {
             console.warn('Expected input element but found:', input.tagName);
             return;
         }
 
-        // Get configuration from data attributes
+        // Guard against duplicate script inclusion / re-initialization.
+        input.dataset.sourceListWidgetInitialized = 'true';
+
+        const widgetContainer = input.closest('.source-list-widget-container');
+
+        // --- Configuration from data attributes ---
         const targetSelectId = input.dataset.targetSelect;
-        const targetSelect = document.getElementById(targetSelectId);
-        const listElement = document.getElementById(targetSelectId + '_list');
-        const emptyMessage = document.getElementById(targetSelectId + '_empty');
-        const feedbackElement = document.getElementById(targetSelectId + '_feedback');
+        const targetSelect = widgetContainer
+            ? widgetContainer.querySelector(`select[id="${targetSelectId}"]`)
+            : document.getElementById(targetSelectId);
+        const listElement = widgetContainer
+            ? widgetContainer.querySelector('ul.list-group')
+            : document.getElementById(targetSelectId + '_list');
+        const emptyMessage = widgetContainer
+            ? widgetContainer.querySelector('p[id$="_empty"]')
+            : document.getElementById(targetSelectId + '_empty');
+        const feedbackElement = widgetContainer
+            ? widgetContainer.querySelector('p[id$="_feedback"]')
+            : document.getElementById(targetSelectId + '_feedback');
         const autocompleteUrl = input.dataset.autocompleteUrl;
         const quickCreateUrl = input.dataset.quickCreateUrl;
         const labelField = input.dataset.labelField;
-        const authorsInput = document.getElementById(targetSelectId + '_authors');
-        const yearInput = document.getElementById(targetSelectId + '_year');
+        const authorsInput = widgetContainer
+            ? widgetContainer.querySelector('input.source-author-tomselect-add')
+            : document.getElementById(targetSelectId + '_authors');
+        const yearInput = widgetContainer
+            ? widgetContainer.querySelector('input.source-year-input')
+            : document.getElementById(targetSelectId + '_year');
+        const newTitleInput = widgetContainer
+            ? widgetContainer.querySelector('input.source-new-title')
+            : document.getElementById(targetSelectId + '_new_title');
 
-        // Destroy any existing TomSelect instance
+        if (!targetSelect || !listElement) {
+            return;
+        }
+
+        // Track IDs of sources created via quick-create in this widget session
+        // so we can delete them if the user removes them before saving.
+        const quickCreatedIds = new Set();
+
+        // --- Author TomSelect for the create-new-source section ---
         if (input.tomselect) {
             input.tomselect.destroy();
         }
@@ -349,14 +395,12 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!authorTomSelect || !authorTomSelect.items.length) {
                 return [];
             }
-
             return authorTomSelect.items
                 .map(function (authorId) {
                     const option = authorTomSelect.options[authorId];
                     if (!option) {
                         return null;
                     }
-
                     return {
                         id: String(authorId),
                         first_names: option.first_names || '',
@@ -366,50 +410,33 @@ document.addEventListener('DOMContentLoaded', function () {
                 .filter(Boolean);
         };
 
-        const createHandler = quickCreateUrl ? function (userInput, callback) {
-            const yearValue = yearInput ? yearInput.value : '';
-            const selectedAuthors = buildAuthorMetadata();
+        // --- Helper: add a source to the visible list and hidden select ---
+        function addSourceToWidget(sourceId, sourceLabel, isQuickCreated) {
+            // Guard against duplicates
+            if (targetSelect.querySelector(`option[value="${sourceId}"]`)) {
+                return;
+            }
 
-            createSourceFromInput(userInput, quickCreateUrl, feedbackElement, {
-                year: yearValue,
-                authors: selectedAuthors
-            })
-                .then(createdSource => {
-                    if (!createdSource || !createdSource.id) {
-                        callback();
-                        return;
-                    }
+            if (isQuickCreated) {
+                quickCreatedIds.add(String(sourceId));
+            }
 
-                    if (authorTomSelect) {
-                        authorTomSelect.clear(true);
-                    }
-                    if (yearInput) {
-                        yearInput.value = '';
-                    }
+            clearFeedback(feedbackElement);
 
-                    const optionLabel =
-                        createdSource[labelField] ||
-                        createdSource.label ||
-                        createdSource.text ||
-                        createdSource.title ||
-                        userInput;
+            const optionElement = document.createElement('option');
+            optionElement.value = sourceId;
+            optionElement.text = sourceLabel;
+            optionElement.selected = true;
+            targetSelect.appendChild(optionElement);
 
-                    callback({
-                        id: String(createdSource.id),
-                        title: createdSource.title || userInput,
-                        [labelField]: optionLabel
-                    });
-                })
-                .catch(() => {
-                    showFeedback(
-                        feedbackElement,
-                        'Could not create source. Please try again.'
-                    );
-                    callback();
-                });
-        } : false;
+            addSourceToList(listElement, sourceId, sourceLabel, targetSelect);
 
-        // Initialize TomSelect for autocomplete
+            if (emptyMessage) {
+                emptyMessage.style.display = 'none';
+            }
+        }
+
+        // --- Search TomSelect (no create handler — search only) ---
         const tomselect = new TomSelect(input, {
             valueField: 'id',
             labelField: labelField,
@@ -418,14 +445,9 @@ document.addEventListener('DOMContentLoaded', function () {
             maxOptions: 50,
             loadThrottle: 300,
             preload: 'focus',
-            create: createHandler,
+            create: false,
             persist: false,
 
-            createFilter: function (userInput) {
-                return !!(userInput && userInput.trim());
-            },
-
-            // Load options from autocomplete endpoint
             load: function (query, callback) {
                 const url = autocompleteUrl + (query ? '?q=' + encodeURIComponent(query) : '');
                 fetch(url)
@@ -439,20 +461,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
             },
 
-            // When a source is selected, add it to the list
             onChange: function (value) {
                 if (!value) return;
 
                 const option = tomselect.options[value];
                 if (!option) return;
-
-                // Check if already selected
-                if (targetSelect.querySelector(`option[value="${value}"]`)) {
-                    tomselect.clear();
-                    return;
-                }
-
-                clearFeedback(feedbackElement);
 
                 const sourceLabel =
                     option[labelField] ||
@@ -461,42 +474,86 @@ document.addEventListener('DOMContentLoaded', function () {
                     option.title ||
                     value;
 
-                // Add to hidden select for form submission
-                const optionElement = document.createElement('option');
-                optionElement.value = value;
-                optionElement.text = sourceLabel;
-                optionElement.selected = true;
-                targetSelect.appendChild(optionElement);
-
-                // Add to visible list
-                addSourceToList(listElement, value, sourceLabel, targetSelect);
-
-                // Clear the search input
+                addSourceToWidget(value, sourceLabel, false);
                 tomselect.clear();
-
-                // Hide empty message
-                if (emptyMessage) {
-                    emptyMessage.style.display = 'none';
-                }
             },
 
-            // Render functions
             render: {
                 option: function (data, escape) {
-                    return '<div class="option">' + escape(data[labelField]) + '</div>';
+                    return '<div class="option">' + escape(data[labelField] || '') + '</div>';
                 },
                 item: function (data, escape) {
-                    return '<div>' + escape(data[labelField]) + '</div>';
+                    return '<div>' + escape(data[labelField] || '') + '</div>';
                 }
             },
 
-            placeholder: 'Search sources...',
             plugins: ['clear_button'],
             closeAfterSelect: true,
             hideSelected: true
         });
 
-        // Handle remove button clicks
+        // --- "Add source" button handler ---
+        const createBtn = widgetContainer
+            ? widgetContainer.querySelector(
+                `.source-create-btn[data-target-select="${targetSelectId}"]`
+            )
+            : document.querySelector(
+                `.source-create-btn[data-target-select="${targetSelectId}"]`
+            );
+
+        if (createBtn && quickCreateUrl) {
+            createBtn.addEventListener('click', async function () {
+                const title = newTitleInput ? newTitleInput.value.trim() : '';
+                if (!title) {
+                    showFeedback(feedbackElement, 'Please enter a title for the new source.');
+                    if (newTitleInput) {
+                        newTitleInput.focus();
+                    }
+                    return;
+                }
+
+                const yearValue = yearInput ? yearInput.value.trim() : '';
+                const selectedAuthors = buildAuthorMetadata();
+
+                createBtn.disabled = true;
+                clearFeedback(feedbackElement);
+
+                const createdSource = await createSourceFromInput(
+                    title,
+                    quickCreateUrl,
+                    feedbackElement,
+                    { year: yearValue, authors: selectedAuthors }
+                ).catch(() => null);
+
+                createBtn.disabled = false;
+
+                if (!createdSource || !createdSource.id) {
+                    return;
+                }
+
+                const optionLabel =
+                    createdSource[labelField] ||
+                    createdSource.label ||
+                    createdSource.text ||
+                    createdSource.title ||
+                    title;
+
+                addSourceToWidget(String(createdSource.id), optionLabel, true);
+
+                // Clear the create-new-source form
+                if (newTitleInput) {
+                    newTitleInput.value = '';
+                }
+                if (authorTomSelect) {
+                    authorTomSelect.clear(true);
+                }
+                if (yearInput) {
+                    yearInput.value = '';
+                }
+            });
+        }
+
+        // --- Remove button / modal link handler ---
         listElement.addEventListener('click', function (e) {
             const modalLink = e.target.closest('a.modal-link');
             if (modalLink && listElement.contains(modalLink)) {
@@ -513,7 +570,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 : e.target.closest('.source-remove-btn');
 
             if (removeBtn) {
-                const sourceId = removeBtn.dataset.value;
+                const sourceId = String(removeBtn.dataset.value);
+
+                // If this was quick-created in this session, delete it from the DB
+                if (quickCreatedIds.has(sourceId) && quickCreateUrl) {
+                    quickCreatedIds.delete(sourceId);
+                    deleteQuickCreatedSource(sourceId, quickCreateUrl);
+                }
 
                 // Remove from hidden select
                 const option = targetSelect.querySelector(`option[value="${sourceId}"]`);
@@ -527,18 +590,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     li.remove();
                 }
 
-                // Show empty message if no sources left
                 if (listElement.children.length === 0 && emptyMessage) {
                     emptyMessage.style.display = 'block';
                 }
             }
         });
 
-        // Ensure all options are selected on form submit
+        // --- Ensure all options are selected on form submit ---
         const form = targetSelect.closest('form');
         if (form) {
             form.addEventListener('submit', function () {
-                // Select all options in the hidden select to ensure they're submitted
                 Array.from(targetSelect.options).forEach(option => {
                     option.selected = true;
                 });

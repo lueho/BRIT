@@ -26,12 +26,13 @@
     </div>
 
     <div class="card-body">
-        {# TomSelect input for adding new sources #}
+        {# Section 1: Search and add existing sources #}
         <div class="source-add-section mb-3">
+            <label class="form-label small fw-semibold mb-1">Search existing sources</label>
             <input type="text"
                    id="{{ widget.attrs.id }}_add"
                    class="form-control source-tomselect-add"
-                   placeholder="Search by title or abbreviation..."
+                   placeholder="Search by title, author or abbreviation..."
                    value=""
                    data-autocomplete-url="{% url widget.autocomplete_url %}"
                    data-quick-create-url="{% url 'source-quick-create' %}"
@@ -39,28 +40,45 @@
                    data-author-quick-create-url="{% url 'author-quick-create' %}"
                    data-label-field="{{ widget.label_field }}"
                    data-target-select="{{ widget.attrs.id }}">
-            <p class="text-muted small mt-2 mb-0">Can't find a source? Type a title and press Enter to create it.</p>
-            <details class="mt-2">
-                <summary class="small text-muted">Optional: add authors and year</summary>
-                <div class="mt-2">
-                    <label class="form-label small mb-1" for="{{ widget.attrs.id }}_authors">Authors</label>
-                    <input type="text"
-                           id="{{ widget.attrs.id }}_authors"
-                           class="form-control form-control-sm source-author-tomselect-add"
-                           placeholder="Search or type author and press Enter"
-                           data-author-autocomplete-url="{% url 'author-autocomplete' %}"
-                           data-author-quick-create-url="{% url 'author-quick-create' %}">
-                </div>
-                <div class="mt-2">
-                    <label class="form-label small mb-1" for="{{ widget.attrs.id }}_year">Year</label>
-                    <input type="number"
-                           id="{{ widget.attrs.id }}_year"
-                           class="form-control form-control-sm source-year-input"
-                           min="0"
-                           step="1"
-                           placeholder="e.g. 2024">
-                </div>
-            </details>
+        </div>
+
+        {# Section 2: Create a new source #}
+        <div class="source-create-section border rounded p-3 bg-light mb-3"
+             id="{{ widget.attrs.id }}_create_section">
+            <p class="small fw-semibold mb-2">Create new source</p>
+            <div class="mb-2">
+                <label class="form-label small mb-1" for="{{ widget.attrs.id }}_new_title">
+                    Title <span class="text-danger">*</span>
+                </label>
+                <input type="text"
+                       id="{{ widget.attrs.id }}_new_title"
+                       class="form-control form-control-sm source-new-title"
+                       placeholder="Publication title">
+            </div>
+            <div class="mb-2">
+                <label class="form-label small mb-1" for="{{ widget.attrs.id }}_authors">Authors</label>
+                <input type="text"
+                       id="{{ widget.attrs.id }}_authors"
+                       class="form-control form-control-sm source-author-tomselect-add"
+                       placeholder="Search or type name, then press Enter to add"
+                       data-author-autocomplete-url="{% url 'author-autocomplete' %}"
+                       data-author-quick-create-url="{% url 'author-quick-create' %}">
+                <p class="text-muted small mt-1 mb-0">
+                    For organisations or single names, type the full name and press Enter. For persons, use "Last, First" format.
+                </p>
+            </div>
+            <div class="mb-2">
+                <label class="form-label small mb-1" for="{{ widget.attrs.id }}_year">Year</label>
+                <input type="number"
+                       id="{{ widget.attrs.id }}_year"
+                       class="form-control form-control-sm source-year-input"
+                       min="0"
+                       step="1"
+                       placeholder="e.g. 2024">
+            </div>
+            <button type="button"
+                    class="btn btn-sm btn-primary source-create-btn"
+                    data-target-select="{{ widget.attrs.id }}">Add source</button>
             <p class="text-danger small mt-2 mb-0 d-none"
                id="{{ widget.attrs.id }}_feedback"></p>
         </div>

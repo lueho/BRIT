@@ -426,6 +426,37 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
             status=201,
         )
 
+    def delete(self, request, *args, **kwargs):
+        """Delete a quick-created Source owned by the requesting user.
+
+        Only sources that were created by the requesting user and have not yet
+        been published (i.e. still in draft/private state) may be deleted via
+        this endpoint.  This prevents orphaned records when the user removes a
+        just-created source from the widget before saving the parent form.
+        """
+        try:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            payload = {}
+
+        source_id = payload.get("id")
+        if not source_id:
+            return JsonResponse({"error": "Source id is required."}, status=400)
+
+        try:
+            source = Source.objects.get(pk=int(source_id), owner=request.user)
+        except (Source.DoesNotExist, TypeError, ValueError):
+            return JsonResponse({"error": "Source not found."}, status=404)
+
+        if source.publication_status == "published":
+            return JsonResponse(
+                {"error": "Published sources cannot be deleted via this endpoint."},
+                status=403,
+            )
+
+        source.delete()
+        return JsonResponse({"deleted": True}, status=200)
+
 
 class SourceCheckUrlView(LoginRequiredMixin, View):
     object = None

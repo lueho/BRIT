@@ -152,6 +152,25 @@ class AuthorQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(payload["id"], existing.pk)
         self.assertEqual(Author.objects.filter(last_names="Lovelace").count(), 1)
 
+    def test_post_http_201_creates_organisation_author_with_empty_first_names(self):
+        """Organisation names passed as last_names should be stored verbatim."""
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("author-quick-create"),
+            data=json.dumps(
+                {"first_names": "", "last_names": "European Environment Agency"}
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        author = Author.objects.get(pk=payload["id"])
+
+        self.assertEqual(author.first_names, "")
+        self.assertEqual(author.last_names, "European Environment Agency")
+        self.assertEqual(payload["label"], "European Environment Agency")
+
 
 # ----------- Licence CRUD ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -644,3 +663,69 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         created_author = source.sourceauthors.first().author
         self.assertEqual(created_author.first_names, "Ada")
         self.assertEqual(created_author.last_names, "Lovelace")
+
+    def test_delete_http_302_redirect_to_login_for_anonymous(self):
+        self.client.force_login(self.member)
+        source = Source.objects.create(owner=self.member, title="To delete")
+        self.client.logout()
+
+        response = self.client.delete(
+            reverse("source-quick-create"),
+            data=json.dumps({"id": source.pk}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_delete_http_200_owner_can_delete_own_unpublished_source(self):
+        self.client.force_login(self.member)
+        source = Source.objects.create(owner=self.member, title="To delete")
+
+        response = self.client.delete(
+            reverse("source-quick-create"),
+            data=json.dumps({"id": source.pk}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Source.objects.filter(pk=source.pk).exists())
+
+    def test_delete_http_404_cannot_delete_another_users_source(self):
+        self.client.force_login(self.member)
+        other_source = Source.objects.create(owner=self.outsider, title="Other source")
+
+        response = self.client.delete(
+            reverse("source-quick-create"),
+            data=json.dumps({"id": other_source.pk}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Source.objects.filter(pk=other_source.pk).exists())
+
+    def test_delete_http_403_cannot_delete_published_source(self):
+        self.client.force_login(self.member)
+        source = Source.objects.create(
+            owner=self.member,
+            title="Published source",
+            publication_status="published",
+        )
+
+        response = self.client.delete(
+            reverse("source-quick-create"),
+            data=json.dumps({"id": source.pk}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Source.objects.filter(pk=source.pk).exists())
+
+    def test_delete_http_400_when_id_is_missing(self):
+        self.client.force_login(self.member)
+
+        response = self.client.delete(
+            reverse("source-quick-create"),
+            data=json.dumps({}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
