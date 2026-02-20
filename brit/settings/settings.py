@@ -244,12 +244,7 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 COOKIE_CONSENT_NAME = "cookie_consent"
 
 CELERY_BROKER_URL = os.environ.get("REDIS_URL")
-_redis_url = os.environ.get("REDIS_URL", "")
-CELERY_RESULT_BACKEND = (
-    f"{_redis_url}{'&' if '?' in _redis_url else '?'}ssl_cert_reqs=none"
-    if _redis_url.startswith("rediss://")
-    else _redis_url
-)
+CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
 CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
 CELERY_REDIS_BACKEND_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
 
