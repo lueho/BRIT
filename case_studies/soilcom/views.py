@@ -830,6 +830,35 @@ class AggregatedCollectionPropertyValueUpdateView(
             kwargs.update({"owner": self.request.user})
         return super().get_formset_kwargs(**kwargs)
 
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = self.get_form()
+        formset = self.get_formset()
+
+        if form.is_valid() and formset.is_valid():
+            self.object = form.save()
+
+            # Capture bibliographic sources saved by the form before the formset
+            # overwrites the sources M2M via .set() with only WasteFlyer objects.
+            bibliographic_sources = list(
+                self.object.sources.exclude(type="waste_flyer").values_list(
+                    "pk", flat=True
+                )
+            )
+
+            formset.parent_object = self.object
+            formset.save()
+
+            # Re-add bibliographic sources that were wiped by formset.save()
+            if bibliographic_sources:
+                self.object.sources.add(*bibliographic_sources)
+
+            return HttpResponseRedirect(self.get_success_url())
+        else:
+            return self.render_to_response(
+                self.get_context_data(form=form, formset=formset)
+            )
+
 
 class AggregatedCollectionPropertyValueModalDeleteView(
     UserCreatedObjectModalDeleteView
