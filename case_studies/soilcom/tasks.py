@@ -13,18 +13,23 @@ def check_wasteflyer_url(pk):
     flyer = WasteFlyer.objects.get(pk=pk)
     url_valid = check_url(flyer.url)
 
-    if not url_valid:
-        collection_year = (
-            flyer.collections.exclude(valid_from__isnull=True)
-            .order_by("-valid_from")
-            .values_list("valid_from__year", flat=True)
-            .first()
-        )
-        if collection_year:
-            wayback_url = find_wayback_snapshot_for_year(flyer.url, collection_year)
-            if wayback_url:
-                flyer.url = wayback_url
-                url_valid = True
+    if flyer.url and "web.archive.org" in flyer.url:
+        flyer.url_valid = url_valid
+        flyer.url_checked = timezone.localdate()
+        flyer.save()
+        return True
+
+    collection_year = (
+        flyer.collections.exclude(valid_from__isnull=True)
+        .order_by("-valid_from")
+        .values_list("valid_from__year", flat=True)
+        .first()
+    )
+    if collection_year:
+        wayback_url = find_wayback_snapshot_for_year(flyer.url, collection_year)
+        if wayback_url:
+            flyer.url = wayback_url
+            url_valid = True
 
     flyer.url_valid = url_valid
     flyer.url_checked = timezone.localdate()

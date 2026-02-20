@@ -116,3 +116,45 @@ class CheckWasteFlyerUrlWaybackFallbackTestCase(TestCase):
         self.assertFalse(self.flyer.url_valid)
         self.assertEqual(self.flyer.url, original_url)
         mock_wayback.assert_called_once_with(original_url, 2021)
+
+    def test_replaces_live_url_with_year_snapshot(self, mock_check_url, mock_wayback):
+        original_url = self.flyer.url
+        mock_check_url.return_value = True
+        mock_wayback.return_value = (
+            "https://web.archive.org/web/20211230153000/"
+            "https://example.com/dead-flyer.pdf"
+        )
+
+        check_wasteflyer_url(self.flyer.pk)
+
+        self.flyer.refresh_from_db()
+        self.assertTrue(self.flyer.url_valid)
+        self.assertEqual(self.flyer.url, mock_wayback.return_value)
+        mock_wayback.assert_called_once_with(original_url, 2021)
+
+    def test_keeps_live_url_when_no_snapshot_exists(self, mock_check_url, mock_wayback):
+        original_url = self.flyer.url
+        mock_check_url.return_value = True
+        mock_wayback.return_value = None
+
+        check_wasteflyer_url(self.flyer.pk)
+
+        self.flyer.refresh_from_db()
+        self.assertTrue(self.flyer.url_valid)
+        self.assertEqual(self.flyer.url, original_url)
+        mock_wayback.assert_called_once_with(original_url, 2021)
+
+    def test_skips_wayback_lookup_when_url_is_already_archived(
+        self, mock_check_url, mock_wayback
+    ):
+        with mute_signals(signals.post_save):
+            self.flyer.url = (
+                "https://web.archive.org/web/20211230153000/"
+                "https://example.com/dead-flyer.pdf"
+            )
+            self.flyer.save()
+        mock_check_url.return_value = True
+
+        check_wasteflyer_url(self.flyer.pk)
+
+        mock_wayback.assert_not_called()
