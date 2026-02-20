@@ -722,9 +722,21 @@ class CollectionPropertyValueUpdateView(
             instance.collection = anchor
 
         self.object = form.save()
+
+        # Capture bibliographic sources saved by the form before the formset
+        # overwrites the sources M2M via .set() with only WasteFlyer objects.
+        bibliographic_sources = list(
+            self.object.sources.exclude(type="waste_flyer").values_list("pk", flat=True)
+        )
+
         # Update formset's parent_object so it can set the M2M relationship
         formset.parent_object = self.object
         formset.save()
+
+        # Re-add bibliographic sources that were wiped by formset.save()
+        if bibliographic_sources:
+            self.object.sources.add(*bibliographic_sources)
+
         return HttpResponseRedirect(self.get_success_url())
 
     def forms_invalid(self, form, formset):
