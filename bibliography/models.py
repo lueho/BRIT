@@ -1,7 +1,7 @@
 import string
 
 import celery
-from django.db import models
+from django.db import models, transaction
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
@@ -218,8 +218,10 @@ class Source(UserCreatedObject):
 
 @receiver(post_save, sender=Source)
 def check_url_valid(sender, instance, created, **kwargs):
-    if created:
-        celery.current_app.send_task("check_source_url", (instance.pk,))
+    if created and instance.url:
+        transaction.on_commit(
+            lambda: celery.current_app.send_task("check_source_url", (instance.pk,))
+        )
 
 
 @receiver(post_save, sender="bibliography.SourceAuthor")
