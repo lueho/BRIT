@@ -3,6 +3,8 @@ from datetime import timedelta
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Column, Div, Field, Layout, Row
 from django.core.exceptions import ValidationError
+from django.db.models import Case, Value, When
+from django.db.models import IntegerField as DBIntegerField
 from django.forms import (
     CheckboxSelectMultiple,
     ChoiceField,
@@ -445,9 +447,42 @@ class CollectionModelForm(
     Model form for Collection, including all collection parameters and waste stream fields.
     """
 
+    _WASTE_COMPONENT_ORDER = {
+        "Food waste: Non-processed animal-based": 10,
+        "Food waste: Non-processed plant-based": 20,
+        "Food waste: Processed animal-based": 30,
+        "Food waste: Processed plant-based": 40,
+        "Garden waste: Hard materials": 50,
+        "Garden waste: Soft materials": 60,
+        "Collection Support Item: Biodegradable plastic bags": 70,
+        "Collection Support Item: Paper bags": 80,
+        "Collection Support Item: Newspaper": 90,
+        "Collection Support Item: Plastic bags": 100,
+        "Other: Paper tissue": 110,
+        "Other: Soil": 120,
+    }
+
     def __init__(self, *args, predecessor=None, **kwargs):
         self.predecessor = predecessor
         super().__init__(*args, **kwargs)
+        qs = self._ordered_waste_component_qs()
+        self.fields["allowed_materials"].queryset = qs
+        self.fields["forbidden_materials"].queryset = qs
+
+    @classmethod
+    def _ordered_waste_component_qs(cls):
+        """Return WasteComponents with explicit display order; unknown materials sort last by name."""
+        whens = [
+            When(name=name, then=Value(pos))
+            for name, pos in cls._WASTE_COMPONENT_ORDER.items()
+        ]
+        return WasteComponent.objects.annotate(
+            _display_order=Case(
+                *whens,
+                default=Value(999),
+                output_field=DBIntegerField(),
+            )
+        ).order_by("_display_order", "name")
 
     catchment = TomSelectModelChoiceField(
         config=TomSelectConfig(
