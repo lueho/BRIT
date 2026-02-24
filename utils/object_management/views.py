@@ -1875,6 +1875,17 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
     allow_anonymous = True
     page_size = 15
 
+    def __init_subclass__(cls, **kwargs):
+        """Preserve inherited search_lookups/value_fields that the upstream
+        ``AutocompleteModelView.__init_subclass__`` would reset to ``[]``."""
+        super().__init_subclass__(**kwargs)
+        for attr in ("search_lookups", "value_fields"):
+            if attr not in cls.__dict__:
+                for base in cls.__mro__[1:]:
+                    if attr in base.__dict__:
+                        setattr(cls, attr, list(base.__dict__[attr]))
+                        break
+
     def hook_queryset(self, queryset):
         qs = filter_queryset_for_user(queryset, self.request.user)
         try:
