@@ -7,40 +7,40 @@ requires-python = ">=3.12"
 dependencies = [
     # Core Django and web framework
     "django>=5.2.4",
-    "djangorestframework>=3.16.0",
+    "djangorestframework>=3.16.1",
     "djangorestframework-csv>=3.0.2",
     "djangorestframework-gis>=1.2.0",
-    "gunicorn>=23.0.0",
+    "gunicorn>=25.1.0",
     "whitenoise>=6.9.0",
     # Database and caching
-    "dj-database-url>=3.0.1",
+    "dj-database-url>=3.1.2",
     "django-redis>=6.0.0",
     "psycopg2-binary>=2.9.0",
     # Task queue
     "celery>=5.6",
-    "tblib>=3.1.0",
+    "tblib>=3.2.2",
     # UI and forms
-    "django-crispy-forms>=2.4",
+    "django-crispy-forms>=2.5",
     "crispy-bootstrap5>=2025.6",
     "django-bootstrap-modal-forms>=3.0.5",
-    "django-tomselect>=2025.7.1",
+    "django-tomselect>=2026.1.3",
     "django-extra-views>=0.16.0",
     # Geographic and mapping
     "django-geojson>=4.2.0",
-    "django-leaflet>=0.32.0",
+    "django-leaflet>=0.33.0",
     # User management and utilities
     "django-registration-redux>=2.13",
     "django-cookie-consent>=0.6.0",
     # File storage and processing
     "django-storages>=1.14.6",
-    "boto3>=1.39.13",
-    "pillow>=11.3.0",
+    "boto3>=1.42.55",
+    "pillow>=12.1.1",
     "openpyxl>=3.1.5",
-    "xlsxwriter>=3.2.5",
+    "xlsxwriter>=3.2.9",
     # Utilities
-    "ambient-toolbox>=12.4.4",
-    "requests>=2.32.4",
-    "django-tree-queries>=0.20.0",
+    "ambient-toolbox>=12.7.3",
+    "requests>=2.32.5",
+    "django-tree-queries>=0.23.1",
     "pint>=0.23",
 
 ]
@@ -48,25 +48,22 @@ dependencies = [
 [dependency-groups]
 dev = [
     # Development and debugging
-    "django-debug-toolbar>=6.0.0",
+    "django-debug-toolbar>=6.2.0",
     "django-extensions>=3.2.0",
 
     # Testing
     "factory-boy>=3.3.3",
-    "pytest>=7.4.0",
-    "pytest-django>=4.5.0",
-    "pytest-cov>=4.1.0",
 
     # Code quality
-    "ruff>=0.6.4",
-    "pre-commit>=3.8.0",
+    "ruff>=0.15.2",
+    "pre-commit>=4.5.1",
     "mypy>=1.5.0",
     "djlint>=1.36.4",
 
     # Documentation
     "mkdocs>=1.6.1",
-    "mkdocs-material>=9.6.15",
-    "mkdocstrings[python]>=0.30.0",
+    "mkdocs-material>=9.7.2",
+    "mkdocstrings[python]>=1.0.3",
 
     # Monitoring
     "flower>=2.0.1",
