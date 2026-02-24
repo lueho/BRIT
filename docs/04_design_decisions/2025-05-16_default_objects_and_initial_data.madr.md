@@ -34,8 +34,7 @@ Recent refactors have unified and clarified the canonical pattern for managing d
 - Tests and business logic must never conflate these roles.
 
 ### 5. **Documentation and review**
-- The canonical pattern is documented in `notes/default_objects_and_initial_data_review.md`.
-- This ADR is referenced in onboarding and code review checklists.
+- This ADR is the canonical reference and is linked from onboarding and code review checklists.
 
 ## Consequences
 - DRY, explicit, and robust management of initial data and default objects
@@ -48,7 +47,6 @@ Recent refactors have unified and clarified the canonical pattern for managing d
 - Allowing helpers to create missing objects (rejected: hides errors, leads to inconsistent state)
 
 ## References
-- `notes/default_objects_and_initial_data_review.md`
 - Initial data management command and dependency resolution logic
 - Code review and CI onboarding docs
 

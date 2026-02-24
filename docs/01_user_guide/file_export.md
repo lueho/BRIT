@@ -84,7 +84,6 @@ This approach is fully general and supports any number of extra parameters or fi
 
 - If you are migrating an old export, remove any code that passes or expects lists of IDs.
 - Update your export views and tasks to use filter parameters and context instead.
-- See `notes/planning/file_export_object_workflow_plan.md` for the full rationale and migration checklist.
 
 ---
 
@@ -101,7 +100,7 @@ This approach is fully general and supports any number of extra parameters or fi
 ---
 
 ## Questions?
-- See `notes/planning/file_export_object_workflow_plan.md` for design decisions and technical details.
+- For implementation details, see `utils/file_export/README.md` and the code in `utils/file_export/`.
 - Contact the engineering team for further help.
 
 ---

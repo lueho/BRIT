@@ -17,7 +17,7 @@ This document outlines the coding and documentation conventions for the BRIT pro
 - Name templates with the pattern `<app>/<model>_<action>.html` (e.g., `maps/location_list.html`).
 - Use plural for app names (e.g., `users`, `materials`).
 - Place static files in the app’s `static/<app>/` directory.
-- **All ForeignKey fields with a default must use fetch-only helpers from `utils.py`, never from `models.py`, and never create objects.** See the [canonical note](../../notes/default_objects_and_initial_data_review.md) and [MADR](../../notes/02_design_decisions/2025-05-16_default_objects_and_initial_data.madr.md).
+- **All ForeignKey fields with a default must use fetch-only helpers from `utils.py`, never from `models.py`, and never create objects.** See [Initial Data Management](initial_data_management.md) and the [MADR](../04_design_decisions/2025-05-16_default_objects_and_initial_data.madr.md).
 
 ## JavaScript
 - Use ES6 syntax and features.
