@@ -1941,5 +1941,9 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
                 lookup,
             )
             return queryset
-        else:
+
+        try:
+            return queryset.filter(**{lookup: value})
+        except Exception as e:
+            logger.error(f"Error applying filter {lookup}={value!r}: {e}")
             return queryset
