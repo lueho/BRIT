@@ -64,10 +64,21 @@ class RegionModelForm(SimpleModelForm):
         model = Region
         fields = ("name", "geom", "country", "description")
 
+    def __init__(self, *args, **kwargs):
+        instance = kwargs.get("instance")
+        super().__init__(*args, **kwargs)
+        if (
+            instance
+            and getattr(instance, "pk", None)
+            and instance.geom is not None
+            and "geom" not in self.initial
+        ):
+            self.initial["geom"] = instance.geom
+
     def save(self, commit=True):
         geom = self.cleaned_data.pop("geom")
         instance = super().save(commit=False)
-        instance.borders = GeoPolygon.objects.create(geom=geom)
+        instance.geom = geom
         if commit:
             instance.save()
         return instance

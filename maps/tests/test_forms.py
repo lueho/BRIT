@@ -7,7 +7,6 @@ from ..models import LauRegion, Region
 
 
 class RegionModelFormTestCase(TestCase):
-
     def test_valid_form_submission(self):
         poly = MultiPolygon(Polygon(((0, 0), (1, 1), (1, 0), (0, 0))))
 
@@ -62,9 +61,51 @@ class RegionModelFormTestCase(TestCase):
         self.assertIsNotNone(region.borders.pk)
         self.assertEqual(region.borders.geom, poly)
 
+    def test_edit_form_prepopulates_geom_initial(self):
+        poly = MultiPolygon(Polygon(((0, 0), (1, 1), (1, 0), (0, 0))))
+        region = Region.objects.create(
+            name="Existing Region",
+            country="DE",
+            borders=Region._meta.get_field("borders").related_model.objects.create(
+                geom=poly
+            ),
+        )
+
+        form = RegionModelForm(instance=region)
+
+        self.assertIn("geom", form.initial)
+        self.assertEqual(form.initial["geom"], poly)
+
+    def test_save_updates_existing_region_geometry(self):
+        original_poly = MultiPolygon(Polygon(((0, 0), (1, 1), (1, 0), (0, 0))))
+        updated_poly = MultiPolygon(Polygon(((0, 0), (2, 2), (2, 0), (0, 0))))
+        region = Region.objects.create(
+            name="Existing Region",
+            country="DE",
+            borders=Region._meta.get_field("borders").related_model.objects.create(
+                geom=original_poly
+            ),
+        )
+        original_borders_pk = region.borders_id
+
+        form = RegionModelForm(
+            data={
+                "name": region.name,
+                "country": region.country,
+                "description": region.description,
+                "geom": updated_poly,
+            },
+            instance=region,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        updated_region = form.save()
+
+        self.assertEqual(updated_region.borders_id, original_borders_pk)
+        self.assertEqual(updated_region.borders.geom, updated_poly)
+
 
 class TestRegionMergeFormset(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         lau = LauRegion.objects.create(
