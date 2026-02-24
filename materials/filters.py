@@ -1,5 +1,4 @@
 from django_filters import (
-    BooleanFilter,
     CharFilter,
     ChoiceFilter,
     DateFromToRangeFilter,
@@ -41,6 +40,7 @@ class MaterialListFilter(UserCreatedObjectScopedFilterSet):
         queryset=Material.objects.none(),
         field_name="name",
         label="Material Name",
+        empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url="material-autocomplete",
@@ -52,6 +52,7 @@ class MaterialListFilter(UserCreatedObjectScopedFilterSet):
         queryset=MaterialCategory.objects.all(),
         field_name="categories",
         label="Category",
+        empty_label="All",
     )
 
     def __init__(self, *args, **kwargs):
@@ -103,6 +104,7 @@ class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
         queryset=MaterialComponent.objects.none(),
         field_name="name",
         label="Component Name",
+        empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url="materialcomponent-autocomplete",
@@ -218,6 +220,7 @@ class SampleFilter(UserCreatedObjectScopedFilterSet):
         queryset=Sample.objects.none(),
         field_name="name",
         label="Sample Name",
+        empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url="sample-autocomplete",
@@ -229,13 +232,13 @@ class SampleFilter(UserCreatedObjectScopedFilterSet):
         queryset=Material.objects.filter(type="material"),
         field_name="material__name",
         label="Material",
+        empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url="material-autocomplete",
             )
         ),
     )
-    standalone = BooleanFilter(field_name="standalone", label="Standalone")
     created_at = DateFromToRangeFilter(field_name="created_at", label="Created")
 
     def __init__(self, *args, **kwargs):
@@ -267,7 +270,6 @@ class SampleFilter(UserCreatedObjectScopedFilterSet):
             "scope",
             "name",
             "material",
-            "standalone",
             "created_at",
         )
 
@@ -277,6 +279,7 @@ class PublishedSampleFilter(SampleFilter):
         queryset=Sample.objects.filter(publication_status="published"),
         field_name="name",
         label="Sample Name",
+        empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url="sample-autocomplete-published",
@@ -290,6 +293,7 @@ class UserOwnedSampleFilter(SampleFilter):
         queryset=Sample.objects.all(),
         field_name="name",
         label="Sample Name",
+        empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url="sample-autocomplete-owned",
@@ -303,6 +307,7 @@ class SampleSeriesFilter(UserCreatedObjectScopedFilterSet):
         queryset=Material.objects.filter(type="material"),
         field_name="material__name",
         label="Material",
+        empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url="material-autocomplete",
