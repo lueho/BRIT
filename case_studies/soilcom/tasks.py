@@ -10,7 +10,10 @@ from .models import WasteFlyer, WasteStream
 
 @app.task(name="check_wasteflyer_url", trail=True)
 def check_wasteflyer_url(pk):
-    flyer = WasteFlyer.objects.get(pk=pk)
+    flyer = WasteFlyer.objects.filter(pk=pk).first()
+    if flyer is None:
+        return False
+
     url_valid = check_url(flyer.url)
 
     if flyer.url and "web.archive.org" in flyer.url:

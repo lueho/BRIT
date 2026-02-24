@@ -158,3 +158,15 @@ class CheckWasteFlyerUrlWaybackFallbackTestCase(TestCase):
         check_wasteflyer_url(self.flyer.pk)
 
         mock_wayback.assert_not_called()
+
+    def test_returns_false_when_wasteflyer_was_deleted(
+        self, mock_check_url, mock_wayback
+    ):
+        flyer_pk = self.flyer.pk
+        self.flyer.delete()
+
+        result = check_wasteflyer_url(flyer_pk)
+
+        self.assertFalse(result)
+        mock_check_url.assert_not_called()
+        mock_wayback.assert_not_called()
