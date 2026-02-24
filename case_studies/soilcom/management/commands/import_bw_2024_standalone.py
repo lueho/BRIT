@@ -70,7 +70,9 @@ _SPECIFIC_KG_COLS = [
     (33, 2021),
 ]
 
-_SPECIFIC_MG_COLS = [
+# The BW sheet labels these as "Specific ... [t/year]", but the values are
+# total annual amounts and must map to "total waste collected" (Mg/a).
+_TOTAL_MG_COLS = [
     (34, 2022),
     (35, 2023),
     (36, 2024),
@@ -85,6 +87,7 @@ _BASIS_TO_UNIT = {
 _CONN_RATE_FALLBACK_UNIT = "% (of unknown reference)"
 
 _PROP_SPECIFIC = 1
+_PROP_TOTAL = 9
 _PROP_CONN_RATE = 4
 _UNIT_KG = "kg/(cap.*a)"
 _UNIT_MG = "Mg/a"
@@ -154,12 +157,12 @@ def _collect_property_values(row) -> list[dict]:
                 }
             )
 
-    for col, year in _SPECIFIC_MG_COLS:
+    for col, year in _TOTAL_MG_COLS:
         value = row[col]
         if value is not None:
             pvs.append(
                 {
-                    "property_id": _PROP_SPECIFIC,
+                    "property_id": _PROP_TOTAL,
                     "unit_name": _UNIT_MG,
                     "year": year,
                     "average": float(value),
