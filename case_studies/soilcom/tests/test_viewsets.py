@@ -5,6 +5,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 
+from case_studies.soilcom.importers import CollectionImporter
 from case_studies.soilcom.models import (
     AggregatedCollectionPropertyValue,
     Catchment,
@@ -19,7 +20,7 @@ from case_studies.soilcom.models import (
     WasteStream,
 )
 from case_studies.soilcom.viewsets import CollectionViewSet
-from utils.object_management.models import UserCreatedObject
+from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.properties.models import Property, Unit
 
 
@@ -502,3 +503,102 @@ class CollectionReviewActionApiTestCase(APITestCase):
         self.assertEqual(cpv_other.approved_by, self.staff)
         self.assertEqual(acpv_review.publication_status, "published")
         self.assertEqual(acpv_review.approved_by, self.staff)
+
+
+class CollectionImporterWorkflowTestCase(APITestCase):
+    """Verify CollectionImporter uses the proper submit_for_review workflow.
+
+    When publication_status='review', collections must be created as private
+    and then submitted via submit_for_review(), so that submitted_at is set
+    and a ReviewAction(submitted) is created — identical to the UI workflow.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        import datetime
+
+        cls.owner = User.objects.create_user(username="importer-owner")
+        cls.catchment = CollectionCatchment.objects.create(
+            name="Importer Test Catchment"
+        )
+        cls.collection_system = CollectionSystem.objects.create(
+            name="Importer Test System"
+        )
+        cls.waste_category = WasteCategory.objects.create(name="Importer Test Category")
+        cls.valid_from = datetime.date(2099, 6, 1)
+
+    def _make_record(self):
+        return {
+            "nuts_or_lau_id": None,
+            "catchment_name": self.catchment.name,
+            "collection_system": self.collection_system.name,
+            "waste_category": self.waste_category.name,
+            "valid_from": self.valid_from,
+            "valid_until": None,
+            "collector": None,
+            "fee_system": None,
+            "frequency": None,
+            "connection_type": None,
+            "min_bin_size": None,
+            "required_bin_capacity": None,
+            "required_bin_capacity_reference": None,
+            "allowed_materials": "",
+            "forbidden_materials": "",
+            "description": "",
+            "property_values": [],
+            "flyer_urls": [],
+        }
+
+    def test_import_as_private_stays_private(self):
+        """Collections imported with publication_status='private' have no ReviewAction."""
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        stats = importer.run([self._make_record()])
+        self.assertEqual(stats["created"], 1)
+
+        collection = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertEqual(collection.publication_status, "private")
+        self.assertIsNone(collection.submitted_at)
+        self.assertFalse(
+            ReviewAction.for_object(collection)
+            .filter(action=ReviewAction.ACTION_SUBMITTED)
+            .exists()
+        )
+        collection.delete()
+
+    def test_import_as_review_uses_submit_workflow(self):
+        """Collections imported with publication_status='review' go through submit_for_review()."""
+        importer = CollectionImporter(owner=self.owner, publication_status="review")
+        stats = importer.run([self._make_record()])
+        self.assertEqual(stats["created"], 1)
+
+        collection = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertEqual(collection.publication_status, "review")
+        self.assertIsNotNone(collection.submitted_at)
+        self.assertTrue(
+            ReviewAction.for_object(collection)
+            .filter(action=ReviewAction.ACTION_SUBMITTED)
+            .exists()
+        )
+        collection.delete()
+
+    def test_import_dry_run_creates_no_records(self):
+        """Dry run must not persist any collection or ReviewAction."""
+        importer = CollectionImporter(owner=self.owner, publication_status="review")
+        stats = importer.run([self._make_record()], dry_run=True)
+        self.assertEqual(stats["created"], 1)
+
+        self.assertFalse(
+            Collection.objects.filter(
+                owner=self.owner,
+                valid_from=self.valid_from,
+                collection_system=self.collection_system,
+            ).exists()
+        )

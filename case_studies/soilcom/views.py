@@ -37,6 +37,7 @@ from maps.views import (
 )
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.forms import M2MInlineFormSetMixin
+from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,
@@ -1273,6 +1274,17 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
 class CollectionModalDetailView(UserCreatedObjectModalDetailView):
     model = Collection
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        waste_stream = getattr(self.object, "waste_stream", None)
+        context["allowed_materials"] = (
+            list(waste_stream.allowed_materials.all()) if waste_stream else []
+        )
+        context["forbidden_materials"] = (
+            list(waste_stream.forbidden_materials.all()) if waste_stream else []
+        )
+        return context
+
 
 class CollectionReviewActionCascadeMixin:
     """
@@ -1457,6 +1469,22 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
             )
         except Exception:
             pass
+
+        waste_stream = getattr(obj, "waste_stream", None)
+        review_context["allowed_materials"] = (
+            list(waste_stream.allowed_materials.all()) if waste_stream else []
+        )
+        review_context["forbidden_materials"] = (
+            list(waste_stream.forbidden_materials.all()) if waste_stream else []
+        )
+
+        # review_logs is set on the parent context before this method is called
+        review_logs = context.get("review_logs") or []
+        submitted = next(
+            (a for a in review_logs if a.action == ReviewAction.ACTION_SUBMITTED),
+            None,
+        )
+        review_context["review_submitted_action"] = submitted
 
         return review_context
 

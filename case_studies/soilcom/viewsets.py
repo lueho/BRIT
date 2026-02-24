@@ -1,15 +1,17 @@
 from django.db.models import F
 from django_filters import rest_framework as rf_filters
-from rest_framework import permissions, viewsets
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from case_studies.soilcom.filters import CollectionFilterSet
+from case_studies.soilcom.importers import CollectionImporter
 from case_studies.soilcom.models import Collection, Collector
 from case_studies.soilcom.serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
     CollectionFlatSerializer,
+    CollectionImportRecordSerializer,
     CollectionModelSerializer,
     CollectorGeometrySerializer,
     WasteCollectionGeometrySerializer,
@@ -146,6 +148,80 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             filters=filters if filters else None,
             id_list=id_list if id_list else None,
         )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+        url_path="import",
+    )
+    def bulk_import(self, request, *args, **kwargs):
+        """Bulk-import waste collection records from a JSON array.
+
+        Accepts a JSON body with a top-level ``records`` list.  Each element
+        follows the ``CollectionImportRecordSerializer`` schema.
+
+        Optional top-level fields:
+
+        - ``dry_run`` (bool, default false) – validate and report without writing.
+        - ``publication_status`` (str, default ``"private"``) – status to assign
+          to newly created records.
+
+        Returns a summary dict with created/skipped counts and any warnings.
+
+        Only staff users may call this endpoint.
+        """
+        if not request.user.is_staff:
+            return Response(
+                {"detail": "Only staff users may import collection records."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        payload = request.data
+        if not isinstance(payload, dict):
+            return Response(
+                {"detail": "Request body must be a JSON object."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        records_raw = payload.get("records")
+        if not isinstance(records_raw, list):
+            return Response(
+                {"detail": "'records' must be a JSON array."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        dry_run = payload.get("dry_run", False)
+        if not isinstance(dry_run, bool):
+            return Response(
+                {"detail": "'dry_run' must be a boolean."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        pub_status = payload.get("publication_status", "private")
+        valid_statuses = ("private", "review")
+        if pub_status not in valid_statuses:
+            return Response(
+                {"detail": f"'publication_status' must be one of {valid_statuses}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate all records up-front; collect per-record errors
+        serializer = CollectionImportRecordSerializer(data=records_raw, many=True)
+        if not serializer.is_valid():
+            return Response(
+                {"detail": "Validation failed.", "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        importer = CollectionImporter(
+            owner=request.user,
+            publication_status=pub_status,
+        )
+        stats = importer.run(serializer.validated_data, dry_run=dry_run)
+
+        http_status = status.HTTP_200_OK if dry_run else status.HTTP_201_CREATED
+        return Response({"dry_run": dry_run, "stats": stats}, status=http_status)
 
     @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
     def summaries(self, request, *args, **kwargs):
