@@ -1,0 +1,111 @@
+{% load custom_tags %}
+{% load moderation_tags %}
+<div class="modal-header">
+  <h5 class="modal-title">Collection Detail</h5>
+  <button type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"></button>
+</div>
+<div class="modal-body">
+  <p class="card-text">
+    <strong>Name:</strong>
+    <br>
+    {{ object.name }}
+  </p>
+  {% if object.catchment %}
+    <p class="card-text">
+      <strong>Catchment:</strong>
+      <br>
+      {{ object.catchment.name }}
+    </p>
+  {% endif %}
+  {% if object.collection_system %}
+    <p class="card-text">
+      <strong>Collection System:</strong>
+      <br>
+      {{ object.collection_system.name }}
+    </p>
+  {% endif %}
+  {% if object.waste_stream %}
+    <p class="card-text">
+      <strong>Waste Category:</strong>
+      <br>
+      {{ object.waste_stream.category }}
+    </p>
+  {% endif %}
+  <p class="card-text">
+    <strong>Valid from:</strong>
+    <br>
+    {{ object.valid_from|date:"Y" }}
+  </p>
+  {% if object.connection_type %}
+    <p class="card-text">
+      <strong>Connection Type:</strong>
+      <br>
+      {{ object.get_connection_type_display }}
+    </p>
+  {% endif %}
+  {% if object.min_bin_size %}
+    <p class="card-text">
+      <strong>Smallest available bin size:</strong>
+      <br>
+      {{ object.min_bin_size }} L
+    </p>
+  {% endif %}
+  {% if object.required_bin_capacity %}
+    <p class="card-text">
+      <strong>Minimum required specific bin capacity (L/reference unit):</strong>
+      <br>
+      {{ object.required_bin_capacity }} L
+      {% if object.required_bin_capacity_reference %}
+        {% if object.required_bin_capacity_reference == 'not_specified' %}
+          <span class="text-muted">(reference not specified)</span>
+        {% else %}
+          <span class="text-muted">{{ object.get_required_bin_capacity_reference_display }}</span>
+        {% endif %}
+      {% endif %}
+    </p>
+  {% endif %}
+  {% if allowed_materials %}
+    <p class="card-text">
+      <strong>Allowed Materials:</strong>
+    </p>
+    <ul>
+      {% for material in allowed_materials %}<li>{{ material }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+  {% if forbidden_materials %}
+    <p class="card-text">
+      <strong>Forbidden Materials:</strong>
+    </p>
+    <ul>
+      {% for material in forbidden_materials %}<li>{{ material }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+  {% if object.frequency %}
+    <p class="card-text">
+      <strong>Frequency:</strong>
+      <br>
+      {{ object.frequency.name }}
+    </p>
+  {% endif %}
+  {% if object.fee_system %}
+    <p class="card-text">
+      <strong>Fee System:</strong>
+      <br>
+      {{ object.fee_system.name }}
+    </p>
+  {% endif %}
+  {% if object.description %}
+    <p class="card-text">
+      <strong>Description:</strong>
+      <br>
+      {{ object.description }}
+    </p>
+  {% endif %}
+</div>
+<div class="modal-footer">
+  <a href="{% detail_or_review_url object True %}" class="btn btn-primary">More</a>
+  <button type="button" class="btn btn-default" data-bs-dismiss="modal">Close</button>
+</div>

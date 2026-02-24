@@ -530,7 +530,7 @@ class Collection(NamedUserCreatedObject):
     required_bin_capacity = models.DecimalField(
         blank=True,
         null=True,
-        verbose_name="Required bin capacity per unit (L)",
+        verbose_name="Minimum required specific bin capacity (L/reference unit)",
         help_text="Minimum total bin capacity that must be supplied per reference unit (see field below).",
         max_digits=8,
         decimal_places=1,
@@ -542,7 +542,7 @@ class Collection(NamedUserCreatedObject):
         null=True,
         choices=REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
         default=None,
-        verbose_name="Reference unit for required bin capacity",
+        verbose_name="Reference unit for minimum required specific bin capacity",
         help_text="Defines the unit (person, household, property) for which the required bin capacity applies. Leave blank if not specified.",
     )
 

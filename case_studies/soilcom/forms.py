@@ -547,7 +547,7 @@ class CollectionModelForm(
     required_bin_capacity_reference = ChoiceField(
         choices=[("", "---------")] + REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
         required=False,
-        label="Reference unit for required bin capacity",
+        label="Reference unit for minimum required specific bin capacity",
         help_text="Defines the unit (person, household, property) for which the required bin capacity applies. Leave blank if not specified.",
     )
 

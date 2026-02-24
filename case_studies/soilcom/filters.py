@@ -550,12 +550,12 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         label="Smallest available bin size (L)",
     )
     required_bin_capacity = RequiredBinCapacityRangeFilter(
-        label="Required bin capacity per unit (L)",
+        label="Minimum required specific bin capacity (L/reference unit)",
         help_text="Minimum total bin capacity that must be supplied per reference unit (see below).",
     )
     required_bin_capacity_reference = ChoiceFilter(
         choices=REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
-        label="Reference unit for required bin capacity",
+        label="Reference unit for minimum required specific bin capacity",
         field_name="required_bin_capacity_reference",
         help_text="Defines the unit (person, household, property) for which the required bin capacity applies. Leave blank if not specified.",
     )

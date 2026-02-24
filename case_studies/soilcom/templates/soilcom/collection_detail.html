@@ -190,14 +190,14 @@
 
   {% if object.required_bin_capacity %}
     <p class="card-text">
-      <strong>Required bin capacity:</strong>
+      <strong>Minimum required specific bin capacity (L/reference unit):</strong>
       <br>
       {{ object.required_bin_capacity }} L
       {% if object.required_bin_capacity_reference %}
         {% if object.required_bin_capacity_reference == 'not_specified' %}
           <span class="text-muted">(reference not specified)</span>
         {% else %}
-          <span class="text-muted">per {{ object.required_bin_capacity_reference }}</span>
+          <span class="text-muted">{{ object.get_required_bin_capacity_reference_display }}</span>
         {% endif %}
       {% endif %}
     </p>
@@ -441,6 +441,21 @@
       <br>
       {{ object.owner.username|default:object.owner }}
     </p>
+  {% endif %}
+  {% if review_mode %}
+    <p class="card-text">
+      <strong>Created at:</strong>
+      <br>
+      {{ object.created_at|date:"d.m.Y H:i" }}
+    </p>
+    {% if review_submitted_action %}
+      <p class="card-text">
+        <strong>Submitted at:</strong>
+        <br>
+        {{ review_submitted_action.created_at|date:"d.m.Y H:i" }}
+        <span class="text-muted">by {{ review_submitted_action.user }}</span>
+      </p>
+    {% endif %}
   {% endif %}
   {% if visible_predecessors %}
     <strong>Predecessors:</strong>

@@ -188,7 +188,7 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
         allow_null=True,
     )
     required_bin_capacity_reference = serializers.SerializerMethodField(
-        label="Required bin capacity reference"
+        label="Minimum required specific bin capacity reference unit"
     )
     comments = serializers.CharField(
         source="description", required=False, allow_blank=True
@@ -438,3 +438,108 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
 
         # Return the ordered representation
         return ordered_representation
+
+
+# ---------------------------------------------------------------------------
+# Import API serializer
+# ---------------------------------------------------------------------------
+
+
+class CollectionImportPropertyValueSerializer(serializers.Serializer):
+    """A single property value to attach to an imported collection."""
+
+    property_id = serializers.IntegerField(
+        help_text="Primary key of the Property (e.g. 1=specific waste collected, 4=Connection rate)."
+    )
+    unit_name = serializers.CharField(
+        help_text="Exact name of the Unit as stored in the database."
+    )
+    year = serializers.IntegerField(
+        min_value=1900,
+        max_value=2100,
+        help_text="Measurement year.",
+    )
+    average = serializers.FloatField(help_text="Measured / observed value.")
+    standard_deviation = serializers.FloatField(required=False, allow_null=True)
+
+
+class CollectionImportRecordSerializer(serializers.Serializer):
+    """
+    Validates a single collection record for the bulk import endpoint.
+
+    All lookup fields are resolved by name so the caller does not need to know
+    internal primary keys.  Predecessor linking is automatic: the importer
+    searches for the most recent existing collection with the same
+    catchment / waste_category / collection_system and an earlier valid_from.
+
+    Required fields
+    ---------------
+    nuts_or_lau_id      NUTS or LAU identifier that maps to a CollectionCatchment.
+                        May be omitted only when catchment_name is provided.
+    catchment_name      Exact name of a CollectionCatchment.  Used only when
+                        nuts_or_lau_id is absent.
+    collector_name      Exact name of the Collector.
+    collection_system   Exact name of the CollectionSystem (or the alias
+                        'On demand' for 'On demand kerbside collection').
+    waste_category      Exact name of the WasteCategory.
+    valid_from          ISO 8601 date string (YYYY-MM-DD).
+
+    Optional fields
+    ---------------
+    fee_system          Exact name of the FeeSystem.
+    frequency           Exact name of the CollectionFrequency.
+    connection_type     One of 'mandatory', 'mandatory with exception', 'voluntary',
+                        'not specified'.
+    valid_until         ISO 8601 date string.
+    min_bin_size        Decimal (litres).
+    required_bin_capacity  Decimal (litres).
+    required_bin_capacity_reference  One of 'person', 'household', 'property', 'not_specified'.
+    description         Free-text comments.
+    flyer_urls          List of URL strings to attach as WasteFlyers.
+    property_values     List of CollectionImportPropertyValueSerializer records.
+    """
+
+    nuts_or_lau_id = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True
+    )
+    catchment_name = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True
+    )
+    collector_name = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True
+    )
+    collection_system = serializers.CharField()
+    waste_category = serializers.CharField()
+    valid_from = serializers.DateField()
+    valid_until = serializers.DateField(required=False, allow_null=True)
+
+    fee_system = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True
+    )
+    frequency = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    connection_type = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True
+    )
+    min_bin_size = serializers.DecimalField(
+        required=False, allow_null=True, max_digits=8, decimal_places=1
+    )
+    required_bin_capacity = serializers.DecimalField(
+        required=False, allow_null=True, max_digits=8, decimal_places=1
+    )
+    required_bin_capacity_reference = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True
+    )
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    flyer_urls = serializers.ListField(
+        child=serializers.URLField(), required=False, default=list
+    )
+    property_values = CollectionImportPropertyValueSerializer(
+        many=True, required=False, default=list
+    )
+
+    def validate(self, attrs):
+        if not attrs.get("nuts_or_lau_id") and not attrs.get("catchment_name"):
+            raise serializers.ValidationError(
+                "Either 'nuts_or_lau_id' or 'catchment_name' must be provided."
+            )
+        return attrs
