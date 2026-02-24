@@ -22,7 +22,6 @@ from case_studies.soilcom.models import (
     WasteFlyer,
     WasteStream,
 )
-from maps.models import LauRegion, NutsRegion
 from materials.models import Material
 from utils.object_management.models import ReviewAction
 from utils.properties.models import Property, Unit
@@ -145,23 +144,33 @@ class CollectionImporter:
         }
         self._units: dict[str, Unit] = {o.name: o for o in Unit.objects.all()}
 
-        # NUTS id → CollectionCatchment
-        self._nuts_catchments: dict[str, CollectionCatchment] = {}
-        for nuts in NutsRegion.objects.select_related("region_ptr").all():
-            catchment = CollectionCatchment.objects.filter(
-                region=nuts.region_ptr
-            ).first()
-            if catchment:
-                self._nuts_catchments[nuts.nuts_id] = catchment
+        # NUTS id → CollectionCatchment  (single JOIN, no per-row queries)
+        nuts_rows = (
+            CollectionCatchment.objects.filter(region__nutsregion__isnull=False)
+            .select_related("region__nutsregion")
+            .values_list("region__nutsregion__nuts_id", "id")
+        )
+        catchment_pks = {pk for _, pk in nuts_rows}
+        _catchment_objs = {
+            c.pk: c for c in CollectionCatchment.objects.filter(pk__in=catchment_pks)
+        }
+        self._nuts_catchments: dict[str, CollectionCatchment] = {
+            nuts_id: _catchment_objs[pk] for nuts_id, pk in nuts_rows if nuts_id
+        }
 
-        # LAU id → CollectionCatchment
-        self._lau_catchments: dict[str, CollectionCatchment] = {}
-        for lau in LauRegion.objects.select_related("region_ptr").all():
-            catchment = CollectionCatchment.objects.filter(
-                region=lau.region_ptr
-            ).first()
-            if catchment:
-                self._lau_catchments[lau.lau_id] = catchment
+        # LAU id → CollectionCatchment  (single JOIN, no per-row queries)
+        lau_rows = (
+            CollectionCatchment.objects.filter(region__lauregion__isnull=False)
+            .select_related("region__lauregion")
+            .values_list("region__lauregion__lau_id", "id")
+        )
+        catchment_pks = {pk for _, pk in lau_rows}
+        _catchment_objs = {
+            c.pk: c for c in CollectionCatchment.objects.filter(pk__in=catchment_pks)
+        }
+        self._lau_catchments: dict[str, CollectionCatchment] = {
+            lau_id: _catchment_objs[pk] for lau_id, pk in lau_rows if lau_id
+        }
 
         self._lookups_loaded = True
 
