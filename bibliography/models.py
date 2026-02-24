@@ -104,7 +104,7 @@ class Source(UserCreatedObject):
         Licence, on_delete=models.PROTECT, blank=True, null=True
     )
     attributions = models.TextField(blank=True, null=True)
-    url = models.URLField(max_length=511, blank=True, null=True)
+    url = models.URLField(max_length=2083, blank=True, null=True)
     url_valid = models.BooleanField(default=False)
     url_checked = models.DateField(blank=True, null=True)
     doi = models.CharField(max_length=255, blank=True, null=True)
