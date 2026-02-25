@@ -2,6 +2,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import (
     Case,
     CharField,
+    Count,
     Exists,
     F,
     FloatField,
@@ -32,6 +33,7 @@ from .serializers import (
     CatchmentCollectionAmountSerializer,
     CatchmentCollectionCountSerializer,
     CatchmentCollectionSupportSerializer,
+    CatchmentCollectionSystemCountSerializer,
     CatchmentCollectionSystemSerializer,
     CatchmentCombinedCollectionCountSerializer,
     CatchmentCombinedFeeSystemSerializer,
@@ -53,6 +55,9 @@ _FOOD_WASTE_MATERIAL_IDS = {11, 12, 13, 14}
 # Material IDs for collection support items (Karte 5, 6)
 _PAPER_BAGS_MATERIAL_ID = 19
 _PLASTIC_BAGS_MATERIAL_ID = 17
+
+# Waste category names for green waste maps.
+_GREEN_WASTE_CATEGORY_NAMES = ["Green waste"]
 
 # Property ID for "Connection rate" (properties_property table)
 CONNECTION_RATE_PROPERTY_ID = 4
@@ -233,6 +238,36 @@ class CollectionSystemViewSet(viewsets.ViewSet):
             for cid, val in best.items()
         ]
         serializer = CatchmentCollectionSystemSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class GreenWasteCollectionSystemCountViewSet(viewsets.ViewSet):
+    """Return number of distinct green-waste collection systems per catchment.
+
+    Counts distinct collection systems among Green/Garden waste collections
+    in the selected country/year.
+
+    Example::
+
+        GET /waste_collection/api/waste-atlas/green-waste-collection-system-count/?country=DE&year=2024
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        """Return a JSON array of {catchment_id, collection_system_count}."""
+        country, year = _parse_country_year(request)
+        qs = (
+            Collection.objects.filter(
+                valid_from__year=year,
+                catchment__region__country=country,
+                waste_stream__category__name__in=_GREEN_WASTE_CATEGORY_NAMES,
+            )
+            .values("catchment_id")
+            .annotate(collection_system_count=Count("collection_system", distinct=True))
+            .values("catchment_id", "collection_system_count")
+        )
+        serializer = CatchmentCollectionSystemCountSerializer(qs, many=True)
         return Response(serializer.data)
 
 
