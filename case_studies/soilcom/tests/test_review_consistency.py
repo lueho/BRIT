@@ -29,7 +29,6 @@ class ReviewSubmissionConsistencyTests(TestCase):
         self.moderator = User.objects.create_user(username="moderator", is_staff=True)
 
         # Add moderator permissions
-
         content_type = ContentType.objects.get_for_model(Collection)
         permission, _ = Permission.objects.get_or_create(
             codename="can_moderate_collection",
