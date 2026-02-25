@@ -1,7 +1,13 @@
+from django.test import SimpleTestCase
+
 from maps.models import Catchment, Region
 from utils.tests.testcases import AbstractTestCases
 
 from ..models import Scenario
+from ..views import (
+    InventoryAlgorithmAutocompleteView,
+    ScenarioInventoryAlgorithmAutocompleteView,
+)
 
 # ----------- Scenario CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -39,6 +45,29 @@ class ScenarioCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
                 publication_status="published",
             ),
         }
+
+
+class InventoryAutocompleteInheritanceRegressionTests(SimpleTestCase):
+    """Regression tests for tomselect subclass attribute inheritance."""
+
+    def test_scenario_inventory_algorithm_view_inherits_search_and_value_fields(self):
+        """Subclass keeps inherited search/value fields after class initialization."""
+        self.assertEqual(
+            ScenarioInventoryAlgorithmAutocompleteView.search_lookups,
+            InventoryAlgorithmAutocompleteView.search_lookups,
+        )
+        self.assertEqual(
+            ScenarioInventoryAlgorithmAutocompleteView.value_fields,
+            InventoryAlgorithmAutocompleteView.value_fields,
+        )
+        self.assertEqual(
+            ScenarioInventoryAlgorithmAutocompleteView.search_lookups,
+            ["name__icontains"],
+        )
+        self.assertEqual(
+            ScenarioInventoryAlgorithmAutocompleteView.value_fields,
+            ["name"],
+        )
 
 
 class ScenarioResultCRUDViewsTestCase(

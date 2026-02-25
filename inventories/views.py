@@ -81,6 +81,27 @@ class InventoryAlgorithmAutocompleteView(AutocompleteModelView):
     allow_anonymous = True
     page_size = 15
 
+    def __init_subclass__(cls, **kwargs):
+        """Preserve inherited search/value fields across subclasses.
+
+        django-tomselect 2026.1.3 resets list attributes in
+        ``AutocompleteModelView.__init_subclass__`` for subclasses that do not
+        define them directly. Save inherited values before calling super and
+        restore them afterwards.
+        """
+        saved = {}
+        for attr in ("search_lookups", "value_fields"):
+            if attr not in cls.__dict__:
+                for base in cls.__mro__[1:]:
+                    if attr in base.__dict__:
+                        saved[attr] = list(base.__dict__[attr])
+                        break
+
+        super().__init_subclass__(**kwargs)
+
+        for attr, value in saved.items():
+            setattr(cls, attr, value)
+
 
 # ----------- Scenario CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
