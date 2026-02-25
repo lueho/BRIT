@@ -25,7 +25,8 @@
                     {% for object in object_list %}
                         <tr>
                             <td data-label="Author" class="ps-3">
-                                <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                                <a href="{% detail_or_review_url object use_back=True %}"
+                                   class="text-decoration-none">
                                     <strong class="d-block">{{ object }}</strong>
                                     {% if object.preferred_citation %}
                                         <span class="text-muted small">{{

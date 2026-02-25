@@ -32,17 +32,11 @@
                                 <span class="badge bg-secondary">{{ object.verbose_name|default:"Item" }}</span>
                             </td>
                             <td data-label="Name">
-                                <a href="{% detail_or_review_url object %}">{{ object.name|default:object }}</a>
+                                <a href="{% detail_or_review_url object use_back=True %}">{{ object.name|default:object }}</a>
                             </td>
-                            <td data-label="Owner">
-                                {{ object.owner.username }}
-                            </td>
-                            <td data-label="Submitted">
-                                {{ object.submitted_at|date:"Y-m-d H:i"|default:"—" }}
-                            </td>
-                            <td class="actions-column mobile-no-label">
-                                {% include "object_management/status_actions_cell.html" %}
-                            </td>
+                            <td data-label="Owner">{{ object.owner.username }}</td>
+                            <td data-label="Submitted">{{ object.submitted_at|date:"Y-m-d H:i"|default:"—" }}</td>
+                            <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -59,9 +53,7 @@
     <form method="get">
         {% crispy filter.form %}
         <div class="d-flex justify-content-end gap-2 mt-2">
-            <button id="btn-filter"
-                    class="btn btn-primary submit-filter"
-                    type="submit">
+            <button id="btn-filter" class="btn btn-primary submit-filter" type="submit">
                 <i class="fas fa-filter"></i> Filter
             </button>
             <a class="btn btn-outline-secondary"
@@ -74,15 +66,17 @@
 {% endblock filters_pane_body %}
 
 {% block options_pane_body %}
-    <p class="text-muted small">
-        Review items from all models you have permission to moderate.
-    </p>
-    
+    <p class="text-muted small">Review items from all models you have permission to moderate.</p>
+
     {% if page_obj %}
         <div class="card mb-2">
             <div class="card-body">
-                <h6 class="card-title mb-2"><i class="fas fa-chart-simple"></i> Statistics</h6>
-                <p class="mb-1"><strong>Total items:</strong> {{ page_obj.paginator.count }}</p>
+                <h6 class="card-title mb-2">
+                    <i class="fas fa-chart-simple"></i> Statistics
+                </h6>
+                <p class="mb-1">
+                    <strong>Total items:</strong> {{ page_obj.paginator.count }}
+                </p>
             </div>
         </div>
     {% endif %}

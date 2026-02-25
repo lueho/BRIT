@@ -40,16 +40,15 @@
                     {% for object in object_list %}
                         <tr>
                             <td data-label="Collection" class="ps-3">
-                                <a href="{% detail_or_review_url object %}" class="collection-link">
+                                <a href="{% detail_or_review_url object use_back=True %}"
+                                   class="collection-link">
                                     <strong class="d-block">{{ object.catchment.region.name }} - {{ object.waste_stream.category }} collection</strong>
                                     <span class="text-muted small">
                                         {{ object.collector }} · {{ object.collection_system }} · {{ object.valid_from.year }}
                                     </span>
                                 </a>
                             </td>
-                            <td class="actions-column mobile-no-label">
-                                {% include "object_management/status_actions_cell.html" %}
-                            </td>
+                            <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
                         </tr>
                     {% endfor %}
                 </tbody>

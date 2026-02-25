@@ -25,14 +25,33 @@
                     {% for object in object_list %}
                         <tr>
                             <td data-label="Sample Series" class="ps-3">
-                                <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                                <a href="{% detail_or_review_url object use_back=True %}"
+                                   class="text-decoration-none">
                                     <strong class="d-block">{{ object.name }}</strong>
-                                    <span class="text-muted small">{{ object.material.name }}{% if object.created_at %} · {{ object.created_at|date:"Y-m-d" }}{% endif %}</span>
+                                    <span class="text-muted small">{{ object.material.name }}
+                                        {% if object.created_at %}· {{ object.created_at|date:"Y-m-d" }}{% endif %}
+                                    </span>
                                 </a>
                             </td>
                             {% if object_list.model|is_user_created %}
                                 <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
                             {% endif %}
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="{% if object_list.model|is_user_created %}2{% else %}1{% endif %}"
+                                class="text-center text-muted py-4">
+                                <div class="mb-3">
+                                    <i class="fas fa-filter me-1"></i> No items match your current filters.
+                                    <a href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}"
+                                       class="ms-2">Reset filters</a>
+                                </div>
+                                {% if not user.is_authenticated %}
+                                    <div class="small">Log in to create new sample series.</div>
+                                {% elif create_permission in perms or user.is_staff %}
+                                    <div class="small">Create your first sample series to get started.</div>
+                                {% endif %}
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -60,7 +79,9 @@
     <form method="get">
         {% crispy filter.form %}
         <div class="d-flex justify-content-end gap-2 mt-2">
-            <button id="btn-filter" class="btn btn-sm btn-primary submit-filter" type="submit">Filter</button>
+            <button id="btn-filter"
+                    class="btn btn-sm btn-primary submit-filter"
+                    type="submit">Filter</button>
             <a class="btn btn-sm btn-outline-secondary"
                href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}"
                aria-label="Reset filters">Reset</a>

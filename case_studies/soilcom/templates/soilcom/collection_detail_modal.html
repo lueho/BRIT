@@ -106,6 +106,7 @@
   {% endif %}
 </div>
 <div class="modal-footer">
-  <a href="{% detail_or_review_url object True %}" class="btn btn-primary">More</a>
+  <a href="{% detail_or_review_url object use_back=True %}"
+     class="btn btn-primary">More</a>
   <button type="button" class="btn btn-default" data-bs-dismiss="modal">Close</button>
 </div>

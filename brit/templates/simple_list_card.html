@@ -114,7 +114,7 @@
                     {% block list_table_row %}
                       <tr>
                         <td class="ps-3">
-                          <a href="{% detail_or_review_url object %}"
+                          <a href="{% detail_or_review_url object use_back=True %}"
                              class="text-decoration-none"
                              aria-label="View details of {{ object.name }}">
                             <strong class="d-block">{{ object.name }}</strong>

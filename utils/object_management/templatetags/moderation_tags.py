@@ -257,9 +257,7 @@ def detail_or_review_url(context, obj, use_back=False):
                 next_param = ""
                 try:
                     if request is not None:
-                        next_param = (
-                            f"?next={quote(request.get_full_path or '', safe='')}"
-                        )
+                        next_param = f"?next={quote(request.get_full_path(), safe='')}"
                 except Exception:  # pragma: no cover - defensive
                     next_param = ""
                 return f"{review_url}{next_param}"
@@ -283,7 +281,7 @@ def detail_or_review_url(context, obj, use_back=False):
                     try:
                         if request is not None:
                             next_param = (
-                                f"?next={quote(request.get_full_path or '', safe='')}"
+                                f"?next={quote(request.get_full_path(), safe='')}"
                             )
                     except Exception:  # pragma: no cover - defensive
                         next_param = ""
@@ -300,9 +298,7 @@ def detail_or_review_url(context, obj, use_back=False):
         # Optionally include ?back=<current_path> for detail pages coming from lists
         if use_back and request is not None:
             try:
-                return (
-                    f"{absolute_url}?back={quote(request.get_full_path or '', safe='')}"
-                )
+                return f"{absolute_url}?back={quote(request.get_full_path(), safe='')}"
             except Exception:  # pragma: no cover - defensive
                 return absolute_url
         return absolute_url
@@ -343,9 +339,7 @@ def detail_or_review_url(context, obj, use_back=False):
                 next_param = ""
                 try:
                     if request is not None:
-                        next_param = (
-                            f"?next={quote(request.get_full_path or '', safe='')}"
-                        )
+                        next_param = f"?next={quote(request.get_full_path(), safe='')}"
                 except Exception:  # pragma: no cover - defensive
                     next_param = ""
                 return f"{review_url}{next_param}"
@@ -358,7 +352,9 @@ def detail_or_review_url(context, obj, use_back=False):
             # Not eligible for review view; optionally add back param
             if use_back and request is not None:
                 try:
-                    return f"{absolute_url}?back={quote(request.get_full_path or '', safe='')}"
+                    return (
+                        f"{absolute_url}?back={quote(request.get_full_path(), safe='')}"
+                    )
                 except Exception:  # pragma: no cover - defensive
                     return absolute_url
             return absolute_url

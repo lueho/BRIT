@@ -135,11 +135,13 @@
                   <tbody>
                     {% for object in object_list %}
                       {% block list_table_row %}
-                        <tr tabindex="0" role="link"
-                            onclick="window.location='{% detail_or_review_url object %}'"
-                            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.location='{% detail_or_review_url object %}'}">
+                        <tr tabindex="0"
+                            role="link"
+                            onclick="window.location='{% detail_or_review_url object use_back=True %}'"
+                            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.location='{% detail_or_review_url object use_back=True %}'}">
                           <td data-label="Name" class="ps-3">
-                            <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                            <a href="{% detail_or_review_url object use_back=True %}"
+                               class="text-decoration-none">
                               <strong class="d-block">{{ object.name }}</strong>
                               {% if object.description %}<span class="text-muted small">{{ object.description|truncatewords:15 }}</span>{% endif %}
                             </a>
@@ -171,19 +173,27 @@
                 <nav aria-label="Pagination" class="mt-3">
                   <ul class="pagination pagination-sm justify-content-center mb-0">
                     <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
-                      <a class="page-link" {% if page_obj.has_previous %}href="?{% param_replace page=1 %}"{% endif %} aria-label="First page">&laquo;</a>
+                      <a class="page-link"
+                         {% if page_obj.has_previous %}href="?{% param_replace page=1 %}"{% endif %}
+                         aria-label="First page">&laquo;</a>
                     </li>
                     <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
-                      <a class="page-link" {% if page_obj.has_previous %}href="?{% param_replace page=page_obj.previous_page_number %}"{% endif %} aria-label="Previous page">&lsaquo;</a>
+                      <a class="page-link"
+                         {% if page_obj.has_previous %}href="?{% param_replace page=page_obj.previous_page_number %}"{% endif %}
+                         aria-label="Previous page">&lsaquo;</a>
                     </li>
                     <li class="page-item disabled">
                       <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
                     </li>
                     <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
-                      <a class="page-link" {% if page_obj.has_next %}href="?{% param_replace page=page_obj.next_page_number %}"{% endif %} aria-label="Next page">&rsaquo;</a>
+                      <a class="page-link"
+                         {% if page_obj.has_next %}href="?{% param_replace page=page_obj.next_page_number %}"{% endif %}
+                         aria-label="Next page">&rsaquo;</a>
                     </li>
                     <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
-                      <a class="page-link" {% if page_obj.has_next %}href="?{% param_replace page=page_obj.paginator.num_pages %}"{% endif %} aria-label="Last page">&raquo;</a>
+                      <a class="page-link"
+                         {% if page_obj.has_next %}href="?{% param_replace page=page_obj.paginator.num_pages %}"{% endif %}
+                         aria-label="Last page">&raquo;</a>
                     </li>
                   </ul>
                 </nav>
@@ -297,9 +307,7 @@
                     {% block list_card_options_dropdown_additional_links %}
                     {% endblock list_card_options_dropdown_additional_links %}
                     {% if not user.is_authenticated %}
-                      <p class="text-muted small mt-3 mb-0">
-                        Log in to enable export and additional options.
-                      </p>
+                      <p class="text-muted small mt-3 mb-0">Log in to enable export and additional options.</p>
                     {% endif %}
                   {% endblock options_pane_body %}
                 </div>

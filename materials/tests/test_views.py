@@ -1,4 +1,5 @@
 from decimal import Decimal
+from urllib.parse import quote
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -850,6 +851,94 @@ class SampleSeriesCreateDuplicateViewTestCase(
                 name="Test Material", publication_status="published"
             )
         }
+
+
+# ----------- Back URL Navigation Tests ----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class BackURLNavigationTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    """Test that back URL parameter is properly passed from list/detail navigation.
+
+    Uses the standard CRUD test infrastructure so that objects are created via the
+    proper fixtures/helpers that satisfy signal requirements.
+    """
+
+    create_view = False
+    public_list_view = False
+    private_list_view = False
+    update_view = False
+    delete_view = False
+
+    model = SampleSeries
+
+    view_detail_name = "sampleseries-detail"
+    view_published_list_name = "sampleseries-list"
+
+    create_object_data = {"name": "Back Nav Test Series"}
+    update_object_data = {"name": "Updated Back Nav Test Series"}
+
+    @classmethod
+    def create_related_objects(cls):
+        return {
+            "material": Material.objects.create(
+                name="Back Nav Test Material", publication_status="published"
+            )
+        }
+
+    def test_sampleseries_detail_shows_back_to_results_button(self):
+        """Detail page shows 'Back to results' button when back parameter is present."""
+        self.client.force_login(self.non_owner_user)
+        list_url = f"{reverse('sampleseries-list')}?scope=published"
+        detail_url = (
+            f"{reverse('sampleseries-detail', kwargs={'pk': self.published_object.pk})}"
+            f"?back={quote(list_url, safe='')}"
+        )
+        response = self.client.get(detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Back to results")
+        self.assertContains(response, f'href="{list_url}"')
+
+    def test_sampleseries_list_back_param_present_in_detail_links(self):
+        """Sample series list links contain ?back= pointing to the current list URL."""
+        self.client.force_login(self.staff_user)
+        list_url = f"{reverse('sampleseries-list')}?scope=published"
+        response = self.client.get(list_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "?back=")
+
+    def test_sampleseries_list_with_filters_back_param_contains_filters(self):
+        """The back param on detail links encodes active filter/sort state."""
+        self.client.force_login(self.staff_user)
+        list_url = f"{reverse('sampleseries-list')}?scope=published"
+        response = self.client.get(list_url)
+        self.assertEqual(response.status_code, 200)
+        expected_back_fragment = quote(list_url, safe="")
+        self.assertContains(response, f"back={expected_back_fragment}")
+
+    def test_review_objects_use_next_parameter_not_back(self):
+        """Objects in review status use ?next= for review flow, not ?back=."""
+        review_object = SampleSeries.objects.create(
+            name="Back Nav Review Series",
+            publication_status="review",
+            owner=self.non_owner_user,
+            **self.related_objects,
+        )
+
+        self.client.force_login(self.staff_user)
+        list_url = reverse("sampleseries-list-review")
+        response = self.client.get(list_url, follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(SampleSeries).id,
+                "object_id": review_object.pk,
+            },
+        )
+        self.assertContains(response, f"{review_url}?next=")
+        self.assertNotContains(response, f"{review_url}?back=")
 
 
 # ----------- Sample CRUD ----------------------------------------------------------------------------------------------

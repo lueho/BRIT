@@ -15,7 +15,7 @@
             {% for object in object_list %}
                 <tr>
                     <td>
-                        <a href="{% detail_or_review_url object %}">{{ object.name }}</a>
+                        <a href="{% detail_or_review_url object use_back=True %}">{{ object.name }}</a>
                     </td>
                     <td>{{ object.type }}</td>
                     {% if object_list.model|is_user_created %}

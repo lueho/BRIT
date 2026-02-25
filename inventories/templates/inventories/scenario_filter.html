@@ -24,7 +24,8 @@
                     {% for object in object_list %}
                         <tr>
                             <td data-label="Inventory" class="ps-3">
-                                <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                                <a href="{% detail_or_review_url object use_back=True %}"
+                                   class="text-decoration-none">
                                     <strong class="d-block">{{ object.name }}</strong>
                                     <span class="text-muted small">
                                         {{ object.catchment }}
