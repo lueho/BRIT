@@ -14,9 +14,12 @@ Tests use RequestFactory to simulate view-level calls and test the mixin logic
 in isolation, bypassing URL routing.
 """
 
+import codecs
+import csv
 import time
 from collections import namedtuple
 from datetime import date
+from io import BytesIO
 from unittest.mock import patch
 
 from celery import chord
@@ -28,17 +31,24 @@ from django.http.request import MultiValueDict, QueryDict
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from factory.django import mute_signals
+from openpyxl import load_workbook
 
 from case_studies.soilcom.models import (
     AggregatedCollectionPropertyValue,
     Collection,
     CollectionCatchment,
+    CollectionFrequency,
     CollectionPropertyValue,
     CollectionSystem,
+    Collector,
+    FeeSystem,
     WasteCategory,
+    WasteComponent,
     WasteFlyer,
     WasteStream,
 )
+from case_studies.soilcom.renderers import CollectionCSVRenderer, CollectionXLSXRenderer
+from case_studies.soilcom.serializers import CollectionFlatSerializer
 from case_studies.soilcom.tasks import (
     check_wasteflyer_url,
     check_wasteflyer_urls,
@@ -50,6 +60,8 @@ from case_studies.soilcom.views import (
     CollectionSubmitForReviewView,
     CollectionWithdrawFromReviewView,
 )
+from maps.models import NutsRegion
+from materials.models import MaterialCategory
 from utils.object_management.models import ReviewAction
 from utils.properties.models import Property, Unit
 
@@ -840,3 +852,196 @@ class CheckWasteFlyerUrlWaybackFallbackTestCase(TestCase):
         self.assertFalse(result)
         mock_check_url.assert_not_called()
         mock_wayback.assert_not_called()
+
+
+class CollectionCSVRendererTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        MaterialCategory.objects.create(name="Biowaste component")
+        cls.allowed_material_1 = WasteComponent.objects.create(
+            name="Allowed Material 1"
+        )
+        cls.allowed_material_2 = WasteComponent.objects.create(
+            name="Allowed Material 2"
+        )
+        cls.forbidden_material_1 = WasteComponent.objects.create(
+            name="Forbidden Material 1"
+        )
+        cls.forbidden_material_2 = WasteComponent.objects.create(
+            name="Forbidden Material 2"
+        )
+        waste_stream = WasteStream.objects.create(
+            name="Test waste stream",
+            category=WasteCategory.objects.create(name="Test category"),
+        )
+        waste_stream.allowed_materials.add(cls.allowed_material_1)
+        waste_stream.allowed_materials.add(cls.allowed_material_2)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
+        with mute_signals(signals.post_save):
+            waste_flyer = WasteFlyer.objects.create(
+                abbreviation="WasteFlyer123", url="https://www.test-flyer.org"
+            )
+        frequency = CollectionFrequency.objects.create(name="Test Frequency")
+        nuts = NutsRegion.objects.create(
+            name="Test NUTS", nuts_id="DE123", cntr_code="DE"
+        )
+        catchment = CollectionCatchment.objects.create(
+            name="Test catchment", region=nuts.region_ptr
+        )
+        for i in range(1, 3):
+            collection = Collection.objects.create(
+                name=f"collection{i}",
+                catchment=catchment,
+                collector=Collector.objects.create(name=f"collector{1}"),
+                collection_system=CollectionSystem.objects.create(name="Test system"),
+                waste_stream=waste_stream,
+                fee_system=FeeSystem.objects.create(name="Fixed fee"),
+                frequency=frequency,
+                valid_from=date(2020, 1, 1),
+                description="This is a test case.",
+            )
+            collection.flyers.add(waste_flyer)
+
+    def setUp(self):
+        self.file = BytesIO()
+        self.content = CollectionFlatSerializer(
+            Collection.objects.all(), many=True
+        ).data
+
+    def test_fieldnames_in_right_order(self):
+        renderer = CollectionCSVRenderer()
+        renderer.render(self.file, self.content)
+        self.file.seek(0)
+        reader = csv.DictReader(codecs.getreader("utf-8")(self.file), delimiter="\t")
+        fieldnames = [renderer.labels[key] for key in renderer.header]
+        self.assertListEqual(fieldnames, list(reader.fieldnames))
+        self.assertEqual(2, sum(1 for _ in reader))
+        self.assertIn("Connection type", reader.fieldnames)
+        self.assertEqual(
+            renderer.header.index("connection_type"),
+            reader.fieldnames.index("Connection type"),
+        )
+
+    def test_connection_type_field_exported(self):
+        renderer = CollectionCSVRenderer()
+        renderer.render(self.file, self.content)
+        self.file.seek(0)
+        reader = csv.DictReader(codecs.getreader("utf-8")(self.file), delimiter="\t")
+        valid_labels = [
+            "Compulsory",
+            "Voluntary",
+            "Mandatory",
+            "Mandatory with exception for home composters",
+            "Not specified",
+            "",
+        ]
+        for row in reader:
+            self.assertIn(row["Connection type"], valid_labels)
+
+    def test_allowed_materials_formatted_as_comma_separated_list_in_one_field(self):
+        renderer = CollectionCSVRenderer()
+        renderer.render(self.file, self.content)
+        self.file.seek(0)
+        reader = csv.DictReader(codecs.getreader("utf-8")(self.file), delimiter="\t")
+        for row in reader:
+            self.assertEqual(
+                "Allowed Material 1, Allowed Material 2", row["Allowed Materials"]
+            )
+
+    def test_forbidden_materials_formatted_as_comma_separated_list_in_one_field(self):
+        renderer = CollectionCSVRenderer()
+        renderer.render(self.file, self.content)
+        self.file.seek(0)
+        reader = csv.DictReader(codecs.getreader("utf-8")(self.file), delimiter="\t")
+        for row in reader:
+            self.assertEqual(
+                "Forbidden Material 1, Forbidden Material 2", row["Forbidden Materials"]
+            )
+
+    def test_regression_flyers_without_urls_dont_raise_type_error(self):
+        defected_collection = Collection.objects.first()
+        with mute_signals(signals.post_save):
+            rogue_flyer = WasteFlyer.objects.create(
+                title="Rogue flyer without url", abbreviation="RF"
+            )
+        defected_collection.flyers.add(rogue_flyer)
+        renderer = CollectionCSVRenderer()
+        renderer.render(self.file, self.content)
+        self.file.seek(0)
+        reader = csv.DictReader(codecs.getreader("utf-8")(self.file), delimiter="\t")
+        self.assertEqual(Collection.objects.count(), len(list(reader)))
+
+
+class CollectionXLSXRendererTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        User.objects.create(username="outsider")
+        member = User.objects.create(username="member")
+        content_type = ContentType.objects.get_for_model(Collection)
+        permission, _ = Permission.objects.get_or_create(
+            codename="add_collection",
+            content_type=content_type,
+            defaults={"name": "Can add collection"},
+        )
+        member.user_permissions.add(permission)
+
+        MaterialCategory.objects.create(name="Biowaste component")
+        cls.allowed_material_1 = WasteComponent.objects.create(
+            name="Allowed Material 1"
+        )
+        cls.allowed_material_2 = WasteComponent.objects.create(
+            name="Allowed Material 2"
+        )
+        cls.forbidden_material_1 = WasteComponent.objects.create(
+            name="Forbidden Material 1"
+        )
+        cls.forbidden_material_2 = WasteComponent.objects.create(
+            name="Forbidden Material 2"
+        )
+        waste_stream = WasteStream.objects.create(
+            name="Test waste stream",
+            category=WasteCategory.objects.create(name="Test category"),
+        )
+        waste_stream.allowed_materials.add(cls.allowed_material_1)
+        waste_stream.allowed_materials.add(cls.allowed_material_2)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
+        with mute_signals(signals.post_save):
+            waste_flyer = WasteFlyer.objects.create(
+                abbreviation="WasteFlyer123", url="https://www.test-flyer.org"
+            )
+        frequency = CollectionFrequency.objects.create(name="Test Frequency")
+        nuts = NutsRegion.objects.create(
+            name="Test NUTS", nuts_id="DE123", cntr_code="DE"
+        )
+        catchment = CollectionCatchment.objects.create(
+            name="Test catchment", region=nuts.region_ptr
+        )
+        for i in range(1, 3):
+            collection = Collection.objects.create(
+                name=f"collection{i}",
+                catchment=catchment,
+                collector=Collector.objects.create(name=f"collector{1}"),
+                collection_system=CollectionSystem.objects.create(name="Test system"),
+                waste_stream=waste_stream,
+                frequency=frequency,
+                description="This is a test case.",
+            )
+            collection.flyers.add(waste_flyer)
+
+    def setUp(self):
+        self.file = BytesIO()
+
+    def test_contains_all_labels_in_right_order(self):
+        renderer = CollectionXLSXRenderer()
+        qs = Collection.objects.all()
+        content = CollectionFlatSerializer(qs, many=True).data
+        renderer.render(self.file, content)
+        wb = load_workbook(self.file)
+        ws = wb.active
+        ordered_content = [
+            {k: row.get(k) for k in list(renderer.labels.keys())} for row in content
+        ]
+        for column, (key, _value) in enumerate(ordered_content[0].items(), start=1):
+            self.assertEqual(renderer.labels[key], ws.cell(row=1, column=column).value)
