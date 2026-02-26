@@ -1,44 +1,50 @@
-{% load static %}
-{% load cookie_consent_tags %}
+{% load static cookie_consent_tags %}
 {% if request|cookie_consent_enabled %}
-  <link href="{% static 'css/cookie-bar.css' %}" rel="stylesheet">
-  <script type="text/javascript"
-          src="{% static 'cookie_consent/cookiebar.js' %}"></script>
-  {% not_accepted_or_declined_cookie_groups request as cookie_groups %}
-  {% if cookie_groups %}
+    <link href="{% static 'css/cookie-bar.css' %}" rel="stylesheet">
+    {% static "cookie_consent/cookiebar.module.js" as cookiebar_src %}
     {% url "cookie_consent_cookie_group_list" as url_cookies %}
-    {% cookie_consent_accept_url cookie_groups as url_accept %}
-    {% cookie_consent_decline_url cookie_groups as url_decline %}
-    <script type="text/javascript">
-            const cookie_groups = [];
-            {% for cookie_group in cookie_groups %}
-                cookie_groups.push("{{ cookie_group.varname }}");
-            {% endfor %}
+    {% url "cookie_consent_status" as status_url %}
+    {% all_cookie_groups "cookie-consent__cookie-groups" %}
+    <template id="cookie-consent__cookie-bar">
+        <div class="fixed-bottom cookie-bar p-3 p-md-4"
+             role="region"
+             aria-label="Cookie consent banner">
+            <div class="bg-white border shadow rounded-3 w-100 mw-100"
+                 role="alert"
+                 data-autohide="false">
+                <div class="p-3 p-md-4">
+                    <div class="d-flex flex-column flex-lg-row align-items-center justify-content-between gap-3">
+                        <div class="flex-grow-1 mb-3 mb-lg-0">
+                            <h5 class="mb-2 text-primary">Cookie Consent</h5>
+                            <p class="mb-0 text-muted small">
+                                This site requires cookies to function properly. We also use Google Analytics to understand how visitors interact with our site. Please let us know if you accept these additional cookies. Press "Config" for detailed options.
+                            </p>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 justify-content-center">
+                            <a href="#"
+                               class="cc-cookie-accept btn btn-primary"
+                               aria-label="Accept all cookies">Accept All</a>
+                            <a href="#"
+                               class="cc-cookie-decline btn btn-outline-secondary"
+                               aria-label="Decline additional cookies">Decline</a>
+                            <a href="{{ url_cookies }}"
+                               class="btn btn-outline-primary"
+                               aria-label="Configure cookie preferences">Config</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+    <script type="module">
+      import { showCookieBar } from "{{ cookiebar_src }}";
 
-            function ready(fn) {
-                if (document.readyState !== 'loading') {
-                    fn();
-                } else if (document.addEventListener) {
-                    document.addEventListener('DOMContentLoaded', fn);
-                } else {
-                    document.attachEvent('onreadystatechange', function() {
-                        if (document.readyState !== 'loading') {
-                            fn();
-                        }
-                    });
-                }
-            }
-
-            ready(function() {
-                legacyShowCookieBar({
-                    content: '<div class="fixed-bottom cookie-bar p-3 p-md-4" role="region" aria-label="Cookie consent banner"><div class="bg-white border shadow rounded-3 w-100 mw-100" role="alert" data-autohide="false"><div class="p-3 p-md-4"><div class="d-flex flex-column flex-lg-row align-items-center justify-content-between gap-3"><div class="flex-grow-1 mb-3 mb-lg-0"><h5 class="mb-2 text-primary">Cookie Consent</h5><p class="mb-0 text-muted small">This site requires cookies to function properly. We also use Google Analytics to understand how visitors interact with our site. Please let us know if you accept these additional cookies. Press "Config" for detailed options.</p></div><div class="d-flex flex-wrap gap-2 justify-content-center"><a href="{{ url_accept }}" class="cc-cookie-accept btn btn-primary" aria-label="Accept all cookies">Accept All</a><a href="{{ url_decline }}" class="cc-cookie-decline btn btn-outline-secondary" aria-label="Decline additional cookies">Decline</a><a href="{{ url_cookies }}" class="btn btn-outline-primary" aria-label="Configure cookie preferences">Config</a></div></div></div></div></div>',
-                    cookie_groups: cookie_groups,
-                    cookie_decline: "{% get_decline_cookie_groups_cookie_string request cookie_groups %}",
-                    beforeDeclined: function() {
-                        document.cookie = "{% get_decline_cookie_groups_cookie_string request cookie_groups %}";
-                    }
-                });
-            });
+      showCookieBar({
+          statusUrl: "{{ status_url|escapejs }}",
+          templateSelector: "#cookie-consent__cookie-bar",
+          cookieGroupsSelector: "#cookie-consent__cookie-groups",
+          acceptSelector: ".cc-cookie-accept",
+          declineSelector: ".cc-cookie-decline",
+      });
     </script>
-  {% endif %}
 {% endif %}

@@ -156,7 +156,7 @@ requires-dist = [
     { name = "dj-database-url", specifier = ">=3.1.2" },
     { name = "django", specifier = ">=5.2.4" },
     { name = "django-bootstrap-modal-forms", specifier = ">=3.0.5" },
-    { name = "django-cookie-consent", specifier = ">=0.6.0" },
+    { name = "django-cookie-consent", specifier = ">=1.0.0" },
     { name = "django-crispy-forms", specifier = ">=2.5" },
     { name = "django-extra-views", specifier = ">=0.16.0" },
     { name = "django-geojson", specifier = ">=4.2.0" },
@@ -436,15 +436,15 @@ wheels = [
 
 [[package]]
 name = "django-cookie-consent"
-version = "0.8.0"
+version = "1.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
     { name = "django-appconf" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ab/2b/4758a4b3a90befa6706069a6aa31e374178cda7a940033598981952e0655/django_cookie_consent-0.8.0.tar.gz", hash = "sha256:ee373a1323e90408e988268dd8dc66ad2f088c3c12a40e1e5c075a73d790c631", size = 29060, upload-time = "2025-05-30T06:41:38.438Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9a/80/fa34d2240e55097d02285fb63716e6e5c2bad5b42748749fa41986520563/django_cookie_consent-1.0.0.tar.gz", hash = "sha256:f78a6f9a55c2d7e1daa64118181891d313bf363158825f637ab24e3d0856eb14", size = 30039, upload-time = "2026-02-04T20:36:32.999Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4e/23/fe9ccd9c93607346095dc12c0e670492d4b4b39abf079310809b144047f5/django_cookie_consent-0.8.0-py3-none-any.whl", hash = "sha256:4c6388cb08311b76eb738a0465ae83fc9cea1eb89f6c93cdf4dbd2b55ecc0448", size = 28391, upload-time = "2025-05-30T06:41:36.536Z" },
+    { url = "https://files.pythonhosted.org/packages/69/fb/53822dc832ac952097574c51de5d7ef716679ad7f9a47c92de93c8771145/django_cookie_consent-1.0.0-py3-none-any.whl", hash = "sha256:964b870ee5a9d6db6c62edb303f65671df91a5281d36cf77187dbdc5f724d971", size = 28597, upload-time = "2026-02-04T20:36:31.839Z" },
 ]
 
 [[package]]

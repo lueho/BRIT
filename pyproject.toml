@@ -30,7 +30,7 @@ dependencies = [
     "django-leaflet>=0.33.0",
     # User management and utilities
     "django-registration-redux>=2.13",
-    "django-cookie-consent>=0.6.0",
+    "django-cookie-consent>=1.0.0",
     # File storage and processing
     "django-storages>=1.14.6",
     "boto3>=1.42.55",
