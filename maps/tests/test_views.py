@@ -1,6 +1,7 @@
 import json
 from datetime import date
 from unittest.mock import patch
+from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -1096,6 +1097,76 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(200, response.status_code)
         ids = [region["id"] for region in json.loads(response.content)["results"]]
         self.assertListEqual([lau.id for lau in LauRegion.objects.all()], ids)
+
+
+class NutsRegionAutocompleteFilterParsingTestCase(ViewWithPermissionsTestCase):
+    url = reverse("nutsregion-autocomplete-level1")
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.parent_a = NutsRegion.objects.create(
+            name="Parent A",
+            name_latn="Parent A",
+            nuts_name="Parent A",
+            nuts_id="DE1",
+            levl_code=0,
+            publication_status="published",
+        )
+        cls.parent_b = NutsRegion.objects.create(
+            name="Parent B",
+            name_latn="Parent B",
+            nuts_name="Parent B",
+            nuts_id="DE2",
+            levl_code=0,
+            publication_status="published",
+        )
+        cls.child_a = NutsRegion.objects.create(
+            name="Child A",
+            name_latn="Child A",
+            nuts_name="Child A",
+            nuts_id="DE11",
+            levl_code=1,
+            parent=cls.parent_a,
+            publication_status="published",
+        )
+        cls.child_b = NutsRegion.objects.create(
+            name="Child B",
+            name_latn="Child B",
+            nuts_name="Child B",
+            nuts_id="DE21",
+            levl_code=1,
+            parent=cls.parent_b,
+            publication_status="published",
+        )
+
+    def test_nutsregion_level_filter_accepts_single_filter_by(self):
+        response = self.client.get(
+            self.url,
+            data={"f": f"level_0__parent_id='{self.parent_a.id}'"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ids = [region["id"] for region in response.json()["results"]]
+        self.assertIn(self.child_a.id, ids)
+        self.assertNotIn(self.child_b.id, ids)
+
+    def test_nutsregion_level_filter_accepts_repeated_filter_by_values(self):
+        query = urlencode(
+            {
+                "f": [
+                    f"level_0__parent_id='{self.parent_a.id}'",
+                    "scope__name='published'",
+                ]
+            },
+            doseq=True,
+        )
+        response = self.client.get(f"{self.url}?{query}")
+
+        self.assertEqual(response.status_code, 200)
+        ids = [region["id"] for region in response.json()["results"]]
+        self.assertIn(self.child_a.id, ids)
+        self.assertNotIn(self.child_b.id, ids)
 
 
 class ClearGeojsonCacheViewTest(TestCase):

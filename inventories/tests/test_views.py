@@ -1,6 +1,12 @@
+from types import SimpleNamespace
+
 from django.test import SimpleTestCase
 
 from maps.models import Catchment, Region
+from utils.object_management.views import (
+    get_tomselect_filter_pairs,
+    get_tomselect_filter_value,
+)
 from utils.tests.testcases import AbstractTestCases
 
 from ..models import Scenario
@@ -68,6 +74,31 @@ class InventoryAutocompleteInheritanceRegressionTests(SimpleTestCase):
             ScenarioInventoryAlgorithmAutocompleteView.value_fields,
             ["name"],
         )
+
+
+class TomSelectFilterHelpersTests(SimpleTestCase):
+    """Ensure helper parsing supports legacy and list-based TomSelect params."""
+
+    def test_get_tomselect_filter_pairs_supports_single_filter_by(self):
+        view = SimpleNamespace(filter_by="scope__name='published'", filters_by=[])
+
+        self.assertEqual(
+            get_tomselect_filter_pairs(view),
+            [("scope__name", "published")],
+        )
+        self.assertEqual(get_tomselect_filter_value(view), "published")
+
+    def test_get_tomselect_filter_pairs_supports_list_based_filters(self):
+        view = SimpleNamespace(
+            filter_by=None,
+            filters_by=["scope__name='private'", "owner_id='12'"],
+        )
+
+        self.assertEqual(
+            get_tomselect_filter_pairs(view),
+            [("scope__name", "private"), ("owner_id", "12")],
+        )
+        self.assertEqual(get_tomselect_filter_value(view, lookup="owner_id"), "12")
 
 
 class ScenarioResultCRUDViewsTestCase(

@@ -38,6 +38,7 @@ from utils.object_management.views import (
     UserCreatedObjectModalDetailView,
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectUpdateView,
+    get_tomselect_filter_pairs,
 )
 
 from .filters import (
@@ -751,21 +752,21 @@ class NutsRegionAutocompleteView(UserCreatedObjectAutocompleteView):
         if ancestor_nuts_id:
             return queryset.filter(nuts_id__startswith=ancestor_nuts_id)
 
-        if not self.filter_by and not self.exclude_by:
+        filter_pairs = get_tomselect_filter_pairs(self)
+        if not filter_pairs:
             return queryset
 
-        if self.filter_by:
-            import urllib.parse
+        for lookup, value in filter_pairs:
+            if not value:
+                continue
 
-            lookup, value = (
-                urllib.parse.unquote(self.filter_by).replace("'", "").split("=")
-            )
-            # Only apply parent_id filter if a value is provided
-            if value:
-                dependent_field, dependent_field_lookup = lookup.split("__")
+            try:
+                dependent_field, _dependent_field_lookup = lookup.split("__", 1)
                 levl_code = int(dependent_field.split("_")[-1]) + 1
-                filter_dict = {"levl_code": levl_code, "parent_id": value}
-                queryset = queryset.filter(**filter_dict)
+            except (IndexError, ValueError):
+                continue
+
+            return queryset.filter(levl_code=levl_code, parent_id=value)
 
         return queryset
 
