@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from django.test import TestCase
 
+from utils.object_management.models import get_default_owner
 from utils.properties.models import Unit
 from utils.properties.units import UnitConversionError
 
@@ -74,3 +75,10 @@ class UnitModelConversionTestCase(TestCase):
             result = source.convert(Decimal("2"), target)
 
         self.assertEqual(result, 2000)
+
+
+class UtilsInitialDataTestCase(TestCase):
+    def test_no_unit_exists_for_default_owner(self):
+        owner = get_default_owner()
+        unit = Unit.objects.get(owner=owner, name="No unit")
+        self.assertTrue(unit.dimensionless)
