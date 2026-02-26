@@ -11,6 +11,8 @@
       33 thematische Karten zur Abfallsammlung in Deutschland, Italien, Schweden, Dänemark, den Niederlanden und Belgien
     </p>
 
+    <h2 class="h4 mt-4">Germany</h2>
+
     <div class="row">
       <div class="col-md-6">
         <div class="card mb-3">
@@ -20,21 +22,6 @@
           <ul class="list-group list-group-flush">
             <li class="list-group-item">
               <a href="{% url 'waste-atlas-orga-level-map' %}">Karte 1 — Sammlungs-Organisationsebene</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-orga-level-italy-map' %}">Map 29 — Administrative level of waste collection (Italy, EN)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-orga-level-sweden-map' %}">Map 30 — Administrative level of waste collection (Sweden, EN)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-orga-level-denmark-map' %}">Map 31 — Administrative level of waste collection (Denmark, EN)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-orga-level-netherlands-map' %}">Map 32 — Administrative level of waste collection (The Netherlands, EN)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-orga-level-belgium-map' %}">Map 33 — Administrative level of waste collection (Belgium, EN)</a>
             </li>
             <li class="list-group-item">
               <a href="{% url 'waste-atlas-collection-system-map' %}">Karte 2 — Küchenabfall-Sammelsysteme</a>
@@ -174,6 +161,75 @@
           <ul class="list-group list-group-flush">
             <li class="list-group-item">
               <a href="{% url 'waste-atlas-population-density-map' %}">Karte 20 — Einwohnerdichte</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="h4 mt-4">Country-specific maps</h2>
+
+    <div class="row">
+      <div class="col-md-6 col-lg-4">
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong>Italy</strong>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-orga-level-italy-map' %}">Map 29 — Administrative level of waste collection (Italy, EN)</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong>Sweden</strong>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-orga-level-sweden-map' %}">Map 30 — Administrative level of waste collection (Sweden, EN)</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong>Denmark</strong>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-orga-level-denmark-map' %}">Map 31 — Administrative level of waste collection (Denmark, EN)</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong>The Netherlands</strong>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-orga-level-netherlands-map' %}">Map 32 — Administrative level of waste collection (The Netherlands, EN)</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong>Belgium</strong>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-orga-level-belgium-map' %}">Map 33 — Administrative level of waste collection (Belgium, EN)</a>
             </li>
           </ul>
         </div>

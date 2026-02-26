@@ -3078,21 +3078,22 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "No data")
 
     def test_country_specific_orga_level_maps_default_to_expected_country(self):
-        """Country-specific orga-level maps default to their own country selection."""
-        map_to_country = {
-            "waste-atlas-orga-level-italy-map": "IT",
-            "waste-atlas-orga-level-sweden-map": "SE",
-            "waste-atlas-orga-level-denmark-map": "DK",
-            "waste-atlas-orga-level-netherlands-map": "NL",
-            "waste-atlas-orga-level-belgium-map": "BE",
+        """Country-specific orga-level maps default to expected country and year."""
+        map_defaults = {
+            "waste-atlas-orga-level-italy-map": ("IT", "2024"),
+            "waste-atlas-orga-level-sweden-map": ("SE", "2024"),
+            "waste-atlas-orga-level-denmark-map": ("DK", "2023"),
+            "waste-atlas-orga-level-netherlands-map": ("NL", "2024"),
+            "waste-atlas-orga-level-belgium-map": ("BE", "2024"),
         }
 
-        for url_name, expected_country in map_to_country.items():
+        for url_name, (expected_country, expected_year) in map_defaults.items():
             with self.subTest(url_name=url_name):
                 response = self.client.get(reverse(url_name))
 
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, f'value="{expected_country}" selected')
+                self.assertContains(response, f'value="{expected_year}" selected')
                 self.assertContains(
                     response, "Administrative level of waste collection"
                 )

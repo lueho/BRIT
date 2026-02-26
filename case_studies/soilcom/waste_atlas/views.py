@@ -22,13 +22,14 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
 
     map_title = ""
     default_country = "DE"
+    default_year = "2024"
     map_overview_label = "Kartenübersicht"
 
     def get_context_data(self, **kwargs):
         """Pass country, year, and map_title to the template."""
         ctx = super().get_context_data(**kwargs)
         ctx["country"] = self.request.GET.get("country", self.default_country)
-        ctx["year"] = self.request.GET.get("year", "2024")
+        ctx["year"] = self.request.GET.get("year", self.default_year)
         ctx["map_title"] = self.map_title
         ctx["map_overview_label"] = self.map_overview_label
         return ctx
@@ -78,6 +79,7 @@ class DenmarkOrgaLevelMapView(AtlasMapView):
     template_name = "waste_atlas/karte31_orga_level_denmark.html"
     map_title = "Administrative level of waste collection"
     default_country = "DK"
+    default_year = "2023"
     map_overview_label = "Map overview"
 
 
