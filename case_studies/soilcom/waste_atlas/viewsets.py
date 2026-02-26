@@ -46,6 +46,7 @@ from .serializers import (
     CatchmentMaterialStatusSerializer,
     CatchmentMinBinSizeSerializer,
     CatchmentOrgaLevelSerializer,
+    CatchmentOrganicRatioSerializer,
     CatchmentPopulationSerializer,
     CatchmentRequiredBinCapacitySerializer,
     CatchmentWasteRatioSerializer,
@@ -1260,6 +1261,103 @@ class ResidualRequiredBinCapacityViewSet(viewsets.ViewSet):
         country, year = _parse_country_year(request)
         data = _get_required_bin_capacity(country, year, ["Residual waste"])
         serializer = CatchmentRequiredBinCapacitySerializer(data, many=True)
+        return Response(serializer.data)
+
+
+_ORGANIC_CATEGORY_NAMES = ["Biowaste", "Food waste"] + _GREEN_WASTE_CATEGORY_NAMES
+
+
+def _get_organic_amounts(country, year):
+    """Return per-catchment summed organic waste amount (kg/person/year).
+
+    Sums bio/food waste from ``_get_collection_amount`` with green waste from
+    ``_get_green_waste_collection_amount``.  Catchments present in either
+    source are included; amounts are summed where both are available.
+    """
+    bio_rows = _get_collection_amount(country, year, ["Biowaste", "Food waste"])
+    green_rows = _get_green_waste_collection_amount(country, year)
+
+    bio_map = {
+        r["catchment_id"]: r["amount"] for r in bio_rows if not r.get("no_collection")
+    }
+    green_map = {
+        r["catchment_id"]: r["amount"] for r in green_rows if not r.get("no_collection")
+    }
+
+    all_ids = set(bio_map) | set(green_map)
+    result = {}
+    for cid in all_ids:
+        b = bio_map.get(cid)
+        g = green_map.get(cid)
+        if b is not None and g is not None:
+            result[cid] = b + g
+        elif b is not None:
+            result[cid] = b
+        elif g is not None:
+            result[cid] = g
+        else:
+            result[cid] = None
+    return result
+
+
+class OrganicCollectionAmountViewSet(viewsets.ViewSet):
+    """Return aggregated organic waste amount per catchment (Karte 27).
+
+    Sums biowaste/food waste and green waste specific collection amounts
+    into a single organic total (kg/person/year).
+
+    Example::
+
+        GET /waste_collection/api/waste-atlas/organic-collection-amount/?country=DE&year=2024
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        """Return a JSON array of {catchment_id, amount}."""
+        country, year = _parse_country_year(request)
+        organic = _get_organic_amounts(country, year)
+        data = [{"catchment_id": cid, "amount": amt} for cid, amt in organic.items()]
+        serializer = CatchmentCollectionAmountSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class OrganicWasteRatioViewSet(viewsets.ViewSet):
+    """Return organic / (organic + residual) ratio per catchment (Karte 28).
+
+    Example::
+
+        GET /waste_collection/api/waste-atlas/organic-waste-ratio/?country=DE&year=2024
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        """Return a JSON array of {catchment_id, organic_amount, residual_amount, ratio}."""
+        country, year = _parse_country_year(request)
+        organic = _get_organic_amounts(country, year)
+        res_map = {
+            r["catchment_id"]: r["amount"]
+            for r in _get_collection_amount(country, year, ["Residual waste"])
+        }
+        all_ids = set(organic) | set(res_map)
+        data = []
+        for cid in all_ids:
+            o = organic.get(cid)
+            r = res_map.get(cid)
+            if o is not None and r is not None and (o + r) > 0:
+                ratio = o / (o + r)
+            else:
+                ratio = None
+            data.append(
+                {
+                    "catchment_id": cid,
+                    "organic_amount": o,
+                    "residual_amount": r,
+                    "ratio": ratio,
+                }
+            )
+        serializer = CatchmentOrganicRatioSerializer(data, many=True)
         return Response(serializer.data)
 
 

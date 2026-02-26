@@ -184,6 +184,20 @@ class GreenWasteCollectionAmountMapView(AtlasMapView):
     map_title = "Spezifisch gesammelte Menge an Grüngut"
 
 
+class OrganicCollectionAmountMapView(AtlasMapView):
+    """Karte 27 — Aggregierte Sammelmenge organischer Fraktionen."""
+
+    template_name = "waste_atlas/karte27_organic_collection_amount.html"
+    map_title = "Aggregierte Sammelmenge organischer Fraktionen (kg/P/a)"
+
+
+class OrganicWasteRatioMapView(AtlasMapView):
+    """Karte 28 — Verhältnis organischer Fraktionen zu Restabfall."""
+
+    template_name = "waste_atlas/karte28_organic_waste_ratio.html"
+    map_title = "Anteil organischer Fraktionen an Gesamtabfall"
+
+
 class BiowasteMinBinSizeMapView(AtlasMapView):
     """Karte 23 — Mindest-Behältergröße Bioabfall."""
 

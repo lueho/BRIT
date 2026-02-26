@@ -19,6 +19,8 @@ from .viewsets import (
     GreenWasteCollectionAmountViewSet,
     GreenWasteCollectionSystemCountViewSet,
     OrgaLevelViewSet,
+    OrganicCollectionAmountViewSet,
+    OrganicWasteRatioViewSet,
     PaperBagsStatusViewSet,
     PlasticBagsStatusViewSet,
     ResidualCollectionAmountViewSet,
@@ -156,6 +158,16 @@ router.register(
     "residual-required-bin-capacity",
     ResidualRequiredBinCapacityViewSet,
     basename="api-waste-atlas-residual-required-bin-capacity",
+)
+router.register(
+    "organic-collection-amount",
+    OrganicCollectionAmountViewSet,
+    basename="api-waste-atlas-organic-collection-amount",
+)
+router.register(
+    "organic-waste-ratio",
+    OrganicWasteRatioViewSet,
+    basename="api-waste-atlas-organic-waste-ratio",
 )
 router.register(
     "waste-ratio",

@@ -18,6 +18,8 @@ from .views import (
     GreenWasteCollectionAmountMapView,
     GreenWasteCollectionSystemCountMapView,
     OrgaLevelMapView,
+    OrganicCollectionAmountMapView,
+    OrganicWasteRatioMapView,
     PaperBagsMapView,
     PlasticBagsMapView,
     PopulationDensityMapView,
@@ -147,6 +149,16 @@ urlpatterns = [
         "map/population-density/",
         PopulationDensityMapView.as_view(),
         name="waste-atlas-population-density-map",
+    ),
+    path(
+        "map/organic-collection-amount/",
+        OrganicCollectionAmountMapView.as_view(),
+        name="waste-atlas-organic-collection-amount-map",
+    ),
+    path(
+        "map/organic-waste-ratio/",
+        OrganicWasteRatioMapView.as_view(),
+        name="waste-atlas-organic-waste-ratio-map",
     ),
     path(
         "map/biowaste-min-bin-size/",

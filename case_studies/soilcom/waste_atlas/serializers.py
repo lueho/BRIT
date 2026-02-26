@@ -156,6 +156,15 @@ class CatchmentWasteRatioSerializer(serializers.Serializer):
     ratio = serializers.FloatField(allow_null=True)
 
 
+class CatchmentOrganicRatioSerializer(serializers.Serializer):
+    """Flat JSON serializer for organic / (organic + residual) ratio (Karte 28)."""
+
+    catchment_id = serializers.IntegerField()
+    organic_amount = serializers.FloatField(allow_null=True)
+    residual_amount = serializers.FloatField(allow_null=True)
+    ratio = serializers.FloatField(allow_null=True)
+
+
 class CatchmentMinBinSizeSerializer(serializers.Serializer):
     """Flat JSON serializer for minimum bin size per catchment (Karte 23, 24)."""
 

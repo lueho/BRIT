@@ -7,7 +7,7 @@
 {% block content %}
   <div class="container mt-4">
     <h1>Waste Atlas — Kartenübersicht</h1>
-    <p class="lead">26 thematische Karten zur Abfallsammlung in Deutschland (Stand 2022)</p>
+    <p class="lead">28 thematische Karten zur Abfallsammlung in Deutschland (Stand 2022)</p>
 
     <div class="row">
       <div class="col-md-6">
@@ -120,6 +120,12 @@
             </li>
             <li class="list-group-item">
               <a href="{% url 'waste-atlas-waste-ratio-map' %}">Karte 19 — Sammelmengen-Verhältnis</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-organic-collection-amount-map' %}">Karte 27 — Aggregierte organische Sammelmenge</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-organic-waste-ratio-map' %}">Karte 28 — Anteil organischer Fraktionen</a>
             </li>
           </ul>
         </div>

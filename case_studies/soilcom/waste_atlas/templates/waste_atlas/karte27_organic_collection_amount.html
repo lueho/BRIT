@@ -1,0 +1,48 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+  <script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2024,
+      title:       'Aggregierte Sammelmenge organischer Fraktionen (Bio- + Küchen- + Grünabfall)',
+      dataUrl:     '/waste_collection/api/waste-atlas/organic-collection-amount/',
+      dataField:   '_classified',
+      categories: [
+        { value: 'very_high', label: '> 300 kg/P/a',        color: '#1a9850' },
+        { value: 'high',      label: '201 – 300 kg/P/a',    color: '#66bd63' },
+        { value: 'medium',    label: '101 – 200 kg/P/a',    color: '#a6d96a' },
+        { value: 'low',       label: '51 – 100 kg/P/a',     color: '#d9f0d3' },
+        { value: 'very_low',  label: '0 – 50 kg/P/a',       color: '#f7fcf0' }
+      ],
+      noDataColor: '#ffffff',
+      noDataLabel: 'Keine Daten',
+      legendTitle: 'Organik-Sammelmenge (kg/P/a)',
+      fileBase:    'karte27_organische_sammelmenge',
+      transformData: function (records) {
+        return records.map(function (r) {
+          var cls;
+          if (r.amount === null) {
+            cls = null;
+          } else if (r.amount > 300) {
+            cls = 'very_high';
+          } else if (r.amount > 200) {
+            cls = 'high';
+          } else if (r.amount > 100) {
+            cls = 'medium';
+          } else if (r.amount > 50) {
+            cls = 'low';
+          } else {
+            cls = 'very_low';
+          }
+          return { catchment_id: r.catchment_id, _classified: cls };
+        });
+      }
+    });
+  });
+  </script>
+{% endblock atlas_config %}
