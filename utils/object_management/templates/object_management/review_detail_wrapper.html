@@ -11,11 +11,11 @@ page, then defers to the model's regular detail template content.
 {% endblock detail_header_actions %}
 
 {% block detail_header_review_actions %}
-  {# Back link to detail view - use next parameter or object's detail URL #}
-  {% with back_url=request.GET.next|default:object.get_absolute_url %}
-    {% if back_url %}
+  {# Detail view button - always goes to object's detail page #}
+  {% with detail_url=object.get_absolute_url %}
+    {% if detail_url %}
       <a class="btn btn-sm btn-outline-secondary"
-         href="{{ back_url }}"
+         href="{{ detail_url }}"
          title="Detail view">
         <i class="fas fa-file-lines"></i> <span class="d-none d-sm-inline">Detail view</span>
       </a>
