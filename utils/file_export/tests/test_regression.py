@@ -2,8 +2,8 @@ from collections import OrderedDict, namedtuple
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
-from django.contrib.auth.models import User
-from django.test import SimpleTestCase, TestCase
+from django.contrib.auth.models import AnonymousUser, User
+from django.test import RequestFactory, SimpleTestCase, TestCase
 from openpyxl import load_workbook
 
 from ..export_registry import (
@@ -14,6 +14,7 @@ from ..export_registry import (
 )
 from ..generic_tasks import BATCH_SIZE, export_user_created_object_to_file
 from ..renderers import BaseCSVRenderer, BaseXLSXRenderer
+from ..templatetags.file_export_tags import export_link, export_modal_button
 
 
 class ExportRegistryTestCase(SimpleTestCase):
@@ -364,3 +365,79 @@ class ExportTaskTestCase(TestCase):
         last_call = mock_self.update_state.call_args_list[-1]
         self.assertEqual(last_call[1]["meta"]["percent"], 100)
         self.assertEqual(last_call[1]["meta"]["current"], total)
+
+
+class ExportLinkTagTestCase(SimpleTestCase):
+    """Tests for the export_link template tag."""
+
+    def test_csv_format_returns_csv_icon_class(self):
+        result = export_link("csv", "export-modal")
+        self.assertIn("fa-file-csv", result["icon_class"])
+
+    def test_xlsx_format_returns_excel_icon_class(self):
+        result = export_link("xlsx", "export-modal")
+        self.assertIn("fa-file-excel", result["icon_class"])
+
+    def test_invalid_format_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            export_link("pdf", "export-modal")
+
+    def test_returns_correct_file_format(self):
+        result = export_link("csv", "export-modal")
+        self.assertEqual(result["file_format"], "csv")
+
+    def test_progress_url_contains_placeholder(self):
+        result = export_link("csv", "export-modal")
+        self.assertIn("/progress/", result["progress_url"])
+
+
+class ExportModalButtonTagTestCase(SimpleTestCase):
+    """Tests for the export_modal_button template tag."""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def _make_context(self, user=None):
+        request = self.factory.get("/")
+        request.user = user or MagicMock(is_authenticated=True)
+        return {"request": request}
+
+    def test_authenticated_user_gets_enabled_button(self):
+        context = self._make_context()
+        result = export_modal_button(context, "export-modal")
+        self.assertFalse(result["export_disabled"])
+
+    def test_anonymous_user_gets_disabled_button(self):
+        context = self._make_context(user=AnonymousUser())
+        result = export_modal_button(context, "export-modal")
+        self.assertTrue(result["export_disabled"])
+
+    def test_custom_text_is_passed_through(self):
+        context = self._make_context()
+        result = export_modal_button(context, "export-modal", text="Download")
+        self.assertEqual(result["button_text"], "Download")
+
+    def test_custom_element_id_is_passed_through(self):
+        context = self._make_context()
+        result = export_modal_button(context, "export-modal", element_id="my-btn")
+        self.assertEqual(result["button_id"], "my-btn")
+
+    def test_default_element_id_derived_from_url_name(self):
+        context = self._make_context()
+        result = export_modal_button(context, "export-modal")
+        self.assertEqual(result["button_id"], "export-modal-export-modal")
+
+    def test_extra_params_included_in_modal_href(self):
+        context = self._make_context()
+        result = export_modal_button(context, "export-modal", scope="public")
+        self.assertIn("scope=public", result["modal_href"])
+
+    def test_none_extra_param_excluded_from_top_level_modal_params(self):
+        context = self._make_context()
+        result = export_modal_button(context, "export-modal", empty_param=None)
+
+        from urllib.parse import parse_qs, urlparse
+
+        parsed = urlparse(result["modal_href"])
+        top_level_params = parse_qs(parsed.query)
+        self.assertNotIn("empty_param", top_level_params)
