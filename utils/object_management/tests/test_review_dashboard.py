@@ -415,6 +415,7 @@ class ReviewDashboardViewTests(TestCase):
                 "_in_review_queryset_for_model",
                 side_effect=RuntimeError("boom"),
             ),
+            self.assertLogs("utils.object_management.views", level="WARNING"),
         ):
             review_items = view.collect_review_items()
 
