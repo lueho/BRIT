@@ -14,10 +14,14 @@ Tests use RequestFactory to simulate view-level calls and test the mixin logic
 in isolation, bypassing URL routing.
 """
 
+import time
 from datetime import date
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 from django.test import RequestFactory, TestCase
+from django.urls import reverse
 
 from case_studies.soilcom.models import (
     AggregatedCollectionPropertyValue,
@@ -34,6 +38,7 @@ from case_studies.soilcom.views import (
     CollectionSubmitForReviewView,
     CollectionWithdrawFromReviewView,
 )
+from utils.object_management.models import ReviewAction
 from utils.properties.models import Property, Unit
 
 User = get_user_model()
@@ -426,3 +431,247 @@ class RejectCascadeMixinTest(CollectionCascadeMixinTestCase):
 
         self.assertEqual(cpv1.publication_status, "declined")
         self.assertEqual(cpv2.publication_status, "declined")
+
+
+class ReviewSubmissionConsistencyTests(TestCase):
+    """Regression tests ensuring review-submission timestamps remain consistent."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(username="owner")
+        self.moderator = User.objects.create_user(username="moderator", is_staff=True)
+
+        content_type = ContentType.objects.get_for_model(Collection)
+        permission, _ = Permission.objects.get_or_create(
+            codename="can_moderate_collection",
+            content_type=content_type,
+            defaults={"name": "Can moderate collections"},
+        )
+        self.moderator.user_permissions.add(permission)
+
+        self.collection = Collection.objects.create(
+            name="Test Collection",
+            owner=self.owner,
+            publication_status=Collection.STATUS_PRIVATE,
+        )
+
+    def test_initial_submission_consistency(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse(
+                "object_management:submit_for_review",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(Collection).pk,
+                    "object_id": self.collection.pk,
+                },
+            ),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        self.collection.refresh_from_db()
+        self.assertIsNotNone(self.collection.submitted_at)
+
+        actions = ReviewAction.objects.filter(
+            content_type=ContentType.objects.get_for_model(Collection),
+            object_id=self.collection.pk,
+            action=ReviewAction.ACTION_SUBMITTED,
+        )
+        self.assertEqual(actions.count(), 1)
+
+        latest_action = actions.order_by("-created_at", "-id").first()
+        self.assertIsNotNone(latest_action)
+
+        time_diff = abs(self.collection.submitted_at - latest_action.created_at)
+        self.assertLess(time_diff.total_seconds(), 1.0)
+
+    def test_resubmission_consistency(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse(
+                "object_management:submit_for_review",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(Collection).pk,
+                    "object_id": self.collection.pk,
+                },
+            ),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.collection.refresh_from_db()
+        initial_submitted_at = self.collection.submitted_at
+        initial_action = (
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(Collection),
+                object_id=self.collection.pk,
+                action=ReviewAction.ACTION_SUBMITTED,
+            )
+            .order_by("-created_at", "-id")
+            .first()
+        )
+
+        response = self.client.post(
+            reverse(
+                "object_management:withdraw_from_review",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(Collection).pk,
+                    "object_id": self.collection.pk,
+                },
+            ),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.collection.refresh_from_db()
+        self.assertIsNone(self.collection.submitted_at)
+
+        time.sleep(0.01)
+
+        response = self.client.post(
+            reverse(
+                "object_management:submit_for_review",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(Collection).pk,
+                    "object_id": self.collection.pk,
+                },
+            ),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.collection.refresh_from_db()
+
+        latest_action = (
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(Collection),
+                object_id=self.collection.pk,
+                action=ReviewAction.ACTION_SUBMITTED,
+            )
+            .order_by("-created_at", "-id")
+            .first()
+        )
+
+        self.assertIsNotNone(self.collection.submitted_at)
+        self.assertIsNotNone(latest_action)
+        time_diff = abs(self.collection.submitted_at - latest_action.created_at)
+        self.assertLess(time_diff.total_seconds(), 1.0)
+
+        self.assertGreater(self.collection.submitted_at, initial_submitted_at)
+        self.assertGreater(latest_action.created_at, initial_action.created_at)
+
+    def test_review_ui_shows_latest_submission(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse(
+                "object_management:submit_for_review",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(Collection).pk,
+                    "object_id": self.collection.pk,
+                },
+            ),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        time.sleep(0.01)
+
+        response = self.client.post(
+            reverse(
+                "object_management:withdraw_from_review",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(Collection).pk,
+                    "object_id": self.collection.pk,
+                },
+            ),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        time.sleep(0.01)
+
+        response = self.client.post(
+            reverse(
+                "object_management:submit_for_review",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(Collection).pk,
+                    "object_id": self.collection.pk,
+                },
+            ),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.collection.refresh_from_db()
+
+        self.client.force_login(self.moderator)
+        response = self.client.get(
+            reverse(
+                "object_management:review_item_detail",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(Collection).pk,
+                    "object_id": self.collection.pk,
+                },
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+
+        self.assertIn("review_submitted_action", response.context)
+        submitted_action = response.context["review_submitted_action"]
+        self.assertIsNotNone(submitted_action)
+        self.assertEqual(submitted_action.action, ReviewAction.ACTION_SUBMITTED)
+
+        latest_action = (
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(Collection),
+                object_id=self.collection.pk,
+                action=ReviewAction.ACTION_SUBMITTED,
+            )
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        self.assertEqual(submitted_action.pk, latest_action.pk)
+
+        time_diff = abs(submitted_action.created_at - self.collection.submitted_at)
+        self.assertLess(time_diff.total_seconds(), 1.0)
+
+    def test_approval_preserves_submission_timestamp(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse(
+                "object_management:submit_for_review",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(Collection).pk,
+                    "object_id": self.collection.pk,
+                },
+            ),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.collection.refresh_from_db()
+        submitted_at_before = self.collection.submitted_at
+
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            reverse(
+                "object_management:approve_item",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(Collection).pk,
+                    "object_id": self.collection.pk,
+                },
+            ),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.collection.refresh_from_db()
+
+        self.assertEqual(self.collection.submitted_at, submitted_at_before)
+
+        latest_action = (
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(Collection),
+                object_id=self.collection.pk,
+                action=ReviewAction.ACTION_SUBMITTED,
+            )
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        time_diff = abs(self.collection.submitted_at - latest_action.created_at)
+        self.assertLess(time_diff.total_seconds(), 1.0)
