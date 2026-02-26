@@ -60,6 +60,11 @@
       <label for="sel-country">Country</label>
       <select id="sel-country">
         <option value="DE" {% if country == "DE" %}selected{% endif %}>Germany (DE)</option>
+        <option value="IT" {% if country == "IT" %}selected{% endif %}>Italy (IT)</option>
+        <option value="SE" {% if country == "SE" %}selected{% endif %}>Sweden (SE)</option>
+        <option value="DK" {% if country == "DK" %}selected{% endif %}>Denmark (DK)</option>
+        <option value="NL" {% if country == "NL" %}selected{% endif %}>The Netherlands (NL)</option>
+        <option value="BE" {% if country == "BE" %}selected{% endif %}>Belgium (BE)</option>
       </select>
     </div>
     <div>
@@ -74,7 +79,7 @@
     </button>
     <a href="{% url 'waste-atlas-overview' %}"
        class="btn btn-outline-secondary btn-sm">
-      <i class="fas fa-th-list"></i> Kartenübersicht
+      <i class="fas fa-th-list"></i> {{ map_overview_label|default:"Kartenübersicht" }}
     </a>
   </div>
 

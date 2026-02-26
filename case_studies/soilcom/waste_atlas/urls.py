@@ -2,6 +2,7 @@ from django.urls import include, path
 
 from .router import router
 from .views import (
+    BelgiumOrgaLevelMapView,
     BiowasteCollectionAmountMapView,
     BiowasteCollectionCountMapView,
     BiowasteFeeSystemMapView,
@@ -14,9 +15,12 @@ from .views import (
     CombinedFeeSystemMapView,
     CombinedFrequencyMapView,
     ConnectionRateMapView,
+    DenmarkOrgaLevelMapView,
     FoodWasteCategoryMapView,
     GreenWasteCollectionAmountMapView,
     GreenWasteCollectionSystemCountMapView,
+    ItalyOrgaLevelMapView,
+    NetherlandsOrgaLevelMapView,
     OrgaLevelMapView,
     OrganicCollectionAmountMapView,
     OrganicWasteRatioMapView,
@@ -29,6 +33,7 @@ from .views import (
     ResidualFrequencyMapView,
     ResidualMinBinSizeMapView,
     ResidualRequiredBinCapacityMapView,
+    SwedenOrgaLevelMapView,
     WasteAtlasOverviewView,
     WasteRatioMapView,
 )
@@ -44,6 +49,31 @@ urlpatterns = [
         "map/orga-level/",
         OrgaLevelMapView.as_view(),
         name="waste-atlas-orga-level-map",
+    ),
+    path(
+        "map/orga-level-italy/",
+        ItalyOrgaLevelMapView.as_view(),
+        name="waste-atlas-orga-level-italy-map",
+    ),
+    path(
+        "map/orga-level-sweden/",
+        SwedenOrgaLevelMapView.as_view(),
+        name="waste-atlas-orga-level-sweden-map",
+    ),
+    path(
+        "map/orga-level-denmark/",
+        DenmarkOrgaLevelMapView.as_view(),
+        name="waste-atlas-orga-level-denmark-map",
+    ),
+    path(
+        "map/orga-level-netherlands/",
+        NetherlandsOrgaLevelMapView.as_view(),
+        name="waste-atlas-orga-level-netherlands-map",
+    ),
+    path(
+        "map/orga-level-belgium/",
+        BelgiumOrgaLevelMapView.as_view(),
+        name="waste-atlas-orga-level-belgium-map",
     ),
     path(
         "map/collection-system/",

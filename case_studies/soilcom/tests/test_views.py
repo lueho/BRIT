@@ -2,7 +2,7 @@ from datetime import date, timedelta
 from unittest.mock import patch
 from urllib.parse import urlencode
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.core.exceptions import ValidationError
@@ -3053,3 +3053,92 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
         self.assertIn("Forbidden Materials", body)
         self.assertIn("Allowed Material", body)
         self.assertIn("Forbidden Material", body)
+
+
+class WasteAtlasMapViewsTestCase(TestCase):
+    """Tests for Waste Atlas map pages rendered via template views."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(username="atlas-user", password="secret")
+        waste_atlas_group, _ = Group.objects.get_or_create(name="waste_atlas")
+        cls.user.groups.add(waste_atlas_group)
+
+    def setUp(self):
+        self.client.force_login(self.user)
+
+    def test_italy_orga_level_map_defaults_to_it_and_english_labels(self):
+        """Italy orga-level map defaults to country IT and English text."""
+        response = self.client.get(reverse("waste-atlas-orga-level-italy-map"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="IT" selected')
+        self.assertContains(response, "Administrative level of waste collection")
+        self.assertContains(response, "Map overview")
+        self.assertContains(response, "No data")
+
+    def test_country_specific_orga_level_maps_default_to_expected_country(self):
+        """Country-specific orga-level maps default to their own country selection."""
+        map_to_country = {
+            "waste-atlas-orga-level-italy-map": "IT",
+            "waste-atlas-orga-level-sweden-map": "SE",
+            "waste-atlas-orga-level-denmark-map": "DK",
+            "waste-atlas-orga-level-netherlands-map": "NL",
+            "waste-atlas-orga-level-belgium-map": "BE",
+        }
+
+        for url_name, expected_country in map_to_country.items():
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name))
+
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, f'value="{expected_country}" selected')
+                self.assertContains(
+                    response, "Administrative level of waste collection"
+                )
+                self.assertContains(response, "Map overview")
+                self.assertContains(response, "No data")
+
+    def test_italy_orga_level_map_allows_country_override(self):
+        """Italy orga-level map still allows overriding country via query param."""
+        response = self.client.get(
+            reverse("waste-atlas-orga-level-italy-map"),
+            {"country": "DE"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="DE" selected')
+
+    def test_waste_atlas_overview_includes_italy_orga_level_entry(self):
+        """Overview page lists all country-specific organizational-level maps."""
+        response = self.client.get(reverse("waste-atlas-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("waste-atlas-orga-level-italy-map"))
+        self.assertContains(
+            response,
+            "Map 29 — Administrative level of waste collection (Italy, EN)",
+        )
+        self.assertContains(response, reverse("waste-atlas-orga-level-sweden-map"))
+        self.assertContains(
+            response,
+            "Map 30 — Administrative level of waste collection (Sweden, EN)",
+        )
+        self.assertContains(response, reverse("waste-atlas-orga-level-denmark-map"))
+        self.assertContains(
+            response,
+            "Map 31 — Administrative level of waste collection (Denmark, EN)",
+        )
+        self.assertContains(
+            response,
+            reverse("waste-atlas-orga-level-netherlands-map"),
+        )
+        self.assertContains(
+            response,
+            "Map 32 — Administrative level of waste collection (The Netherlands, EN)",
+        )
+        self.assertContains(response, reverse("waste-atlas-orga-level-belgium-map"))
+        self.assertContains(
+            response,
+            "Map 33 — Administrative level of waste collection (Belgium, EN)",
+        )

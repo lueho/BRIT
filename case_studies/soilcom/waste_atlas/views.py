@@ -21,13 +21,16 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
     """
 
     map_title = ""
+    default_country = "DE"
+    map_overview_label = "Kartenübersicht"
 
     def get_context_data(self, **kwargs):
         """Pass country, year, and map_title to the template."""
         ctx = super().get_context_data(**kwargs)
-        ctx["country"] = self.request.GET.get("country", "DE")
+        ctx["country"] = self.request.GET.get("country", self.default_country)
         ctx["year"] = self.request.GET.get("year", "2024")
         ctx["map_title"] = self.map_title
+        ctx["map_overview_label"] = self.map_overview_label
         return ctx
 
 
@@ -49,6 +52,51 @@ class OrgaLevelMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte1_orga_level.html"
     map_title = "Administrative Ebene der Abfallsammlung"
+
+
+class ItalyOrgaLevelMapView(AtlasMapView):
+    """Map 29 — Organization level of waste collection in Italy (English)."""
+
+    template_name = "waste_atlas/karte29_orga_level_italy.html"
+    map_title = "Administrative level of waste collection"
+    default_country = "IT"
+    map_overview_label = "Map overview"
+
+
+class SwedenOrgaLevelMapView(AtlasMapView):
+    """Map 30 — Organization level of waste collection in Sweden (English)."""
+
+    template_name = "waste_atlas/karte30_orga_level_sweden.html"
+    map_title = "Administrative level of waste collection"
+    default_country = "SE"
+    map_overview_label = "Map overview"
+
+
+class DenmarkOrgaLevelMapView(AtlasMapView):
+    """Map 31 — Organization level of waste collection in Denmark (English)."""
+
+    template_name = "waste_atlas/karte31_orga_level_denmark.html"
+    map_title = "Administrative level of waste collection"
+    default_country = "DK"
+    map_overview_label = "Map overview"
+
+
+class NetherlandsOrgaLevelMapView(AtlasMapView):
+    """Map 32 — Organization level of waste collection in the Netherlands (English)."""
+
+    template_name = "waste_atlas/karte32_orga_level_netherlands.html"
+    map_title = "Administrative level of waste collection"
+    default_country = "NL"
+    map_overview_label = "Map overview"
+
+
+class BelgiumOrgaLevelMapView(AtlasMapView):
+    """Map 33 — Organization level of waste collection in Belgium (English)."""
+
+    template_name = "waste_atlas/karte33_orga_level_belgium.html"
+    map_title = "Administrative level of waste collection"
+    default_country = "BE"
+    map_overview_label = "Map overview"
 
 
 class CollectionSystemMapView(AtlasMapView):
