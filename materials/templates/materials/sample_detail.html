@@ -194,216 +194,246 @@
 {% block second_row %}
   {% object_policy object as policy %}
 
-  {# --- Properties Card --- #}
-  <div class="col col-12 col-md-6 col-lg-4">
-    <div class="card shadow h-100">
-      <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-        <h5 class="mb-0">Properties</h5>
-      </div>
-      <div class="card-body">
-        {% with properties=object.properties.all %}
-          {% if properties %}
-            <div class="table-responsive">
-              <table class="table table-sm mb-0">
-                <thead>
-                  <tr>
-                    <th>Property</th>
-                    <th>Value</th>
-                    <th>Method</th>
-                    <th>Sources</th>
-                    {% if policy.can_add_property %}<th class="remove-property collapse multi-collapse">Remove</th>{% endif %}
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for property in properties %}
-                    <tr>
-                      <td>
-                        <a href="{% url 'materialproperty-detail-modal' property.property.pk %}"
-                           class="modal-link">{{ property.property.name }}</a>
-                      </td>
-                      <td class="text-nowrap">
-                        {{ property.average|trim_decimal:6 }} ± {{ property.standard_deviation|trim_decimal:6 }} {{ property.property.unit }}
-                      </td>
-                      <td>
-                        {% if property.analytical_method %}
-                          <a href="{% url 'analyticalmethod-detail-modal' property.analytical_method.pk %}"
-                             class="modal-link">{{ property.analytical_method.name }}</a>
-                        {% else %}
-                          -
-                        {% endif %}
-                      </td>
-                      <td>
-                        {% for source in property.sources.all %}
-                          <a href="{% url 'source-detail-modal' source.pk %}" class="modal-link">{{ source.abbreviation }}</a>
-                          {% if not forloop.last %},{% endif %}
-                        {% empty %}
-                          -
-                        {% endfor %}
-                      </td>
-                      {% if policy.can_add_property %}
-                        <td class="remove-property collapse multi-collapse">
-                          <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}"
-                             class="modal-link">
-                            <i class="fas fa-fw fa-trash"></i>
-                          </a>
-                        </td>
-                      {% endif %}
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          {% else %}
-            <div class="p-3 text-muted">
-              {% if not user.is_authenticated %}
-                No properties recorded. Log in to add properties.
-              {% elif policy.can_add_property %}
-                No properties recorded. Add your first property.
-              {% else %}
-                No properties recorded.
-              {% endif %}
-            </div>
-          {% endif %}
-        {% endwith %}
-      </div>
-      <div class="card-footer">
-        {% if policy.can_add_property %}
-          <a href="{% url 'sample-add-property' object.id %}">
-            <i class="fas fa-fw fa-plus"></i> Add property
-          </a>
-          <a class="ms-3"
-             href="javascript:void(0);"
-             data-bs-toggle="collapse"
-             data-bs-target=".remove-property"
-             aria-expanded="false"
-             aria-controls="remove-property">
-            <i class="fas fa-fw fa-minus"></i> Remove properties
-          </a>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  {# --- Component Measurements Card --- #}
-  {% if component_measurements %}
-    <div class="col col-12 col-lg-8">
-      <div class="card shadow h-100">
-        <div class="card-header bg-body-tertiary border-bottom-0 py-3 d-flex justify-content-between align-items-center">
-          <h5 class="mb-0">Component Measurements</h5>
-          {% regroup component_measurements by group as measurements_by_group %}
-          {% if measurements_by_group %}
-            <div class="d-flex gap-2">
-              <div class="btn-group btn-group-sm" role="group">
-                <button type="button"
-                        class="btn btn-outline-secondary btn-sm"
-                        onclick="expandAllGroups()">
-                  <i class="fas fa-expand-alt"></i> Expand
-                </button>
-                <button type="button"
-                        class="btn btn-outline-secondary btn-sm"
-                        onclick="collapseAllGroups()">
-                  <i class="fas fa-compress-alt"></i> Collapse
-                </button>
-              </div>
-            </div>
-          {% endif %}
+  {# --- Measurements Card (Properties + Component Measurements) --- #}
+  {% with properties=object.properties.all %}
+    {% regroup component_measurements by group as measurements_by_group %}
+    <div class="col col-12">
+      <div class="card shadow h-100 tab-card">
+        <div class="card-header tab-card-header bg-body-tertiary border-bottom-0 py-3">
+          <h5 class="mb-0">Measurements</h5>
+          <ul class="nav nav-tabs card-header-tabs"
+              id="sample-measurements-tabs"
+              role="tablist">
+            <li class="nav-item" role="presentation">
+              <a class="nav-link active"
+                 id="sample-properties-tab-link"
+                 data-bs-toggle="tab"
+                 href="#sample-properties-tab"
+                 role="tab"
+                 aria-controls="sample-properties-tab"
+                 aria-selected="true">
+                Properties
+                <span class="badge text-bg-secondary ms-1">{{ properties|length }}</span>
+              </a>
+            </li>
+            <li class="nav-item" role="presentation">
+              <a class="nav-link"
+                 id="sample-component-measurements-tab-link"
+                 data-bs-toggle="tab"
+                 href="#sample-component-measurements-tab"
+                 role="tab"
+                 aria-controls="sample-component-measurements-tab"
+                 aria-selected="false">
+                Component Measurements
+                <span class="badge text-bg-secondary ms-1">{{ component_measurements|length }}</span>
+              </a>
+            </li>
+          </ul>
         </div>
-        <div class="card-body p-0">
-          {% if measurements_by_group %}
-            <div class="accordion accordion-flush" id="measurementsAccordion">
-              {% for group in measurements_by_group %}
-                <div class="accordion-item">
-                  <h2 class="accordion-header" id="heading-{{ forloop.counter }}">
-                    <button class="accordion-button {% if not forloop.first %}collapsed{% endif %} py-2"
-                            type="button"
-                            data-bs-toggle="collapse"
-                            data-bs-target="#collapse-{{ forloop.counter }}"
-                            aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
-                            aria-controls="collapse-{{ forloop.counter }}">
-                      <strong>{{ group.grouper.name }}</strong>
-                      <span class="badge bg-secondary ms-2">{{ group.list|length }}</span>
-                    </button>
-                  </h2>
-                  <div id="collapse-{{ forloop.counter }}"
-                       class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
-                       aria-labelledby="heading-{{ forloop.counter }}"
-                       data-bs-parent="#measurementsAccordion">
-                    <div class="accordion-body p-0">
-                      <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                          <thead class="table-light">
-                            <tr>
-                              <th class="ps-3">Component</th>
-                              <th>Abbr.</th>
-                              <th>Basis</th>
-                              <th>Value</th>
-                              <th class="text-center">n</th>
-                              <th>Method</th>
-                              <th>Sources</th>
-                              <th class="pe-3">Comments</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {% for measurement in group.list %}
+
+        <div class="card-body tab-content p-0"
+             id="sample-measurements-tabs-content">
+          <div class="tab-pane fade show active"
+               id="sample-properties-tab"
+               role="tabpanel"
+               aria-labelledby="sample-properties-tab-link">
+            {% if properties %}
+              <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                  <thead>
+                    <tr>
+                      <th>Property</th>
+                      <th>Value</th>
+                      <th>Method</th>
+                      <th>Sources</th>
+                      {% if policy.can_add_property %}<th class="remove-property collapse multi-collapse">Remove</th>{% endif %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for property in properties %}
+                      <tr>
+                        <td>
+                          <a href="{% url 'materialproperty-detail-modal' property.property.pk %}"
+                             class="modal-link">{{ property.property.name }}</a>
+                        </td>
+                        <td class="text-nowrap">
+                          {{ property.average|trim_decimal:6 }} ± {{ property.standard_deviation|trim_decimal:6 }} {{ property.property.unit }}
+                        </td>
+                        <td>
+                          {% if property.analytical_method %}
+                            <a href="{% url 'analyticalmethod-detail-modal' property.analytical_method.pk %}"
+                               class="modal-link">{{ property.analytical_method.name }}</a>
+                          {% else %}
+                            -
+                          {% endif %}
+                        </td>
+                        <td>
+                          {% for source in property.sources.all %}
+                            <a href="{% url 'source-detail-modal' source.pk %}" class="modal-link">{{ source.abbreviation }}</a>
+                            {% if not forloop.last %},{% endif %}
+                          {% empty %}
+                            -
+                          {% endfor %}
+                        </td>
+                        {% if policy.can_add_property %}
+                          <td class="remove-property collapse multi-collapse">
+                            <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}"
+                               class="modal-link">
+                              <i class="fas fa-fw fa-trash"></i>
+                            </a>
+                          </td>
+                        {% endif %}
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="p-3 text-muted">
+                {% if not user.is_authenticated %}
+                  No properties recorded. Log in to add properties.
+                {% elif policy.can_add_property %}
+                  No properties recorded. Add your first property.
+                {% else %}
+                  No properties recorded.
+                {% endif %}
+              </div>
+            {% endif %}
+
+            {% if policy.can_add_property %}
+              <div class="p-3 border-top">
+                <a href="{% url 'sample-add-property' object.id %}">
+                  <i class="fas fa-fw fa-plus"></i> Add property
+                </a>
+                {% if properties %}
+                  <a class="ms-3"
+                     href="javascript:void(0);"
+                     data-bs-toggle="collapse"
+                     data-bs-target=".remove-property"
+                     aria-expanded="false"
+                     aria-controls="remove-property">
+                    <i class="fas fa-fw fa-minus"></i> Remove properties
+                  </a>
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="tab-pane fade"
+               id="sample-component-measurements-tab"
+               role="tabpanel"
+               aria-labelledby="sample-component-measurements-tab-link">
+            {% if measurements_by_group %}
+              <div class="d-flex justify-content-end p-3 border-bottom">
+                <div class="btn-group btn-group-sm" role="group">
+                  <button type="button"
+                          class="btn btn-outline-secondary btn-sm"
+                          onclick="expandAllGroups()">
+                    <i class="fas fa-expand-alt"></i> Expand
+                  </button>
+                  <button type="button"
+                          class="btn btn-outline-secondary btn-sm"
+                          onclick="collapseAllGroups()">
+                    <i class="fas fa-compress-alt"></i> Collapse
+                  </button>
+                </div>
+              </div>
+
+              <div class="accordion accordion-flush" id="measurementsAccordion">
+                {% for group in measurements_by_group %}
+                  <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading-{{ forloop.counter }}">
+                      <button class="accordion-button {% if not forloop.first %}collapsed{% endif %} py-2"
+                              type="button"
+                              data-bs-toggle="collapse"
+                              data-bs-target="#collapse-{{ forloop.counter }}"
+                              aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
+                              aria-controls="collapse-{{ forloop.counter }}">
+                        <strong>{{ group.grouper.name }}</strong>
+                        <span class="badge bg-secondary ms-2">{{ group.list|length }}</span>
+                      </button>
+                    </h2>
+                    <div id="collapse-{{ forloop.counter }}"
+                         class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+                         aria-labelledby="heading-{{ forloop.counter }}"
+                         data-bs-parent="#measurementsAccordion">
+                      <div class="accordion-body p-0">
+                        <div class="table-responsive">
+                          <table class="table table-sm table-striped mb-0">
+                            <thead class="table-light">
                               <tr>
-                                <td class="ps-3">{{ measurement.component.name }}</td>
-                                <td>{{ measurement.component.abbreviation|default:"-" }}</td>
-                                <td>{{ measurement.basis_component.name|default:"-" }}</td>
-                                <td class="text-nowrap">
-                                  <strong>{{ measurement.average|trim_decimal:4 }}</strong>
-                                  {% if measurement.standard_deviation %}
-                                    <small class="text-muted">± {{ measurement.standard_deviation|trim_decimal:2 }}</small>
-                                  {% endif %}
-                                  <small>{{ measurement.unit }}</small>
-                                </td>
-                                <td class="text-center">{{ measurement.sample_size|default:"-" }}</td>
-                                <td>
-                                  {% if measurement.analytical_method %}
-                                    <a href="{% url 'analyticalmethod-detail-modal' measurement.analytical_method.pk %}"
-                                       class="modal-link text-truncate d-inline-block"
-                                       style="max-width: 120px"
-                                       title="{{ measurement.analytical_method.name }}">
-                                      {{ measurement.analytical_method.name }}
-                                    </a>
-                                  {% else %}
-                                    <span class="text-muted">-</span>
-                                  {% endif %}
-                                </td>
-                                <td>
-                                  {% for source in measurement.sources.all %}
-                                    <a href="{% url 'source-detail-modal' source.pk %}"
-                                       class="modal-link badge bg-light text-dark text-decoration-none"
-                                       title="{{ source.title|default:source.abbreviation }}">
-                                      {{ source.abbreviation|default:"Source" }}
-                                    </a>
-                                  {% empty %}
-                                    <span class="text-muted">-</span>
-                                  {% endfor %}
-                                </td>
-                                <td class="pe-3">
-                                  {% if measurement.comment %}
-                                    {{ measurement.comment }}
-                                  {% else %}
-                                    <span class="text-muted">-</span>
-                                  {% endif %}
-                                </td>
+                                <th class="ps-3">Component</th>
+                                <th>Abbr.</th>
+                                <th>Basis</th>
+                                <th>Value</th>
+                                <th class="text-center">n</th>
+                                <th>Method</th>
+                                <th>Sources</th>
+                                <th class="pe-3">Comments</th>
                               </tr>
-                            {% endfor %}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {% for measurement in group.list %}
+                                <tr>
+                                  <td class="ps-3">{{ measurement.component.name }}</td>
+                                  <td>{{ measurement.component.abbreviation|default:"-" }}</td>
+                                  <td>{{ measurement.basis_component.name|default:"-" }}</td>
+                                  <td class="text-nowrap">
+                                    <strong>{{ measurement.average|trim_decimal:4 }}</strong>
+                                    {% if measurement.standard_deviation %}
+                                      <small class="text-muted">± {{ measurement.standard_deviation|trim_decimal:2 }}</small>
+                                    {% endif %}
+                                    <small>{{ measurement.unit }}</small>
+                                  </td>
+                                  <td class="text-center">{{ measurement.sample_size|default:"-" }}</td>
+                                  <td>
+                                    {% if measurement.analytical_method %}
+                                      <a href="{% url 'analyticalmethod-detail-modal' measurement.analytical_method.pk %}"
+                                         class="modal-link text-truncate d-inline-block"
+                                         style="max-width: 120px"
+                                         title="{{ measurement.analytical_method.name }}">
+                                        {{ measurement.analytical_method.name }}
+                                      </a>
+                                    {% else %}
+                                      <span class="text-muted">-</span>
+                                    {% endif %}
+                                  </td>
+                                  <td>
+                                    {% for source in measurement.sources.all %}
+                                      <a href="{% url 'source-detail-modal' source.pk %}"
+                                         class="modal-link badge bg-light text-dark text-decoration-none"
+                                         title="{{ source.title|default:source.abbreviation }}">
+                                        {{ source.abbreviation|default:"Source" }}
+                                      </a>
+                                    {% empty %}
+                                      <span class="text-muted">-</span>
+                                    {% endfor %}
+                                  </td>
+                                  <td class="pe-3">
+                                    {% if measurement.comment %}
+                                      {{ measurement.comment }}
+                                    {% else %}
+                                      <span class="text-muted">-</span>
+                                    {% endif %}
+                                  </td>
+                                </tr>
+                              {% endfor %}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              {% endfor %}
-            </div>
-          {% else %}
-            <div class="p-3 text-muted">No component measurements.</div>
-          {% endif %}
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="p-3 text-muted">No component measurements.</div>
+            {% endif %}
+          </div>
         </div>
       </div>
     </div>
-  {% endif %}
+  {% endwith %}
 
   {# --- Composition Cards --- #}
   {% if data.compositions %}
