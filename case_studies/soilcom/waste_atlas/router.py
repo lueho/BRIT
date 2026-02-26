@@ -5,6 +5,8 @@ from .viewsets import (
     BiowasteCollectionCountViewSet,
     BiowasteFeeSystemViewSet,
     BiowasteFrequencyTypeViewSet,
+    BiowasteMinBinSizeViewSet,
+    BiowasteRequiredBinCapacityViewSet,
     CatchmentPopulationViewSet,
     CatchmentViewSet,
     CollectionSupportViewSet,
@@ -23,6 +25,8 @@ from .viewsets import (
     ResidualCollectionCountViewSet,
     ResidualFeeSystemViewSet,
     ResidualFrequencyTypeViewSet,
+    ResidualMinBinSizeViewSet,
+    ResidualRequiredBinCapacityViewSet,
     WasteRatioViewSet,
 )
 
@@ -132,6 +136,26 @@ router.register(
     "green-waste-collection-amount",
     GreenWasteCollectionAmountViewSet,
     basename="api-waste-atlas-green-waste-collection-amount",
+)
+router.register(
+    "biowaste-min-bin-size",
+    BiowasteMinBinSizeViewSet,
+    basename="api-waste-atlas-biowaste-min-bin-size",
+)
+router.register(
+    "residual-min-bin-size",
+    ResidualMinBinSizeViewSet,
+    basename="api-waste-atlas-residual-min-bin-size",
+)
+router.register(
+    "biowaste-required-bin-capacity",
+    BiowasteRequiredBinCapacityViewSet,
+    basename="api-waste-atlas-biowaste-required-bin-capacity",
+)
+router.register(
+    "residual-required-bin-capacity",
+    ResidualRequiredBinCapacityViewSet,
+    basename="api-waste-atlas-residual-required-bin-capacity",
 )
 router.register(
     "waste-ratio",

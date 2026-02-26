@@ -44,8 +44,10 @@ from .serializers import (
     CatchmentFrequencyTypeSerializer,
     CatchmentGeometrySerializer,
     CatchmentMaterialStatusSerializer,
+    CatchmentMinBinSizeSerializer,
     CatchmentOrgaLevelSerializer,
     CatchmentPopulationSerializer,
+    CatchmentRequiredBinCapacitySerializer,
     CatchmentWasteRatioSerializer,
 )
 
@@ -1133,6 +1135,131 @@ class GreenWasteCollectionAmountViewSet(viewsets.ViewSet):
         country, year = _parse_country_year(request)
         data = _get_green_waste_collection_amount(country, year)
         serializer = CatchmentCollectionAmountSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+def _get_min_bin_size(country, year, waste_categories):
+    """Return per-catchment minimum bin size (L) for door-to-door collections.
+
+    Picks the primary door-to-door collection per catchment using
+    ``_COLLECTION_SYSTEM_PRIORITY`` and returns its ``min_bin_size`` value.
+    Only door-to-door collections carry meaningful bin size data.
+    """
+    rows = Collection.objects.filter(
+        valid_from__year=year,
+        catchment__region__country=country,
+        waste_stream__category__name__in=waste_categories,
+        collection_system__name="Door to door",
+    ).values_list("catchment_id", "min_bin_size")
+
+    best: dict[int, float | None] = {}
+    for cid, size in rows:
+        if cid not in best:
+            best[cid] = float(size) if size is not None else None
+
+    return [{"catchment_id": cid, "min_bin_size": size} for cid, size in best.items()]
+
+
+def _get_required_bin_capacity(country, year, waste_categories):
+    """Return per-catchment required specific bin capacity for door-to-door collections.
+
+    Returns ``required_bin_capacity`` (L/reference) and
+    ``required_bin_capacity_reference`` (person / household / property /
+    not_specified) for the primary door-to-door collection per catchment.
+    """
+    rows = Collection.objects.filter(
+        valid_from__year=year,
+        catchment__region__country=country,
+        waste_stream__category__name__in=waste_categories,
+        collection_system__name="Door to door",
+    ).values_list(
+        "catchment_id", "required_bin_capacity", "required_bin_capacity_reference"
+    )
+
+    best: dict[int, tuple[float | None, str | None]] = {}
+    for cid, cap, ref in rows:
+        if cid not in best:
+            best[cid] = (float(cap) if cap is not None else None, ref or None)
+
+    return [
+        {
+            "catchment_id": cid,
+            "required_bin_capacity": cap,
+            "required_bin_capacity_reference": ref,
+        }
+        for cid, (cap, ref) in best.items()
+    ]
+
+
+class BiowasteMinBinSizeViewSet(viewsets.ViewSet):
+    """Return minimum bin size for biowaste door-to-door collections (Karte 23).
+
+    Example::
+
+        GET /waste_collection/api/waste-atlas/biowaste-min-bin-size/?country=DE&year=2024
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        """Return a JSON array of {catchment_id, min_bin_size}."""
+        country, year = _parse_country_year(request)
+        data = _get_min_bin_size(country, year, ["Biowaste", "Food waste"])
+        serializer = CatchmentMinBinSizeSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class ResidualMinBinSizeViewSet(viewsets.ViewSet):
+    """Return minimum bin size for residual waste door-to-door collections (Karte 24).
+
+    Example::
+
+        GET /waste_collection/api/waste-atlas/residual-min-bin-size/?country=DE&year=2024
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        """Return a JSON array of {catchment_id, min_bin_size}."""
+        country, year = _parse_country_year(request)
+        data = _get_min_bin_size(country, year, ["Residual waste"])
+        serializer = CatchmentMinBinSizeSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class BiowasteRequiredBinCapacityViewSet(viewsets.ViewSet):
+    """Return required specific bin capacity for biowaste collections (Karte 25).
+
+    Example::
+
+        GET /waste_collection/api/waste-atlas/biowaste-required-bin-capacity/?country=DE&year=2024
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        """Return a JSON array of {catchment_id, required_bin_capacity, required_bin_capacity_reference}."""
+        country, year = _parse_country_year(request)
+        data = _get_required_bin_capacity(country, year, ["Biowaste", "Food waste"])
+        serializer = CatchmentRequiredBinCapacitySerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class ResidualRequiredBinCapacityViewSet(viewsets.ViewSet):
+    """Return required specific bin capacity for residual waste collections (Karte 26).
+
+    Example::
+
+        GET /waste_collection/api/waste-atlas/residual-required-bin-capacity/?country=DE&year=2024
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        """Return a JSON array of {catchment_id, required_bin_capacity, required_bin_capacity_reference}."""
+        country, year = _parse_country_year(request)
+        data = _get_required_bin_capacity(country, year, ["Residual waste"])
+        serializer = CatchmentRequiredBinCapacitySerializer(data, many=True)
         return Response(serializer.data)
 
 

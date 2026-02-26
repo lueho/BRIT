@@ -338,3 +338,155 @@ class GreenWasteCollectionAmountViewSetTests(APITestCase):
         self.assertIsNone(data_by_catchment[self.catchment_no_collection.id]["amount"])
 
         self.assertNotIn(self.catchment_ignored.id, data_by_catchment)
+
+
+class BinSizeViewSetTests(APITestCase):
+    """Regression tests for Karte 23–26 min bin size and required bin capacity endpoints."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
+        cls.residual_category, _ = WasteCategory.objects.get_or_create(
+            name="Residual waste"
+        )
+        cls.green_category, _ = WasteCategory.objects.get_or_create(name="Green waste")
+
+        cls.bio_stream = WasteStream.objects.create(category=cls.bio_category)
+        cls.residual_stream = WasteStream.objects.create(category=cls.residual_category)
+        cls.green_stream = WasteStream.objects.create(category=cls.green_category)
+
+        cls.d2d, _ = CollectionSystem.objects.get_or_create(name="Door to door")
+        cls.bring_point, _ = CollectionSystem.objects.get_or_create(name="Bring point")
+
+        cls.region = Region.objects.create(name="Region BinSize DE", country="DE")
+
+        cls.catchment_bio = CollectionCatchment.objects.create(
+            name="BinSize Bio", region=cls.region
+        )
+        cls.catchment_residual = CollectionCatchment.objects.create(
+            name="BinSize Residual", region=cls.region
+        )
+        cls.catchment_no_bin = CollectionCatchment.objects.create(
+            name="BinSize NoBin", region=cls.region
+        )
+        cls.catchment_ignored = CollectionCatchment.objects.create(
+            name="BinSize Ignored", region=cls.region
+        )
+
+        cls.bio_col = Collection.objects.create(
+            name="BinSize bio col",
+            catchment=cls.catchment_bio,
+            waste_stream=cls.bio_stream,
+            collection_system=cls.d2d,
+            valid_from=date(2024, 1, 1),
+            min_bin_size=80,
+            required_bin_capacity=10,
+            required_bin_capacity_reference="person",
+        )
+        cls.residual_col = Collection.objects.create(
+            name="BinSize residual col",
+            catchment=cls.catchment_residual,
+            waste_stream=cls.residual_stream,
+            collection_system=cls.d2d,
+            valid_from=date(2024, 1, 1),
+            min_bin_size=120,
+            required_bin_capacity=40,
+            required_bin_capacity_reference="household",
+        )
+        # D2D collection with null bin size fields
+        Collection.objects.create(
+            name="BinSize no bin col",
+            catchment=cls.catchment_no_bin,
+            waste_stream=cls.bio_stream,
+            collection_system=cls.d2d,
+            valid_from=date(2024, 1, 1),
+        )
+        # Non-D2D collection — must be excluded from bin size maps
+        Collection.objects.create(
+            name="BinSize bring point col",
+            catchment=cls.catchment_ignored,
+            waste_stream=cls.bio_stream,
+            collection_system=cls.bring_point,
+            valid_from=date(2024, 1, 1),
+            min_bin_size=60,
+        )
+
+    # --- Karte 23: biowaste min bin size ---
+
+    def test_biowaste_min_bin_size_returns_d2d_collections(self):
+        """Karte 23 returns min_bin_size for D2D biowaste catchments."""
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/biowaste-min-bin-size/",
+            {"country": "DE", "year": 2024},
+        )
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        self.assertEqual(by_catchment[self.catchment_bio.id]["min_bin_size"], 80.0)
+        self.assertIn(self.catchment_no_bin.id, by_catchment)
+        self.assertIsNone(by_catchment[self.catchment_no_bin.id]["min_bin_size"])
+        self.assertNotIn(self.catchment_residual.id, by_catchment)
+
+    def test_biowaste_min_bin_size_excludes_non_d2d(self):
+        """Karte 23 excludes bring-point and other non-D2D collections."""
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/biowaste-min-bin-size/",
+            {"country": "DE", "year": 2024},
+        )
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        self.assertNotIn(self.catchment_ignored.id, by_catchment)
+
+    # --- Karte 24: residual min bin size ---
+
+    def test_residual_min_bin_size_returns_d2d_collections(self):
+        """Karte 24 returns min_bin_size for D2D residual catchments."""
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/residual-min-bin-size/",
+            {"country": "DE", "year": 2024},
+        )
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        self.assertEqual(
+            by_catchment[self.catchment_residual.id]["min_bin_size"], 120.0
+        )
+        self.assertNotIn(self.catchment_bio.id, by_catchment)
+
+    # --- Karte 25: biowaste required bin capacity ---
+
+    def test_biowaste_required_bin_capacity_returns_value_and_reference(self):
+        """Karte 25 returns required_bin_capacity and reference for biowaste D2D."""
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/biowaste-required-bin-capacity/",
+            {"country": "DE", "year": 2024},
+        )
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        row = by_catchment[self.catchment_bio.id]
+        self.assertEqual(row["required_bin_capacity"], 10.0)
+        self.assertEqual(row["required_bin_capacity_reference"], "person")
+        self.assertNotIn(self.catchment_residual.id, by_catchment)
+
+    def test_biowaste_required_bin_capacity_null_when_not_set(self):
+        """Karte 25 returns null capacity for catchments without the field set."""
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/biowaste-required-bin-capacity/",
+            {"country": "DE", "year": 2024},
+        )
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        row = by_catchment[self.catchment_no_bin.id]
+        self.assertIsNone(row["required_bin_capacity"])
+        self.assertIsNone(row["required_bin_capacity_reference"])
+
+    # --- Karte 26: residual required bin capacity ---
+
+    def test_residual_required_bin_capacity_returns_value_and_reference(self):
+        """Karte 26 returns required_bin_capacity and reference for residual D2D."""
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/residual-required-bin-capacity/",
+            {"country": "DE", "year": 2024},
+        )
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        row = by_catchment[self.catchment_residual.id]
+        self.assertEqual(row["required_bin_capacity"], 40.0)
+        self.assertEqual(row["required_bin_capacity_reference"], "household")
+        self.assertNotIn(self.catchment_bio.id, by_catchment)

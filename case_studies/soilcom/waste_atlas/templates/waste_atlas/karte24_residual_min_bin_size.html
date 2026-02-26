@@ -1,0 +1,48 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+  <script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2024,
+      title:       'Kleinste verfügbare Behältergröße für Restmüll (L)',
+      dataUrl:     '/waste_collection/api/waste-atlas/residual-min-bin-size/',
+      dataField:   '_classified',
+      categories: [
+        { value: 'xs',      label: '≤ 60 L',         color: '#fde0dd' },
+        { value: 'small',   label: '61 – 80 L',       color: '#fc9272' },
+        { value: 'medium',  label: '81 – 120 L',      color: '#de2d26' },
+        { value: 'large',   label: '121 – 180 L',     color: '#a50f15' },
+        { value: 'xl',      label: '> 180 L',         color: '#67000d' }
+      ],
+      noDataColor: '#ffffff',
+      noDataLabel: 'Keine Daten',
+      legendTitle: 'Min. Behältergröße (L)',
+      fileBase:    'karte24_residual_min_bin_size',
+      transformData: function (records) {
+        return records.map(function (r) {
+          var cls;
+          if (r.min_bin_size === null) {
+            cls = null;
+          } else if (r.min_bin_size <= 60) {
+            cls = 'xs';
+          } else if (r.min_bin_size <= 80) {
+            cls = 'small';
+          } else if (r.min_bin_size <= 120) {
+            cls = 'medium';
+          } else if (r.min_bin_size <= 180) {
+            cls = 'large';
+          } else {
+            cls = 'xl';
+          }
+          return { catchment_id: r.catchment_id, _classified: cls };
+        });
+      }
+    });
+  });
+  </script>
+{% endblock atlas_config %}

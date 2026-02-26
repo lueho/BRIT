@@ -154,3 +154,18 @@ class CatchmentWasteRatioSerializer(serializers.Serializer):
     bio_amount = serializers.FloatField(allow_null=True)
     residual_amount = serializers.FloatField(allow_null=True)
     ratio = serializers.FloatField(allow_null=True)
+
+
+class CatchmentMinBinSizeSerializer(serializers.Serializer):
+    """Flat JSON serializer for minimum bin size per catchment (Karte 23, 24)."""
+
+    catchment_id = serializers.IntegerField()
+    min_bin_size = serializers.FloatField(allow_null=True)
+
+
+class CatchmentRequiredBinCapacitySerializer(serializers.Serializer):
+    """Flat JSON serializer for required specific bin capacity (Karte 25, 26)."""
+
+    catchment_id = serializers.IntegerField()
+    required_bin_capacity = serializers.FloatField(allow_null=True)
+    required_bin_capacity_reference = serializers.CharField(allow_null=True)

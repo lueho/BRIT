@@ -7,7 +7,7 @@
 {% block content %}
   <div class="container mt-4">
     <h1>Waste Atlas — Kartenübersicht</h1>
-    <p class="lead">22 thematische Karten zur Abfallsammlung in Deutschland (Stand 2022)</p>
+    <p class="lead">26 thematische Karten zur Abfallsammlung in Deutschland (Stand 2022)</p>
 
     <div class="row">
       <div class="col-md-6">
@@ -120,6 +120,26 @@
             </li>
             <li class="list-group-item">
               <a href="{% url 'waste-atlas-waste-ratio-map' %}">Karte 19 — Sammelmengen-Verhältnis</a>
+            </li>
+          </ul>
+        </div>
+
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong>Behältergrößen</strong>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-biowaste-min-bin-size-map' %}">Karte 23 — Mindest-Behältergröße Bioabfall</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-residual-min-bin-size-map' %}">Karte 24 — Mindest-Behältergröße Restmüll</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-biowaste-required-bin-capacity-map' %}">Karte 25 — Mindest-Behältervolumen Bioabfall</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-residual-required-bin-capacity-map' %}">Karte 26 — Mindest-Behältervolumen Restmüll</a>
             </li>
           </ul>
         </div>

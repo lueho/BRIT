@@ -184,6 +184,34 @@ class GreenWasteCollectionAmountMapView(AtlasMapView):
     map_title = "Spezifisch gesammelte Menge an Grüngut"
 
 
+class BiowasteMinBinSizeMapView(AtlasMapView):
+    """Karte 23 — Mindest-Behältergröße Bioabfall."""
+
+    template_name = "waste_atlas/karte23_biowaste_min_bin_size.html"
+    map_title = "Kleinste verfügbare Behältergröße für Bioabfall (L)"
+
+
+class ResidualMinBinSizeMapView(AtlasMapView):
+    """Karte 24 — Mindest-Behältergröße Restmüll."""
+
+    template_name = "waste_atlas/karte24_residual_min_bin_size.html"
+    map_title = "Kleinste verfügbare Behältergröße für Restmüll (L)"
+
+
+class BiowasteRequiredBinCapacityMapView(AtlasMapView):
+    """Karte 25 — Mindest-Behältervolumen Bioabfall."""
+
+    template_name = "waste_atlas/karte25_biowaste_required_bin_capacity.html"
+    map_title = "Mindest-Behältervolumen für Bioabfall (L/Bezugseinheit)"
+
+
+class ResidualRequiredBinCapacityMapView(AtlasMapView):
+    """Karte 26 — Mindest-Behältervolumen Restmüll."""
+
+    template_name = "waste_atlas/karte26_residual_required_bin_capacity.html"
+    map_title = "Mindest-Behältervolumen für Restmüll (L/Bezugseinheit)"
+
+
 class WasteRatioMapView(AtlasMapView):
     """Karte 19 — Sammelmengen-Verhältnis."""
 

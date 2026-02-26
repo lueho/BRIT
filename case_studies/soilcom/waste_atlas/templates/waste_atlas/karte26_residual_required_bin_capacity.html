@@ -1,0 +1,48 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+  <script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2024,
+      title:       'Mindest-Behältervolumen für Restmüll (L/Bezugseinheit)',
+      dataUrl:     '/waste_collection/api/waste-atlas/residual-required-bin-capacity/',
+      dataField:   '_classified',
+      categories: [
+        { value: 'very_low',  label: '≤ 10 L/Einheit',    color: '#fde0dd' },
+        { value: 'low',       label: '11 – 20 L/Einheit',  color: '#fc9272' },
+        { value: 'medium',    label: '21 – 40 L/Einheit',  color: '#de2d26' },
+        { value: 'high',      label: '41 – 80 L/Einheit',  color: '#a50f15' },
+        { value: 'very_high', label: '> 80 L/Einheit',     color: '#67000d' }
+      ],
+      noDataColor: '#ffffff',
+      noDataLabel: 'Keine Daten',
+      legendTitle: 'Min. Behältervolumen (L/Einheit)',
+      fileBase:    'karte26_residual_required_bin_capacity',
+      transformData: function (records) {
+        return records.map(function (r) {
+          var cls;
+          if (r.required_bin_capacity === null) {
+            cls = null;
+          } else if (r.required_bin_capacity <= 10) {
+            cls = 'very_low';
+          } else if (r.required_bin_capacity <= 20) {
+            cls = 'low';
+          } else if (r.required_bin_capacity <= 40) {
+            cls = 'medium';
+          } else if (r.required_bin_capacity <= 80) {
+            cls = 'high';
+          } else {
+            cls = 'very_high';
+          }
+          return { catchment_id: r.catchment_id, _classified: cls };
+        });
+      }
+    });
+  });
+  </script>
+{% endblock atlas_config %}

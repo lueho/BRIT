@@ -1,0 +1,48 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+  <script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2024,
+      title:       'Mindest-Behältervolumen für Bioabfall (L/Bezugseinheit)',
+      dataUrl:     '/waste_collection/api/waste-atlas/biowaste-required-bin-capacity/',
+      dataField:   '_classified',
+      categories: [
+        { value: 'very_low',  label: '≤ 5 L/Einheit',    color: '#d9f0d3' },
+        { value: 'low',       label: '6 – 10 L/Einheit',  color: '#a6d96a' },
+        { value: 'medium',    label: '11 – 20 L/Einheit', color: '#66bd63' },
+        { value: 'high',      label: '21 – 60 L/Einheit', color: '#1a9850' },
+        { value: 'very_high', label: '> 60 L/Einheit',    color: '#006837' }
+      ],
+      noDataColor: '#ffffff',
+      noDataLabel: 'Keine Daten',
+      legendTitle: 'Min. Behältervolumen (L/Einheit)',
+      fileBase:    'karte25_biowaste_required_bin_capacity',
+      transformData: function (records) {
+        return records.map(function (r) {
+          var cls;
+          if (r.required_bin_capacity === null) {
+            cls = null;
+          } else if (r.required_bin_capacity <= 5) {
+            cls = 'very_low';
+          } else if (r.required_bin_capacity <= 10) {
+            cls = 'low';
+          } else if (r.required_bin_capacity <= 20) {
+            cls = 'medium';
+          } else if (r.required_bin_capacity <= 60) {
+            cls = 'high';
+          } else {
+            cls = 'very_high';
+          }
+          return { catchment_id: r.catchment_id, _classified: cls };
+        });
+      }
+    });
+  });
+  </script>
+{% endblock atlas_config %}

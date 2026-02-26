@@ -6,6 +6,8 @@ from .views import (
     BiowasteCollectionCountMapView,
     BiowasteFeeSystemMapView,
     BiowasteFrequencyMapView,
+    BiowasteMinBinSizeMapView,
+    BiowasteRequiredBinCapacityMapView,
     CollectionSupportMapView,
     CollectionSystemMapView,
     CombinedCollectionCountMapView,
@@ -23,6 +25,8 @@ from .views import (
     ResidualCollectionCountMapView,
     ResidualFeeSystemMapView,
     ResidualFrequencyMapView,
+    ResidualMinBinSizeMapView,
+    ResidualRequiredBinCapacityMapView,
     WasteAtlasOverviewView,
     WasteRatioMapView,
 )
@@ -143,5 +147,25 @@ urlpatterns = [
         "map/population-density/",
         PopulationDensityMapView.as_view(),
         name="waste-atlas-population-density-map",
+    ),
+    path(
+        "map/biowaste-min-bin-size/",
+        BiowasteMinBinSizeMapView.as_view(),
+        name="waste-atlas-biowaste-min-bin-size-map",
+    ),
+    path(
+        "map/residual-min-bin-size/",
+        ResidualMinBinSizeMapView.as_view(),
+        name="waste-atlas-residual-min-bin-size-map",
+    ),
+    path(
+        "map/biowaste-required-bin-capacity/",
+        BiowasteRequiredBinCapacityMapView.as_view(),
+        name="waste-atlas-biowaste-required-bin-capacity-map",
+    ),
+    path(
+        "map/residual-required-bin-capacity/",
+        ResidualRequiredBinCapacityMapView.as_view(),
+        name="waste-atlas-residual-required-bin-capacity-map",
     ),
 ]
