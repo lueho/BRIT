@@ -559,18 +559,6 @@
     </div>
   {% endif %}
 
-  {# --- Add Composition --- #}
-  {% if policy.can_manage_samples %}
-    <div class="col col-12 mt-4">
-      <div class="card border-left-primary border">
-        <div class="card-body">
-          <a href="{% url 'sample-add-composition' object.id %}?next={{ request.path }}">
-            <i class="fas fa-fw fa-plus"></i> Add composition
-          </a>
-        </div>
-      </div>
-    </div>
-  {% endif %}
 {% endblock second_row %}
 
 {% block detail_with_options_scripts %}
