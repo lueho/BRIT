@@ -9,6 +9,8 @@
           content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <meta name="description"
           content="The tool for categorization and inventorization of bioresources, including GIS">
+    <meta name="keywords"
+          content="{% block meta_keywords %}{% endblock meta_keywords %}">
     <meta name="author" content="Phillipp Lüssenhop">
     {% block meta %}
     {% endblock meta %}
@@ -17,7 +19,7 @@
         BRIT | Bioresource Information Tool
       {% endblock title %}
     </title>
-    {% include 'partials/_analytics.html' %}
+    {% include "partials/_analytics.html" %}
     <link rel="icon" href="{% static 'img/favicon.ico' %}" type="image/x-icon">
     <!-- Custom fonts for this template-->
     <link rel="stylesheet"
@@ -54,7 +56,6 @@
     <!-- Custom scripts for all pages-->
     <script src="{% static 'js/bootstrap5.modal.forms.min.js' %}"></script>
     <script src="{% static 'js/modal_links.js' %}"></script>
-    <script type="text/javascript" src={% static "cookie_consent/cookiebar.js" %}></script>
     <!-- Page level plugins -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@2.8.0/dist/Chart.min.js"
             crossorigin="anonymous"></script>

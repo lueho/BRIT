@@ -6,11 +6,13 @@ SITE_ID = 1
 
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "host.docker.internal"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "host.docker.internal", "testserver"]
 
 INSTALLED_APPS.append("debug_toolbar")
 
-DEBUG_TOOLBAR_CONFIG = {"SHOW_TOOLBAR_CALLBACK": lambda request: True}
+DEBUG_TOOLBAR_CONFIG = {
+    "SHOW_TOOLBAR_CALLBACK": lambda request: "/api/" not in request.path
+}
 
 INTERNAL_IPS = ALLOWED_HOSTS
 
