@@ -183,6 +183,20 @@ Moderators cannot approve or reject their own submissions. This ensures independ
 - `UserCreatedObjectModalApproveView`: Approve submission
 - `UserCreatedObjectModalRejectView`: Reject submission
 
+#### Review detail routing and runtime delegation
+
+- URL routing always targets `ReviewItemDetailView.as_view()` via
+  `object_management:review_item_detail`.
+- `ReviewItemDetailView.dispatch()` resolves the object first, then checks the
+  internal `_model_view_registry`.
+- If a model-specific subclass was registered with `register_for_model()`,
+  dispatch delegates to that specialized class at runtime.
+- Example: `CollectionReviewItemDetailView.register_for_model(Collection)` keeps
+  URL routing unchanged while enabling collection-specific context handling.
+
+This is why tools that inspect URL resolution (for example Debug Toolbar) may
+show `ReviewItemDetailView` as the endpoint even though specialized logic runs.
+
 ### DRF ViewSets
 
 ```python

@@ -98,6 +98,28 @@ Source: `utils/object_management/views.py:ReviewItemDetailView`.
 - Owners can access the review detail page only while the item is in `review` (to comment) or `declined` (to read feedback).
 - Others are not allowed.
 
+### Review detail routing and delegation
+
+Source: `utils/object_management/urls.py` and `utils/object_management/views.py`.
+
+- The URL pattern `object_management:review_item_detail` always points to
+  `ReviewItemDetailView.as_view()`.
+- `ReviewItemDetailView.dispatch()` then resolves the target object from
+  `content_type_id` and `object_id`.
+- After object resolution, `dispatch()` looks up the object model in
+  `_model_view_registry` and delegates to a specialized subclass if one was
+  registered with `register_for_model()`.
+- Example: `CollectionReviewItemDetailView.register_for_model(Collection)`
+  registers the collection-specific review detail handler while keeping the URL
+  unchanged.
+
+Implication for debugging/observability tools:
+
+- Tooling such as Django Debug Toolbar may report `ReviewItemDetailView` as the
+  endpoint because URL resolution happened there first.
+- This is expected even when specialized logic is executed, because delegation
+  happens at runtime inside `dispatch()`.
+
 ## DRF viewsets and actions
 
 Source: `utils/object_management/viewsets.py`.

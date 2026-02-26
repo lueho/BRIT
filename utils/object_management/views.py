@@ -1404,6 +1404,13 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
     - Provide the resolved base template to the wrapper via context as 'base_template'.
     - Support model-specific subclasses via registry pattern for specialized context.
 
+    Routing and delegation model:
+    - URLConf always points to this base class (`ReviewItemDetailView.as_view()`).
+    - `dispatch()` resolves the target object and can delegate to a model-specific
+      subclass registered via `register_for_model()`.
+    - Observability tools may still report the base view as the routed endpoint,
+      because delegation happens inside this class at runtime.
+
     Subclasses can register themselves for specific models to provide custom
     review-specific context via get_review_specific_context() hook method.
     """
@@ -1415,6 +1422,10 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
     def register_for_model(cls, model_class):
         """
         Register this view class as the handler for a specific model.
+
+        This updates the in-memory registry used by `ReviewItemDetailView.dispatch()`.
+        It does not add or change URL patterns: requests still enter through the
+        base `review_item_detail` route and are delegated after object resolution.
 
         Usage in subclass:
             class CollectionReviewItemDetailView(ReviewItemDetailView):
@@ -1448,9 +1459,15 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         """
         Authorize review details for moderators/staff and for owners in review/declined.
 
-        If a specialized view is registered for this model, delegate to it.
-        Owners can access while the item is in review (for commenting) and when declined
-        (to read feedback).
+        Delegation order:
+        1. Resolve object from content type/object id.
+        2. Look up model class in `_model_view_registry`.
+        3. If a specialized class is registered, call that class via `as_view()` and
+           return its response.
+        4. Otherwise execute base authorization and rendering.
+
+        Owners can access while the item is in review (for commenting) and when
+        declined (to read feedback).
         """
         obj = self.get_object()
         model_class = obj.__class__

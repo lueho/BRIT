@@ -1306,6 +1306,13 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
 
     Extends the base review view to show collection property values and
     aggregated property values with review-aware deduplication logic.
+
+    Routing note:
+    - Requests still enter through the generic
+      `object_management:review_item_detail` URL (base `ReviewItemDetailView`).
+    - The base view delegates at runtime to this class when the resolved object
+      model is `Collection` and this class has been registered via
+      `register_for_model(Collection)`.
     """
 
     model = Collection
