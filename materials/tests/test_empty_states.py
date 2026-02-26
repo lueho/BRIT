@@ -10,6 +10,7 @@ from materials.models import (
     MaterialComponent,
     MaterialComponentGroup,
     MaterialProperty,
+    MaterialPropertyValue,
     Sample,
     SampleSeries,
 )
@@ -102,7 +103,7 @@ class EmptyStateViewsTestCase(TestCase):
         # Grant add property permission
         perm = Permission.objects.get(
             codename="add_materialpropertyvalue",
-            content_type=ContentType.objects.get_for_model(Material),
+            content_type=ContentType.objects.get_for_model(MaterialPropertyValue),
         )
         self.staff_user.user_permissions.add(perm)
 
@@ -191,7 +192,7 @@ class EmptyStateViewsTestCase(TestCase):
         # Test with filter that returns no results
         self.client.force_login(self.staff_user)
         response = self.client.get(
-            reverse("material-list") + "?scope=published&name=nonexistent"
+            reverse("material-list") + "?scope=published&name__icontains=nonexistent"
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No items match your current filters.")
