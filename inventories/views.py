@@ -27,6 +27,7 @@ from utils.object_management.views import (
     UserCreatedObjectDetailView,
     UserCreatedObjectModalDeleteView,
     UserCreatedObjectUpdateView,
+    get_tomselect_filter_value,
 )
 
 from .evaluations import ScenarioResult
@@ -325,17 +326,6 @@ class ScenarioRemoveInventoryAlgorithmView(
         return redirect("scenario-detail", pk=self.scenario.id)
 
 
-def _extract_filter_id(param: str | None) -> str | None:
-    """Extract ID from TomSelect filter_by/exclude_by parameter string.
-
-    TomSelect passes filter parameters as strings like "field_name='123'".
-    This helper extracts the ID value.
-    """
-    if param and "=" in param:
-        return param.split("=", 1)[1].strip("'") or None
-    return None
-
-
 class ScenarioGeoDataSetAutocompleteView(GeoDataSetAutocompleteView):
     """GeoDataset autocomplete filtered by scenario and feedstock (create mode).
 
@@ -350,8 +340,10 @@ class ScenarioGeoDataSetAutocompleteView(GeoDataSetAutocompleteView):
         we leverage correlated sub-queries so the whole operation executes in **one** SQL
         statement.
         """
-        feedstock_id = _extract_filter_id(self.filter_by)
-        scenario_id = _extract_filter_id(self.exclude_by)
+        feedstock_id = get_tomselect_filter_value(self, lookup="feedstock_id")
+        scenario_id = get_tomselect_filter_value(
+            self, use_excludes=True, lookup="scenario_id"
+        )
 
         if not (feedstock_id and scenario_id):
             return GeoDataset.objects.none()
@@ -407,8 +399,10 @@ class ScenarioInventoryAlgorithmAutocompleteView(InventoryAlgorithmAutocompleteV
         Note: This does not check if the algorithm is already configured for a scenario.
         Duplicate prevention is handled by form validation.
         """
-        geodataset_id = _extract_filter_id(self.filter_by)
-        feedstock_id = _extract_filter_id(self.exclude_by)
+        geodataset_id = get_tomselect_filter_value(self, lookup="geodataset_id")
+        feedstock_id = get_tomselect_filter_value(
+            self, use_excludes=True, lookup="feedstock_id"
+        )
 
         if not (geodataset_id and feedstock_id):
             return InventoryAlgorithm.objects.none()

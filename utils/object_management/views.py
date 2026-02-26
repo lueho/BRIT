@@ -29,6 +29,7 @@ from django.urls import reverse
 from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
 from django_filters.views import FilterView
 from django_tomselect.autocompletes import AutocompleteModelView
+from django_tomselect.constants import EXCLUDEBY_VAR, FILTERBY_VAR
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
 from utils.object_management.filters import ReviewDashboardFilterSet
@@ -58,6 +59,87 @@ from ..views import (
 logger = logging.getLogger(__name__)
 
 
+def parse_tomselect_filter_expression(raw_expression):
+    """Parse a TomSelect filter expression into a lookup/value pair.
+
+    Supports expressions such as ``scope__name='published'``.
+    Returns ``None`` for invalid/empty inputs.
+    """
+    if not raw_expression or not isinstance(raw_expression, str):
+        return None
+
+    cleaned = unquote(raw_expression).replace("'", "")
+    if "=" not in cleaned:
+        return None
+
+    lookup, value = cleaned.split("=", 1)
+    lookup = lookup.strip()
+    value = value.strip()
+    if not lookup:
+        return None
+    return lookup, value
+
+
+def get_tomselect_filter_pairs(view, *, use_excludes=False):
+    """Return parsed TomSelect filters for a view.
+
+    Supports both:
+    - legacy single-value attrs: ``filter_by`` / ``exclude_by``
+    - list-based attrs: ``filters_by`` / ``excludes_by``
+    """
+    list_attr = "excludes_by" if use_excludes else "filters_by"
+    single_attr = "exclude_by" if use_excludes else "filter_by"
+    query_var = EXCLUDEBY_VAR if use_excludes else FILTERBY_VAR
+
+    raw_values = []
+
+    request = getattr(view, "request", None)
+    if request is not None:
+        try:
+            request_values = request.GET.getlist(query_var)
+        except Exception:
+            request_values = []
+        for raw in request_values:
+            if raw and raw not in raw_values:
+                raw_values.append(raw)
+
+    list_values = getattr(view, list_attr, None) or []
+    if isinstance(list_values, str):
+        list_values = [list_values]
+
+    for raw in list_values:
+        if raw:
+            raw_values.append(raw)
+
+    single_value = getattr(view, single_attr, None)
+    if single_value and single_value not in raw_values:
+        raw_values.append(single_value)
+
+    parsed = []
+    for raw in raw_values:
+        item = parse_tomselect_filter_expression(raw)
+        if item is None:
+            logger.warning("Skipping invalid TomSelect filter expression: %r", raw)
+            continue
+        parsed.append(item)
+
+    return parsed
+
+
+def get_tomselect_filter_value(view, *, use_excludes=False, lookup=None):
+    """Return first matching TomSelect filter value for a view.
+
+    If ``lookup`` is provided, returns the first value with that lookup.
+    Otherwise returns the first parsed filter value.
+    """
+    for candidate_lookup, candidate_value in get_tomselect_filter_pairs(
+        view, use_excludes=use_excludes
+    ):
+        if lookup is None or candidate_lookup == lookup:
+            return candidate_value or None
+    return None
+
+
 class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
     """Dashboard showing all objects in review status that the user can moderate.
 
@@ -76,6 +158,32 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         """Reset per-request cache."""
         super().setup(request, *args, **kwargs)
         self._available_models_cache = None
+
+    @staticmethod
+    def _in_review_queryset_for_model(model):
+        """Return a queryset containing review items for the provided model.
+
+        Supports models whose manager either:
+        - exposes ``in_review()`` directly,
+        - exposes a queryset with ``in_review()``, or
+        - only supports standard queryset filtering.
+        """
+        manager = model.objects
+        if hasattr(manager, "in_review"):
+            return manager.in_review()
+
+        queryset = manager.get_queryset()
+        if hasattr(queryset, "in_review"):
+            return queryset.in_review()
+
+        try:
+            model._meta.get_field("publication_status")
+        except FieldDoesNotExist as exc:
+            raise AttributeError(
+                f"{model.__name__} has no publication_status field for review filtering"
+            ) from exc
+
+        return queryset.filter(publication_status=UserCreatedObject.STATUS_REVIEW)
 
     def get_available_models(self):
         """Discover all concrete UserCreatedObject subclasses that have items in review.
@@ -148,6 +256,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             if (
                 issubclass(model, UserCreatedObject)
                 and not model._meta.abstract
+                and model.__module__.startswith(f"{model._meta.app_label}.models")
                 and hasattr(model, "objects")
                 and model not in available_models  # Don't duplicate priority models
             ):
@@ -155,7 +264,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                 if can_moderate(model):
                     # Check if there are any items in review for this model
                     try:
-                        if model.objects.in_review().exists():
+                        if self._in_review_queryset_for_model(model).exists():
                             available_models.append(model)
                     except (AttributeError, Exception) as e:
                         # Model may not have in_review() manager method or other issues
@@ -224,6 +333,16 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         max_items_per_model = self.paginate_by * max(10, len(available_models))
 
         for model_class in available_models:
+            try:
+                review_queryset = self._in_review_queryset_for_model(model_class)
+            except Exception as exc:
+                logger.warning(
+                    "Could not build in-review queryset for %s: %s",
+                    model_class.__name__,
+                    exc,
+                )
+                continue
+
             # Get items in review for this model, excluding current user's own items
             try:
                 # Build select_related fields dynamically based on model's FK fields
@@ -240,8 +359,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
 
                 # Apply database-level ordering and limit to reduce memory usage
                 items = (
-                    model_class.objects.in_review()
-                    .exclude(owner=self.request.user)
+                    review_queryset.exclude(owner=self.request.user)
                     .select_related(*select_fields)
                     .order_by("-submitted_at")[:max_items_per_model]
                 )
@@ -253,11 +371,9 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                     "Trying without select_related."
                 )
                 try:
-                    items = (
-                        model_class.objects.in_review()
-                        .exclude(owner=self.request.user)
-                        .order_by("-submitted_at")[:max_items_per_model]
-                    )
+                    items = review_queryset.exclude(owner=self.request.user).order_by(
+                        "-submitted_at"
+                    )[:max_items_per_model]
                     review_items.extend(list(items))
                 except (FieldDoesNotExist, AttributeError) as e2:
                     # owner field might not exist, filter in Python
@@ -268,7 +384,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                     try:
                         # Even in fallback, use database ordering and limit
                         items = list(
-                            model_class.objects.in_review().order_by("-submitted_at")[
+                            review_queryset.order_by("-submitted_at")[
                                 :max_items_per_model
                             ]
                         )
@@ -1917,65 +2033,52 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
             return qs
 
     def apply_filters(self, queryset):
-        if not self.filter_by:
+        filter_pairs = get_tomselect_filter_pairs(self)
+        if not filter_pairs:
             return queryset
 
-        try:
-            unquoted = unquote(self.filter_by)
-            cleaned = unquoted.replace("'", "")
+        for lookup, value in filter_pairs:
+            if not value:
+                value = "published"
 
-            if "=" not in cleaned:
+            if lookup == "scope__name":
+                scope_value = value or "published"
+                try:
+                    queryset = apply_scope_filter(
+                        queryset, scope_value, user=self.request.user
+                    )
+                except ImproperlyConfigured:
+                    queryset = queryset.none()
+                continue
+
+            # Generic guard: skip obviously invalid values (e.g. the language code accidentally
+            # injected in the request) that would break lookups expecting an integer PK.
+            # Django would raise FieldError / ValueError when trying to cast the string to int.
+            if (
+                value
+                and isinstance(value, str)
+                and value.lower() in {"en-us", "en", "de", "fr"}
+            ):
                 logger.warning(
-                    f"No '=' found in filter_by: {repr(cleaned)}, returning original queryset"
+                    "Invalid language code %s supplied for lookup %s – skipping this filter to "
+                    "avoid EmptyQuerySet and widget validation errors.",
+                    value,
+                    lookup,
                 )
-                return queryset
+                continue
 
-            lookup, value = cleaned.split(
-                "=", 1
-            )  # Use maxsplit=1 to handle multiple '=' chars
+            # Additional guard for *_id style lookups that require an integer value.
+            if lookup.endswith("_id") and value and not value.isdigit():
+                logger.warning(
+                    "Non-numeric value %s supplied for integer lookup %s – skipping filter.",
+                    value,
+                    lookup,
+                )
+                continue
 
-        except Exception as e:
-            logger.error(f"Error parsing filter_by '{self.filter_by}': {e}")
-            return queryset
-
-        if not value:
-            value = "published"
-
-        if lookup == "scope__name":
-            scope_value = value or "published"
             try:
-                queryset = apply_scope_filter(
-                    queryset, scope_value, user=self.request.user
-                )
-            except ImproperlyConfigured:
-                queryset = queryset.none()
-        # Generic guard: skip obviously invalid values (e.g. the language code accidentally
-        # injected in the request) that would break lookups expecting an integer PK.
-        # Django would raise FieldError / ValueError when trying to cast the string to int.
-        if (
-            value
-            and isinstance(value, str)
-            and value.lower() in {"en-us", "en", "de", "fr"}
-        ):
-            logger.warning(
-                "Invalid language code %s supplied for lookup %s – skipping this filter to "
-                "avoid EmptyQuerySet and widget validation errors.",
-                value,
-                lookup,
-            )
-            return queryset
+                queryset = queryset.filter(**{lookup: value})
+            except Exception as e:
+                logger.error(f"Error applying filter {lookup}={value!r}: {e}")
 
-        # Additional guard for *_id style lookups that require an integer value.
-        if lookup.endswith("_id") and value and not value.isdigit():
-            logger.warning(
-                "Non-numeric value %s supplied for integer lookup %s – skipping filter.",
-                value,
-                lookup,
-            )
-            return queryset
-
-        try:
-            return queryset.filter(**{lookup: value})
-        except Exception as e:
-            logger.error(f"Error applying filter {lookup}={value!r}: {e}")
-            return queryset
+        return queryset

@@ -1,12 +1,17 @@
+from unittest.mock import patch
+
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.db.models.signals import post_save, pre_save
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from factory.django import mute_signals
 
 from case_studies.soilcom.models import Collection
+from distributions.models import TemporalDistribution
+from maps.models import Catchment, Region
 from utils.object_management.models import UserCreatedObject
+from utils.object_management.views import ReviewDashboardView
 
 
 class ReviewDashboardViewTests(TestCase):
@@ -337,6 +342,83 @@ class ReviewDashboardViewTests(TestCase):
 
         # Template should handle empty state
         self.assertContains(response, "There are no items currently in review")
+
+    def test_dashboard_includes_temporal_distribution_with_plain_manager(self):
+        """Models without manager.in_review() must still appear in the dashboard."""
+        owner = User.objects.create_user(
+            username="distribution_owner", password="test123"
+        )
+        TemporalDistribution.objects.create(
+            name="Review Distribution",
+            owner=owner,
+            publication_status=UserCreatedObject.STATUS_REVIEW,
+        )
+
+        self.client.force_login(self.staff_user)
+        response = self.client.get(reverse("object_management:review_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        review_items = list(response.context["review_items"])
+        self.assertTrue(
+            any(isinstance(item, TemporalDistribution) for item in review_items)
+        )
+
+    def test_dashboard_includes_catchment_with_custom_manager(self):
+        """Models with custom managers must still be resolved to in-review querysets."""
+        owner = User.objects.create_user(username="catchment_owner", password="test123")
+        region = Region.objects.create(name="Review Region", country="DE", owner=owner)
+        Catchment.objects.create(
+            name="Review Catchment",
+            owner=owner,
+            region=region,
+            publication_status=UserCreatedObject.STATUS_REVIEW,
+        )
+
+        self.client.force_login(self.staff_user)
+        response = self.client.get(reverse("object_management:review_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        review_items = list(response.context["review_items"])
+        self.assertTrue(any(isinstance(item, Catchment) for item in review_items))
+
+    def test_get_available_models_accepts_models_module_subpackages(self):
+        """Models in ``<app>.models.<submodule>`` are discoverable for moderation."""
+        request = RequestFactory().get(reverse("object_management:review_dashboard"))
+        request.user = self.moderator_user
+
+        view = ReviewDashboardView()
+        view.setup(request)
+
+        submodule_path = f"{Collection._meta.app_label}.models.submodule"
+        with (
+            patch("django.apps.apps.get_models", return_value=[Collection]),
+            patch.object(Collection, "__module__", submodule_path),
+        ):
+            available_models = view.get_available_models()
+
+        self.assertIn(Collection, available_models)
+
+    def test_collect_review_items_ignores_models_with_unresolvable_review_queryset(
+        self,
+    ):
+        """collect_review_items should skip failing models instead of crashing."""
+        request = RequestFactory().get(reverse("object_management:review_dashboard"))
+        request.user = self.staff_user
+
+        view = ReviewDashboardView()
+        view.setup(request)
+
+        with (
+            patch.object(view, "get_available_models", return_value=[Collection]),
+            patch.object(
+                view,
+                "_in_review_queryset_for_model",
+                side_effect=RuntimeError("boom"),
+            ),
+        ):
+            review_items = view.collect_review_items()
+
+        self.assertEqual(review_items, [])
 
 
 class ReviewDashboardFilterTests(TestCase):
