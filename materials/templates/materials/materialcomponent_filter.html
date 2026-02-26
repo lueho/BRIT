@@ -25,7 +25,8 @@
                     {% for object in object_list %}
                         <tr>
                             <td data-label="Component" class="ps-3">
-                                <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                                <a href="{% detail_or_review_url object use_back=True %}"
+                                   class="text-decoration-none">
                                     <strong class="d-block">{{ object.name }}</strong>
                                     <span class="text-muted small">{{ object.get_component_kind_display }}
                                         {% if object.abbreviation %}· {{ object.abbreviation }}{% endif %}
@@ -37,6 +38,14 @@
                                 <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
                             {% endif %}
                         </tr>
+                    {% empty %}
+                        {% if not user.is_authenticated %}
+                            {% include "includes/list_empty_state.html" with hint="Log in to create new components." %}
+                        {% elif create_permission in perms or user.is_staff %}
+                            {% include "includes/list_empty_state.html" with hint="Create your first component to get started." %}
+                        {% else %}
+                            {% include "includes/list_empty_state.html" %}
+                        {% endif %}
                     {% endfor %}
                 </tbody>
             </table>

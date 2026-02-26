@@ -129,6 +129,8 @@
                             </div>
                         </td>
                     </tr>
+                {% empty %}
+                    {% include "includes/list_empty_state.html" with colspan=3 %}
                 {% endfor %}
             </tbody>
         </table>

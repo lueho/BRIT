@@ -3,9 +3,13 @@
 {% load user_created_object_tags %}
 {% load moderation_tags %}
 
-{% block title %}BRIT | Waste Components{% endblock title %}
+{% block title %}
+    BRIT | Waste Components
+{% endblock title %}
 
-{% block list_card_header %}<strong>Waste Components</strong>{% endblock list_card_header %}
+{% block list_card_header %}
+    <strong>Waste Components</strong>
+{% endblock list_card_header %}
 
 {% block list_table %}
     <div class="collection-list-min-height">
@@ -14,9 +18,7 @@
                 <thead>
                     <tr>
                         <th>Waste Component</th>
-                        {% if object_list.model|is_user_created %}
-                            <th class="actions-column">Status/Actions</th>
-                        {% endif %}
+                        {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -28,11 +30,11 @@
                                 </a>
                             </td>
                             {% if object_list.model|is_user_created %}
-                                <td class="actions-column mobile-no-label">
-                                    {% include "object_management/status_actions_cell.html" %}
-                                </td>
+                                <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
                             {% endif %}
                         </tr>
+                    {% empty %}
+                        {% include "includes/list_empty_state.html" %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -40,5 +42,7 @@
     </div>
 {% endblock list_table %}
 
-{% block learning_tab_button %}{% endblock learning_tab_button %}
-{% block learning_tab_pane %}{% endblock learning_tab_pane %}
+{% block learning_tab_button %}
+{% endblock learning_tab_button %}
+{% block learning_tab_pane %}
+{% endblock learning_tab_pane %}

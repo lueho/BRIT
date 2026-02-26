@@ -16,18 +16,22 @@
                 {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
             </tr>
         </thead>
-        {% for object in object_list %}
-            <tr>
-                <td>
-                    <a href="{% detail_or_review_url object use_back=True %}">{{ object }}</a>
-                </td>
-                <td>
-                    <a href="{{ object.reference_url }}" target="_blank">{{ object.reference_url }}</a>
-                </td>
-                {% if object_list.model|is_user_created %}
-                    <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
-                {% endif %}
-            </tr>
-        {% endfor %}
+        <tbody>
+            {% for object in object_list %}
+                <tr>
+                    <td>
+                        <a href="{% detail_or_review_url object use_back=True %}">{{ object }}</a>
+                    </td>
+                    <td>
+                        <a href="{{ object.reference_url }}" target="_blank">{{ object.reference_url }}</a>
+                    </td>
+                    {% if object_list.model|is_user_created %}
+                        <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
+                    {% endif %}
+                </tr>
+            {% empty %}
+                {% include "includes/list_empty_state.html" %}
+            {% endfor %}
+        </tbody>
     </table>
 {% endblock list_table %}

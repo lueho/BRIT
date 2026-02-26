@@ -28,7 +28,8 @@
                     {% for object in object_list %}
                         <tr>
                             <td data-label="Category" class="ps-3">
-                                <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                                <a href="{% detail_or_review_url object use_back=True %}"
+                                   class="text-decoration-none">
                                     <strong class="d-block">{{ object.name }}</strong>
                                     {% if object.description %}<span class="text-muted small">{{ object.description|truncatewords:15 }}</span>{% endif %}
                                 </a>
@@ -37,6 +38,14 @@
                                 <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
                             {% endif %}
                         </tr>
+                    {% empty %}
+                        {% if not user.is_authenticated %}
+                            {% include "includes/list_empty_state.html" with hint="Log in to create new categories." %}
+                        {% elif create_permission in perms or user.is_staff %}
+                            {% include "includes/list_empty_state.html" with hint="Create your first category to get started." %}
+                        {% else %}
+                            {% include "includes/list_empty_state.html" %}
+                        {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -63,7 +72,9 @@
     <form method="get">
         {% crispy filter.form %}
         <div class="d-flex justify-content-end gap-2 mt-2">
-            <button id="btn-filter" class="btn btn-sm btn-primary submit-filter" type="submit">Filter</button>
+            <button id="btn-filter"
+                    class="btn btn-sm btn-primary submit-filter"
+                    type="submit">Filter</button>
             <a class="btn btn-sm btn-outline-secondary"
                href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}"
                aria-label="Reset filters">Reset</a>

@@ -59,6 +59,8 @@
                                 <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
                             {% endif %}
                         </tr>
+                    {% empty %}
+                        {% include "includes/list_empty_state.html" %}
                     {% endfor %}
                 </tbody>
             </table>

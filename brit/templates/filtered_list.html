@@ -151,18 +151,10 @@
                           {% endif %}
                         </tr>
                       {% endblock list_table_row %}
+                    {% empty %}
+                      {% include "includes/list_empty_state.html" %}
                     {% endfor %}
                   </tbody>
-                  {% if not object_list %}
-                    <tbody>
-                      <tr>
-                        <td colspan="2" class="text-center text-muted py-4">
-                          <i class="fas fa-filter me-1"></i> No items match your current filters.
-                          <a href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% elif list_type == 'review' %}{{ object_list.model.review_list_url }}?scope=review{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}">Reset filters</a>
-                        </td>
-                      </tr>
-                    </tbody>
-                  {% endif %}
                   {% block list_table_footer %}
                   {% endblock list_table_footer %}
                 </table>

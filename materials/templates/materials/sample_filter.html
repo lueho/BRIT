@@ -39,21 +39,13 @@
                             {% endif %}
                         </tr>
                     {% empty %}
-                        <tr>
-                            <td colspan="{% if object_list.model|is_user_created %}2{% else %}1{% endif %}"
-                                class="text-center text-muted py-4">
-                                <div class="mb-3">
-                                    <i class="fas fa-filter me-1"></i> No items match your current filters.
-                                    <a href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}"
-                                       class="ms-2">Reset filters</a>
-                                </div>
-                                {% if not user.is_authenticated %}
-                                    <div class="small">Log in to create new samples.</div>
-                                {% elif create_permission in perms or user.is_staff %}
-                                    <div class="small">Create your first sample to get started.</div>
-                                {% endif %}
-                            </td>
-                        </tr>
+                        {% if not user.is_authenticated %}
+                            {% include "includes/list_empty_state.html" with hint="Log in to create new samples." %}
+                        {% elif create_permission in perms or user.is_staff %}
+                            {% include "includes/list_empty_state.html" with hint="Create your first sample to get started." %}
+                        {% else %}
+                            {% include "includes/list_empty_state.html" %}
+                        {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
