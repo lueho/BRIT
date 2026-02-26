@@ -254,7 +254,15 @@
               </table>
             </div>
           {% else %}
-            <p class="text-muted mb-0">No properties recorded.</p>
+            <div class="p-3 text-muted">
+              {% if not user.is_authenticated %}
+                No properties recorded. Log in to add properties.
+              {% elif policy.can_add_property %}
+                No properties recorded. Add your first property.
+              {% else %}
+                No properties recorded.
+              {% endif %}
+            </div>
           {% endif %}
         {% endwith %}
       </div>
@@ -398,100 +406,128 @@
   {% endif %}
 
   {# --- Composition Cards --- #}
-  {% for composition in data.compositions %}
-    <div class="col col-12 col-md-6 col-lg-3 mt-4">
-      <div class="card shadow h-100 tab-card">
-        <div class="card-header tab-card-header bg-body-tertiary border-bottom-0 py-3">
-          <h5 class="mb-0">
-            <a href="{% url 'materialcomponentgroup-detail-modal' composition.group %}"
-               class="modal-link text-decoration-none text-body">{{ composition.group_name }}</a>
-          </h5>
-          <ul class="nav nav-tabs card-header-tabs"
-              id="composition-tabs-{{ composition.id }}"
-              role="tablist">
-            <li class="nav-item">
-              <a class="nav-link active"
-                 id="composition-table-tab-{{ composition.id }}"
-                 data-bs-toggle="tab"
-                 href="#composition-table-{{ composition.id }}-tab"
-                 role="tab"
-                 aria-controls="composition-table-{{ composition.id }}-tab"
-                 aria-selected="true">Table</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link"
-                 id="composition-chart-tab-{{ composition.id }}"
-                 data-bs-toggle="tab"
-                 href="#composition-chart-{{ composition.id }}-tab"
-                 role="tab"
-                 aria-controls="composition-chart-{{ composition.id }}-tab"
-                 aria-selected="false">Chart</a>
-            </li>
-          </ul>
-        </div>
-        <div class="card-body tab-content"
-             id="composition-tabs-{{ composition.id }}-content">
-          <div class="tab-pane fade show active"
-               id="composition-table-{{ composition.id }}-tab"
-               role="tabpanel"
-               aria-labelledby="composition-table-tab-{{ composition.id }}">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Component</th>
-                  <th>Share</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for share in composition.shares %}
+  {% if data.compositions %}
+    {% for composition in data.compositions %}
+      <div class="col col-12 col-md-6 col-lg-3 mt-4">
+        <div class="card shadow h-100 tab-card">
+          <div class="card-header tab-card-header bg-body-tertiary border-bottom-0 py-3">
+            <h5 class="mb-0">
+              <a href="{% url 'materialcomponentgroup-detail-modal' composition.group %}"
+                 class="modal-link text-decoration-none text-body">{{ composition.group_name }}</a>
+            </h5>
+            <ul class="nav nav-tabs card-header-tabs"
+                id="composition-tabs-{{ composition.id }}"
+                role="tablist">
+              <li class="nav-item">
+                <a class="nav-link active"
+                   id="composition-table-tab-{{ composition.id }}"
+                   data-bs-toggle="tab"
+                   href="#composition-table-{{ composition.id }}-tab"
+                   role="tab"
+                   aria-controls="composition-table-{{ composition.id }}-tab"
+                   aria-selected="true">Table</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link"
+                   id="composition-chart-tab-{{ composition.id }}"
+                   data-bs-toggle="tab"
+                   href="#composition-chart-{{ composition.id }}-tab"
+                   role="tab"
+                   aria-controls="composition-chart-{{ composition.id }}-tab"
+                   aria-selected="false">Chart</a>
+              </li>
+            </ul>
+          </div>
+          <div class="card-body tab-content"
+               id="composition-tabs-{{ composition.id }}-content">
+            <div class="tab-pane fade show active"
+                 id="composition-table-{{ composition.id }}-tab"
+                 role="tabpanel"
+                 aria-labelledby="composition-table-tab-{{ composition.id }}">
+              <table class="table">
+                <thead>
                   <tr>
-                    <td>
-                      <a href="{% url 'materialcomponent-detail-modal' share.component %}"
-                         class="modal-link">{{ share.component_name }}</a>
-                    </td>
-                    {# <td>{{ share.average }} ± {{ share.standard_deviation }} %</td>#}
-                    <td>{{ share.as_percentage }}</td>
+                    <th>Component</th>
+                    <th>Share</th>
                   </tr>
-                {% endfor %}
-              </tbody>
-              <tfoot></tfoot>
-            </table>
+                </thead>
+                <tbody>
+                  {% for share in composition.shares %}
+                    <tr>
+                      <td>
+                        <a href="{% url 'materialcomponent-detail-modal' share.component %}"
+                           class="modal-link">{{ share.component_name }}</a>
+                      </td>
+                      {# <td>{{ share.average }} ± {{ share.standard_deviation }} %</td>#}
+                      <td>{{ share.as_percentage }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+                <tfoot></tfoot>
+              </table>
+            </div>
+            <div class="tab-pane fade p-0"
+                 id="composition-chart-{{ composition.id }}-tab"
+                 role="tabpanel"
+                 aria-labelledby="composition-chart-tab-{{ composition.id }}">
+              <div id="composition-chart-{{ composition.id }}"></div>
+            </div>
+            <strong>Shares of:</strong> {{ composition.fractions_of_name }}
           </div>
-          <div class="tab-pane fade p-0"
-               id="composition-chart-{{ composition.id }}-tab"
-               role="tabpanel"
-               aria-labelledby="composition-chart-tab-{{ composition.id }}">
-            <div id="composition-chart-{{ composition.id }}"></div>
+          <div class="card-footer d-flex">
+            {% if policy.can_manage_samples %}
+              <a id="move-group-{{ composition.id }}-left"
+                 href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}"
+                 class="me-3 nowrap">
+                <i class="fas fa-fw fa-arrow-left"></i>
+              </a>
+              <a id="edit-group-{{ composition.id }}"
+                 href="{% url 'composition-update' composition.id %}?next={{ request.path }}"
+                 class="me-3 nowrap">
+                <i class="fas fa-fw fa-pen-to-square"></i> Edit
+              </a>
+              <a id="remove-group-{{ composition.id }}"
+                 href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}"
+                 class="me-3 nowrap modal-link">
+                <i class="fas fa-fw fa-trash"></i> Delete
+              </a>
+              <a id="move-group-{{ composition.id }}-right"
+                 href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}"
+                 class="ms-auto nowrap">
+                <i class="fas fa-fw fa-arrow-right"></i>
+              </a>
+            {% endif %}
           </div>
-          <strong>Shares of:</strong> {{ composition.fractions_of_name }}
-        </div>
-        <div class="card-footer d-flex">
-          {% if policy.can_manage_samples %}
-            <a id="move-group-{{ composition.id }}-left"
-               href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}"
-               class="me-3 nowrap">
-              <i class="fas fa-fw fa-arrow-left"></i>
-            </a>
-            <a id="edit-group-{{ composition.id }}"
-               href="{% url 'composition-update' composition.id %}?next={{ request.path }}"
-               class="me-3 nowrap">
-              <i class="fas fa-fw fa-pen-to-square"></i> Edit
-            </a>
-            <a id="remove-group-{{ composition.id }}"
-               href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}"
-               class="me-3 nowrap modal-link">
-              <i class="fas fa-fw fa-trash"></i> Delete
-            </a>
-            <a id="move-group-{{ composition.id }}-right"
-               href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}"
-               class="ms-auto nowrap">
-              <i class="fas fa-fw fa-arrow-right"></i>
-            </a>
-          {% endif %}
         </div>
       </div>
+    {% endfor %}
+  {% else %}
+    <div class="col col-12 mt-4">
+      <div class="card shadow h-100">
+        <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+          <h5 class="mb-0">Compositions</h5>
+        </div>
+        <div class="card-body">
+          <div class="p-3 text-muted">
+            {% if not user.is_authenticated %}
+              No compositions available. Log in to create compositions.
+            {% elif policy.can_manage_samples %}
+              No compositions available. Create your first composition.
+            {% else %}
+              No compositions available.
+            {% endif %}
+          </div>
+        </div>
+        {% if policy.can_manage_samples %}
+          <div class="card-footer">
+            <a href="{% url 'sample-add-composition' object.id %}?next={{ request.path }}">
+              <i class="fas fa-fw fa-plus"></i> Add composition
+            </a>
+          </div>
+        {% endif %}
+      </div>
     </div>
-  {% endfor %}
+  {% endif %}
 
   {# --- Add Composition --- #}
   {% if policy.can_manage_samples %}

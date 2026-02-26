@@ -2,15 +2,20 @@
 {% load moderation_tags %}
 
 <div class="card shadow h-100">
-    <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0"><a class="stretched-link text-decoration-none text-body" href="{% detail_or_review_url object %}">{{ object.material.name }}</a></h5></div>
-    {% if object.image %}
-    <div class="card-img-top">
-        <img class="w-100 m-0" src="{{ object.image.url }}" alt="Maps Module Cover Image">
+    <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+        <h5 class="mb-0">
+            <a class="stretched-link text-decoration-none text-body"
+               href="{% detail_or_review_url object use_back=True %}">{{ object.material.name }}</a>
+        </h5>
     </div>
+    {% if object.image %}
+        <div class="card-img-top">
+            <img class="w-100 m-0"
+                 src="{{ object.image.url }}"
+                 alt="Maps Module Cover Image">
+        </div>
     {% endif %}
     <div class="card-body">
-        <p class="card-text">
-            {{ object.description }}
-        </p>
+        <p class="card-text">{{ object.description }}</p>
     </div>
 </div>

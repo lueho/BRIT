@@ -1,34 +1,28 @@
-{% extends 'simple_list_card.html' %}
+{% extends "simple_list_card.html" %}
 {% load user_created_object_tags %}
 {% load moderation_tags %}
 
 {% block list_table_head %}
     <thead>
-    <tr>
-        <th>Name</th>
-        <th>Technique</th>
-        <th>standard</th>
-        {% if object_list.model|is_user_created %}
-            <th class="actions-column">Status/Actions</th>
-        {% endif %}
-    </tr>
+        <tr>
+            <th>Name</th>
+            <th>Technique</th>
+            <th>standard</th>
+            {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
+        </tr>
     </thead>
 {% endblock list_table_head %}
 
 {% block list_table_row %}
     <tr>
         <td>
-            <a href="{% detail_or_review_url object %}"
-               aria-label="View details of {{ object.name }}">
-                {{ object.name }}
-            </a>
+            <a href="{% detail_or_review_url object use_back=True %}"
+               aria-label="View details of {{ object.name }}">{{ object.name }}</a>
         </td>
         <td>{{ object.technique }}</td>
         <td>{{ object.standard }}</td>
         {% if object_list.model|is_user_created %}
-            <td class="actions-column mobile-no-label">
-                {% include 'object_management/status_actions_cell.html' %}
-            </td>
+            <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
         {% endif %}
     </tr>
-{% endblock %}
+{% endblock list_table_row %}
