@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
@@ -10,7 +12,6 @@ from materials.models import (
     MaterialComponent,
     MaterialComponentGroup,
     MaterialProperty,
-    MaterialPropertyValue,
     Sample,
     SampleSeries,
 )
@@ -20,7 +21,6 @@ class EmptyStateViewsTestCase(TestCase):
     """Test empty state messaging and CTAs across Materials views."""
 
     def setUp(self):
-        self.anonymous_user = None
         self.regular_user = User.objects.create_user(
             username="regular", password="test123"
         )
@@ -49,29 +49,46 @@ class EmptyStateViewsTestCase(TestCase):
             )
             self.staff_user.user_permissions.add(perm)
 
+    def _create_unused_category(self):
+        """Create a category that is guaranteed not to be assigned to materials in this test."""
+        return MaterialCategory.objects.create(
+            name=f"unused-category-{uuid4()}",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+
     def test_material_list_empty_anonymous_shows_login_hint(self):
-        """Anonymous users see login hint in empty material list."""
-        response = self.client.get(reverse("material-list") + "?scope=published")
+        """Anonymous users see generic options hint but no create CTA."""
+        category = self._create_unused_category()
+        response = self.client.get(
+            reverse("material-list") + f"?scope=published&category={category.pk}"
+        )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No items match your current filters.")
         self.assertContains(response, "Reset filters")
-        self.assertContains(response, "Log in to create new materials.")
-        self.assertNotContains(response, "Create your first material")
+        self.assertContains(response, "Log in to enable export and additional options.")
+        self.assertNotContains(response, "Create new material")
 
     def test_material_list_empty_staff_shows_create_cta(self):
-        """Staff users with create permission see create CTA in empty material list."""
+        """Staff users with create permission see create CTA in options pane."""
         self.client.force_login(self.staff_user)
-        response = self.client.get(reverse("material-list-owned") + "?scope=private")
+        category = self._create_unused_category()
+        response = self.client.get(
+            reverse("material-list-owned") + f"?scope=private&category={category.pk}"
+        )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No items match your current filters.")
         self.assertContains(response, "Reset filters")
-        self.assertContains(response, "Create your first material to get started.")
+        self.assertContains(response, "Create new material")
         self.assertNotContains(response, "Log in to create")
 
     def test_material_list_empty_regular_no_create_cta(self):
         """Regular users without create permission don't see create CTA."""
         self.client.force_login(self.regular_user)
-        response = self.client.get(reverse("material-list-owned") + "?scope=private")
+        category = self._create_unused_category()
+        response = self.client.get(
+            reverse("material-list-owned") + f"?scope=private&category={category.pk}"
+        )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No items match your current filters.")
         self.assertContains(response, "Reset filters")
@@ -92,30 +109,23 @@ class EmptyStateViewsTestCase(TestCase):
             response, "No properties recorded. Log in to add properties."
         )
 
-    def test_sample_detail_empty_properties_with_permission(self):
-        """Users with add property permission see actionable message."""
+    def test_sample_detail_empty_properties_owner_sees_actionable_message(self):
+        """Sample owners see actionable empty-state message for properties."""
         sample = Sample.objects.create(
             name="Test Sample",
             material=Material.objects.create(name="Test Material", type="material"),
-            owner=self.staff_user,
+            owner=self.regular_user,
             publication_status="published",
         )
-        # Grant add property permission
-        perm = Permission.objects.get(
-            codename="add_materialpropertyvalue",
-            content_type=ContentType.objects.get_for_model(MaterialPropertyValue),
-        )
-        self.staff_user.user_permissions.add(perm)
-
-        self.client.force_login(self.staff_user)
+        self.client.force_login(self.regular_user)
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response, "No properties recorded. Add your first property."
         )
 
-    def test_sample_detail_empty_compositions_anonymous(self):
-        """Anonymous users see login hint for empty compositions section."""
+    def test_sample_detail_shows_default_composition(self):
+        """New samples include a default composition instead of an empty-state message."""
         sample = Sample.objects.create(
             name="Test Sample",
             material=Material.objects.create(name="Test Material", type="material"),
@@ -124,30 +134,12 @@ class EmptyStateViewsTestCase(TestCase):
         )
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response, "No compositions available. Log in to create compositions."
-        )
-
-    def test_sample_detail_empty_compositions_with_permission(self):
-        """Users with manage permission see actionable message."""
-        sample = Sample.objects.create(
-            name="Test Sample",
-            material=Material.objects.create(name="Test Material", type="material"),
-            owner=self.staff_user,
-            publication_status="published",
-        )
-        self.client.force_login(self.staff_user)
-        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response, "No compositions available. Create your first composition."
-        )
-        self.assertContains(response, "Add composition")
+        self.assertNotContains(response, "No compositions available")
 
     def test_analytical_method_list_empty_anonymous(self):
         """Anonymous users see login hint in empty analytical method list."""
         response = self.client.get(
-            reverse("analyticalmethod-list") + "?scope=published"
+            reverse("analyticalmethod-list") + "?scope=published&name=no-match-token"
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No items match your current filters.")
@@ -157,7 +149,8 @@ class EmptyStateViewsTestCase(TestCase):
         """Staff users see create CTA in empty analytical method list."""
         self.client.force_login(self.staff_user)
         response = self.client.get(
-            reverse("analyticalmethod-list-owned") + "?scope=private"
+            reverse("analyticalmethod-list-owned")
+            + "?scope=private&name=no-match-token"
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(
@@ -189,10 +182,12 @@ class EmptyStateViewsTestCase(TestCase):
             publication_status="published",
         )
 
+        empty_category = self._create_unused_category()
+
         # Test with filter that returns no results
         self.client.force_login(self.staff_user)
         response = self.client.get(
-            reverse("material-list") + "?scope=published&name__icontains=nonexistent"
+            reverse("material-list") + f"?scope=published&category={empty_category.pk}"
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No items match your current filters.")
