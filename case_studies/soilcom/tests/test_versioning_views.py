@@ -533,6 +533,14 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
 
         cls.ct_id = ContentType.objects.get_for_model(Collection).pk
 
+        # Create materials for testing allowed/forbidden display
+        from materials.models import Material
+
+        cls.allowed_material = Material.objects.create(name="Allowed Material")
+        cls.forbidden_material = Material.objects.create(name="Forbidden Material")
+        cls.stream.allowed_materials.add(cls.allowed_material)
+        cls.stream.forbidden_materials.add(cls.forbidden_material)
+
     def test_review_preview_shows_published_and_review_only(self):
         self.client.force_login(self.staff)
         url = reverse(
@@ -558,3 +566,29 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
         self.assertIn("12", body)
         self.assertIn("45", body)
         self.assertNotIn("Private", body)
+
+    def test_review_detail_shows_allowed_and_forbidden_materials(self):
+        """Test that allowed and forbidden materials are displayed in review view."""
+        self.client.force_login(self.staff)
+        url = reverse(
+            "object_management:review_item_detail",
+            kwargs={"content_type_id": self.ct_id, "object_id": self.collection.pk},
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        # Check that materials are in context
+        allowed_materials = response.context["allowed_materials"]
+        forbidden_materials = response.context["forbidden_materials"]
+
+        self.assertEqual(len(allowed_materials), 1)
+        self.assertEqual(len(forbidden_materials), 1)
+        self.assertEqual(allowed_materials[0].name, "Allowed Material")
+        self.assertEqual(forbidden_materials[0].name, "Forbidden Material")
+
+        # Check that materials are displayed in the rendered HTML
+        body = response.content.decode()
+        self.assertIn("Allowed Materials", body)
+        self.assertIn("Forbidden Materials", body)
+        self.assertIn("Allowed Material", body)
+        self.assertIn("Forbidden Material", body)
