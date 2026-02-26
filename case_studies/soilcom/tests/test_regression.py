@@ -46,6 +46,7 @@ from case_studies.soilcom.derived_values import (
     get_population_for_collection,
 )
 from case_studies.soilcom.forms import CollectionModelForm
+from case_studies.soilcom.importers import CollectionImporter
 from case_studies.soilcom.models import (
     AggregatedCollectionPropertyValue,
     Collection,
@@ -55,6 +56,7 @@ from case_studies.soilcom.models import (
     CollectionSystem,
     Collector,
     FeeSystem,
+    SortingMethod,
     WasteCategory,
     WasteComponent,
     WasteFlyer,
@@ -2176,3 +2178,241 @@ class WasteStreamSaveOptimizationTestCase(TestCase):
         form.save()
 
         self.assertLessEqual(mock_clear.call_count, 2)
+
+
+class SortingMethodModelTestCase(TestCase):
+    """Unit tests for the SortingMethod model."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="sm-test-owner")
+
+    def test_str_returns_name(self):
+        method = SortingMethod(name="Separate bins")
+        self.assertEqual(str(method), "Separate bins")
+
+    def test_create_and_retrieve(self):
+        method = SortingMethod.objects.create(
+            name="Optical bag sorting",
+            owner=self.owner,
+            publication_status="private",
+        )
+        retrieved = SortingMethod.objects.get(pk=method.pk)
+        self.assertEqual(retrieved.name, "Optical bag sorting")
+
+    def test_description_optional(self):
+        method = SortingMethod.objects.create(
+            name="Two compartments bin",
+            owner=self.owner,
+            publication_status="private",
+        )
+        self.assertIsNone(method.description)
+
+
+class CollectionSortingMethodFieldTestCase(TestCase):
+    """Tests for Collection.sorting_method FK behaviour."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="col-sm-owner")
+        cls.catchment = CollectionCatchment.objects.create(name="SM Field Catchment")
+        cls.sorting_method = SortingMethod.objects.create(
+            name="Four compartments bin",
+            owner=cls.owner,
+            publication_status="private",
+        )
+
+    def test_collection_stores_sorting_method(self):
+        col = Collection.objects.create(
+            catchment=self.catchment,
+            sorting_method=self.sorting_method,
+        )
+        col.refresh_from_db()
+        self.assertEqual(col.sorting_method_id, self.sorting_method.pk)
+
+    def test_sorting_method_null_by_default(self):
+        col = Collection.objects.create(catchment=self.catchment)
+        self.assertIsNone(col.sorting_method)
+
+    def test_delete_sorting_method_sets_null_on_collection(self):
+        method = SortingMethod.objects.create(
+            name="Temporary method",
+            owner=self.owner,
+            publication_status="private",
+        )
+        col = Collection.objects.create(
+            catchment=self.catchment,
+            sorting_method=method,
+        )
+        method.delete()
+        col.refresh_from_db()
+        self.assertIsNone(col.sorting_method)
+
+
+class CollectionEstablishedFieldTestCase(TestCase):
+    """Tests for Collection.established field."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.catchment = CollectionCatchment.objects.create(name="Est Field Catchment")
+
+    def test_established_stores_year(self):
+        col = Collection.objects.create(
+            catchment=self.catchment,
+            established=2005,
+        )
+        col.refresh_from_db()
+        self.assertEqual(col.established, 2005)
+
+    def test_established_null_by_default(self):
+        col = Collection.objects.create(catchment=self.catchment)
+        self.assertIsNone(col.established)
+
+
+class CollectionImporterSortingMethodTestCase(TestCase):
+    """Integration tests for sorting_method and established in CollectionImporter."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="imp-sm-owner")
+        cls.catchment = CollectionCatchment.objects.create(name="Importer SM Catchment")
+        cls.collection_system = CollectionSystem.objects.create(
+            name="Door to door", owner=cls.owner
+        )
+        cls.waste_category = WasteCategory.objects.create(name="Food waste")
+        cls.sorting_method = SortingMethod.objects.create(
+            name="Separate bins",
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.valid_from = date(2021, 1, 1)
+
+    def _make_record(self, **overrides):
+        base = {
+            "nuts_or_lau_id": None,
+            "catchment_name": self.catchment.name,
+            "collection_system": self.collection_system.name,
+            "waste_category": self.waste_category.name,
+            "sorting_method": self.sorting_method.name,
+            "established": 2015,
+            "valid_from": self.valid_from,
+            "valid_until": None,
+            "collector_name": None,
+            "fee_system": None,
+            "frequency": None,
+            "connection_type": None,
+            "min_bin_size": None,
+            "required_bin_capacity": None,
+            "required_bin_capacity_reference": None,
+            "allowed_materials": "",
+            "forbidden_materials": "",
+            "description": "",
+            "property_values": [],
+            "flyer_urls": [],
+        }
+        base.update(overrides)
+        return base
+
+    def test_import_sets_sorting_method(self):
+        """Importer persists sorting_method on newly created collection."""
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        stats = importer.run([self._make_record()])
+        self.assertEqual(stats["created"], 1)
+        self.assertEqual(stats["warnings"], [])
+
+        col = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertEqual(col.sorting_method, self.sorting_method)
+        col.delete()
+
+    def test_import_sets_established(self):
+        """Importer persists established year on newly created collection."""
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        stats = importer.run([self._make_record()])
+        self.assertEqual(stats["created"], 1)
+
+        col = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertEqual(col.established, 2015)
+        col.delete()
+
+    def test_unknown_sorting_method_adds_warning_and_leaves_field_empty(self):
+        """Unknown sorting_method name produces a warning and does not block import."""
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        stats = importer.run([self._make_record(sorting_method="Nonexistent Method")])
+        self.assertEqual(stats["created"], 1)
+        self.assertTrue(
+            any(
+                "SortingMethod" in w and "Nonexistent Method" in w
+                for w in stats["warnings"]
+            ),
+            msg=f"Expected SortingMethod warning, got: {stats['warnings']}",
+        )
+
+        col = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertIsNone(col.sorting_method)
+        col.delete()
+
+    def test_empty_sorting_method_skips_resolution_silently(self):
+        """Empty sorting_method string does not produce a warning."""
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        stats = importer.run([self._make_record(sorting_method="")])
+        self.assertEqual(stats["created"], 1)
+        self.assertFalse(
+            any("SortingMethod" in w for w in stats["warnings"]),
+            msg="Unexpected SortingMethod warning for empty value",
+        )
+
+        col = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertIsNone(col.sorting_method)
+        col.delete()
+
+    def test_import_updates_null_sorting_method_on_existing_collection(self):
+        """Re-importing updates sorting_method when it was previously null."""
+        valid_from = date(2021, 3, 1)
+
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        importer.run([self._make_record(sorting_method="", valid_from=valid_from)])
+        col = Collection.objects.get(
+            owner=self.owner,
+            valid_from=valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertIsNone(col.sorting_method)
+
+        importer2 = CollectionImporter(owner=self.owner, publication_status="private")
+        importer2.run([self._make_record(valid_from=valid_from)])
+        col.refresh_from_db()
+        self.assertEqual(col.sorting_method, self.sorting_method)
+        col.delete()
+
+    def test_import_updates_null_established_on_existing_collection(self):
+        """Re-importing updates established when it was previously null."""
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        importer.run([self._make_record(established=None)])
+        col = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertIsNone(col.established)
+
+        importer2 = CollectionImporter(owner=self.owner, publication_status="private")
+        importer2.run([self._make_record(established=2010)])
+        col.refresh_from_db()
+        self.assertEqual(col.established, 2010)
+        col.delete()
