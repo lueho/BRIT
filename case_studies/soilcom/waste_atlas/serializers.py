@@ -56,6 +56,13 @@ class CatchmentCollectionSystemSerializer(serializers.Serializer):
     collection_system = serializers.CharField()
 
 
+class CatchmentCollectionSystemCountSerializer(serializers.Serializer):
+    """Flat JSON serializer for number of collection systems per catchment."""
+
+    catchment_id = serializers.IntegerField()
+    collection_system_count = serializers.IntegerField()
+
+
 class CatchmentConnectionRateSerializer(serializers.Serializer):
     """Flat JSON serializer for catchment connection rate (Karte 3)."""
 

@@ -13,6 +13,8 @@ from .views import (
     CombinedFrequencyMapView,
     ConnectionRateMapView,
     FoodWasteCategoryMapView,
+    GreenWasteCollectionAmountMapView,
+    GreenWasteCollectionSystemCountMapView,
     OrgaLevelMapView,
     PaperBagsMapView,
     PlasticBagsMapView,
@@ -41,6 +43,11 @@ urlpatterns = [
         "map/collection-system/",
         CollectionSystemMapView.as_view(),
         name="waste-atlas-collection-system-map",
+    ),
+    path(
+        "map/green-waste-collection-system-count/",
+        GreenWasteCollectionSystemCountMapView.as_view(),
+        name="waste-atlas-green-waste-collection-system-count-map",
     ),
     path(
         "map/connection-rate/",
@@ -121,6 +128,11 @@ urlpatterns = [
         "map/biowaste-collection-amount/",
         BiowasteCollectionAmountMapView.as_view(),
         name="waste-atlas-biowaste-collection-amount-map",
+    ),
+    path(
+        "map/green-waste-collection-amount/",
+        GreenWasteCollectionAmountMapView.as_view(),
+        name="waste-atlas-green-waste-collection-amount-map",
     ),
     path(
         "map/waste-ratio/",

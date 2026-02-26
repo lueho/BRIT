@@ -1,78 +1,140 @@
 {% extends "base.html" %}
 
-{% block title %}Waste Atlas — Kartenübersicht{% endblock title %}
+{% block title %}
+  Waste Atlas — Kartenübersicht
+{% endblock title %}
 
 {% block content %}
-<div class="container mt-4">
-  <h1>Waste Atlas — Kartenübersicht</h1>
-  <p class="lead">20 thematische Karten zur Abfallsammlung in Deutschland (Stand 2022)</p>
+  <div class="container mt-4">
+    <h1>Waste Atlas — Kartenübersicht</h1>
+    <p class="lead">22 thematische Karten zur Abfallsammlung in Deutschland (Stand 2022)</p>
 
-  <div class="row">
-    <div class="col-md-6">
-      <div class="card mb-3">
-        <div class="card-header"><strong>Sammelsysteme &amp; Organisation</strong></div>
-        <ul class="list-group list-group-flush">
-          <li class="list-group-item"><a href="{% url 'waste-atlas-orga-level-map' %}">Karte 1 — Sammlungs-Organisationsebene</a></li>
-          <li class="list-group-item"><a href="{% url 'waste-atlas-collection-system-map' %}">Karte 2 — Küchenabfall-Sammelsysteme</a></li>
-          <li class="list-group-item"><a href="{% url 'waste-atlas-connection-rate-map' %}">Karte 3 — Anschlussgrad an die Biotonne</a></li>
-        </ul>
+    <div class="row">
+      <div class="col-md-6">
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong>Sammelsysteme &amp; Organisation</strong>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-orga-level-map' %}">Karte 1 — Sammlungs-Organisationsebene</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-collection-system-map' %}">Karte 2 — Küchenabfall-Sammelsysteme</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-green-waste-collection-system-count-map' %}">Karte 21 — Anzahl Grüngut-Sammelsysteme</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-connection-rate-map' %}">Karte 3 — Anschlussgrad an die Biotonne</a>
+            </li>
+          </ul>
+        </div>
+
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong>Erlaubte Materialien</strong>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-food-waste-category-map' %}">Karte 4 — Küchenabfall in der Biotonne</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-paper-bags-map' %}">Karte 5 — Papierprodukte in Bioabfällen</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-plastic-bags-map' %}">Karte 6 — Kunststoffbeutel in Bioabfällen</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-collection-support-map' %}">Karte 7 — Bioabfall-Sammelhilfen</a>
+            </li>
+          </ul>
+        </div>
+
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong>Sammelrhythmus</strong>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-residual-frequency-map' %}">Karte 8 — Sammelrhythmus Restmüll</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-biowaste-frequency-map' %}">Karte 9 — Sammelrhythmus Bioabfall</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-combined-frequency-map' %}">Karte 10 — Sammelrhythmus in Kombination</a>
+            </li>
+          </ul>
+        </div>
       </div>
 
-      <div class="card mb-3">
-        <div class="card-header"><strong>Erlaubte Materialien</strong></div>
-        <ul class="list-group list-group-flush">
-          <li class="list-group-item"><a href="{% url 'waste-atlas-food-waste-category-map' %}">Karte 4 — Küchenabfall in der Biotonne</a></li>
-          <li class="list-group-item"><a href="{% url 'waste-atlas-paper-bags-map' %}">Karte 5 — Papierprodukte in Bioabfällen</a></li>
-          <li class="list-group-item"><a href="{% url 'waste-atlas-plastic-bags-map' %}">Karte 6 — Kunststoffbeutel in Bioabfällen</a></li>
-          <li class="list-group-item"><a href="{% url 'waste-atlas-collection-support-map' %}">Karte 7 — Bioabfall-Sammelhilfen</a></li>
-        </ul>
-      </div>
+      <div class="col-md-6">
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong>Sammelhäufigkeit</strong>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-residual-collection-count-map' %}">Karte 11 — Häufigkeit Restmüllabholung</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-biowaste-collection-count-map' %}">Karte 12 — Häufigkeit Bioabfallabholung</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-combined-collection-count-map' %}">Karte 13 — Sammelhäufigkeit in Kombination</a>
+            </li>
+          </ul>
+        </div>
 
-      <div class="card mb-3">
-        <div class="card-header"><strong>Sammelrhythmus</strong></div>
-        <ul class="list-group list-group-flush">
-          <li class="list-group-item"><a href="{% url 'waste-atlas-residual-frequency-map' %}">Karte 8 — Sammelrhythmus Restmüll</a></li>
-          <li class="list-group-item"><a href="{% url 'waste-atlas-biowaste-frequency-map' %}">Karte 9 — Sammelrhythmus Bioabfall</a></li>
-          <li class="list-group-item"><a href="{% url 'waste-atlas-combined-frequency-map' %}">Karte 10 — Sammelrhythmus in Kombination</a></li>
-        </ul>
-      </div>
-    </div>
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong>Gebührensysteme</strong>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-residual-fee-system-map' %}">Karte 14 — Gebührensysteme Restmüll</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-biowaste-fee-system-map' %}">Karte 15 — Gebührensysteme Bioabfall</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-combined-fee-system-map' %}">Karte 16 — Gebührensysteme in Kombination</a>
+            </li>
+          </ul>
+        </div>
 
-    <div class="col-md-6">
-      <div class="card mb-3">
-        <div class="card-header"><strong>Sammelhäufigkeit</strong></div>
-        <ul class="list-group list-group-flush">
-          <li class="list-group-item"><a href="{% url 'waste-atlas-residual-collection-count-map' %}">Karte 11 — Häufigkeit Restmüllabholung</a></li>
-          <li class="list-group-item"><a href="{% url 'waste-atlas-biowaste-collection-count-map' %}">Karte 12 — Häufigkeit Bioabfallabholung</a></li>
-          <li class="list-group-item"><a href="{% url 'waste-atlas-combined-collection-count-map' %}">Karte 13 — Sammelhäufigkeit in Kombination</a></li>
-        </ul>
-      </div>
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong>Sammelmengen</strong>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-residual-collection-amount-map' %}">Karte 17 — Restmüll-Sammelmengen</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-biowaste-collection-amount-map' %}">Karte 18 — Bioabfall-Sammelmengen</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-green-waste-collection-amount-map' %}">Karte 22 — Grüngut-Sammelmengen</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-waste-ratio-map' %}">Karte 19 — Sammelmengen-Verhältnis</a>
+            </li>
+          </ul>
+        </div>
 
-      <div class="card mb-3">
-        <div class="card-header"><strong>Gebührensysteme</strong></div>
-        <ul class="list-group list-group-flush">
-          <li class="list-group-item"><a href="{% url 'waste-atlas-residual-fee-system-map' %}">Karte 14 — Gebührensysteme Restmüll</a></li>
-          <li class="list-group-item"><a href="{% url 'waste-atlas-biowaste-fee-system-map' %}">Karte 15 — Gebührensysteme Bioabfall</a></li>
-          <li class="list-group-item"><a href="{% url 'waste-atlas-combined-fee-system-map' %}">Karte 16 — Gebührensysteme in Kombination</a></li>
-        </ul>
-      </div>
-
-      <div class="card mb-3">
-        <div class="card-header"><strong>Sammelmengen</strong></div>
-        <ul class="list-group list-group-flush">
-          <li class="list-group-item"><a href="{% url 'waste-atlas-residual-collection-amount-map' %}">Karte 17 — Restmüll-Sammelmengen</a></li>
-          <li class="list-group-item"><a href="{% url 'waste-atlas-biowaste-collection-amount-map' %}">Karte 18 — Bioabfall-Sammelmengen</a></li>
-          <li class="list-group-item"><a href="{% url 'waste-atlas-waste-ratio-map' %}">Karte 19 — Sammelmengen-Verhältnis</a></li>
-        </ul>
-      </div>
-
-      <div class="card mb-3">
-        <div class="card-header"><strong>Demographie</strong></div>
-        <ul class="list-group list-group-flush">
-          <li class="list-group-item"><a href="{% url 'waste-atlas-population-density-map' %}">Karte 20 — Einwohnerdichte</a></li>
-        </ul>
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong>Demographie</strong>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-population-density-map' %}">Karte 20 — Einwohnerdichte</a>
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
-</div>
 {% endblock content %}

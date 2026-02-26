@@ -32,7 +32,7 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
 
 
 class WasteAtlasOverviewView(WasteAtlasGroupMixin, TemplateView):
-    """Overview page linking to all 20 waste atlas maps."""
+    """Overview page linking to all waste atlas maps."""
 
     template_name = "waste_atlas/overview.html"
 
@@ -56,6 +56,13 @@ class CollectionSystemMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte2_collection_system.html"
     map_title = "Primäres Sammelsystem für Küchenabfälle"
+
+
+class GreenWasteCollectionSystemCountMapView(AtlasMapView):
+    """Karte 21 — Anzahl Grüngut-Sammelsysteme."""
+
+    template_name = "waste_atlas/karte21_green_waste_collection_system_count.html"
+    map_title = "Anzahl Grüngut-Sammelsysteme pro Einzugsgebiet"
 
 
 class ConnectionRateMapView(AtlasMapView):
@@ -168,6 +175,13 @@ class BiowasteCollectionAmountMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte18_biowaste_collection_amount.html"
     map_title = "Spezifisch gesammelte Menge an Bioabfall"
+
+
+class GreenWasteCollectionAmountMapView(AtlasMapView):
+    """Karte 22 — Grüngut-Sammelmengen."""
+
+    template_name = "waste_atlas/karte22_green_waste_collection_amount.html"
+    map_title = "Spezifisch gesammelte Menge an Grüngut"
 
 
 class WasteRatioMapView(AtlasMapView):

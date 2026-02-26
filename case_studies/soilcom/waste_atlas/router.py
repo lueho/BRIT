@@ -14,6 +14,8 @@ from .viewsets import (
     CombinedFrequencyTypeViewSet,
     ConnectionRateViewSet,
     FoodWasteCategoryViewSet,
+    GreenWasteCollectionAmountViewSet,
+    GreenWasteCollectionSystemCountViewSet,
     OrgaLevelViewSet,
     PaperBagsStatusViewSet,
     PlasticBagsStatusViewSet,
@@ -40,6 +42,11 @@ router.register(
     "collection-system",
     CollectionSystemViewSet,
     basename="api-waste-atlas-collection-system",
+)
+router.register(
+    "green-waste-collection-system-count",
+    GreenWasteCollectionSystemCountViewSet,
+    basename="api-waste-atlas-green-waste-collection-system-count",
 )
 router.register(
     "connection-rate",
@@ -120,6 +127,11 @@ router.register(
     "biowaste-collection-amount",
     BiowasteCollectionAmountViewSet,
     basename="api-waste-atlas-biowaste-collection-amount",
+)
+router.register(
+    "green-waste-collection-amount",
+    GreenWasteCollectionAmountViewSet,
+    basename="api-waste-atlas-green-waste-collection-amount",
 )
 router.register(
     "waste-ratio",

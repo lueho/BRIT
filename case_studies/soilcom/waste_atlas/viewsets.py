@@ -244,7 +244,7 @@ class CollectionSystemViewSet(viewsets.ViewSet):
 class GreenWasteCollectionSystemCountViewSet(viewsets.ViewSet):
     """Return number of distinct green-waste collection systems per catchment.
 
-    Counts distinct collection systems among Green/Garden waste collections
+    Counts distinct collection systems among Green waste collections
     in the selected country/year.
 
     Example::
@@ -900,6 +900,188 @@ def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
     return result
 
 
+def _get_green_waste_collection_amount(country, year):
+    """Return per-catchment green-waste amount in kg/person/year.
+
+    Priority for amount resolution:
+
+    1) aggregated specific amount (ACPV)
+    2) specific amount (CPV)
+    3) total amount (CPV/ACPV) converted via population
+    """
+    rows = (
+        Collection.objects.filter(
+            valid_from__year=year,
+            catchment__region__country=country,
+            waste_stream__category__name__in=_GREEN_WASTE_CATEGORY_NAMES,
+        )
+        .select_related("collection_system")
+        .values_list("id", "catchment_id", "collection_system__name")
+    )
+
+    best: dict[int, tuple[int, str, int]] = {}
+    for col_id, cid, system in rows:
+        priority = _COLLECTION_SYSTEM_PRIORITY.get(system, 99)
+        if cid not in best or priority < best[cid][2]:
+            best[cid] = (col_id, system, priority)
+
+    catchment_ids = list(best.keys())
+    if not catchment_ids:
+        return []
+
+    all_col_rows = Collection.objects.filter(
+        catchment_id__in=catchment_ids,
+        waste_stream__category__name__in=_GREEN_WASTE_CATEGORY_NAMES,
+    ).values_list("id", "catchment_id")
+
+    col_to_cid: dict[int, int] = {}
+    all_collection_ids: set[int] = set()
+    for col_id, cid in all_col_rows:
+        col_to_cid[col_id] = cid
+        all_collection_ids.add(col_id)
+
+    cfg = get_derived_property_config()
+
+    # 1) Aggregated specific waste amount per catchment.
+    agg_specific_by_catchment: dict[int, list[float]] = {}
+    agg_specific_qs = (
+        AggregatedCollectionPropertyValue.objects.filter(
+            collections__id__in=all_collection_ids,
+            property_id=cfg.specific_property_id,
+            year=year,
+        )
+        .exclude(average=0)
+        .values_list("collections__id", "average")
+    )
+    for col_id, avg in agg_specific_qs:
+        cid = col_to_cid.get(col_id)
+        if cid is not None:
+            agg_specific_by_catchment.setdefault(cid, []).append(avg)
+
+    amounts = {
+        cid: sum(values) / len(values)
+        for cid, values in agg_specific_by_catchment.items()
+        if values
+    }
+
+    missing_cids = [cid for cid in catchment_ids if cid not in amounts]
+
+    # 2) Fallback to non-aggregated specific amount.
+    if missing_cids:
+        missing_cid_set = set(missing_cids)
+        missing_cols = {
+            col_id for col_id, cid in col_to_cid.items() if cid in missing_cid_set
+        }
+        cpv_specific_by_catchment: dict[int, list[float]] = {}
+        cpv_specific_qs = (
+            CollectionPropertyValue.objects.filter(
+                collection_id__in=missing_cols,
+                property_id=cfg.specific_property_id,
+                year=year,
+            )
+            .exclude(average=0)
+            .values_list("collection_id", "average")
+        )
+        for col_id, avg in cpv_specific_qs:
+            cid = col_to_cid.get(col_id)
+            if cid is not None:
+                cpv_specific_by_catchment.setdefault(cid, []).append(avg)
+
+        for cid, values in cpv_specific_by_catchment.items():
+            if cid not in amounts and values:
+                amounts[cid] = sum(values) / len(values)
+
+    missing_cids = [cid for cid in catchment_ids if cid not in amounts]
+
+    # 3) Fallback to total amount converted via population.
+    if missing_cids:
+        missing_cid_set = set(missing_cids)
+        missing_cols = {
+            col_id for col_id, cid in col_to_cid.items() if cid in missing_cid_set
+        }
+
+        total_by_catchment: dict[int, float] = {}
+        total_qs = (
+            CollectionPropertyValue.objects.filter(
+                collection_id__in=missing_cols,
+                property_id=cfg.total_property_id,
+                year=year,
+            )
+            .exclude(average=0)
+            .values_list("collection_id", "average")
+        )
+        for col_id, avg in total_qs:
+            cid = col_to_cid.get(col_id)
+            if cid is not None:
+                total_by_catchment[cid] = total_by_catchment.get(cid, 0) + avg
+
+        still_missing_cids = [
+            cid for cid in missing_cids if cid not in total_by_catchment
+        ]
+        if still_missing_cids:
+            still_missing_cid_set = set(still_missing_cids)
+            still_missing_cols = {
+                col_id
+                for col_id, cid in col_to_cid.items()
+                if cid in still_missing_cid_set
+            }
+            agg_total_by_catchment: dict[int, list[float]] = {}
+            agg_total_qs = (
+                AggregatedCollectionPropertyValue.objects.filter(
+                    collections__id__in=still_missing_cols,
+                    property_id=cfg.total_property_id,
+                    year=year,
+                )
+                .exclude(average=0)
+                .values_list("collections__id", "average")
+            )
+            for col_id, avg in agg_total_qs:
+                cid = col_to_cid.get(col_id)
+                if cid is not None:
+                    agg_total_by_catchment.setdefault(cid, []).append(avg)
+            for cid, values in agg_total_by_catchment.items():
+                if cid not in total_by_catchment and values:
+                    total_by_catchment[cid] = sum(values) / len(values)
+
+        if total_by_catchment:
+            pop_qs = (
+                RegionAttributeValue.objects.filter(
+                    region__catchment__id__in=list(total_by_catchment.keys()),
+                    attribute_id=_resolved_population_attribute_id(),
+                )
+                .order_by("region_id", "-date")
+                .distinct("region_id")
+                .values_list("region_id", "value")
+            )
+            region_pop: dict[int, float] = dict(pop_qs)
+
+            catchment_regions = dict(
+                CollectionCatchment.objects.filter(
+                    id__in=list(total_by_catchment.keys()),
+                ).values_list("id", "region_id")
+            )
+            for cid, total_mg in total_by_catchment.items():
+                region_id = catchment_regions.get(cid)
+                if region_id is None:
+                    continue
+                pop = region_pop.get(region_id)
+                if pop and pop > 0:
+                    amounts[cid] = convert_total_to_specific(total_mg, pop, ndigits=1)
+
+    data = []
+    for cid, (_col_id, system, _priority) in best.items():
+        no_collection = system == "No separate collection"
+        amount = None if no_collection else amounts.get(cid)
+        data.append(
+            {
+                "catchment_id": cid,
+                "amount": amount,
+                "no_collection": no_collection,
+            }
+        )
+    return data
+
+
 class ResidualCollectionAmountViewSet(viewsets.ViewSet):
     """Return specific waste collected for residual waste (Karte 17).
 
@@ -932,6 +1114,24 @@ class BiowasteCollectionAmountViewSet(viewsets.ViewSet):
         """Return a JSON array of {catchment_id, amount}."""
         country, year = _parse_country_year(request)
         data = _get_collection_amount(country, year, ["Biowaste", "Food waste"])
+        serializer = CatchmentCollectionAmountSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class GreenWasteCollectionAmountViewSet(viewsets.ViewSet):
+    """Return specific waste collected for green waste (Karte 22).
+
+    Example::
+
+        GET /waste_collection/api/waste-atlas/green-waste-collection-amount/?country=DE&year=2024
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        """Return a JSON array of {catchment_id, amount, no_collection}."""
+        country, year = _parse_country_year(request)
+        data = _get_green_waste_collection_amount(country, year)
         serializer = CatchmentCollectionAmountSerializer(data, many=True)
         return Response(serializer.data)
 
