@@ -80,6 +80,16 @@ class CollectionSystem(NamedUserCreatedObject):
         return self.name
 
 
+class SortingMethod(NamedUserCreatedObject):
+    """How waste fractions are separated at the household level (e.g. separate bins, optical sorting)."""
+
+    class Meta:
+        verbose_name = "sorting method"
+
+    def __str__(self):
+        return self.name
+
+
 class WasteCategory(NamedUserCreatedObject):
     class Meta:
         verbose_name_plural = "waste categories"
@@ -507,6 +517,21 @@ class Collection(NamedUserCreatedObject):
     valid_until = models.DateField(blank=True, null=True)
     predecessors = models.ManyToManyField(
         "self", blank=True, symmetrical=False, related_name="successors"
+    )
+    sorting_method = models.ForeignKey(
+        SortingMethod,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="collections",
+        verbose_name="Sorting method",
+        help_text="How waste fractions are separated at the household level.",
+    )
+    established = models.PositiveSmallIntegerField(
+        blank=True,
+        null=True,
+        verbose_name="Year established",
+        help_text="Year when this collection scheme was first introduced.",
     )
     connection_type = models.CharField(
         max_length=40,

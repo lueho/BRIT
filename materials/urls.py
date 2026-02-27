@@ -62,6 +62,11 @@ urlpatterns = [
         name="material-autocomplete",
     ),
     path(
+        "materials/substrates/autocomplete/",
+        views.SampleSubstrateMaterialAutocompleteView.as_view(),
+        name="sample-substrate-material-autocomplete",
+    ),
+    path(
         "analytical_methods/",
         views.AnalyticalMethodPublishedListView.as_view(),
         name="analyticalmethod-list",

@@ -131,6 +131,11 @@ class CollectionSystemSerializer(OwnedObjectModelSerializer):
         model = models.CollectionSystem
 
 
+class SortingMethodSerializer(OwnedObjectModelSerializer):
+    class Meta(OwnedObjectModelSerializer.Meta):
+        model = models.SortingMethod
+
+
 class WasteComponentSerializer(OwnedObjectModelSerializer):
     class Meta(OwnedObjectModelSerializer.Meta):
         model = Material
@@ -164,6 +169,7 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     catchment = serializers.StringRelatedField()
     collector = serializers.StringRelatedField()
     collection_system = serializers.StringRelatedField()
+    sorting_method = serializers.StringRelatedField()
     waste_category = serializers.CharField(source="waste_stream.category")
     publication_status = serializers.CharField()
     connection_type = serializers.CharField(required=False, allow_null=True)
@@ -205,6 +211,8 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
             "catchment",
             "collector",
             "collection_system",
+            "sorting_method",
+            "established",
             "waste_category",
             "connection_type",
             "allowed_materials",
@@ -490,6 +498,8 @@ class CollectionImportRecordSerializer(serializers.Serializer):
     frequency           Exact name of the CollectionFrequency.
     connection_type     One of 'mandatory', 'mandatory with exception', 'voluntary',
                         'not specified'.
+    sorting_method      Exact name of the SortingMethod.
+    established         Year (integer) the collection scheme was established.
     valid_until         ISO 8601 date string.
     min_bin_size        Decimal (litres).
     required_bin_capacity  Decimal (litres).
@@ -519,6 +529,12 @@ class CollectionImportRecordSerializer(serializers.Serializer):
     frequency = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     connection_type = serializers.CharField(
         required=False, allow_null=True, allow_blank=True
+    )
+    sorting_method = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True
+    )
+    established = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1900, max_value=2100
     )
     min_bin_size = serializers.DecimalField(
         required=False, allow_null=True, max_digits=8, decimal_places=1

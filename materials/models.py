@@ -28,8 +28,24 @@ class MaterialPropertyAggregationKind(models.TextChoices):
     NON_MASS_RELATED = "non_mass_related", "Non mass-related"
 
 
+def get_sample_substrate_category_name():
+    """Return the configured substrate category name used for sample filtering."""
+    return getattr(settings, "SAMPLE_SUBSTRATE_CATEGORY_NAME", "Bioresource")
+
+
 class MaterialCategory(NamedUserCreatedObject):
     pass
+
+
+def get_or_create_sample_substrate_category():
+    """Return the configured substrate category, creating it when missing."""
+    return MaterialCategory.objects.get_or_create(
+        name=get_sample_substrate_category_name(),
+        defaults={
+            "description": "Category for substrate materials used in sample filtering.",
+            "publication_status": "published",
+        },
+    )
 
 
 class BaseMaterial(NamedUserCreatedObject):

@@ -161,6 +161,44 @@ class CatchmentPedigreeTestCase(TestCase):
         self.assertNotIn(self.unrelated_catchment, pedigree)
 
 
+class LauCatchmentParentSignalTestCase(TestCase):
+    """Regression test: LAU catchments must get the correct tree parent on creation.
+
+    When a LAU catchment is created its ``parent_id`` must point to the
+    *Catchment* wrapping the NUTS parent region, not to the NutsRegion row PK
+    (which lives in a separate ID space and may coincide with an unrelated
+    Catchment PK).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        nuts0 = NutsRegion.objects.create(
+            nuts_id="ZZ", levl_code=0, name_latn="Test Country"
+        )
+        nuts1 = NutsRegion.objects.create(
+            nuts_id="ZZ1", levl_code=1, name_latn="Test Region 1", parent=nuts0
+        )
+        nuts3 = NutsRegion.objects.create(
+            nuts_id="ZZ123", levl_code=3, name_latn="Test Region 3", parent=nuts1
+        )
+        cls.nuts3_catchment = Catchment.objects.create(
+            name="NUTS3 Catchment", region=nuts3.region_ptr, type="nuts"
+        )
+        lau = LauRegion.objects.create(
+            lau_id="ZZ00001", lau_name="Test Municipality", nuts_parent=nuts3
+        )
+        cls.lau_catchment = Catchment.objects.create(region=lau.region_ptr, type="lau")
+
+    def test_lau_catchment_parent_is_nuts3_catchment(self):
+        self.lau_catchment.refresh_from_db()
+        self.assertEqual(self.lau_catchment.parent_id, self.nuts3_catchment.pk)
+
+    def test_lau_catchment_is_descendant_of_nuts3_catchment(self):
+        self.lau_catchment.refresh_from_db()
+        descendants = list(self.nuts3_catchment.descendants(include_self=True))
+        self.assertIn(self.lau_catchment, descendants)
+
+
 class NutsRegionTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):

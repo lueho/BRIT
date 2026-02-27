@@ -26,6 +26,7 @@ from .models import (
     MaterialPropertyAggregationKind,
     Sample,
     SampleSeries,
+    get_or_create_sample_substrate_category,
 )
 
 
@@ -228,14 +229,27 @@ class SampleFilter(UserCreatedObjectScopedFilterSet):
             ),
         ),
     )
-    material = ModelChoiceFilter(
-        queryset=Material.objects.filter(type="material"),
-        field_name="material__name",
-        label="Material",
+    substrate_material = ModelChoiceFilter(
+        queryset=Material.objects.none(),
+        field_name="material",
+        label="Substrate material",
         empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
-                url="material-autocomplete",
+                url="sample-substrate-material-autocomplete",
+                value_field="id",
+            )
+        ),
+    )
+    parameter = ModelChoiceFilter(
+        queryset=MaterialProperty.objects.none(),
+        field_name="properties__property",
+        label="Parameter",
+        empty_label="All",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="materialproperty-autocomplete",
+                value_field="id",
             )
         ),
     )
@@ -249,27 +263,52 @@ class SampleFilter(UserCreatedObjectScopedFilterSet):
             queryset = filter_queryset_for_user(queryset, request.user)
 
         scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
+        if hasattr(self, "data") and self.data:
+            scope_value = self.data.get("scope")
 
         if scope_value:
             queryset = apply_scope_filter(
                 queryset, scope_value, user=getattr(request, "user", None)
             )
 
+        substrate_category, _ = get_or_create_sample_substrate_category()
+        substrate_queryset = Material.objects.filter(
+            type="material",
+            categories=substrate_category,
+        ).distinct()
+        parameter_queryset = MaterialProperty.objects.all()
+
+        if request and hasattr(request, "user"):
+            substrate_queryset = filter_queryset_for_user(
+                substrate_queryset, request.user
+            )
+            parameter_queryset = filter_queryset_for_user(
+                parameter_queryset, request.user
+            )
+
+        if scope_value:
+            substrate_queryset = apply_scope_filter(
+                substrate_queryset,
+                scope_value,
+                user=getattr(request, "user", None),
+            )
+            parameter_queryset = apply_scope_filter(
+                parameter_queryset,
+                scope_value,
+                user=getattr(request, "user", None),
+            )
+
         self.filters["name"].queryset = queryset
+        self.filters["substrate_material"].queryset = substrate_queryset
+        self.filters["parameter"].queryset = parameter_queryset
 
     class Meta:
         model = Sample
         fields = (
             "scope",
             "name",
-            "material",
+            "substrate_material",
+            "parameter",
             "created_at",
         )
 

@@ -9,6 +9,7 @@ from .models import (
     CollectionSystem,
     Collector,
     FeeSystem,
+    SortingMethod,
     WasteCategory,
     WasteComponent,
     WasteFlyer,
@@ -26,6 +27,14 @@ class CollectorAdmin(admin.ModelAdmin):
 
 @admin.register(CollectionSystem)
 class CollectionSystemAdmin(admin.ModelAdmin):
+    list_display = ("name", "owner", "publication_status")
+    search_fields = ("name",)
+    list_filter = ("publication_status",)
+    ordering = ("name",)
+
+
+@admin.register(SortingMethod)
+class SortingMethodAdmin(admin.ModelAdmin):
     list_display = ("name", "owner", "publication_status")
     search_fields = ("name",)
     list_filter = ("publication_status",)
@@ -108,7 +117,12 @@ class CollectionAdmin(admin.ModelAdmin):
         "publication_status",
     )
     search_fields = ("name", "collector__name", "catchment__name")
-    list_filter = ("publication_status", "connection_type", "collection_system")
+    list_filter = (
+        "publication_status",
+        "connection_type",
+        "collection_system",
+        "sorting_method",
+    )
     ordering = ("name",)
     autocomplete_fields = ("sources",)
     filter_horizontal = ("samples", "flyers", "predecessors")

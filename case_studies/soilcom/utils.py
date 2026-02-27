@@ -3,13 +3,16 @@ from django.core.exceptions import ObjectDoesNotExist
 from distributions.models import Period, TemporalDistribution, Timestep
 from utils.object_management.models import get_default_owner
 
-from .models import CollectionCountOptions, CollectionFrequency, CollectionSeason
+from .models import (
+    CollectionCountOptions,
+    CollectionFrequency,
+    CollectionSeason,
+)
 
 INITIALIZATION_DEPENDENCIES = ["distributions"]
 
 
 def ensure_initial_data(stdout=None):
-
     owner = get_default_owner()
 
     try:
@@ -28,7 +31,7 @@ def ensure_initial_data(stdout=None):
     except ObjectDoesNotExist:
         raise RuntimeError(
             "Distributions initial data missing: ensure 'Months of the year', all time steps and the full-year period exist."
-        )
+        ) from None
 
     frequency, _ = CollectionFrequency.objects.get_or_create(
         name="Fixed; 52 per year (1 per week)", type="Fixed"

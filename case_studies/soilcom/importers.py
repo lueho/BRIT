@@ -18,6 +18,7 @@ from case_studies.soilcom.models import (
     CollectionSystem,
     Collector,
     FeeSystem,
+    SortingMethod,
     WasteCategory,
     WasteFlyer,
     WasteStream,
@@ -77,6 +78,7 @@ class CollectionImporter:
     def __init__(self, owner, publication_status: str = "private"):
         self.owner = owner
         self.publication_status = publication_status
+        self.dry_run = False
         self._lookups_loaded = False
 
     # ------------------------------------------------------------------
@@ -93,6 +95,7 @@ class CollectionImporter:
         Returns:
             Statistics dict.
         """
+        self.dry_run = dry_run
         self._load_lookups()
 
         stats = {
@@ -126,6 +129,9 @@ class CollectionImporter:
         }
         self._collection_systems: dict[str, CollectionSystem] = {
             o.name: o for o in CollectionSystem.objects.all()
+        }
+        self._sorting_methods: dict[str, SortingMethod] = {
+            o.name: o for o in SortingMethod.objects.all()
         }
         self._fee_systems: dict[str, FeeSystem] = {
             o.name: o for o in FeeSystem.objects.all()
@@ -200,6 +206,8 @@ class CollectionImporter:
         fee_system = self._resolve_fee_system(record, label, stats)
         frequency = self._resolve_frequency(record, label, stats)
         connection_type = self._resolve_connection_type(record, label, stats)
+        sorting_method = self._resolve_sorting_method(record, label, stats)
+        established = record.get("established")
         bin_cap_ref = self._resolve_bin_capacity_reference(record)
         allowed_materials, forbidden_materials = self._resolve_material_lists(
             record, label, stats
@@ -259,35 +267,106 @@ class CollectionImporter:
                     existing = legacy
 
         if existing:
-            stats["skipped"] += 1
             collection = existing
             update_fields = []
-            if collection.collector_id is None and collector is not None:
+            changes = []
+
+            # Update collector if different
+            if collector and collection.collector_id != (
+                collector.pk if collector else None
+            ):
+                changes.append(
+                    f"collector: {collection.collector or 'None'} → {collector}"
+                )
                 collection.collector = collector
                 update_fields.append("collector")
-            if collection.fee_system_id is None and fee_system is not None:
+
+            # Update fee_system if different
+            if fee_system and collection.fee_system_id != (
+                fee_system.pk if fee_system else None
+            ):
+                changes.append(
+                    f"fee_system: {collection.fee_system or 'None'} → {fee_system}"
+                )
                 collection.fee_system = fee_system
                 update_fields.append("fee_system")
-            if collection.frequency_id is None and frequency is not None:
+
+            # Update frequency if different
+            if frequency and collection.frequency_id != (
+                frequency.pk if frequency else None
+            ):
+                changes.append(
+                    f"frequency: {collection.frequency or 'None'} → {frequency}"
+                )
                 collection.frequency = frequency
                 update_fields.append("frequency")
-            if collection.connection_type is None and connection_type is not None:
+
+            # Update connection_type if different
+            if connection_type and collection.connection_type != connection_type:
+                changes.append(
+                    f"connection_type: {collection.connection_type or 'None'} → {connection_type}"
+                )
                 collection.connection_type = connection_type
                 update_fields.append("connection_type")
-            if (
-                collection.required_bin_capacity is None
-                and required_bin_capacity is not None
+
+            # Update sorting_method if different
+            if sorting_method and collection.sorting_method_id != (
+                sorting_method.pk if sorting_method else None
             ):
+                changes.append(
+                    f"sorting_method: {collection.sorting_method or 'None'} → {sorting_method}"
+                )
+                collection.sorting_method = sorting_method
+                update_fields.append("sorting_method")
+
+            # Update established if different
+            if established is not None and collection.established != established:
+                changes.append(f"established: {collection.established} → {established}")
+                collection.established = established
+                update_fields.append("established")
+
+            # Update required_bin_capacity if different
+            if (
+                required_bin_capacity is not None
+                and collection.required_bin_capacity != required_bin_capacity
+            ):
+                changes.append(
+                    f"required_bin_capacity: {collection.required_bin_capacity} → {required_bin_capacity}"
+                )
                 collection.required_bin_capacity = required_bin_capacity
                 update_fields.append("required_bin_capacity")
+
+            # Update required_bin_capacity_reference if different
             if (
-                collection.required_bin_capacity_reference in (None, "")
-                and bin_cap_ref is not None
+                bin_cap_ref is not None
+                and collection.required_bin_capacity_reference != bin_cap_ref
             ):
+                changes.append(
+                    f"required_bin_capacity_reference: {collection.required_bin_capacity_reference or 'None'} → {bin_cap_ref}"
+                )
                 collection.required_bin_capacity_reference = bin_cap_ref
                 update_fields.append("required_bin_capacity_reference")
+
+            # Update description if different
+            if description and collection.description != description:
+                changes.append("description updated")
+                collection.description = description
+                update_fields.append("description")
+
+            # Update valid_until if different
+            if valid_until != collection.valid_until:
+                changes.append(f"valid_until: {collection.valid_until} → {valid_until}")
+                collection.valid_until = valid_until
+                update_fields.append("valid_until")
+
             if update_fields:
-                collection.save(update_fields=[*update_fields, "lastmodified_at"])
+                if not self.dry_run:
+                    collection.save(update_fields=[*update_fields, "lastmodified_at"])
+                stats["updated"] = stats.get("updated", 0) + 1
+                stats["changes"] = stats.get("changes", [])
+                stats["changes"].append(f"{label}: {', '.join(changes)}")
+            else:
+                stats["skipped"] += 1
         else:
             predecessor = self._find_predecessor(
                 catchment, waste_stream, collection_system, valid_from
@@ -310,6 +389,8 @@ class CollectionImporter:
                 valid_from=valid_from,
                 valid_until=valid_until,
                 connection_type=connection_type,
+                sorting_method=sorting_method,
+                established=established,
                 description=description,
             )
             if min_bin_size is not None:
@@ -457,6 +538,19 @@ class CollectionImporter:
                 f"{label}: CollectionSystem '{name}' not found — record skipped."
             )
         return system
+
+    def _resolve_sorting_method(
+        self, record: dict, label: str, stats: dict
+    ) -> SortingMethod | None:
+        name = record.get("sorting_method") or ""
+        if not name:
+            return None
+        method = self._sorting_methods.get(name)
+        if method is None:
+            stats["warnings"].append(
+                f"{label}: SortingMethod '{name}' not found — field left empty."
+            )
+        return method
 
     def _resolve_waste_category(
         self, record: dict, label: str, stats: dict

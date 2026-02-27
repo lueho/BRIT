@@ -126,6 +126,44 @@ def invalidate_nuts_region_cache(sender, instance, **kwargs):
         clear_geojson_cache_pattern(f"nuts_geojson:parent:{instance.parent_id}:*")
 
 
+@receiver(post_save, sender=Catchment)
+def set_lau_catchment_parent(sender, instance, created, **kwargs):
+    """Set the correct tree parent for LAU catchments on creation.
+
+    When a LAU catchment is first created its ``parent_id`` may point to the
+    ``NutsRegion`` row PK (= ``Region`` PK) of the NUTS parent rather than to
+    the *Catchment* that wraps that NUTS region.  These two PKs diverge whenever
+    the Catchment table was populated independently, which causes ``descendants``
+    / ``downstream_collections`` lookups on country-level catchments to return
+    empty results.
+
+    This signal fires only on ``created=True`` and only for LAU-typed catchments
+    whose region has a ``nuts_parent``.  It resolves the correct parent Catchment
+    and updates ``parent_id`` if it is wrong or missing.
+    """
+    if not created:
+        return
+    if instance.type != "lau":
+        return
+
+    try:
+        nuts_parent_region = instance.region.lauregion.nuts_parent
+    except AttributeError:
+        return
+    if nuts_parent_region is None:
+        return
+
+    correct_parent = (
+        Catchment.objects.filter(region__nutsregion=nuts_parent_region)
+        .exclude(pk=instance.pk)
+        .first()
+    )
+    if correct_parent is None:
+        return
+    if instance.parent_id != correct_parent.pk:
+        Catchment.objects.filter(pk=instance.pk).update(parent_id=correct_parent.pk)
+
+
 @receiver(post_save, sender=LauRegion)
 @receiver(post_delete, sender=LauRegion)
 def invalidate_lau_region_cache(sender, instance, **kwargs):

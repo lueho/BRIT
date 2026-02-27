@@ -135,6 +135,12 @@ ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME")
 # Default object owner
 DEFAULT_OBJECT_OWNER_USERNAME = os.environ.get("DEFAULT_OBJECT_OWNER_USERNAME")
 
+# Default category used to classify substrate materials in sample filtering
+SAMPLE_SUBSTRATE_CATEGORY_NAME = os.environ.get(
+    "SAMPLE_SUBSTRATE_CATEGORY_NAME",
+    "Bioresource",
+)
+
 # Django registration settings
 ACCOUNT_ACTIVATION_DAYS = 2
 REGISTRATION_AUTO_LOGIN = True

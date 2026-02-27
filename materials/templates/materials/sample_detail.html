@@ -444,6 +444,7 @@
             <h5 class="mb-0">
               <a href="{% url 'materialcomponentgroup-detail-modal' composition.group %}"
                  class="modal-link text-decoration-none text-body">{{ composition.group_name }}</a>
+              {% if composition.is_derived %}<span class="badge text-bg-info ms-2">Derived</span>{% endif %}
             </h5>
             <ul class="nav nav-tabs card-header-tabs"
                 id="composition-tabs-{{ composition.id }}"
@@ -505,7 +506,7 @@
             <strong>Shares of:</strong> {{ composition.fractions_of_name }}
           </div>
           <div class="card-footer d-flex">
-            {% if policy.can_manage_samples %}
+            {% if policy.can_manage_samples and not composition.is_derived %}
               <a id="move-group-{{ composition.id }}-left"
                  href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}"
                  class="me-3 nowrap">
@@ -526,6 +527,8 @@
                  class="ms-auto nowrap">
                 <i class="fas fa-fw fa-arrow-right"></i>
               </a>
+            {% elif composition.is_derived %}
+              <small class="text-muted">Derived from component measurements</small>
             {% endif %}
           </div>
         </div>

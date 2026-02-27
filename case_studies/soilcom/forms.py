@@ -51,6 +51,7 @@ from .models import (
     CollectionSystem,
     Collector,
     FeeSystem,
+    SortingMethod,
     WasteCategory,
     WasteComponent,
     WasteFlyer,
@@ -85,6 +86,16 @@ class CollectionSystemModelForm(SimpleModelForm):
 
 
 class CollectionSystemModalModelForm(ModalModelFormMixin, CollectionSystemModelForm):
+    pass
+
+
+class SortingMethodModelForm(SimpleModelForm):
+    class Meta:
+        model = SortingMethod
+        fields = ("name", "description")
+
+
+class SortingMethodModalModelForm(ModalModelFormMixin, SortingMethodModelForm):
     pass
 
 
@@ -416,6 +427,7 @@ class CollectionModelFormHelper(FormHelper):
         Field("catchment"),
         ForeignkeyField("collector"),
         ForeignkeyField("collection_system"),
+        Field("sorting_method"),
         # Waste stream configuration
         ForeignkeyField("waste_category"),
         Field("connection_type"),
@@ -428,6 +440,7 @@ class CollectionModelFormHelper(FormHelper):
         Field("required_bin_capacity"),
         Field("required_bin_capacity_reference"),
         # Validity period
+        Field("established"),
         Field("valid_from"),
         Field("valid_until"),
         # Additional information
@@ -553,18 +566,31 @@ class CollectionModelForm(
 
     # __init__ logic for sources field is provided by SourcesFieldMixin
 
+    sorting_method = ModelChoiceField(
+        queryset=SortingMethod.objects.all(), required=False, label="Sorting method"
+    )
+    established = IntegerField(
+        required=False,
+        min_value=1800,
+        max_value=2100,
+        label="Year established",
+        help_text="Year when this collection scheme was first introduced.",
+    )
+
     class Meta:
         model = Collection
         fields = (
             "catchment",
             "collector",
             "collection_system",
+            "sorting_method",
             "waste_category",
             "connection_type",
             "allowed_materials",
             "forbidden_materials",
             "frequency",
             "fee_system",
+            "established",
             "valid_from",
             "valid_until",
             "description",
