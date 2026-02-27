@@ -279,19 +279,11 @@ class SampleFilter(UserCreatedObjectScopedFilterSet):
         parameter_queryset = MaterialProperty.objects.all()
 
         if request and hasattr(request, "user"):
-            substrate_queryset = filter_queryset_for_user(
-                substrate_queryset, request.user
-            )
             parameter_queryset = filter_queryset_for_user(
                 parameter_queryset, request.user
             )
 
         if scope_value:
-            substrate_queryset = apply_scope_filter(
-                substrate_queryset,
-                scope_value,
-                user=getattr(request, "user", None),
-            )
             parameter_queryset = apply_scope_filter(
                 parameter_queryset,
                 scope_value,
