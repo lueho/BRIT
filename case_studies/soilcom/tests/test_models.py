@@ -21,6 +21,11 @@ from ..models import (
     WasteFlyer,
     WasteStream,
 )
+from .test_views import (  # noqa: F401
+    CollectionEstablishedFieldTestCase,
+    CollectionSortingMethodFieldTestCase,
+    SortingMethodModelTestCase,
+)
 
 
 class InitialDataTestCase(TestCase):

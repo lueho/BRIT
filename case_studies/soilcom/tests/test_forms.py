@@ -38,6 +38,10 @@ from ..models import (
     WasteStream,
 )
 from ..tasks import cleanup_orphaned_waste_flyers
+from .test_views import (  # noqa: F401
+    CollectionFormPredecessorSaveTestCase,
+    WasteStreamSaveOptimizationTestCase,
+)
 
 
 def dict_to_querydict(data):
