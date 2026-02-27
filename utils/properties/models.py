@@ -5,7 +5,11 @@ from django.db import models
 
 from bibliography.models import Source
 from utils.object_management.models import NamedUserCreatedObject, get_default_owner
-from utils.properties.units import UnitConversionError, get_unit_registry
+from utils.properties.units import (
+    UnitConversionError,
+    convert_weight_fraction_value,
+    get_unit_registry,
+)
 
 
 class PropertyBase(NamedUserCreatedObject):
@@ -66,20 +70,30 @@ class Unit(NamedUserCreatedObject):
             raise UnitConversionError("Target unit is required for conversion.")
 
         registry = get_unit_registry()
-        if registry is None:
-            raise UnitConversionError("pint is not installed.")
+        if (
+            registry is not None
+            and self.pint_unit is not None
+            and target_unit.pint_unit is not None
+        ):
+            try:
+                quantity = registry.Quantity(value, self.pint_unit)
+                return quantity.to(target_unit.pint_unit).magnitude
+            except Exception as exc:
+                raise UnitConversionError(
+                    f"Failed to convert from '{self}' to '{target_unit}'."
+                ) from exc
 
-        if self.pint_unit is None or target_unit.pint_unit is None:
+        source_token = (self.symbol or self.name or "").strip()
+        target_token = (target_unit.symbol or target_unit.name or "").strip()
+        try:
+            return convert_weight_fraction_value(value, source_token, target_token)
+        except UnitConversionError as exc:
+            if registry is None:
+                raise UnitConversionError(
+                    "pint is not installed and no supported fallback conversion was found."
+                ) from exc
             raise UnitConversionError(
                 f"Cannot convert from '{self}' to '{target_unit}': unmapped unit symbol."
-            )
-
-        try:
-            quantity = registry.Quantity(value, self.pint_unit)
-            return quantity.to(target_unit.pint_unit).magnitude
-        except Exception as exc:
-            raise UnitConversionError(
-                f"Failed to convert from '{self}' to '{target_unit}'."
             ) from exc
 
 

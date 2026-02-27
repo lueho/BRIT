@@ -16,6 +16,7 @@ from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
 from ..models import (
     AnalyticalMethod,
+    ComponentMeasurement,
     Composition,
     Material,
     MaterialCategory,
@@ -26,6 +27,15 @@ from ..models import (
     Sample,
     SampleSeries,
     WeightShare,
+    get_sample_substrate_category_name,
+)
+from ._legacy_regression_cases import (  # noqa: F401
+    MaterialsReviewDashboardTests,
+    MaterialsReviewDetailAccessTests,
+    MaterialsReviewWorkflowTests,
+    ReviewActionLoggingTests,
+    SampleDetailTemplateReviewUITests,
+    SampleSeriesDetailTemplateReviewUITests,
 )
 
 User = get_user_model()
@@ -47,6 +57,49 @@ class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse("materials-explorer"))
         self.assertEqual(200, response.status_code)
+
+
+class SampleSubstrateMaterialAutocompleteViewTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        substrate_category_name = get_sample_substrate_category_name()
+        category, _ = MaterialCategory.objects.get_or_create(
+            name=substrate_category_name
+        )
+
+        substrate = Material.objects.create(
+            name="Food waste mix",
+            publication_status="published",
+        )
+        substrate.categories.add(category)
+
+        non_substrate = Material.objects.create(
+            name="Amino Acids",
+            publication_status="published",
+        )
+
+        component = MaterialComponent.objects.create(
+            name="Carbon",
+            publication_status="published",
+        )
+        component.categories.add(category)
+
+        cls.substrate_name = substrate.name
+        cls.non_substrate_name = non_substrate.name
+        cls.component_name = component.name
+
+    def test_autocomplete_returns_only_complex_substrate_materials(self):
+        response = self.client.get(
+            reverse("sample-substrate-material-autocomplete"),
+            {"q": "a"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        names = [item["name"] for item in response.json()["results"]]
+
+        self.assertIn(self.substrate_name, names)
+        self.assertNotIn(self.non_substrate_name, names)
+        self.assertNotIn(self.component_name, names)
 
 
 class AnalyticalMethodReviewCascadeTest(TestCase):
@@ -2059,6 +2112,327 @@ class EmptyStateViewsTestCase(TestCase):
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "No compositions available")
+
+    def test_sample_detail_derives_composition_from_measurements_when_absent(self):
+        sample = Sample.objects.create(
+            name="Sample Without Persisted Composition",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        sample.compositions.all().delete()
+        unit_percent = Unit.objects.filter(name="%").first()
+        if unit_percent is None:
+            unit_percent = Unit.objects.create(
+                name="%", symbol="percent", owner=self.staff_user
+            )
+        elif not unit_percent.symbol:
+            unit_percent.symbol = "percent"
+            unit_percent.save(update_fields=["symbol"])
+
+        group = MaterialComponentGroup.objects.create(
+            name="Chemical Elements",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        carbon = MaterialComponent.objects.create(
+            name="Carbon",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        nitrogen = MaterialComponent.objects.create(
+            name="Nitrogen",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=carbon,
+            unit=unit_percent,
+            average=Decimal("30"),
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=nitrogen,
+            unit=unit_percent,
+            average=Decimal("70"),
+        )
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Chemical Elements")
+        self.assertContains(response, "30.0 ± 0.0%")
+        self.assertContains(response, "70.0 ± 0.0%")
+        self.assertNotContains(response, "No compositions available")
+
+    def test_sample_detail_prefers_persisted_composition_over_measurement_fallback(
+        self,
+    ):
+        sample = Sample.objects.create(
+            name="Sample With Persisted Composition",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        sample.compositions.all().delete()
+        unit_percent = Unit.objects.filter(name="%").first()
+        if unit_percent is None:
+            unit_percent = Unit.objects.create(
+                name="%", symbol="percent", owner=self.staff_user
+            )
+        elif not unit_percent.symbol:
+            unit_percent.symbol = "percent"
+            unit_percent.save(update_fields=["symbol"])
+
+        group = MaterialComponentGroup.objects.create(
+            name="Macronutrients",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        phosphorus = MaterialComponent.objects.create(
+            name="Phosphorus",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        potassium = MaterialComponent.objects.create(
+            name="Potassium",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+
+        persisted_composition = Composition.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            fractions_of=MaterialComponent.objects.default(),
+        )
+        WeightShare.objects.create(
+            owner=self.staff_user,
+            composition=persisted_composition,
+            component=phosphorus,
+            average=Decimal("0.2"),
+            standard_deviation=Decimal("0.0"),
+        )
+        WeightShare.objects.create(
+            owner=self.staff_user,
+            composition=persisted_composition,
+            component=potassium,
+            average=Decimal("0.8"),
+            standard_deviation=Decimal("0.0"),
+        )
+
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=phosphorus,
+            unit=unit_percent,
+            average=Decimal("70"),
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=potassium,
+            unit=unit_percent,
+            average=Decimal("30"),
+        )
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "20.0 ± 0.0%")
+        self.assertContains(response, "80.0 ± 0.0%")
+        self.assertNotContains(response, "70.0 ± 0.0%")
+
+    def test_sample_detail_keeps_dm_percent_values_for_dm_measurements(self):
+        sample = Sample.objects.create(
+            name="Sample DM Basis",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        sample.compositions.all().delete()
+
+        unit_percent = Unit.objects.filter(name="%").first()
+        if unit_percent is None:
+            unit_percent = Unit.objects.create(
+                name="%", symbol="percent", owner=self.staff_user
+            )
+        elif not unit_percent.symbol:
+            unit_percent.symbol = "percent"
+            unit_percent.save(update_fields=["symbol"])
+
+        group = MaterialComponentGroup.objects.create(
+            name="DM Group",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        dry_matter = MaterialComponent.objects.create(
+            name="DM",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        lignin = MaterialComponent.objects.create(
+            name="Lignin",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        cellulose = MaterialComponent.objects.create(
+            name="Cellulose",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=lignin,
+            basis_component=dry_matter,
+            unit=unit_percent,
+            average=Decimal("35"),
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=cellulose,
+            basis_component=dry_matter,
+            unit=unit_percent,
+            average=Decimal("25"),
+        )
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "35.0 ± 0.0% of DM")
+        self.assertContains(response, "25.0 ± 0.0% of DM")
+        self.assertContains(response, "40.0 ± 0.0% of DM")
+
+    def test_sample_detail_fills_other_for_incomplete_weight_percent_measurements(self):
+        sample = Sample.objects.create(
+            name="Sample Incomplete Weight Percent",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        sample.compositions.all().delete()
+
+        unit_g_per_kg = Unit.objects.filter(name="g/kg").first()
+        if unit_g_per_kg is None:
+            unit_g_per_kg = Unit.objects.create(
+                name="g/kg", symbol="g/kg", owner=self.staff_user
+            )
+        elif not unit_g_per_kg.symbol:
+            unit_g_per_kg.symbol = "g/kg"
+            unit_g_per_kg.save(update_fields=["symbol"])
+
+        group = MaterialComponentGroup.objects.create(
+            name="Weight Percent Group",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        protein = MaterialComponent.objects.create(
+            name="Protein",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        fat = MaterialComponent.objects.create(
+            name="Fat",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=protein,
+            unit=unit_g_per_kg,
+            average=Decimal("150"),
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=fat,
+            unit=unit_g_per_kg,
+            average=Decimal("250"),
+        )
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "15.0 ± 0.0%")
+        self.assertContains(response, "25.0 ± 0.0%")
+        self.assertContains(response, "60.0 ± 0.0%")
+
+    def test_sample_detail_uses_basis_component_as_reference_for_derived_composition(
+        self,
+    ):
+        sample = Sample.objects.create(
+            name="Sample Basis Component Reference",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        sample.compositions.all().delete()
+
+        unit_g_per_kg = Unit.objects.filter(name="g/kg").first()
+        if unit_g_per_kg is None:
+            unit_g_per_kg = Unit.objects.create(
+                name="g/kg", symbol="g/kg", owner=self.staff_user
+            )
+        elif not unit_g_per_kg.symbol:
+            unit_g_per_kg.symbol = "g/kg"
+            unit_g_per_kg.save(update_fields=["symbol"])
+
+        group = MaterialComponentGroup.objects.create(
+            name="Reference Group",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        volatile_solids = MaterialComponent.objects.create(
+            name="VS",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        protein = MaterialComponent.objects.create(
+            name="Protein",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        fat = MaterialComponent.objects.create(
+            name="Fat",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=protein,
+            basis_component=volatile_solids,
+            unit=unit_g_per_kg,
+            average=Decimal("100"),
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=fat,
+            basis_component=volatile_solids,
+            unit=unit_g_per_kg,
+            average=Decimal("200"),
+        )
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Shares of:</strong> VS")
 
     def test_analytical_method_list_empty_anonymous(self):
         response = self.client.get(
