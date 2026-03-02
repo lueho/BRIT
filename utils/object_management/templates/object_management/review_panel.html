@@ -4,10 +4,12 @@
 <div class="card border-0 mb-3 shadow-sm" id="review-panel">
   <div class="card-body">
     {% if not review_mode %}
-    <div class="d-flex align-items-center justify-content-between mb-2">
-      <h5 class="mb-0"><i class="fas fa-comments me-2"></i>{% trans "Review" %}</h5>
-      <small class="text-muted">{% trans "Detail-based review panel" %}</small>
-    </div>
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h5 class="mb-0">
+          <i class="fas fa-comments me-2"></i>{% trans "Review" %}
+        </h5>
+        <small class="text-muted">{% trans "Detail-based review panel" %}</small>
+      </div>
     {% endif %}
 
     {# Thread (collapsible when long) #}
@@ -31,9 +33,7 @@
                       <span class="badge rounded-pill bg-body-secondary text-body me-2"><i class="fas fa-comment-dots me-1"></i> {{ log.get_action_display }}</span>
                     {% endif %}
                     <strong>{{ log.user }}</strong>
-                    {% if log.comment %}
-                      <div class="mt-1">{{ log.comment|linebreaksbr }}</div>
-                    {% endif %}
+                    {% if log.comment %}<div class="mt-1">{{ log.comment|markdown_to_html }}</div>{% endif %}
                   </div>
                   <small class="text-muted text-nowrap">{{ log.created_at|date:"Y-m-d H:i" }}</small>
                 </div>
@@ -42,7 +42,8 @@
           </ul>
           {% if log_count > 3 %}
             <div class="mt-2">
-              <button class="btn btn-sm btn-link" type="button"
+              <button class="btn btn-sm btn-link"
+                      type="button"
                       data-bs-toggle="collapse"
                       data-bs-target="#review-logs-more-{{ object.id }}"
                       aria-expanded="false"
@@ -50,7 +51,8 @@
                 {% trans "Show older comments" %} ({{ log_count|add:"-3" }})
               </button>
             </div>
-            <ul id="review-logs-more-{{ object.id }}" class="list-unstyled collapse mt-2">
+            <ul id="review-logs-more-{{ object.id }}"
+                class="list-unstyled collapse mt-2">
               {% for log in review_logs|slice:"3:" %}
                 <li class="py-2 border-bottom border-light-subtle">
                   <div class="d-flex justify-content-between align-items-start">
@@ -67,9 +69,7 @@
                         <span class="badge rounded-pill bg-body-secondary text-body me-2"><i class="fas fa-comment-dots me-1"></i> {{ log.get_action_display }}</span>
                       {% endif %}
                       <strong>{{ log.user }}</strong>
-                      {% if log.comment %}
-                        <div class="mt-1">{{ log.comment|linebreaksbr }}</div>
-                      {% endif %}
+                      {% if log.comment %}<div class="mt-1">{{ log.comment|markdown_to_html }}</div>{% endif %}
                     </div>
                     <small class="text-muted text-nowrap">{{ log.created_at|date:"Y-m-d H:i" }}</small>
                   </div>
@@ -86,18 +86,29 @@
     {# Shared message box for all actions #}
     <div class="mb-2">
       <label for="review-message-{{ object.id }}" class="form-label mb-1 small">{% trans "Message (optional)" %}</label>
-      <textarea id="review-message-{{ object.id }}" class="form-control form-control-sm" rows="2" placeholder="{% trans 'Write a short note or comment…' %}"></textarea>
+      <textarea id="review-message-{{ object.id }}"
+                class="form-control form-control-sm"
+                rows="2"
+                placeholder="{% trans 'Write a short note or comment…' %}"></textarea>
     </div>
 
     {# Actions #}
-    <div class="btn-toolbar gap-2 flex-wrap align-items-center" role="toolbar" aria-label="Review actions">
+    <div class="btn-toolbar gap-2 flex-wrap align-items-center"
+         role="toolbar"
+         aria-label="Review actions">
       {# Single comment button using the shared message box #}
       {% if policy.is_owner or policy.is_moderator or policy.is_staff %}
-        <form method="post" action="{% url 'object_management:add_review_comment' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0 btn-group align-items-center" role="group" onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
+        <form method="post"
+              action="{% url 'object_management:add_review_comment' content_type_id=object|get_content_type_id object_id=object.id %}"
+              class="m-0 btn-group align-items-center"
+              role="group"
+              onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.get_full_path }}">
           <input type="hidden" name="message" value="">
-          <button class="btn btn-sm btn-outline-primary" type="submit"><i class="fas fa-paper-plane"></i> {% trans "Comment" %}</button>
+          <button class="btn btn-sm btn-outline-primary" type="submit">
+            <i class="fas fa-paper-plane"></i> {% trans "Comment" %}
+          </button>
         </form>
       {% endif %}
 
@@ -105,33 +116,53 @@
       {% if policy.is_owner %}
         {% if policy.is_declined %}
           {% if policy.can_submit_review %}
-            <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0 btn-group align-items-center" role="group" onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
+            <form method="post"
+                  action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}"
+                  class="m-0 btn-group align-items-center"
+                  role="group"
+                  onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
               {% csrf_token %}
               <input type="hidden" name="next" value="{{ object.get_absolute_url }}">
               <input type="hidden" name="message" value="">
-              <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-paper-plane"></i> {% trans "Resubmit" %}</button>
+              <button type="submit" class="btn btn-sm btn-primary">
+                <i class="fas fa-paper-plane"></i> {% trans "Resubmit" %}
+              </button>
             </form>
           {% endif %}
         {% endif %}
         {% if policy.can_withdraw_review %}
-          <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0 btn-group align-items-center" role="group" onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
+          <form method="post"
+                action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}"
+                class="m-0 btn-group align-items-center"
+                role="group"
+                onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.get_full_path }}">
             <input type="hidden" name="message" value="">
             {% if policy.is_declined %}
-              <button type="submit" class="btn btn-sm btn-secondary"><i class="fas fa-lock"></i> {% trans "Set to Private" %}</button>
+              <button type="submit" class="btn btn-sm btn-secondary">
+                <i class="fas fa-lock"></i> {% trans "Set to Private" %}
+              </button>
             {% else %}
-              <button type="submit" class="btn btn-sm btn-secondary"><i class="fas fa-rotate-left"></i> {% trans "Withdraw" %}</button>
+              <button type="submit" class="btn btn-sm btn-secondary">
+                <i class="fas fa-rotate-left"></i> {% trans "Withdraw" %}
+              </button>
             {% endif %}
           </form>
         {% endif %}
         {% if policy.is_private %}
           {% if policy.can_submit_review %}
-            <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0 btn-group align-items-center" role="group" onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
+            <form method="post"
+                  action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}"
+                  class="m-0 btn-group align-items-center"
+                  role="group"
+                  onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
               {% csrf_token %}
               <input type="hidden" name="next" value="{{ request.get_full_path }}">
               <input type="hidden" name="message" value="">
-              <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-paper-plane"></i> {% trans "Submit for Review" %}</button>
+              <button type="submit" class="btn btn-sm btn-primary">
+                <i class="fas fa-paper-plane"></i> {% trans "Submit for Review" %}
+              </button>
             </form>
           {% endif %}
         {% endif %}
@@ -140,19 +171,31 @@
       {# Moderator actions via policy #}
       {% if policy.is_in_review %}
         {% if policy.can_approve %}
-          <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0 btn-group align-items-center" role="group" onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
+          <form method="post"
+                action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}"
+                class="m-0 btn-group align-items-center"
+                role="group"
+                onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.get_full_path }}">
             <input type="hidden" name="message" value="">
-            <button type="submit" class="btn btn-sm btn-success"><i class="fas fa-check"></i> {% trans "Approve" %}</button>
+            <button type="submit" class="btn btn-sm btn-success">
+              <i class="fas fa-check"></i> {% trans "Approve" %}
+            </button>
           </form>
         {% endif %}
         {% if policy.can_reject %}
-          <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0 btn-group align-items-center" role="group" onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
+          <form method="post"
+                action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}"
+                class="m-0 btn-group align-items-center"
+                role="group"
+                onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.get_full_path }}">
             <input type="hidden" name="message" value="">
-            <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-xmark"></i> {% trans "Reject" %}</button>
+            <button type="submit" class="btn btn-sm btn-danger">
+              <i class="fas fa-xmark"></i> {% trans "Reject" %}
+            </button>
           </form>
         {% endif %}
       {% endif %}

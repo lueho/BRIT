@@ -326,6 +326,27 @@ class ReviewDetailAccessTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 403)
 
+    def test_review_detail_renders_markdown_comments(self):
+        """Markdown comments are rendered as HTML in the review panel."""
+        ReviewAction.objects.create(
+            content_type_id=self.ct_id,
+            object_id=self.obj_review.id,
+            action=ReviewAction.ACTION_COMMENT,
+            comment="**Bold observation**\n\n- first point",
+            user=self.owner,
+        )
+        url = reverse(
+            "object_management:review_item_detail",
+            kwargs={"content_type_id": self.ct_id, "object_id": self.obj_review.id},
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<strong>Bold observation</strong>")
+        self.assertContains(response, "<li>first point</li>")
+
     # Dashboard behavior is covered in ReviewWorkflowViewTests.
 
 

@@ -7,8 +7,10 @@ from django.test import TestCase
 from django.urls import reverse
 from factory.django import mute_signals
 
-from case_studies.soilcom.models import Collection
+from bibliography.models import Source
+from case_studies.soilcom.models import Collection, CollectionPropertyValue
 from utils.object_management.models import ReviewAction, UserCreatedObject
+from utils.properties.models import Property, Unit
 
 
 class ReviewAPIViewsTests(TestCase):
@@ -176,3 +178,264 @@ class ReviewAPIViewsTests(TestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 403)
+
+    def test_review_context_includes_sources(self):
+        """Context payload includes serialized sources from the object."""
+        source = Source.objects.create(
+            title="Test Source",
+            abbreviation="TS2024",
+            url="https://example.com/report.pdf",
+            year=2024,
+            type="article",
+        )
+        self.review_collection.sources.add(source)
+
+        url = reverse(
+            "object_management:api_review_context",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.review_collection.id,
+            },
+        )
+        self.client.force_login(self.moderator)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        ctx = response.json()["context"]
+        self.assertIn("sources", ctx)
+        self.assertEqual(len(ctx["sources"]), 1)
+        self.assertEqual(ctx["sources"][0]["title"], "Test Source")
+        self.assertEqual(ctx["sources"][0]["url"], "https://example.com/report.pdf")
+
+    def test_review_context_includes_related_display(self):
+        """Context payload includes human-readable FK display strings."""
+        url = reverse(
+            "object_management:api_review_context",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.review_collection.id,
+            },
+        )
+        self.client.force_login(self.moderator)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        ctx = response.json()["context"]
+        self.assertIn("related_display", ctx)
+        self.assertIn("owner", ctx["related_display"])
+
+    def test_review_context_includes_flyers_for_collection(self):
+        """Context payload includes flyers section for Collection items."""
+        url = reverse(
+            "object_management:api_review_context",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.review_collection.id,
+            },
+        )
+        self.client.force_login(self.moderator)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        ctx = response.json()["context"]
+        self.assertIn("flyers", ctx)
+
+    def test_review_context_does_not_include_review_guidance(self):
+        """BRIT context payload contains only domain data; guidance is assembled by MCP."""
+        url = reverse(
+            "object_management:api_review_context",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.review_collection.id,
+            },
+        )
+        self.client.force_login(self.moderator)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("review_guidance", response.json()["context"])
+
+    def test_review_queue_includes_tracking_fields(self):
+        """Queue items include my_last_comment_at and lastmodified_at."""
+        url = reverse("object_management:api_review_queue")
+        self.client.force_login(self.moderator)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        results = response.json()["results"]
+        self.assertTrue(len(results) > 0)
+        first = results[0]
+        self.assertIn("my_last_comment_at", first)
+        self.assertIn("lastmodified_at", first)
+
+    def test_review_queue_my_last_comment_at_reflects_comments(self):
+        """my_last_comment_at is set after the moderator posts a comment."""
+        url = reverse("object_management:api_review_queue")
+        self.client.force_login(self.moderator)
+
+        response = self.client.get(url)
+        item = next(
+            i
+            for i in response.json()["results"]
+            if i["object_id"] == self.review_collection.id
+        )
+        self.assertIsNone(item["my_last_comment_at"])
+
+        ReviewAction.objects.create(
+            content_type_id=self.content_type_id,
+            object_id=self.review_collection.id,
+            action=ReviewAction.ACTION_COMMENT,
+            comment="Bot review",
+            user=self.moderator,
+        )
+
+        response = self.client.get(url)
+        item = next(
+            i
+            for i in response.json()["results"]
+            if i["object_id"] == self.review_collection.id
+        )
+        self.assertIsNotNone(item["my_last_comment_at"])
+
+
+class ReviewContextCPVEnrichmentTests(TestCase):
+    """Validate CPV-specific enrichments in the review context API."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="cpv_owner")
+        cls.moderator = User.objects.create_user(username="cpv_moderator")
+
+        collection_ct = ContentType.objects.get_for_model(Collection)
+        cpv_ct = ContentType.objects.get_for_model(CollectionPropertyValue)
+
+        for ct in (collection_ct, cpv_ct):
+            perm, _ = Permission.objects.get_or_create(
+                codename=f"can_moderate_{ct.model}",
+                content_type=ct,
+                defaults={"name": f"Can moderate {ct.model}"},
+            )
+            cls.moderator.user_permissions.add(perm)
+
+        cls.unit = Unit.objects.create(
+            name="tonnes", symbol="t", publication_status="published"
+        )
+        cls.prop = Property.objects.create(
+            name="total waste collected", unit="t", publication_status="published"
+        )
+        cls.prop.allowed_units.add(cls.unit)
+
+        with mute_signals(post_save, pre_save):
+            cls.collection = Collection.objects.create(
+                name="CPV Test Collection",
+                owner=cls.owner,
+                publication_status="published",
+            )
+
+        cls.cpv_2020 = CollectionPropertyValue.objects.create(
+            collection=cls.collection,
+            property=cls.prop,
+            unit=cls.unit,
+            year=2020,
+            average=100.0,
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.cpv_2021 = CollectionPropertyValue.objects.create(
+            collection=cls.collection,
+            property=cls.prop,
+            unit=cls.unit,
+            year=2021,
+            average=105.0,
+            owner=cls.owner,
+            publication_status=UserCreatedObject.STATUS_REVIEW,
+        )
+        cls.cpv_ct_id = cpv_ct.id
+
+    def test_context_includes_value_timeline_for_non_derived_cpv(self):
+        """Non-derived CPV context includes timeline of sibling values."""
+        url = reverse(
+            "object_management:api_review_context",
+            kwargs={
+                "content_type_id": self.cpv_ct_id,
+                "object_id": self.cpv_2021.id,
+            },
+        )
+        self.client.force_login(self.moderator)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        ctx = response.json()["context"]
+        self.assertIn("value_timeline", ctx)
+        self.assertEqual(len(ctx["value_timeline"]), 1)
+        self.assertEqual(ctx["value_timeline"][0]["year"], 2020)
+        self.assertEqual(ctx["value_timeline"][0]["average"], 100.0)
+
+    def test_context_includes_parent_collection(self):
+        """CPV context includes parent collection with name and sources."""
+        url = reverse(
+            "object_management:api_review_context",
+            kwargs={
+                "content_type_id": self.cpv_ct_id,
+                "object_id": self.cpv_2021.id,
+            },
+        )
+        self.client.force_login(self.moderator)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        ctx = response.json()["context"]
+        self.assertIn("parent_collection", ctx)
+        self.assertEqual(ctx["parent_collection"]["id"], self.collection.id)
+        self.assertEqual(ctx["parent_collection"]["name"], str(self.collection))
+
+    def test_context_excludes_timeline_for_derived_cpv(self):
+        """Derived CPVs do not get a value_timeline in the context."""
+        derived_cpv = CollectionPropertyValue.objects.create(
+            collection=self.collection,
+            property=self.prop,
+            unit=self.unit,
+            year=2021,
+            average=50.0,
+            owner=self.owner,
+            is_derived=True,
+            publication_status=UserCreatedObject.STATUS_REVIEW,
+        )
+        url = reverse(
+            "object_management:api_review_context",
+            kwargs={
+                "content_type_id": self.cpv_ct_id,
+                "object_id": derived_cpv.id,
+            },
+        )
+        self.client.force_login(self.moderator)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        ctx = response.json()["context"]
+        self.assertNotIn("value_timeline", ctx)
+        self.assertIn("parent_collection", ctx)
+
+    def test_context_does_not_include_cpv_review_guidance(self):
+        """CPV context payload contains only domain data; guidance is assembled by MCP."""
+        url = reverse(
+            "object_management:api_review_context",
+            kwargs={
+                "content_type_id": self.cpv_ct_id,
+                "object_id": self.cpv_2021.id,
+            },
+        )
+        self.client.force_login(self.moderator)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("review_guidance", response.json()["context"])

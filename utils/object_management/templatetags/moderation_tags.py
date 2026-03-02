@@ -1,4 +1,5 @@
 import logging
+import re
 from urllib.parse import quote
 
 from django import template
@@ -7,11 +8,79 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.urls import reverse
+from django.utils.html import escape, mark_safe
 
 register = template.Library()
 
+_BOLD_PATTERN = re.compile(r"\*\*(.+?)\*\*")
 
-def _safe_policy_fallback(user, obj, review_mode=False, error_message=None):
+
+@register.filter
+def markdown_to_html(value):
+    """Render a deliberately limited markdown subset.
+
+    Supported features:
+    - Bold text via ``**bold**``
+    - Unordered lists via ``- item`` or ``* item``
+    - Ordered lists via ``1. item``
+
+    Any other markdown syntax (e.g. headings) is rendered as plain text.
+    """
+    text = "" if value is None else str(value)
+    return mark_safe(_render_limited_markdown(text))
+
+
+def _render_limited_markdown(text: str) -> str:
+    """Convert a small markdown subset to safe HTML."""
+    html_parts: list[str] = []
+    list_items: list[str] = []
+    current_list_tag: str | None = None
+
+    def flush_list() -> None:
+        nonlocal list_items, current_list_tag
+        if not list_items or not current_list_tag:
+            return
+        html_parts.append(f"<{current_list_tag}>")
+        for item in list_items:
+            html_parts.append(f"<li>{item}</li>")
+        html_parts.append(f"</{current_list_tag}>")
+        list_items = []
+        current_list_tag = None
+
+    for raw_line in text.splitlines():
+        unordered = re.match(r"^\s*[-*]\s+(.*)$", raw_line)
+        ordered = re.match(r"^\s*\d+\.\s+(.*)$", raw_line)
+
+        if unordered:
+            if current_list_tag not in {None, "ul"}:
+                flush_list()
+            current_list_tag = "ul"
+            list_items.append(_render_inline_limited(unordered.group(1)))
+            continue
+
+        if ordered:
+            if current_list_tag not in {None, "ol"}:
+                flush_list()
+            current_list_tag = "ol"
+            list_items.append(_render_inline_limited(ordered.group(1)))
+            continue
+
+        flush_list()
+        stripped = raw_line.strip()
+        if stripped:
+            html_parts.append(f"<p>{_render_inline_limited(stripped)}</p>")
+
+    flush_list()
+    return "".join(html_parts)
+
+
+def _render_inline_limited(text: str) -> str:
+    """Render safe inline markdown (bold only)."""
+    escaped = escape(text)
+    return _BOLD_PATTERN.sub(r"<strong>\1</strong>", escaped)
+
+
+def _safe_policy_fallback(user, obj, review_mode=False):
     """
     Build a minimal, safe policy dictionary using only simple attribute access.
     This is used when the full get_object_policy import/call fails, so that
@@ -98,8 +167,6 @@ def _safe_policy_fallback(user, obj, review_mode=False, error_message=None):
         # Fallback marker
         "fallback": True,
     }
-    if error_message:
-        policy["policy_error"] = error_message
     return policy
 
 
@@ -162,9 +229,9 @@ def object_policy(context, obj, review_mode=False):
 
         result = _get_object_policy(user, obj, request=request, review_mode=review_mode)
         return result
-    except Exception as e:
+    except Exception:
         logger.exception("object_policy tag failed", exc_info=True)
-        # Show error to staff users regardless of DEBUG; otherwise show in DEBUG only
+        # Fall back safely for staff/owners/debug contexts without exposing internals
         try:
             request = context.get("request")
             user = getattr(request, "user", None)
@@ -174,27 +241,21 @@ def object_policy(context, obj, review_mode=False):
                 and getattr(user, "is_authenticated", False)
                 and getattr(user, "is_staff", False)
             ):
-                return _safe_policy_fallback(
-                    user, obj, review_mode, f"{type(e).__name__}: {e}"
-                )
+                return _safe_policy_fallback(user, obj, review_mode)
             # Reveal to owner of the object as well (helps debugging private pages)
             try:
                 if user is not None and getattr(user, "is_authenticated", False):
                     owner_id = getattr(obj, "owner_id", None)
                     if owner_id == getattr(user, "id", None):
-                        return _safe_policy_fallback(
-                            user, obj, review_mode, f"{type(e).__name__}: {e}"
-                        )
+                        return _safe_policy_fallback(user, obj, review_mode)
             except Exception:
                 pass
         except Exception:
             pass
         try:
             if getattr(settings, "DEBUG", False):
-                # In debug, reveal error and fallback too
-                return _safe_policy_fallback(
-                    user, obj, review_mode, f"{type(e).__name__}: {e}"
-                )
+                # In debug, still return fallback without leaking exception details
+                return _safe_policy_fallback(user, obj, review_mode)
         except Exception:
             pass
         # Last resort: minimal fallback without error message

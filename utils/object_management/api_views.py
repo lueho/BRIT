@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 
 from .models import ReviewAction
 from .permissions import UserCreatedObjectPermission
-from .review_ai import build_llm_review_context
+from .review_ai import build_review_context
 from .views import ReviewDashboardView
 
 
@@ -29,11 +29,11 @@ class ReviewQueueAPIView(APIView):
         dashboard_view._available_models_cache = None
 
         items = dashboard_view.collect_review_items()
-        payload = [self._serialize_item(item) for item in items]
+        payload = [self._serialize_item(request.user, item) for item in items]
 
         return Response({"count": len(payload), "results": payload})
 
-    def _serialize_item(self, item):
+    def _serialize_item(self, user, item):
         """Serialize one review queue object into API-safe primitives."""
         content_type = ContentType.objects.get_for_model(item.__class__)
         review_detail_url = reverse(
@@ -42,6 +42,18 @@ class ReviewQueueAPIView(APIView):
                 "content_type_id": content_type.id,
                 "object_id": item.pk,
             },
+        )
+
+        my_last_comment = (
+            ReviewAction.objects.filter(
+                content_type=content_type,
+                object_id=item.pk,
+                action=ReviewAction.ACTION_COMMENT,
+                user=user,
+            )
+            .order_by("-created_at")
+            .values_list("created_at", flat=True)
+            .first()
         )
 
         return {
@@ -54,6 +66,8 @@ class ReviewQueueAPIView(APIView):
             "owner_id": getattr(item, "owner_id", None),
             "publication_status": getattr(item, "publication_status", None),
             "submitted_at": getattr(item, "submitted_at", None),
+            "lastmodified_at": getattr(item, "lastmodified_at", None),
+            "my_last_comment_at": my_last_comment,
             "review_detail_url": review_detail_url,
         }
 
@@ -136,7 +150,7 @@ class ReviewContextAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        context = build_llm_review_context(
+        context = build_review_context(
             obj,
             include_history=include_history,
             history_limit=max(1, min(history_limit, 50)),

@@ -8,6 +8,7 @@ from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 
 from utils.object_management.templatetags.moderation_tags import (
+    markdown_to_html,
     pending_review_count_for_user,
 )
 
@@ -68,3 +69,19 @@ class PendingReviewCountTagTests(TestCase):
         rendered = template.render(Context({"obj": obj, "policy": policy}))
 
         self.assertIn("fa-lock", rendered)
+
+
+class MarkdownToHtmlFilterTests(TestCase):
+    def test_allows_bold_and_lists(self):
+        rendered = markdown_to_html("**Bold**\n- one\n- two\n1. three")
+
+        self.assertIn("<strong>Bold</strong>", rendered)
+        self.assertIn("<ul>", rendered)
+        self.assertIn("<ol>", rendered)
+        self.assertIn("<li>one</li>", rendered)
+
+    def test_headings_are_not_rendered_as_h_tags(self):
+        rendered = markdown_to_html("## Heading\nNormal")
+
+        self.assertNotIn("<h2>", rendered)
+        self.assertIn("<p>## Heading</p>", rendered)
