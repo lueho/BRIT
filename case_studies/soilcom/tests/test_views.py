@@ -668,6 +668,25 @@ class CollectionPropertyValueCRUDViewsTestCase(
             {bibliographic_source.pk, flyer.pk},
         )
 
+    def test_detail_context_includes_visible_related_collections(self):
+        predecessor = Collection.objects.create(
+            owner=self.owner_user,
+            name="CPV predecessor",
+            publication_status="published",
+            valid_from=date(2020, 1, 1),
+        )
+        self.related_objects["collection"].predecessors.add(predecessor)
+
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+
+        self.assertEqual(response.status_code, 200)
+        related_collections = response.context["visible_related_collections"]
+        self.assertSetEqual(
+            {collection.pk for collection in related_collections},
+            {predecessor.pk, self.related_objects["collection"].pk},
+        )
+
 
 # ----------- AggregatedCollectionPropertyValue CRUD -------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -2947,6 +2966,70 @@ class CollectionReviewDetailPropertiesTestCase(TestCase):
         self.assertIn("77", body)
         self.assertIn("ReviewUnit", body)
         self.assertIn("aggregated", body)
+
+
+class CollectionPropertyValueReviewDetailRelatedCollectionsTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create(username="cpv-review-staff", is_staff=True)
+
+        cls.catchment = CollectionCatchment.objects.create(name="CPV RC")
+        cls.system = CollectionSystem.objects.create(name="CPV RS")
+        cls.category = WasteCategory.objects.create(name="CPV RCat")
+        cls.stream = WasteStream.objects.create(category=cls.category)
+
+        cls.root_collection = Collection.objects.create(
+            name="CPV Root Collection",
+            catchment=cls.catchment,
+            collection_system=cls.system,
+            waste_stream=cls.stream,
+            publication_status="published",
+            valid_from=date(2020, 1, 1),
+        )
+        cls.successor_collection = Collection.objects.create(
+            name="CPV Successor Collection",
+            catchment=cls.catchment,
+            collection_system=cls.system,
+            waste_stream=cls.stream,
+            publication_status="review",
+            valid_from=date(2021, 1, 1),
+        )
+        cls.successor_collection.predecessors.add(cls.root_collection)
+
+        cls.prop = Property.objects.create(
+            name="CPV Review Related Prop", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(
+            name="CPV Review Related Unit", publication_status="published"
+        )
+        cls.prop.allowed_units.add(cls.unit)
+
+        cls.cpv = CollectionPropertyValue.objects.create(
+            collection=cls.successor_collection,
+            property=cls.prop,
+            unit=cls.unit,
+            year=2021,
+            average=22,
+            publication_status="review",
+        )
+
+        cls.ct_id = ContentType.objects.get_for_model(CollectionPropertyValue).pk
+
+    def test_review_detail_context_includes_visible_related_collections(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse(
+                "object_management:review_item_detail",
+                kwargs={"content_type_id": self.ct_id, "object_id": self.cpv.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        related_collections = response.context["visible_related_collections"]
+        self.assertSetEqual(
+            {collection.pk for collection in related_collections},
+            {self.root_collection.pk, self.successor_collection.pk},
+        )
 
 
 class CollectionDetailOnlyPublishedCpvsTestCase(TestCase):

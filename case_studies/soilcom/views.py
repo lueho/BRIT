@@ -122,6 +122,24 @@ from .models import (
 from .tasks import check_wasteflyer_url, check_wasteflyer_urls
 
 
+def _visible_collection_chain_for_user(collection, user):
+    """Return visible collections from the version chain for ``collection``."""
+
+    if not collection or not hasattr(collection, "all_versions"):
+        return []
+
+    related_qs = (
+        collection.all_versions().select_related("owner").order_by("-valid_from", "-pk")
+    )
+
+    try:
+        related_qs = filter_queryset_for_user(related_qs, user)
+    except Exception:
+        pass
+
+    return list(related_qs)
+
+
 class CollectionExplorerView(TemplateView):
     template_name = "wastecollection_dashboard.html"
 
@@ -705,6 +723,47 @@ class CollectionPropertyValueCreateView(
 
 class CollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = CollectionPropertyValue
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["visible_related_collections"] = _visible_collection_chain_for_user(
+            getattr(self.object, "collection", None), self.request.user
+        )
+        return context
+
+
+class CollectionPropertyValueReviewItemDetailView(ReviewItemDetailView):
+    """Review detail view for CPVs with collection-chain context."""
+
+    model = CollectionPropertyValue
+
+    def get_object(self, queryset=None):
+        """Fetch the CPV and related objects used by detail/review templates."""
+        if hasattr(self, "object") and self.object is not None:
+            return self.object
+
+        content_type_id = self.kwargs.get("content_type_id")
+        object_id = self.kwargs.get("object_id")
+
+        qs = CollectionPropertyValue.objects.select_related(
+            "owner", "property", "unit", "collection"
+        ).prefetch_related("sources")
+
+        if content_type_id and object_id:
+            obj = get_object_or_404(qs, pk=object_id)
+        else:
+            obj = get_object_or_404(qs, pk=self.kwargs.get("pk"))
+
+        self.object = obj
+        return obj
+
+    def get_review_specific_context(self, context):
+        """Add the visible collection chain to CPV review pages."""
+        return {
+            "visible_related_collections": _visible_collection_chain_for_user(
+                getattr(self.object, "collection", None), self.request.user
+            )
+        }
 
 
 class CollectionPropertyValueUpdateView(
@@ -1508,6 +1567,7 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
 # This allows the generic object_management:review_item_detail URL to automatically
 # delegate to this view when reviewing Collection objects
 CollectionReviewItemDetailView.register_for_model(Collection)
+CollectionPropertyValueReviewItemDetailView.register_for_model(CollectionPropertyValue)
 
 
 class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):

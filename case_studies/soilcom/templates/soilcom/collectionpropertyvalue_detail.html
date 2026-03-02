@@ -51,20 +51,24 @@
 {% endblock detail_header_actions %}
 
 {% block detail_body %}
-    <p class="card-text">
-        <strong>Collection:</strong>
-        <br>
-        <a href="{{ object.collection.get_absolute_url }}">{{ object.collection }}</a>
-    </p>
-    {% with anchor=object.collection.version_anchor %}
-        {% if anchor and anchor.pk != object.collection.pk %}
-            <p class="card-text">
-                <strong>Anchor collection:</strong>
-                <br>
-                <a href="{{ anchor.get_absolute_url }}">{{ anchor }}</a>
-            </p>
-        {% endif %}
-    {% endwith %}
+    {% if visible_related_collections %}
+        <p class="card-text">
+            <strong>Related collections:</strong>
+        </p>
+        <ul>
+            {% for related_collection in visible_related_collections %}
+                <li>
+                    <a href="{{ related_collection.get_absolute_url }}">{{ related_collection }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="card-text">
+            <strong>Collection:</strong>
+            <br>
+            <a href="{{ object.collection.get_absolute_url }}">{{ object.collection }}</a>
+        </p>
+    {% endif %}
     <p class="card-text">
         <strong>Property:</strong>
         <br>
