@@ -192,6 +192,7 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
         decimal_places=1,
         required=False,
         allow_null=True,
+        label="Minimum required specific bin capacity (L/reference unit)",
     )
     required_bin_capacity_reference = serializers.SerializerMethodField(
         label="Minimum required specific bin capacity reference unit"
@@ -296,6 +297,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
         decimal_places=1,
         required=False,
         allow_null=True,
+        label="Minimum required specific bin capacity (L/reference unit)",
     )
     required_bin_capacity_reference = serializers.CharField(
         required=False, allow_null=True
@@ -540,7 +542,11 @@ class CollectionImportRecordSerializer(serializers.Serializer):
         required=False, allow_null=True, max_digits=8, decimal_places=1
     )
     required_bin_capacity = serializers.DecimalField(
-        required=False, allow_null=True, max_digits=8, decimal_places=1
+        required=False,
+        allow_null=True,
+        max_digits=8,
+        decimal_places=1,
+        label="Minimum required specific bin capacity (L/reference unit)",
     )
     required_bin_capacity_reference = serializers.CharField(
         required=False, allow_null=True, allow_blank=True

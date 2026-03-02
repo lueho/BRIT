@@ -21,7 +21,11 @@ from ..models import (
     WasteFlyer,
     WasteStream,
 )
-from ..serializers import CollectionFlatSerializer, CollectionModelSerializer
+from ..serializers import (
+    CollectionFlatSerializer,
+    CollectionImportRecordSerializer,
+    CollectionModelSerializer,
+)
 
 
 class CollectionModelSerializerTestCase(TestCase):
@@ -106,6 +110,13 @@ class CollectionModelSerializerTestCase(TestCase):
         serializer = CollectionModelSerializer(self.collection)
         data = serializer.data
         self.assertIsNone(data["required_bin_capacity"])
+
+    def test_required_bin_capacity_field_label(self):
+        serializer = CollectionModelSerializer(self.collection)
+        self.assertEqual(
+            serializer.fields["required_bin_capacity"].label,
+            "Minimum required specific bin capacity (L/reference unit)",
+        )
 
     def test_required_bin_capacity_reference_serialization(self):
         choices = dict(REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES)
@@ -275,6 +286,13 @@ class CollectionFlatSerializerTestCase(TestCase):
         }
         self.assertTrue(static_keys.issubset(set(serializer.data.keys())))
 
+    def test_required_bin_capacity_field_label(self):
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        self.assertEqual(
+            serializer.fields["required_bin_capacity"].label,
+            "Minimum required specific bin capacity (L/reference unit)",
+        )
+
     def test_serializer_gets_information_from_foreign_keys_correctly(self):
         serializer = CollectionFlatSerializer(self.collection_nuts)
         self.assertEqual("Test Catchment", serializer.data["catchment"])
@@ -415,3 +433,12 @@ class CollectionFlatSerializerChainAwareStatsTestCase(TestCase):
         self.assertEqual(data["connection_rate_2021_unit"], str(self.unit))
 
         self.assertTrue(data.get("aggregated", False))
+
+
+class CollectionImportRecordSerializerTestCase(TestCase):
+    def test_required_bin_capacity_field_label(self):
+        serializer = CollectionImportRecordSerializer()
+        self.assertEqual(
+            serializer.fields["required_bin_capacity"].label,
+            "Minimum required specific bin capacity (L/reference unit)",
+        )

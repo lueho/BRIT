@@ -437,6 +437,10 @@ class CollectionModelFormTestCase(TestCase):
     def test_required_bin_capacity_field_present_and_valid(self):
         form = CollectionModelForm()
         self.assertIn("required_bin_capacity", form.fields)
+        self.assertEqual(
+            form.fields["required_bin_capacity"].label,
+            "Minimum required specific bin capacity (L/reference unit)",
+        )
         # Valid value
         data = {
             "catchment": self.catchment.id,

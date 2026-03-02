@@ -555,6 +555,7 @@ class CollectionModelForm(
         min_value=0,
         max_digits=8,
         decimal_places=1,
+        label="Minimum required specific bin capacity (L/reference unit)",
         widget=NumberInput(attrs={"step": "0.1", "min": "0"}),
     )
     required_bin_capacity_reference = ChoiceField(
