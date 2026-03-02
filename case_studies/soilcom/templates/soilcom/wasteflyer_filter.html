@@ -66,9 +66,11 @@
     async function monitor_task_progress(url, count = 0) {
         const response = await fetch(url);
         const data = await response.json();
-        const elCheckUrlLinkWrapper = document.getElementById('check_url');
-        const elCheckUrlLink = elCheckUrlLinkWrapper.children[0];
-        const elCheckUrlLinkText = elCheckUrlLink.children[1];
+        const elCheckUrlLink = document.getElementById('check_url');
+        const elCheckUrlLinkText = elCheckUrlLink ? elCheckUrlLink.querySelector('span') : null;
+        if (!elCheckUrlLinkText) {
+            return;
+        }
         if (data["state"] === "PENDING") {
             elCheckUrlLinkText.innerText = "checking" + ".".repeat(count++ % 4);
             setTimeout(monitor_task_progress, 500, url, count);
@@ -88,9 +90,11 @@
     }
 
     function block_link() {
-        const elCheckUrlLinkWrapper = document.getElementById('check_url');
-        const elCheckUrlLink = elCheckUrlLinkWrapper.children[0];
-        const elCheckUrlLinkText = elCheckUrlLink.children[1];
+        const elCheckUrlLink = document.getElementById('check_url');
+        const elCheckUrlLinkText = elCheckUrlLink ? elCheckUrlLink.querySelector('span') : null;
+        if (!elCheckUrlLink || !elCheckUrlLinkText) {
+            return;
+        }
         elCheckUrlLinkText.innerText = "checking";
         elCheckUrlLink.classList.add("disabled");
     }

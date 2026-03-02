@@ -1,4 +1,7 @@
+from types import SimpleNamespace
+
 from celery import chord
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from bibliography.utils import check_url, find_wayback_snapshot_for_year
@@ -46,15 +49,20 @@ def check_wasteflyer_urls_callback(results):
 
 
 @app.task(bind=True, trail=True, name="scheduler")
-def check_wasteflyer_urls(self, params):
+def check_wasteflyer_urls(self, params, user_id=None):
     self.myname = "scheduler"
-    qs = WasteFlyerFilter(params, queryset=WasteFlyer.objects.all()).qs
+    user = None
+    if user_id:
+        user = get_user_model().objects.filter(pk=user_id).first()
+    request = SimpleNamespace(user=user)
+
+    qs = WasteFlyerFilter(params, queryset=WasteFlyer.objects.all(), request=request).qs
     signatures = []
     for flyer in qs:
         signatures.append(check_wasteflyer_url.s(flyer.pk))
     callback = check_wasteflyer_urls_callback.s()
     task_chord = chord(signatures)(callback)
-    return task_chord
+    return task_chord.task_id
 
 
 @app.task(name="cleanup_orphaned_waste_flyers", trail=True)

@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models, transaction
 from django.db.models import Case, Count, IntegerField, Q, Sum, Value, When
-from django.db.models.signals import post_delete, post_save, pre_save
+from django.db.models.signals import m2m_changed, post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
@@ -348,8 +348,10 @@ def set_source_type_and_check_url(sender, instance, **kwargs):
 
 @receiver(post_save, sender=WasteFlyer)
 def check_url_valid(sender, instance, created, **kwargs):
-    if created:
-        celery.current_app.send_task("check_wasteflyer_url", (instance.pk,))
+    if created and instance.url:
+        transaction.on_commit(
+            lambda: celery.current_app.send_task("check_wasteflyer_url", (instance.pk,))
+        )
 
 
 class CollectionSeasonManager(UserCreatedObjectManager):
@@ -981,3 +983,54 @@ class CollectionPropertyValue(PropertyValue):
 class AggregatedCollectionPropertyValue(PropertyValue):
     collections = models.ManyToManyField(Collection)
     year = models.PositiveSmallIntegerField(null=True, validators=[YEAR_VALIDATOR])
+
+
+def _schedule_wasteflyer_url_check(flyer_ids):
+    """Schedule URL checks for the provided waste flyer ids after commit."""
+
+    unique_flyer_ids = sorted({pk for pk in flyer_ids if pk})
+    if not unique_flyer_ids:
+        return
+
+    def _enqueue_tasks():
+        for flyer_id in unique_flyer_ids:
+            celery.current_app.send_task("check_wasteflyer_url", (flyer_id,))
+
+    transaction.on_commit(_enqueue_tasks)
+
+
+def _waste_flyer_ids_for_pk_set(pk_set):
+    """Return ids from ``pk_set`` that belong to WasteFlyers."""
+
+    return list(WasteFlyer.objects.filter(pk__in=pk_set).values_list("pk", flat=True))
+
+
+@receiver(m2m_changed, sender=Collection.flyers.through)
+def check_collection_flyers_on_add(sender, action, pk_set, **kwargs):
+    """Trigger URL checks whenever flyers are attached to a collection."""
+
+    if action != "post_add" or not pk_set:
+        return
+    _schedule_wasteflyer_url_check(pk_set)
+
+
+@receiver(m2m_changed, sender=CollectionPropertyValue.sources.through)
+def check_collection_property_value_flyers_on_add(sender, action, pk_set, **kwargs):
+    """Trigger URL checks for WasteFlyer sources attached to collection values."""
+
+    if action != "post_add" or not pk_set:
+        return
+    flyer_ids = _waste_flyer_ids_for_pk_set(pk_set)
+    _schedule_wasteflyer_url_check(flyer_ids)
+
+
+@receiver(m2m_changed, sender=AggregatedCollectionPropertyValue.sources.through)
+def check_aggregated_collection_property_value_flyers_on_add(
+    sender, action, pk_set, **kwargs
+):
+    """Trigger URL checks for WasteFlyer sources attached to aggregated values."""
+
+    if action != "post_add" or not pk_set:
+        return
+    flyer_ids = _waste_flyer_ids_for_pk_set(pk_set)
+    _schedule_wasteflyer_url_check(flyer_ids)

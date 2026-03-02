@@ -1,10 +1,25 @@
 from django.urls import path
 
-from . import views
+from . import api_views, views
 
 app_name = "object_management"
 
 urlpatterns = [
+    path(
+        "api/review/queue/",
+        api_views.ReviewQueueAPIView.as_view(),
+        name="api_review_queue",
+    ),
+    path(
+        "api/review/<int:content_type_id>/<int:object_id>/comment/",
+        api_views.AddReviewCommentAPIView.as_view(),
+        name="api_add_review_comment",
+    ),
+    path(
+        "api/review/<int:content_type_id>/<int:object_id>/context/",
+        api_views.ReviewContextAPIView.as_view(),
+        name="api_review_context",
+    ),
     path("review/", views.ReviewDashboardView.as_view(), name="review_dashboard"),
     path(
         "review/detail/<int:content_type_id>/<int:object_id>/",

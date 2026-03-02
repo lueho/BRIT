@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
 from django.db.models import signals
@@ -8,13 +9,17 @@ from factory.django import mute_signals
 
 from distributions.models import Period, TemporalDistribution, Timestep
 from materials.models import Material
+from utils.object_management.models import get_default_owner
+from utils.properties.models import Property, Unit
 from utils.tests.testcases import comparable_model_dict
 
 from ..models import (
+    AggregatedCollectionPropertyValue,
     Collection,
     CollectionCatchment,
     CollectionCountOptions,
     CollectionFrequency,
+    CollectionPropertyValue,
     CollectionSeason,
     CollectionSystem,
     WasteCategory,
@@ -675,6 +680,89 @@ class WasteFlyerTestCase(TestCase):
         with mute_signals(signals.post_save):
             flyer = WasteFlyer.objects.get(abbreviation="WasteFlyer007")
         self.assertEqual(flyer.__str__(), "https://www.super-test-flyer.org")
+
+
+class WasteFlyerUrlCheckSignalTestCase(TestCase):
+    def setUp(self):
+        self.owner = get_default_owner()
+        self.catchment = CollectionCatchment.objects.create(name="Signal Catchment")
+        self.collection_system = CollectionSystem.objects.create(name="Signal System")
+        self.category = WasteCategory.objects.create(name="Signal Category")
+        self.waste_stream = WasteStream.objects.create(category=self.category)
+        self.collection = Collection.objects.create(
+            owner=self.owner,
+            catchment=self.catchment,
+            collection_system=self.collection_system,
+            waste_stream=self.waste_stream,
+            valid_from=date(2024, 1, 1),
+        )
+        self.property = Property.objects.create(
+            owner=self.owner,
+            name="Signal Property",
+            unit="kg",
+        )
+        self.unit = Unit.objects.create(owner=self.owner, name="kg", symbol="kg")
+        self.property.allowed_units.add(self.unit)
+
+    @patch("case_studies.soilcom.models.celery.current_app.send_task")
+    def test_collection_flyer_add_schedules_wasteflyer_url_check(self, mock_send_task):
+        with mute_signals(signals.post_save):
+            flyer = WasteFlyer.objects.create(
+                owner=self.owner,
+                title="Signal Flyer",
+                abbreviation="SignalFlyer",
+                url="https://example.com/flyer-signal.pdf",
+            )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.collection.flyers.add(flyer)
+
+        mock_send_task.assert_called_once_with("check_wasteflyer_url", (flyer.pk,))
+
+    @patch("case_studies.soilcom.models.celery.current_app.send_task")
+    def test_cpv_source_add_schedules_wasteflyer_url_check(self, mock_send_task):
+        cpv = CollectionPropertyValue.objects.create(
+            owner=self.owner,
+            collection=self.collection,
+            property=self.property,
+            unit=self.unit,
+            average=12.5,
+        )
+        with mute_signals(signals.post_save):
+            flyer = WasteFlyer.objects.create(
+                owner=self.owner,
+                title="Signal Flyer",
+                abbreviation="SignalFlyer",
+                url="https://example.com/flyer-cpv-signal.pdf",
+            )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            cpv.sources.add(flyer)
+
+        mock_send_task.assert_called_once_with("check_wasteflyer_url", (flyer.pk,))
+
+    @patch("case_studies.soilcom.models.celery.current_app.send_task")
+    def test_aggregated_cpv_source_add_schedules_wasteflyer_url_check(
+        self, mock_send_task
+    ):
+        aggregated = AggregatedCollectionPropertyValue.objects.create(
+            owner=self.owner,
+            property=self.property,
+            unit=self.unit,
+            average=20.0,
+        )
+        with mute_signals(signals.post_save):
+            flyer = WasteFlyer.objects.create(
+                owner=self.owner,
+                title="Signal Flyer",
+                abbreviation="SignalFlyer",
+                url="https://example.com/flyer-agg-signal.pdf",
+            )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            aggregated.sources.add(flyer)
+
+        mock_send_task.assert_called_once_with("check_wasteflyer_url", (flyer.pk,))
 
 
 class CollectionTestCase(TestCase):

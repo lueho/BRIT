@@ -313,6 +313,28 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         response = self.client.get(self.get_detail_url(self.published_object.pk))
         self.assertNotContains(response, "Check URLs")
 
+    def test_create_wasteflyer_without_author_succeeds(self):
+        self.client.force_login(self.user_with_add_perm)
+        post_data = {
+            "url": "https://example.com/waste-flyer.pdf",
+            "sourceauthors-TOTAL_FORMS": 1,
+            "sourceauthors-INITIAL_FORMS": 0,
+            "sourceauthors-0-id": "",
+            "sourceauthors-0-source": "",
+            "sourceauthors-0-author": "",
+        }
+
+        response = self.client.post(
+            reverse("wasteflyer-create"), post_data, follow=True
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            WasteFlyer.objects.filter(
+                url="https://example.com/waste-flyer.pdf"
+            ).exists()
+        )
+
     @patch("case_studies.soilcom.views.check_wasteflyer_url")
     def test_check_url_view_dispatches_wasteflyer_task(self, mock_task):
         mock_task.delay.return_value.task_id = "fake-task-id"
@@ -2448,11 +2470,50 @@ class WasteFlyerListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
     @patch("case_studies.soilcom.views.check_wasteflyer_urls.delay")
     def test_get_http_200_ok_for_members(self, mock_delay):
         mock_task = mock_delay.return_value
-        mock_task.get.return_value = [[123]]  # Simulate callback_id as in view
+        mock_task.task_id = "scheduler-task-id"
         self.client.force_login(self.member)
         response = self.client.get(reverse("wasteflyer-list-check-urls"))
         self.assertEqual(response.status_code, 200)
         mock_delay.assert_called_once()
+        self.assertEqual(mock_delay.call_args.args[1], self.member.pk)
+        self.assertEqual(response.json()["task_id"], "scheduler-task-id")
+
+
+class WasteFlyerListCheckUrlsProgressViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = "change_wasteflyer"
+
+    @patch("case_studies.soilcom.views.AsyncResult")
+    def test_get_uses_callback_task_state_after_scheduler_success(
+        self, mock_async_result
+    ):
+        scheduler_result = type(
+            "SchedulerResult",
+            (object,),
+            {"state": "SUCCESS", "result": "callback-task-id", "info": None},
+        )()
+        callback_result = type(
+            "CallbackResult",
+            (object,),
+            {"state": "PENDING", "info": {"progress": 50}},
+        )()
+        mock_async_result.side_effect = [scheduler_result, callback_result]
+
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse(
+                "wasteflyer-list-check-urls-progress",
+                kwargs={"task_id": "scheduler-task-id"},
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(
+            response.content,
+            {"state": "PENDING", "details": {"progress": 50}},
+        )
+        self.assertEqual(mock_async_result.call_count, 2)
+        mock_async_result.assert_any_call("scheduler-task-id")
+        mock_async_result.assert_any_call("callback-task-id")
 
 
 # --- Regression tests -------------------------------------------------------------------------------------------------
@@ -3894,6 +3955,53 @@ class CheckWasteFlyerUrlsTestCase(TestCase):
         ]
         result = chord(header)(callback)
         self.assertEqual(result.task_id, "fake_task_id")
+
+
+@patch("case_studies.soilcom.tasks.chord")
+class CheckWasteFlyerUrlsScopeRegressionTestCase(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user("task_owner")
+        self.other_owner = User.objects.create_user("task_other_owner")
+
+        with mute_signals(signals.post_save):
+            self.owner_flyers = [
+                WasteFlyer.objects.create(
+                    owner=self.owner,
+                    title="Owner flyer 1",
+                    abbreviation="OwnerWF1",
+                ),
+                WasteFlyer.objects.create(
+                    owner=self.owner,
+                    title="Owner flyer 2",
+                    abbreviation="OwnerWF2",
+                ),
+            ]
+            WasteFlyer.objects.create(
+                owner=self.other_owner,
+                title="Other owner flyer",
+                abbreviation="OtherWF",
+            )
+
+    def test_private_scope_checks_only_requesting_users_flyers(self, mock_chord):
+        captured_header = {}
+
+        def fake_chord(header):
+            captured_header["header"] = header
+            return lambda _: type("task", (object,), {"task_id": "callback-task-id"})()
+
+        mock_chord.side_effect = fake_chord
+
+        params = QueryDict("scope=private", mutable=True)
+        task_id = check_wasteflyer_urls.run(params, self.owner.pk)
+
+        self.assertEqual(task_id, "callback-task-id")
+        scheduled_ids = sorted(
+            signature.args[0] for signature in captured_header["header"]
+        )
+        self.assertEqual(
+            scheduled_ids,
+            sorted(flyer.pk for flyer in self.owner_flyers),
+        )
 
 
 @patch("case_studies.soilcom.tasks.find_wayback_snapshot_for_year")

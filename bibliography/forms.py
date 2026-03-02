@@ -148,6 +148,8 @@ class SourceAuthorFormSet(BaseInlineFormSet):
         Ensure positions are sequential without gaps.
         """
         source = self.instance
+        if not source.pk:
+            return
         authors = list(source.sourceauthors.all().order_by("position"))
 
         # Update positions if necessary

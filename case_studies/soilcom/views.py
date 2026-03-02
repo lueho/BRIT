@@ -510,16 +510,24 @@ class WasteFlyerListCheckUrlsView(PermissionRequiredMixin, View):
         params = request.GET.copy()
         params.pop("csrfmiddlewaretoken", None)
         params.pop("page", None)
-        task = check_wasteflyer_urls.delay(params)
-        callback_id = task.get()[0][0]
-        response_data = {"task_id": callback_id}
+        task = check_wasteflyer_urls.delay(params, request.user.pk)
+        response_data = {"task_id": task.task_id}
         return HttpResponse(json.dumps(response_data), content_type="application/json")
 
 
 class WasteFlyerListCheckUrlsProgressView(LoginRequiredMixin, View):
     @staticmethod
     def get(request, task_id):
-        result = AsyncResult(task_id)
+        scheduler_result = AsyncResult(task_id)
+
+        # The scheduler task returns the callback task id. Once available, poll the
+        # callback task so UI progress reflects the full batch execution.
+        result = scheduler_result
+        if scheduler_result.state == "SUCCESS" and isinstance(
+            scheduler_result.result, str
+        ):
+            result = AsyncResult(scheduler_result.result)
+
         response_data = {
             "state": result.state,
             "details": result.info,
