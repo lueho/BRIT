@@ -1,4 +1,5 @@
 {% extends "detail_with_options.html" %}
+{% load moderation_tags %}
 
 {% block detail_body %}
     <p class="card-text">
@@ -17,7 +18,7 @@
         <p class="card-text">
             <strong>Description:</strong>
             <br>
-            {{ object.description }}
+            {{ object.description|markdown_to_html }}
         </p>
     {% endif %}
 {% endblock detail_body %}

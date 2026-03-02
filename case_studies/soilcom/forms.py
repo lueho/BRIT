@@ -28,6 +28,7 @@ from distributions.models import TemporalDistribution, Timestep
 from materials.models import Sample
 from utils.crispy_fields import ForeignkeyField
 from utils.forms import (
+    MARKDOWN_HELP_TEXT,
     CreateInlineMixin,
     DynamicTableInlineFormSetHelper,
     M2MInlineFormSet,
@@ -73,6 +74,7 @@ class CollectorModelForm(SimpleModelForm):
     class Meta:
         model = Collector
         fields = ("name", "website", "catchment", "description")
+        help_texts = {"description": MARKDOWN_HELP_TEXT}
 
 
 class CollectorModalModelForm(ModalModelFormMixin, CollectorModelForm):
@@ -83,6 +85,7 @@ class CollectionSystemModelForm(SimpleModelForm):
     class Meta:
         model = CollectionSystem
         fields = ("name", "description")
+        help_texts = {"description": MARKDOWN_HELP_TEXT}
 
 
 class CollectionSystemModalModelForm(ModalModelFormMixin, CollectionSystemModelForm):
@@ -93,6 +96,7 @@ class SortingMethodModelForm(SimpleModelForm):
     class Meta:
         model = SortingMethod
         fields = ("name", "description")
+        help_texts = {"description": MARKDOWN_HELP_TEXT}
 
 
 class SortingMethodModalModelForm(ModalModelFormMixin, SortingMethodModelForm):
@@ -103,6 +107,7 @@ class WasteCategoryModelForm(SimpleModelForm):
     class Meta:
         model = WasteCategory
         fields = ("name", "description")
+        help_texts = {"description": MARKDOWN_HELP_TEXT}
 
 
 class WasteCategoryModalModelForm(ModalModelFormMixin, WasteCategoryModelForm):
@@ -113,6 +118,7 @@ class WasteComponentModelForm(SimpleModelForm):
     class Meta:
         model = WasteComponent
         fields = ("name", "description")
+        help_texts = {"description": MARKDOWN_HELP_TEXT}
 
 
 class WasteComponentModalModelForm(ModalModelFormMixin, WasteComponentModelForm):
@@ -123,6 +129,7 @@ class FeeSystemModelForm(SimpleModelForm):
     class Meta:
         model = FeeSystem
         fields = ("name", "description")
+        help_texts = {"description": MARKDOWN_HELP_TEXT}
 
 
 class FeeSystemModalModelForm(ModalModelFormMixin, FeeSystemModelForm):
@@ -133,6 +140,7 @@ class CollectionFrequencyModelForm(SimpleModelForm):
     class Meta:
         model = CollectionFrequency
         fields = ("name", "type", "description")
+        help_texts = {"description": MARKDOWN_HELP_TEXT}
 
 
 class CollectionFrequencyModalModelForm(
@@ -604,6 +612,7 @@ class CollectionModelForm(
             "description": "Comments",
             "connection_type": "Connection type",
         }
+        help_texts = {"description": MARKDOWN_HELP_TEXT}
         widgets = {
             "valid_from": DateInput(attrs={"type": "date"}),
             "valid_until": DateInput(attrs={"type": "date"}),

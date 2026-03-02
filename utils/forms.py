@@ -10,6 +10,8 @@ from django.forms import (
     modelformset_factory,
 )
 
+MARKDOWN_HELP_TEXT = "Supports **bold** text and lists (- item). No headings."
+
 
 class FormHelperMixin:
     """

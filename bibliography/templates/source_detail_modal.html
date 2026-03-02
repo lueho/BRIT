@@ -1,3 +1,4 @@
+{% load moderation_tags %}
 <div class="modal-header">
     <h5 class="modal-title">{{ object.abbreviation }}</h5>
     <button type="button"
@@ -114,7 +115,7 @@
         <p>
             <strong>Abstract:</strong>
             <br>
-            {{ object_data.abstract }}
+            {{ object_data.abstract|markdown_to_html }}
         </p>
     {% endif %}
 </div>

@@ -80,7 +80,7 @@
               <p class="card-text">
                 <strong>{% trans "Description" %}:</strong>
                 <br>
-                {{ object.description }}
+                {{ object.description|markdown_to_html }}
               </p>
             {% endif %}
           {% endblock detail_body %}

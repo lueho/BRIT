@@ -1,4 +1,5 @@
 {% extends 'geo_detail_card.html' %}
+{% load moderation_tags %}
 
 {% block title %}BRIT | Maps | Region: {{ object.name }}{% endblock %}
 
@@ -21,7 +22,7 @@
         <p class="card-text">
             <strong>Description:</strong>
             <br>
-            {{ object.description }}
+            {{ object.description|markdown_to_html }}
         </p>
     {% endif %}
     {% block additional_details %}{% endblock %}

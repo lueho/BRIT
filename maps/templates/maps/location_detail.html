@@ -1,16 +1,29 @@
 {% extends 'geo_detail_card.html' %}
+{% load moderation_tags %}
 
 {% block title %}BRIT | Maps | Location: {{ object.name }}{% endblock %}
 
 {% block detail_header %}Location: {{ object.name }}{% endblock %}
 
 {% block detail_body %}
-    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
+    <p class="card-text">
+        <strong>Name:</strong>
+        <br>
+        {{ object.name }}
+    </p>
     {% if object.address %}
-        <p class="card-text"><strong>Address:</strong><br>{{ object.address }}</p>
+        <p class="card-text">
+            <strong>Address:</strong>
+            <br>
+            {{ object.address }}
+        </p>
     {% endif %}
     {% if object.description %}
-        <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+        <p class="card-text">
+            <strong>Description:</strong>
+            <br>
+            {{ object.description|markdown_to_html }}
+        </p>
     {% endif %}
     {% block additional_details %}{% endblock %}
 {% endblock %}

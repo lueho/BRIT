@@ -1,19 +1,29 @@
+{% load moderation_tags %}
 <div class="modal-header">
     <h5 class="modal-title">Licence Details</h5>
-    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <button type="button"
+            class="btn-close"
+            data-bs-dismiss="modal"
+            aria-label="Close"></button>
 </div>
 <div class="modal-body">
-    <p><strong>Name:</strong><br>
+    <p>
+        <strong>Name:</strong>
+        <br>
         {{ object.name }}
     </p>
     {% if object.reference_url %}
-        <p><strong>Reference url:</strong><br>
+        <p>
+            <strong>Reference url:</strong>
+            <br>
             <a href="{{ object.reference_url }}" target="_blank">{{ object.reference_url }}</a>
         </p>
     {% endif %}
     {% if object.description %}
-        <p><strong>Description:</strong><br>
-            {{ object.description }}
+        <p>
+            <strong>Description:</strong>
+            <br>
+            {{ object.description|markdown_to_html }}
         </p>
     {% endif %}
 </div>
@@ -21,7 +31,3 @@
 <div class="modal-footer">
     <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
 </div>
-
-
-
-

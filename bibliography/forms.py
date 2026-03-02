@@ -3,7 +3,7 @@ from django.db import transaction
 from django.forms import BaseInlineFormSet, DateInput
 from django_tomselect.forms import TomSelectConfig, TomSelectModelChoiceField
 
-from utils.forms import ModalModelFormMixin, SimpleModelForm
+from utils.forms import MARKDOWN_HELP_TEXT, ModalModelFormMixin, SimpleModelForm
 
 from .models import Author, Licence, Source, SourceAuthor
 
@@ -41,6 +41,7 @@ class SourceModelForm(SimpleModelForm):
             "year",
             "licence",
             "attributions",
+            "abstract",
             "url",
             "url_valid",
             "url_checked",
@@ -51,6 +52,7 @@ class SourceModelForm(SimpleModelForm):
             "url_checked": DateInput(attrs={"type": "date"}),
             "last_accessed": DateInput(attrs={"type": "date"}),
         }
+        help_texts = {"abstract": MARKDOWN_HELP_TEXT}
 
 
 class SourceModalModelForm(ModalModelFormMixin, SourceModelForm):
