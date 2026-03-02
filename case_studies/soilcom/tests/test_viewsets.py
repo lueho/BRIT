@@ -131,6 +131,101 @@ class CollectionViewSetTestCase(APITestCase):
         self.assertNotIn(self.other_user_review_collection.pk, feature_ids)
         self.assertNotIn(self.other_user_published_collection.pk, feature_ids)
 
+    def test_geojson_defaults_to_latest_visible_collection_version(self):
+        """Map endpoint should hide older versions when no temporal/id filter is provided."""
+        predecessor = self._create_collection(
+            name="Versioned Collection 2021",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
+        )
+        predecessor.valid_from = date(2021, 1, 1)
+        predecessor.valid_until = date(2021, 12, 31)
+        predecessor.save(update_fields=["valid_from", "valid_until"])
+
+        successor = self._create_collection(
+            name="Versioned Collection 2022",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
+        )
+        successor.valid_from = date(2022, 1, 1)
+        successor.save(update_fields=["valid_from"])
+        successor.add_predecessor(predecessor)
+
+        self.client.force_login(self.regular_user)
+        url = reverse("api-waste-collection-geojson")
+        response = self.client.get(url, {"scope": "published"})
+
+        feature_ids = {f["properties"]["id"] for f in response.data["features"]}
+        self.assertIn(successor.pk, feature_ids)
+        self.assertNotIn(predecessor.pk, feature_ids)
+
+    def test_geojson_with_valid_on_includes_historical_versions(self):
+        """Historical filters should bypass latest-only version suppression."""
+        predecessor = self._create_collection(
+            name="Temporal Collection 2021",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
+        )
+        predecessor.valid_from = date(2021, 1, 1)
+        predecessor.valid_until = date(2021, 12, 31)
+        predecessor.save(update_fields=["valid_from", "valid_until"])
+
+        successor = self._create_collection(
+            name="Temporal Collection 2022",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
+        )
+        successor.valid_from = date(2022, 1, 1)
+        successor.save(update_fields=["valid_from"])
+        successor.add_predecessor(predecessor)
+
+        self.client.force_login(self.regular_user)
+        url = reverse("api-waste-collection-geojson")
+        response = self.client.get(
+            url,
+            {
+                "scope": "published",
+                "valid_on": "2021-06-01",
+            },
+        )
+
+        feature_ids = {f["properties"]["id"] for f in response.data["features"]}
+        self.assertIn(predecessor.pk, feature_ids)
+        self.assertNotIn(successor.pk, feature_ids)
+
+    def test_geojson_with_id_filter_allows_explicit_historical_version(self):
+        """Explicit ID selection should return requested historical version."""
+        predecessor = self._create_collection(
+            name="Pinned Collection 2021",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
+        )
+        predecessor.valid_from = date(2021, 1, 1)
+        predecessor.valid_until = date(2021, 12, 31)
+        predecessor.save(update_fields=["valid_from", "valid_until"])
+
+        successor = self._create_collection(
+            name="Pinned Collection 2022",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
+        )
+        successor.valid_from = date(2022, 1, 1)
+        successor.save(update_fields=["valid_from"])
+        successor.add_predecessor(predecessor)
+
+        self.client.force_login(self.regular_user)
+        url = reverse("api-waste-collection-geojson")
+        response = self.client.get(
+            url,
+            {
+                "scope": "published",
+                "id": [str(predecessor.pk)],
+            },
+        )
+
+        feature_ids = {f["properties"]["id"] for f in response.data["features"]}
+        self.assertEqual(feature_ids, {predecessor.pk})
+
     def test_create_permission_denied_without_model_permission(self):
         """User without add_collection permission cannot create collections."""
         data = {

@@ -520,6 +520,9 @@ class CollectionImportRecordSerializer(serializers.Serializer):
     collector_name = serializers.CharField(
         required=False, allow_null=True, allow_blank=True
     )
+    collector_website = serializers.URLField(
+        required=False, allow_null=True, allow_blank=True
+    )
     collection_system = serializers.CharField()
     waste_category = serializers.CharField()
     valid_from = serializers.DateField()

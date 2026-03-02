@@ -20,6 +20,7 @@ Usage::
 
 from __future__ import annotations
 
+import csv
 import json
 import sys
 from datetime import date
@@ -35,6 +36,7 @@ from django.core.management.base import BaseCommand, CommandError
 _EXCEL_FILE = Path("Sweden_Waste statistics2021.xlsx")
 _PDF_2022 = Path("husha-llsavfall-i-siffror-2022.pdf")
 _PDF_2023 = Path("husha-llsavfall-i-siffror-2023.pdf")
+_MUNICIPALITIES_CSV = Path("sweden_municipalities.csv")
 
 _BATCH_SIZE = 50
 _VALID_STATUSES = ("private", "review")
@@ -473,6 +475,31 @@ _DROP_KEYS = {
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _load_collector_websites(
+    csv_path: Path,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Return (lau_id → website, lau_id → collector_name) from the CSV.
+
+    Reads ``sweden_municipalities.csv`` which has columns:
+    ``lau_id``, ``municipality_name``, ``collector_website``,
+    ``collector_name`` (optional).
+    """
+    if not csv_path.exists():
+        return {}, {}
+    websites: dict[str, str] = {}
+    names: dict[str, str] = {}
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            lau_id = row.get("lau_id", "").strip().zfill(4)
+            website = row.get("collector_website", "").strip()
+            name = row.get("collector_name", "").strip()
+            if lau_id and website and website != "TO_BE_RESEARCHED":
+                websites[lau_id] = website
+                if name:
+                    names[lau_id] = name
+    return websites, names
 
 
 def _numeric(value) -> float | None:
@@ -1041,6 +1068,15 @@ class Command(BaseCommand):
             default=_BATCH_SIZE,
             help=f"Number of records per API request (default: {_BATCH_SIZE}).",
         )
+        parser.add_argument(
+            "--municipalities-csv",
+            type=str,
+            default=str(_MUNICIPALITIES_CSV),
+            help=(
+                f"Path to sweden_municipalities.csv with collector_website column "
+                f"(default: {_MUNICIPALITIES_CSV})."
+            ),
+        )
 
     # ------------------------------------------------------------------
     # Auth helpers
@@ -1049,7 +1085,7 @@ class Command(BaseCommand):
     def _get_token(self, api_url: str, username: str, password: str) -> str:
         """Obtain a DRF token via the token-auth endpoint."""
         try:
-            url = f"{api_url.rstrip('/')}/api/auth/token/"
+            url = f"{api_url.rstrip('/')}/api-token-auth/"
             payload = json.dumps({"username": username, "password": password}).encode()
             req = Request(
                 url,
@@ -1118,6 +1154,18 @@ class Command(BaseCommand):
             2023: Path(options["pdf_2023"]),
         }
 
+        # Load LAU ID → collector_website mapping from CSV
+        csv_path = Path(options["municipalities_csv"])
+        collector_websites, collector_names = _load_collector_websites(csv_path)
+        if collector_websites:
+            self.stdout.write(
+                f"Loaded collector website mappings for {len(collector_websites)} municipalities.\n"
+            )
+        else:
+            self.stdout.write(
+                f"Warning: No collector website mappings loaded (CSV not found or empty: {csv_path}).\n"
+            )
+
         # Resolve auth token
         token = options.get("token")
         if not token:
@@ -1139,6 +1187,7 @@ class Command(BaseCommand):
             "cpv_created": 0,
             "cpv_skipped": 0,
             "flyers_created": 0,
+            "collectors_created": 0,
             "warnings": [],
             "changes": [],
         }
@@ -1158,6 +1207,15 @@ class Command(BaseCommand):
                 raise
             except Exception as exc:
                 raise CommandError(f"Error parsing {year} data: {exc}") from exc
+
+            # Inject collector_website and collector_name from CSV
+            if collector_websites:
+                for rec in records:
+                    lau_id = (rec.get("nuts_or_lau_id") or "").strip().zfill(4)
+                    if lau_id and lau_id in collector_websites:
+                        rec["collector_website"] = collector_websites[lau_id]
+                        if lau_id in collector_names:
+                            rec["collector_name"] = collector_names[lau_id]
 
             records_json = _records_to_json_serialisable(records)
             self.stdout.write(f"  {len(records_json)} records parsed")
@@ -1190,6 +1248,7 @@ class Command(BaseCommand):
         self.stdout.write(f"  CPVs created:         {totals['cpv_created']}\n")
         self.stdout.write(f"  CPVs skipped:         {totals['cpv_skipped']}\n")
         self.stdout.write(f"  Flyers created:       {totals['flyers_created']}\n")
+        self.stdout.write(f"  Collectors created:   {totals['collectors_created']}\n")
         if totals["warnings"]:
             self.stdout.write(f"\n  Warnings ({len(totals['warnings'])}):\n")
             for w in totals["warnings"]:
@@ -1214,6 +1273,7 @@ class Command(BaseCommand):
             "cpv_created",
             "cpv_skipped",
             "flyers_created",
+            "collectors_created",
         ):
             totals[key] = totals.get(key, 0) + stats.get(key, 0)
         totals["warnings"].extend(stats.get("warnings", []))

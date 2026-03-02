@@ -367,6 +367,14 @@ class CollectionImporter:
                 stats["changes"].append(f"{label}: {', '.join(changes)}")
             else:
                 stats["skipped"] += 1
+
+            if (
+                self.publication_status == "review"
+                and collection.publication_status
+                in (collection.STATUS_PRIVATE, collection.STATUS_DECLINED)
+                and not self.dry_run
+            ):
+                self._submit_for_review(collection)
         else:
             predecessor = self._find_predecessor(
                 catchment, waste_stream, collection_system, valid_from
@@ -567,14 +575,45 @@ class CollectionImporter:
         self, record: dict, label: str, stats: dict
     ) -> Collector | None:
         name = record.get("collector_name") or ""
-        if not name:
+        website = record.get("collector_website") or ""
+
+        if not name and not website:
             return None
-        collector = self._collectors.get(name)
-        if collector is None:
-            stats["warnings"].append(
-                f"{label}: Collector '{name}' not found — field left empty."
+
+        # Primary: look up by name
+        if name:
+            collector = self._collectors.get(name)
+            if collector is not None:
+                return collector
+
+        # Secondary: look up by website URL
+        if website:
+            collector = next(
+                (c for c in self._collectors.values() if c.website == website),
+                None,
             )
-        return collector
+            if collector is not None:
+                return collector
+
+            # Auto-create a Collector keyed by website domain
+            from urllib.parse import urlparse  # noqa: PLC0415
+
+            domain = urlparse(website).netloc or website
+            new_name = name or domain
+            collector, created = Collector.objects.get_or_create(
+                website=website,
+                defaults={"name": new_name, "owner": self.owner},
+            )
+            if created:
+                stats.setdefault("collectors_created", 0)
+                stats["collectors_created"] += 1
+            self._collectors[collector.name] = collector
+            return collector
+
+        stats["warnings"].append(
+            f"{label}: Collector '{name}' not found — field left empty."
+        )
+        return None
 
     def _resolve_fee_system(
         self, record: dict, label: str, stats: dict

@@ -1,4 +1,4 @@
-from django.db.models import F
+from django.db.models import Exists, F, OuterRef
 from django_filters import rest_framework as rf_filters
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -83,6 +83,31 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             )
         )
         return qs
+
+    def get_geojson_queryset_with_bbox(self, request):
+        """Apply base filtering and hide outdated versions by default on maps.
+
+        Map views should show the latest visible versions by default. Historical
+        versions remain available when users explicitly request a point in time
+        via ``valid_on`` or ask for specific ``id`` values.
+        """
+        queryset = super().get_geojson_queryset_with_bbox(request)
+        return self._latest_visible_versions_queryset(queryset, request)
+
+    def _latest_visible_versions_queryset(self, queryset, request):
+        """Return latest visible versions unless an explicit temporal/id filter is set."""
+        params = request.query_params
+        has_id_filter = bool(params.get("id"))
+        if hasattr(params, "getlist"):
+            has_id_filter = has_id_filter or bool(params.getlist("id"))
+
+        if params.get("valid_on") or has_id_filter:
+            return queryset
+
+        visible_successors = queryset.order_by().filter(predecessors=OuterRef("pk"))
+        return queryset.annotate(
+            has_visible_successor=Exists(visible_successors)
+        ).filter(has_visible_successor=False)
 
     def get_serializer_class(self):
         """Use detailed serializer for retrieve so the UI receives ownership and status fields.
