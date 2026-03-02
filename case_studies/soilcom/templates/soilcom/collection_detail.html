@@ -163,6 +163,13 @@
     <br>
     {{ object.valid_from|date:"Y" }}
   </p>
+  {% if object.established %}
+    <p class="card-text">
+      <strong>Year established:</strong>
+      <br>
+      {{ object.established }}
+    </p>
+  {% endif %}
   {% if object.connection_type %}
     <p class="card-text">
       <strong>Connection Type:</strong>
