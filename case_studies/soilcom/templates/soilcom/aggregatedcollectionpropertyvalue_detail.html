@@ -1,7 +1,14 @@
 {% extends "detail_with_options.html" %}
+{% load static %}
 {% load moderation_tags %}
 
 {% object_policy object as policy %}
+
+{% block style_sheets %}
+    {{ block.super }}
+    <link rel="stylesheet"
+          href="{% static 'soilcom/css/collection_detail.css' %}">
+{% endblock style_sheets %}
 
 {% block detail_header_badge %}
     {% include "object_management/review_status_badge.html" with object=object %}
@@ -92,16 +99,17 @@
             {% for source in object.sources.all %}
                 <li>
                     {% if source.type == "waste_flyer" %}
-                        {# Waste flyer: Display as clickable URL with document icon #}
+                        {# Waste flyer: Keep full href, but compact visible label for better UX #}
                         <i class="fas fa-file-alt text-muted"></i>
                         <span class="badge bg-secondary text-white me-2">Waste Flyer</span>
                         <a href="{{ source.url }}"
                            target="_blank"
                            rel="noopener noreferrer"
-                           class="text-break">
-                            {{ source.url }}
+                           class="source-url-line js-compact-url">
+                            <span class="source-url-label">{{ source.url }}</span>
                             <i class="fas fa-external-link-alt ms-1 small"></i>
                         </a>
+                        {% if "web.archive.org" in source.url %}<span class="badge text-bg-light border ms-2">Archived</span>{% endif %}
                     {% else %}
                         {# Regular bibliographic source #}
                         <a href="{{ source.get_absolute_url }}">{{ source.abbreviation }}</a>
@@ -109,9 +117,13 @@
                         {% if source.year %}({{ source.year }}){% endif %}
                         {% if source.url %}
                             <br>
-                            <span class="text-muted small">
-                                <a href="{{ source.url }}" target="_blank" rel="noopener noreferrer">
-                                    <i class="fas fa-external-link-alt"></i> {{ source.url }}
+                            <span class="text-muted small source-url-meta">
+                                <a href="{{ source.url }}"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   class="source-url-line js-compact-url">
+                                    <i class="fas fa-external-link-alt"></i>
+                                    <span class="source-url-label">{{ source.url }}</span>
                                 </a>
                             </span>
                         {% endif %}
@@ -121,3 +133,7 @@
         </ul>
     {% endif %}
 {% endblock detail_body %}
+
+{% block detail_with_options_scripts %}
+    <script src="{% static 'js/source_url_display.js' %}" type="text/javascript"></script>
+{% endblock detail_with_options_scripts %}
