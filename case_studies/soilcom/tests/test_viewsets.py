@@ -193,6 +193,34 @@ class CollectionViewSetTestCase(APITestCase):
         self.assertIn(predecessor.pk, feature_ids)
         self.assertNotIn(successor.pk, feature_ids)
 
+    def test_geojson_published_predecessor_not_hidden_by_review_successor(self):
+        """A published collection must not be hidden when its successor is still in review.
+
+        Regression test: before the fix, the subquery used the scope-filtered outer
+        queryset.  For staff or unscoped requests that include review collections,
+        the 2024 review successor would cause the 2022 published predecessor to be
+        suppressed even though no *published* replacement exists yet.
+        """
+        predecessor = self._create_collection(
+            name="Published 2022",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
+        )
+        successor = self._create_collection(
+            name="Review 2024",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_REVIEW,
+        )
+        successor.add_predecessor(predecessor)
+
+        self.client.force_login(self.regular_user)
+        url = reverse("api-waste-collection-geojson")
+        response = self.client.get(url, {"scope": "published"})
+
+        feature_ids = {f["properties"]["id"] for f in response.data["features"]}
+        self.assertIn(predecessor.pk, feature_ids)
+        self.assertNotIn(successor.pk, feature_ids)
+
     def test_geojson_with_id_filter_allows_explicit_historical_version(self):
         """Explicit ID selection should return requested historical version."""
         predecessor = self._create_collection(

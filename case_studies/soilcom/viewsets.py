@@ -95,7 +95,13 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         return self._latest_visible_versions_queryset(queryset, request)
 
     def _latest_visible_versions_queryset(self, queryset, request):
-        """Return latest visible versions unless an explicit temporal/id filter is set."""
+        """Return latest visible versions unless an explicit temporal/id filter is set.
+
+        A collection is only considered outdated when a *published* successor exists.
+        Using the scope-filtered outer queryset for the subquery would incorrectly
+        suppress published collections when their review-status successors appear in
+        an unscoped (all-objects) staff view.
+        """
         params = request.query_params
         has_id_filter = bool(params.get("id"))
         if hasattr(params, "getlist"):
@@ -104,9 +110,12 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         if params.get("valid_on") or has_id_filter:
             return queryset
 
-        visible_successors = queryset.order_by().filter(predecessors=OuterRef("pk"))
+        published_successors = Collection.objects.filter(
+            publication_status=Collection.STATUS_PUBLISHED,
+            predecessors=OuterRef("pk"),
+        )
         return queryset.annotate(
-            has_visible_successor=Exists(visible_successors)
+            has_visible_successor=Exists(published_successors)
         ).filter(has_visible_successor=False)
 
     def get_serializer_class(self):
