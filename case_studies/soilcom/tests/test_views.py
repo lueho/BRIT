@@ -2912,6 +2912,11 @@ class CollectionReviewDetailPropertiesTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.staff = User.objects.create(username="moderator", is_staff=True)
+        cls.sorting_method = SortingMethod.objects.create(
+            name="Optical sorting",
+            owner=cls.staff,
+            publication_status="published",
+        )
 
         cls.catchment = CollectionCatchment.objects.create(name="RC")
         cls.system = CollectionSystem.objects.create(name="RS")
@@ -2922,6 +2927,7 @@ class CollectionReviewDetailPropertiesTestCase(TestCase):
             catchment=cls.catchment,
             collection_system=cls.system,
             waste_stream=cls.stream,
+            sorting_method=cls.sorting_method,
             publication_status="published",
         )
 
@@ -2966,6 +2972,8 @@ class CollectionReviewDetailPropertiesTestCase(TestCase):
         self.assertIn("77", body)
         self.assertIn("ReviewUnit", body)
         self.assertIn("aggregated", body)
+        self.assertIn("Sorting method", body)
+        self.assertIn("Optical sorting", body)
 
 
 class CollectionPropertyValueReviewDetailRelatedCollectionsTestCase(TestCase):

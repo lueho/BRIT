@@ -153,6 +153,13 @@
     <br>
     <a href="{{ object.collection_system.get_absolute_url }}">{{ object.collection_system.name }}</a>
   </p>
+  {% if object.sorting_method %}
+    <p class="card-text">
+      <strong>Sorting method:</strong>
+      <br>
+      {{ object.sorting_method.name }}
+    </p>
+  {% endif %}
   <p class="card-text">
     <strong>Waste Category:</strong>
     <br>
