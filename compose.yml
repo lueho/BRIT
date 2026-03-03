@@ -19,6 +19,7 @@ services:
       context: .
       args:
         INSTALL_DEV: true
+        INSTALL_PDF_PARSING: true
     image: brit-web
     restart: unless-stopped
     command: python manage.py runserver 0.0.0.0:8000

@@ -3,6 +3,7 @@ build:
     web: Dockerfile
   config:
     INSTALL_DEV: false
+    INSTALL_PDF_PARSING: false
 release:
   image: web
   command:

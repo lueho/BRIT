@@ -11,6 +11,9 @@ ENV UV_COMPILE_BYTECODE=1 \
 # Optional build-time flag: set to "true" to include dev dependencies
 ARG INSTALL_DEV=false
 
+# Optional build-time flag: set to "true" to include PDF parsing dependencies/tools
+ARG INSTALL_PDF_PARSING=false
+
 # System build dependencies (kept only in this stage)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -28,9 +31,17 @@ COPY pyproject.toml uv.lock* ./
 
 # Resolve & install deps into .venv with --frozen for reproducibility (without BuildKit cache)
 RUN if [ "$INSTALL_DEV" = "true" ]; then \
-    uv sync --locked --dev; \
+        if [ "$INSTALL_PDF_PARSING" = "true" ]; then \
+            uv sync --locked --dev --group pdf_parsing; \
+        else \
+            uv sync --locked --dev; \
+        fi; \
     else \
-    uv sync --locked --no-dev; \
+        if [ "$INSTALL_PDF_PARSING" = "true" ]; then \
+            uv sync --locked --no-dev --group pdf_parsing; \
+        else \
+            uv sync --locked --no-dev; \
+        fi; \
     fi
 
 COPY . .
@@ -39,6 +50,8 @@ COPY . .
 # ---------- runtime --------------
 ####################################
 FROM python:3.12-slim-bookworm
+
+ARG INSTALL_PDF_PARSING=false
 
 # Python environment configuration
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -50,6 +63,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libproj25 \
     libgdal32 \
     curl \
+    && if [ "$INSTALL_PDF_PARSING" = "true" ]; then \
+        apt-get install -y --no-install-recommends \
+        poppler-utils \
+        qpdf \
+        tesseract-ocr \
+        tesseract-ocr-swe \
+        ghostscript; \
+    fi \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user & static-files directory

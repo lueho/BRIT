@@ -70,6 +70,8 @@ dev = [
     "flower>=2.0.1",
 ]
 
+pdf_parsing = ["pypdf>=6.7.5", "pymupdf>=1.27.1", "ocrmypdf>=17.3.0"]
+
 # Ruff configuration for linting and formatting
 [tool.ruff]
 line-length = 88
