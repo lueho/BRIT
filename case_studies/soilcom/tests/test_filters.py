@@ -390,6 +390,17 @@ class CollectionFilterTestCase(TestCase):
         self.assertIn(self.child_collection, qs)
         self.assertIn(self.collection1, qs)
 
+    def test_non_numeric_collector_is_ignored(self):
+        data = self.data.copy()
+        data.update({"collector": "*"})
+
+        filtr = CollectionFilterSet(data, queryset=Collection.objects.all())
+        filtr.is_valid()
+        self.assertNotIn("collector", filtr.form.errors)
+        self.assertQuerySetEqual(
+            Collection.objects.order_by("id"), filtr.qs.order_by("id")
+        )
+
     def test_connection_rate_range_filter_fields_exists_in_filter_and_form(self):
         self.data.update({"connection_rate_min": 50, "connection_rate_max": 99})
         filtr = CollectionFilterSet(self.data, queryset=Collection.objects.all())

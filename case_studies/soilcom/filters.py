@@ -602,16 +602,25 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         skip_min_max = kwargs.pop("skip_min_max", False)
+        data_from_args = False
         data = kwargs.get("data")
+        if data is None and args:
+            data = args[0]
+            data_from_args = True
         if data:
             data = data.copy()
-            catchment_value = data.get("catchment")
-            if catchment_value:
+            for field_name in ("catchment", "collector"):
+                field_value = data.get(field_name)
+                if not field_value:
+                    continue
                 try:
-                    int(catchment_value)
+                    int(field_value)
                 except (TypeError, ValueError):
-                    data.pop("catchment", None)
-            kwargs["data"] = data
+                    data.pop(field_name, None)
+            if data_from_args:
+                args = (data, *args[1:])
+            else:
+                kwargs["data"] = data
         super().__init__(*args, **kwargs)
         if not skip_min_max:
             self.filters["connection_rate"].set_min_max()
