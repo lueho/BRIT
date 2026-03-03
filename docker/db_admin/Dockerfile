@@ -42,3 +42,4 @@ RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tm
 # 4. Make custom commands executable
 # ------------------------------------------------------------------
 COPY ./commands/ /usr/bin/
+RUN chmod +x /usr/bin/dump /usr/bin/pull /usr/bin/push
