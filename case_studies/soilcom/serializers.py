@@ -471,6 +471,12 @@ class CollectionImportPropertyValueSerializer(serializers.Serializer):
     )
     average = serializers.FloatField(help_text="Measured / observed value.")
     standard_deviation = serializers.FloatField(required=False, allow_null=True)
+    flyer_urls = serializers.ListField(
+        child=serializers.URLField(),
+        required=False,
+        default=list,
+        help_text="Source URLs to attach as WasteFlyers to this property value.",
+    )
 
 
 class CollectionImportRecordSerializer(serializers.Serializer):

@@ -42,6 +42,24 @@ _BATCH_SIZE = 50
 _VALID_STATUSES = ("private", "review")
 
 # ---------------------------------------------------------------------------
+# Authoritative source URLs for Avfall Sverige annual reports
+# ---------------------------------------------------------------------------
+_SOURCE_URL_2021 = (
+    "https://www.avfallsverige.se/media/yamled2u/kommunalt-avfall-2021.pdf"
+)
+_SOURCE_URL_2022 = (
+    "https://www.avfallsverige.se/media/zpsm3tgx/husha-llsavfall-i-siffror-2022.pdf"
+)
+_SOURCE_URL_2023 = (
+    "https://www.avfallsverige.se/media/dmqbrvlq/husha-llsavfall-i-siffror.pdf"
+)
+_SOURCE_URLS: dict[int, str] = {
+    2021: _SOURCE_URL_2021,
+    2022: _SOURCE_URL_2022,
+    2023: _SOURCE_URL_2023,
+}
+
+# ---------------------------------------------------------------------------
 # Property / unit constants (verified against DB)
 # ---------------------------------------------------------------------------
 _PROP_SPECIFIC = 1  # "specific waste collected"
@@ -565,6 +583,7 @@ def _build_food_waste_record(
 ) -> dict:
     """Build a CollectionImporter record for food waste collection."""
     allowed_materials = [bag_material] if bag_material else []
+    source_urls = [u for u in [_SOURCE_URLS.get(data_year)] if u]
     pvs = []
     if food_kg is not None:
         pvs.append(
@@ -573,6 +592,7 @@ def _build_food_waste_record(
                 "unit_name": _UNIT_KG,
                 "year": data_year,
                 "average": food_kg,
+                "flyer_urls": source_urls,
             }
         )
     if conn_rate is not None:
@@ -582,6 +602,7 @@ def _build_food_waste_record(
                 "unit_name": _UNIT_PCT_HH,
                 "year": data_year,
                 "average": conn_rate,
+                "flyer_urls": source_urls,
             }
         )
     return {
@@ -597,7 +618,7 @@ def _build_food_waste_record(
         "valid_from": _valid_from_year(data_year),
         "valid_until": None,
         "description": description,
-        "flyer_urls": [],
+        "flyer_urls": source_urls,
         "property_values": pvs,
     }
 
@@ -609,6 +630,7 @@ def _build_residual_waste_record(
     residual_kg: float,
 ) -> dict:
     """Build a CollectionImporter record for residual waste collection."""
+    source_urls = [u for u in [_SOURCE_URLS.get(data_year)] if u]
     return {
         **_resolve_catchment_key(city),
         "collection_system": _COLLECTION_SYSTEM_DOOR_TO_DOOR,
@@ -622,13 +644,14 @@ def _build_residual_waste_record(
         "valid_from": _valid_from_year(data_year),
         "valid_until": None,
         "description": "",
-        "flyer_urls": [],
+        "flyer_urls": source_urls,
         "property_values": [
             {
                 "property_id": _PROP_SPECIFIC,
                 "unit_name": _UNIT_KG,
                 "year": data_year,
                 "average": residual_kg,
+                "flyer_urls": source_urls,
             }
         ],
     }

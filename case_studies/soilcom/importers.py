@@ -446,6 +446,38 @@ class CollectionImporter:
         for pv in record.get("property_values") or []:
             self._import_property_value(collection, pv, stats)
 
+    def _attach_cpv_sources(
+        self, cpv: CollectionPropertyValue, urls: list[str], stats: dict
+    ) -> None:
+        """Attach WasteFlyer sources to a CollectionPropertyValue.
+
+        Only adds flyers not already linked.  Creates new WasteFlyer objects
+        as needed and submits them for review when the importer is in review
+        mode.
+        """
+        existing_urls = set(cpv.sources.values_list("url", flat=True))
+        for url in urls:
+            if url in existing_urls:
+                continue
+            if len(url) > 2083:
+                stats["warnings"].append(
+                    f"CPV source URL too long ({len(url)} chars), skipped."
+                )
+                continue
+            flyer, created = WasteFlyer.objects.get_or_create(
+                url=url,
+                defaults={
+                    "owner": self.owner,
+                    "title": self._flyer_title(url),
+                    "publication_status": "private",
+                },
+            )
+            cpv.sources.add(flyer)
+            if created:
+                stats["flyers_created"] += 1
+                if self.publication_status == "review":
+                    self._submit_for_review(flyer)
+
     def _import_property_value(
         self, collection: Collection, pv: dict, stats: dict
     ) -> None:
@@ -466,9 +498,17 @@ class CollectionImporter:
             return
 
         year = pv["year"]
-        if CollectionPropertyValue.objects.filter(
+        existing_cpv = CollectionPropertyValue.objects.filter(
             collection=collection, property=prop, unit=unit, year=year
-        ).exists():
+        ).first()
+        if existing_cpv is not None:
+            flyer_urls = pv.get("flyer_urls") or []
+            self._attach_cpv_sources(existing_cpv, flyer_urls, stats)
+            derived = CollectionPropertyValue.objects.filter(
+                collection=collection, year=year, is_derived=True
+            ).first()
+            if derived is not None:
+                self._attach_cpv_sources(derived, flyer_urls, stats)
             stats["cpv_skipped"] += 1
             return
 
@@ -485,6 +525,16 @@ class CollectionImporter:
             standard_deviation=pv.get("standard_deviation"),
         )
         stats["cpv_created"] += 1
+        self._attach_cpv_sources(cpv, pv.get("flyer_urls") or [], stats)
+
+        flyer_urls = pv.get("flyer_urls") or []
+        derived = CollectionPropertyValue.objects.filter(
+            collection=collection,
+            year=year,
+            is_derived=True,
+        ).first()
+        if derived is not None:
+            self._attach_cpv_sources(derived, flyer_urls, stats)
 
         if self.publication_status == "review":
             # Submit the derived counterpart first (created by the post_save signal
@@ -492,13 +542,7 @@ class CollectionImporter:
             # submit_for_review() on the source CPV, because that triggers the
             # signal a second time and would overwrite the derived CPV's
             # publication_status to 'review' without setting submitted_at.
-            derived = CollectionPropertyValue.objects.filter(
-                collection=collection,
-                year=year,
-                is_derived=True,
-                submitted_at__isnull=True,
-            ).first()
-            if derived is not None:
+            if derived is not None and derived.submitted_at is None:
                 self._submit_cpv_for_review(derived)
             self._submit_cpv_for_review(cpv)
 
