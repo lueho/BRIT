@@ -19,6 +19,7 @@ from case_studies.soilcom.models import (
     CollectionSystem,
     Collector,
     FeeSystem,
+    SortingMethod,
     WasteCategory,
     WasteStream,
 )
@@ -823,6 +824,117 @@ class GreenWasteCollectionSystemCountViewSetTests(APITestCase):
         self.assertEqual(count_by_catchment[self.catchment_a.id], 2)
         self.assertEqual(count_by_catchment[self.catchment_b.id], 1)
         self.assertEqual(len(count_by_catchment), 2)
+
+
+class SortingMethodViewSetTests(APITestCase):
+    """Tests for sorting-method atlas endpoint."""
+
+    endpoint = "/waste_collection/api/waste-atlas/sorting-method/"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.region_se = Region.objects.create(name="Region SE", country="SE")
+        cls.region_de = Region.objects.create(name="Region DE", country="DE")
+
+        cls.catchment_a = CollectionCatchment.objects.create(
+            name="SE Catchment A",
+            region=cls.region_se,
+        )
+        cls.catchment_b = CollectionCatchment.objects.create(
+            name="SE Catchment B",
+            region=cls.region_se,
+        )
+        cls.catchment_c = CollectionCatchment.objects.create(
+            name="SE Catchment C",
+            region=cls.region_se,
+        )
+        cls.catchment_other_country = CollectionCatchment.objects.create(
+            name="DE Catchment",
+            region=cls.region_de,
+        )
+
+        cls.d2d = CollectionSystem.objects.create(name="Door to door")
+        cls.bring_point = CollectionSystem.objects.create(name="Bring point")
+        cls.no_collection = CollectionSystem.objects.create(
+            name="No separate collection"
+        )
+
+        cls.separate_bins = SortingMethod.objects.create(name="Separate bins")
+        cls.optical_sorting = SortingMethod.objects.create(name="Optical bag sorting")
+
+        cls.food_category = WasteCategory.objects.create(name="Food waste")
+        cls.food_stream = WasteStream.objects.create(category=cls.food_category)
+
+        cls._create_collection(
+            catchment=cls.catchment_a,
+            collection_system=cls.d2d,
+            sorting_method=cls.separate_bins,
+            year=2023,
+        )
+        # Lower-priority system must not override the door-to-door sorting method.
+        cls._create_collection(
+            catchment=cls.catchment_a,
+            collection_system=cls.bring_point,
+            sorting_method=cls.optical_sorting,
+            year=2023,
+        )
+        cls._create_collection(
+            catchment=cls.catchment_b,
+            collection_system=cls.no_collection,
+            sorting_method=None,
+            year=2023,
+        )
+        cls._create_collection(
+            catchment=cls.catchment_c,
+            collection_system=cls.d2d,
+            sorting_method=None,
+            year=2023,
+        )
+        cls._create_collection(
+            catchment=cls.catchment_other_country,
+            collection_system=cls.d2d,
+            sorting_method=cls.optical_sorting,
+            year=2023,
+        )
+        cls._create_collection(
+            catchment=cls.catchment_a,
+            collection_system=cls.d2d,
+            sorting_method=cls.optical_sorting,
+            year=2024,
+        )
+
+    @classmethod
+    def _create_collection(
+        cls,
+        *,
+        catchment,
+        collection_system,
+        sorting_method,
+        year,
+    ):
+        """Create a collection row for sorting-method endpoint tests."""
+        return Collection.objects.create(
+            name=f"{catchment.name}-{collection_system.name}-{year}",
+            catchment=catchment,
+            waste_stream=cls.food_stream,
+            collection_system=collection_system,
+            sorting_method=sorting_method,
+            valid_from=date(year, 1, 1),
+        )
+
+    def test_returns_sorting_method_with_expected_fallbacks(self):
+        """Endpoint returns primary sorting method, no-collection and no-data fallbacks."""
+        response = self.client.get(self.endpoint, {"country": "SE", "year": 2023})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        by_catchment = {
+            row["catchment_id"]: row["sorting_method"] for row in response.data
+        }
+        self.assertEqual(by_catchment[self.catchment_a.id], "Separate bins")
+        self.assertEqual(by_catchment[self.catchment_b.id], "No separate collection")
+        self.assertEqual(by_catchment[self.catchment_c.id], "no_data")
+        self.assertNotIn(self.catchment_other_country.id, by_catchment)
 
 
 @override_settings(

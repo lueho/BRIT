@@ -73,6 +73,16 @@ class SwedenOrgaLevelMapView(AtlasMapView):
     map_overview_label = "Map overview"
 
 
+class SwedenSortingMethodMapView(AtlasMapView):
+    """Map 34 — Sorting methods of waste fractions in Sweden (English)."""
+
+    template_name = "waste_atlas/karte34_sorting_method_sweden.html"
+    map_title = "Sorting methods of waste fractions"
+    default_country = "SE"
+    default_year = "2023"
+    map_overview_label = "Map overview"
+
+
 class DenmarkOrgaLevelMapView(AtlasMapView):
     """Map 31 — Organization level of waste collection in Denmark (English)."""
 

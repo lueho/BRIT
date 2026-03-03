@@ -29,6 +29,7 @@ from .viewsets import (
     ResidualFrequencyTypeViewSet,
     ResidualMinBinSizeViewSet,
     ResidualRequiredBinCapacityViewSet,
+    SortingMethodViewSet,
     WasteRatioViewSet,
 )
 
@@ -48,6 +49,11 @@ router.register(
     "collection-system",
     CollectionSystemViewSet,
     basename="api-waste-atlas-collection-system",
+)
+router.register(
+    "sorting-method",
+    SortingMethodViewSet,
+    basename="api-waste-atlas-sorting-method",
 )
 router.register(
     "green-waste-collection-system-count",

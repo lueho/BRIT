@@ -56,6 +56,13 @@ class CatchmentCollectionSystemSerializer(serializers.Serializer):
     collection_system = serializers.CharField()
 
 
+class CatchmentSortingMethodSerializer(serializers.Serializer):
+    """Flat JSON serializer for catchment sorting method."""
+
+    catchment_id = serializers.IntegerField()
+    sorting_method = serializers.CharField()
+
+
 class CatchmentCollectionSystemCountSerializer(serializers.Serializer):
     """Flat JSON serializer for number of collection systems per catchment."""
 

@@ -49,6 +49,7 @@ from .serializers import (
     CatchmentOrganicRatioSerializer,
     CatchmentPopulationSerializer,
     CatchmentRequiredBinCapacitySerializer,
+    CatchmentSortingMethodSerializer,
     CatchmentWasteRatioSerializer,
 )
 
@@ -241,6 +242,53 @@ class CollectionSystemViewSet(viewsets.ViewSet):
             for cid, val in best.items()
         ]
         serializer = CatchmentCollectionSystemSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class SortingMethodViewSet(viewsets.ViewSet):
+    """Return the primary sorting method for biowaste per catchment.
+
+    For each catchment, selects the primary biowaste / food-waste collection via
+    collection-system priority and returns its sorting method.
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        """Return a JSON array of {catchment_id, sorting_method}."""
+        country, year = _parse_country_year(request)
+
+        rows = (
+            Collection.objects.filter(
+                valid_from__year=year,
+                catchment__region__country=country,
+                waste_stream__category__name__in=["Biowaste", "Food waste"],
+            )
+            .select_related("collection_system", "sorting_method")
+            .values_list(
+                "catchment_id",
+                "collection_system__name",
+                "sorting_method__name",
+            )
+        )
+
+        best = {}  # catchment_id -> (system, sorting_method, priority)
+        for cid, system, sorting_method in rows:
+            p = _COLLECTION_SYSTEM_PRIORITY.get(system, 99)
+            if cid not in best or p < best[cid][2]:
+                best[cid] = (system, sorting_method, p)
+
+        data = []
+        for cid, (system, sorting_method, _) in best.items():
+            if system == "No separate collection":
+                value = "No separate collection"
+            elif sorting_method:
+                value = sorting_method
+            else:
+                value = "no_data"
+            data.append({"catchment_id": cid, "sorting_method": value})
+
+        serializer = CatchmentSortingMethodSerializer(data, many=True)
         return Response(serializer.data)
 
 

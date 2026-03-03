@@ -34,6 +34,7 @@ from .views import (
     ResidualMinBinSizeMapView,
     ResidualRequiredBinCapacityMapView,
     SwedenOrgaLevelMapView,
+    SwedenSortingMethodMapView,
     WasteAtlasOverviewView,
     WasteRatioMapView,
 )
@@ -59,6 +60,11 @@ urlpatterns = [
         "map/orga-level-sweden/",
         SwedenOrgaLevelMapView.as_view(),
         name="waste-atlas-orga-level-sweden-map",
+    ),
+    path(
+        "map/sorting-method-sweden/",
+        SwedenSortingMethodMapView.as_view(),
+        name="waste-atlas-sorting-method-sweden-map",
     ),
     path(
         "map/orga-level-denmark/",

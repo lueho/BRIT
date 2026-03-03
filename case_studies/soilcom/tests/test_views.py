@@ -3309,6 +3309,17 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="DE" selected')
 
+    def test_sweden_sorting_method_map_defaults_to_se_2023_and_english_labels(self):
+        """Sweden sorting-method map defaults to country SE and year 2023."""
+        response = self.client.get(reverse("waste-atlas-sorting-method-sweden-map"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="SE" selected')
+        self.assertContains(response, 'value="2023" selected')
+        self.assertContains(response, "Sorting methods of waste fractions")
+        self.assertContains(response, "Map overview")
+        self.assertContains(response, "No data")
+
     def test_waste_atlas_overview_includes_italy_orga_level_entry(self):
         """Overview page lists all country-specific organizational-level maps."""
         response = self.client.get(reverse("waste-atlas-overview"))
@@ -3323,6 +3334,11 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(
             response,
             "Map 30 — Administrative level of waste collection (Sweden, EN)",
+        )
+        self.assertContains(response, reverse("waste-atlas-sorting-method-sweden-map"))
+        self.assertContains(
+            response,
+            "Map 34 — Sorting methods of waste fractions (Sweden, EN)",
         )
         self.assertContains(
             response,
