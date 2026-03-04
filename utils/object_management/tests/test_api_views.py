@@ -179,6 +179,25 @@ class ReviewAPIViewsTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_review_context_returns_404_for_stale_content_type(self):
+        """Stale content types are handled as not found instead of raising ValueError."""
+        stale_content_type = ContentType.objects.create(
+            app_label="missing_app",
+            model="missing_model",
+        )
+        url = reverse(
+            "object_management:api_review_context",
+            kwargs={
+                "content_type_id": stale_content_type.id,
+                "object_id": self.review_collection.id,
+            },
+        )
+        self.client.force_login(self.moderator)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 404)
+
     def test_review_context_includes_sources(self):
         """Context payload includes serialized sources from the object."""
         source = Source.objects.create(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from django.contrib.contenttypes.models import ContentType
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from rest_framework import permissions, status
@@ -170,6 +171,8 @@ def _get_review_object(*, content_type_id: int, object_id: int):
     """Resolve and return the review object addressed by content type and id."""
     content_type = get_object_or_404(ContentType, pk=content_type_id)
     model_class = content_type.model_class()
+    if model_class is None:
+        raise Http404("No model is registered for this content type.")
     return get_object_or_404(model_class, pk=object_id)
 
 
