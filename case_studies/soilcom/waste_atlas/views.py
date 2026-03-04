@@ -111,6 +111,16 @@ class BelgiumOrgaLevelMapView(AtlasMapView):
     map_overview_label = "Map overview"
 
 
+class BelgiumFlandersOrgaLevelMapView(AtlasMapView):
+    """Map 35 — Organization level of waste collection in Flanders + Brussels (English)."""
+
+    template_name = "waste_atlas/karte35_orga_level_belgium_flanders.html"
+    map_title = "Administrative level of waste collection"
+    default_country = "BE"
+    default_year = "2022"
+    map_overview_label = "Map overview"
+
+
 class CollectionSystemMapView(AtlasMapView):
     """Karte 2 — Küchenabfall-Sammelsysteme."""
 

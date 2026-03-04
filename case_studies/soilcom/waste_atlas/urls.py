@@ -2,6 +2,7 @@ from django.urls import include, path
 
 from .router import router
 from .views import (
+    BelgiumFlandersOrgaLevelMapView,
     BelgiumOrgaLevelMapView,
     BiowasteCollectionAmountMapView,
     BiowasteCollectionCountMapView,
@@ -80,6 +81,11 @@ urlpatterns = [
         "map/orga-level-belgium/",
         BelgiumOrgaLevelMapView.as_view(),
         name="waste-atlas-orga-level-belgium-map",
+    ),
+    path(
+        "map/orga-level-belgium-flanders/",
+        BelgiumFlandersOrgaLevelMapView.as_view(),
+        name="waste-atlas-orga-level-belgium-flanders-map",
     ),
     path(
         "map/collection-system/",

@@ -3320,6 +3320,22 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "Map overview")
         self.assertContains(response, "No data")
 
+    def test_belgium_flanders_orga_level_map_defaults_to_be_2022_and_english_labels(
+        self,
+    ):
+        """Belgium Flanders+Brussels orga-level map defaults to country BE, year 2022, English."""
+        response = self.client.get(
+            reverse("waste-atlas-orga-level-belgium-flanders-map")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="BE" selected')
+        self.assertContains(response, 'value="2022" selected')
+        self.assertContains(response, "Administrative level of waste collection")
+        self.assertContains(response, "Map overview")
+        self.assertContains(response, "No data")
+        self.assertContains(response, "BE1,BE2")
+
     def test_waste_atlas_overview_includes_italy_orga_level_entry(self):
         """Overview page lists all country-specific organizational-level maps."""
         response = self.client.get(reverse("waste-atlas-overview"))
@@ -3389,10 +3405,17 @@ class WasteAtlasMapViewsTestCase(TestCase):
             response,
             "Map 32 — Administrative level of waste collection (The Netherlands, EN)",
         )
-        self.assertContains(response, reverse("waste-atlas-orga-level-belgium-map"))
         self.assertContains(
             response,
-            "Map 33 — Administrative level of waste collection (Belgium, EN)",
+            reverse("waste-atlas-orga-level-belgium-flanders-map"),
+        )
+        self.assertContains(
+            response,
+            "Map 35 — Administrative level of waste collection (Flanders + Brussels, EN)",
+        )
+        self.assertContains(
+            response,
+            "Belgium (Flanders + Brussels)",
         )
 
 

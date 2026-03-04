@@ -101,6 +101,51 @@ def _parse_country_year(request):
     return country, year
 
 
+def _parse_nuts_prefixes(request):
+    """Return a list of NUTS-ID prefixes from the ``nuts_prefix`` query param.
+
+    The parameter accepts a comma-separated list of NUTS prefixes, e.g.
+    ``nuts_prefix=BE1,BE2`` to restrict results to Brussels and Flanders.
+    Returns an empty list when the parameter is absent.
+    """
+    raw = request.query_params.get("nuts_prefix", "")
+    return [p.strip() for p in raw.split(",") if p.strip()]
+
+
+def _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path=""):
+    """Narrow a queryset to catchments whose NUTS ancestry matches any prefix.
+
+    Walks the catchment parent chain by filtering on NutsRegion rows whose
+    ``nuts_id`` starts with one of *nuts_prefixes*.  The filter is applied via
+    a subquery on the parent catchment hierarchy (depth ≤ 3).
+
+    *catchment_path* is the ORM path prefix to the catchment FK, e.g.
+    ``"catchment__"`` for Collection querysets, or ``""`` for
+    CollectionCatchment querysets.
+    """
+    if not nuts_prefixes:
+        return qs
+
+    from django.db.models import Q
+
+    prefix_q = Q()
+    for prefix in nuts_prefixes:
+        prefix_q |= Q(
+            **{f"{catchment_path}region__nutsregion__nuts_id__startswith": prefix}
+        )
+        prefix_q |= Q(
+            **{
+                f"{catchment_path}parent__region__nutsregion__nuts_id__startswith": prefix
+            }
+        )
+        prefix_q |= Q(
+            **{
+                f"{catchment_path}parent__parent__region__nutsregion__nuts_id__startswith": prefix
+            }
+        )
+    return qs.filter(prefix_q)
+
+
 class CatchmentViewSet(viewsets.ReadOnlyModelViewSet):
     """Read-only viewset returning GeoJSON for catchments that have waste collections.
 
@@ -120,7 +165,8 @@ class CatchmentViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """Return distinct catchments matching the country/year filter."""
         country, year = _parse_country_year(self.request)
-        return (
+        nuts_prefixes = _parse_nuts_prefixes(self.request)
+        qs = (
             CollectionCatchment.objects.filter(
                 collections__valid_from__year=year,
                 region__country=country,
@@ -129,6 +175,7 @@ class CatchmentViewSet(viewsets.ReadOnlyModelViewSet):
             .distinct()
             .select_related("region", "region__borders")
         )
+        return _apply_nuts_prefix_filter(qs, nuts_prefixes)
 
     @action(detail=False, methods=["get"])
     def geojson(self, request, *args, **kwargs):
@@ -166,6 +213,7 @@ class OrgaLevelViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, orga_level}."""
         country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
 
         nuts_exists = Exists(
             NutsRegion.objects.filter(region_ptr_id=OuterRef("region_id"))
@@ -190,6 +238,7 @@ class OrgaLevelViewSet(viewsets.ViewSet):
             )
             .values("id", "orga_level")
         )
+        qs = _apply_nuts_prefix_filter(qs, nuts_prefixes)
 
         data = [
             {"catchment_id": row["id"], "orga_level": row["orga_level"]} for row in qs
@@ -220,15 +269,16 @@ class CollectionSystemViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, collection_system}."""
         country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
 
-        rows = (
-            Collection.objects.filter(
-                valid_from__year=year,
-                catchment__region__country=country,
-                waste_stream__category__name__in=["Biowaste", "Food waste"],
-            )
-            .select_related("collection_system")
-            .values_list("catchment_id", "collection_system__name")
+        qs = Collection.objects.filter(
+            valid_from__year=year,
+            catchment__region__country=country,
+            waste_stream__category__name__in=["Biowaste", "Food waste"],
+        )
+        qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+        rows = qs.select_related("collection_system").values_list(
+            "catchment_id", "collection_system__name"
         )
 
         best = {}
@@ -257,19 +307,18 @@ class SortingMethodViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, sorting_method}."""
         country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
 
-        rows = (
-            Collection.objects.filter(
-                valid_from__year=year,
-                catchment__region__country=country,
-                waste_stream__category__name__in=["Biowaste", "Food waste"],
-            )
-            .select_related("collection_system", "sorting_method")
-            .values_list(
-                "catchment_id",
-                "collection_system__name",
-                "sorting_method__name",
-            )
+        qs = Collection.objects.filter(
+            valid_from__year=year,
+            catchment__region__country=country,
+            waste_stream__category__name__in=["Biowaste", "Food waste"],
+        )
+        qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+        rows = qs.select_related("collection_system", "sorting_method").values_list(
+            "catchment_id",
+            "collection_system__name",
+            "sorting_method__name",
         )
 
         best = {}  # catchment_id -> (system, sorting_method, priority)
@@ -308,13 +357,15 @@ class GreenWasteCollectionSystemCountViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, collection_system_count}."""
         country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        qs = Collection.objects.filter(
+            valid_from__year=year,
+            catchment__region__country=country,
+            waste_stream__category__name__in=_GREEN_WASTE_CATEGORY_NAMES,
+        )
+        qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
         qs = (
-            Collection.objects.filter(
-                valid_from__year=year,
-                catchment__region__country=country,
-                waste_stream__category__name__in=_GREEN_WASTE_CATEGORY_NAMES,
-            )
-            .values("catchment_id")
+            qs.values("catchment_id")
             .annotate(collection_system_count=Count("collection_system", distinct=True))
             .values("catchment_id", "collection_system_count")
         )
@@ -345,7 +396,7 @@ def _classify_food_waste(material_ids):
     return "Uncategorized"
 
 
-def _get_material_status(country, year, material_id):
+def _get_material_status(country, year, material_id, nuts_prefixes=()):
     """Return per-catchment allowed/forbidden status for a given material.
 
     Returns a list of dicts: ``[{catchment_id, status}]`` where *status* is
@@ -355,14 +406,14 @@ def _get_material_status(country, year, material_id):
     from case_studies.soilcom.models import WasteStream
 
     # Step 1: pick primary bio/food waste collection per catchment
-    rows = (
-        Collection.objects.filter(
-            valid_from__year=year,
-            catchment__region__country=country,
-            waste_stream__category__name__in=["Biowaste", "Food waste"],
-        )
-        .select_related("collection_system")
-        .values_list("catchment_id", "waste_stream_id", "collection_system__name")
+    _qs = Collection.objects.filter(
+        valid_from__year=year,
+        catchment__region__country=country,
+        waste_stream__category__name__in=["Biowaste", "Food waste"],
+    )
+    _qs = _apply_nuts_prefix_filter(_qs, nuts_prefixes, catchment_path="catchment__")
+    rows = _qs.select_related("collection_system").values_list(
+        "catchment_id", "waste_stream_id", "collection_system__name"
     )
 
     best = {}  # catchment_id -> (waste_stream_id, system, priority)
@@ -400,20 +451,22 @@ def _get_material_status(country, year, material_id):
     return data
 
 
-def _get_collection_count(country, year, waste_categories):
+def _get_collection_count(country, year, waste_categories, nuts_prefixes=()):
     """Return per-catchment annual collection count for the given waste categories.
 
     For door-to-door collections, sums ``CollectionCountOptions.standard``
     across all seasons.  Also flags whether the counts vary by season.
     Non-door-to-door catchments are excluded (they have no frequency data).
     """
-    rows = Collection.objects.filter(
+    _qs = Collection.objects.filter(
         valid_from__year=year,
         catchment__region__country=country,
         waste_stream__category__name__in=waste_categories,
         collection_system__name="Door to door",
         frequency__isnull=False,
-    ).values_list(
+    )
+    _qs = _apply_nuts_prefix_filter(_qs, nuts_prefixes, catchment_path="catchment__")
+    rows = _qs.values_list(
         "catchment_id",
         "frequency__collectioncountoptions__standard",
     )
@@ -437,24 +490,22 @@ def _get_collection_count(country, year, waste_categories):
     return data
 
 
-def _get_frequency_type(country, year, waste_categories):
+def _get_frequency_type(country, year, waste_categories, nuts_prefixes=()):
     """Return per-catchment frequency type for the given waste categories.
 
     For door-to-door collections, returns the ``CollectionFrequency.type``;
     for other systems, returns the collection system name.
     """
-    rows = (
-        Collection.objects.filter(
-            valid_from__year=year,
-            catchment__region__country=country,
-            waste_stream__category__name__in=waste_categories,
-        )
-        .select_related("collection_system", "frequency")
-        .values_list(
-            "catchment_id",
-            "collection_system__name",
-            "frequency__type",
-        )
+    _qs = Collection.objects.filter(
+        valid_from__year=year,
+        catchment__region__country=country,
+        waste_stream__category__name__in=waste_categories,
+    )
+    _qs = _apply_nuts_prefix_filter(_qs, nuts_prefixes, catchment_path="catchment__")
+    rows = _qs.select_related("collection_system", "frequency").values_list(
+        "catchment_id",
+        "collection_system__name",
+        "frequency__type",
     )
 
     best = {}  # catchment_id -> (system, freq_type, priority)
@@ -486,7 +537,8 @@ class ResidualFrequencyTypeViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, frequency_type}."""
         country, year = _parse_country_year(request)
-        data = _get_frequency_type(country, year, ["Residual waste"])
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = _get_frequency_type(country, year, ["Residual waste"], nuts_prefixes)
         serializer = CatchmentFrequencyTypeSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -504,9 +556,12 @@ class CombinedFrequencyTypeViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, bio_frequency, residual_frequency}."""
         country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
         bio = {
             r["catchment_id"]: r["frequency_type"]
-            for r in _get_frequency_type(country, year, ["Biowaste", "Food waste"])
+            for r in _get_frequency_type(
+                country, year, ["Biowaste", "Food waste"], nuts_prefixes
+            )
         }
         res = {
             r["catchment_id"]: r["frequency_type"]
@@ -539,7 +594,10 @@ class BiowasteFrequencyTypeViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, frequency_type}."""
         country, year = _parse_country_year(request)
-        data = _get_frequency_type(country, year, ["Biowaste", "Food waste"])
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = _get_frequency_type(
+            country, year, ["Biowaste", "Food waste"], nuts_prefixes
+        )
         serializer = CatchmentFrequencyTypeSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -557,7 +615,8 @@ class ResidualCollectionCountViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, collection_count, has_seasonal_variation}."""
         country, year = _parse_country_year(request)
-        data = _get_collection_count(country, year, ["Residual waste"])
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = _get_collection_count(country, year, ["Residual waste"], nuts_prefixes)
         serializer = CatchmentCollectionCountSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -577,15 +636,22 @@ class BiowasteCollectionCountViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, collection_count, has_seasonal_variation}."""
         country, year = _parse_country_year(request)
-        door_to_door = _get_collection_count(country, year, ["Biowaste", "Food waste"])
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        door_to_door = _get_collection_count(
+            country, year, ["Biowaste", "Food waste"], nuts_prefixes
+        )
         d2d_ids = {r["catchment_id"] for r in door_to_door}
 
         # Include non-door-to-door biowaste catchments.
-        all_bio = Collection.objects.filter(
+        _all_bio_qs = Collection.objects.filter(
             valid_from__year=year,
             catchment__region__country=country,
             waste_stream__category__name__in=["Biowaste", "Food waste"],
-        ).values_list("catchment_id", "collection_system__name")
+        )
+        _all_bio_qs = _apply_nuts_prefix_filter(
+            _all_bio_qs, nuts_prefixes, catchment_path="catchment__"
+        )
+        all_bio = _all_bio_qs.values_list("catchment_id", "collection_system__name")
         best_system: dict[int, tuple[str, int]] = {}
         for cid, system in all_bio:
             p = _COLLECTION_SYSTEM_PRIORITY.get(system, 99)
@@ -619,13 +685,18 @@ class CombinedCollectionCountViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, bio_count, residual_count}."""
         country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
         bio = {
             r["catchment_id"]: r["collection_count"]
-            for r in _get_collection_count(country, year, ["Biowaste", "Food waste"])
+            for r in _get_collection_count(
+                country, year, ["Biowaste", "Food waste"], nuts_prefixes
+            )
         }
         res = {
             r["catchment_id"]: r["collection_count"]
-            for r in _get_collection_count(country, year, ["Residual waste"])
+            for r in _get_collection_count(
+                country, year, ["Residual waste"], nuts_prefixes
+            )
         }
         all_ids = set(bio) | set(res)
         data = [
@@ -640,24 +711,22 @@ class CombinedCollectionCountViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-def _get_fee_system(country, year, waste_categories):
+def _get_fee_system(country, year, waste_categories, nuts_prefixes=()):
     """Return per-catchment fee system for the given waste categories.
 
     For biowaste, non-door-to-door catchments return the collection
     system name instead of the fee system.
     """
-    rows = (
-        Collection.objects.filter(
-            valid_from__year=year,
-            catchment__region__country=country,
-            waste_stream__category__name__in=waste_categories,
-        )
-        .select_related("collection_system", "fee_system")
-        .values_list(
-            "catchment_id",
-            "collection_system__name",
-            "fee_system__name",
-        )
+    _qs = Collection.objects.filter(
+        valid_from__year=year,
+        catchment__region__country=country,
+        waste_stream__category__name__in=waste_categories,
+    )
+    _qs = _apply_nuts_prefix_filter(_qs, nuts_prefixes, catchment_path="catchment__")
+    rows = _qs.select_related("collection_system", "fee_system").values_list(
+        "catchment_id",
+        "collection_system__name",
+        "fee_system__name",
     )
 
     best: dict[int, tuple[str, str | None, int]] = {}
@@ -691,7 +760,8 @@ class ResidualFeeSystemViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, fee_system}."""
         country, year = _parse_country_year(request)
-        data = _get_fee_system(country, year, ["Residual waste"])
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = _get_fee_system(country, year, ["Residual waste"], nuts_prefixes)
         serializer = CatchmentFeeSystemSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -709,7 +779,8 @@ class BiowasteFeeSystemViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, fee_system}."""
         country, year = _parse_country_year(request)
-        data = _get_fee_system(country, year, ["Biowaste", "Food waste"])
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = _get_fee_system(country, year, ["Biowaste", "Food waste"], nuts_prefixes)
         serializer = CatchmentFeeSystemSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -727,13 +798,16 @@ class CombinedFeeSystemViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, bio_fee, residual_fee}."""
         country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
         bio = {
             r["catchment_id"]: r["fee_system"]
-            for r in _get_fee_system(country, year, ["Biowaste", "Food waste"])
+            for r in _get_fee_system(
+                country, year, ["Biowaste", "Food waste"], nuts_prefixes
+            )
         }
         res = {
             r["catchment_id"]: r["fee_system"]
-            for r in _get_fee_system(country, year, ["Residual waste"])
+            for r in _get_fee_system(country, year, ["Residual waste"], nuts_prefixes)
         }
         all_ids = set(bio) | set(res)
         data = [
@@ -753,7 +827,7 @@ class CombinedFeeSystemViewSet(viewsets.ViewSet):
 _2022_AMOUNT_YEARS = (2020, 2021)
 
 
-def _get_collection_amount(country, year, waste_categories):
+def _get_collection_amount(country, year, waste_categories, nuts_prefixes=()):
     """Return per-catchment collection amount in kg/person/year.
 
     Strategy varies by atlas year:
@@ -771,14 +845,14 @@ def _get_collection_amount(country, year, waste_categories):
     # ------------------------------------------------------------------
     # Step 1: pick primary collection system per catchment
     # ------------------------------------------------------------------
-    rows = (
-        Collection.objects.filter(
-            valid_from__year=year,
-            catchment__region__country=country,
-            waste_stream__category__name__in=waste_categories,
-        )
-        .select_related("collection_system")
-        .values_list("id", "catchment_id", "collection_system__name")
+    _qs = Collection.objects.filter(
+        valid_from__year=year,
+        catchment__region__country=country,
+        waste_stream__category__name__in=waste_categories,
+    )
+    _qs = _apply_nuts_prefix_filter(_qs, nuts_prefixes, catchment_path="catchment__")
+    rows = _qs.select_related("collection_system").values_list(
+        "id", "catchment_id", "collection_system__name"
     )
 
     best: dict[int, tuple[int, str, int]] = {}
@@ -951,7 +1025,7 @@ def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
     return result
 
 
-def _get_green_waste_collection_amount(country, year):
+def _get_green_waste_collection_amount(country, year, nuts_prefixes=()):
     """Return per-catchment green-waste amount in kg/person/year.
 
     Priority for amount resolution:
@@ -960,14 +1034,14 @@ def _get_green_waste_collection_amount(country, year):
     2) specific amount (CPV)
     3) total amount (CPV/ACPV) converted via population
     """
-    rows = (
-        Collection.objects.filter(
-            valid_from__year=year,
-            catchment__region__country=country,
-            waste_stream__category__name__in=_GREEN_WASTE_CATEGORY_NAMES,
-        )
-        .select_related("collection_system")
-        .values_list("id", "catchment_id", "collection_system__name")
+    _qs = Collection.objects.filter(
+        valid_from__year=year,
+        catchment__region__country=country,
+        waste_stream__category__name__in=_GREEN_WASTE_CATEGORY_NAMES,
+    )
+    _qs = _apply_nuts_prefix_filter(_qs, nuts_prefixes, catchment_path="catchment__")
+    rows = _qs.select_related("collection_system").values_list(
+        "id", "catchment_id", "collection_system__name"
     )
 
     best: dict[int, tuple[int, str, int]] = {}
@@ -1146,7 +1220,8 @@ class ResidualCollectionAmountViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, amount}."""
         country, year = _parse_country_year(request)
-        data = _get_collection_amount(country, year, ["Residual waste"])
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = _get_collection_amount(country, year, ["Residual waste"], nuts_prefixes)
         serializer = CatchmentCollectionAmountSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -1164,7 +1239,10 @@ class BiowasteCollectionAmountViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, amount}."""
         country, year = _parse_country_year(request)
-        data = _get_collection_amount(country, year, ["Biowaste", "Food waste"])
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = _get_collection_amount(
+            country, year, ["Biowaste", "Food waste"], nuts_prefixes
+        )
         serializer = CatchmentCollectionAmountSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -1182,24 +1260,27 @@ class GreenWasteCollectionAmountViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, amount, no_collection}."""
         country, year = _parse_country_year(request)
-        data = _get_green_waste_collection_amount(country, year)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = _get_green_waste_collection_amount(country, year, nuts_prefixes)
         serializer = CatchmentCollectionAmountSerializer(data, many=True)
         return Response(serializer.data)
 
 
-def _get_min_bin_size(country, year, waste_categories):
+def _get_min_bin_size(country, year, waste_categories, nuts_prefixes=()):
     """Return per-catchment minimum bin size (L) for door-to-door collections.
 
     Picks the primary door-to-door collection per catchment using
     ``_COLLECTION_SYSTEM_PRIORITY`` and returns its ``min_bin_size`` value.
     Only door-to-door collections carry meaningful bin size data.
     """
-    rows = Collection.objects.filter(
+    _qs = Collection.objects.filter(
         valid_from__year=year,
         catchment__region__country=country,
         waste_stream__category__name__in=waste_categories,
         collection_system__name="Door to door",
-    ).values_list("catchment_id", "min_bin_size")
+    )
+    _qs = _apply_nuts_prefix_filter(_qs, nuts_prefixes, catchment_path="catchment__")
+    rows = _qs.values_list("catchment_id", "min_bin_size")
 
     best: dict[int, float | None] = {}
     for cid, size in rows:
@@ -1209,19 +1290,21 @@ def _get_min_bin_size(country, year, waste_categories):
     return [{"catchment_id": cid, "min_bin_size": size} for cid, size in best.items()]
 
 
-def _get_required_bin_capacity(country, year, waste_categories):
+def _get_required_bin_capacity(country, year, waste_categories, nuts_prefixes=()):
     """Return per-catchment required specific bin capacity for door-to-door collections.
 
     Returns ``required_bin_capacity`` (L/reference) and
     ``required_bin_capacity_reference`` (person / household / property /
     not_specified) for the primary door-to-door collection per catchment.
     """
-    rows = Collection.objects.filter(
+    _qs = Collection.objects.filter(
         valid_from__year=year,
         catchment__region__country=country,
         waste_stream__category__name__in=waste_categories,
         collection_system__name="Door to door",
-    ).values_list(
+    )
+    _qs = _apply_nuts_prefix_filter(_qs, nuts_prefixes, catchment_path="catchment__")
+    rows = _qs.values_list(
         "catchment_id", "required_bin_capacity", "required_bin_capacity_reference"
     )
 
@@ -1253,7 +1336,10 @@ class BiowasteMinBinSizeViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, min_bin_size}."""
         country, year = _parse_country_year(request)
-        data = _get_min_bin_size(country, year, ["Biowaste", "Food waste"])
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = _get_min_bin_size(
+            country, year, ["Biowaste", "Food waste"], nuts_prefixes
+        )
         serializer = CatchmentMinBinSizeSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -1271,7 +1357,8 @@ class ResidualMinBinSizeViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, min_bin_size}."""
         country, year = _parse_country_year(request)
-        data = _get_min_bin_size(country, year, ["Residual waste"])
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = _get_min_bin_size(country, year, ["Residual waste"], nuts_prefixes)
         serializer = CatchmentMinBinSizeSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -1289,7 +1376,10 @@ class BiowasteRequiredBinCapacityViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, required_bin_capacity, required_bin_capacity_reference}."""
         country, year = _parse_country_year(request)
-        data = _get_required_bin_capacity(country, year, ["Biowaste", "Food waste"])
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = _get_required_bin_capacity(
+            country, year, ["Biowaste", "Food waste"], nuts_prefixes
+        )
         serializer = CatchmentRequiredBinCapacitySerializer(data, many=True)
         return Response(serializer.data)
 
@@ -1307,7 +1397,10 @@ class ResidualRequiredBinCapacityViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, required_bin_capacity, required_bin_capacity_reference}."""
         country, year = _parse_country_year(request)
-        data = _get_required_bin_capacity(country, year, ["Residual waste"])
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = _get_required_bin_capacity(
+            country, year, ["Residual waste"], nuts_prefixes
+        )
         serializer = CatchmentRequiredBinCapacitySerializer(data, many=True)
         return Response(serializer.data)
 
@@ -1315,15 +1408,17 @@ class ResidualRequiredBinCapacityViewSet(viewsets.ViewSet):
 _ORGANIC_CATEGORY_NAMES = ["Biowaste", "Food waste"] + _GREEN_WASTE_CATEGORY_NAMES
 
 
-def _get_organic_amounts(country, year):
+def _get_organic_amounts(country, year, nuts_prefixes=()):
     """Return per-catchment summed organic waste amount (kg/person/year).
 
     Sums bio/food waste from ``_get_collection_amount`` with green waste from
     ``_get_green_waste_collection_amount``.  Catchments present in either
     source are included; amounts are summed where both are available.
     """
-    bio_rows = _get_collection_amount(country, year, ["Biowaste", "Food waste"])
-    green_rows = _get_green_waste_collection_amount(country, year)
+    bio_rows = _get_collection_amount(
+        country, year, ["Biowaste", "Food waste"], nuts_prefixes
+    )
+    green_rows = _get_green_waste_collection_amount(country, year, nuts_prefixes)
 
     bio_map = {
         r["catchment_id"]: r["amount"] for r in bio_rows if not r.get("no_collection")
@@ -1364,7 +1459,8 @@ class OrganicCollectionAmountViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, amount}."""
         country, year = _parse_country_year(request)
-        organic = _get_organic_amounts(country, year)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        organic = _get_organic_amounts(country, year, nuts_prefixes)
         data = [{"catchment_id": cid, "amount": amt} for cid, amt in organic.items()]
         serializer = CatchmentCollectionAmountSerializer(data, many=True)
         return Response(serializer.data)
@@ -1383,10 +1479,13 @@ class OrganicWasteRatioViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, organic_amount, residual_amount, ratio}."""
         country, year = _parse_country_year(request)
-        organic = _get_organic_amounts(country, year)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        organic = _get_organic_amounts(country, year, nuts_prefixes)
         res_map = {
             r["catchment_id"]: r["amount"]
-            for r in _get_collection_amount(country, year, ["Residual waste"])
+            for r in _get_collection_amount(
+                country, year, ["Residual waste"], nuts_prefixes
+            )
         }
         all_ids = set(organic) | set(res_map)
         data = []
@@ -1422,13 +1521,18 @@ class WasteRatioViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, bio_amount, residual_amount, ratio}."""
         country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
         bio = {
             r["catchment_id"]: r["amount"]
-            for r in _get_collection_amount(country, year, ["Biowaste", "Food waste"])
+            for r in _get_collection_amount(
+                country, year, ["Biowaste", "Food waste"], nuts_prefixes
+            )
         }
         res = {
             r["catchment_id"]: r["amount"]
-            for r in _get_collection_amount(country, year, ["Residual waste"])
+            for r in _get_collection_amount(
+                country, year, ["Residual waste"], nuts_prefixes
+            )
         }
         all_ids = set(bio) | set(res)
         data = []
@@ -1467,18 +1571,21 @@ class CollectionSupportViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, paper_bags, plastic_bags}."""
         country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
 
         from case_studies.soilcom.models import WasteStream
 
         # Step 1: pick primary bio/food waste collection per catchment
-        rows = (
-            Collection.objects.filter(
-                valid_from__year=year,
-                catchment__region__country=country,
-                waste_stream__category__name__in=["Biowaste", "Food waste"],
-            )
-            .select_related("collection_system")
-            .values_list("catchment_id", "waste_stream_id", "collection_system__name")
+        _qs = Collection.objects.filter(
+            valid_from__year=year,
+            catchment__region__country=country,
+            waste_stream__category__name__in=["Biowaste", "Food waste"],
+        )
+        _qs = _apply_nuts_prefix_filter(
+            _qs, nuts_prefixes, catchment_path="catchment__"
+        )
+        rows = _qs.select_related("collection_system").values_list(
+            "catchment_id", "waste_stream_id", "collection_system__name"
         )
 
         best = {}  # catchment_id -> (waste_stream_id, system, priority)
@@ -1550,7 +1657,10 @@ class PaperBagsStatusViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, status}."""
         country, year = _parse_country_year(request)
-        data = _get_material_status(country, year, _PAPER_BAGS_MATERIAL_ID)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = _get_material_status(
+            country, year, _PAPER_BAGS_MATERIAL_ID, nuts_prefixes
+        )
         serializer = CatchmentMaterialStatusSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -1571,7 +1681,10 @@ class PlasticBagsStatusViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, status}."""
         country, year = _parse_country_year(request)
-        data = _get_material_status(country, year, _PLASTIC_BAGS_MATERIAL_ID)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = _get_material_status(
+            country, year, _PLASTIC_BAGS_MATERIAL_ID, nuts_prefixes
+        )
         serializer = CatchmentMaterialStatusSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -1597,18 +1710,19 @@ class FoodWasteCategoryViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, food_waste_category}."""
         country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
 
         # Step 1: pick primary bio/food waste collection per catchment
-        rows = (
-            Collection.objects.filter(
-                valid_from__year=year,
-                catchment__region__country=country,
-                waste_stream__category__name__in=["Biowaste", "Food waste"],
-            )
-            .select_related("collection_system")
-            .values_list(
-                "id", "catchment_id", "waste_stream_id", "collection_system__name"
-            )
+        _qs = Collection.objects.filter(
+            valid_from__year=year,
+            catchment__region__country=country,
+            waste_stream__category__name__in=["Biowaste", "Food waste"],
+        )
+        _qs = _apply_nuts_prefix_filter(
+            _qs, nuts_prefixes, catchment_path="catchment__"
+        )
+        rows = _qs.select_related("collection_system").values_list(
+            "id", "catchment_id", "waste_stream_id", "collection_system__name"
         )
 
         best = {}  # catchment_id -> (collection_id, waste_stream_id, system, priority)
@@ -1667,16 +1781,19 @@ class ConnectionRateViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, connection_rate, is_door_to_door}."""
         country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
 
         # Step 1: pick primary bio/food waste collection per catchment
-        rows = (
-            Collection.objects.filter(
-                valid_from__year=year,
-                catchment__region__country=country,
-                waste_stream__category__name__in=["Biowaste", "Food waste"],
-            )
-            .select_related("collection_system")
-            .values_list("id", "catchment_id", "collection_system__name")
+        _qs = Collection.objects.filter(
+            valid_from__year=year,
+            catchment__region__country=country,
+            waste_stream__category__name__in=["Biowaste", "Food waste"],
+        )
+        _qs = _apply_nuts_prefix_filter(
+            _qs, nuts_prefixes, catchment_path="catchment__"
+        )
+        rows = _qs.select_related("collection_system").values_list(
+            "id", "catchment_id", "collection_system__name"
         )
 
         best = {}  # catchment_id -> (collection_id, system_name, priority)

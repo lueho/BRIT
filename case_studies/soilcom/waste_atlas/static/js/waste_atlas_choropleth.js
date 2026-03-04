@@ -69,11 +69,12 @@ var WasteAtlasChoropleth = (function () {
 
   function _fetchAll(cfg) {
     var base = '/waste_collection/api/waste-atlas/';
-    var catchUrl = base + 'catchment/geojson/?country=' + cfg.country + '&year=' + cfg.year;
-    var allCatchUrl = base + 'catchment/geojson/?country=' + cfg.country + '&year=2022';
+    var nutsSuffix = cfg.nutsPrefix ? '&nuts_prefix=' + encodeURIComponent(cfg.nutsPrefix) : '';
+    var catchUrl = base + 'catchment/geojson/?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix;
+    var allCatchUrl = base + 'catchment/geojson/?country=' + cfg.country + '&year=2022' + nutsSuffix;
     var nuts0Url = '/maps/api/nuts_region/geojson/?levl_code=0&cntr_code=' + cfg.country;
     var nuts1Url = '/maps/api/nuts_region/geojson/?levl_code=1&cntr_code=' + cfg.country;
-    var dataUrl = cfg.dataUrl + '?country=' + cfg.country + '&year=' + cfg.year;
+    var dataUrl = cfg.dataUrl + '?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix;
 
     return Promise.all([
       _fetchJSON(catchUrl),

@@ -273,11 +273,35 @@
       <div class="col-md-6 col-lg-4">
         <div class="card mb-3">
           <div class="card-header">
-            <strong>Belgium</strong>
+            <strong>Belgium (Flanders + Brussels)</strong>
           </div>
           <ul class="list-group list-group-flush">
             <li class="list-group-item">
-              <a href="{% url 'waste-atlas-orga-level-belgium-map' %}">Map 33 — Administrative level of waste collection (Belgium, EN)</a>
+              <a href="{% url 'waste-atlas-orga-level-belgium-flanders-map' %}">Map 35 — Administrative level of waste collection (Flanders + Brussels, EN)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-collection-system-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 2 — Küchenabfall-Sammelsysteme (Flanders + Brussels, 2022)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-connection-rate-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 3 — Anschlussgrad an die Biotonne (Flanders + Brussels, 2022)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-biowaste-fee-system-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 15 — Gebührensystem Biotonne (Flanders + Brussels, 2022)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-biowaste-frequency-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 10 — Abfuhrrhythmus Biotonne (Flanders + Brussels, 2022)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-biowaste-collection-amount-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 18 — Bioabfall-Sammelmengen (Flanders + Brussels, 2022)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-residual-collection-amount-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 17 — Restmüll-Sammelmengen (Flanders + Brussels, 2022)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-waste-ratio-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 19 — Sammelmengen-Verhältnis (Flanders + Brussels, 2022)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-green-waste-collection-amount-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 22 — Grüngut-Sammelmengen (Flanders + Brussels, 2022)</a>
             </li>
           </ul>
         </div>
