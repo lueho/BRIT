@@ -3363,6 +3363,26 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
+            f"{reverse('waste-atlas-collection-system-map')}?country=DK&amp;year=2023",
+        )
+        self.assertContains(
+            response,
+            f"{reverse('waste-atlas-biowaste-frequency-map')}?country=DK&amp;year=2023",
+        )
+        self.assertContains(
+            response,
+            f"{reverse('waste-atlas-biowaste-collection-amount-map')}?country=DK&amp;year=2023",
+        )
+        self.assertContains(
+            response,
+            f"{reverse('waste-atlas-organic-collection-amount-map')}?country=DK&amp;year=2023",
+        )
+        self.assertContains(
+            response,
+            f"{reverse('waste-atlas-organic-waste-ratio-map')}?country=DK&amp;year=2023",
+        )
+        self.assertContains(
+            response,
             reverse("waste-atlas-orga-level-netherlands-map"),
         )
         self.assertContains(
