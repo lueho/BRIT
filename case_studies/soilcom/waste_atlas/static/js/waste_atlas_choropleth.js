@@ -83,11 +83,21 @@ var WasteAtlasChoropleth = (function () {
       _fetchJSON(nuts1Url),
       _fetchJSON(allCatchUrl),
     ]).then(function (results) {
+      var bundeslaender = results[3];
+      if (cfg.nutsPrefix && bundeslaender && bundeslaender.features) {
+        var prefixes = cfg.nutsPrefix.split(',').map(function (p) { return p.trim(); });
+        bundeslaender = Object.assign({}, bundeslaender, {
+          features: bundeslaender.features.filter(function (f) {
+            var nutsId = f.properties && (f.properties.nuts_id || f.properties.NUTS_ID || '');
+            return prefixes.some(function (p) { return nutsId.indexOf(p) === 0; });
+          }),
+        });
+      }
       return {
         catchments: results[0],
         thematicData: results[1],
         countryBorder: results[2],
-        bundeslaender: results[3],
+        bundeslaender: bundeslaender,
         allCatchments: results[4],
       };
     });
@@ -126,18 +136,22 @@ var WasteAtlasChoropleth = (function () {
 
     _svg.selectAll('*').remove();
 
-    // Projection — fit to country border so the extent is identical across years
-    var fitData = (data.countryBorder && data.countryBorder.features && data.countryBorder.features.length)
-      ? data.countryBorder : data.catchments;
+    // Projection — fit to country border (or filtered regions when nutsPrefix is set)
+    var regionBorder = (cfg.nutsPrefix && data.bundeslaender && data.bundeslaender.features && data.bundeslaender.features.length)
+      ? data.bundeslaender : data.countryBorder;
+    var fitData = (regionBorder && regionBorder.features && regionBorder.features.length)
+      ? regionBorder : data.catchments;
     var projection = d3.geoMercator()
       .fitExtent([[40, 60], [width - 40, height - 100]], fitData);
     var path = d3.geoPath().projection(projection);
 
-    // Layer 1: country background fill (no stroke — border drawn on top)
-    if (data.countryBorder && data.countryBorder.features) {
+    // Layer 1: background fill (filtered NUTS1 regions when nutsPrefix set, else full country)
+    var fillData = (cfg.nutsPrefix && data.bundeslaender && data.bundeslaender.features && data.bundeslaender.features.length)
+      ? data.bundeslaender : data.countryBorder;
+    if (fillData && fillData.features) {
       _svg.append('g').attr('class', 'layer-country-fill')
         .selectAll('path')
-        .data(data.countryBorder.features)
+        .data(fillData.features)
         .enter().append('path')
         .attr('d', path)
         .attr('fill', COUNTRY_FILL)
@@ -188,11 +202,13 @@ var WasteAtlasChoropleth = (function () {
         .attr('stroke-width', BUNDESLAND_STROKE_WIDTH);
     }
 
-    // Layer 5: country border (very top)
-    if (data.countryBorder && data.countryBorder.features) {
+    // Layer 5: outer border (very top) — filtered regions when nutsPrefix set, else full country
+    var borderData = (cfg.nutsPrefix && data.bundeslaender && data.bundeslaender.features && data.bundeslaender.features.length)
+      ? data.bundeslaender : data.countryBorder;
+    if (borderData && borderData.features) {
       _svg.append('g').attr('class', 'layer-country-border')
         .selectAll('path')
-        .data(data.countryBorder.features)
+        .data(borderData.features)
         .enter().append('path')
         .attr('d', path)
         .attr('fill', 'none')

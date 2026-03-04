@@ -266,6 +266,7 @@ class NutsRegionGeometrySerializer(GeoFeatureModelSerializer):
         fields = (
             "id",
             "level",
+            "nuts_id",
         )
 
 
