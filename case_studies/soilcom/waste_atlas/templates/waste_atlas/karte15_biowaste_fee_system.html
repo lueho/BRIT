@@ -1,7 +1,7 @@
 {% extends "waste_atlas/choropleth_map.html" %}
 
 {% block atlas_config %}
-<script>
+  <script>
   document.addEventListener('DOMContentLoaded', function () {
     WasteAtlasChoropleth.init({
       svgId:       'atlas-svg',
@@ -9,6 +9,7 @@
       loadingId:   'loading-overlay',
       country:     '{{ country }}',
       year:        parseInt('{{ year }}', 10) || 2024,
+      {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       title:       'Gebührensysteme der Bioabfallabholung',
       dataUrl:     '/waste_collection/api/waste-atlas/biowaste-fee-system/',
       dataField:   'fee_system',
@@ -26,5 +27,5 @@
       fileBase:    'karte15_gebuehrensystem_bioabfall'
     });
   });
-</script>
+  </script>
 {% endblock atlas_config %}

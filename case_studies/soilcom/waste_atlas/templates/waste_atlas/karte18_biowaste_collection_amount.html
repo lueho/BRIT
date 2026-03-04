@@ -9,6 +9,7 @@
       loadingId:   'loading-overlay',
       country:     '{{ country }}',
       year:        parseInt('{{ year }}', 10) || 2024,
+      {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       title:       'Spezifisch gesammelte Menge an Bioabfall pro Person und Jahr',
       dataUrl:     '/waste_collection/api/waste-atlas/biowaste-collection-amount/',
       dataField:   '_classified',

@@ -26,10 +26,11 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
     map_overview_label = "Kartenübersicht"
 
     def get_context_data(self, **kwargs):
-        """Pass country, year, and map_title to the template."""
+        """Pass country, year, nuts_prefix, and map_title to the template."""
         ctx = super().get_context_data(**kwargs)
         ctx["country"] = self.request.GET.get("country", self.default_country)
         ctx["year"] = self.request.GET.get("year", self.default_year)
+        ctx["nuts_prefix"] = self.request.GET.get("nuts_prefix", "")
         ctx["map_title"] = self.map_title
         ctx["map_overview_label"] = self.map_overview_label
         return ctx

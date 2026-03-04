@@ -1,7 +1,7 @@
 {% extends "waste_atlas/choropleth_map.html" %}
 
 {% block atlas_config %}
-<script>
+  <script>
   document.addEventListener('DOMContentLoaded', function () {
     WasteAtlasChoropleth.init({
       svgId:       'atlas-svg',
@@ -9,6 +9,7 @@
       loadingId:   'loading-overlay',
       country:     '{{ country }}',
       year:        parseInt('{{ year }}', 10) || 2024,
+      {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       title:       'Spezifisch gesammelte Menge an Grüngut pro Person und Jahr',
       dataUrl:     '/waste_collection/api/waste-atlas/green-waste-collection-amount/',
       dataField:   '_classified',
@@ -44,5 +45,5 @@
       }
     });
   });
-</script>
+  </script>
 {% endblock atlas_config %}
