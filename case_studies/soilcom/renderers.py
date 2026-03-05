@@ -35,13 +35,27 @@ _STATIC_LABELS = {
     "required_bin_capacity": "Minimum required specific bin capacity (L/reference unit)",
     "required_bin_capacity_reference": "Reference unit for minimum required specific bin capacity",
     "comments": "Comments",
-    "flyer_urls": "Flyer URLs",
+    "flyer_urls": "Weblinks",
     "bibliography_sources": "Bibliography Sources",
     "valid_from": "Valid from",
     "valid_until": "Valid until",
     "created_at": "Created at",
     "lastmodified_at": "Last modified at",
 }
+
+_TRAILING_STATIC_KEYS = [
+    "comments",
+    "flyer_urls",
+    "bibliography_sources",
+    "valid_from",
+    "valid_until",
+    "created_at",
+    "lastmodified_at",
+]
+
+_LEADING_STATIC_KEYS = [
+    key for key in _STATIC_LABELS if key not in _TRAILING_STATIC_KEYS
+]
 
 
 class CollectionXLSXRenderer(BaseXLSXRenderer):
@@ -50,30 +64,32 @@ class CollectionXLSXRenderer(BaseXLSXRenderer):
 
     def render(self, file, data, *args, **kwargs):
         """Extend column list with dynamic property-value columns found in data."""
+        dynamic = []
         labels = dict(_STATIC_LABELS)
         if data:
             dynamic = _discover_dynamic_columns(data, labels)
             for key in dynamic:
                 labels[key] = _label_for_dynamic_key(key)
-            self.column_order = list(_STATIC_LABELS.keys()) + dynamic
+        self.column_order = _LEADING_STATIC_KEYS + dynamic + _TRAILING_STATIC_KEYS
         self.labels = labels
         super().render(file, data, *args, **kwargs)
 
 
 class CollectionCSVRenderer(BaseCSVRenderer):
     writer_opts = {"delimiter": "\t"}
-    header = list(_STATIC_LABELS.keys())
+    header = _LEADING_STATIC_KEYS + _TRAILING_STATIC_KEYS
     labels = dict(_STATIC_LABELS)
 
     def render(self, file, data, *args, **kwargs):
         """Extend header with dynamic property-value columns found in data."""
-        header = list(_STATIC_LABELS.keys())
+        dynamic = []
+        header = _LEADING_STATIC_KEYS + _TRAILING_STATIC_KEYS
         labels = dict(_STATIC_LABELS)
         if data:
             dynamic = _discover_dynamic_columns(data, labels)
             for key in dynamic:
                 labels[key] = _label_for_dynamic_key(key)
-            header.extend(dynamic)
+        header = _LEADING_STATIC_KEYS + dynamic + _TRAILING_STATIC_KEYS
         self.header = header
         self.labels = labels
         super().render(file, data, *args, **kwargs)
