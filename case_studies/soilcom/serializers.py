@@ -4,6 +4,7 @@ from rest_framework import serializers
 from rest_framework_gis.fields import GeometrySerializerMethodField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
+from bibliography.models import Source
 from maps.models import GeoPolygon
 from materials.models import Material
 from utils.object_management.permissions import get_object_policy
@@ -573,4 +574,183 @@ class CollectionImportRecordSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 "Either 'nuts_or_lau_id' or 'catchment_name' must be provided."
             )
+        return attrs
+
+
+class CollectionMutationCreateSerializer(serializers.Serializer):
+    """Validate payloads for programmatic collection creation."""
+
+    catchment = serializers.PrimaryKeyRelatedField(
+        queryset=models.CollectionCatchment.objects.all()
+    )
+    waste_category = serializers.PrimaryKeyRelatedField(
+        queryset=models.WasteCategory.objects.all()
+    )
+    collection_system = serializers.PrimaryKeyRelatedField(
+        queryset=models.CollectionSystem.objects.all()
+    )
+    collector = serializers.PrimaryKeyRelatedField(
+        queryset=models.Collector.objects.all(), required=False, allow_null=True
+    )
+    frequency = serializers.PrimaryKeyRelatedField(
+        queryset=models.CollectionFrequency.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    fee_system = serializers.PrimaryKeyRelatedField(
+        queryset=models.FeeSystem.objects.all(), required=False, allow_null=True
+    )
+    sorting_method = serializers.PrimaryKeyRelatedField(
+        queryset=models.SortingMethod.objects.all(), required=False, allow_null=True
+    )
+    allowed_materials = serializers.PrimaryKeyRelatedField(
+        queryset=Material.objects.all(), many=True, required=False, default=list
+    )
+    forbidden_materials = serializers.PrimaryKeyRelatedField(
+        queryset=Material.objects.all(), many=True, required=False, default=list
+    )
+    sources = serializers.PrimaryKeyRelatedField(
+        queryset=Source.objects.all(), many=True, required=False, default=list
+    )
+    flyer_urls = serializers.ListField(
+        child=serializers.URLField(), required=False, default=list
+    )
+
+    valid_from = serializers.DateField()
+    valid_until = serializers.DateField(required=False, allow_null=True)
+    established = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1800, max_value=2100
+    )
+    connection_type = serializers.ChoiceField(
+        choices=[choice[0] for choice in models.CONNECTION_TYPE_CHOICES],
+        required=False,
+        allow_null=True,
+    )
+    min_bin_size = serializers.DecimalField(
+        required=False,
+        allow_null=True,
+        max_digits=8,
+        decimal_places=1,
+    )
+    required_bin_capacity = serializers.DecimalField(
+        required=False,
+        allow_null=True,
+        max_digits=8,
+        decimal_places=1,
+    )
+    required_bin_capacity_reference = serializers.ChoiceField(
+        choices=[
+            choice[0] for choice in models.REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES
+        ],
+        required=False,
+        allow_null=True,
+    )
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    submit_for_review = serializers.BooleanField(required=False, default=True)
+
+    def validate(self, attrs):
+        valid_from = attrs.get("valid_from")
+        valid_until = attrs.get("valid_until")
+        if valid_from and valid_until and valid_from >= valid_until:
+            raise serializers.ValidationError(
+                {"valid_until": ("Valid until date must be after the valid from date.")}
+            )
+        return attrs
+
+
+class CollectionMutationVersionSerializer(serializers.Serializer):
+    """Validate payloads for creating a new collection version from a predecessor."""
+
+    catchment = serializers.PrimaryKeyRelatedField(
+        queryset=models.CollectionCatchment.objects.all(), required=False
+    )
+    waste_category = serializers.PrimaryKeyRelatedField(
+        queryset=models.WasteCategory.objects.all(), required=False
+    )
+    collection_system = serializers.PrimaryKeyRelatedField(
+        queryset=models.CollectionSystem.objects.all(), required=False
+    )
+    collector = serializers.PrimaryKeyRelatedField(
+        queryset=models.Collector.objects.all(), required=False, allow_null=True
+    )
+    frequency = serializers.PrimaryKeyRelatedField(
+        queryset=models.CollectionFrequency.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    fee_system = serializers.PrimaryKeyRelatedField(
+        queryset=models.FeeSystem.objects.all(), required=False, allow_null=True
+    )
+    sorting_method = serializers.PrimaryKeyRelatedField(
+        queryset=models.SortingMethod.objects.all(), required=False, allow_null=True
+    )
+    allowed_materials = serializers.PrimaryKeyRelatedField(
+        queryset=Material.objects.all(), many=True, required=False
+    )
+    forbidden_materials = serializers.PrimaryKeyRelatedField(
+        queryset=Material.objects.all(), many=True, required=False
+    )
+    sources = serializers.PrimaryKeyRelatedField(
+        queryset=Source.objects.all(), many=True, required=False
+    )
+    flyer_urls = serializers.ListField(child=serializers.URLField(), required=False)
+
+    valid_from = serializers.DateField()
+    valid_until = serializers.DateField(required=False, allow_null=True)
+    established = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1800, max_value=2100
+    )
+    connection_type = serializers.ChoiceField(
+        choices=[choice[0] for choice in models.CONNECTION_TYPE_CHOICES],
+        required=False,
+        allow_null=True,
+    )
+    min_bin_size = serializers.DecimalField(
+        required=False,
+        allow_null=True,
+        max_digits=8,
+        decimal_places=1,
+    )
+    required_bin_capacity = serializers.DecimalField(
+        required=False,
+        allow_null=True,
+        max_digits=8,
+        decimal_places=1,
+    )
+    required_bin_capacity_reference = serializers.ChoiceField(
+        choices=[
+            choice[0] for choice in models.REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES
+        ],
+        required=False,
+        allow_null=True,
+    )
+    description = serializers.CharField(required=False, allow_blank=True)
+    submit_for_review = serializers.BooleanField(required=False, default=True)
+
+    def validate(self, attrs):
+        predecessor = self.context.get("predecessor")
+        if predecessor is None:
+            raise serializers.ValidationError("A predecessor collection is required.")
+
+        valid_from = attrs.get("valid_from")
+        valid_until = attrs.get("valid_until")
+
+        if valid_from and valid_until and valid_from >= valid_until:
+            raise serializers.ValidationError(
+                {"valid_until": ("Valid until date must be after the valid from date.")}
+            )
+
+        if (
+            valid_from
+            and predecessor.valid_from
+            and valid_from <= predecessor.valid_from
+        ):
+            raise serializers.ValidationError(
+                {
+                    "valid_from": (
+                        "valid_from must be later than the predecessor valid_from date."
+                    )
+                }
+            )
+
         return attrs
