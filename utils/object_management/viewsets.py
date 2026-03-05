@@ -3,7 +3,7 @@ import logging
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-from rest_framework import permissions, status, viewsets
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -42,7 +42,7 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         - scope: Different filtering options for objects
           'published' - Only published objects (default)
           'private' - Only user's own objects
-          'review' - User's own objects or objects in review
+          'review' - Only user's own objects currently in review
         """
         user = self.request.user
         queryset = self.queryset
@@ -61,10 +61,8 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
             # Private scope: only user's own objects
             return queryset.filter(owner=user)
         elif scope == "review":
-            # Review scope: user's own objects or objects in review
-            q_owner = Q(owner=user)
-            q_review = Q(publication_status="review")
-            return queryset.filter(q_owner | q_review)
+            # Review scope: only user's own objects in review
+            return queryset.filter(owner=user, publication_status="review")
         elif scope == "published":
             # Published scope: only published objects
             return queryset.filter(publication_status="published")
@@ -155,7 +153,7 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
             )
 
     @action(
-        detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated]
+        detail=True, methods=["post"], permission_classes=[UserCreatedObjectPermission]
     )
     def register_for_review(self, request, pk=None):
         """
@@ -165,6 +163,15 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
 
         # Enforce object-level permissions
         self.check_object_permissions(request, obj)
+
+        permission = UserCreatedObjectPermission()
+        if not permission.has_submit_permission(request, obj):
+            return Response(
+                {
+                    "error": "You do not have permission to submit this object for review."
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         try:
             previous_status = getattr(obj, "publication_status", None)
@@ -186,7 +193,7 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(
-        detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated]
+        detail=True, methods=["post"], permission_classes=[UserCreatedObjectPermission]
     )
     def withdraw_from_review(self, request, pk=None):
         """
@@ -196,6 +203,15 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
 
         # Enforce object-level permissions
         self.check_object_permissions(request, obj)
+
+        permission = UserCreatedObjectPermission()
+        if not permission.has_withdraw_permission(request, obj):
+            return Response(
+                {
+                    "error": "You do not have permission to withdraw this object from review."
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         try:
             previous_status = getattr(obj, "publication_status", None)

@@ -17,7 +17,7 @@ This package provides the core infrastructure for managing user-created objects 
 The base model for all objects created by users. Provides:
 
 - **Owner tracking**: Every object has an `owner` (ForeignKey to User)
-- **Publication status**: Objects can be `private`, `in_review`, `published`, `declined`, or `archived`
+- **Publication status**: Objects can be `private`, `review`, `published`, `declined`, or `archived`
 - **Timestamps**: Automatic tracking of creation and modification times
 - **Approval workflow**: Fields for tracking approval/rejection by moderators
 
@@ -137,12 +137,14 @@ The signal creates all `can_moderate_<model>` permissions during test database s
 
 ## Review Workflow
 
+> Canonical policy source: `docs/02_developer_guide/security_permission_validation.md`
+
 ### States
 
 Objects can be in one of five publication states:
 
-1. **private**: Only visible to owner and staff
-2. **in_review**: Submitted for moderation review
+1. **private**: Draft state before review
+2. **review**: Submitted for moderation review
 3. **published**: Publicly visible
 4. **declined**: Rejected by moderators with feedback
 5. **archived**: No longer active but preserved
@@ -151,10 +153,10 @@ Objects can be in one of five publication states:
 
 | Action | Who can perform | State transition |
 |--------|----------------|------------------|
-| Submit for review | Owner | private/declined → in_review |
-| Withdraw | Owner | in_review → private |
-| Approve | Moderator (not owner) | in_review → published |
-| Reject | Moderator (not owner) | in_review → declined |
+| Submit for review | Owner or staff | private/declined → review |
+| Withdraw | Owner or staff | review/declined → private |
+| Approve | Moderator/staff (not owner) | review → published |
+| Reject | Moderator/staff (not owner) | review → declined |
 | Archive | Owner/Moderator/Staff | published → archived |
 
 ### Four-Eyes Principle

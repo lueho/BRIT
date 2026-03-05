@@ -3,6 +3,7 @@ from django.forms import HiddenInput
 from django_filters import ChoiceFilter, FilterSet, RangeFilter
 
 from utils.fields import NullablePercentageRangeField, NullableRangeField
+from utils.object_management.permissions import apply_scope_filter
 
 
 class BaseCrispyFilterSet(FilterSet):
@@ -151,17 +152,9 @@ class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
     def filter_scope(self, queryset, name, value):
         """Filter *queryset* according to *value* of ``scope``.
 
-        - ``private``: return objects owned by the authenticated user; anonymous
-          users get an empty queryset.
-        - any other value (including ``published`` or empty): return only
-          published objects.
+        Delegates to ``apply_scope_filter`` so visibility rules stay consistent
+        across API, HTML list views, and exports.
         """
-        if value == "private":
-            user = getattr(self.request, "user", None)
-            if user is None or not user.is_authenticated:
-                return queryset.none()
-            return queryset.filter(owner=user)
-        elif value == "review":
-            return queryset.filter(publication_status="review")
-        # Default / fallback: only published objects
-        return queryset.filter(publication_status="published")
+        user = getattr(self.request, "user", None)
+        scope = value if value in {"published", "private", "review"} else "published"
+        return apply_scope_filter(queryset, scope, user=user)

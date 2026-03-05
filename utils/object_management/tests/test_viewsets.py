@@ -5,7 +5,6 @@ from unittest.mock import Mock, patch
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ValidationError
 from django.db import connection
-from django.db.models import Q
 from django.test import TestCase
 from rest_framework import serializers, status
 from rest_framework.request import Request
@@ -239,10 +238,9 @@ class UserCreatedObjectQueryTests(BaseAPITestCase):
 
     def test_regular_scope_review(self):
         self._get_qs(user=self.regular_user, params={"scope": "review"})
-        q = self.base_qs.filter.call_args[0][0]
-        self.assertIsInstance(q, Q)
-        self.assertIn(("owner", self.regular_user), q.children)
-        self.assertIn(("publication_status", "review"), q.children)
+        self.base_qs.filter.assert_called_once_with(
+            owner=self.regular_user, publication_status="review"
+        )
 
     def test_invalid_scope_fallback(self):
         self._get_qs(user=self.regular_user, params={"scope": "wat"})
@@ -278,6 +276,7 @@ class UserCreatedObjectWorkflowTests(BaseAPITestCase):
         self.viewset.queryset = Mock(model=MockUserCreatedObject)
         self.viewset.get_queryset = Mock(return_value=self.viewset.queryset)
         self.viewset.check_object_permissions = Mock()
+        self.other_user = User.objects.create_user(username="other")
         self.private_obj = MockUserCreatedObject(
             pk=1, owner=self.regular_user, publication_status="private"
         )
@@ -285,10 +284,11 @@ class UserCreatedObjectWorkflowTests(BaseAPITestCase):
             pk=2, owner=self.regular_user, publication_status="review"
         )
 
-    def _action(self, action: str, obj: MockUserCreatedObject):
+    def _action(self, action: str, obj: MockUserCreatedObject, actor=None):
+        actor = actor or self.regular_user
         req = self._build_request("post", f"/objects/{obj.pk}/action/")
-        force_authenticate(req, user=self.regular_user)
-        req.user = self.regular_user
+        force_authenticate(req, user=actor)
+        req.user = actor
         self.viewset.request = Request(req)
         self.viewset.kwargs = {"pk": obj.pk}
         with (
@@ -313,6 +313,20 @@ class UserCreatedObjectWorkflowTests(BaseAPITestCase):
         resp = self._action("withdraw_from_review", self.review_obj)
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(self.review_obj.publication_status, "private")
+
+    def test_register_for_review_denied_for_non_owner(self):
+        resp = self._action(
+            "register_for_review", self.private_obj, actor=self.other_user
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.private_obj.publication_status, "private")
+
+    def test_withdraw_from_review_denied_for_non_owner(self):
+        resp = self._action(
+            "withdraw_from_review", self.review_obj, actor=self.other_user
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.review_obj.publication_status, "review")
 
 
 class UserCreatedObjectPermissionTests(BaseAPITestCase):

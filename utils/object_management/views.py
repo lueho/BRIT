@@ -2038,9 +2038,6 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
             return queryset
 
         for lookup, value in filter_pairs:
-            if not value:
-                value = "published"
-
             if lookup == "scope__name":
                 scope_value = value or "published"
                 try:
@@ -2048,12 +2045,15 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
                         queryset, scope_value, user=self.request.user
                     )
                 except ImproperlyConfigured:
-                    queryset = queryset.none()
+                    return queryset.none()
+                continue
+
+            if not value:
                 continue
 
             # Generic guard: skip obviously invalid values (e.g. the language code accidentally
             # injected in the request) that would break lookups expecting an integer PK.
-            # Django would raise FieldError / ValueError when trying to cast the string to int.
+            # Fail closed to avoid unintentionally broadening results.
             if (
                 value
                 and isinstance(value, str)
@@ -2065,7 +2065,7 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
                     value,
                     lookup,
                 )
-                continue
+                return queryset.none()
 
             # Additional guard for *_id style lookups that require an integer value.
             if lookup.endswith("_id") and value and not value.isdigit():
@@ -2074,11 +2074,12 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
                     value,
                     lookup,
                 )
-                continue
+                return queryset.none()
 
             try:
                 queryset = queryset.filter(**{lookup: value})
             except Exception as e:
                 logger.error(f"Error applying filter {lookup}={value!r}: {e}")
+                return queryset.none()
 
         return queryset

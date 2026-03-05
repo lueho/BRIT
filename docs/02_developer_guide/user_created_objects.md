@@ -1,179 +1,91 @@
 # UserCreatedObject Permission System
 
-This document outlines the permission system for UserCreatedObject models across both class-based views and viewsets.
+This page is an implementation map for developers working on
+`UserCreatedObject` flows.
 
-## Single source of truth
+The **authoritative policy tables and state diagrams** live in:
 
-All permission checks and button visibility are centralized in `utils/object_management/permissions.py`:
+- [`security_permission_validation.md`](security_permission_validation.md)
 
-- `UserCreatedObjectPermission` — backend permission class used by DRF and enforced in CBVs via mixins and explicit checks.
-- `get_object_policy(user, obj, request=None, review_mode=False)` — computes a unified policy dict consumed by templates and views for button visibility and UI behavior.
+To avoid drift, keep policy details in that one canonical page.
 
-Templates should consume the policy via templatetags in `utils/object_management/templatetags/moderation_tags.py`:
+## Permission architecture at a glance
 
-- `{% object_policy object as policy %}` returns the policy dict.
-- `{{ user|can_moderate:object }}` checks per‑model moderator rights.
+| Concern | Primary helper/component | File |
+|---|---|---|
+| API action & object permissions | `UserCreatedObjectPermission` | `utils/object_management/permissions.py` |
+| Template/UI action visibility | `get_object_policy(...)` | `utils/object_management/permissions.py` |
+| Base read visibility (list/autocomplete/export seed) | `filter_queryset_for_user(...)` | `utils/object_management/permissions.py` |
+| Scope-based filtering (`published/private/review/...`) | `apply_scope_filter(...)` | `utils/object_management/permissions.py` |
+| Export filter payload normalization | `build_scope_filter_params(...)` | `utils/object_management/permissions.py` |
+| Review transition API actions | `register_for_review`, `withdraw_from_review`, `approve`, `reject`, `archive` | `utils/object_management/viewsets.py` |
+| Review transition HTML actions | `BaseReviewActionView` and subclasses | `utils/object_management/views.py` |
+| Autocomplete hardening (fail-closed invalid filters) | `UserCreatedObjectAutocompleteView.apply_filters(...)` | `utils/object_management/views.py` |
+| Form-level reference validation | `UserCreatedObjectFormMixin.clean()` | `utils/forms.py` |
 
-Avoid ad‑hoc permission logic elsewhere; do not reimplement checks in views or templates.
+## Request-path overview
 
-## Roles and states
+```text
+UI/API request
+    |
+    +--> Early visibility filter
+    |      - filter_queryset_for_user(...)
+    |      - apply_scope_filter(...)
+    |
+    +--> Authoritative backend check
+           - UserCreatedObjectPermission (API)
+           - UserCreatedObjectFormMixin.clean() (forms)
+           - action-specific permission helpers
+    |
+    +--> UI rendering
+           - get_object_policy(...) for button visibility
+```
 
-- Anonymous — not authenticated.
-- Authenticated — logged in but neither owner, moderator, nor staff.
-- Owner — `obj.owner == request.user`.
-- Moderator — per‑model permission `can_moderate_<model>` or staff.
-- Staff — `is_staff=True`.
+## Review workflow integration points
 
-Publication states (`obj.publication_status` and convenience flags):
+```text
+private|declined -- submit --> review -- approve --> published -- archive --> archived
+                                  |\
+                                  | reject
+                                  v
+                               declined
+```
 
-- `private`, `review`, `published`, `declined`, `archived`.
+- Four-eyes rule is enforced in permission helpers for approve/reject.
+- API and HTML review actions must delegate to the same helper methods.
 
-## Read access (views vs API)
+## Moderator permissions
 
-### HTML Class‑Based Views (CBVs)
+- Per-model moderation rights use `can_moderate_<model>`.
+- Permissions are created/maintained via `post_migrate` signal logic in
+  `utils/object_management/signals.py`.
+- Staff users are always treated as moderators for moderation checks.
 
-Source: `UserCreatedObjectReadAccessMixin.test_func()` in `utils/object_management/views.py`.
+Testing tip:
 
-| Object state | Anonymous | Authenticated (not owner/staff) | Owner | Staff |
-|--------------|-----------|---------------------------------|-------|-------|
-| published    | ✅        | ✅                              | ✅    | ✅    |
-| review       | ❌        | ❌                              | ✅    | ✅    |
-| private      | ❌        | ❌                              | ✅    | ✅    |
-| declined     | ❌        | ❌                              | ✅    | ✅    |
-| archived     | ❌        | ❌                              | ✅    | ✅    |
-
-Note: Non‑staff moderators (users with `can_moderate_<model>`) can access the dedicated review UI, see “Review UI access” below, but not the regular detail view of private/declined items via this mixin.
-
-### Django REST Framework (API, safe methods)
-
-Source: `UserCreatedObjectPermission._check_safe_permissions()` in `utils/object_management/permissions.py`.
-
-| Object state | Anonymous | Authenticated (not owner/moderator/staff) | Owner | Moderator/Staff |
-|--------------|-----------|-------------------------------------------|-------|------------------|
-| published    | ✅        | ✅                                        | ✅    | ✅               |
-| review       | ❌        | ❌                                        | ✅    | ✅               |
-| private      | ❌        | ❌                                        | ✅    | ✅               |
-| archived     | ❌        | ❌                                        | ✅    | ✅               |
-
-Notes:
-
-- “declined” is not explicitly handled in the API safe‑method checker and currently defaults to deny; use the Review UI for owner feedback visibility. If API read‑access to declined objects is required, extend `_check_safe_permissions()` accordingly (treat declined like private).
-
-## Actions and conditions
-
-Source: `get_object_policy()` and `UserCreatedObjectPermission` helpers. Conditions below describe who can see/use actions in the UI and who will pass backend checks.
-
-| Action | Who | Conditions |
-|-------|-----|------------|
-| Create | Staff | Always |
-| Create | Authenticated user | Must have `add_<model>` permission on the model |
-| Edit | Owner | Not archived AND not published |
-| Edit | Staff | Not archived |
-| Edit | Moderator | Only allowed to change `publication_status` via PUT/PATCH; cannot modify other fields; cannot edit private objects when not owner |
-| Delete | Owner | Object is not archived AND not published OR is declined/review/private, and a delete URL is provided |
-| Delete | Staff | Any state (published and archived included), if a delete URL is provided |
-| Archive | Owner, Moderator, or Staff | Object is published and not archived |
-| Duplicate | Authenticated user | Must have `add_<model>` permission |
-| New version | Owner or Staff | Requires Duplicate permission AND object is published AND not archived |
-| Manage samples | Owner or Staff | Not published AND not archived |
-| Add property | Owner or Staff | Not published AND not archived |
-| Export | Anyone | Public objects always exportable; private export requires authenticated owner or staff |
-| Submit for review | Owner or Staff | State is `private` or `declined`; not archived |
-| Withdraw from review | Owner or Staff | State is `review` or `declined`; not archived |
-| Approve | Moderator (not owner) | Four‑eyes principle; state is `review` |
-| Reject | Moderator (not owner) | Four‑eyes principle; state is `review` |
-| View review feedback | Owner | `declined` state and not in review_mode (handled by `can_view_review_feedback`) |
-
-Notes:
-
-- Moderator = per‑model `can_moderate_<model>` permission or staff, see `_is_moderator()`.
-- Four‑eyes principle: Approvers must not be the object owner.
-- Archive nuances: The UI policy (`get_object_policy`) and the CBV modal (`UserCreatedObjectModalArchiveView`) allow owners to archive published objects. The DRF `archive` action enforces `UserCreatedObjectPermission`, which currently denies owners modifying published objects; moderators/staff should use the API for archival.
-
-## Review UI access
-
-Source: `utils/object_management/views.py:ReviewItemDetailView`.
-
-- Staff and per‑model moderators (`can_moderate_<model>`) can access any item’s review detail page.
-- Owners can access the review detail page only while the item is in `review` (to comment) or `declined` (to read feedback).
-- Others are not allowed.
-
-### Review detail routing and delegation
-
-Source: `utils/object_management/urls.py` and `utils/object_management/views.py`.
-
-- The URL pattern `object_management:review_item_detail` always points to
-  `ReviewItemDetailView.as_view()`.
-- `ReviewItemDetailView.dispatch()` then resolves the target object from
-  `content_type_id` and `object_id`.
-- After object resolution, `dispatch()` looks up the object model in
-  `_model_view_registry` and delegates to a specialized subclass if one was
-  registered with `register_for_model()`.
-- Example: `CollectionReviewItemDetailView.register_for_model(Collection)`
-  registers the collection-specific review detail handler while keeping the URL
-  unchanged.
-
-Implication for debugging/observability tools:
-
-- Tooling such as Django Debug Toolbar may report `ReviewItemDetailView` as the
-  endpoint because URL resolution happened there first.
-- This is expected even when specialized logic is executed, because delegation
-  happens at runtime inside `dispatch()`.
-
-## DRF viewsets and actions
-
-Source: `utils/object_management/viewsets.py`.
-
-- `UserCreatedObjectViewSet` uses `UserCreatedObjectPermission` as its base `permission_classes`.
-- Actions provided: `register_for_review` (same policy as submit), `withdraw_from_review`, `approve`, `reject`, `archive`.
-- Object creation assigns `owner=self.request.user` and requires `add_<model>` permission per `UserCreatedObjectPermission.has_permission`.
-
-All API endpoints are expected to mirror the rules above; if you add new endpoints, delegate checks to `UserCreatedObjectPermission` or the specific helper methods.
-
-## Per‑model moderator permission
-
-Moderation rights are granted via `can_moderate_<model>` permissions created and distributed automatically via a `post_migrate` signal to the configured moderators group.
-
-**How it works:**
-- Signal handler in `utils/object_management/signals.py` automatically creates permissions for all `UserCreatedObject` subclasses
-- Runs in **all environments** (development, production, and tests) for consistent behavior
-- Permissions are assigned to the group specified by `settings.REVIEW_MODERATORS_GROUP_NAME` (defaults to `"moderators"`)
-- Uses `get_or_create()` for idempotent execution
-- Staff users always qualify as moderators regardless of group membership
-
-**Testing:**
-When writing tests, **fetch** permissions rather than creating them:
 ```python
-# ✅ Correct
+# Fetch auto-created permission (do not create duplicates)
 permission = Permission.objects.get(
     codename="can_moderate_mymodel",
     content_type=content_type,
 )
-
-# ❌ Wrong - will cause IntegrityError
-# permission = Permission.objects.create(...)
 ```
 
-See `utils/object_management/README.md` for detailed documentation on the permission system.
-
-## Using the policy in templates
-
-Example:
+## Template usage
 
 ```django
+{% load moderation_tags %}
 {% object_policy object as policy %}
 
 {% if policy.can_submit_review %}
-  <a href="{{ object.submit_for_review_url }}" class="btn btn-primary">Submit for review</a>
-{% endif %}
-
-{% if user|can_moderate:object and policy.can_approve %}
-  <a href="{{ object.approve_url }}" class="btn btn-success">Approve</a>
+  <a href="{{ object.submit_for_review_url }}">Submit for review</a>
 {% endif %}
 ```
 
-## Best practices
+## Maintenance rule
 
-- Always consult `get_object_policy()` for UI decisions and button visibility.
-- In views, rely on `UserCreatedObjectPermission` and dedicated helpers (`has_submit_permission`, `has_withdraw_permission`, `has_approve_permission`, `has_reject_permission`).
-- Do not duplicate permission logic in templates or views.
+When permission behavior changes, update all three together:
+
+1. Implementation (`permissions.py` and call sites)
+2. Regression tests
+3. Canonical doc: `security_permission_validation.md`

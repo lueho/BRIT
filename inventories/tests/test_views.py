@@ -1,9 +1,12 @@
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
+from django.contrib.auth.models import AnonymousUser
 from django.test import SimpleTestCase
 
 from maps.models import Catchment, Region
 from utils.object_management.views import (
+    UserCreatedObjectAutocompleteView,
     get_tomselect_filter_pairs,
     get_tomselect_filter_value,
 )
@@ -99,6 +102,60 @@ class TomSelectFilterHelpersTests(SimpleTestCase):
             [("scope__name", "private"), ("owner_id", "12")],
         )
         self.assertEqual(get_tomselect_filter_value(view, lookup="owner_id"), "12")
+
+
+class UserCreatedObjectAutocompleteViewFilterTests(SimpleTestCase):
+    def setUp(self):
+        self.view = UserCreatedObjectAutocompleteView()
+        self.view.request = SimpleNamespace(user=AnonymousUser())
+
+    def test_invalid_language_code_filter_fails_closed(self):
+        queryset = Mock()
+        empty_queryset = Mock()
+        queryset.none.return_value = empty_queryset
+
+        with patch(
+            "utils.object_management.views.get_tomselect_filter_pairs",
+            return_value=[("owner_id", "en-us")],
+        ):
+            result = self.view.apply_filters(queryset)
+
+        self.assertIs(result, empty_queryset)
+
+    def test_filter_exception_fails_closed(self):
+        queryset = Mock()
+        empty_queryset = Mock()
+        queryset.none.return_value = empty_queryset
+        queryset.filter.side_effect = Exception("bad lookup")
+
+        with patch(
+            "utils.object_management.views.get_tomselect_filter_pairs",
+            return_value=[("parent__invalid", "123")],
+        ):
+            result = self.view.apply_filters(queryset)
+
+        self.assertIs(result, empty_queryset)
+
+    @patch("utils.object_management.views.apply_scope_filter")
+    def test_scope_filter_defaults_to_published_only_for_scope_lookup(
+        self, mock_apply_scope_filter
+    ):
+        queryset = Mock()
+        scoped_queryset = Mock()
+        mock_apply_scope_filter.return_value = scoped_queryset
+
+        with patch(
+            "utils.object_management.views.get_tomselect_filter_pairs",
+            return_value=[("scope__name", "")],
+        ):
+            result = self.view.apply_filters(queryset)
+
+        self.assertIs(result, scoped_queryset)
+        mock_apply_scope_filter.assert_called_once_with(
+            queryset,
+            "published",
+            user=self.view.request.user,
+        )
 
 
 class ScenarioResultCRUDViewsTestCase(
