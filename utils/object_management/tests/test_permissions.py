@@ -333,6 +333,9 @@ class TestUserCreatedObjectPermission(TestCase):
         self.private_obj = SampleModel(
             owner=self.owner_user, publication_status="private"
         )
+        self.declined_obj = SampleModel(
+            owner=self.owner_user, publication_status="declined"
+        )
         self.undefined_status_obj = SampleModel(
             owner=self.owner_user, publication_status=None
         )
@@ -461,6 +464,28 @@ class TestUserCreatedObjectPermission(TestCase):
         request = self.create_request(method="GET", user=self.other_user)
         view = Mock()
         obj = self.private_obj
+        self.assertFalse(self.permission.has_object_permission(request, view, obj))
+
+    def test_has_object_permission_safe_declined_owner(self):
+        """Tests that owners can read their own declined objects."""
+        request = self.create_request(method="GET", user=self.owner_user)
+        view = Mock()
+        obj = self.declined_obj
+        self.assertTrue(self.permission.has_object_permission(request, view, obj))
+
+    def test_has_object_permission_safe_declined_moderator(self):
+        """Tests that moderators can read declined objects."""
+        request = self.create_request(method="GET", user=self.moderator_user)
+        view = Mock()
+        obj = self.declined_obj
+        self.assertTrue(self.permission.has_object_permission(request, view, obj))
+
+    def test_has_object_permission_safe_declined_other_user(self):
+        """Tests that other users cannot read declined objects."""
+        request = self.create_request(method="GET", user=self.other_user)
+        view = Mock()
+        obj = self.declined_obj
+        self.permission._is_moderator = Mock(return_value=False)
         self.assertFalse(self.permission.has_object_permission(request, view, obj))
 
     def test_has_object_permission_safe_undefined_status(self):
@@ -602,6 +627,31 @@ class TestUserCreatedObjectPermission(TestCase):
         obj = self.private_obj
         result = self.permission._check_safe_permissions(request, obj)
         self.assertFalse(result)
+
+    def test_check_safe_permissions_declined_owner(self):
+        """Tests that owners can view their own declined objects."""
+        request = self.create_request(method="GET", user=self.owner_user)
+        obj = self.declined_obj
+        result = self.permission._check_safe_permissions(request, obj)
+        self.assertTrue(result)
+
+    def test_check_safe_permissions_declined_moderator(self):
+        """Tests that moderators can view declined objects."""
+        request = self.create_request(method="GET", user=self.moderator_user)
+        obj = self.declined_obj
+        self.permission._is_moderator = Mock(return_value=True)
+        result = self.permission._check_safe_permissions(request, obj)
+        self.assertTrue(result)
+        self.permission._is_moderator.assert_called_with(self.moderator_user, obj)
+
+    def test_check_safe_permissions_declined_other_user(self):
+        """Tests that other users cannot view declined objects."""
+        request = self.create_request(method="GET", user=self.other_user)
+        obj = self.declined_obj
+        self.permission._is_moderator = Mock(return_value=False)
+        result = self.permission._check_safe_permissions(request, obj)
+        self.assertFalse(result)
+        self.permission._is_moderator.assert_called_with(self.other_user, obj)
 
     def test_check_safe_permissions_undefined_status(self):
         """Tests that other users cannot view objects with undefined publication status."""

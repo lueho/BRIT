@@ -1,297 +1,147 @@
-# Permission Validation Architecture
+# Permission and Visibility Policy
 
-## Overview
+This page is the canonical, implementation-aligned overview of permission logic
+for `UserCreatedObject` data in BRIT.
 
-BRIT implements a **defense-in-depth** approach to permission validation for user-created objects, combining frontend UX filtering with backend security validation.
+## Source of truth in code
 
-## Components
+- `utils/object_management/permissions.py`
+  - `UserCreatedObjectPermission`
+  - `get_object_policy(...)`
+  - `filter_queryset_for_user(...)`
+  - `apply_scope_filter(...)`
+  - `build_scope_filter_params(...)`
+- `utils/object_management/viewsets.py`
+  - review transition API actions delegate to permission helpers
+- `utils/object_management/views.py`
+  - `UserCreatedObjectAutocompleteView` uses visibility filtering + fail-closed filter handling
+- `utils/forms.py`
+  - `UserCreatedObjectFormMixin.clean()` enforces backend validation of referenced objects
 
-### 1. Frontend: Autocomplete Filtering (UX)
+If this page conflicts with implementation, update this page together with code.
 
-**Location**: Autocomplete views (`UserCreatedObjectAutocompleteView`)
+## Roles and states
 
-**Purpose**: Filter dropdown options in UI based on user permissions
+### Roles
 
-**Example**:
-```python
-class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
-    model = Source
-    
-    def hook_queryset(self, queryset):
-        # Filter to only show sources user can access
-        return filter_queryset_for_user(queryset, self.request.user)
+- **Anonymous**: not authenticated
+- **Authenticated user**: authenticated, but not owner/moderator/staff
+- **Owner**: `obj.owner == user`
+- **Moderator**: has per-model permission `can_moderate_<model>`
+- **Staff**: `is_staff=True` (treated as moderator for moderation checks)
+
+### Publication states
+
+- `private`
+- `review`
+- `published`
+- `declined`
+- `archived`
+
+## Defense-in-depth flow
+
+```text
+User input (UI or API)
+    |
+    +--> Autocomplete / list filtering (UX + early restriction)
+    |      - filter_queryset_for_user(...)
+    |      - apply_scope_filter(...)
+    |      - invalid autocomplete filters fail closed (queryset.none())
+    |
+    +--> Form/API backend validation (authoritative)
+           - UserCreatedObjectFormMixin.clean()
+           - UserCreatedObjectPermission.has_permission()/has_object_permission()
+           - action-specific helpers (submit/withdraw/approve/reject/archive)
+                    |
+                    +--> DB mutation / response
 ```
 
-**Benefits**:
-- Improved UX (users only see relevant options)
-- Reduced bandwidth (smaller option lists)
-- Performance optimization
+## Read visibility policy
 
-**Limitation**: ⚠️ Can be bypassed via browser devtools or direct POST requests
+### General read filter (`filter_queryset_for_user`)
 
----
+| User type | Visible records |
+|---|---|
+| Staff | All |
+| Anonymous | `published` only |
+| Authenticated regular | Own + `published` |
+| Authenticated moderator | Own + `published` + `review` |
 
-### 2. Backend: Form Validation (Security)
+### Scope filter (`apply_scope_filter`)
 
-**Location**: Form `clean()` methods via `UserCreatedObjectFormMixin`
+| Scope | Anonymous | Authenticated regular | Moderator | Staff |
+|---|---|---|---|---|
+| `published` | published | published | published | published |
+| `private` | none | own (all statuses) | own (all statuses) | all |
+| `review` | none | own `review` | all `review` | all `review` |
+| `declined` | none | own `declined` | own `declined` | all `declined` |
+| `archived` | none | own `archived` | own `archived` | all `archived` |
 
-**Purpose**: Validate that user has permission to access selected objects
+Notes:
 
-**Implementation**:
-```python
-class UserCreatedObjectFormMixin:
-    def clean(self):
-        cleaned_data = super().clean()
-        request = getattr(self, 'request', None)
-        
-        # Check all UserCreatedObject fields
-        for field_name, value in cleaned_data.items():
-            if isinstance(value, UserCreatedObject):
-                # Validate permission using existing permission system
-                filtered_qs = filter_queryset_for_user(
-                    value.__class__.objects.filter(pk=value.pk),
-                    request.user
-                )
-                if not filtered_qs.exists():
-                    raise ValidationError(...)
-        
-        return cleaned_data
+- Unknown scopes currently return the queryset unchanged.
+- Scope filtering requires a model with `publication_status`; owner-restricted scopes also require an `owner` field.
+
+### Object-level safe-method reads (`_check_safe_permissions`)
+
+| State | Anonymous | Authenticated regular | Owner | Moderator/Staff |
+|---|---|---|---|---|
+| `published` | ✅ | ✅ | ✅ | ✅ |
+| `review` | ❌ | ❌ | ✅ | ✅ |
+| `private` | ❌ | ❌ | ✅ | ✅ |
+| `archived` | ❌ | ❌ | ✅ | ✅ |
+| `declined` | ❌ | ❌ | ✅ | ✅ |
+
+## Action policy (UI + backend)
+
+This table summarizes effective policy from `get_object_policy(...)` and
+`UserCreatedObjectPermission` helper methods.
+
+| Action | Allowed actors | Required state/condition |
+|---|---|---|
+| Create (`create` and configured create-like actions) | Authenticated users with `add_<model>`; staff | Model add permission required |
+| Edit (owner path) | Owner | Not `published`, not `archived` |
+| Edit (moderator path, non-owner) | Moderator/Staff | Not private of another owner; for PATCH/PUT only `publication_status` may change |
+| Delete | Owner/Staff | Owner: non-published non-archived states with delete URL. Staff: can delete across states (incl. archived) with delete URL |
+| Archive | Owner/Moderator/Staff | `published` and not `archived` |
+| Submit for review | Owner/Staff | `private` or `declined`, and not `archived` |
+| Withdraw from review | Owner/Staff | `review` or `declined`, and not `archived` |
+| Approve | Moderator/Staff, not owner | State is `review` (four-eyes) |
+| Reject | Moderator/Staff, not owner | State is `review` (four-eyes) |
+| Add review comment | Owner/Moderator/Staff | Authenticated |
+| Duplicate | Authenticated user with `add_<model>` | Model add permission required |
+| New version | Authenticated user with `add_<model>` | Not `archived` and (`published` or owner) |
+| Manage samples | Owner/Staff | Not `published`, not `archived` |
+| Add property | Owner/Staff | Not `archived` |
+| Export | Public + owner/staff private export | `published`/`archived` are public-exportable; otherwise authenticated owner/staff |
+| View review feedback | Owner | `declined` and not in `review_mode` |
+
+## Review workflow transitions
+
+```text
+private --(owner/staff submit)--> review
+declined --(owner/staff submit)--> review
+
+review --(owner/staff withdraw)--> private
+review --(moderator/staff, not owner approve)--> published
+review --(moderator/staff, not owner reject)--> declined
+
+published --(owner/moderator/staff archive)--> archived
 ```
 
-**Benefits**:
-- ✅ **Cannot be bypassed** - runs on server
-- ✅ **Consistent** - applies to all UserCreatedObject fields automatically
-- ✅ **Centralized** - single source of truth for validation logic
-- ✅ **Comprehensive** - validates both ForeignKey and M2M relationships
+## Autocomplete and export hardening
 
----
+- Autocomplete visibility starts with `filter_queryset_for_user(...)` and excludes archived objects where supported.
+- `scope__name` in autocomplete is handled via `apply_scope_filter(...)`.
+- Invalid autocomplete filters (e.g., malformed numeric IDs, incompatible values) fail closed with `queryset.none()`.
+- Async export for user-created objects applies the same centralized visibility/scope helpers to prevent scope leakage.
 
-## Usage
+## Maintenance rules
 
-### For Forms with UserCreatedObject References
-
-```python
-from utils.forms import UserCreatedObjectFormMixin, SimpleModelForm
-
-class MyModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
-    # TomSelect fields with autocomplete
-    catchment = TomSelectModelChoiceField(
-        config=TomSelectConfig(
-            url="catchment-autocomplete",  # ← Frontend filtering
-            label_field="name",
-        ),
-    )
-    
-    class Meta:
-        model = MyModel
-        fields = ('name', 'catchment', ...)
-```
-
-**In the View**:
-```python
-class MyCreateView(UserCreatedObjectCreateView):
-    form_class = MyModelForm
-    
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['request'] = self.request  # ← Required for validation
-        return kwargs
-```
-
-### For Sources Field (Special Case)
-
-The sources field uses an additional mixin for widget setup:
-
-```python
-from utils.forms import UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
-
-class MyModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm):
-    class Meta:
-        model = MyModel
-        fields = ('name', 'sources', ...)
-```
-
-**What each mixin does**:
-- `UserCreatedObjectFormMixin`: Permission validation (security) ✓
-- `SourcesFieldMixin`: Widget setup + queryset population (UX) ✓
-
----
-
-## Security Model
-
-### Permission Rules
-
-Enforced by `filter_queryset_for_user()`:
-
-1. **Public objects**: Accessible to all authenticated users
-2. **Private objects**: Only accessible to:
-   - Owner
-   - Staff/superusers
-   - Users with explicit permissions
-
-3. **Review/Draft objects**: Only accessible to:
-   - Owner
-   - Moderators for that model
-
-### Attack Vectors Prevented
-
-❌ **Browser Devtools Bypass**
-```javascript
-// Attacker tries to inject unauthorized ID via devtools
-fetch('/form/', {
-    method: 'POST',
-    body: 'catchment=999'  // ID of private catchment they don't own
-})
-```
-✅ **Blocked by**: `UserCreatedObjectFormMixin.clean()` validates ID 999
-and raises `ValidationError` if user lacks permission
-
-❌ **Direct POST Request**
-```bash
-# Attacker tries direct POST without using the form UI
-curl -X POST /form/ -d "material=123&sources=456,789"
-```
-✅ **Blocked by**: Backend validation checks all submitted IDs (123, 456, 789)
-
----
-
-## Architecture Diagram
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    User Submits Form                    │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│  1. FRONTEND (UX Layer)                                 │
-│  • TomSelect autocomplete shows filtered options        │
-│  • UserCreatedObjectAutocompleteView.hook_queryset()   │
-│  • CAN BE BYPASSED via devtools/direct POST             │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│  2. FORM VALIDATION (Security Layer)                    │
-│  • UserCreatedObjectFormMixin.clean()                   │
-│  • Validates ALL UserCreatedObject references           │
-│  • Uses filter_queryset_for_user() permission check     │
-│  • CANNOT BE BYPASSED - runs on server                  │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│  3. DATABASE SAVE                                       │
-│  • Only objects user has permission to access           │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-## Migration Guide
-
-### Before (Inconsistent)
-
-```python
-# Some forms had permission checks
-class SampleModelForm(SimpleModelForm):
-    def __init__(self, *args, **kwargs):
-        request = kwargs.pop('request', None)
-        super().__init__(*args, **kwargs)
-        
-        # Manual permission filtering (only for some fields)
-        if request:
-            queryset = filter_queryset_for_user(
-                Source.objects.filter(...), 
-                request.user
-            )
-            self.fields['sources'].queryset = queryset
-```
-
-**Problem**: Other fields (material, series, catchment, etc.) had no validation!
-
-### After (Consistent)
-
-```python
-# All forms automatically protected
-class SampleModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
-    # No manual permission code needed!
-    # ALL UserCreatedObject fields automatically validated
-    pass
-```
-
-**Benefits**: Material, series, sources, catchment, collector ALL validated ✓
-
----
-
-## Testing
-
-### Test Permission Validation
-
-```python
-def test_form_rejects_unauthorized_object(self):
-    """User cannot select objects they don't have permission for."""
-    # Create private object owned by another user
-    other_user = User.objects.create(username='other')
-    private_catchment = Catchment.objects.create(
-        owner=other_user,
-        publication_status='private',
-        name='Private Catchment'
-    )
-    
-    # Try to submit form with unauthorized catchment
-    form = CollectionModelForm(
-        data={'catchment': private_catchment.id, ...},
-        request=self.request  # Current user
-    )
-    
-    # Form should be invalid
-    self.assertFalse(form.is_valid())
-    self.assertIn('catchment', form.errors)
-    self.assertIn("don't have permission", str(form.errors['catchment']))
-```
-
----
-
-## Performance Considerations
-
-### Queryset Optimization
-
-The mixin checks each object individually, which could cause N+1 queries. However:
-
-1. **Small scale**: Forms typically have < 10 UserCreatedObject fields
-2. **Caching**: Permission checks use Django's query caching
-3. **Efficient**: `filter_queryset_for_user()` uses optimized queries
-
-### If Performance Becomes an Issue
-
-```python
-# Option: Prefetch all permission data in view
-def get_form_kwargs(self):
-    kwargs = super().get_form_kwargs()
-    kwargs['request'] = self.request
-    
-    # Prefetch related data for permission checks
-    if hasattr(self, 'object') and self.object:
-        self.object = self.object.select_related(
-            'catchment__owner',
-            'collector__owner',
-            'material__owner'
-        )
-    return kwargs
-```
-
----
-
-## Summary
-
-| Aspect | Frontend (Autocomplete) | Backend (Mixin) |
-|--------|-------------------------|-----------------|
-| **Purpose** | UX filtering | Security validation |
-| **Location** | Autocomplete view | Form.clean() |
-| **Can be bypassed?** | ✗ Yes (devtools) | ✓ No (server-side) |
-| **Applies to** | Dropdown options | All submitted data |
-| **When to use** | Always (UX) | Always (security) |
-| **Implementation** | Per autocomplete view | One mixin for all forms |
-
-**Best Practice**: Use BOTH layers for defense-in-depth ✓
+- Do not duplicate permission logic in templates or views.
+- UI visibility should use `get_object_policy(...)`.
+- Backend checks should delegate to `UserCreatedObjectPermission` and helper methods.
+- When policy changes, update:
+  1. code,
+  2. regression tests,
+  3. this page.

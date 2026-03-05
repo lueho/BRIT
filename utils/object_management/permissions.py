@@ -10,10 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class GlobalObjectPermission(permissions.BasePermission):
-    """
-    Custom permission to allow read-only access to anyone,
-    and write access only to staff users.
-    """
+    """Allow global-object reads for everyone and writes for staff only."""
 
     def has_permission(self, request, view):
         if request.method in permissions.SAFE_METHODS:
@@ -23,58 +20,68 @@ class GlobalObjectPermission(permissions.BasePermission):
 
 
 class UserCreatedObjectPermission(permissions.BasePermission):
-    """
-    Generic permission class for user-created objects.
-    Handles ownership, publication_status, and moderation permissions dynamically.
+    """Permission policy for ``UserCreatedObject`` APIs.
 
-    Supports the review workflow with methods for checking if a user can:
-    - submit_for_review: Only owners can submit their private objects for review
-    - withdraw_from_review: Only owners can withdraw their objects from review
-    - approve: Only moderators can approve objects in review
-    - reject: Only moderators can reject objects in review
+    The class combines:
+    - action-level checks (e.g. add permission for create-like actions),
+    - object-level write restrictions (owner vs moderator rules), and
+    - review-workflow capability helpers used by API/HTML flows.
     """
+
+    def _get_view_model(self, view):
+        """Return the model class exposed by ``view`` or ``None``."""
+        model = None
+        queryset = getattr(view, "queryset", None)
+        if queryset is not None:
+            model = getattr(queryset, "model", None)
+
+        if model is None:
+            try:
+                model = view.get_queryset().model
+            except Exception:
+                model = None
+
+        return model
+
+    def _has_add_model_permission(self, user, view):
+        """Return whether ``user`` may create records for ``view``'s model."""
+        if not (user and user.is_authenticated):
+            return False
+        if user.is_staff:
+            return True
+
+        model = self._get_view_model(view)
+        if model is None:
+            # If we can't determine the model permission, default to False for security
+            return False
+
+        app_label = model._meta.app_label
+        model_name = model._meta.model_name
+        return user.has_perm(f"{app_label}.add_{model_name}")
 
     def has_permission(self, request, view):
-        # Allow any user to list or retrieve published objects
+        """Evaluate action-level access before object-level checks run."""
+        # List/retrieve endpoints are publicly callable; queryset/object checks
+        # enforce which records are actually visible.
         if getattr(view, "action", None) in ["list", "retrieve"]:
             return True
 
-        # For create action, check proper model permissions
-        if getattr(view, "action", None) == "create":
-            # User must be authenticated
-            if not (request.user and request.user.is_authenticated):
-                return False
+        action = getattr(view, "action", None)
+        add_permission_actions = {"create"}
+        add_permission_actions.update(
+            getattr(view, "requires_add_permission_actions", set())
+        )
 
-            # Staff users can always create objects
-            if request.user.is_staff:
-                return True
+        # Create-like actions use explicit model-level add permission.
+        if action in add_permission_actions:
+            return self._has_add_model_permission(request.user, view)
 
-            # Get model from viewset's queryset without requiring a DRF Request
-            model = None
-            queryset = getattr(view, "queryset", None)
-            if queryset is not None:
-                model = getattr(queryset, "model", None)
-
-            if model is None:
-                try:
-                    model = view.get_queryset().model
-                except Exception:
-                    model = None
-
-            if model is None:
-                # If we can't determine the model permission, default to False for security
-                return False
-
-            app_label = model._meta.app_label
-            model_name = model._meta.model_name
-
-            # Check if user has 'add' permission for this model
-            return request.user.has_perm(f"{app_label}.add_{model_name}")
-
-        # For other actions, ensure the user is authenticated
+        # Other actions require authentication and are further constrained by
+        # ``has_object_permission``.
         return request.user and request.user.is_authenticated
 
     def has_object_permission(self, request, view, obj):
+        """Evaluate object-level read/write access."""
         # Handle safe methods
         if request.method in permissions.SAFE_METHODS:
             return self._check_safe_permissions(request, obj)
@@ -136,9 +143,7 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         return False
 
     def _check_safe_permissions(self, request, obj):
-        """
-        Helper method to handle safe method permissions based on publication_status.
-        """
+        """Evaluate read access based on ``publication_status``."""
         if not hasattr(obj, "publication_status"):
             return False  # Deny access if publication_status is undefined
 
@@ -158,6 +163,10 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         if status == UserCreatedObject.STATUS_PRIVATE:
             return obj.owner == request.user or self._is_moderator(request.user, obj)
 
+        # Declined objects: owner or moderator/staff can view
+        if status == getattr(UserCreatedObject, "STATUS_DECLINED", "declined"):
+            return obj.owner == request.user or self._is_moderator(request.user, obj)
+
         # Archived objects: NOT publicly readable; owner or moderator/staff only
         if status == getattr(UserCreatedObject, "STATUS_ARCHIVED", "archived"):
             return obj.owner == request.user or self._is_moderator(request.user, obj)
@@ -165,10 +174,7 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         return False
 
     def _is_moderator(self, user, obj):
-        """
-        Determines if the user has moderation permissions for the given object.
-        Assumes that a permission named 'can_moderate_<modelname>' exists.
-        """
+        """Return whether ``user`` moderates the model type of ``obj``."""
         if not user or not user.is_authenticated:
             return False
 
@@ -177,15 +183,15 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         app_label = obj._meta.app_label
         return user.is_staff or user.has_perm(f"{app_label}.{perm_codename}")
 
-    # Public wrapper to avoid using private method in other modules/templates
     def is_moderator(self, user, obj):  # pragma: no cover - thin wrapper
+        """Public wrapper around ``_is_moderator`` for templates and helpers."""
         return self._is_moderator(user, obj)
 
     def has_submit_permission(self, request, obj):
-        """
-        Check if the user can submit an object for review.
-        Owners or staff can submit when the object is private (first submission)
-        or declined (re‑submission). Archived objects cannot be submitted.
+        """Return whether the object can be submitted for review by this user.
+
+        Allowed when the user is authenticated and owner/staff, the object is
+        in ``private`` or ``declined`` status, and not archived.
         """
         from .models import UserCreatedObject
 
@@ -205,10 +211,10 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         ) and status in allowed_statuses
 
     def has_withdraw_permission(self, request, obj):
-        """
-        Check if the user can withdraw an object from review.
-        Owners or staff can withdraw when the object is in review or declined.
-        Archived objects cannot be withdrawn.
+        """Return whether the object can be withdrawn from review by this user.
+
+        Allowed when the user is authenticated and owner/staff, the object is
+        in ``review`` or ``declined`` status, and not archived.
         """
         from .models import UserCreatedObject
 
@@ -228,9 +234,10 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         ) and status in allowed_statuses
 
     def has_approve_permission(self, request, obj):
-        """
-        Check if the user can approve an object.
-        Only moderators who are NOT the owner can approve objects in review (four eyes principle).
+        """Return whether ``request.user`` may approve ``obj``.
+
+        Enforces four-eyes review: moderators/staff may approve only review
+        objects they do not own.
         """
         from .models import UserCreatedObject
 
@@ -250,9 +257,10 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         )
 
     def has_reject_permission(self, request, obj):
-        """
-        Check if the user can reject an object.
-        Only moderators who are NOT the owner can reject objects in review (four eyes principle).
+        """Return whether ``request.user`` may reject ``obj``.
+
+        Enforces four-eyes review: moderators/staff may reject only review
+        objects they do not own.
         """
         from .models import UserCreatedObject
 
@@ -290,12 +298,10 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         )
 
     def has_archive_permission(self, request, obj):
-        """
-        Check if the user can archive an object.
+        """Return whether ``request.user`` may archive ``obj``.
 
-        Policy aligned with get_object_policy.can_archive:
-        - Object must be published (not already archived)
-        - User must be owner, staff, or moderator for the model
+        The object must be published (and not archived), and the user must be
+        owner, staff, or moderator for the model.
         """
         if not request.user or not request.user.is_authenticated:
             return False
@@ -325,7 +331,6 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         )
 
 
-# Centralized object policy for templates and views
 def get_object_policy(user, obj, request=None, review_mode=False):
     """
     Compute a unified policy dictionary for the given object and user.
@@ -390,25 +395,7 @@ def get_object_policy(user, obj, request=None, review_mode=False):
     if request is None:
         request = SimpleNamespace(user=user)
 
-    # logger.debug(
-    #     "Entering get_object_policy for obj=%s user=%s",
-    #     getattr(obj, "pk", None),
-    #     getattr(user, "id", None),
-    # )
-
-    # Review workflow permissions (delegate to centralized helpers)
-    # logger.debug(
-    #     "get_object_policy status: auth=%s archived=%s owner=%s staff=%s private=%s declined=%s in_review=%s obj=%s user=%s",
-    #     is_authenticated,
-    #     is_archived,
-    #     is_owner,
-    #     is_staff,
-    #     is_private,
-    #     is_declined,
-    #     is_in_review,
-    #     getattr(obj, "pk", None),
-    #     getattr(user, "id", None),
-    # )
+    # Review workflow permissions (delegated to centralized helpers)
     can_submit_review = (
         bool(perm.has_submit_permission(request, obj)) if is_authenticated else False
     )
@@ -423,12 +410,6 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         bool(perm.has_reject_permission(request, obj)) if is_authenticated else False
     )
 
-    # logger.debug(
-    #     "get_object_policy actions: can_submit=%s can_withdraw=%s moderator=%s",
-    #     can_submit_review,
-    #     can_withdraw_review,
-    #     is_moderator,
-    # )
     # CRUD-like actions
     has_update_url = bool(getattr(obj, "update_url", None))
     # Support both modal and direct delete URLs across templates
@@ -468,7 +449,7 @@ def get_object_policy(user, obj, request=None, review_mode=False):
     can_manage_samples = (is_owner or is_staff) and not is_archived and not is_published
     can_add_property = (is_owner or is_staff) and not is_archived
 
-    # Duplicate/New version: require model add permission
+    # Duplicate/new version require model-level add permission.
     can_duplicate = False
     try:
         model = obj.__class__
@@ -481,12 +462,11 @@ def get_object_policy(user, obj, request=None, review_mode=False):
             "Failed checking add permission in get_object_policy", exc_info=True
         )
         can_duplicate = False
-    # New version usually requires ownership/staff, published state, and not archived
-    can_new_version = (
-        can_duplicate and (is_owner or is_staff) and is_published and not is_archived
-    )
+    # New versions require add permission, and are allowed on published objects
+    # or on the user's own objects in any non-archived state.
+    can_new_version = can_duplicate and not is_archived and (is_published or is_owner)
 
-    # Export: allow anonymous export of published/archived; private export requires auth and ownership/staff
+    # Export policy: published/archived are public; private export is owner/staff.
     can_export = (is_published or is_archived) or (
         is_authenticated and (is_owner or is_staff)
     )
@@ -555,7 +535,16 @@ def _resolve_status_value(model, status_name: str):
 
 
 def apply_scope_filter(queryset, scope: str | None, user=None):
-    """Filter ``queryset`` according to the requested scope ('published', 'private', ...)."""
+    """Apply visibility scope filtering to ``queryset``.
+
+    Supported scopes:
+    - ``published``: published records only
+    - ``private``: authenticated owner's records (staff sees all)
+    - ``review``: review records visible by role (owner/moderator/staff)
+    - ``declined``/``archived``: owner-only for authenticated users, staff sees all
+
+    Unknown scopes return ``queryset`` unchanged.
+    """
 
     if scope is None:
         return queryset
@@ -578,25 +567,34 @@ def apply_scope_filter(queryset, scope: str | None, user=None):
                 f"{model.__name__} must define an 'owner' field to use the '{scope_name}' scope."
             )
 
-    staff_or_moderator = getattr(
-        user, "is_staff", False
-    ) or user_is_moderator_for_model(user, model)
+    is_staff = bool(getattr(user, "is_staff", False))
+    is_moderator = user_is_moderator_for_model(user, model)
+    staff_or_moderator = is_staff or is_moderator
     is_authenticated = bool(user) and getattr(user, "is_authenticated", False)
 
     if scope == "published":
         return queryset.filter(**_status_kwargs("published"))
 
     if scope == "private":
-        if staff_or_moderator:
+        if is_staff:
             return queryset
         if not is_authenticated:
             return queryset.none()
         _ensure_owner_field("private")
         return queryset.filter(owner=user)
 
-    if scope in {"review", "declined", "archived"}:
+    if scope == "review":
         filtered = queryset.filter(**_status_kwargs(scope))
         if staff_or_moderator:
+            return filtered
+        if not is_authenticated:
+            return queryset.none()
+        _ensure_owner_field(scope)
+        return filtered.filter(owner=user)
+
+    if scope in {"declined", "archived"}:
+        filtered = queryset.filter(**_status_kwargs(scope))
+        if is_staff:
             return filtered
         if not is_authenticated:
             return queryset.none()
@@ -607,14 +605,17 @@ def apply_scope_filter(queryset, scope: str | None, user=None):
 
 
 def filter_queryset_for_user(queryset, user):
-    """Return the subset of ``queryset`` visible to ``user`` under the read policy."""
+    """Return the subset of ``queryset`` visible to ``user`` under read policy.
+
+    - staff: full queryset
+    - anonymous: published only
+    - authenticated regular: own + published
+    - authenticated moderator: own + published + review
+    """
 
     model = queryset.model
 
     if getattr(user, "is_staff", False):
-        return queryset
-
-    if user_is_moderator_for_model(user, model):
         return queryset
 
     if not getattr(user, "is_authenticated", False):
@@ -627,13 +628,22 @@ def filter_queryset_for_user(queryset, user):
             f"{model.__name__} must define an 'owner' field to apply user visibility filtering."
         )
 
-    return queryset.filter(
-        Q(owner=user) | Q(publication_status=_resolve_status_value(model, "published"))
-    )
+    published_filter = Q(publication_status=_resolve_status_value(model, "published"))
+    owner_filter = Q(owner=user)
+
+    if user_is_moderator_for_model(user, model):
+        review_filter = Q(publication_status=_resolve_status_value(model, "review"))
+        return queryset.filter(owner_filter | published_filter | review_filter)
+
+    return queryset.filter(owner_filter | published_filter)
 
 
 def build_scope_filter_params(scope: str | None, user):
-    """Return filter kwargs (as lists) that mirror ``apply_scope_filter`` for exports."""
+    """Return list-valued filter kwargs for export endpoints.
+
+    These parameters are merged into URL-query-like payloads consumed by
+    filtersets in async export tasks.
+    """
 
     if scope == "private":
         if not user or not getattr(user, "is_authenticated", False):
