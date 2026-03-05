@@ -72,7 +72,7 @@ User input (UI or API)
 | Scope | Anonymous | Authenticated regular | Moderator | Staff |
 |---|---|---|---|---|
 | `published` | published | published | published | published |
-| `private` | none | own (all statuses) | own (all statuses) | all |
+| `private` | none | own (all statuses) | own (all statuses) | own (all statuses) |
 | `review` | none | own `review` | all `review` | all `review` |
 | `declined` | none | own `declined` | own `declined` | all `declined` |
 | `archived` | none | own `archived` | own `archived` | all `archived` |

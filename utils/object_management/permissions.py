@@ -539,7 +539,7 @@ def apply_scope_filter(queryset, scope: str | None, user=None):
 
     Supported scopes:
     - ``published``: published records only
-    - ``private``: authenticated owner's records (staff sees all)
+    - ``private``: authenticated owner's records only
     - ``review``: review records visible by role (owner/moderator/staff)
     - ``declined``/``archived``: owner-only for authenticated users, staff sees all
 
@@ -576,8 +576,6 @@ def apply_scope_filter(queryset, scope: str | None, user=None):
         return queryset.filter(**_status_kwargs("published"))
 
     if scope == "private":
-        if is_staff:
-            return queryset
         if not is_authenticated:
             return queryset.none()
         _ensure_owner_field("private")
