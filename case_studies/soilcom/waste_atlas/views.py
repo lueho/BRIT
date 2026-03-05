@@ -302,3 +302,48 @@ class WasteRatioMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte19_waste_ratio.html"
     map_title = "Verhältnis Bioabfall zu Gesamtabfall"
+
+
+class NetherlandsCollectionSystemMapView(CollectionSystemMapView):
+    """Map 36 — Collection system map for the Netherlands entry point."""
+
+    default_country = "NL"
+    default_year = "2024"
+    map_title = "Primary collection system for kitchen waste"
+    map_overview_label = "Map overview"
+
+
+class NetherlandsBiowasteFrequencyMapView(BiowasteFrequencyMapView):
+    """Map 37 — Biowaste frequency map for the Netherlands entry point."""
+
+    default_country = "NL"
+    default_year = "2024"
+    map_title = "Collection frequency types for biowaste"
+    map_overview_label = "Map overview"
+
+
+class NetherlandsBiowasteCollectionAmountMapView(BiowasteCollectionAmountMapView):
+    """Map 38 — Biowaste collection amount map for the Netherlands entry point."""
+
+    default_country = "NL"
+    default_year = "2024"
+    map_title = "Specifically collected amount of biowaste per person and year"
+    map_overview_label = "Map overview"
+
+
+class NetherlandsOrganicCollectionAmountMapView(OrganicCollectionAmountMapView):
+    """Map 39 — Organic collection amount map for the Netherlands entry point."""
+
+    default_country = "NL"
+    default_year = "2024"
+    map_title = "Aggregated collected amount of organic fractions (kg/p/a)"
+    map_overview_label = "Map overview"
+
+
+class NetherlandsOrganicWasteRatioMapView(OrganicWasteRatioMapView):
+    """Map 40 — Organic waste ratio map for the Netherlands entry point."""
+
+    default_country = "NL"
+    default_year = "2024"
+    map_title = "Share of organic fractions in total waste"
+    map_overview_label = "Map overview"
