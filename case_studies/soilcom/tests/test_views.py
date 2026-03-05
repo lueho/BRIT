@@ -1550,7 +1550,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
     def test_post_http_403_forbidden_for_non_group_members(self):
         self.client.force_login(self.outsider)
         response = self.client.post(
-            reverse(self.url_name, kwargs={"pk": self.collection.id})
+            reverse(self.url_name, kwargs={"pk": self.collection.id}),
         )
         self.assertEqual(response.status_code, 403)
 
@@ -1643,6 +1643,128 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(flyer.url, self.flyer.url)
 
 
+class CollectionVersionLinkVisibilityTestCase(TestCase):
+    """Ensure predecessor/successor links follow collection visibility policy."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="link-owner")
+        cls.other = User.objects.create_user(username="link-other")
+        cls.moderator = User.objects.create_user(username="link-moderator")
+
+        content_type = ContentType.objects.get_for_model(Collection)
+        permission, _ = Permission.objects.get_or_create(
+            codename="can_moderate_collection",
+            content_type=content_type,
+            defaults={"name": "Can moderate collections"},
+        )
+        cls.moderator.user_permissions.add(permission)
+
+        cls.target = Collection.objects.create(
+            owner=cls.owner,
+            publication_status="published",
+            name="Target collection",
+        )
+
+        cls.pred_published = Collection.objects.create(
+            owner=cls.other,
+            publication_status="published",
+            name="Pred published",
+        )
+        cls.pred_owner_private = Collection.objects.create(
+            owner=cls.owner,
+            publication_status="private",
+            name="Pred owner private",
+        )
+        cls.pred_other_private = Collection.objects.create(
+            owner=cls.other,
+            publication_status="private",
+            name="Pred other private",
+        )
+        cls.pred_review = Collection.objects.create(
+            owner=cls.other,
+            publication_status="review",
+            name="Pred review",
+        )
+
+        cls.target.predecessors.add(
+            cls.pred_published,
+            cls.pred_owner_private,
+            cls.pred_other_private,
+            cls.pred_review,
+        )
+
+        cls.succ_published = Collection.objects.create(
+            owner=cls.other,
+            publication_status="published",
+            name="Succ published",
+        )
+        cls.succ_owner_private = Collection.objects.create(
+            owner=cls.owner,
+            publication_status="private",
+            name="Succ owner private",
+        )
+        cls.succ_other_private = Collection.objects.create(
+            owner=cls.other,
+            publication_status="private",
+            name="Succ other private",
+        )
+        cls.succ_review = Collection.objects.create(
+            owner=cls.other,
+            publication_status="review",
+            name="Succ review",
+        )
+
+        cls.succ_published.predecessors.add(cls.target)
+        cls.succ_owner_private.predecessors.add(cls.target)
+        cls.succ_other_private.predecessors.add(cls.target)
+        cls.succ_review.predecessors.add(cls.target)
+
+    def test_owner_sees_public_and_own_links_only(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse("collection-detail", kwargs={"pk": self.target.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        visible_predecessors = {
+            obj.pk for obj in response.context["visible_predecessors"]
+        }
+        visible_successors = {obj.pk for obj in response.context["visible_successors"]}
+
+        self.assertSetEqual(
+            visible_predecessors,
+            {self.pred_published.pk, self.pred_owner_private.pk},
+        )
+        self.assertSetEqual(
+            visible_successors,
+            {self.succ_published.pk, self.succ_owner_private.pk},
+        )
+
+    def test_moderator_sees_public_and_review_links_but_not_other_private(self):
+        self.client.force_login(self.moderator)
+
+        response = self.client.get(
+            reverse("collection-detail", kwargs={"pk": self.target.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        visible_predecessors = {
+            obj.pk for obj in response.context["visible_predecessors"]
+        }
+        visible_successors = {obj.pk for obj in response.context["visible_successors"]}
+
+        self.assertSetEqual(
+            visible_predecessors,
+            {self.pred_published.pk, self.pred_review.pk},
+        )
+        self.assertSetEqual(
+            visible_successors,
+            {self.succ_published.pk, self.succ_review.pk},
+        )
+
+
 class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "add_collection"
     url_name = "collection-new-version"
@@ -1717,6 +1839,17 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
         )
         cls.collection.flyers.add(cls.flyer)
         cls.collection.flyers.add(cls.flyer2)
+        cls.private_collection = Collection.objects.create(
+            name="private-predecessor",
+            owner=cls.owner,
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.collection_system,
+            waste_stream=waste_stream,
+            frequency=cls.frequency,
+            description="Private predecessor",
+            publication_status="private",
+        )
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(
@@ -1746,8 +1879,36 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
 
     def test_post_http_403_forbidden_for_non_group_members(self):
         self.client.force_login(self.outsider)
+        data = {
+            "catchment": self.catchment.id,
+            "collector": self.collector.id,
+            "collection_system": self.collection_system.id,
+            "waste_category": self.waste_stream.category.id,
+            "connection_type": "VOLUNTARY",
+            "allowed_materials": [
+                self.allowed_material_1.id,
+                self.allowed_material_2.id,
+            ],
+            "forbidden_materials": [
+                self.forbidden_material_1.id,
+                self.forbidden_material_2.id,
+            ],
+            "frequency": self.frequency.id,
+            "valid_from": date(2022, 1, 1),
+            "description": "Outsider version",
+            "form-INITIAL_FORMS": "0",
+            "form-TOTAL_FORMS": "0",
+        }
         response = self.client.post(
-            reverse(self.url_name, kwargs={"pk": self.collection.id})
+            reverse(self.url_name, kwargs={"pk": self.collection.id}),
+            data=data,
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_403_for_private_predecessor_of_other_user(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(
+            reverse(self.url_name, kwargs={"pk": self.private_collection.id})
         )
         self.assertEqual(response.status_code, 403)
 
@@ -3299,6 +3460,26 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertContains(response, "Map overview")
                 self.assertContains(response, "No data")
 
+    def test_netherlands_bundle_maps_default_to_nl_2024(self):
+        """Dedicated Netherlands bundle maps default to country NL and year 2024."""
+        map_defaults = {
+            "waste-atlas-collection-system-netherlands-map": "Primary collection system for kitchen waste",
+            "waste-atlas-biowaste-frequency-netherlands-map": "Collection frequency types for biowaste",
+            "waste-atlas-biowaste-collection-amount-netherlands-map": "Specifically collected amount of biowaste per person and year",
+            "waste-atlas-organic-collection-amount-netherlands-map": "Aggregated collected amount of organic fractions (kg/p/a)",
+            "waste-atlas-organic-waste-ratio-netherlands-map": "Share of organic fractions in total waste",
+        }
+
+        for url_name, expected_title in map_defaults.items():
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name))
+
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'value="NL" selected')
+                self.assertContains(response, 'value="2024" selected')
+                self.assertContains(response, expected_title)
+                self.assertContains(response, "Map overview")
+
     def test_italy_orga_level_map_allows_country_override(self):
         """Italy orga-level map still allows overriding country via query param."""
         response = self.client.get(
@@ -3404,6 +3585,46 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(
             response,
             "Map 32 — Administrative level of waste collection (The Netherlands, EN)",
+        )
+        self.assertContains(
+            response,
+            reverse("waste-atlas-collection-system-netherlands-map"),
+        )
+        self.assertContains(
+            response,
+            "Map 36 — Primary collection system for kitchen waste (The Netherlands, EN)",
+        )
+        self.assertContains(
+            response,
+            reverse("waste-atlas-biowaste-frequency-netherlands-map"),
+        )
+        self.assertContains(
+            response,
+            "Map 37 — Collection frequency types for biowaste (The Netherlands, EN)",
+        )
+        self.assertContains(
+            response,
+            reverse("waste-atlas-biowaste-collection-amount-netherlands-map"),
+        )
+        self.assertContains(
+            response,
+            "Map 38 — Specifically collected amount of biowaste (The Netherlands, EN)",
+        )
+        self.assertContains(
+            response,
+            reverse("waste-atlas-organic-collection-amount-netherlands-map"),
+        )
+        self.assertContains(
+            response,
+            "Map 39 — Aggregated collection amount of organic fractions (The Netherlands, EN)",
+        )
+        self.assertContains(
+            response,
+            reverse("waste-atlas-organic-waste-ratio-netherlands-map"),
+        )
+        self.assertContains(
+            response,
+            "Map 40 — Share of organic fractions in total waste (The Netherlands, EN)",
         )
         self.assertContains(
             response,
@@ -4253,6 +4474,16 @@ class CheckWasteFlyerUrlWaybackFallbackTestCase(TestCase):
 
 
 class CollectionCSVRendererTestCase(TestCase):
+    _TRAILING_EXPORT_HEADERS = [
+        "Comments",
+        "Weblinks",
+        "Bibliography Sources",
+        "Valid from",
+        "Valid until",
+        "Created at",
+        "Last modified at",
+    ]
+
     @classmethod
     def setUpTestData(cls):
         MaterialCategory.objects.create(name="Biowaste component")
@@ -4370,8 +4601,29 @@ class CollectionCSVRendererTestCase(TestCase):
         reader = csv.DictReader(codecs.getreader("utf-8")(self.file), delimiter="\t")
         self.assertEqual(Collection.objects.count(), len(list(reader)))
 
+    def test_trailing_metadata_headers_are_last_and_flyer_label_is_weblinks(self):
+        renderer = CollectionCSVRenderer()
+        renderer.render(self.file, self.content)
+        self.file.seek(0)
+        reader = csv.DictReader(codecs.getreader("utf-8")(self.file), delimiter="\t")
+        self.assertEqual(
+            self._TRAILING_EXPORT_HEADERS,
+            list(reader.fieldnames)[-len(self._TRAILING_EXPORT_HEADERS) :],
+        )
+        self.assertNotIn("Flyer URLs", list(reader.fieldnames))
+
 
 class CollectionXLSXRendererTestCase(TestCase):
+    _TRAILING_EXPORT_HEADERS = [
+        "Comments",
+        "Weblinks",
+        "Bibliography Sources",
+        "Valid from",
+        "Valid until",
+        "Created at",
+        "Last modified at",
+    ]
+
     @classmethod
     def setUpTestData(cls):
         User.objects.create(username="outsider")
@@ -4443,6 +4695,20 @@ class CollectionXLSXRendererTestCase(TestCase):
         ]
         for column, (key, _value) in enumerate(ordered_content[0].items(), start=1):
             self.assertEqual(renderer.labels[key], ws.cell(row=1, column=column).value)
+
+    def test_trailing_metadata_headers_are_last_and_flyer_label_is_weblinks(self):
+        renderer = CollectionXLSXRenderer()
+        content = CollectionFlatSerializer(Collection.objects.all(), many=True).data
+        renderer.render(self.file, content)
+        wb = load_workbook(self.file)
+        ws = wb.active
+
+        header = [cell.value for cell in ws[1] if cell.value]
+        self.assertEqual(
+            self._TRAILING_EXPORT_HEADERS,
+            header[-len(self._TRAILING_EXPORT_HEADERS) :],
+        )
+        self.assertNotIn("Flyer URLs", header)
 
 
 @override_settings(

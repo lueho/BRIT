@@ -1,24 +1,32 @@
-from django.db.models import Exists, F, OuterRef
+from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
+from django.db.models import Exists, F, OuterRef, Q
+from django.urls import reverse
 from django_filters import rest_framework as rf_filters
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from case_studies.soilcom.filters import CollectionFilterSet
 from case_studies.soilcom.importers import CollectionImporter
-from case_studies.soilcom.models import Collection, Collector
+from case_studies.soilcom.models import Collection, Collector, WasteFlyer, WasteStream
 from case_studies.soilcom.serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
     CollectionFlatSerializer,
     CollectionImportRecordSerializer,
     CollectionModelSerializer,
+    CollectionMutationCreateSerializer,
+    CollectionMutationVersionSerializer,
     CollectorGeometrySerializer,
     WasteCollectionGeometrySerializer,
 )
 from maps.db_functions import SimplifyPreserveTopology
 from maps.mixins import CachedGeoJSONMixin
 from maps.utils import build_collection_cache_key
+from utils.object_management.models import ReviewAction
+from utils.object_management.permissions import UserCreatedObjectPermission
 from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 
@@ -59,6 +67,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     geojson_serializer_class = WasteCollectionGeometrySerializer
     filter_backends = (CollectionDjangoFilterBackend,)
     filterset_class = CollectionFilterSet
+    requires_add_permission_actions = {"create_collection", "create_new_version"}
 
     def get_geojson_queryset(self):
         """Return optimized queryset for GeoJSON with simplified geometry.
@@ -181,6 +190,292 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             user=user,
             filters=filters if filters else None,
             id_list=id_list if id_list else None,
+        )
+
+    @staticmethod
+    def _build_waste_stream(
+        owner, waste_category, allowed_materials, forbidden_materials
+    ):
+        """Return an exact waste-stream match, creating one if required."""
+        stream, _ = WasteStream.objects.get_or_create(
+            category=waste_category,
+            allowed_materials=allowed_materials,
+            forbidden_materials=forbidden_materials,
+            defaults={"owner": owner},
+        )
+        return stream
+
+    @staticmethod
+    def _flyer_title(url):
+        """Return a short title derived from the URL hostname (max 255 chars)."""
+        from urllib.parse import urlparse
+
+        try:
+            hostname = urlparse(url).hostname or url
+        except Exception:
+            hostname = url
+        return hostname[:255]
+
+    @staticmethod
+    def _attach_sources_and_flyers(collection, sources, flyer_urls):
+        """Attach bibliography sources and flyer URLs to ``collection``."""
+        if sources:
+            collection.sources.add(*sources)
+
+        for url in flyer_urls:
+            if len(url) > 2083:
+                continue
+
+            flyer, _ = WasteFlyer.objects.get_or_create(
+                url=url,
+                defaults={
+                    "owner": collection.owner,
+                    "title": CollectionViewSet._flyer_title(url),
+                    "publication_status": "private",
+                },
+            )
+            collection.flyers.add(flyer)
+
+    @staticmethod
+    def _new_version_predecessor_queryset(user):
+        """Return predecessor queryset visible for version creation.
+
+        Rule: authenticated users may branch from published collections and
+        from their own collections.
+        """
+        if not user or not user.is_authenticated:
+            return Collection.objects.none()
+        return Collection.objects.filter(
+            Q(publication_status=Collection.STATUS_PUBLISHED) | Q(owner=user)
+        )
+
+    def _submit_for_review_if_requested(self, request, collection, submit_for_review):
+        """Submit ``collection`` for review and create a submitted ReviewAction."""
+        if not submit_for_review:
+            return False
+
+        permission = UserCreatedObjectPermission()
+        if not permission.has_submit_permission(request, collection):
+            raise PermissionDenied(
+                "You do not have permission to submit this collection for review."
+            )
+
+        collection.submit_for_review()
+        ReviewAction.objects.create(
+            content_type=ContentType.objects.get_for_model(collection.__class__),
+            object_id=collection.pk,
+            user=request.user,
+            action=ReviewAction.ACTION_SUBMITTED,
+            comment="",
+        )
+        return True
+
+    @staticmethod
+    def _serialize_mutation_response(collection, submitted):
+        """Build a consistent response payload for mutation endpoints."""
+        content_type_id = ContentType.objects.get_for_model(collection.__class__).id
+        return {
+            "id": collection.pk,
+            "content_type_id": content_type_id,
+            "object_id": collection.pk,
+            "publication_status": collection.publication_status,
+            "submitted": submitted,
+            "review_detail_url": reverse(
+                "object_management:review_item_detail",
+                kwargs={
+                    "content_type_id": content_type_id,
+                    "object_id": collection.pk,
+                },
+            ),
+            "detail_url": reverse(
+                "collection-detail",
+                kwargs={"pk": collection.pk},
+            ),
+        }
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="create",
+        url_name="create",
+    )
+    def create_collection(self, request, *args, **kwargs):
+        """Create a collection from a programmatic payload and optionally submit it."""
+        serializer = CollectionMutationCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        with transaction.atomic():
+            waste_stream = self._build_waste_stream(
+                owner=request.user,
+                waste_category=data["waste_category"],
+                allowed_materials=data.get("allowed_materials", []),
+                forbidden_materials=data.get("forbidden_materials", []),
+            )
+
+            collection = Collection.objects.create(
+                name="",
+                owner=request.user,
+                publication_status=Collection.STATUS_PRIVATE,
+                catchment=data["catchment"],
+                collector=data.get("collector"),
+                collection_system=data["collection_system"],
+                waste_stream=waste_stream,
+                frequency=data.get("frequency"),
+                fee_system=data.get("fee_system"),
+                sorting_method=data.get("sorting_method"),
+                established=data.get("established"),
+                valid_from=data["valid_from"],
+                valid_until=data.get("valid_until"),
+                connection_type=data.get("connection_type"),
+                min_bin_size=data.get("min_bin_size"),
+                required_bin_capacity=data.get("required_bin_capacity"),
+                required_bin_capacity_reference=data.get(
+                    "required_bin_capacity_reference"
+                ),
+                description=data.get("description", ""),
+            )
+
+            self._attach_sources_and_flyers(
+                collection,
+                sources=data.get("sources", []),
+                flyer_urls=data.get("flyer_urls", []),
+            )
+            submitted = self._submit_for_review_if_requested(
+                request,
+                collection,
+                submit_for_review=data.get("submit_for_review", True),
+            )
+
+        return Response(
+            self._serialize_mutation_response(collection, submitted),
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="new-version",
+        url_name="new-version",
+    )
+    def create_new_version(self, request, pk=None):
+        """Create a new collection version from an existing predecessor."""
+        predecessor = (
+            self._new_version_predecessor_queryset(request.user)
+            .filter(pk=pk)
+            .select_related(
+                "owner",
+                "catchment",
+                "collector",
+                "collection_system",
+                "waste_stream",
+                "waste_stream__category",
+                "frequency",
+                "fee_system",
+                "sorting_method",
+            )
+            .first()
+        )
+        if predecessor is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        serializer = CollectionMutationVersionSerializer(
+            data=request.data,
+            context={"predecessor": predecessor},
+        )
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        default_waste_stream = predecessor.waste_stream
+        default_allowed = (
+            list(default_waste_stream.allowed_materials.all())
+            if default_waste_stream
+            else []
+        )
+        default_forbidden = (
+            list(default_waste_stream.forbidden_materials.all())
+            if default_waste_stream
+            else []
+        )
+
+        waste_category = data.get(
+            "waste_category",
+            default_waste_stream.category if default_waste_stream else None,
+        )
+        if waste_category is None:
+            return Response(
+                {
+                    "detail": (
+                        "waste_category is required when the predecessor has no waste_stream."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            waste_stream = self._build_waste_stream(
+                owner=request.user,
+                waste_category=waste_category,
+                allowed_materials=data.get("allowed_materials", default_allowed),
+                forbidden_materials=data.get("forbidden_materials", default_forbidden),
+            )
+
+            collection = Collection.objects.create(
+                name="",
+                owner=request.user,
+                publication_status=Collection.STATUS_PRIVATE,
+                catchment=data.get("catchment", predecessor.catchment),
+                collector=data.get("collector", predecessor.collector),
+                collection_system=data.get(
+                    "collection_system",
+                    predecessor.collection_system,
+                ),
+                waste_stream=waste_stream,
+                frequency=data.get("frequency", predecessor.frequency),
+                fee_system=data.get("fee_system", predecessor.fee_system),
+                sorting_method=data.get("sorting_method", predecessor.sorting_method),
+                established=data.get("established", predecessor.established),
+                valid_from=data["valid_from"],
+                valid_until=data.get("valid_until"),
+                connection_type=data.get(
+                    "connection_type", predecessor.connection_type
+                ),
+                min_bin_size=data.get("min_bin_size", predecessor.min_bin_size),
+                required_bin_capacity=data.get(
+                    "required_bin_capacity",
+                    predecessor.required_bin_capacity,
+                ),
+                required_bin_capacity_reference=data.get(
+                    "required_bin_capacity_reference",
+                    predecessor.required_bin_capacity_reference,
+                ),
+                description=data.get("description", predecessor.description or ""),
+            )
+            collection.add_predecessor(predecessor)
+
+            default_sources = list(predecessor.sources.all())
+            default_flyer_urls = list(
+                predecessor.flyers.exclude(url__isnull=True)
+                .exclude(url="")
+                .values_list("url", flat=True)
+            )
+            self._attach_sources_and_flyers(
+                collection,
+                sources=data.get("sources", default_sources),
+                flyer_urls=data.get("flyer_urls", default_flyer_urls),
+            )
+            submitted = self._submit_for_review_if_requested(
+                request,
+                collection,
+                submit_for_review=data.get("submit_for_review", True),
+            )
+
+        return Response(
+            {
+                **self._serialize_mutation_response(collection, submitted),
+                "predecessor_id": predecessor.pk,
+            },
+            status=status.HTTP_201_CREATED,
         )
 
     @action(

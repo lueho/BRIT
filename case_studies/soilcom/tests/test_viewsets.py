@@ -1,12 +1,14 @@
 from datetime import date
 from unittest.mock import patch
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
+from django.contrib.contenttypes.models import ContentType
 from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 
+from bibliography.models import Source
 from case_studies.soilcom.derived_values import clear_derived_value_config_cache
 from case_studies.soilcom.importers import CollectionImporter
 from case_studies.soilcom.models import (
@@ -21,10 +23,12 @@ from case_studies.soilcom.models import (
     FeeSystem,
     SortingMethod,
     WasteCategory,
+    WasteFlyer,
     WasteStream,
 )
 from case_studies.soilcom.viewsets import CollectionViewSet
-from maps.models import Attribute, Region, RegionAttributeValue
+from maps.models import Attribute, GeoPolygon, NutsRegion, Region, RegionAttributeValue
+from materials.models import Material
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.properties.models import Property, Unit
 
@@ -732,6 +736,315 @@ class CollectionImporterWorkflowTestCase(APITestCase):
         )
 
 
+class CollectionMutationApiTestCase(APITestCase):
+    """Tests for programmatic collection creation and new-version endpoints."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="agent-owner")
+        cls.other_user = User.objects.create_user(username="agent-other")
+        cls.staff = User.objects.create_user(username="agent-staff", is_staff=True)
+
+        content_type = ContentType.objects.get_for_model(Collection)
+        cls.add_collection_permission, _ = Permission.objects.get_or_create(
+            content_type=content_type,
+            codename="add_collection",
+            defaults={"name": "Can add collection"},
+        )
+        cls.owner.user_permissions.add(cls.add_collection_permission)
+        cls.other_user.user_permissions.add(cls.add_collection_permission)
+
+        cls.catchment = CollectionCatchment.objects.create(name="Agent Catchment")
+        cls.collection_system = CollectionSystem.objects.create(name="Agent System")
+        cls.waste_category = WasteCategory.objects.create(name="Agent Waste")
+        cls.collector = Collector.objects.create(name="Agent Collector")
+        cls.frequency = CollectionFrequency.objects.create(name="Agent Frequency")
+        cls.fee_system = FeeSystem.objects.create(name="Agent Fee")
+        cls.sorting_method = SortingMethod.objects.create(name="Agent Sorting")
+        cls.allowed_material = Material.objects.create(
+            name="Agent Allowed Material", owner=cls.owner
+        )
+        cls.forbidden_material = Material.objects.create(
+            name="Agent Forbidden Material", owner=cls.owner
+        )
+        cls.source = Source.objects.create(
+            owner=cls.owner,
+            title="Agent Source",
+            abbreviation="AgentSource",
+            url="https://example.com/source",
+        )
+
+        predecessor_stream = WasteStream.objects.create(
+            category=cls.waste_category,
+            owner=cls.owner,
+        )
+        predecessor_stream.allowed_materials.add(cls.allowed_material)
+        predecessor_stream.forbidden_materials.add(cls.forbidden_material)
+
+        cls.predecessor = Collection.objects.create(
+            owner=cls.owner,
+            publication_status="published",
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.collection_system,
+            waste_stream=predecessor_stream,
+            frequency=cls.frequency,
+            fee_system=cls.fee_system,
+            sorting_method=cls.sorting_method,
+            valid_from=date(2024, 1, 1),
+            description="predecessor",
+        )
+        cls.private_predecessor = Collection.objects.create(
+            owner=cls.owner,
+            publication_status="private",
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.collection_system,
+            waste_stream=predecessor_stream,
+            frequency=cls.frequency,
+            fee_system=cls.fee_system,
+            sorting_method=cls.sorting_method,
+            valid_from=date(2024, 6, 1),
+            description="private predecessor",
+        )
+        cls.predecessor.sources.add(cls.source)
+        cls.predecessor_flyer = WasteFlyer.objects.create(
+            owner=cls.owner,
+            title="Predecessor flyer",
+            publication_status="private",
+            url="https://example.com/predecessor-flyer",
+        )
+        cls.predecessor.flyers.add(cls.predecessor_flyer)
+
+    def test_create_endpoint_requires_add_permission(self):
+        """Create endpoint denies users lacking add_collection permission."""
+        user = User.objects.create_user(username="agent-no-perm")
+        self.client.force_login(user)
+
+        response = self.client.post(
+            reverse("api-waste-collection-create"),
+            {
+                "catchment": self.catchment.pk,
+                "waste_category": self.waste_category.pk,
+                "collection_system": self.collection_system.pk,
+                "valid_from": "2025-01-01",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_endpoint_private_draft_when_submit_disabled(self):
+        """Create endpoint can persist a private draft without review submission."""
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse("api-waste-collection-create"),
+            {
+                "catchment": self.catchment.pk,
+                "waste_category": self.waste_category.pk,
+                "collection_system": self.collection_system.pk,
+                "collector": self.collector.pk,
+                "frequency": self.frequency.pk,
+                "fee_system": self.fee_system.pk,
+                "sorting_method": self.sorting_method.pk,
+                "allowed_materials": [self.allowed_material.pk],
+                "forbidden_materials": [self.forbidden_material.pk],
+                "sources": [self.source.pk],
+                "flyer_urls": ["https://example.com/new-flyer"],
+                "valid_from": "2025-01-01",
+                "description": "Agent draft",
+                "submit_for_review": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(response.data["submitted"])
+
+        collection = Collection.objects.get(pk=response.data["id"])
+        self.assertEqual(collection.publication_status, "private")
+        self.assertIsNone(collection.submitted_at)
+        self.assertEqual(collection.sources.count(), 1)
+        self.assertEqual(collection.flyers.count(), 1)
+        self.assertFalse(
+            ReviewAction.for_object(collection)
+            .filter(action=ReviewAction.ACTION_SUBMITTED)
+            .exists()
+        )
+
+    def test_create_endpoint_submits_for_review(self):
+        """Create endpoint submits to review and logs a submitted ReviewAction."""
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse("api-waste-collection-create"),
+            {
+                "catchment": self.catchment.pk,
+                "waste_category": self.waste_category.pk,
+                "collection_system": self.collection_system.pk,
+                "valid_from": "2025-02-01",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["submitted"])
+
+        collection = Collection.objects.get(pk=response.data["id"])
+        self.assertEqual(collection.publication_status, "review")
+        self.assertIsNotNone(collection.submitted_at)
+        self.assertTrue(
+            ReviewAction.for_object(collection)
+            .filter(action=ReviewAction.ACTION_SUBMITTED)
+            .exists()
+        )
+
+    def test_create_endpoint_validates_dates(self):
+        """Create endpoint rejects invalid validity periods."""
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse("api-waste-collection-create"),
+            {
+                "catchment": self.catchment.pk,
+                "waste_category": self.waste_category.pk,
+                "collection_system": self.collection_system.pk,
+                "valid_from": "2025-02-01",
+                "valid_until": "2025-01-01",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("valid_until", response.data)
+
+    def test_new_version_with_add_permission_succeeds(self):
+        """Users with add permission can still create a version from published predecessors."""
+        self.client.force_login(self.other_user)
+
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-new-version",
+                kwargs={"pk": self.predecessor.pk},
+            ),
+            {
+                "valid_from": "2025-03-01",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        successor = Collection.objects.get(pk=response.data["id"])
+        self.assertEqual(successor.owner, self.other_user)
+        self.assertTrue(successor.predecessors.filter(pk=self.predecessor.pk).exists())
+
+    def test_new_version_without_add_permission_is_denied_for_published_predecessor(
+        self,
+    ):
+        """Users need add_collection permission even when predecessor is published."""
+        user = User.objects.create_user(username="agent-no-add-version")
+        self.client.force_login(user)
+
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-new-version",
+                kwargs={"pk": self.predecessor.pk},
+            ),
+            {"valid_from": "2025-03-15"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_new_version_rejects_private_predecessor_of_other_user(self):
+        """Branching from another user's private predecessor is not allowed."""
+        user = User.objects.create_user(username="agent-private-denied")
+        user.user_permissions.add(self.add_collection_permission)
+        self.client.force_login(user)
+
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-new-version",
+                kwargs={"pk": self.private_predecessor.pk},
+            ),
+            {"valid_from": "2025-04-01"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_new_version_allows_own_private_predecessor_with_add_permission(self):
+        """Users with add permission may branch from their own private predecessors."""
+        user = User.objects.create_user(username="agent-own-private")
+        user.user_permissions.add(self.add_collection_permission)
+        own_predecessor_stream = WasteStream.objects.create(
+            category=self.waste_category,
+            owner=user,
+        )
+        own_predecessor = Collection.objects.create(
+            owner=user,
+            publication_status="private",
+            catchment=self.catchment,
+            collector=self.collector,
+            collection_system=self.collection_system,
+            waste_stream=own_predecessor_stream,
+            frequency=self.frequency,
+            fee_system=self.fee_system,
+            sorting_method=self.sorting_method,
+            valid_from=date(2024, 7, 1),
+            description="own private predecessor",
+        )
+        self.client.force_login(user)
+
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-new-version",
+                kwargs={"pk": own_predecessor.pk},
+            ),
+            {"valid_from": "2025-04-02"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        successor = Collection.objects.get(pk=response.data["id"])
+        self.assertEqual(successor.owner, user)
+        self.assertTrue(successor.predecessors.filter(pk=own_predecessor.pk).exists())
+
+    def test_new_version_creates_predecessor_link_and_submits(self):
+        """New-version endpoint creates linked successor and optional review submission."""
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-new-version",
+                kwargs={"pk": self.predecessor.pk},
+            ),
+            {
+                "valid_from": "2025-03-01",
+                "description": "agent successor",
+                "submit_for_review": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["predecessor_id"], self.predecessor.pk)
+        self.assertTrue(response.data["submitted"])
+
+        successor = Collection.objects.get(pk=response.data["id"])
+        self.assertTrue(successor.predecessors.filter(pk=self.predecessor.pk).exists())
+        self.assertEqual(successor.publication_status, "review")
+        self.assertIsNotNone(successor.submitted_at)
+        self.assertEqual(successor.sources.count(), 1)
+        self.assertTrue(successor.flyers.filter(pk=self.predecessor_flyer.pk).exists())
+        self.assertTrue(
+            ReviewAction.for_object(successor)
+            .filter(action=ReviewAction.ACTION_SUBMITTED)
+            .exists()
+        )
+
+
 class GreenWasteCollectionSystemCountViewSetTests(APITestCase):
     """Tests for Green Waste collection-system count atlas endpoint."""
 
@@ -935,6 +1248,96 @@ class SortingMethodViewSetTests(APITestCase):
         self.assertEqual(by_catchment[self.catchment_b.id], "No separate collection")
         self.assertEqual(by_catchment[self.catchment_c.id], "no_data")
         self.assertNotIn(self.catchment_other_country.id, by_catchment)
+
+
+class NutsPrefixAtlasFilteringTests(APITestCase):
+    """Regression tests for nuts_prefix filtering across Waste Atlas endpoints."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.be1_region = NutsRegion.objects.create(
+            name="Brussels",
+            country="BE",
+            cntr_code="BE",
+            nuts_id="BE1",
+            levl_code=1,
+            borders=GeoPolygon.objects.create(),
+        )
+        cls.be2_region = NutsRegion.objects.create(
+            name="Flanders",
+            country="BE",
+            cntr_code="BE",
+            nuts_id="BE2",
+            levl_code=1,
+            borders=GeoPolygon.objects.create(),
+        )
+        cls.be3_region = NutsRegion.objects.create(
+            name="Wallonia",
+            country="BE",
+            cntr_code="BE",
+            nuts_id="BE3",
+            levl_code=1,
+            borders=GeoPolygon.objects.create(),
+        )
+
+        cls.catchment_be1 = CollectionCatchment.objects.create(
+            name="Brussels Catchment",
+            region=cls.be1_region,
+        )
+        cls.catchment_be2 = CollectionCatchment.objects.create(
+            name="Flanders Catchment",
+            region=cls.be2_region,
+        )
+        cls.catchment_be3 = CollectionCatchment.objects.create(
+            name="Wallonia Catchment",
+            region=cls.be3_region,
+        )
+
+        cls.d2d = CollectionSystem.objects.create(name="Door to door")
+        cls.biowaste_category = WasteCategory.objects.create(name="Biowaste")
+        cls.biowaste_stream = WasteStream.objects.create(category=cls.biowaste_category)
+
+        for catchment in (cls.catchment_be1, cls.catchment_be2, cls.catchment_be3):
+            Collection.objects.create(
+                name=f"{catchment.name} 2022",
+                catchment=catchment,
+                waste_stream=cls.biowaste_stream,
+                collection_system=cls.d2d,
+                valid_from=date(2022, 1, 1),
+            )
+
+    def test_collection_system_endpoint_respects_nuts_prefix(self):
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/collection-system/",
+            {
+                "country": "BE",
+                "year": 2022,
+                "nuts_prefix": "BE1,BE2",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        catchment_ids = {row["catchment_id"] for row in response.data}
+
+        self.assertEqual(catchment_ids, {self.catchment_be1.id, self.catchment_be2.id})
+
+    def test_catchment_geojson_endpoint_respects_nuts_prefix(self):
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/catchment/geojson/",
+            {
+                "country": "BE",
+                "year": 2022,
+                "nuts_prefix": "BE1,BE2",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        feature_ids = {
+            feature["properties"]["catchment_id"]
+            for feature in response.data["features"]
+        }
+
+        self.assertEqual(feature_ids, {self.catchment_be1.id, self.catchment_be2.id})
 
 
 @override_settings(

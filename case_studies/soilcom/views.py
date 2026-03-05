@@ -1168,6 +1168,23 @@ class CollectionCreateNewVersionView(CollectionCopyView):
 
     predecessor = None
 
+    def has_permission(self):
+        """Require add permission and published-or-own predecessor access."""
+        if not super().has_permission():
+            return False
+
+        user = getattr(self.request, "user", None)
+
+        try:
+            predecessor = self.get_object()
+        except Exception:
+            return False
+
+        return (
+            predecessor.publication_status == Collection.STATUS_PUBLISHED
+            or predecessor.owner_id == user.id
+        )
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         predecessor = self.predecessor or getattr(self, "object", None)

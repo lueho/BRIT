@@ -536,6 +536,8 @@
        href="{% url 'collection-copy' object.id %}">
       <i class="fas fa-copy"></i> Duplicate
     </a>
+  {% endif %}
+  {% if policy.can_new_version %}
     <a class="btn btn-outline-secondary w-100 mb-2"
        href="{% url 'collection-new-version' object.id %}">
       <i class="fas fa-code-branch"></i> New version
