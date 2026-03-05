@@ -8,6 +8,7 @@ Sources (local paths, configurable via CLI flags):
 - 2021: Excel file  Sweden_Waste statistics2021.xlsx
 - 2022: PDF         husha-llsavfall-i-siffror-2022.pdf
 - 2023: PDF         husha-llsavfall-i-siffror-2023.pdf
+- 2024: PDF         husha-llsavfall-i-siffror-2024.pdf
 
 Usage::
 
@@ -22,6 +23,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -36,6 +38,7 @@ from django.core.management.base import BaseCommand, CommandError
 _EXCEL_FILE = Path("Sweden_Waste statistics2021.xlsx")
 _PDF_2022 = Path("husha-llsavfall-i-siffror-2022.pdf")
 _PDF_2023 = Path("husha-llsavfall-i-siffror-2023.pdf")
+_PDF_2024 = Path("husha-llsavfall-i-siffror-2024.pdf")
 _MUNICIPALITIES_CSV = Path("sweden_municipalities.csv")
 
 _BATCH_SIZE = 50
@@ -53,10 +56,14 @@ _SOURCE_URL_2022 = (
 _SOURCE_URL_2023 = (
     "https://www.avfallsverige.se/media/dmqbrvlq/husha-llsavfall-i-siffror.pdf"
 )
+_SOURCE_URL_2024 = (
+    "https://www.avfallsverige.se/media/tmxdos1o/husha-llsavfall-i-siffror-2024.pdf"
+)
 _SOURCE_URLS: dict[int, str] = {
     2021: _SOURCE_URL_2021,
     2022: _SOURCE_URL_2022,
     2023: _SOURCE_URL_2023,
+    2024: _SOURCE_URL_2024,
 }
 
 # ---------------------------------------------------------------------------
@@ -455,6 +462,7 @@ _CITY_ALIAS = {
     "Norsjö - - Tvådelade kärl Papper Obl": "Norsjö",
     "Ödeshög - - Optisk sortering Bioplast Obl": "Ödeshög",
     "LSR Landskrona-Sva-": "Landskrona-Svalöv (LSR)",
+    "LSR Landskrona/Svalöv": "Landskrona-Svalöv (LSR)",
 }
 
 # Rows to drop entirely (county aggregate rows, header fragments)
@@ -542,6 +550,9 @@ def _valid_from_year(year: int) -> date:
 def _clean_city(raw: str) -> str | None:
     """Return canonical city name, or None if the row should be dropped."""
     raw = raw.strip()
+    if raw == raw.upper():
+        return None
+    raw = re.sub(r"\((\d+)\)", r"\1)", raw)
     if raw in _DROP_KEYS:
         return None
     return _CITY_ALIAS.get(raw, raw)
@@ -763,7 +774,11 @@ def _parse_pdf(path: Path, data_year: int) -> list[dict]:
 
     with pdfplumber.open(str(path)) as pdf:
         _extract_table3(pdf, amounts)
-        _extract_table5(pdf, data_year, details)
+        # Municipality-level collection-system details were available in table 5
+        # for 2022/2023. In 2024, table 5 changed to recycling/index metrics and
+        # no longer provides the needed fields for this importer.
+        if data_year <= 2023:
+            _extract_table5(pdf, data_year, details)
 
     all_cities = set(amounts) | set(details)
     records = []
@@ -800,50 +815,160 @@ def _parse_pdf(path: Path, data_year: int) -> list[dict]:
 
 def _extract_table3(pdf, amounts: dict) -> None:
     """Extract food and residual waste kg/person from Table 3 using line-based parsing."""
+
+    def _is_table3_header(page_text: str) -> bool:
+        upper = page_text.upper()
+        return (
+            "TABELL 3" in upper
+            and "INSAMLADE MÄNGDER" in upper
+            and "HUSHÅLLSAVFALL" in upper
+            and "KOMMUN/FÖRBUND" in upper
+        )
+
+    def _is_table4_header(page_text: str) -> bool:
+        upper = page_text.upper()
+        return "TABELL 4" in upper and "BEHANDLADE MÄNGDER" in upper
+
+    def _is_data_header_or_note(line: str) -> bool:
+        upper = line.upper()
+        if any(
+            key in upper
+            for key in (
+                "TABELL",
+                "INSAMLADE MÄNGDER",
+                "MÄNGD INSAMLAT HUSHÅLLSAVFALL",
+                "FARLIGT AVFALL INKL",
+                "LÄN ELAVFALL OCH",
+                "KOMMUN/FÖRBUND TOTALT MATAVFALL RESTAVFALL",
+                "RIKET, MEDEL",
+                "INKLUDERAR AVFALL SOM UPPKOMMER HOS HUSHÅLL",
+                "OCH SOM INGÅR I DET KOMMUNALA AVFALLSANSVARET",
+            )
+        ):
+            return True
+        if re.match(r"^\d+\)", line):
+            return True
+        if line.isdigit():
+            return True
+        return False
+
+    def _is_numeric_or_dash(token: str) -> bool:
+        return token == "-" or _try_float_swedish(token) is not None
+
+    def _extract_table3_values(
+        table_text: str,
+    ) -> dict[str, tuple[float | None, float | None]]:
+        table_amounts: dict[str, tuple[float | None, float | None]] = {}
+        lines = [line.strip() for line in table_text.split("\n") if line.strip()]
+        pending_name_parts: list[str] = []
+
+        index = 0
+        while index < len(lines):
+            line = lines[index]
+            line = re.sub(
+                r"^hushållsavfall\s+\d{4}\s+",
+                "",
+                line,
+                flags=re.IGNORECASE,
+            )
+            if _is_data_header_or_note(line):
+                pending_name_parts = []
+                index += 1
+                continue
+
+            parts = line.split()
+            first_numeric_idx = next(
+                (idx for idx, token in enumerate(parts) if _is_numeric_or_dash(token)),
+                None,
+            )
+
+            if first_numeric_idx is None:
+                pending_name_parts.append(line)
+                index += 1
+                continue
+
+            name_prefix = " ".join(parts[:first_numeric_idx]).strip()
+            numeric_tokens = parts[first_numeric_idx:]
+
+            if name_prefix and name_prefix == name_prefix.upper():
+                # County aggregate / section row (e.g. "STOCKHOLM 388 ...").
+                pending_name_parts = []
+                index += 1
+                continue
+
+            row_name_parts: list[str] = []
+            if pending_name_parts:
+                if (
+                    not name_prefix
+                    or pending_name_parts[-1].endswith("-")
+                    or pending_name_parts[-1].endswith("&")
+                ):
+                    row_name_parts.extend(pending_name_parts)
+                pending_name_parts = []
+            if name_prefix:
+                row_name_parts.append(name_prefix)
+
+            # Handle wrapped municipality names where suffix appears on next line.
+            if index + 1 < len(lines):
+                next_line = lines[index + 1]
+                next_tokens = next_line.split()
+                next_has_numeric = any(
+                    _is_numeric_or_dash(token) for token in next_tokens
+                )
+                if (
+                    next_line
+                    and not next_has_numeric
+                    and not _is_data_header_or_note(next_line)
+                    and (not name_prefix or name_prefix.endswith("-"))
+                ):
+                    row_name_parts.append(next_line)
+                    index += 1
+
+            if not row_name_parts:
+                index += 1
+                continue
+
+            city_raw = " ".join(row_name_parts)
+            city_raw = re.sub(r"-\s+", "", city_raw)
+            city_raw = re.sub(r"\s+", " ", city_raw).strip()
+            city = _clean_city(city_raw)
+            if not city:
+                index += 1
+                continue
+
+            values: list[float | None] = []
+            for token in numeric_tokens:
+                if token == "-":
+                    values.append(None)
+                else:
+                    parsed = _try_float_swedish(token)
+                    if parsed is not None:
+                        values.append(parsed)
+
+            if len(values) < 3:
+                index += 1
+                continue
+
+            food_kg = values[1]
+            residual_kg = values[2]
+            if food_kg is None and residual_kg is None:
+                index += 1
+                continue
+            table_amounts[city] = (food_kg, residual_kg)
+            index += 1
+
+        return table_amounts
+
     in_table3 = False
     for page in pdf.pages:
         text = page.extract_text() or ""
-        # Match the exact page header of data pages (not the TOC)
-        if text.startswith("Tabell 3 Insamlade mängder hushållsavfall"):
+        if _is_table3_header(text):
             in_table3 = True
-        if text.startswith("Tabell 4") and in_table3:
+        if _is_table4_header(text) and in_table3:
             break
         if not in_table3:
             continue
-        for line in text.split("\n"):
-            parts = line.strip().split()
-            if not parts:
-                continue
-            upper = line.upper()
-            if any(kw in upper for kw in ("MEDEL", "RIKET", "TABELL")):
-                continue
-            if "Matavfall" in line or "Restavfall" in line:
-                continue
-            # Split line into city name (non-numeric prefix) and numeric values
-            city_parts: list[str] = []
-            numeric_vals: list[float] = []
-            for p in parts:
-                v = _try_float_swedish(p)
-                if v is not None and city_parts:
-                    numeric_vals.append(v)
-                elif v is None and (city_parts or p not in ("-", "ET", "DS")):
-                    city_parts.append(p)
-            if not city_parts or len(numeric_vals) < 2:
-                continue
-            # Strip trailing dash/placeholder tokens from city name
-            while city_parts and city_parts[-1] in ("-", "ET", "DS"):
-                city_parts.pop()
-            if not city_parts:
-                continue
-            city_raw = " ".join(city_parts)
-            city = _clean_city(city_raw)
-            if not city:
-                continue
-            # Layout: total, food, residual, ...
-            food_kg = numeric_vals[1] if len(numeric_vals) > 1 else None
-            residual_kg = numeric_vals[2] if len(numeric_vals) > 2 else None
-            if food_kg is not None or residual_kg is not None:
-                amounts[city] = (food_kg, residual_kg)
+        amounts.update(_extract_table3_values(text))
 
 
 def _extract_table5(pdf, data_year: int, details: dict) -> None:
@@ -1011,7 +1136,7 @@ def _records_to_json_serialisable(records: list[dict]) -> list[dict]:
 
 
 class Command(BaseCommand):
-    """Import Swedish waste collection data from Avfall Sverige reports (2021–2023).
+    """Import Swedish waste collection data from Avfall Sverige reports (2021–2024).
 
     Runs locally against a BRIT instance via the bulk-import API endpoint.
     Parses Excel and PDF source files on the local machine, then POSTs records
@@ -1019,7 +1144,7 @@ class Command(BaseCommand):
     """
 
     help = (
-        "Import Swedish waste collection data (2021–2023) via the BRIT API. "
+        "Import Swedish waste collection data (2021–2024) via the BRIT API. "
         "Runs locally; parses Excel/PDF source files and POSTs to the import endpoint."
     )
 
@@ -1063,7 +1188,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--year",
             type=int,
-            choices=(2021, 2022, 2023),
+            choices=(2021, 2022, 2023, 2024),
             default=None,
             help="Import only this specific year (default: all years).",
         )
@@ -1084,6 +1209,12 @@ class Command(BaseCommand):
             type=str,
             default=str(_PDF_2023),
             help=f"Path to 2023 PDF (default: {_PDF_2023}).",
+        )
+        parser.add_argument(
+            "--pdf-2024",
+            type=str,
+            default=str(_PDF_2024),
+            help=f"Path to 2024 PDF (default: {_PDF_2024}).",
         )
         parser.add_argument(
             "--batch-size",
@@ -1169,12 +1300,13 @@ class Command(BaseCommand):
         publication_status = options["publication_status"]
         batch_size = options["batch_size"]
         only_year = options["year"]
-        years_to_run = [2021, 2022, 2023] if only_year is None else [only_year]
+        years_to_run = [2021, 2022, 2023, 2024] if only_year is None else [only_year]
 
         paths = {
             2021: Path(options["excel"]),
             2022: Path(options["pdf_2022"]),
             2023: Path(options["pdf_2023"]),
+            2024: Path(options["pdf_2024"]),
         }
 
         # Load LAU ID → collector_website mapping from CSV
