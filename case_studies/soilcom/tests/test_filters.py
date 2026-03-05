@@ -4,6 +4,7 @@ from django.utils import timezone
 from factory.django import mute_signals
 
 from distributions.models import TemporalDistribution, Timestep
+from maps.models import Region
 from utils.properties.models import Property
 
 from ..filters import (
@@ -389,6 +390,33 @@ class CollectionFilterTestCase(TestCase):
         qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
         self.assertIn(self.child_collection, qs)
         self.assertIn(self.collection1, qs)
+
+    def test_country_level_catchment_falls_back_to_country_collections(self):
+        sweden_region = Region.objects.create(name="Sweden Region", country="SE")
+        sweden_catchment = CollectionCatchment.objects.create(
+            name="Sverige (SE)",
+            type="nuts",
+            region=sweden_region,
+        )
+        unrelated_parent = CollectionCatchment.objects.create(
+            name="Wrong Parent",
+            type="nuts",
+        )
+        municipality_catchment = CollectionCatchment.objects.create(
+            name="Stockholm (0180)",
+            type="administrative",
+            parent=unrelated_parent,
+            region=sweden_region,
+        )
+        sweden_collection = Collection.objects.create(
+            catchment=municipality_catchment,
+            publication_status="published",
+        )
+
+        self.data.update({"catchment": sweden_catchment.pk})
+        qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
+
+        self.assertIn(sweden_collection, qs)
 
     def test_non_numeric_collector_is_ignored(self):
         data = self.data.copy()

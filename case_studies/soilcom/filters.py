@@ -659,6 +659,18 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
             if not spatially_related_qs.exists():
                 spatially_related_qs = value.upstream_collections.order_by("name")
 
+            # Country-level NUTS catchments (e.g. "Sverige (SE)") should still
+            # resolve to their country's collections even if hierarchy links are
+            # incomplete or temporarily inconsistent in imported map data.
+            if not spatially_related_qs.exists() and value.type == "nuts":
+                region = getattr(value, "region", None)
+                if region is not None:
+                    country_code = region.country_code or region.country
+                    if country_code:
+                        spatially_related_qs = Collection.objects.filter(
+                            catchment__region__country=country_code
+                        ).order_by("name")
+
         collection_ids = list(spatially_related_qs.values_list("id", flat=True))
 
         return queryset.filter(id__in=collection_ids)

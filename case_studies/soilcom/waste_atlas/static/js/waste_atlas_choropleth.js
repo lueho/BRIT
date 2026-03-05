@@ -85,7 +85,10 @@ var WasteAtlasChoropleth = (function () {
     ]).then(function (results) {
       var bundeslaender = results[3];
       if (cfg.nutsPrefix && bundeslaender && bundeslaender.features) {
-        var prefixes = cfg.nutsPrefix.split(',').map(function (p) { return p.trim(); });
+        var prefixes = cfg.nutsPrefix
+          .split(',')
+          .map(function (p) { return p.trim(); })
+          .filter(function (p) { return p.length > 0; });
         bundeslaender = Object.assign({}, bundeslaender, {
           features: bundeslaender.features.filter(function (f) {
             var nutsId = f.properties && (f.properties.nuts_id || f.properties.NUTS_ID || '');
