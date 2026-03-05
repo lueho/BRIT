@@ -139,11 +139,11 @@ Custom Django test runner that ensures all initial data is created before runnin
 Includes @serial_test decorator: mark test classes or methods for serial execution even when parallel is enabled.
 Usage:
     from utils.tests.testrunner import serial_test
-    
+
     @serial_test
     class MySerialTest(TestCase):
         ...
-    
+
     or
     class MyTest(TestCase):
         @serial_test
@@ -163,9 +163,6 @@ def serial_test(obj):
     """
     SERIAL_TESTS.add(obj)
     return obj
-
-
-class StopwatchTestResult(unittest.TextTestResult): ...
 
 
 class SerialAwareTestRunner(DiscoverRunner):
@@ -191,6 +188,14 @@ class SerialAwareTestRunner(DiscoverRunner):
 
     def get_resultclass(self):
         return StopwatchTestResult
+
+    def setup_databases(self, **kwargs):
+        old_config = super().setup_databases(**kwargs)
+
+        if getattr(settings, "TESTING", False):
+            call_command("ensure_initial_data")
+
+        return old_config
 
     def run_tests(self, test_labels, extra_tests=None, **kwargs):
         # Check if we have any serial tests to handle

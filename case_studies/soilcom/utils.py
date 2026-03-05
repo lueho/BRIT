@@ -7,6 +7,7 @@ from .models import (
     CollectionCountOptions,
     CollectionFrequency,
     CollectionSeason,
+    SortingMethod,
 )
 
 INITIALIZATION_DEPENDENCIES = ["distributions"]
@@ -43,6 +44,14 @@ def ensure_initial_data(stdout=None):
     CollectionSeason.objects.get_or_create(
         distribution=distribution, first_timestep=january, last_timestep=december
     )
+
+    for method_name in (
+        "Separate bins",
+        "Optical bag sorting",
+        "Four compartments bin",
+        "Two compartments bin",
+    ):
+        SortingMethod.objects.get_or_create(name=method_name)
 
     if stdout:
         print("Soilcom initial data ensured.", file=stdout)

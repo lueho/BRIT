@@ -22,10 +22,12 @@ from ..models import (
     CollectionPropertyValue,
     CollectionSeason,
     CollectionSystem,
+    SortingMethod,
     WasteCategory,
     WasteFlyer,
     WasteStream,
 )
+from ..utils import ensure_initial_data
 from .test_views import (  # noqa: F401
     CollectionEstablishedFieldTestCase,
     CollectionSortingMethodFieldTestCase,
@@ -34,8 +36,8 @@ from .test_views import (  # noqa: F401
 
 
 class InitialDataTestCase(TestCase):
-    @staticmethod
-    def test_simple_initial_collection_frequency_exists():
+    def test_simple_initial_collection_frequency_exists(self):
+        ensure_initial_data()
         season = CollectionSeason.objects.get(
             distribution=TemporalDistribution.objects.get(name="Months of the year"),
             first_timestep=Timestep.objects.get(name="January"),
@@ -44,6 +46,21 @@ class InitialDataTestCase(TestCase):
         CollectionCountOptions.objects.get(
             frequency__type="Fixed", season=season, standard=52
         )
+
+    def test_default_sorting_methods_exist(self):
+        ensure_initial_data()
+        expected_names = {
+            "Separate bins",
+            "Optical bag sorting",
+            "Four compartments bin",
+            "Two compartments bin",
+        }
+        existing_names = set(
+            SortingMethod.objects.filter(name__in=expected_names).values_list(
+                "name", flat=True
+            )
+        )
+        self.assertTrue(expected_names.issubset(existing_names))
 
 
 class CollectionCatchmentTestCase(TestCase):
