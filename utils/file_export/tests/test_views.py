@@ -86,6 +86,22 @@ class FilteredListFileExportViewTests(TestCase):
         self.assertEqual(result.get("some_filter"), ["value"])
         self.assertNotIn("list_type", result)
 
+    def test_get_filter_params_ignores_scope_when_list_type_is_used(self):
+        """Scope must be dropped to avoid double scope filtering in async export tasks."""
+        params = {
+            "list_type": ["private"],
+            "scope": ["private"],
+            "some_filter": ["value"],
+        }
+        request = self._make_request()
+        view_instance = DummyExportView()
+
+        result = view_instance.get_filter_params(request, params.copy())
+
+        self.assertNotIn("scope", result)
+        self.assertEqual(result.get("owner"), [self.user.pk])
+        self.assertEqual(result.get("some_filter"), ["value"])
+
     def test_get_filter_params_defaults_to_published_when_no_list_type(self):
         """Verify default scoping when list_type is not provided."""
         params = {"some_filter": ["value"]}

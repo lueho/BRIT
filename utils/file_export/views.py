@@ -103,6 +103,10 @@ class FilteredListFileExportView(LoginRequiredMixin, View):
         """
         params.pop("page", None)
         list_type = params.pop("list_type", ["published"])[0]
+        # Scope is already resolved by list_type/context. Keeping both can make
+        # filtersets with request-dependent scope handlers collapse to an empty
+        # queryset in async exports where no request object is available.
+        params.pop("scope", None)
 
         params.update(build_scope_filter_params(list_type, request.user))
         return params

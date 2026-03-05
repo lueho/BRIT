@@ -267,6 +267,63 @@ class ExportTaskTestCase(TestCase):
     @patch(
         "utils.file_export.generic_tasks.utils.file_export.storages.write_file_for_download"
     )
+    @patch("utils.file_export.generic_tasks.apply_scope_filter")
+    @patch("utils.file_export.generic_tasks.filter_queryset_for_user")
+    @patch("utils.file_export.generic_tasks.get_export_spec")
+    def test_models_with_publication_status_use_visibility_helpers(
+        self,
+        mock_get_spec,
+        mock_filter_queryset_for_user,
+        mock_apply_scope_filter,
+        mock_write,
+    ):
+        """Models with publication_status must use centralized visibility helpers."""
+        mock_model = MagicMock()
+        publication_field = MagicMock()
+        publication_field.name = "publication_status"
+        mock_model._meta.get_fields.return_value = [publication_field]
+        mock_model._meta.model_name = "mockmodel"
+
+        all_qs = MagicMock()
+        visible_qs = MagicMock()
+        scoped_qs = MagicMock()
+        scoped_qs.count.return_value = 0
+
+        mock_model.objects.all.return_value = all_qs
+        mock_filter_queryset_for_user.return_value = visible_qs
+        mock_apply_scope_filter.return_value = scoped_qs
+
+        mock_filtered = MagicMock()
+        mock_filtered.qs = scoped_qs
+
+        spec = TaskExportSpec(
+            model=mock_model,
+            filterset=lambda data, queryset: mock_filtered,
+            serializer=DummySerializer,
+            renderers={"csv": MagicMock()},
+        )
+        mock_get_spec.return_value = spec
+        mock_write.return_value = "url"
+
+        self._run_task(
+            "test.Model", "csv", {}, {"user_id": self.owner.pk, "list_type": "review"}
+        )
+
+        mock_model.objects.all.assert_called_once_with()
+        mock_filter_queryset_for_user.assert_called_once()
+        filter_user = mock_filter_queryset_for_user.call_args.args[1]
+        self.assertEqual(filter_user.pk, self.owner.pk)
+
+        mock_apply_scope_filter.assert_called_once()
+        apply_scope_user = mock_apply_scope_filter.call_args.kwargs["user"]
+        self.assertEqual(apply_scope_user.pk, self.owner.pk)
+        self.assertEqual(mock_apply_scope_filter.call_args.args[1], "review")
+
+        mock_model.objects.filter.assert_not_called()
+
+    @patch(
+        "utils.file_export.generic_tasks.utils.file_export.storages.write_file_for_download"
+    )
     @patch("utils.file_export.generic_tasks.get_export_spec")
     def test_review_scope_returns_empty_for_model_without_publication_status(
         self, mock_get_spec, mock_write

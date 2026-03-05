@@ -1,7 +1,12 @@
 from celery import shared_task
+from django.contrib.auth import get_user_model
 from django.http.request import MultiValueDict, QueryDict
 
 import utils.file_export.storages
+from utils.object_management.permissions import (
+    apply_scope_filter,
+    filter_queryset_for_user,
+)
 
 from .export_registry import get_export_spec
 
@@ -24,23 +29,24 @@ def export_user_created_object_to_file(
 
     # Build base queryset using context (user_id, list_type)
     user_id = context.get("user_id")
-    list_type = context.get("list_type", "public")
+    list_type = context.get("list_type", "published")
+    if list_type == "public":
+        list_type = "published"
+
+    user = get_user_model().objects.filter(pk=user_id).first() if user_id else None
+
     has_publication_status = "publication_status" in [
         f.name for f in spec.model._meta.get_fields()
     ]
 
-    if list_type == "private":
-        base_qs = spec.model.objects.filter(owner_id=user_id)
-    elif list_type == "review":
-        # Review scope: items in review status (visible to staff/moderators)
-        if has_publication_status:
-            base_qs = spec.model.objects.filter(publication_status="review")
-        else:
-            base_qs = spec.model.objects.none()
+    if has_publication_status:
+        visible_qs = filter_queryset_for_user(spec.model.objects.all(), user)
+        base_qs = apply_scope_filter(visible_qs, list_type, user=user)
     else:
-        # Default: only published items
-        if has_publication_status:
-            base_qs = spec.model.objects.filter(publication_status="published")
+        if list_type == "private" and user_id is not None:
+            base_qs = spec.model.objects.filter(owner_id=user_id)
+        elif list_type == "review":
+            base_qs = spec.model.objects.none()
         else:
             base_qs = spec.model.objects.all()
 
