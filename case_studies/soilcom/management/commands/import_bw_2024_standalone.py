@@ -96,6 +96,20 @@ _VALID_STATUSES = ("private", "review")
 _BATCH_SIZE = 50
 
 
+def _merge_unresolved_frequencies(target: dict, source: dict) -> None:
+    """Merge unresolved frequency counters from one stats payload into another."""
+    for frequency_name, details in (source or {}).items():
+        reason = details.get("reason", "not_found")
+        count = int(details.get("count", 0))
+        existing = target.setdefault(
+            frequency_name,
+            {"count": 0, "reason": reason},
+        )
+        existing["count"] = int(existing.get("count", 0)) + count
+        if existing.get("reason") != reason:
+            existing["reason"] = "mixed"
+
+
 # ---------------------------------------------------------------------------
 # Row conversion helpers
 # ---------------------------------------------------------------------------
@@ -113,14 +127,13 @@ def _resolve_date(value):
 
 def _collect_flyer_urls(row) -> list[str]:
     urls = []
-    for col in (_COL["sources"], _COL["sources_new"]):
-        raw = row[col]
-        if not raw:
-            continue
-        for part in str(raw).split(","):
-            part = part.strip()
-            if part.startswith("http"):
-                urls.append(part)
+    raw = row[_COL["sources_new"]]
+    if not raw:
+        return urls
+    for part in str(raw).split(","):
+        part = part.strip()
+        if part.startswith("http"):
+            urls.append(part)
     return urls
 
 
@@ -298,7 +311,7 @@ def main():
     file_path = (
         Path(args.file)
         if args.file
-        else Path("BRIT_Deutschland_Baden-Württemberg_2024_SW.xlsx")
+        else Path("BRIT_Deutschland_Baden-Württemberg_2024_SW1.xlsx")
     )
     if not file_path.exists():
         sys.exit(f"Excel file not found: {file_path}")
@@ -340,7 +353,9 @@ def main():
         "cpv_skipped": 0,
         "flyers_created": 0,
         "warnings": [],
+        "unresolved_frequencies": {},
     }
+    totals["skipped"] += len(pre_skip_warnings)
 
     batches = [
         records[i : i + args.batch_size]
@@ -366,6 +381,10 @@ def main():
         ):
             totals[key] += stats.get(key, 0)
         totals["warnings"].extend(stats.get("warnings", []))
+        _merge_unresolved_frequencies(
+            totals["unresolved_frequencies"],
+            stats.get("unresolved_frequencies", {}),
+        )
         print(f"created={stats.get('created', 0)} skipped={stats.get('skipped', 0)}")
 
     print("\n=== Import Summary ===")
@@ -380,6 +399,16 @@ def main():
         print(f"\n  Warnings ({len(all_warnings)}):")
         for w in all_warnings:
             print(f"    {w}")
+    if totals["unresolved_frequencies"]:
+        print("\n  Unresolved frequencies (manual fix after sync):")
+        unresolved_items = sorted(
+            totals["unresolved_frequencies"].items(),
+            key=lambda item: (-int(item[1].get("count", 0)), item[0]),
+        )
+        for frequency_name, details in unresolved_items:
+            print(
+                f"    {frequency_name} (count={details.get('count', 0)}, reason={details.get('reason', 'not_found')})"
+            )
 
 
 if __name__ == "__main__":

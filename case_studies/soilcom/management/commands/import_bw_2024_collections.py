@@ -99,6 +99,20 @@ _VALID_STATUSES = ("private", "review")
 _BATCH_SIZE = 50  # records per POST request
 
 
+def _merge_unresolved_frequencies(target: dict, source: dict) -> None:
+    """Merge unresolved frequency counters from one stats payload into another."""
+    for frequency_name, details in (source or {}).items():
+        reason = details.get("reason", "not_found")
+        count = int(details.get("count", 0))
+        existing = target.setdefault(
+            frequency_name,
+            {"count": 0, "reason": reason},
+        )
+        existing["count"] = int(existing.get("count", 0)) + count
+        if existing.get("reason") != reason:
+            existing["reason"] = "mixed"
+
+
 def _resolve_date(value):
     """Convert an openpyxl cell value to a Python date, or None."""
 
@@ -112,16 +126,15 @@ def _resolve_date(value):
 
 
 def _collect_flyer_urls(row) -> list[str]:
-    """Extract HTTP URLs from the sources columns (38, 39)."""
+    """Extract HTTP URLs from the Sources_new column."""
     urls = []
-    for col in (_COL["sources"], _COL["sources_new"]):
-        raw = row[col]
-        if not raw:
-            continue
-        for part in str(raw).split(","):
-            part = part.strip()
-            if part.startswith("http"):
-                urls.append(part)
+    raw = row[_COL["sources_new"]]
+    if not raw:
+        return urls
+    for part in str(raw).split(","):
+        part = part.strip()
+        if part.startswith("http"):
+            urls.append(part)
     return urls
 
 
@@ -369,7 +382,7 @@ class Command(BaseCommand):
 
         # Resolve Excel path
         if file_path is None:
-            file_path = Path("BRIT_Deutschland_Baden-Württemberg_2024_SW.xlsx")
+            file_path = Path("BRIT_Deutschland_Baden-Württemberg_2024_SW1.xlsx")
         else:
             file_path = Path(file_path)
 
@@ -383,7 +396,31 @@ class Command(BaseCommand):
         raw_rows = list(wb.active.iter_rows(values_only=True))[1:]
         self.stdout.write(f"Read {len(raw_rows)} data rows from Excel.\n")
 
-        records = _records_to_json_serialisable([_row_to_record(r) for r in raw_rows])
+        all_records = _records_to_json_serialisable(
+            [_row_to_record(r) for r in raw_rows]
+        )
+
+        # Pre-filter rows that violate hard-required fields to avoid noisy API skips.
+        records = []
+        pre_skip_warnings = []
+        for i, rec in enumerate(all_records, start=2):  # +2: 1-indexed + header row
+            missing = []
+            if not rec.get("collection_system"):
+                missing.append("collection_system")
+            if not rec.get("valid_from"):
+                missing.append("valid_from")
+            if missing:
+                pre_skip_warnings.append(
+                    f"Row {i} ({rec.get('catchment_name') or rec.get('nuts_or_lau_id')}): "
+                    f"skipped — missing required field(s): {', '.join(missing)}"
+                )
+            else:
+                records.append(rec)
+
+        if pre_skip_warnings:
+            self.stdout.write(
+                f"Pre-flight: skipping {len(pre_skip_warnings)} invalid row(s).\n"
+            )
 
         # Aggregate stats across batches
         totals = {
@@ -394,7 +431,9 @@ class Command(BaseCommand):
             "cpv_skipped": 0,
             "flyers_created": 0,
             "warnings": [],
+            "unresolved_frequencies": {},
         }
+        totals["skipped"] += len(pre_skip_warnings)
 
         batches = [
             records[i : i + batch_size] for i in range(0, len(records), batch_size)
@@ -418,6 +457,10 @@ class Command(BaseCommand):
             ):
                 totals[key] += stats.get(key, 0)
             totals["warnings"].extend(stats.get("warnings", []))
+            _merge_unresolved_frequencies(
+                totals["unresolved_frequencies"],
+                stats.get("unresolved_frequencies", {}),
+            )
             self.stdout.write(
                 f" created={stats.get('created', 0)} skipped={stats.get('skipped', 0)}\n"
             )
@@ -429,7 +472,18 @@ class Command(BaseCommand):
         self.stdout.write(f"  CPVs created:         {totals['cpv_created']}\n")
         self.stdout.write(f"  CPVs skipped:         {totals['cpv_skipped']}\n")
         self.stdout.write(f"  Flyers created:       {totals['flyers_created']}\n")
-        if totals["warnings"]:
-            self.stdout.write(f"\n  Warnings ({len(totals['warnings'])}):\n")
-            for w in totals["warnings"]:
+        all_warnings = pre_skip_warnings + totals["warnings"]
+        if all_warnings:
+            self.stdout.write(f"\n  Warnings ({len(all_warnings)}):\n")
+            for w in all_warnings:
                 self.stdout.write(f"    {w}\n")
+        if totals["unresolved_frequencies"]:
+            self.stdout.write("\n  Unresolved frequencies (manual fix after sync):\n")
+            unresolved_items = sorted(
+                totals["unresolved_frequencies"].items(),
+                key=lambda item: (-int(item[1].get("count", 0)), item[0]),
+            )
+            for frequency_name, details in unresolved_items:
+                self.stdout.write(
+                    f"    {frequency_name} (count={details.get('count', 0)}, reason={details.get('reason', 'not_found')})\n"
+                )
