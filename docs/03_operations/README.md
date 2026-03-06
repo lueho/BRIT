@@ -1,16 +1,21 @@
 # Operations Guide
 
-This section provides guides for deployment, environment setup, monitoring, and operational run-books for BRIT.
+This section contains BRIT runtime and deployment documentation.
 
-## Recommended Reading Order
-- [Operations & Deployment](operations.md)
+## Start Here
 
-## Planned Additions
-- Backup & Restore Guide
-- Monitoring Guide
+- **Canonical operations runbook**
+  Use [Operations & Deployment](operations.md).
 
----
+## Documentation Ownership
 
-*For deployment and environment setup, see Operations & Deployment. Planned guides will be added as the project evolves.*
+- **Deployment and release procedures**
+  Keep in [operations.md](operations.md).
 
-_Last updated: 2025-05-02_
+- **Development workflow commands**
+  Keep in [Developer Guidelines](../02_developer_guide/guidelines.md).
+
+- **Architecture context**
+  Keep in [Deployment Overview](../02_developer_guide/architecture/deployment.md).
+
+_Last updated: 2026-03-06_

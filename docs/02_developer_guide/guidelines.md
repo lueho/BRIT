@@ -1,144 +1,120 @@
 # Developer Guidelines
 
-## Build & Configuration
+This page is the canonical source for day-to-day development workflow in BRIT.
 
-- Use Docker Compose for all environments (dev, test, prod).
-- Manage environment variables in `.env` (never committed).
-- PostgreSQL with PostGIS and Redis are required.
-- Run migrations and collectstatic as part of deployment.
+## Scope of This Page
 
-## Initial Data & Default Objects
+- **Use this page for**
+  Local setup, container usage, development commands, testing, and migration workflow.
 
-- All initial data creation is centralized in per-app, idempotent `ensure_initial_data()` functions (never in migrations). See [Initial Data Management](initial_data_management.md).
-- For deep design rationale, see [Default Objects & Initial Data ADRs](../04_design_decisions/2025-05-16_default_objects_and_initial_data.madr.md).
-- All ForeignKey defaults must use fetch-only helpers from their app's `utils.py` (never from `models.py`).
-- These helpers only fetch, never create, and raise if missing. See [Initial Data Management](initial_data_management.md) and the [MADR](../04_design_decisions/2025-05-16_default_objects_and_initial_data.madr.md) for details.
-- This pattern is required for all new development and enforced by code review.
+- **Do not duplicate here**
+  Detailed architecture belongs in [Architecture Overview](architecture.md). Deployment and runtime operations belong in [Operations](../03_operations/operations.md).
 
-## Creating a Superuser
+## Core Workflow Rules
+
+- **Docker first**
+  Run BRIT through Docker Compose.
+
+- **Use the web container for Django commands**
+  Run management commands in the `web` service.
+
+- **Do not use host Python for app commands**
+  Do not run `python manage.py ...` directly on the host when the containerized app is available.
+
+- **Keep secrets out of the repository**
+  Use `.env` for local development only and never commit it.
+
+## Local Development
+
+### Start the stack
+
+```sh
+docker compose up
+```
+
+### Access local services
+
+- **Application**
+  `http://localhost:8000`
+
+- **Admin**
+  `http://localhost:8000/admin`
+
+- **Flower**
+  `http://localhost:5555`
+
+### Common Django commands
+
 ```sh
 docker compose exec web python manage.py createsuperuser
+docker compose exec web python manage.py makemigrations
+docker compose exec web python manage.py migrate
+docker compose exec web python manage.py shell
 ```
 
-## Accessing the Application
-- Application: http://localhost:8000
-- Admin: http://localhost:8000/admin
-- Flower (Celery monitoring): http://localhost:5555
+## Testing
 
-## Production Deployment
+Run tests inside Docker with the dedicated test settings.
 
-The project is configured for deployment on Heroku:
-
-1. **Heroku Configuration**:
-   - Set all required environment variables in the Heroku dashboard.
-   - Ensure PostgreSQL with PostGIS is enabled.
-   - Configure Redis for caching and Celery.
-
-2. **Deployment**:
-   ```sh
-   git push heroku main
-   ```
-
-## Testing Information
-
-### Running Tests
-Run tests inside Docker containers using the `run` command:
+### Default test command
 
 ```sh
-# Run all tests
-docker compose run web python manage.py test
-
-# Run tests for a specific app
-docker compose run web python manage.py test utils
-
-# Run a specific test class
-docker compose run web python manage.py test utils.tests.test_example.ExampleTestCase
-
-# Run a specific test method
-docker compose run web python manage.py test utils.tests.test_example.ExampleTestCase.test_addition
+docker compose exec web python manage.py test --keepdb --noinput --settings=brit.settings.testrunner --parallel 4
 ```
 
-Use `--noinput` to prevent prompts and `--keepdb` to speed up tests when no DB changes have occurred:
+### Targeted test runs
 
 ```sh
-# Run tests with --noinput and --keepdb
-docker compose run web python manage.py test --noinput --keepdb
-
-# Run tests for a specific app with flags
-docker compose run web python manage.py test utils --noinput --keepdb
+docker compose exec web python manage.py test utils --keepdb --noinput --settings=brit.settings.testrunner --parallel 4
+docker compose exec web python manage.py test utils.tests.test_example.ExampleTestCase --keepdb --noinput --settings=brit.settings.testrunner --parallel 4
+docker compose exec web python manage.py test utils.tests.test_example.ExampleTestCase.test_addition --keepdb --noinput --settings=brit.settings.testrunner --parallel 4
 ```
 
-### Test Configuration
+### When to omit `--keepdb`
 
-- Uses a custom test runner: `brit/settings/testrunner.py`.
-- Static files are served using Django's StaticFilesStorage.
-- Cookie consent is disabled during tests.
-- Tests use local settings with test-specific overrides.
+- **Use `--keepdb` by default**
+  This keeps repeated test runs fast.
 
-To use the test runner settings:
+- **Omit `--keepdb` when the test database is suspected to be broken**
+  Use a clean test database if database state or migrations look inconsistent.
 
-```sh
-# Run tests with test runner settings
-DJANGO_SETTINGS_MODULE=brit.settings.testrunner python manage.py test
+## Migrations and Data Changes
 
-# Or with Docker
-docker compose run -e DJANGO_SETTINGS_MODULE=brit.settings.testrunner web python manage.py test
-```
+- **Schema changes**
+  Use Django migrations for schema changes.
 
-### Writing Tests
+- **Data changes and backfills**
+  Prepare SQL to be run manually instead of shipping data migrations.
 
-1. **Test Structure:**
-   - Organize tests by app in a `tests` directory.
-   - Each test file should focus on a specific component (models, views, forms, etc.).
-   - Use descriptive method names.
+- **Initial data and default objects**
+  Keep initial data creation in per-app idempotent `ensure_initial_data()` functions. See [Initial Data Management](initial_data_management.md).
 
-2. **Base Test Classes:**
-   - `TestCase`: Django's standard test case.
-   - `UserLoginTestCase`: For tests requiring authentication.
-   - `ViewWithPermissionsTestCase`: For permissioned views.
-   - `AbstractTestCases.UserCreatedObjectCRUDViewTestCase`: For CRUD on user-created objects.
+- **ForeignKey defaults**
+  Use fetch-only helpers from app `utils.py` modules rather than creating data from `models.py` defaults. See [Default Objects & Initial Data](../04_design_decisions/2025-05-16_default_objects_and_initial_data.madr.md).
 
-3. **Example Test:**
-```python
-from django.test import TestCase
+## Code Quality
 
-class ExampleTestCase(TestCase):
-    """A simple test case."""
-    def test_addition(self):
-        self.assertEqual(1 + 1, 2)
-```
+- **Formatting and linting**
+  Follow Ruff formatting and linting expectations.
 
-4. **Factory Boy:**
-   - Used for creating test data.
-   - Factories in `tests/factories.py` of each app.
-   - Use `mute_signals` to prevent unwanted signals.
+- **Python style**
+  Follow PEP 8.
 
-## Code Style
-- Follow PEP 8.
-- Use 4 spaces for indentation.
-- Max line length: 120 characters.
-- Use docstrings for all classes and methods.
+- **Docstrings**
+  Add Google-style docstrings to public functions and classes.
 
-## Project Structure
-- Organized into multiple Django apps:
-  - `brit`: Core application and settings
-  - `utils`: Shared utilities
-  - `maps`: GIS and mapping
-  - `case_studies`: Case studies as separate apps
-  - `materials`: Material definitions
-  - `distributions`: Temporal/spatial distributions
-  - `users`: User management
+- **Tests**
+  Use Django's test framework.
 
-## Key Components
-1. **GIS Integration:**
-   - Uses GeoDjango and Leaflet; requires PostGIS.
-2. **Celery Tasks:**
-   - Celery for background tasks; Redis as broker.
-   - Tasks in `tasks.py` of each app.
-3. **User-Created Objects:**
-   - Many models inherit from `UserCreatedObject`.
-   - Views inherit from `UserCreatedObjectCreateView`, etc.
-4. **Frontend:**
-   - Bootstrap 5 for UI; Crispy Forms for forms; Bootstrap Modal Forms for dialogs.
-   - Planned upgrade to Bootstrap 5.
-   - Long-term goal: phase out jQuery; write new code with this in mind.
+## Deployment Handoff
+
+- **Deployment path**
+  BRIT is deployed through GitHub-based workflow.
+
+- **Do not push directly to Heroku**
+  Use the repository workflow that promotes changes through GitHub. The `deploy` branch is reserved for deployment automation.
+
+- **Where deployment instructions live**
+  See [Operations](../03_operations/operations.md) for canonical deployment and runtime guidance.
+
+_Last updated: 2026-03-06_

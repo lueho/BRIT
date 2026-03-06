@@ -1,175 +1,103 @@
 # Materials Module
 
 ## Overview
-The Materials module is a core component of the Bioresource Inventory Tool (BRIT) that provides comprehensive functionality for managing and analyzing material data. It enables users to define materials, their components, properties, and samples, supporting detailed characterization of bioresources.
 
-## Features
-- Material categorization and classification
-- Component-based material composition management
-- Sample and sample series management
-- Temporal distribution of material properties
-- Analytical method documentation
-- Property value tracking
-- Weight share calculations
-- Integration with bibliographic sources
+The `materials` app manages bioresource definitions, laboratory-style sample data, compositions, and measurement-related metadata.
 
-## Models
+## Scope
 
-### Material Classification
-- **MaterialCategory**: Simple categorization for materials
-- **BaseMaterial**: Base class for all material types
-- **Material**: Generic material class for many purposes
+- **Catalogue layer**
+  Materials, material components, and material categories.
 
-### Components and Compositions
-- **MaterialComponent**: Components of materials (e.g., total solids, volatile solids)
-- **MaterialComponentGroup**: Groups of components that form a composition
-- **Composition**: Settings for component groups for each material
-- **WeightShare**: Actual values of weight fractions in material compositions
+- **Sampling layer**
+  Sample series and individual samples, including temporal context.
 
-### Samples and Properties
-- **SampleSeries**: Series of samples taken from a comparable source at different times
-- **Sample**: Representation of a single sample taken at a specific location and time
-- **MaterialProperty**: Properties of materials with units
-- **MaterialPropertyValue**: Values for material properties
+- **Composition layer**
+  Component groups, compositions, and weight shares.
 
-### Analysis
-- **AnalyticalMethod**: Represents laboratory procedures for analysis
+- **Measurement layer**
+  Materials-specific properties, property values, raw component measurements, and analytical methods.
 
-## Entity Relationship Diagram
+## Main Concepts
 
-```mermaid
-erDiagram
-    NamedUserCreatedObject ||--|{ BaseMaterial : "inherits"
-    NamedUserCreatedObject ||--|{ MaterialComponentGroup : "inherits"
-    NamedUserCreatedObject ||--|{ MaterialProperty : "inherits"
-    NamedUserCreatedObject ||--|{ SampleSeries : "inherits"
-    NamedUserCreatedObject ||--|{ AnalyticalMethod : "inherits"
+### Materials and components
 
-    BaseMaterial ||--o{ SampleSeries : "has"
-    BaseMaterial ||--o{ Sample : "categorizes"
-    BaseMaterial }o--o{ MaterialCategory : "belongs_to"
-    BaseMaterial ||--|{ Material : "proxy"
-    BaseMaterial ||--|{ MaterialComponent : "proxy"
-    
-    SampleSeries ||--o{ Sample : "contains"
-    SampleSeries }o--o{ TemporalDistribution : "uses"
-    SampleSeries }o--|| Timestep : "has_default"
-    
-    Sample ||--o{ Composition : "has"
-    Sample }o--o{ MaterialPropertyValue : "has_properties"
-    Sample }o--o{ Source : "references"
-    Sample }o--|| Timestep : "belongs_to"
-    Sample }o--|| SampleSeries : "belongs_to"
-    
-    Composition ||--o{ WeightShare : "contains"
-    Composition }o--|| MaterialComponentGroup : "belongs_to"
-    Composition }o--|| MaterialComponent : "fractions_of"
-    Composition }o--o{ TemporalDistribution : "has"
-    
-    WeightShare }o--|| MaterialComponent : "of"
-    
-    MaterialProperty ||--o{ MaterialPropertyValue : "defines"
-    
-    AnalyticalMethod }o--o{ Source : "references"
-    
-    MaterialCategory {
-        string name
-    }
-    
-    BaseMaterial {
-        string name
-        string type
-        Owner owner
-    }
-    
-    Material {
-        string name
-        string type
-    }
-    
-    MaterialComponent {
-        string name
-        string type
-    }
-    
-    MaterialComponentGroup {
-        string name
-        Owner owner
-    }
-    
-    SampleSeries {
-        string name
-        boolean publish
-        Material material
-        TemporalDistribution temporal_distribution
-        Timestep default_timestep
-    }
-    
-    Sample {
-        string name
-        Material material
-        datetime datetime
-        string location
-        SampleSeries series
-        Timestep timestep
-        ImageField image
-    }
-    
-    Composition {
-        Sample sample
-        MaterialComponentGroup group
-        MaterialComponent fractions_of
-        int order
-    }
-    
-    WeightShare {
-        MaterialComponent component
-        Composition composition
-        decimal average
-        decimal standard_deviation
-    }
-    
-    MaterialProperty {
-        string name
-        string unit
-    }
-    
-    MaterialPropertyValue {
-        MaterialProperty property
-        float average
-        float standard_deviation
-    }
-    
-    AnalyticalMethod {
-        string name
-        string technique
-        string standard
-        string instrument_type
-        string lower_detection_limit
-        URL ontology_uri
-    }
-```
+- **`MaterialCategory`**
+  Categorizes materials.
 
-## Views
-The module provides a comprehensive set of views for managing material data:
-- CRUD operations for materials, components, and samples
-- Sample series management
-- Composition and weight share management
-- Property value tracking
-- Analytical method documentation
-- Integration with bibliographic sources
+- **`BaseMaterial`**
+  Shared base model for material-like objects.
 
-## Integration
-The Materials module integrates with other BRIT modules:
-- Bibliography module for data sources
-- Distributions module for temporal aspects of material properties
-- Case Studies modules for specialized material analysis
-- Inventories module for material availability calculations
+- **`Material`**
+  Proxy model for materials.
 
-## Usage
-This module is used throughout BRIT to:
-- Define and categorize bioresource materials
-- Characterize material compositions and properties
-- Track samples and their analysis results
-- Support temporal analysis of material characteristics
-- Provide the foundation for bioresource inventory calculations
+- **`MaterialComponent`**
+  Proxy model for components used in compositions and measurements.
+
+### Samples and time context
+
+- **`SampleSeries`**
+  Groups comparable samples over time.
+
+- **`Sample`**
+  Stores a concrete sampling event and links to sources, properties, and measurements.
+
+### Compositions
+
+- **`MaterialComponentGroup`**
+  Groups components into a composition domain.
+
+- **`Composition`**
+  Stores composition settings for a sample and group.
+
+- **`WeightShare`**
+  Stores composition values for components within a composition.
+
+### Measurements and methods
+
+- **`MaterialProperty`**
+  Defines a materials-specific property.
+
+- **`MaterialPropertyGroup`**
+  Groups related properties for aggregation logic.
+
+- **`MaterialPropertyValue`**
+  Stores a measured property value and related metadata.
+
+- **`ComponentMeasurement`**
+  Stores raw component measurements for a sample.
+
+- **`AnalyticalMethod`**
+  Stores laboratory method metadata and related sources.
+
+## App Boundaries
+
+- **Depends on `bibliography`**
+  For sources and references.
+
+- **Depends on `distributions`**
+  For temporal distributions and timesteps.
+
+- **Used by other domains**
+  Inventory, case-study, and reporting workflows can build on materials data.
+
+## Data Entry Notes
+
+- **Interactive workflows**
+  Material data is primarily managed through BRIT views and admin-supported workflows.
+
+- **Excel import**
+  The old CLI Excel import path is deprecated. Use the supported admin or view-based import workflow instead of relying on an old command-line path.
+
+## Documentation Boundaries
+
+- **Development commands**
+  See [Developer Guidelines](../docs/02_developer_guide/guidelines.md).
+
+- **Deployment and runtime operations**
+  See [Operations](../docs/03_operations/operations.md).
+
+- **Architecture context**
+  See [Architecture Overview](../docs/02_developer_guide/architecture.md).
+
+_Last updated: 2026-03-06_

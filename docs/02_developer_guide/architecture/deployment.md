@@ -1,42 +1,63 @@
 # Deployment Overview
 
-This document outlines how to deploy the BRIT project in both local and production environments.
+This page describes BRIT deployment architecture and boundaries. It is not the step-by-step operations runbook.
 
-## Local Development
-- Use Docker Compose to run all services (web, db, redis, celery, etc.):
-  ```sh
-  docker compose up
-  ```
-- Services:
-  - Django app (web)
-  - PostgreSQL with PostGIS
-  - Redis
-  - Celery worker and beat
-- Access the app at: http://localhost:8000
+## Scope of This Page
 
-## Production Deployment
-- Deploy to Heroku or any compatible PaaS.
-- Set all required environment variables (never commit `.env`).
-- Ensure PostgreSQL with PostGIS and Redis are provisioned.
-- Run migrations and collectstatic as part of the release process:
-  ```sh
-  python manage.py migrate
-  python manage.py collectstatic --noinput
-  ```
-- Use Gunicorn as the WSGI server.
-- Static/media files served via Nginx or cloud storage.
+- **Use this page for**
+  Understanding which services exist, how local and production deployments differ, and where configuration belongs.
 
-## Environment Variables
-- All secrets and configuration are managed via environment variables.
-- Never commit sensitive data to the repository.
+- **Do not duplicate here**
+  Release steps and runtime commands belong in [Operations](../../03_operations/operations.md).
 
-## CI/CD
-- Use GitHub Actions or similar for automated testing and deployment.
-- Run tests with `--noinput` and `--keepdb` flags for efficiency.
-- Review test output before merging or releasing.
+## Local Deployment Topology
 
----
+- **Application service**
+  Django runs in the `web` container.
 
-*For architecture context, see [../architecture.md](../architecture.md). For data flow, see [data_flow.md](data_flow.md).*
+- **Database**
+  PostgreSQL with PostGIS backs relational and geospatial data.
 
-_Last updated: 2025-05-02_
+- **Background processing**
+  Redis and Celery support asynchronous tasks.
+
+- **Supporting services**
+  Flower may be enabled for task monitoring.
+
+## Production Deployment Topology
+
+- **Application runtime**
+  BRIT runs as a containerized Django application served by Gunicorn.
+
+- **Stateful services**
+  Production requires PostgreSQL with PostGIS and Redis.
+
+- **Static assets**
+  Static files are collected during release and served through the deployment platform or a dedicated static/media layer.
+
+- **Configuration**
+  Secrets and environment-specific settings must come from environment variables or platform configuration, not committed files.
+
+## Release Responsibilities
+
+- **Development workflow**
+  Code changes, tests, and migrations are prepared during normal development. See [Developer Guidelines](../guidelines.md).
+
+- **Operations workflow**
+  Release execution, runtime commands, and operational checks are described in [Operations](../../03_operations/operations.md).
+
+- **Deployment branch**
+  Deployment automation is tied to the repository workflow and the reserved `deploy` branch.
+
+## Related Documentation
+
+- **Architecture overview**
+  See [../architecture.md](../architecture.md).
+
+- **Data flow**
+  See [data_flow.md](data_flow.md).
+
+- **Operations runbook**
+  See [../../03_operations/operations.md](../../03_operations/operations.md).
+
+_Last updated: 2026-03-06_

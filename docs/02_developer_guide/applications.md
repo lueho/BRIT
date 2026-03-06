@@ -1,42 +1,47 @@
 # Applications Overview
 
-This document provides a summary of the core and sub-applications in the BRIT project, their responsibilities, and relationships.
+This document is a high-level map of BRIT apps and their responsibilities. App-specific behavior and domain details should be documented in the relevant app `README.md` files.
 
-## Core Applications
+## Core Project Layer
 
-### brit
-- Main Django project and configuration.
-- Global settings, URLs, and WSGI/ASGI entry points.
+### `brit`
+- Project settings, root URL configuration, templates, and shared static assets.
 
-### utils
-- Shared utilities and helper functions used across the project.
+### `utils`
+- Shared infrastructure such as object lifecycle handling, exports, properties, and reusable cross-app patterns.
 
-### users
-- User authentication, registration, and management.
+### `users`
+- Authentication, profile-related functionality, and user management.
 
-## Domain Applications
+## Domain Apps
 
-### maps
-- GIS and mapping features using GeoDjango and Leaflet.
-- Handles spatial data, map views, and related models.
+### `maps`
+- Catchments, regional data, GIS behavior, and map-oriented views.
 
-### materials
-- Material definitions, properties, and related logic.
+### `materials`
+- Material catalogues, samples, compositions, measurements, and related laboratory metadata.
 
-### distributions
-- Temporal and spatial distribution models and logic.
+### `distributions`
+- Temporal distributions and timesteps used by other apps.
 
-### case_studies
-- Encapsulates individual case studies as separate Django apps.
-- Each case study may have its own models, views, and admin.
+### `bibliography`
+- Sources, authors, licensing metadata, and supporting bibliographic workflows.
 
-## Application Structure Guidelines
-- Each app should have its own `models.py`, `views.py`, `admin.py`, `tests/`, and `templates/` as needed.
-- Place reusable logic in `utils/` or app-specific helpers.
-- Keep apps focused and modular.
+### `inventories`
+- Inventory and scenario tooling.
 
----
+### `case_studies`
+- Project-specific or domain-specific extensions such as Soilcom and Flexibi.
 
-*For detailed architecture, see [architecture.md](architecture.md). For API details, see [api.md](api.md).*
+## Documentation Boundaries
 
-_Last updated: 2025-05-02_
+- **Architecture-level descriptions**
+  Keep in [architecture.md](architecture.md).
+
+- **Module-specific detail**
+  Keep in app `README.md` files.
+
+- **Workflow commands**
+  Keep in [guidelines.md](guidelines.md) or [../03_operations/operations.md](../03_operations/operations.md), depending on whether they are development or runtime tasks.
+
+_Last updated: 2026-03-06_

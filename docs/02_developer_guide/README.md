@@ -1,18 +1,36 @@
 # Developer Guide
 
-Welcome to the BRIT Developer Guide. This section contains all developer-facing documentation, including architecture, code style, contribution, and onboarding.
+This section contains developer-facing documentation for BRIT. Workflow instructions are kept separate from architecture and operations so each topic has a single canonical home.
 
-## Recommended Reading Order
-- [Guidelines](guidelines.md)
-- [Style Guide](style_guide.md)
-- [Architecture Overview](architecture.md)
-- [API Reference](api.md)
-- [Applications](applications.md)
+## Start Here
 
----
+- **Daily development workflow**
+  Read [Guidelines](guidelines.md).
 
-*If you are new to BRIT development, start with Guidelines. For architecture and API details, see the relevant sections. Contributing and onboarding guides are planned.*
+- **Code style and conventions**
+  Read [Style Guide](style_guide.md).
 
----
+- **Architecture**
+  Read [Architecture Overview](architecture.md) and [Applications Overview](applications.md).
 
-*Last updated: 2025-05-02*
+- **Deployment context**
+  Read [Deployment Overview](architecture/deployment.md), then use [Operations](../03_operations/operations.md) for the actual deployment and runtime procedures.
+
+- **API details**
+  Read [API Reference](api.md).
+
+## Documentation Ownership
+
+- **Workflow commands**
+  Keep in [Guidelines](guidelines.md).
+
+- **Deployment and runtime procedures**
+  Keep in [Operations](../03_operations/operations.md).
+
+- **Architecture and boundaries**
+  Keep in overview pages in this section.
+
+- **App-specific behavior**
+  Keep in the respective app `README.md` files.
+
+_Last updated: 2026-03-06_
