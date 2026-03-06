@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ValidationError
@@ -214,8 +214,21 @@ class GlobalObjectViewSetTests(BaseAPITestCase):
 class UserCreatedObjectQueryTests(BaseAPITestCase):
     def setUp(self):
         super().setUp()
-        self.base_qs = Mock(name="base_qs", spec=["filter"])
+        self.base_qs = Mock(name="base_qs", spec=["filter", "model"])
         self.base_qs.filter.side_effect = lambda *a, **kw: self.base_qs
+        self.base_qs.model = type(
+            "ScopeModel",
+            (),
+            {
+                "publication_status": object(),
+                "owner": object(),
+                "_meta": type(
+                    "Meta",
+                    (),
+                    {"app_label": "test_app", "model_name": "scopemodel"},
+                )(),
+            },
+        )
         MockUserCreatedObjectViewSet.queryset = self.base_qs
 
     def _get_qs(self, *, user: User | AnonymousUser, params: dict | None = None):
@@ -238,9 +251,25 @@ class UserCreatedObjectQueryTests(BaseAPITestCase):
 
     def test_regular_scope_review(self):
         self._get_qs(user=self.regular_user, params={"scope": "review"})
-        self.base_qs.filter.assert_called_once_with(
-            owner=self.regular_user, publication_status="review"
+        self.assertEqual(
+            self.base_qs.filter.call_args_list,
+            [
+                call(publication_status="review"),
+                call(owner=self.regular_user),
+            ],
         )
+
+    def test_staff_default_scope_is_published_only_filters_queryset(self):
+        self._get_qs(user=self.staff_user)
+        self.base_qs.filter.assert_called_once_with(publication_status="published")
+
+    def test_staff_scope_private_is_owner_only(self):
+        self._get_qs(user=self.staff_user, params={"scope": "private"})
+        self.base_qs.filter.assert_called_once_with(owner=self.staff_user)
+
+    def test_staff_scope_review_returns_all_review_objects(self):
+        self._get_qs(user=self.staff_user, params={"scope": "review"})
+        self.base_qs.filter.assert_called_once_with(publication_status="review")
 
     def test_invalid_scope_fallback(self):
         self._get_qs(user=self.regular_user, params={"scope": "wat"})
@@ -248,8 +277,13 @@ class UserCreatedObjectQueryTests(BaseAPITestCase):
         self.assertIn(("owner", self.regular_user), q.children)
         self.assertIn(("publication_status", "published"), q.children)
 
-    def test_staff_sees_everything(self):
+    def test_staff_default_scope_is_published_only_returns_filtered_queryset(self):
         qs = self._get_qs(user=self.staff_user)
+        self.base_qs.filter.assert_called_once_with(publication_status="published")
+        self.assertIs(qs, self.base_qs)
+
+    def test_staff_invalid_scope_param_sees_everything(self):
+        qs = self._get_qs(user=self.staff_user, params={"scope": "wat"})
         self.base_qs.filter.assert_not_called()
         self.assertIs(qs, self.base_qs)
 

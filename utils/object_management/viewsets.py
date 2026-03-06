@@ -2,14 +2,18 @@ import logging
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.db.models import Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from .models import ReviewAction
-from .permissions import GlobalObjectPermission, UserCreatedObjectPermission
+from .permissions import (
+    GlobalObjectPermission,
+    UserCreatedObjectPermission,
+    apply_scope_filter,
+    filter_queryset_for_user,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,35 +45,17 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         Supports query parameter:
         - scope: Different filtering options for objects
           'published' - Only published objects (default)
-          'private' - Only user's own objects
-          'review' - Only user's own objects currently in review
+          'private' - Only user's own objects across statuses
+          'review' - Review objects visible to the user role
         """
         user = self.request.user
         queryset = self.queryset
         scope = self.request.query_params.get("scope", "published")
 
-        # Staff users see all objects without filtering
-        if user.is_staff:
-            return queryset
+        if scope in {"published", "private", "review"}:
+            return apply_scope_filter(queryset, scope, user=user)
 
-        # Unauthenticated users only see published objects
-        if not user.is_authenticated:
-            return queryset.filter(publication_status="published")
-
-        # Handle different scopes for authenticated non-staff users
-        if scope == "private":
-            # Private scope: only user's own objects
-            return queryset.filter(owner=user)
-        elif scope == "review":
-            # Review scope: only user's own objects in review
-            return queryset.filter(owner=user, publication_status="review")
-        elif scope == "published":
-            # Published scope: only published objects
-            return queryset.filter(publication_status="published")
-        else:
-            # Default behavior for invalid scope: same as no scope
-            # See user's own objects and published objects
-            return queryset.filter(Q(owner=user) | Q(publication_status="published"))
+        return filter_queryset_for_user(queryset, user)
 
     def get_object(self):
         """
