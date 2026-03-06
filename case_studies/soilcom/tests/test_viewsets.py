@@ -24,7 +24,6 @@ from case_studies.soilcom.models import (
     SortingMethod,
     WasteCategory,
     WasteFlyer,
-    WasteStream,
 )
 from case_studies.soilcom.viewsets import CollectionViewSet
 from maps.models import Attribute, GeoPolygon, NutsRegion, Region, RegionAttributeValue
@@ -52,9 +51,6 @@ class CollectionViewSetTestCase(APITestCase):
             name="Test Collection System"
         )
         cls.waste_category = WasteCategory.objects.create(name="Test Waste Category")
-        cls.waste_stream = WasteStream.objects.create(
-            name="Test Waste Stream", category=cls.waste_category
-        )
 
         cls.private_collection = cls._create_collection(
             name="Private Collection",
@@ -93,7 +89,7 @@ class CollectionViewSetTestCase(APITestCase):
             name=name,
             owner=owner,
             catchment=cls.catchment,
-            waste_stream=cls.waste_stream,
+            waste_category=cls.waste_category,
             collection_system=cls.collection_system,
             publication_status=publication_status,
             collector=cls.collector,
@@ -528,9 +524,6 @@ class CollectionReviewActionApiTestCase(APITestCase):
             name="Test Collection System"
         )
         cls.waste_category = WasteCategory.objects.create(name="Test Waste Category")
-        cls.waste_stream = WasteStream.objects.create(
-            name="Test Waste Stream", category=cls.waste_category
-        )
         cls.frequency = CollectionFrequency.objects.create(name="Test Frequency")
         cls.fee_system = FeeSystem.objects.create(name="Test Fee System")
 
@@ -547,7 +540,7 @@ class CollectionReviewActionApiTestCase(APITestCase):
             name=name,
             owner=owner,
             catchment=self.catchment,
-            waste_stream=self.waste_stream,
+            waste_category=self.waste_category,
             collection_system=self.collection_system,
             publication_status=publication_status,
             collector=self.collector,
@@ -774,39 +767,36 @@ class CollectionMutationApiTestCase(APITestCase):
             url="https://example.com/source",
         )
 
-        predecessor_stream = WasteStream.objects.create(
-            category=cls.waste_category,
-            owner=cls.owner,
-        )
-        predecessor_stream.allowed_materials.add(cls.allowed_material)
-        predecessor_stream.forbidden_materials.add(cls.forbidden_material)
-
         cls.predecessor = Collection.objects.create(
             owner=cls.owner,
             publication_status="published",
             catchment=cls.catchment,
             collector=cls.collector,
             collection_system=cls.collection_system,
-            waste_stream=predecessor_stream,
+            waste_category=cls.waste_category,
             frequency=cls.frequency,
             fee_system=cls.fee_system,
             sorting_method=cls.sorting_method,
             valid_from=date(2024, 1, 1),
             description="predecessor",
         )
+        cls.predecessor.allowed_materials.add(cls.allowed_material)
+        cls.predecessor.forbidden_materials.add(cls.forbidden_material)
         cls.private_predecessor = Collection.objects.create(
             owner=cls.owner,
             publication_status="private",
             catchment=cls.catchment,
             collector=cls.collector,
             collection_system=cls.collection_system,
-            waste_stream=predecessor_stream,
+            waste_category=cls.waste_category,
             frequency=cls.frequency,
             fee_system=cls.fee_system,
             sorting_method=cls.sorting_method,
             valid_from=date(2024, 6, 1),
             description="private predecessor",
         )
+        cls.private_predecessor.allowed_materials.add(cls.allowed_material)
+        cls.private_predecessor.forbidden_materials.add(cls.forbidden_material)
         cls.predecessor.sources.add(cls.source)
         cls.predecessor_flyer = WasteFlyer.objects.create(
             owner=cls.owner,
@@ -978,17 +968,13 @@ class CollectionMutationApiTestCase(APITestCase):
         """Users with add permission may branch from their own private predecessors."""
         user = User.objects.create_user(username="agent-own-private")
         user.user_permissions.add(self.add_collection_permission)
-        own_predecessor_stream = WasteStream.objects.create(
-            category=self.waste_category,
-            owner=user,
-        )
         own_predecessor = Collection.objects.create(
             owner=user,
             publication_status="private",
             catchment=self.catchment,
             collector=self.collector,
             collection_system=self.collection_system,
-            waste_stream=own_predecessor_stream,
+            waste_category=self.waste_category,
             frequency=self.frequency,
             fee_system=self.fee_system,
             sorting_method=self.sorting_method,
@@ -1069,57 +1055,54 @@ class GreenWasteCollectionSystemCountViewSetTests(APITestCase):
         cls.green_category = WasteCategory.objects.create(name="Green waste")
         cls.bio_category = WasteCategory.objects.create(name="Biowaste")
 
-        cls.green_stream = WasteStream.objects.create(category=cls.green_category)
-        cls.bio_stream = WasteStream.objects.create(category=cls.bio_category)
-
         cls._create_collection(
             catchment=cls.catchment_a,
-            waste_stream=cls.green_stream,
+            waste_category=cls.green_category,
             collection_system=cls.d2d,
             year=2024,
         )
         cls._create_collection(
             catchment=cls.catchment_a,
-            waste_stream=cls.green_stream,
+            waste_category=cls.green_category,
             collection_system=cls.bring_point,
             year=2024,
         )
         # Duplicate system should not increase distinct system count.
         cls._create_collection(
             catchment=cls.catchment_a,
-            waste_stream=cls.green_stream,
+            waste_category=cls.green_category,
             collection_system=cls.bring_point,
             year=2024,
         )
 
         cls._create_collection(
             catchment=cls.catchment_b,
-            waste_stream=cls.green_stream,
+            waste_category=cls.green_category,
             collection_system=cls.recycling,
             year=2024,
         )
         # Non-green category in the same catchment must be ignored.
         cls._create_collection(
             catchment=cls.catchment_b,
-            waste_stream=cls.bio_stream,
+            waste_category=cls.bio_category,
             collection_system=cls.d2d,
             year=2024,
         )
         # Different year must be ignored for year=2024 filter.
         cls._create_collection(
             catchment=cls.catchment_b,
-            waste_stream=cls.green_stream,
+            waste_category=cls.green_category,
             collection_system=cls.bring_point,
             year=2022,
         )
 
     @classmethod
-    def _create_collection(cls, *, catchment, waste_stream, collection_system, year):
+    def _create_collection(cls, *, catchment, waste_category, collection_system, year):
         """Create a collection row for atlas endpoint test data."""
         return Collection.objects.create(
             name=f"{catchment.name}-{collection_system.name}-{year}",
             catchment=catchment,
-            waste_stream=waste_stream,
+            waste_category=waste_category,
             collection_system=collection_system,
             valid_from=date(year, 1, 1),
         )
@@ -1176,7 +1159,6 @@ class SortingMethodViewSetTests(APITestCase):
         cls.optical_sorting = SortingMethod.objects.create(name="Optical bag sorting")
 
         cls.food_category = WasteCategory.objects.create(name="Food waste")
-        cls.food_stream = WasteStream.objects.create(category=cls.food_category)
 
         cls._create_collection(
             catchment=cls.catchment_a,
@@ -1229,7 +1211,7 @@ class SortingMethodViewSetTests(APITestCase):
         return Collection.objects.create(
             name=f"{catchment.name}-{collection_system.name}-{year}",
             catchment=catchment,
-            waste_stream=cls.food_stream,
+            waste_category=cls.food_category,
             collection_system=collection_system,
             sorting_method=sorting_method,
             valid_from=date(year, 1, 1),
@@ -1295,13 +1277,12 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
 
         cls.d2d = CollectionSystem.objects.create(name="Door to door")
         cls.biowaste_category = WasteCategory.objects.create(name="Biowaste")
-        cls.biowaste_stream = WasteStream.objects.create(category=cls.biowaste_category)
 
         for catchment in (cls.catchment_be1, cls.catchment_be2, cls.catchment_be3):
             Collection.objects.create(
                 name=f"{catchment.name} 2022",
                 catchment=catchment,
-                waste_stream=cls.biowaste_stream,
+                waste_category=cls.biowaste_category,
                 collection_system=cls.d2d,
                 valid_from=date(2022, 1, 1),
             )
@@ -1375,8 +1356,6 @@ class GreenWasteCollectionAmountViewSetTests(APITestCase):
         cls.region = Region.objects.create(name="Region DE Amount", country="DE")
         cls.green_category, _ = WasteCategory.objects.get_or_create(name="Green waste")
         cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
-        cls.green_stream = WasteStream.objects.create(category=cls.green_category)
-        cls.bio_stream = WasteStream.objects.create(category=cls.bio_category)
 
         cls.d2d, _ = CollectionSystem.objects.get_or_create(name="Door to door")
         cls.bring_point, _ = CollectionSystem.objects.get_or_create(name="Bring point")
@@ -1411,44 +1390,44 @@ class GreenWasteCollectionAmountViewSetTests(APITestCase):
 
         cls.agg_collection_a = cls._create_collection(
             catchment=cls.catchment_agg,
-            waste_stream=cls.green_stream,
+            waste_category=cls.green_category,
             collection_system=cls.d2d,
             year=2024,
         )
         cls.agg_collection_b = cls._create_collection(
             catchment=cls.catchment_agg,
-            waste_stream=cls.green_stream,
+            waste_category=cls.green_category,
             collection_system=cls.bring_point,
             year=2024,
         )
 
         cls.specific_collection = cls._create_collection(
             catchment=cls.catchment_specific,
-            waste_stream=cls.green_stream,
+            waste_category=cls.green_category,
             collection_system=cls.d2d,
             year=2024,
         )
         cls.total_collection = cls._create_collection(
             catchment=cls.catchment_total,
-            waste_stream=cls.green_stream,
+            waste_category=cls.green_category,
             collection_system=cls.d2d,
             year=2024,
         )
         cls.agg_total_collection = cls._create_collection(
             catchment=cls.catchment_agg_total,
-            waste_stream=cls.green_stream,
+            waste_category=cls.green_category,
             collection_system=cls.d2d,
             year=2024,
         )
         cls.no_collection_collection = cls._create_collection(
             catchment=cls.catchment_no_collection,
-            waste_stream=cls.green_stream,
+            waste_category=cls.green_category,
             collection_system=cls.no_collection,
             year=2024,
         )
         cls._create_collection(
             catchment=cls.catchment_ignored,
-            waste_stream=cls.bio_stream,
+            waste_category=cls.bio_category,
             collection_system=cls.d2d,
             year=2024,
         )
@@ -1509,12 +1488,12 @@ class GreenWasteCollectionAmountViewSetTests(APITestCase):
         clear_derived_value_config_cache()
 
     @classmethod
-    def _create_collection(cls, *, catchment, waste_stream, collection_system, year):
+    def _create_collection(cls, *, catchment, waste_category, collection_system, year):
         """Create a collection row for green-waste amount endpoint test data."""
         return Collection.objects.create(
             name=f"{catchment.name}-{collection_system.name}-{year}",
             catchment=catchment,
-            waste_stream=waste_stream,
+            waste_category=waste_category,
             collection_system=collection_system,
             valid_from=date(year, 1, 1),
         )
@@ -1579,10 +1558,6 @@ class BinSizeViewSetTests(APITestCase):
         )
         cls.green_category, _ = WasteCategory.objects.get_or_create(name="Green waste")
 
-        cls.bio_stream = WasteStream.objects.create(category=cls.bio_category)
-        cls.residual_stream = WasteStream.objects.create(category=cls.residual_category)
-        cls.green_stream = WasteStream.objects.create(category=cls.green_category)
-
         cls.d2d, _ = CollectionSystem.objects.get_or_create(name="Door to door")
         cls.bring_point, _ = CollectionSystem.objects.get_or_create(name="Bring point")
 
@@ -1604,7 +1579,7 @@ class BinSizeViewSetTests(APITestCase):
         cls.bio_col = Collection.objects.create(
             name="BinSize bio col",
             catchment=cls.catchment_bio,
-            waste_stream=cls.bio_stream,
+            waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
             min_bin_size=80,
@@ -1614,7 +1589,7 @@ class BinSizeViewSetTests(APITestCase):
         cls.residual_col = Collection.objects.create(
             name="BinSize residual col",
             catchment=cls.catchment_residual,
-            waste_stream=cls.residual_stream,
+            waste_category=cls.residual_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
             min_bin_size=120,
@@ -1624,14 +1599,14 @@ class BinSizeViewSetTests(APITestCase):
         Collection.objects.create(
             name="BinSize no bin col",
             catchment=cls.catchment_no_bin,
-            waste_stream=cls.bio_stream,
+            waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
         )
         Collection.objects.create(
             name="BinSize bring point col",
             catchment=cls.catchment_ignored,
-            waste_stream=cls.bio_stream,
+            waste_category=cls.bio_category,
             collection_system=cls.bring_point,
             valid_from=date(2024, 1, 1),
             min_bin_size=60,
@@ -1748,10 +1723,6 @@ class OrganicAmountViewSetTests(APITestCase):
             name="Residual waste"
         )
 
-        cls.bio_stream = WasteStream.objects.create(category=cls.bio_category)
-        cls.green_stream = WasteStream.objects.create(category=cls.green_category)
-        cls.residual_stream = WasteStream.objects.create(category=cls.residual_category)
-
         cls.d2d, _ = CollectionSystem.objects.get_or_create(name="Door to door")
 
         cls.region = Region.objects.create(name="Region Organic DE", country="DE")
@@ -1772,7 +1743,7 @@ class OrganicAmountViewSetTests(APITestCase):
         bio_col_both = Collection.objects.create(
             name="Organic bio both",
             catchment=cls.catchment_both,
-            waste_stream=cls.bio_stream,
+            waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
         )
@@ -1787,7 +1758,7 @@ class OrganicAmountViewSetTests(APITestCase):
         green_col_both = Collection.objects.create(
             name="Organic green both",
             catchment=cls.catchment_both,
-            waste_stream=cls.green_stream,
+            waste_category=cls.green_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
         )
@@ -1804,7 +1775,7 @@ class OrganicAmountViewSetTests(APITestCase):
         residual_col_both = Collection.objects.create(
             name="Organic residual both",
             catchment=cls.catchment_both,
-            waste_stream=cls.residual_stream,
+            waste_category=cls.residual_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
         )
@@ -1819,7 +1790,7 @@ class OrganicAmountViewSetTests(APITestCase):
         bio_col_bio_only = Collection.objects.create(
             name="Organic bio only col",
             catchment=cls.catchment_bio_only,
-            waste_stream=cls.bio_stream,
+            waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
         )
@@ -1834,7 +1805,7 @@ class OrganicAmountViewSetTests(APITestCase):
         green_col_green_only = Collection.objects.create(
             name="Organic green only col",
             catchment=cls.catchment_green_only,
-            waste_stream=cls.green_stream,
+            waste_category=cls.green_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
         )
@@ -1849,7 +1820,7 @@ class OrganicAmountViewSetTests(APITestCase):
         residual_col_only = Collection.objects.create(
             name="Organic residual only col",
             catchment=cls.catchment_residual_only,
-            waste_stream=cls.residual_stream,
+            waste_category=cls.residual_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
         )
