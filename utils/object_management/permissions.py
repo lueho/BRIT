@@ -68,9 +68,14 @@ class UserCreatedObjectPermission(permissions.BasePermission):
 
         action = getattr(view, "action", None)
         add_permission_actions = {"create"}
-        add_permission_actions.update(
-            getattr(view, "requires_add_permission_actions", set())
+        extra_add_permission_actions = getattr(
+            view, "requires_add_permission_actions", None
         )
+        try:
+            if extra_add_permission_actions is not None:
+                add_permission_actions.update(extra_add_permission_actions)
+        except TypeError:
+            pass
 
         # Create-like actions use explicit model-level add permission.
         if action in add_permission_actions:
