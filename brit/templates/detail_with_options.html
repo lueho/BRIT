@@ -8,7 +8,7 @@
   {# Obsolete rejection card removed: owners of declined items are redirected to the review feedback view #}
   <div class="row my-4">
     <div class="col-lg-8">
-      <div class="card shadow">
+      <div class="card shadow detail-layout-card">
         <div class="card-header d-flex justify-content-between align-items-center bg-body-tertiary border-bottom-0 py-3 gap-2 flex-wrap">
           <div class="d-flex align-items-center gap-2 flex-shrink-1 overflow-hidden">
             <h5 class="mb-0 text-truncate">
@@ -154,7 +154,6 @@
                       </a>
                     {% endif %}
                   {% endif %}
-
                   {% comment %}Generic Delete button: published → staff only; private/review/declined → owner or staff;
                   archived → staff{% endcomment %}
                   {% if policy.can_delete %}
@@ -172,7 +171,6 @@
                       {% endif %}
                     {% endif %}
                   {% endif %}
-
                 {% endblock options_primary_actions %}
                 {% block options_secondary_actions %}
                 {% endblock options_secondary_actions %}
