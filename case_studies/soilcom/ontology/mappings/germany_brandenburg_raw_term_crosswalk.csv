@@ -1,0 +1,13 @@
+domain,source_term,source_language,target_scheme_uri,target_concept_uri,target_label,notes
+waste_category,Bioabfall/Biotonne,de,https://brit.bioresource-tools.net/vocab/soilcom/scheme/waste-category,https://brit.bioresource-tools.net/vocab/soilcom/concept/waste-category/biowaste,Biowaste,
+waste_category,Gruenabfall,de,https://brit.bioresource-tools.net/vocab/soilcom/scheme/waste-category,https://brit.bioresource-tools.net/vocab/soilcom/concept/waste-category/green-waste,Green waste,
+waste_category,Grünabfall,de,https://brit.bioresource-tools.net/vocab/soilcom/scheme/waste-category,https://brit.bioresource-tools.net/vocab/soilcom/concept/waste-category/green-waste,Green waste,
+waste_category,Restabfall,de,https://brit.bioresource-tools.net/vocab/soilcom/scheme/waste-category,https://brit.bioresource-tools.net/vocab/soilcom/concept/waste-category/residual-waste,Residual waste,Equivalent German label
+waste_category,Restmüll,de,https://brit.bioresource-tools.net/vocab/soilcom/scheme/waste-category,https://brit.bioresource-tools.net/vocab/soilcom/concept/waste-category/residual-waste,Residual waste,Equivalent German label
+waste_category,Restmuell,de,https://brit.bioresource-tools.net/vocab/soilcom/scheme/waste-category,https://brit.bioresource-tools.net/vocab/soilcom/concept/waste-category/residual-waste,Residual waste,ASCII equivalent German label
+waste_category,Hausmüll,de,https://brit.bioresource-tools.net/vocab/soilcom/scheme/waste-category,https://brit.bioresource-tools.net/vocab/soilcom/concept/waste-category/residual-waste,Residual waste,Equivalent German label
+waste_category,Hausmuell,de,https://brit.bioresource-tools.net/vocab/soilcom/scheme/waste-category,https://brit.bioresource-tools.net/vocab/soilcom/concept/waste-category/residual-waste,Residual waste,ASCII equivalent German label
+waste_category,Restabfall/Hausmuell,de,https://brit.bioresource-tools.net/vocab/soilcom/scheme/waste-category,https://brit.bioresource-tools.net/vocab/soilcom/concept/waste-category/residual-waste,Residual waste,
+waste_category,Restabfall/Hausmüll,de,https://brit.bioresource-tools.net/vocab/soilcom/scheme/waste-category,https://brit.bioresource-tools.net/vocab/soilcom/concept/waste-category/residual-waste,Residual waste,
+collection_system,Door to door,en,https://brit.bioresource-tools.net/vocab/soilcom/scheme/collection-system,https://brit.bioresource-tools.net/vocab/soilcom/concept/collection-system/door-to-door,Door to door,Used for Biowaste and Residual waste in Brandenburg importer
+collection_system,Bring point,en,https://brit.bioresource-tools.net/vocab/soilcom/scheme/collection-system,https://brit.bioresource-tools.net/vocab/soilcom/concept/collection-system/bring-point,Bring point,Used for Green waste in Brandenburg importer

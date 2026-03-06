@@ -1,0 +1,11 @@
+domain,source_term,source_language,target_scheme_uri,target_concept_uri,target_label,notes
+collection_system,Ingen utsortering,sv,https://brit.bioresource-tools.net/vocab/soilcom/scheme/collection-system,https://brit.bioresource-tools.net/vocab/soilcom/concept/collection-system/no-separate-collection,No separate collection,No separate collection
+collection_system,Non,sv,https://brit.bioresource-tools.net/vocab/soilcom/scheme/collection-system,https://brit.bioresource-tools.net/vocab/soilcom/concept/collection-system/no-separate-collection,No separate collection,No separate collection
+sorting_method,Separata kärl,sv,https://brit.bioresource-tools.net/vocab/soilcom/scheme/sorting-method,https://brit.bioresource-tools.net/vocab/soilcom/concept/sorting-method/separate-bins,Separate bins,
+sorting_method,Optisk sortering,sv,https://brit.bioresource-tools.net/vocab/soilcom/scheme/sorting-method,https://brit.bioresource-tools.net/vocab/soilcom/concept/sorting-method/optical-bag-sorting,Optical bag sorting,
+sorting_method,Fyrfackskärl,sv,https://brit.bioresource-tools.net/vocab/soilcom/scheme/sorting-method,https://brit.bioresource-tools.net/vocab/soilcom/concept/sorting-method/four-compartments-bin,Four compartments bin,
+sorting_method,Tvådelade kärl,sv,https://brit.bioresource-tools.net/vocab/soilcom/scheme/sorting-method,https://brit.bioresource-tools.net/vocab/soilcom/concept/sorting-method/two-compartments-bin,Two compartments bin,
+connection_type,Obl,sv,https://brit.bioresource-tools.net/vocab/soilcom/scheme/connection-type,https://brit.bioresource-tools.net/vocab/soilcom/concept/connection-type/mandatory,mandatory,
+connection_type,Friv,sv,https://brit.bioresource-tools.net/vocab/soilcom/scheme/connection-type,https://brit.bioresource-tools.net/vocab/soilcom/concept/connection-type/voluntary,voluntary,
+fee_system,Fixed,en,https://brit.bioresource-tools.net/vocab/soilcom/scheme/fee-system,https://brit.bioresource-tools.net/vocab/soilcom/concept/fee-system/flat-fee,Flat fee,
+fee_system,PAYT,en,https://brit.bioresource-tools.net/vocab/soilcom/scheme/fee-system,https://brit.bioresource-tools.net/vocab/soilcom/concept/fee-system/pay-as-you-throw,Pay as you throw (PAYT),

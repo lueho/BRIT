@@ -1,0 +1,281 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix soilcom: <https://brit.bioresource-tools.net/ontology/soilcom#> .
+@prefix britvoc: <https://brit.bioresource-tools.net/vocab/soilcom/> .
+
+<https://brit.bioresource-tools.net/vocab/soilcom>
+    a owl:Ontology ;
+    dcterms:title "BRIT Soilcom controlled vocabulary"@en ;
+    owl:versionInfo "0.4.0" ;
+    dcterms:created "2026-03-05"^^xsd:date .
+
+britvoc:scheme/waste-category a skos:ConceptScheme ;
+    skos:prefLabel "Waste category"@en .
+
+britvoc:concept/waste-category/biowaste a skos:Concept ;
+    skos:inScheme britvoc:scheme/waste-category ;
+    skos:prefLabel "Biowaste"@en .
+
+britvoc:concept/waste-category/food-waste a skos:Concept ;
+    skos:inScheme britvoc:scheme/waste-category ;
+    skos:prefLabel "Food waste"@en .
+
+britvoc:concept/waste-category/green-waste a skos:Concept ;
+    skos:inScheme britvoc:scheme/waste-category ;
+    skos:prefLabel "Green waste"@en .
+
+britvoc:concept/waste-category/residual-waste a skos:Concept ;
+    skos:inScheme britvoc:scheme/waste-category ;
+    skos:prefLabel "Residual waste"@en ;
+    skos:prefLabel "Restabfall"@de ;
+    skos:altLabel "Restmüll"@de ;
+    skos:altLabel "Hausmüll"@de ;
+    skos:hiddenLabel "Restmuell"@de ;
+    skos:hiddenLabel "Hausmuell"@de .
+
+britvoc:scheme/collection-system a skos:ConceptScheme ;
+    skos:prefLabel "Collection system"@en .
+
+britvoc:concept/collection-system/bring-point a skos:Concept ;
+    skos:inScheme britvoc:scheme/collection-system ;
+    skos:prefLabel "Bring point"@en .
+
+britvoc:concept/collection-system/door-to-door a skos:Concept ;
+    skos:inScheme britvoc:scheme/collection-system ;
+    skos:prefLabel "Door to door"@en .
+
+britvoc:concept/collection-system/home-composting a skos:Concept ;
+    skos:inScheme britvoc:scheme/collection-system ;
+    skos:prefLabel "Home-composting"@en .
+
+britvoc:concept/collection-system/no-separate-collection a skos:Concept ;
+    skos:inScheme britvoc:scheme/collection-system ;
+    skos:prefLabel "No separate collection"@en .
+
+britvoc:concept/collection-system/on-demand-kerbside-collection a skos:Concept ;
+    skos:inScheme britvoc:scheme/collection-system ;
+    skos:prefLabel "On demand kerbside collection"@en .
+
+britvoc:concept/collection-system/recycling-centre a skos:Concept ;
+    skos:inScheme britvoc:scheme/collection-system ;
+    skos:prefLabel "Recycling centre"@en .
+
+britvoc:scheme/collection-frequency a skos:ConceptScheme ;
+    skos:prefLabel "Collection frequency"@en ;
+    rdfs:comment "Detailed frequency values are maintained in the live Django data export."@en .
+
+britvoc:concept/collection-frequency/fixed a skos:Concept ;
+    skos:inScheme britvoc:scheme/collection-frequency ;
+    skos:prefLabel "Fixed"@en .
+
+britvoc:concept/collection-frequency/fixed-flexible a skos:Concept ;
+    skos:inScheme britvoc:scheme/collection-frequency ;
+    skos:prefLabel "Fixed-Flexible"@en .
+
+britvoc:concept/collection-frequency/fixed-seasonal a skos:Concept ;
+    skos:inScheme britvoc:scheme/collection-frequency ;
+    skos:prefLabel "Fixed-Seasonal"@en .
+
+britvoc:concept/collection-frequency/seasonal a skos:Concept ;
+    skos:inScheme britvoc:scheme/collection-frequency ;
+    skos:prefLabel "Seasonal"@en .
+
+britvoc:scheme/sorting-method a skos:ConceptScheme ;
+    skos:prefLabel "Sorting method"@en .
+
+britvoc:concept/sorting-method/four-compartments-bin a skos:Concept ;
+    skos:inScheme britvoc:scheme/sorting-method ;
+    skos:prefLabel "Four compartments bin"@en .
+
+britvoc:concept/sorting-method/optical-bag-sorting a skos:Concept ;
+    skos:inScheme britvoc:scheme/sorting-method ;
+    skos:prefLabel "Optical bag sorting"@en .
+
+britvoc:concept/sorting-method/separate-bins a skos:Concept ;
+    skos:inScheme britvoc:scheme/sorting-method ;
+    skos:prefLabel "Separate bins"@en .
+
+britvoc:concept/sorting-method/two-compartments-bin a skos:Concept ;
+    skos:inScheme britvoc:scheme/sorting-method ;
+    skos:prefLabel "Two compartments bin"@en .
+
+britvoc:scheme/fee-system a skos:ConceptScheme ;
+    skos:prefLabel "Fee system"@en .
+
+britvoc:concept/fee-system/flat-fee a skos:Concept ;
+    skos:inScheme britvoc:scheme/fee-system ;
+    skos:prefLabel "Flat fee"@en .
+
+britvoc:concept/fee-system/flexible a skos:Concept ;
+    skos:inScheme britvoc:scheme/fee-system ;
+    skos:prefLabel "Flexible"@en .
+
+britvoc:concept/fee-system/flexible-plus a skos:Concept ;
+    skos:inScheme britvoc:scheme/fee-system ;
+    skos:prefLabel "Flexible+"@en .
+
+britvoc:concept/fee-system/no-fee a skos:Concept ;
+    skos:inScheme britvoc:scheme/fee-system ;
+    skos:prefLabel "No fee"@en .
+
+britvoc:concept/fee-system/pay-as-you-throw a skos:Concept ;
+    skos:inScheme britvoc:scheme/fee-system ;
+    skos:prefLabel "Pay as you throw (PAYT)"@en .
+
+britvoc:scheme/collection-property a skos:ConceptScheme ;
+    skos:prefLabel "Collection property"@en .
+
+britvoc:concept/collection-property/connection-rate a skos:Concept ;
+    skos:inScheme britvoc:scheme/collection-property ;
+    skos:prefLabel "Connection rate"@en .
+
+britvoc:concept/collection-property/specific-waste-collected a skos:Concept ;
+    skos:inScheme britvoc:scheme/collection-property ;
+    skos:prefLabel "specific waste collected"@en .
+
+britvoc:concept/collection-property/specific-waste-treated a skos:Concept ;
+    skos:inScheme britvoc:scheme/collection-property ;
+    skos:prefLabel "specific waste treated"@en .
+
+britvoc:concept/collection-property/total-waste-collected a skos:Concept ;
+    skos:inScheme britvoc:scheme/collection-property ;
+    skos:prefLabel "total waste collected"@en .
+
+britvoc:concept/collection-property/total-waste-treated a skos:Concept ;
+    skos:inScheme britvoc:scheme/collection-property ;
+    skos:prefLabel "total waste treated"@en .
+
+britvoc:scheme/material a skos:ConceptScheme ;
+    skos:prefLabel "Material"@en ;
+    rdfs:comment "Material terms used by allowed/forbidden constraints are exported from Django data."@en .
+
+britvoc:scheme/unit a skos:ConceptScheme ;
+    skos:prefLabel "Unit"@en .
+
+britvoc:concept/unit/kg-per-cap-a a skos:Concept ;
+    skos:inScheme britvoc:scheme/unit ;
+    skos:prefLabel "kg/(cap.*a)"@en .
+
+britvoc:concept/unit/mg-per-a a skos:Concept ;
+    skos:inScheme britvoc:scheme/unit ;
+    skos:prefLabel "Mg/a"@en .
+
+britvoc:concept/unit/percent-households a skos:Concept ;
+    skos:inScheme britvoc:scheme/unit ;
+    skos:prefLabel "% of households"@en .
+
+britvoc:concept/unit/percent-population a skos:Concept ;
+    skos:inScheme britvoc:scheme/unit ;
+    skos:prefLabel "% of population"@en .
+
+britvoc:concept/unit/percent-residential-properties a skos:Concept ;
+    skos:inScheme britvoc:scheme/unit ;
+    skos:prefLabel "% of residential properties"@en .
+
+britvoc:concept/unit/percent-residual-waste-bins a skos:Concept ;
+    skos:inScheme britvoc:scheme/unit ;
+    skos:prefLabel "% of residual waste bins"@en .
+
+britvoc:concept/unit/percent-unknown-reference a skos:Concept ;
+    skos:inScheme britvoc:scheme/unit ;
+    skos:prefLabel "% (of unknown reference)"@en .
+
+britvoc:scheme/material-role a skos:ConceptScheme ;
+    skos:prefLabel "Material role"@en .
+
+britvoc:concept/material-role/allowed a skos:Concept ;
+    skos:inScheme britvoc:scheme/material-role ;
+    skos:prefLabel "allowed"@en .
+
+britvoc:concept/material-role/forbidden a skos:Concept ;
+    skos:inScheme britvoc:scheme/material-role ;
+    skos:prefLabel "forbidden"@en .
+
+britvoc:scheme/connection-type a skos:ConceptScheme ;
+    skos:prefLabel "Connection type"@en .
+
+britvoc:concept/connection-type/mandatory a skos:Concept ;
+    skos:inScheme britvoc:scheme/connection-type ;
+    skos:prefLabel "mandatory"@en ;
+    skos:notation "MANDATORY" .
+
+britvoc:concept/connection-type/mandatory-with-home-composter-exception a skos:Concept ;
+    skos:inScheme britvoc:scheme/connection-type ;
+    skos:prefLabel "mandatory with exception for home composters"@en ;
+    skos:notation "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION" .
+
+britvoc:concept/connection-type/voluntary a skos:Concept ;
+    skos:inScheme britvoc:scheme/connection-type ;
+    skos:prefLabel "voluntary"@en ;
+    skos:notation "VOLUNTARY" .
+
+britvoc:concept/connection-type/not-specified a skos:Concept ;
+    skos:inScheme britvoc:scheme/connection-type ;
+    skos:prefLabel "not specified"@en ;
+    skos:notation "not_specified" .
+
+britvoc:scheme/required-bin-capacity-reference a skos:ConceptScheme ;
+    skos:prefLabel "Required bin capacity reference"@en .
+
+britvoc:concept/required-bin-capacity-reference/person a skos:Concept ;
+    skos:inScheme britvoc:scheme/required-bin-capacity-reference ;
+    skos:prefLabel "per person"@en ;
+    skos:notation "person" .
+
+britvoc:concept/required-bin-capacity-reference/household a skos:Concept ;
+    skos:inScheme britvoc:scheme/required-bin-capacity-reference ;
+    skos:prefLabel "per household"@en ;
+    skos:notation "household" .
+
+britvoc:concept/required-bin-capacity-reference/property a skos:Concept ;
+    skos:inScheme britvoc:scheme/required-bin-capacity-reference ;
+    skos:prefLabel "per property"@en ;
+    skos:notation "property" .
+
+britvoc:concept/required-bin-capacity-reference/not-specified a skos:Concept ;
+    skos:inScheme britvoc:scheme/required-bin-capacity-reference ;
+    skos:prefLabel "not specified"@en ;
+    skos:notation "not_specified" .
+
+britvoc:scheme/country-language a skos:ConceptScheme ;
+    skos:prefLabel "Country language map"@en .
+
+britvoc:concept/country-language/be a skos:Concept ;
+    skos:inScheme britvoc:scheme/country-language ;
+    skos:prefLabel "Belgium"@en ;
+    skos:notation "BE" ;
+    soilcom:languageCode "nl", "fr", "de" .
+
+britvoc:concept/country-language/de a skos:Concept ;
+    skos:inScheme britvoc:scheme/country-language ;
+    skos:prefLabel "Germany"@en ;
+    skos:notation "DE" ;
+    soilcom:languageCode "de" .
+
+britvoc:concept/country-language/dk a skos:Concept ;
+    skos:inScheme britvoc:scheme/country-language ;
+    skos:prefLabel "Denmark"@en ;
+    skos:notation "DK" ;
+    soilcom:languageCode "da" .
+
+britvoc:concept/country-language/nl a skos:Concept ;
+    skos:inScheme britvoc:scheme/country-language ;
+    skos:prefLabel "Netherlands"@en ;
+    skos:notation "NL" ;
+    soilcom:languageCode "nl" .
+
+britvoc:concept/country-language/se a skos:Concept ;
+    skos:inScheme britvoc:scheme/country-language ;
+    skos:prefLabel "Sweden"@en ;
+    skos:notation "SE" ;
+    soilcom:languageCode "sv" .
+
+britvoc:concept/country-language/uk a skos:Concept ;
+    skos:inScheme britvoc:scheme/country-language ;
+    skos:prefLabel "United Kingdom"@en ;
+    skos:notation "UK" ;
+    soilcom:languageCode "en" .

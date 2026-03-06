@@ -1,0 +1,120 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix soilcom-shape: <https://brit.bioresource-tools.net/ontology/soilcom/shapes#> .
+
+soilcom-shape:CollectionImportRecordShape
+    a sh:NodeShape ;
+    sh:targetClass soilcom-shape:CollectionImportRecord ;
+
+    sh:property [
+        sh:path soilcom-shape:collection_system ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+    ] ;
+
+    sh:property [
+        sh:path soilcom-shape:waste_category ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+    ] ;
+
+    sh:property [
+        sh:path soilcom-shape:valid_from ;
+        sh:minCount 1 ;
+        sh:datatype xsd:date ;
+    ] ;
+
+    sh:property [
+        sh:path soilcom-shape:valid_until ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:date ;
+    ] ;
+
+    sh:or (
+        [
+            sh:property [
+                sh:path soilcom-shape:nuts_or_lau_id ;
+                sh:minCount 1 ;
+                sh:datatype xsd:string ;
+                sh:minLength 1 ;
+            ]
+        ]
+        [
+            sh:property [
+                sh:path soilcom-shape:catchment_name ;
+                sh:minCount 1 ;
+                sh:datatype xsd:string ;
+                sh:minLength 1 ;
+            ]
+        ]
+    ) ;
+
+    sh:property [
+        sh:path soilcom-shape:connection_type ;
+        sh:in (
+            "mandatory"
+            "mandatory with exception"
+            "mandatory with exception for home composters"
+            "voluntary"
+            "not specified"
+        ) ;
+    ] ;
+
+    sh:property [
+        sh:path soilcom-shape:required_bin_capacity_reference ;
+        sh:in (
+            "person"
+            "household"
+            "property"
+            "not specified"
+            "not_specified"
+        ) ;
+    ] ;
+
+    sh:property [
+        sh:path soilcom-shape:property_values ;
+        sh:node soilcom-shape:CollectionImportPropertyValueShape ;
+    ] ;
+
+    sh:sparql [
+        sh:message "valid_until must be later than valid_from" ;
+        sh:select """
+            SELECT $this
+            WHERE {
+                $this soilcom-shape:valid_from ?from .
+                $this soilcom-shape:valid_until ?until .
+                FILTER (?until <= ?from)
+            }
+        """ ;
+    ] .
+
+soilcom-shape:CollectionImportPropertyValueShape
+    a sh:NodeShape ;
+
+    sh:property [
+        sh:path soilcom-shape:property_id ;
+        sh:minCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:minInclusive 1 ;
+    ] ;
+
+    sh:property [
+        sh:path soilcom-shape:unit_name ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:minLength 1 ;
+    ] ;
+
+    sh:property [
+        sh:path soilcom-shape:year ;
+        sh:minCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:minInclusive 1900 ;
+        sh:maxInclusive 2100 ;
+    ] ;
+
+    sh:property [
+        sh:path soilcom-shape:average ;
+        sh:minCount 1 ;
+        sh:datatype xsd:decimal ;
+    ] .

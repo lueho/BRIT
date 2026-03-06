@@ -1,0 +1,97 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix soilcom: <https://brit.bioresource-tools.net/ontology/soilcom#> .
+
+<https://brit.bioresource-tools.net/ontology/soilcom>
+    a owl:Ontology ;
+    dcterms:title "BRIT Soilcom ontology"@en ;
+    owl:versionInfo "0.4.0" ;
+    dcterms:created "2026-03-05"^^xsd:date .
+
+soilcom:Collection a owl:Class ;
+    rdfs:label "Collection"@en ;
+    rdfs:comment "Waste collection configuration for a catchment and waste stream in a validity period."@en .
+
+soilcom:WasteStream a owl:Class ;
+    rdfs:label "Waste stream"@en .
+
+soilcom:WasteCategory a owl:Class ;
+    rdfs:label "Waste category"@en ;
+    rdfs:seeAlso <https://brit.bioresource-tools.net/vocab/soilcom/scheme/waste-category> .
+
+soilcom:CollectionSystem a owl:Class ;
+    rdfs:label "Collection system"@en ;
+    rdfs:seeAlso <https://brit.bioresource-tools.net/vocab/soilcom/scheme/collection-system> .
+
+soilcom:SortingMethod a owl:Class ;
+    rdfs:label "Sorting method"@en ;
+    rdfs:seeAlso <https://brit.bioresource-tools.net/vocab/soilcom/scheme/sorting-method> .
+
+soilcom:FeeSystem a owl:Class ;
+    rdfs:label "Fee system"@en ;
+    rdfs:seeAlso <https://brit.bioresource-tools.net/vocab/soilcom/scheme/fee-system> .
+
+soilcom:Catchment a owl:Class ;
+    rdfs:label "Catchment"@en .
+
+soilcom:hasWasteStream a owl:ObjectProperty ;
+    rdfs:label "has waste stream"@en ;
+    rdfs:domain soilcom:Collection ;
+    rdfs:range soilcom:WasteStream .
+
+soilcom:hasWasteCategory a owl:ObjectProperty ;
+    rdfs:label "has waste category"@en ;
+    rdfs:domain soilcom:WasteStream ;
+    rdfs:range soilcom:WasteCategory .
+
+soilcom:hasCollectionSystem a owl:ObjectProperty ;
+    rdfs:label "has collection system"@en ;
+    rdfs:domain soilcom:Collection ;
+    rdfs:range soilcom:CollectionSystem .
+
+soilcom:hasSortingMethod a owl:ObjectProperty ;
+    rdfs:label "has sorting method"@en ;
+    rdfs:domain soilcom:Collection ;
+    rdfs:range soilcom:SortingMethod .
+
+soilcom:hasFeeSystem a owl:ObjectProperty ;
+    rdfs:label "has fee system"@en ;
+    rdfs:domain soilcom:Collection ;
+    rdfs:range soilcom:FeeSystem .
+
+soilcom:hasCatchment a owl:ObjectProperty ;
+    rdfs:label "has catchment"@en ;
+    rdfs:domain soilcom:Collection ;
+    rdfs:range soilcom:Catchment .
+
+soilcom:connectionTypeCode a owl:DatatypeProperty ;
+    rdfs:label "connection type code"@en ;
+    rdfs:comment "Code value from Collection.connection_type choices."@en ;
+    rdfs:domain soilcom:Collection ;
+    rdfs:range xsd:string ;
+    rdfs:seeAlso <https://brit.bioresource-tools.net/vocab/soilcom/scheme/connection-type> .
+
+soilcom:requiredBinCapacityReferenceCode a owl:DatatypeProperty ;
+    rdfs:label "required bin capacity reference code"@en ;
+    rdfs:comment "Code value from Collection.required_bin_capacity_reference choices."@en ;
+    rdfs:domain soilcom:Collection ;
+    rdfs:range xsd:string ;
+    rdfs:seeAlso <https://brit.bioresource-tools.net/vocab/soilcom/scheme/required-bin-capacity-reference> .
+
+soilcom:minBinSizeLitres a owl:DatatypeProperty ;
+    rdfs:label "minimum bin size in litres"@en ;
+    rdfs:domain soilcom:Collection ;
+    rdfs:range xsd:decimal .
+
+soilcom:requiredBinCapacityLitres a owl:DatatypeProperty ;
+    rdfs:label "required bin capacity in litres"@en ;
+    rdfs:domain soilcom:Collection ;
+    rdfs:range xsd:decimal .
+
+soilcom:languageCode a owl:DatatypeProperty ;
+    rdfs:label "language code"@en ;
+    rdfs:comment "ISO 639-1 language code used for harmonization by country."@en ;
+    rdfs:range xsd:string .
