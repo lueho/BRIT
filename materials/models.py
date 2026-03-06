@@ -101,7 +101,7 @@ class Material(BaseMaterial):
 
 class MaterialComponentManager(UserCreatedObjectManager):
     def default(self):
-        name = getattr(settings, "DEFAULT_MATERIAL_NAME", "Fresh Matter (FM)")
+        name = getattr(settings, "DEFAULT_MATERIALCOMPONENT_NAME", "Fresh Matter (FM)")
         return self.get_queryset().get(name=name, owner=get_default_owner())
 
     def other(self):
