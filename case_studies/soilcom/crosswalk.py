@@ -63,6 +63,21 @@ _CONNECTION_TYPE_IMPORT_ALIASES: Final[set[str]] = {
     "not_specified",
 }
 
+_CONNECTION_TYPE_IMPORT_EQUIVALENTS: Final[dict[str, set[str]]] = {
+    "mandatory": {"mandatory"},
+    "voluntary": {"voluntary"},
+    "mandatory with exception": {
+        "mandatory with exception for home composters",
+        "mandatory_with_home_composter_exception",
+    },
+    "mandatory with exception for home composters": {
+        "mandatory with exception for home composters",
+        "mandatory_with_home_composter_exception",
+    },
+    "not specified": {"not specified", "not_specified"},
+    "not_specified": {"not specified", "not_specified"},
+}
+
 _REQUIRED_BIN_CAPACITY_REFERENCE_IMPORT_ALIASES: Final[dict[str, str]] = {
     "per person": "person",
     "person": "person",
@@ -102,6 +117,12 @@ def _normalize_required_bin_capacity_reference(value: str) -> str | None:
     if "propert" in normalized:
         return "property"
     return None
+
+
+def _normalize_connection_type_candidates(value: str) -> set[str]:
+    """Return normalized connection-type candidates for importer aliases."""
+    normalized = _normalize_term(value)
+    return _CONNECTION_TYPE_IMPORT_EQUIVALENTS.get(normalized, {normalized})
 
 
 class CrosswalkValidationError(ValueError):
@@ -463,8 +484,8 @@ def validate_record_against_controlled_vocabulary(
             for candidate in (entry.get("label"), entry.get("value"))
             if candidate
         }
-        allowed_connection_values.update(_CONNECTION_TYPE_IMPORT_ALIASES)
-        if _normalize_term(connection_value) not in allowed_connection_values:
+        candidate_values = _normalize_connection_type_candidates(connection_value)
+        if candidate_values.isdisjoint(allowed_connection_values):
             warnings.append(
                 "Field 'connection_type' has non-controlled value "
                 f"'{connection_value}'."
