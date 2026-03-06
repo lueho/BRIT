@@ -2,7 +2,9 @@
 
 This section contains BRIT runtime and deployment documentation.
 
-## Start Here
+## Recommended Reading Order
+- [Operations & Deployment](operations.md)
+- [WasteStream removal rollout checklist](wastestream-removal-rollout-checklist.md)
 
 - **Canonical operations runbook**
   Use [Operations & Deployment](operations.md).

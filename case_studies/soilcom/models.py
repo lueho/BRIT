@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models, transaction
 from django.db.models import Case, Count, IntegerField, Q, Sum, Value, When
-from django.db.models.signals import m2m_changed, post_delete, post_save, pre_save
+from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
@@ -14,7 +14,7 @@ from django.utils import timezone
 from bibliography.models import Source
 from distributions.models import Period, TemporalDistribution
 from maps.models import Catchment
-from materials.models import Material, MaterialCategory, Sample, SampleSeries
+from materials.models import Material, MaterialCategory, Sample
 from utils.object_management.models import (
     NamedUserCreatedObject,
     UserCreatedObject,
@@ -42,7 +42,7 @@ class CollectionCatchment(Catchment):
             catchment__in=self.descendants(include_self=True)
         )
         qs = qs.select_related(
-            "catchment", "collector", "waste_stream__category", "collection_system"
+            "catchment", "collector", "waste_category", "collection_system"
         )
         return qs
 
@@ -50,7 +50,7 @@ class CollectionCatchment(Catchment):
     def upstream_collections(self):
         qs = Collection.objects.filter(catchment__in=self.ancestors())
         qs = qs.select_related(
-            "catchment", "collector", "waste_stream__category", "collection_system"
+            "catchment", "collector", "waste_category", "collection_system"
         )
         return qs
 
@@ -113,213 +113,6 @@ def add_material_category(sender, instance, created, **kwargs):
         category = MaterialCategory.objects.get(name="Biowaste component")
         instance.categories.add(category)
         instance.save()
-
-
-class WasteStreamQuerySet(UserCreatedObjectQuerySet):
-    @staticmethod
-    def _material_ids(materials):
-        """Normalize materials input into a list of ids or objects."""
-
-        if materials is None:
-            return None
-        if hasattr(materials, "values_list"):
-            return list(materials.values_list("id", flat=True))
-        return list(materials)
-
-    def match_allowed_materials(self, allowed_materials):
-        allowed_ids = self._material_ids(allowed_materials)
-        if allowed_ids is None:
-            return self
-
-        if allowed_ids:
-            return self.alias(
-                allowed_materials_count=models.Count(
-                    "allowed_materials", distinct=True
-                ),
-                allowed_materials_matches=models.Count(
-                    "allowed_materials",
-                    filter=models.Q(allowed_materials__in=allowed_ids),
-                    distinct=True,
-                ),
-            ).filter(
-                allowed_materials_count=len(allowed_ids),
-                allowed_materials_matches=len(allowed_ids),
-            )
-        return self.filter(allowed_materials__isnull=True)
-
-    def match_forbidden_materials(self, forbidden_materials):
-        forbidden_ids = self._material_ids(forbidden_materials)
-        if forbidden_ids is None:
-            return self
-
-        if forbidden_ids:
-            return self.alias(
-                forbidden_materials_count=models.Count(
-                    "forbidden_materials", distinct=True
-                ),
-                forbidden_materials_matches=models.Count(
-                    "forbidden_materials",
-                    filter=models.Q(forbidden_materials__in=forbidden_ids),
-                    distinct=True,
-                ),
-            ).filter(
-                forbidden_materials_count=len(forbidden_ids),
-                forbidden_materials_matches=len(forbidden_ids),
-            )
-        return self.filter(forbidden_materials__isnull=True)
-
-    def get_or_create(self, defaults=None, **kwargs):
-        """
-        Customizes the regular get_or_create to incorporate comparison of many-to-many relationships of
-        allowed_materials and forbidden_materials. A queryset of allowed_materials and forbidden_materials can be
-        passed to this method to get a waste stream with exactly that combination of materials.
-        Each possible combination can only appear once in the database.
-        :param defaults: dict
-        :param kwargs: dict
-        :return: tuple (WasteStream instance, bool)
-        """
-
-        if defaults:
-            defaults = defaults.copy()
-
-        qs = self
-        unset = object()
-
-        allowed_materials = kwargs.pop("allowed_materials", unset)
-        allowed_provided = allowed_materials is not unset
-        forbidden_materials = kwargs.pop("forbidden_materials", unset)
-        forbidden_provided = forbidden_materials is not unset
-
-        if defaults:
-            if "allowed_materials" in defaults:
-                allowed_materials = defaults.pop("allowed_materials")
-                allowed_provided = True
-            if "forbidden_materials" in defaults:
-                forbidden_materials = defaults.pop("forbidden_materials")
-                forbidden_provided = True
-
-        if not allowed_provided:
-            allowed_materials = None
-        if not forbidden_provided:
-            forbidden_materials = None
-
-        pk_name = self.model._meta.pk.name
-        has_pk = pk_name in kwargs
-
-        if allowed_provided and not has_pk:
-            allowed_ids = self._material_ids(allowed_materials)
-            qs = qs.match_allowed_materials(
-                allowed_ids if allowed_ids is not None else allowed_materials
-            )
-        if forbidden_provided and not has_pk:
-            forbidden_ids = self._material_ids(forbidden_materials)
-            qs = qs.match_forbidden_materials(
-                forbidden_ids if forbidden_ids is not None else forbidden_materials
-            )
-
-        instance, created = super(WasteStreamQuerySet, qs).get_or_create(
-            defaults=defaults, **kwargs
-        )
-
-        if created:
-            allowed_list = [] if allowed_materials is None else list(allowed_materials)
-            forbidden_list = (
-                [] if forbidden_materials is None else list(forbidden_materials)
-            )
-            if allowed_list:
-                instance.allowed_materials.add(*allowed_list)
-            if forbidden_list:
-                instance.forbidden_materials.add(*forbidden_list)
-            if not instance.name:
-                instance.name = f"{instance.category.name} {len(allowed_list)} {len(forbidden_list)}"
-                instance.save()
-
-        return instance, created
-
-    def update_or_create(self, defaults=None, **kwargs):
-        """
-        Customizes the regular update_or_create to incorporate comparison of many-to-many relationships of
-        allowed_materials and forbidden_materials. A queryset of allowed_materials and forbidden_materials can be
-        passed to this method to get a waste stream with exactly that combination of materials.
-        Each possible combination can only appear once in the database.
-        :param defaults: dict
-        :param kwargs: dict
-        :return: tuple (WasteStream instance, bool)
-        """
-
-        if defaults:
-            defaults = defaults.copy()
-
-        instance, created = self.get_or_create(defaults=defaults, **kwargs)
-
-        if not created:
-            new_allowed_materials = defaults.pop("allowed_materials", None)
-            new_forbidden_materials = defaults.pop("forbidden_materials", None)
-            category = kwargs.get("category", None)
-
-            qs = self
-
-            if category:
-                qs = qs.filter(category=category)
-
-            if new_allowed_materials or new_forbidden_materials:
-                if new_allowed_materials:
-                    qs = qs.match_allowed_materials(new_allowed_materials)
-                if new_forbidden_materials:
-                    qs = qs.match_forbidden_materials(new_forbidden_materials)
-
-                if qs.exists():
-                    raise ValidationError(
-                        """
-                        Waste stream cannot be updated. Equivalent waste stream of equal category and same combination
-                        of allowed and forbidden materials already exists.
-                        """
-                    )
-
-            self.filter(id=instance.id).update(**defaults)
-
-            if new_allowed_materials:
-                instance.allowed_materials.clear()
-                instance.allowed_materials.add(*new_allowed_materials)
-
-            if new_forbidden_materials:
-                instance.forbidden_materials.clear()
-                instance.forbidden_materials.add(*new_forbidden_materials)
-
-            instance.refresh_from_db()
-
-        return instance, created
-
-
-class WasteStreamManager(UserCreatedObjectManager):
-    def get_queryset(self):
-        return WasteStreamQuerySet(self.model, using=self._db)
-
-    def match_allowed_materials(self, allowed_materials):
-        return self.get_queryset().match_allowed_materials(allowed_materials)
-
-    def match_forbidden_materials(self, forbidden_materials):
-        return self.get_queryset().match_forbidden_materials(forbidden_materials)
-
-
-class WasteStream(NamedUserCreatedObject):
-    """Describes Waste Streams that are collected in Collections. This model is managed automatically by
-    the Collection model. Instances of this model must not be created, edited or deleted manually.
-    """
-
-    category = models.ForeignKey(WasteCategory, on_delete=models.PROTECT)
-    allowed_materials = models.ManyToManyField(
-        Material, related_name="allowed_in_waste_streams"
-    )
-    forbidden_materials = models.ManyToManyField(
-        Material, related_name="forbidden_in_waste_streams"
-    )
-    composition = models.ManyToManyField(SampleSeries)
-
-    objects = WasteStreamQuerySet.as_manager()
-
-    class Meta:
-        verbose_name = "Waste Stream"
 
 
 class WasteFlyerManager(UserCreatedObjectManager):
@@ -453,6 +246,95 @@ class CollectionQuerySet(UserCreatedObjectQuerySet):
     def archived(self):
         return self.filter(valid_until__lt=timezone.now().date())
 
+    @staticmethod
+    def _normalize_material_ids(materials):
+        if materials is None:
+            return set()
+
+        if hasattr(materials, "values_list"):
+            return {
+                int(material_id)
+                for material_id in materials.values_list("id", flat=True)
+                if material_id is not None
+            }
+
+        material_ids = set()
+        for material in materials:
+            material_id = getattr(material, "pk", material)
+            if material_id is None:
+                continue
+            material_ids.add(int(material_id))
+        return material_ids
+
+    def match_allowed_materials(self, materials):
+        """Return collections whose allowed_materials set exactly matches *materials*."""
+        material_ids = self._normalize_material_ids(materials)
+
+        if not material_ids:
+            matching_ids = (
+                self.annotate(_allowed_total=Count("allowed_materials", distinct=True))
+                .filter(_allowed_total=0)
+                .values("pk")
+            )
+            return self.filter(pk__in=matching_ids)
+
+        matching_ids = (
+            self.annotate(
+                _allowed_total=Count("allowed_materials", distinct=True),
+                _allowed_matched=Count(
+                    "allowed_materials",
+                    filter=Q(allowed_materials__in=material_ids),
+                    distinct=True,
+                ),
+            )
+            .filter(
+                _allowed_total=len(material_ids),
+                _allowed_matched=len(material_ids),
+            )
+            .values("pk")
+        )
+        return self.filter(pk__in=matching_ids)
+
+    def match_forbidden_materials(self, materials):
+        """Return collections whose forbidden_materials set exactly matches *materials*."""
+        material_ids = self._normalize_material_ids(materials)
+
+        if not material_ids:
+            matching_ids = (
+                self.annotate(
+                    _forbidden_total=Count("forbidden_materials", distinct=True)
+                )
+                .filter(_forbidden_total=0)
+                .values("pk")
+            )
+            return self.filter(pk__in=matching_ids)
+
+        matching_ids = (
+            self.annotate(
+                _forbidden_total=Count("forbidden_materials", distinct=True),
+                _forbidden_matched=Count(
+                    "forbidden_materials",
+                    filter=Q(forbidden_materials__in=material_ids),
+                    distinct=True,
+                ),
+            )
+            .filter(
+                _forbidden_total=len(material_ids),
+                _forbidden_matched=len(material_ids),
+            )
+            .values("pk")
+        )
+        return self.filter(pk__in=matching_ids)
+
+    def match_materials(self, *, allowed_materials=None, forbidden_materials=None):
+        """Return collections matching exact allowed/forbidden material combinations."""
+        queryset = self
+        if allowed_materials is not None:
+            queryset = queryset.match_allowed_materials(allowed_materials)
+        if forbidden_materials is not None:
+            queryset = queryset.match_forbidden_materials(forbidden_materials)
+        return queryset
+
 
 CONNECTION_TYPE_CHOICES = [
     ("MANDATORY", "mandatory"),
@@ -474,7 +356,8 @@ REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES = [
 
 class Collection(NamedUserCreatedObject):
     """
-    Represents a waste collection system, including collection parameters, waste stream, and container requirements.
+    Represents a waste collection system, including collection parameters,
+    inline waste category/materials, and container requirements.
     """
 
     collector = models.ForeignKey(
@@ -494,12 +377,22 @@ class Collection(NamedUserCreatedObject):
         null=True,
         related_name="collections",
     )
-    waste_stream = models.ForeignKey(
-        WasteStream,
-        on_delete=models.SET_NULL,
+    waste_category = models.ForeignKey(
+        WasteCategory,
+        on_delete=models.PROTECT,
         blank=True,
         null=True,
         related_name="collections",
+    )
+    allowed_materials = models.ManyToManyField(
+        Material,
+        related_name="allowed_in_collections",
+        blank=True,
+    )
+    forbidden_materials = models.ManyToManyField(
+        Material,
+        related_name="forbidden_in_collections",
+        blank=True,
     )
     frequency = models.ForeignKey(
         CollectionFrequency,
@@ -578,6 +471,18 @@ class Collection(NamedUserCreatedObject):
     @property
     def geom(self):
         return self.catchment.geom
+
+    @property
+    def effective_waste_category(self):
+        return self.waste_category
+
+    @property
+    def effective_allowed_materials(self):
+        return self.allowed_materials.all()
+
+    @property
+    def effective_forbidden_materials(self):
+        return self.forbidden_materials.all()
 
     @cached_property
     def version_chain_ids(self):
@@ -734,8 +639,9 @@ class Collection(NamedUserCreatedObject):
             else "Unknown collection system"
         )
         category = "Unknown waste category"
-        if self.waste_stream and self.waste_stream.category:
-            category = self.waste_stream.category.name
+        effective_waste_category = self.effective_waste_category
+        if effective_waste_category:
+            category = effective_waste_category.name
         return f"{catchment} {category} {system} {self.valid_from.year}"
 
     def clean(self):
@@ -904,44 +810,6 @@ def name_collection(sender, instance, **kwargs):
     instance.name = instance.construct_name()
 
 
-@receiver(pre_save, sender=Collection)
-def capture_previous_waste_stream(sender, instance, **kwargs):
-    """Store previous waste stream id for change detection."""
-
-    update_fields = kwargs.get("update_fields")
-    if update_fields and "waste_stream" not in update_fields:
-        instance._previous_waste_stream_id = instance.waste_stream_id
-        return
-
-    if not instance.pk:
-        instance._previous_waste_stream_id = None
-        return
-
-    instance._previous_waste_stream_id = (
-        sender.objects.filter(pk=instance.pk)
-        .values_list("waste_stream_id", flat=True)
-        .first()
-    )
-
-
-@receiver(post_save, sender=Collection)
-def schedule_orphaned_waste_stream_cleanup(sender, instance, created, **kwargs):
-    """Schedule orphaned waste stream cleanup when waste stream changes."""
-    if created:
-        return
-    previous_waste_stream_id = getattr(instance, "_previous_waste_stream_id", None)
-    if previous_waste_stream_id == instance.waste_stream_id:
-        return
-    celery.current_app.send_task("cleanup_orphaned_waste_streams")
-
-
-@receiver(post_delete, sender=Collection)
-def schedule_orphaned_waste_stream_cleanup_on_delete(sender, instance, **kwargs):
-    """Schedule orphaned waste stream cleanup after collection deletion."""
-    celery.current_app.send_task("cleanup_orphaned_waste_streams")
-
-
-@receiver(post_save, sender=WasteStream)
 @receiver(post_save, sender=WasteCategory)
 @receiver(post_save, sender=CollectionSystem)
 @receiver(post_save, sender=Catchment)
@@ -949,7 +817,7 @@ def schedule_orphaned_waste_stream_cleanup_on_delete(sender, instance, **kwargs)
 def update_collection_names(sender, instance, created, **kwargs):
     if not created:
         if sender == WasteCategory:
-            collections = Collection.objects.filter(waste_stream__category=instance)
+            collections = Collection.objects.filter(waste_category=instance)
         else:
             collections = instance.collections.all()
         for collection in collections:

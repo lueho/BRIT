@@ -5,6 +5,7 @@ from factory.django import mute_signals
 
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import Region
+from materials.models import MaterialCategory
 from utils.properties.models import Property
 
 from ..filters import (
@@ -23,6 +24,7 @@ from ..models import (
     CollectionPropertyValue,
     CollectionSeason,
     Collector,
+    WasteComponent,
     WasteFlyer,
 )
 
@@ -323,6 +325,33 @@ class CollectionFilterTestCase(TestCase):
         )
         cls.collection1.add_predecessor(cls.predecessor_collection)
 
+        MaterialCategory.objects.get_or_create(name="Biowaste component")
+
+        cls.allowed_material_a = WasteComponent.objects.create(name="Filter Allowed A")
+        cls.allowed_material_b = WasteComponent.objects.create(name="Filter Allowed B")
+        cls.allowed_material_c = WasteComponent.objects.create(name="Filter Allowed C")
+        cls.forbidden_material_x = WasteComponent.objects.create(
+            name="Filter Forbidden X"
+        )
+        cls.forbidden_material_y = WasteComponent.objects.create(
+            name="Filter Forbidden Y"
+        )
+
+        cls.collection1.allowed_materials.set(
+            [cls.allowed_material_a, cls.allowed_material_b]
+        )
+        cls.collection1.forbidden_materials.set([cls.forbidden_material_x])
+
+        cls.collection2.allowed_materials.set([cls.allowed_material_a])
+        cls.collection2.forbidden_materials.set([cls.forbidden_material_x])
+
+        cls.child_collection.allowed_materials.set(
+            [cls.allowed_material_a, cls.allowed_material_b, cls.allowed_material_c]
+        )
+        cls.child_collection.forbidden_materials.set(
+            [cls.forbidden_material_x, cls.forbidden_material_y]
+        )
+
         # Add connection_rate properties
         prop_connection_rate = Property.objects.create(name="Connection rate")
         CollectionPropertyValue.objects.create(
@@ -429,6 +458,30 @@ class CollectionFilterTestCase(TestCase):
             Collection.objects.order_by("id"), filtr.qs.order_by("id")
         )
 
+    def test_allowed_materials_filter_matches_selected_material(self):
+        self.data.update({"allowed_materials": [self.allowed_material_b.pk]})
+        qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
+        self.assertIn(self.collection1, qs)
+        self.assertIn(self.child_collection, qs)
+        self.assertNotIn(self.collection2, qs)
+
+    def test_forbidden_materials_filter_matches_selected_material(self):
+        self.data.update({"forbidden_materials": [self.forbidden_material_y.pk]})
+        qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
+        self.assertNotIn(self.collection1, qs)
+        self.assertNotIn(self.collection2, qs)
+        self.assertIn(self.child_collection, qs)
+
+    def test_allowed_and_forbidden_filters_intersect_selected_materials(self):
+        self.data.update(
+            {
+                "allowed_materials": [self.allowed_material_b.pk],
+                "forbidden_materials": [self.forbidden_material_y.pk],
+            }
+        )
+        qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
+        self.assertQuerySetEqual(qs, [self.child_collection], ordered=False)
+
     def test_connection_rate_range_filter_fields_exists_in_filter_and_form(self):
         self.data.update({"connection_rate_min": 50, "connection_rate_max": 99})
         filtr = CollectionFilterSet(self.data, queryset=Collection.objects.all())
@@ -465,7 +518,7 @@ class CollectionFilterTestCase(TestCase):
             "catchment": self.collection1.catchment,
             "collector": self.collection1.collector,
             "collection_system": self.collection1.collection_system,
-            "waste_stream": self.collection1.waste_stream,
+            "waste_category": self.collection1.waste_category,
         }
         values = [
             ("MANDATORY", "MANDATORY"),

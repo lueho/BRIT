@@ -1,6 +1,5 @@
 {% extends "soilcom/collection_filter.html" %}
 {% load moderation_tags %}
-
 {% block list_table %}
     <div class="table-responsive">
         <table class="table modern-table">
@@ -17,7 +16,7 @@
                         <td data-label="Collection" class="ps-3">
                             <a href="{% detail_or_review_url object use_back=True %}"
                                class="collection-link">
-                                <strong class="d-block">{{ object.catchment.region.name }} - {{ object.waste_stream.category }} collection</strong>
+                                <strong class="d-block">{{ object.catchment.region.name }} - {{ object.effective_waste_category }} collection</strong>
                                 <span class="text-muted small">
                                     {{ object.collector }} · {{ object.collection_system }} · {{ object.valid_from.year }}
                                 </span>
@@ -74,7 +73,6 @@
                                                 </a>
                                             {% endif %}
                                         {% endif %}
-
                                         {% if list_type == 'private' %}
                                             {% if object.is_private %}
                                                 {% if user == object.owner or user.is_staff %}
@@ -88,7 +86,6 @@
                                                     </form>
                                                 {% endif %}
                                             {% endif %}
-
                                             {% if object.is_in_review %}
                                                 {% if user == object.owner or user.is_staff %}
                                                     <form method="post"
@@ -102,7 +99,6 @@
                                                 {% endif %}
                                             {% endif %}
                                         {% endif %}
-
                                         {# Moderator shortcuts for items in review #}
                                         {% if object.is_in_review %}
                                             {% if user.is_staff and user != object.owner or perms.can_moderate and user != object.owner %}

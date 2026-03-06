@@ -3,11 +3,9 @@
 {% load crispy_forms_tags %}
 {% load file_export_tags %}
 {% load moderation_tags %}
-
 {% block title %}
     BRIT | Household waste collections
 {% endblock title %}
-
 {% block list_table %}
     {% load custom_tags %}
     {% if chips %}
@@ -42,7 +40,7 @@
                             <td data-label="Collection" class="ps-3">
                                 <a href="{% detail_or_review_url object use_back=True %}"
                                    class="collection-link">
-                                    <strong class="d-block">{{ object.catchment.region.name }} - {{ object.waste_stream.category }} collection</strong>
+                                    <strong class="d-block">{{ object.catchment.region.name }} - {{ object.effective_waste_category }} collection</strong>
                                     <span class="text-muted small">
                                         {{ object.collector }} · {{ object.collection_system }} · {{ object.valid_from.year }}
                                     </span>
@@ -58,7 +56,6 @@
         </div>
     </div>
 {% endblock list_table %}
-
 {% block filters_pane_body %}
     <form method="get">
         {% crispy filter.form %}
@@ -70,7 +67,6 @@
         </div>
     </form>
 {% endblock filters_pane_body %}
-
 {% block options_pane_body %}
     {% if create_permission in perms or user.is_staff %}
         <a class="btn btn-success w-100 mb-2"
@@ -86,14 +82,11 @@
             <i class="fas fa-circle-plus"></i> Add property to collection group
         </a>
     {% endif %}
-
     {% export_modal_button "collection-export" list_type=list_type button_classes="btn btn-outline-secondary w-100" %}
 {% endblock options_pane_body %}
-
 {% block learning_pane_body %}
     {% include "soilcom/includes/learning_materials.html" %}
 {% endblock learning_pane_body %}
-{{ ... }}
 {% block javascript %}
     {{ block.super }}
     <script src="{% static 'js/file_export.min.js' %}" type="text/javascript"></script>

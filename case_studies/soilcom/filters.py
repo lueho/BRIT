@@ -503,19 +503,19 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
     )
     waste_category = ModelMultipleChoiceFilter(
         queryset=WasteCategory.objects.all(),
-        field_name="waste_stream__category",
+        method="filter_waste_category",
         label="Waste categories",
         widget=CheckboxSelectMultiple,
     )
     allowed_materials = ModelMultipleChoiceFilter(
         queryset=WasteComponent.objects.all(),
-        field_name="waste_stream__allowed_materials",
+        method="filter_allowed_materials",
         label="Allowed materials",
         widget=CheckboxSelectMultiple,
     )
     forbidden_materials = ModelMultipleChoiceFilter(
         queryset=WasteComponent.objects.all(),
-        field_name="waste_stream__forbidden_materials",
+        method="filter_forbidden_materials",
         label="Forbidden materials",
         widget=CheckboxSelectMultiple,
     )
@@ -710,6 +710,24 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         return qs.filter(
             Q(valid_from__lte=value), Q(valid_until__gte=value) | Q(valid_until=None)
         )
+
+    @staticmethod
+    def filter_waste_category(qs, _, values):
+        if not values:
+            return qs
+        return qs.filter(waste_category__in=values)
+
+    @staticmethod
+    def filter_allowed_materials(qs, _, values):
+        if not values:
+            return qs
+        return qs.filter(allowed_materials__in=values).distinct()
+
+    @staticmethod
+    def filter_forbidden_materials(qs, _, values):
+        if not values:
+            return qs
+        return qs.filter(forbidden_materials__in=values).distinct()
 
 
 class WasteFlyerFilter(UserCreatedObjectScopedFilterSet):

@@ -56,7 +56,6 @@ from .models import (
     WasteCategory,
     WasteComponent,
     WasteFlyer,
-    WasteStream,
 )
 from .tasks import cleanup_orphaned_waste_flyers
 
@@ -436,11 +435,12 @@ class CollectionModelFormHelper(FormHelper):
         ForeignkeyField("collector"),
         ForeignkeyField("collection_system"),
         Field("sorting_method"),
-        # Waste stream configuration
+        # Waste configuration
         ForeignkeyField("waste_category"),
         Field("connection_type"),
         Field("allowed_materials"),
         Field("forbidden_materials"),
+        Field("samples"),
         # Collection parameters
         ForeignkeyField("fee_system"),
         Field("frequency"),
@@ -465,7 +465,7 @@ class CollectionModelForm(
     UserCreatedObjectFormMixin, SourcesFieldMixin, CreateInlineMixin, SimpleModelForm
 ):
     """
-    Model form for Collection, including all collection parameters and waste stream fields.
+    Model form for Collection, including all collection parameters and waste fields.
     """
 
     _WASTE_COMPONENT_ORDER = {
@@ -537,6 +537,14 @@ class CollectionModelForm(
         widget=CheckboxSelectMultiple,
         required=False,
     )
+    samples = TomSelectModelMultipleChoiceField(
+        config=TomSelectConfig(
+            url="sample-autocomplete",
+            label_field="name",
+        ),
+        required=False,
+        label="Samples",
+    )
     frequency = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="collectionfrequency-autocomplete",
@@ -606,6 +614,7 @@ class CollectionModelForm(
             "min_bin_size",
             "required_bin_capacity",
             "required_bin_capacity_reference",
+            "samples",
             "sources",
         )
         labels = {
@@ -622,33 +631,14 @@ class CollectionModelForm(
 
     def save(self, commit=True):
         """
-        Save the collection, ensuring waste stream and predecessor handling.
+        Save the collection with inline waste fields on the Collection model.
         """
         instance = super().save(commit=False)
         data = self.cleaned_data
         instance.name = (
             f"{data['catchment']} {data['waste_category']} {data['collection_system']}"
         )
-        allowed_materials = data["allowed_materials"]
-        forbidden_materials = data["forbidden_materials"]
-        if (
-            self.predecessor
-            and self.predecessor.waste_stream_id
-            and not {
-                "waste_category",
-                "allowed_materials",
-                "forbidden_materials",
-            }.intersection(self.changed_data)
-        ):
-            instance.waste_stream = self.predecessor.waste_stream
-        else:
-            waste_stream, created = WasteStream.objects.get_or_create(
-                defaults={"owner": instance.owner},
-                category=data["waste_category"],
-                allowed_materials=allowed_materials,
-                forbidden_materials=forbidden_materials,
-            )
-            instance.waste_stream = waste_stream
+        instance.waste_category = data["waste_category"]
         if commit:
             instance.save()
             for predecessor in instance.predecessors.all():
@@ -658,7 +648,7 @@ class CollectionModelForm(
             self.save_m2m()
             return instance
         else:
-            return super().save(commit=False)
+            return instance
 
 
 class CollectionAddWasteSampleForm(SimpleModelForm):
@@ -668,15 +658,29 @@ class CollectionAddWasteSampleForm(SimpleModelForm):
             label_field="name",
         ),
         label="Sample",
+        help_text="Add a sample directly to this collection.",
     )
 
     class Meta:
         model = Sample
         fields = ("sample",)
 
+    def __init__(self, *args, **kwargs):
+        collection = kwargs.get("instance")
+        super().__init__(*args, **kwargs)
+
+        queryset = Sample.objects.order_by("name")
+        if isinstance(collection, Collection) and collection.pk:
+            queryset = queryset.exclude(collections=collection)
+        self.fields["sample"].queryset = queryset
+
 
 class CollectionRemoveWasteSampleForm(SimpleModelForm):
-    sample = ModelChoiceField(queryset=Sample.objects.all())
+    sample = ModelChoiceField(
+        queryset=Sample.objects.all(),
+        label="Sample",
+        help_text="Remove a sample currently linked to this collection.",
+    )
 
     class Meta:
         model = Collection
@@ -686,7 +690,7 @@ class CollectionRemoveWasteSampleForm(SimpleModelForm):
         super().__init__(*args, **kwargs)
         self.fields["sample"].queryset = Sample.objects.filter(
             collections=self.instance
-        )
+        ).order_by("name")
 
 
 class CollectionAddPredecessorForm(SimpleModelForm):

@@ -11,7 +11,7 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from case_studies.soilcom.filters import CollectionFilterSet
 from case_studies.soilcom.importers import CollectionImporter
-from case_studies.soilcom.models import Collection, Collector, WasteFlyer, WasteStream
+from case_studies.soilcom.models import Collection, Collector, WasteFlyer
 from case_studies.soilcom.serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
     CollectionFlatSerializer,
@@ -80,8 +80,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             "catchment",
             "catchment__region",
             "catchment__region__borders",
-            "waste_stream",
-            "waste_stream__category",
+            "waste_category",
             "collection_system",
         )
         # Add simplified geometry annotation
@@ -193,19 +192,6 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         )
 
     @staticmethod
-    def _build_waste_stream(
-        owner, waste_category, allowed_materials, forbidden_materials
-    ):
-        """Return an exact waste-stream match, creating one if required."""
-        stream, _ = WasteStream.objects.get_or_create(
-            category=waste_category,
-            allowed_materials=allowed_materials,
-            forbidden_materials=forbidden_materials,
-            defaults={"owner": owner},
-        )
-        return stream
-
-    @staticmethod
     def _flyer_title(url):
         """Return a short title derived from the URL hostname (max 255 chars)."""
         from urllib.parse import urlparse
@@ -304,15 +290,10 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         serializer = CollectionMutationCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        allowed_materials = list(data.get("allowed_materials", []))
+        forbidden_materials = list(data.get("forbidden_materials", []))
 
         with transaction.atomic():
-            waste_stream = self._build_waste_stream(
-                owner=request.user,
-                waste_category=data["waste_category"],
-                allowed_materials=data.get("allowed_materials", []),
-                forbidden_materials=data.get("forbidden_materials", []),
-            )
-
             collection = Collection.objects.create(
                 name="",
                 owner=request.user,
@@ -320,7 +301,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 catchment=data["catchment"],
                 collector=data.get("collector"),
                 collection_system=data["collection_system"],
-                waste_stream=waste_stream,
+                waste_category=data["waste_category"],
                 frequency=data.get("frequency"),
                 fee_system=data.get("fee_system"),
                 sorting_method=data.get("sorting_method"),
@@ -335,6 +316,10 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 ),
                 description=data.get("description", ""),
             )
+            if allowed_materials:
+                collection.allowed_materials.set(allowed_materials)
+            if forbidden_materials:
+                collection.forbidden_materials.set(forbidden_materials)
 
             self._attach_sources_and_flyers(
                 collection,
@@ -368,12 +353,12 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 "catchment",
                 "collector",
                 "collection_system",
-                "waste_stream",
-                "waste_stream__category",
+                "waste_category",
                 "frequency",
                 "fee_system",
                 "sorting_method",
             )
+            .prefetch_related("allowed_materials", "forbidden_materials")
             .first()
         )
         if predecessor is None:
@@ -386,40 +371,26 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        default_waste_stream = predecessor.waste_stream
-        default_allowed = (
-            list(default_waste_stream.allowed_materials.all())
-            if default_waste_stream
-            else []
-        )
-        default_forbidden = (
-            list(default_waste_stream.forbidden_materials.all())
-            if default_waste_stream
-            else []
-        )
+        default_waste_category = predecessor.effective_waste_category
+        default_allowed = list(predecessor.effective_allowed_materials)
+        default_forbidden = list(predecessor.effective_forbidden_materials)
 
         waste_category = data.get(
             "waste_category",
-            default_waste_stream.category if default_waste_stream else None,
+            default_waste_category,
         )
         if waste_category is None:
             return Response(
                 {
-                    "detail": (
-                        "waste_category is required when the predecessor has no waste_stream."
-                    )
+                    "detail": "waste_category is required when the predecessor has no waste_category."
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        with transaction.atomic():
-            waste_stream = self._build_waste_stream(
-                owner=request.user,
-                waste_category=waste_category,
-                allowed_materials=data.get("allowed_materials", default_allowed),
-                forbidden_materials=data.get("forbidden_materials", default_forbidden),
-            )
+        allowed_materials = list(data.get("allowed_materials", default_allowed))
+        forbidden_materials = list(data.get("forbidden_materials", default_forbidden))
 
+        with transaction.atomic():
             collection = Collection.objects.create(
                 name="",
                 owner=request.user,
@@ -430,7 +401,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                     "collection_system",
                     predecessor.collection_system,
                 ),
-                waste_stream=waste_stream,
+                waste_category=waste_category,
                 frequency=data.get("frequency", predecessor.frequency),
                 fee_system=data.get("fee_system", predecessor.fee_system),
                 sorting_method=data.get("sorting_method", predecessor.sorting_method),
@@ -451,6 +422,8 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 ),
                 description=data.get("description", predecessor.description or ""),
             )
+            collection.allowed_materials.set(allowed_materials)
+            collection.forbidden_materials.set(forbidden_materials)
             collection.add_predecessor(predecessor)
 
             default_sources = list(predecessor.sources.all())

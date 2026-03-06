@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from urllib.parse import urlencode
 
 from celery.result import AsyncResult
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count, Max, Min, Prefetch, Q
@@ -287,7 +288,7 @@ class CollectionSystemModalDeleteView(UserCreatedObjectModalDeleteView):
     model = CollectionSystem
 
 
-# ----------- Waste Stream Category CRUD -------------------------------------------------------------------------------
+# ----------- Waste Category CRUD --------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -1051,7 +1052,7 @@ class CollectionListMixin:
             .get_queryset()
             .select_related(
                 "catchment__region",
-                "waste_stream__category",
+                "waste_category",
                 "collector",
                 "collection_system",
             )
@@ -1138,14 +1139,15 @@ class CollectionCopyView(CollectionCreateView):
         Returns initial data for the duplicate form, including all relevant fields from the original collection.
         """
         initial = model_to_dict(self.object)
+        waste_category = self.object.effective_waste_category
         initial.update(
             {
-                "waste_category": self.object.waste_stream.category.id,
+                "waste_category": waste_category.id if waste_category else None,
                 "allowed_materials": [
-                    mat.id for mat in self.object.waste_stream.allowed_materials.all()
+                    mat.id for mat in self.object.effective_allowed_materials
                 ],
                 "forbidden_materials": [
-                    mat.id for mat in self.object.waste_stream.forbidden_materials.all()
+                    mat.id for mat in self.object.effective_forbidden_materials
                 ],
             }
         )
@@ -1197,14 +1199,15 @@ class CollectionCreateNewVersionView(CollectionCopyView):
         Returns initial data for the new version form, including all relevant fields from the original collection.
         """
         initial = model_to_dict(self.object)
+        waste_category = self.object.effective_waste_category
         initial.update(
             {
-                "waste_category": self.object.waste_stream.category.id,
+                "waste_category": waste_category.id if waste_category else None,
                 "allowed_materials": [
-                    mat.id for mat in self.object.waste_stream.allowed_materials.all()
+                    mat.id for mat in self.object.effective_allowed_materials
                 ],
                 "forbidden_materials": [
-                    mat.id for mat in self.object.waste_stream.forbidden_materials.all()
+                    mat.id for mat in self.object.effective_forbidden_materials
                 ],
             }
         )
@@ -1249,7 +1252,7 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
                 "catchment",
                 "collector",
                 "collection_system",
-                "waste_stream__category",
+                "waste_category",
                 "frequency",
                 "fee_system",
             )
@@ -1258,8 +1261,8 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
                 "flyers",
                 "predecessors",
                 "successors",
-                "waste_stream__allowed_materials",
-                "waste_stream__forbidden_materials",
+                "allowed_materials",
+                "forbidden_materials",
                 "samples",
                 "frequency__collectioncountoptions_set",
             )
@@ -1299,13 +1302,8 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
         context["collection_property_values"] = cpvs
         context["aggregated_collection_property_values"] = agg_cpvs
 
-        waste_stream = getattr(self.object, "waste_stream", None)
-        context["allowed_materials"] = (
-            list(waste_stream.allowed_materials.all()) if waste_stream else []
-        )
-        context["forbidden_materials"] = (
-            list(waste_stream.forbidden_materials.all()) if waste_stream else []
-        )
+        context["allowed_materials"] = list(self.object.effective_allowed_materials)
+        context["forbidden_materials"] = list(self.object.effective_forbidden_materials)
         context["samples"] = list(self.object.samples.all())
 
         # Collect all sources from collection, flyers, CPVs, and ACPVs
@@ -1360,13 +1358,8 @@ class CollectionModalDetailView(UserCreatedObjectModalDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        waste_stream = getattr(self.object, "waste_stream", None)
-        context["allowed_materials"] = (
-            list(waste_stream.allowed_materials.all()) if waste_stream else []
-        )
-        context["forbidden_materials"] = (
-            list(waste_stream.forbidden_materials.all()) if waste_stream else []
-        )
+        context["allowed_materials"] = list(self.object.effective_allowed_materials)
+        context["forbidden_materials"] = list(self.object.effective_forbidden_materials)
         return context
 
 
@@ -1414,8 +1407,7 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
             "catchment",
             "collector",
             "collection_system",
-            "waste_stream",
-            "waste_stream__category",
+            "waste_category",
             "frequency",
             "fee_system",
         ).prefetch_related(
@@ -1424,8 +1416,8 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
             "samples",
             "predecessors",
             "successors",
-            "waste_stream__allowed_materials",
-            "waste_stream__forbidden_materials",
+            "allowed_materials",
+            "forbidden_materials",
             Prefetch(
                 "frequency__collectioncountoptions_set",
                 queryset=CollectionCountOptions.objects.select_related(
@@ -1561,13 +1553,8 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
         except Exception:
             pass
 
-        waste_stream = getattr(obj, "waste_stream", None)
-        review_context["allowed_materials"] = (
-            list(waste_stream.allowed_materials.all()) if waste_stream else []
-        )
-        review_context["forbidden_materials"] = (
-            list(waste_stream.forbidden_materials.all()) if waste_stream else []
-        )
+        review_context["allowed_materials"] = list(obj.effective_allowed_materials)
+        review_context["forbidden_materials"] = list(obj.effective_forbidden_materials)
 
         # review_logs is set on the parent context before this method is called
         review_logs = context.get("review_logs") or []
@@ -1607,14 +1594,15 @@ class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
 
     def get_initial(self):
         initial = super().get_initial()
+        waste_category = self.object.effective_waste_category
         initial.update(
             {
-                "waste_category": self.object.waste_stream.category.id,
+                "waste_category": waste_category.id if waste_category else None,
                 "allowed_materials": [
-                    mat.id for mat in self.object.waste_stream.allowed_materials.all()
+                    mat.id for mat in self.object.effective_allowed_materials
                 ],
                 "forbidden_materials": [
-                    mat.id for mat in self.object.waste_stream.forbidden_materials.all()
+                    mat.id for mat in self.object.effective_forbidden_materials
                 ],
             }
         )
@@ -1765,12 +1753,11 @@ class CollectionWasteSamplesView(UserCreatedObjectUpdateView):
 
     def get_form(self, form_class=None):
         if self.request.method in ("POST", "PUT"):
-            if self.request.POST["submit"] == "Add":
-                return CollectionAddWasteSampleForm(**self.get_form_kwargs())
-            if self.request.POST["submit"] == "Remove":
+            action = self.request.POST.get("submit")
+            if action == "Remove":
                 return CollectionRemoveWasteSampleForm(**self.get_form_kwargs())
-        else:
-            return super().get_form(self.get_form_class())
+            return CollectionAddWasteSampleForm(**self.get_form_kwargs())
+        return super().get_form(self.get_form_class())
 
     def get_context_data(self, **kwargs):
         kwargs["form_add"] = CollectionAddWasteSampleForm(**self.get_form_kwargs())
@@ -1780,10 +1767,25 @@ class CollectionWasteSamplesView(UserCreatedObjectUpdateView):
         return super().get_context_data(**kwargs)
 
     def form_valid(self, form):
-        if self.request.POST["submit"] == "Add":
-            self.object.samples.add(form.cleaned_data["sample"])
-        if self.request.POST["submit"] == "Remove":
-            self.object.samples.remove(form.cleaned_data["sample"])
+        action = self.request.POST.get("submit")
+        sample = form.cleaned_data["sample"]
+
+        if action == "Add":
+            if self.object.samples.filter(pk=sample.pk).exists():
+                messages.info(
+                    self.request, "Sample is already linked to this collection."
+                )
+            else:
+                self.object.samples.add(sample)
+                messages.success(self.request, "Sample linked to collection.")
+
+        elif action == "Remove":
+            if self.object.samples.filter(pk=sample.pk).exists():
+                self.object.samples.remove(sample)
+                messages.success(self.request, "Sample removed from collection.")
+            else:
+                messages.info(self.request, "Sample is not linked to this collection.")
+
         return HttpResponseRedirect(self.get_success_url())
 
 

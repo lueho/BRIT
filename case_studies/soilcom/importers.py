@@ -21,7 +21,6 @@ from case_studies.soilcom.models import (
     SortingMethod,
     WasteCategory,
     WasteFlyer,
-    WasteStream,
 )
 from materials.models import Material
 from utils.object_management.models import ReviewAction
@@ -212,17 +211,8 @@ class CollectionImporter:
         allowed_materials, forbidden_materials = self._resolve_material_lists(
             record, label, stats
         )
-
-        waste_stream = self._get_or_create_waste_stream(
-            waste_category,
-            allowed_materials,
-            forbidden_materials,
-            label,
-            stats,
-        )
-        if waste_stream is None:
-            stats["skipped"] += 1
-            return
+        allowed_material_ids = self._material_ids(allowed_materials)
+        forbidden_material_ids = self._material_ids(forbidden_materials)
 
         valid_from = record.get("valid_from")
         if valid_from is None:
@@ -235,36 +225,14 @@ class CollectionImporter:
         required_bin_capacity = record.get("required_bin_capacity")
 
         # Check for existing collection with same identity
-        existing = Collection.objects.filter(
+        existing = self._find_existing_collection(
             catchment=catchment,
             collection_system=collection_system,
-            waste_stream=waste_stream,
+            waste_category=waste_category,
             valid_from=valid_from,
-        ).first()
-
-        # Legacy backfill path for collections imported before material lists
-        # were mapped into WasteStreams.
-        if existing is None and (allowed_materials or forbidden_materials):
-            legacy_candidates = list(
-                Collection.objects.filter(
-                    catchment=catchment,
-                    collection_system=collection_system,
-                    waste_stream__category=waste_category,
-                    valid_from=valid_from,
-                    owner=self.owner,
-                    publication_status=self.publication_status,
-                )[:2]
-            )
-            if len(legacy_candidates) == 1:
-                legacy = legacy_candidates[0]
-                if (
-                    legacy.waste_stream
-                    and not legacy.waste_stream.allowed_materials.exists()
-                    and not legacy.waste_stream.forbidden_materials.exists()
-                ):
-                    legacy.waste_stream = waste_stream
-                    legacy.save(update_fields=["waste_stream", "lastmodified_at"])
-                    existing = legacy
+            allowed_material_ids=allowed_material_ids,
+            forbidden_material_ids=forbidden_material_ids,
+        )
 
         if existing:
             collection = existing
@@ -359,9 +327,35 @@ class CollectionImporter:
                 collection.valid_until = valid_until
                 update_fields.append("valid_until")
 
-            if update_fields:
+            # Ensure inline waste fields stay in sync with imported payload.
+            if collection.waste_category_id != waste_category.id:
+                changes.append(
+                    f"waste_category: {collection.effective_waste_category or 'None'} → {waste_category}"
+                )
+                collection.waste_category = waste_category
+                update_fields.append("waste_category")
+
+            current_allowed_ids, current_forbidden_ids = (
+                self._effective_material_ids_for_collection(collection)
+            )
+            update_allowed_materials = current_allowed_ids != allowed_material_ids
+            update_forbidden_materials = current_forbidden_ids != forbidden_material_ids
+
+            if update_allowed_materials:
+                changes.append("allowed_materials updated")
+            if update_forbidden_materials:
+                changes.append("forbidden_materials updated")
+
+            if update_fields or update_allowed_materials or update_forbidden_materials:
                 if not self.dry_run:
-                    collection.save(update_fields=[*update_fields, "lastmodified_at"])
+                    if update_fields:
+                        collection.save(
+                            update_fields=[*update_fields, "lastmodified_at"]
+                        )
+                    if update_allowed_materials:
+                        collection.allowed_materials.set(allowed_materials)
+                    if update_forbidden_materials:
+                        collection.forbidden_materials.set(forbidden_materials)
                 stats["updated"] = stats.get("updated", 0) + 1
                 stats["changes"] = stats.get("changes", [])
                 stats["changes"].append(f"{label}: {', '.join(changes)}")
@@ -377,7 +371,12 @@ class CollectionImporter:
                 self._submit_for_review(collection)
         else:
             predecessor = self._find_predecessor(
-                catchment, waste_stream, collection_system, valid_from
+                catchment,
+                waste_category,
+                allowed_material_ids,
+                forbidden_material_ids,
+                collection_system,
+                valid_from,
             )
 
             collection_name = (
@@ -391,7 +390,7 @@ class CollectionImporter:
                 catchment=catchment,
                 collector=collector,
                 collection_system=collection_system,
-                waste_stream=waste_stream,
+                waste_category=waste_category,
                 frequency=frequency,
                 fee_system=fee_system,
                 valid_from=valid_from,
@@ -408,6 +407,8 @@ class CollectionImporter:
             if bin_cap_ref:
                 collection.required_bin_capacity_reference = bin_cap_ref
             collection.save()
+            collection.allowed_materials.set(allowed_materials)
+            collection.forbidden_materials.set(forbidden_materials)
 
             if self.publication_status == "review":
                 self._submit_for_review(collection)
@@ -812,6 +813,43 @@ class CollectionImporter:
         )
 
     @staticmethod
+    def _material_ids(materials: list[Material]) -> set[int]:
+        return {material.id for material in materials if material and material.id}
+
+    @staticmethod
+    def _effective_material_ids_for_collection(
+        collection: Collection,
+    ) -> tuple[set[int], set[int]]:
+        allowed_ids = set(collection.allowed_materials.values_list("id", flat=True))
+        forbidden_ids = set(collection.forbidden_materials.values_list("id", flat=True))
+        return allowed_ids, forbidden_ids
+
+    def _find_existing_collection(
+        self,
+        *,
+        catchment: CollectionCatchment,
+        collection_system: CollectionSystem,
+        waste_category: WasteCategory,
+        valid_from,
+        allowed_material_ids: set[int],
+        forbidden_material_ids: set[int],
+    ) -> Collection | None:
+        return (
+            Collection.objects.filter(
+                catchment=catchment,
+                collection_system=collection_system,
+                valid_from=valid_from,
+                waste_category=waste_category,
+            )
+            .match_materials(
+                allowed_materials=allowed_material_ids,
+                forbidden_materials=forbidden_material_ids,
+            )
+            .order_by("-id")
+            .first()
+        )
+
+    @staticmethod
     def _flyer_title(url: str) -> str:
         """Return a short title derived from the URL hostname (max 255 chars)."""
         from urllib.parse import urlparse
@@ -821,35 +859,6 @@ class CollectionImporter:
         except Exception:
             hostname = url
         return hostname[:255]
-
-    def _get_or_create_waste_stream(
-        self,
-        waste_category: WasteCategory,
-        allowed_materials: list[Material],
-        forbidden_materials: list[Material],
-        label: str,
-        stats: dict,
-    ) -> WasteStream | None:
-        """Return an exact material-aware waste stream for the imported record."""
-        try:
-            ws, created = WasteStream.objects.get_or_create(
-                category=waste_category,
-                allowed_materials=allowed_materials,
-                forbidden_materials=forbidden_materials,
-                defaults={
-                    "name": f"{waste_category.name} {len(allowed_materials)} {len(forbidden_materials)}",
-                    "owner": self.owner,
-                    "publication_status": "private",
-                },
-            )
-        except WasteStream.MultipleObjectsReturned:
-            stats["warnings"].append(
-                f"{label}: Multiple exact WasteStreams found for '{waste_category.name}' with empty materials — record skipped."
-            )
-            return None
-        if created and self.publication_status == "review":
-            self._submit_for_review(ws)
-        return ws
 
     def _submit_for_review(self, obj) -> None:
         """Submit any UserCreatedObject for review and create the ReviewAction."""
@@ -869,15 +878,23 @@ class CollectionImporter:
     @staticmethod
     def _find_predecessor(
         catchment: CollectionCatchment,
-        waste_stream: WasteStream,
+        waste_category: WasteCategory,
+        allowed_material_ids: set[int],
+        forbidden_material_ids: set[int],
         collection_system: CollectionSystem,
         valid_from,
     ) -> Collection | None:
         qs = Collection.objects.filter(
             catchment=catchment,
             collection_system=collection_system,
-            waste_stream=waste_stream,
-        )
+        ).filter(waste_category=waste_category)
         if valid_from:
             qs = qs.filter(valid_from__lt=valid_from)
-        return qs.order_by("-valid_from").first()
+        return (
+            qs.match_materials(
+                allowed_materials=allowed_material_ids,
+                forbidden_materials=forbidden_material_ids,
+            )
+            .order_by("-valid_from")
+            .first()
+        )

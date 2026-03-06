@@ -146,6 +146,11 @@ def _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path=""):
     return qs.filter(prefix_q)
 
 
+def _filter_by_waste_categories(queryset, categories):
+    """Filter collections by inline waste category."""
+    return queryset.filter(waste_category__name__in=categories)
+
+
 class CatchmentViewSet(viewsets.ReadOnlyModelViewSet):
     """Read-only viewset returning GeoJSON for catchments that have waste collections.
 
@@ -271,10 +276,12 @@ class CollectionSystemViewSet(viewsets.ViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
 
-        qs = Collection.objects.filter(
-            valid_from__year=year,
-            catchment__region__country=country,
-            waste_stream__category__name__in=["Biowaste", "Food waste"],
+        qs = _filter_by_waste_categories(
+            Collection.objects.filter(
+                valid_from__year=year,
+                catchment__region__country=country,
+            ),
+            ["Biowaste", "Food waste"],
         )
         qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
         rows = qs.select_related("collection_system").values_list(
@@ -309,10 +316,12 @@ class SortingMethodViewSet(viewsets.ViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
 
-        qs = Collection.objects.filter(
-            valid_from__year=year,
-            catchment__region__country=country,
-            waste_stream__category__name__in=["Biowaste", "Food waste"],
+        qs = _filter_by_waste_categories(
+            Collection.objects.filter(
+                valid_from__year=year,
+                catchment__region__country=country,
+            ),
+            ["Biowaste", "Food waste"],
         )
         qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
         rows = qs.select_related("collection_system", "sorting_method").values_list(
@@ -358,10 +367,12 @@ class GreenWasteCollectionSystemCountViewSet(viewsets.ViewSet):
         """Return a JSON array of {catchment_id, collection_system_count}."""
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
-        qs = Collection.objects.filter(
-            valid_from__year=year,
-            catchment__region__country=country,
-            waste_stream__category__name__in=_GREEN_WASTE_CATEGORY_NAMES,
+        qs = _filter_by_waste_categories(
+            Collection.objects.filter(
+                valid_from__year=year,
+                catchment__region__country=country,
+            ),
+            _GREEN_WASTE_CATEGORY_NAMES,
         )
         qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
         qs = (
@@ -403,47 +414,49 @@ def _get_material_status(country, year, material_id, nuts_prefixes=()):
     one of ``'allowed'``, ``'forbidden'``, ``'No separate collection'``,
     or ``'no_data'``.
     """
-    from case_studies.soilcom.models import WasteStream
-
     # Step 1: pick primary bio/food waste collection per catchment
-    _qs = Collection.objects.filter(
-        valid_from__year=year,
-        catchment__region__country=country,
-        waste_stream__category__name__in=["Biowaste", "Food waste"],
+    qs = _filter_by_waste_categories(
+        Collection.objects.filter(
+            valid_from__year=year,
+            catchment__region__country=country,
+        ),
+        ["Biowaste", "Food waste"],
     )
-    _qs = _apply_nuts_prefix_filter(_qs, nuts_prefixes, catchment_path="catchment__")
-    rows = _qs.select_related("collection_system").values_list(
-        "catchment_id", "waste_stream_id", "collection_system__name"
+    qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+    rows = qs.select_related("collection_system").values_list(
+        "id", "catchment_id", "collection_system__name"
     )
 
-    best = {}  # catchment_id -> (waste_stream_id, system, priority)
-    for cid, ws_id, system in rows:
+    best = {}  # catchment_id -> (collection_id, system, priority)
+    for collection_id, cid, system in rows:
         p = _COLLECTION_SYSTEM_PRIORITY.get(system, 99)
         if cid not in best or p < best[cid][2]:
-            best[cid] = (ws_id, system, p)
+            best[cid] = (collection_id, system, p)
 
-    ws_ids = [v[0] for v in best.values() if v[0] is not None]
+    collection_ids = [v[0] for v in best.values() if v[0] is not None]
 
     # Step 2: batch-fetch allowed / forbidden sets for the target material
-    allowed_ws = set(
-        WasteStream.objects.filter(
-            id__in=ws_ids, allowed_materials__id=material_id
+    allowed_collections = set(
+        Collection.objects.filter(
+            id__in=collection_ids,
+            allowed_materials__id=material_id,
         ).values_list("id", flat=True)
     )
-    forbidden_ws = set(
-        WasteStream.objects.filter(
-            id__in=ws_ids, forbidden_materials__id=material_id
+    forbidden_collections = set(
+        Collection.objects.filter(
+            id__in=collection_ids,
+            forbidden_materials__id=material_id,
         ).values_list("id", flat=True)
     )
 
     # Step 3: classify
     data = []
-    for cid, (ws_id, system, _) in best.items():
+    for cid, (collection_id, system, _) in best.items():
         if system == "No separate collection":
             status = "No separate collection"
-        elif ws_id in allowed_ws:
+        elif collection_id in allowed_collections:
             status = "allowed"
-        elif ws_id in forbidden_ws:
+        elif collection_id in forbidden_collections:
             status = "forbidden"
         else:
             status = "no_data"
@@ -458,15 +471,17 @@ def _get_collection_count(country, year, waste_categories, nuts_prefixes=()):
     across all seasons.  Also flags whether the counts vary by season.
     Non-door-to-door catchments are excluded (they have no frequency data).
     """
-    _qs = Collection.objects.filter(
-        valid_from__year=year,
-        catchment__region__country=country,
-        waste_stream__category__name__in=waste_categories,
-        collection_system__name="Door to door",
-        frequency__isnull=False,
+    qs = _filter_by_waste_categories(
+        Collection.objects.filter(
+            valid_from__year=year,
+            catchment__region__country=country,
+            collection_system__name="Door to door",
+            frequency__isnull=False,
+        ),
+        waste_categories,
     )
-    _qs = _apply_nuts_prefix_filter(_qs, nuts_prefixes, catchment_path="catchment__")
-    rows = _qs.values_list(
+    qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+    rows = qs.values_list(
         "catchment_id",
         "frequency__collectioncountoptions__standard",
     )
@@ -496,13 +511,15 @@ def _get_frequency_type(country, year, waste_categories, nuts_prefixes=()):
     For door-to-door collections, returns the ``CollectionFrequency.type``;
     for other systems, returns the collection system name.
     """
-    _qs = Collection.objects.filter(
-        valid_from__year=year,
-        catchment__region__country=country,
-        waste_stream__category__name__in=waste_categories,
+    qs = _filter_by_waste_categories(
+        Collection.objects.filter(
+            valid_from__year=year,
+            catchment__region__country=country,
+        ),
+        waste_categories,
     )
-    _qs = _apply_nuts_prefix_filter(_qs, nuts_prefixes, catchment_path="catchment__")
-    rows = _qs.select_related("collection_system", "frequency").values_list(
+    qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+    rows = qs.select_related("collection_system", "frequency").values_list(
         "catchment_id",
         "collection_system__name",
         "frequency__type",
@@ -643,15 +660,17 @@ class BiowasteCollectionCountViewSet(viewsets.ViewSet):
         d2d_ids = {r["catchment_id"] for r in door_to_door}
 
         # Include non-door-to-door biowaste catchments.
-        _all_bio_qs = Collection.objects.filter(
-            valid_from__year=year,
-            catchment__region__country=country,
-            waste_stream__category__name__in=["Biowaste", "Food waste"],
+        all_bio_qs = _filter_by_waste_categories(
+            Collection.objects.filter(
+                valid_from__year=year,
+                catchment__region__country=country,
+            ),
+            ["Biowaste", "Food waste"],
         )
-        _all_bio_qs = _apply_nuts_prefix_filter(
-            _all_bio_qs, nuts_prefixes, catchment_path="catchment__"
+        all_bio_qs = _apply_nuts_prefix_filter(
+            all_bio_qs, nuts_prefixes, catchment_path="catchment__"
         )
-        all_bio = _all_bio_qs.values_list("catchment_id", "collection_system__name")
+        all_bio = all_bio_qs.values_list("catchment_id", "collection_system__name")
         best_system: dict[int, tuple[str, int]] = {}
         for cid, system in all_bio:
             p = _COLLECTION_SYSTEM_PRIORITY.get(system, 99)
@@ -717,13 +736,15 @@ def _get_fee_system(country, year, waste_categories, nuts_prefixes=()):
     For biowaste, non-door-to-door catchments return the collection
     system name instead of the fee system.
     """
-    _qs = Collection.objects.filter(
-        valid_from__year=year,
-        catchment__region__country=country,
-        waste_stream__category__name__in=waste_categories,
+    qs = _filter_by_waste_categories(
+        Collection.objects.filter(
+            valid_from__year=year,
+            catchment__region__country=country,
+        ),
+        waste_categories,
     )
-    _qs = _apply_nuts_prefix_filter(_qs, nuts_prefixes, catchment_path="catchment__")
-    rows = _qs.select_related("collection_system", "fee_system").values_list(
+    qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+    rows = qs.select_related("collection_system", "fee_system").values_list(
         "catchment_id",
         "collection_system__name",
         "fee_system__name",
@@ -845,13 +866,15 @@ def _get_collection_amount(country, year, waste_categories, nuts_prefixes=()):
     # ------------------------------------------------------------------
     # Step 1: pick primary collection system per catchment
     # ------------------------------------------------------------------
-    _qs = Collection.objects.filter(
-        valid_from__year=year,
-        catchment__region__country=country,
-        waste_stream__category__name__in=waste_categories,
+    qs = _filter_by_waste_categories(
+        Collection.objects.filter(
+            valid_from__year=year,
+            catchment__region__country=country,
+        ),
+        waste_categories,
     )
-    _qs = _apply_nuts_prefix_filter(_qs, nuts_prefixes, catchment_path="catchment__")
-    rows = _qs.select_related("collection_system").values_list(
+    qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+    rows = qs.select_related("collection_system").values_list(
         "id", "catchment_id", "collection_system__name"
     )
 
@@ -866,9 +889,11 @@ def _get_collection_amount(country, year, waste_categories, nuts_prefixes=()):
     # ------------------------------------------------------------------
     # Step 2: map catchments → all collection IDs (any year)
     # ------------------------------------------------------------------
-    all_col_rows = Collection.objects.filter(
-        catchment_id__in=catchment_ids,
-        waste_stream__category__name__in=waste_categories,
+    all_col_rows = _filter_by_waste_categories(
+        Collection.objects.filter(
+            catchment_id__in=catchment_ids,
+        ),
+        waste_categories,
     ).values_list("id", "catchment_id")
 
     cid_to_cols: dict[int, set[int]] = {}
@@ -993,7 +1018,7 @@ def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
     total_by_catchment: dict[int, float] = {}
     for col_id, avg in total_qs:
         cid = col_to_cid.get(col_id)
-        if cid is not None and cid not in total_by_catchment:
+        if cid is not None:
             total_by_catchment[cid] = avg
 
     if not total_by_catchment:
@@ -1034,13 +1059,15 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=()):
     2) specific amount (CPV)
     3) total amount (CPV/ACPV) converted via population
     """
-    _qs = Collection.objects.filter(
-        valid_from__year=year,
-        catchment__region__country=country,
-        waste_stream__category__name__in=_GREEN_WASTE_CATEGORY_NAMES,
+    qs = _filter_by_waste_categories(
+        Collection.objects.filter(
+            valid_from__year=year,
+            catchment__region__country=country,
+        ),
+        _GREEN_WASTE_CATEGORY_NAMES,
     )
-    _qs = _apply_nuts_prefix_filter(_qs, nuts_prefixes, catchment_path="catchment__")
-    rows = _qs.select_related("collection_system").values_list(
+    qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+    rows = qs.select_related("collection_system").values_list(
         "id", "catchment_id", "collection_system__name"
     )
 
@@ -1054,9 +1081,11 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=()):
     if not catchment_ids:
         return []
 
-    all_col_rows = Collection.objects.filter(
-        catchment_id__in=catchment_ids,
-        waste_stream__category__name__in=_GREEN_WASTE_CATEGORY_NAMES,
+    all_col_rows = _filter_by_waste_categories(
+        Collection.objects.filter(
+            catchment_id__in=catchment_ids,
+        ),
+        _GREEN_WASTE_CATEGORY_NAMES,
     ).values_list("id", "catchment_id")
 
     col_to_cid: dict[int, int] = {}
@@ -1273,14 +1302,16 @@ def _get_min_bin_size(country, year, waste_categories, nuts_prefixes=()):
     ``_COLLECTION_SYSTEM_PRIORITY`` and returns its ``min_bin_size`` value.
     Only door-to-door collections carry meaningful bin size data.
     """
-    _qs = Collection.objects.filter(
-        valid_from__year=year,
-        catchment__region__country=country,
-        waste_stream__category__name__in=waste_categories,
-        collection_system__name="Door to door",
+    qs = _filter_by_waste_categories(
+        Collection.objects.filter(
+            valid_from__year=year,
+            catchment__region__country=country,
+            collection_system__name="Door to door",
+        ),
+        waste_categories,
     )
-    _qs = _apply_nuts_prefix_filter(_qs, nuts_prefixes, catchment_path="catchment__")
-    rows = _qs.values_list("catchment_id", "min_bin_size")
+    qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+    rows = qs.values_list("catchment_id", "min_bin_size")
 
     best: dict[int, float | None] = {}
     for cid, size in rows:
@@ -1297,14 +1328,16 @@ def _get_required_bin_capacity(country, year, waste_categories, nuts_prefixes=()
     ``required_bin_capacity_reference`` (person / household / property /
     not_specified) for the primary door-to-door collection per catchment.
     """
-    _qs = Collection.objects.filter(
-        valid_from__year=year,
-        catchment__region__country=country,
-        waste_stream__category__name__in=waste_categories,
-        collection_system__name="Door to door",
+    qs = _filter_by_waste_categories(
+        Collection.objects.filter(
+            valid_from__year=year,
+            catchment__region__country=country,
+            collection_system__name="Door to door",
+        ),
+        waste_categories,
     )
-    _qs = _apply_nuts_prefix_filter(_qs, nuts_prefixes, catchment_path="catchment__")
-    rows = _qs.values_list(
+    qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+    rows = qs.values_list(
         "catchment_id", "required_bin_capacity", "required_bin_capacity_reference"
     )
 
@@ -1573,39 +1606,39 @@ class CollectionSupportViewSet(viewsets.ViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
 
-        from case_studies.soilcom.models import WasteStream
-
         # Step 1: pick primary bio/food waste collection per catchment
-        _qs = Collection.objects.filter(
-            valid_from__year=year,
-            catchment__region__country=country,
-            waste_stream__category__name__in=["Biowaste", "Food waste"],
+        qs = _filter_by_waste_categories(
+            Collection.objects.filter(
+                valid_from__year=year,
+                catchment__region__country=country,
+            ),
+            ["Biowaste", "Food waste"],
         )
-        _qs = _apply_nuts_prefix_filter(
-            _qs, nuts_prefixes, catchment_path="catchment__"
-        )
-        rows = _qs.select_related("collection_system").values_list(
-            "catchment_id", "waste_stream_id", "collection_system__name"
+        qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+        rows = qs.select_related("collection_system").values_list(
+            "id", "catchment_id", "collection_system__name"
         )
 
-        best = {}  # catchment_id -> (waste_stream_id, system, priority)
-        for cid, ws_id, system in rows:
+        best = {}  # catchment_id -> (collection_id, system, priority)
+        for collection_id, cid, system in rows:
             p = _COLLECTION_SYSTEM_PRIORITY.get(system, 99)
             if cid not in best or p < best[cid][2]:
-                best[cid] = (ws_id, system, p)
+                best[cid] = (collection_id, system, p)
 
-        ws_ids = [v[0] for v in best.values() if v[0] is not None]
+        collection_ids = [v[0] for v in best.values() if v[0] is not None]
 
         # Step 2: batch-fetch allowed/forbidden for both materials
         def _lookup(material_id):
             allowed = set(
-                WasteStream.objects.filter(
-                    id__in=ws_ids, allowed_materials__id=material_id
+                Collection.objects.filter(
+                    id__in=collection_ids,
+                    allowed_materials__id=material_id,
                 ).values_list("id", flat=True)
             )
             forbidden = set(
-                WasteStream.objects.filter(
-                    id__in=ws_ids, forbidden_materials__id=material_id
+                Collection.objects.filter(
+                    id__in=collection_ids,
+                    forbidden_materials__id=material_id,
                 ).values_list("id", flat=True)
             )
             return allowed, forbidden
@@ -1613,22 +1646,22 @@ class CollectionSupportViewSet(viewsets.ViewSet):
         paper_allowed, paper_forbidden = _lookup(_PAPER_BAGS_MATERIAL_ID)
         plastic_allowed, plastic_forbidden = _lookup(_PLASTIC_BAGS_MATERIAL_ID)
 
-        def _status(ws_id, allowed_set, forbidden_set):
-            if ws_id in allowed_set:
+        def _status(collection_id, allowed_set, forbidden_set):
+            if collection_id in allowed_set:
                 return "allowed"
-            if ws_id in forbidden_set:
+            if collection_id in forbidden_set:
                 return "forbidden"
             return "no_data"
 
         # Step 3: build response
         data = []
-        for cid, (ws_id, system, _) in best.items():
+        for cid, (collection_id, system, _) in best.items():
             if system == "No separate collection":
                 paper = "no_collection"
                 plastic = "no_collection"
             else:
-                paper = _status(ws_id, paper_allowed, paper_forbidden)
-                plastic = _status(ws_id, plastic_allowed, plastic_forbidden)
+                paper = _status(collection_id, paper_allowed, paper_forbidden)
+                plastic = _status(collection_id, plastic_allowed, plastic_forbidden)
             data.append(
                 {
                     "catchment_id": cid,
@@ -1645,7 +1678,7 @@ class PaperBagsStatusViewSet(viewsets.ViewSet):
     """Return paper-bags allowed/forbidden status per catchment (Karte 5).
 
     Checks whether 'Collection Support Item: Paper bags' (material 19) appears
-    in the waste stream's ``allowed_materials`` or ``forbidden_materials``.
+    in the collection's ``allowed_materials`` or ``forbidden_materials``.
 
     Example::
 
@@ -1693,7 +1726,7 @@ class FoodWasteCategoryViewSet(viewsets.ViewSet):
     """Return the allowed food waste category per catchment (Karte 4).
 
     Classifies each catchment's biowaste collection by which food waste
-    materials are allowed in the waste stream (animal/plant, raw/processed).
+    materials are allowed in the collection (animal/plant, raw/processed).
 
     Supports query parameters:
 
@@ -1713,44 +1746,42 @@ class FoodWasteCategoryViewSet(viewsets.ViewSet):
         nuts_prefixes = _parse_nuts_prefixes(request)
 
         # Step 1: pick primary bio/food waste collection per catchment
-        _qs = Collection.objects.filter(
-            valid_from__year=year,
-            catchment__region__country=country,
-            waste_stream__category__name__in=["Biowaste", "Food waste"],
+        qs = _filter_by_waste_categories(
+            Collection.objects.filter(
+                valid_from__year=year,
+                catchment__region__country=country,
+            ),
+            ["Biowaste", "Food waste"],
         )
-        _qs = _apply_nuts_prefix_filter(
-            _qs, nuts_prefixes, catchment_path="catchment__"
-        )
-        rows = _qs.select_related("collection_system").values_list(
-            "id", "catchment_id", "waste_stream_id", "collection_system__name"
+        qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+        rows = qs.select_related("collection_system").values_list(
+            "id", "catchment_id", "collection_system__name"
         )
 
-        best = {}  # catchment_id -> (collection_id, waste_stream_id, system, priority)
-        for col_id, cid, ws_id, system in rows:
+        best = {}  # catchment_id -> (collection_id, system, priority)
+        for col_id, cid, system in rows:
             p = _COLLECTION_SYSTEM_PRIORITY.get(system, 99)
-            if cid not in best or p < best[cid][3]:
-                best[cid] = (col_id, ws_id, system, p)
+            if cid not in best or p < best[cid][2]:
+                best[cid] = (col_id, system, p)
 
-        # Step 2: batch-fetch allowed material IDs (11-14) for selected waste streams
-        from case_studies.soilcom.models import WasteStream
-
-        ws_ids = [v[1] for v in best.values() if v[1] is not None]
-        ws_materials = WasteStream.objects.filter(
-            id__in=ws_ids,
+        # Step 2: batch-fetch allowed material IDs (11-14) for selected collections
+        collection_ids = [v[0] for v in best.values() if v[0] is not None]
+        collection_materials = Collection.objects.filter(
+            id__in=collection_ids,
             allowed_materials__id__in=_FOOD_WASTE_MATERIAL_IDS,
         ).values_list("id", "allowed_materials__id")
 
-        ws_mat_map = {}  # waste_stream_id -> set of material_ids
-        for ws_id, mat_id in ws_materials:
-            ws_mat_map.setdefault(ws_id, set()).add(mat_id)
+        collection_material_map = {}  # collection_id -> set of material_ids
+        for col_id, mat_id in collection_materials:
+            collection_material_map.setdefault(col_id, set()).add(mat_id)
 
         # Step 3: classify and build response
         data = []
-        for cid, (_col_id, ws_id, system, _) in best.items():
+        for cid, (col_id, system, _) in best.items():
             if system == "No separate collection":
                 category = "No separate collection"
-            elif ws_id and ws_id in ws_mat_map:
-                category = _classify_food_waste(ws_mat_map[ws_id])
+            elif col_id and col_id in collection_material_map:
+                category = _classify_food_waste(collection_material_map[col_id])
             else:
                 category = system  # fallback to collection system name
             data.append({"catchment_id": cid, "food_waste_category": category})
@@ -1784,15 +1815,15 @@ class ConnectionRateViewSet(viewsets.ViewSet):
         nuts_prefixes = _parse_nuts_prefixes(request)
 
         # Step 1: pick primary bio/food waste collection per catchment
-        _qs = Collection.objects.filter(
-            valid_from__year=year,
-            catchment__region__country=country,
-            waste_stream__category__name__in=["Biowaste", "Food waste"],
+        qs = _filter_by_waste_categories(
+            Collection.objects.filter(
+                valid_from__year=year,
+                catchment__region__country=country,
+            ),
+            ["Biowaste", "Food waste"],
         )
-        _qs = _apply_nuts_prefix_filter(
-            _qs, nuts_prefixes, catchment_path="catchment__"
-        )
-        rows = _qs.select_related("collection_system").values_list(
+        qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+        rows = qs.select_related("collection_system").values_list(
             "id", "catchment_id", "collection_system__name"
         )
 

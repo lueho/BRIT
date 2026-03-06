@@ -37,7 +37,7 @@ BRIT | Waste Collection Explorer
                     <h6 class="mb-0 ms-2">Collections</h6>
                 </div>
                 <p class="card-text text-muted small flex-grow-1">The central model where all information comes
-                    together: catchment, collector, waste stream, frequency, and fees.</p>
+                    together: catchment, collector, waste category/materials, frequency, and fees.</p>
                 <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
                     <span class="badge bg-light text-dark border">{{ collection_count }} published</span>
                     <a href="{% url 'collection-list' %}" class="btn btn-sm btn-outline-primary card-link">Browse</a>
@@ -94,7 +94,7 @@ BRIT | Waste Collection Explorer
                     <span class="explorer-icon bg-success bg-opacity-10 text-success"><i class="fas fa-tags"></i></span>
                     <h6 class="mb-0 ms-2">Waste Categories</h6>
                 </div>
-                <p class="card-text text-muted small flex-grow-1">Classification groups for waste streams, essential for
+                <p class="card-text text-muted small flex-grow-1">Classification groups for collections, essential for
                     effective recycling and process chain management.</p>
                 <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
                     <span class="badge bg-light text-dark border">{{ wastecategory_count }} published</span>
@@ -171,7 +171,7 @@ BRIT | Waste Collection Explorer
                             class="fas fa-cubes"></i></span>
                     <h6 class="mb-0 ms-2">Waste Components</h6>
                 </div>
-                <p class="card-text text-muted small flex-grow-1">Individual materials found in waste streams,
+                <p class="card-text text-muted small flex-grow-1">Individual materials used in collection definitions,
                     specifying which materials are allowed or forbidden.</p>
                 <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
                     <span class="badge bg-light text-dark border">{{ wastecomponent_count }} published</span>

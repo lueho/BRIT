@@ -2,83 +2,92 @@
 {% load static %}
 
 {% block title %}
-    BRIT | Waste Collection Module Diagram
+BRIT | Waste Collection Module Diagram
 {% endblock title %}
 
 {% block custom_style %}
-    <style>
-        .diagram-container {
-            background: #fff;
-            border: 1px solid var(--bs-border-color);
-            border-radius: 0.5rem;
-            padding: 1.5rem;
-            overflow-x: auto;
-        }
-        .diagram-container .node rect,
-        .diagram-container .node polygon,
-        .diagram-container .node circle {
-            cursor: pointer;
-        }
-        .legend-item {
-            display: inline-flex;
-            align-items: center;
-            margin-right: 1.5rem;
-            font-size: 0.85rem;
-        }
-        .legend-line {
-            width: 2rem;
-            height: 0;
-            display: inline-block;
-            margin-right: 0.4rem;
-            vertical-align: middle;
-        }
-        .legend-line--fk {
-            border-top: 2px solid #666;
-        }
-        .legend-line--m2m {
-            border-top: 2px dashed #666;
-        }
-        .legend-swatch {
-            width: 1rem;
-            height: 1rem;
-            border-radius: 3px;
-            display: inline-block;
-            margin-right: 0.4rem;
-            vertical-align: middle;
-        }
-        .legend-swatch--clickable {
-            background: #dbeafe;
-            border: 2px solid #1e40af;
-        }
-        .legend-swatch--internal {
-            background: #f3f4f6;
-            border: 2px solid #9ca3af;
-        }
-    </style>
+<style>
+    .diagram-container {
+        background: #fff;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        overflow-x: auto;
+    }
+
+    .diagram-container .node rect,
+    .diagram-container .node polygon,
+    .diagram-container .node circle {
+        cursor: pointer;
+    }
+
+    .legend-item {
+        display: inline-flex;
+        align-items: center;
+        margin-right: 1.5rem;
+        font-size: 0.85rem;
+    }
+
+    .legend-line {
+        width: 2rem;
+        height: 0;
+        display: inline-block;
+        margin-right: 0.4rem;
+        vertical-align: middle;
+    }
+
+    .legend-line--fk {
+        border-top: 2px solid #666;
+    }
+
+    .legend-line--m2m {
+        border-top: 2px dashed #666;
+    }
+
+    .legend-swatch {
+        width: 1rem;
+        height: 1rem;
+        border-radius: 3px;
+        display: inline-block;
+        margin-right: 0.4rem;
+        vertical-align: middle;
+    }
+
+    .legend-swatch--clickable {
+        background: #dbeafe;
+        border: 2px solid #1e40af;
+    }
+
+    .legend-swatch--internal {
+        background: #f3f4f6;
+        border: 2px solid #9ca3af;
+    }
+</style>
 {% endblock custom_style %}
 
 {% block content %}
-    <div class="mb-4">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-            <div>
-                <h2 class="mb-1">Waste Collection Module &mdash; Model Diagram</h2>
-                <p class="text-muted mb-0">Click on any highlighted model to open its list view.</p>
-            </div>
-            <a href="{% url 'wastecollection-explorer' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="fas fa-arrow-left me-1"></i> Back to Explorer
-            </a>
+<div class="mb-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <h2 class="mb-1">Waste Collection Module &mdash; Model Diagram</h2>
+            <p class="text-muted mb-0">Click on any highlighted model to open its list view.</p>
         </div>
+        <a href="{% url 'wastecollection-explorer' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left me-1"></i> Back to Explorer
+        </a>
     </div>
+</div>
 
-    <div class="mb-3">
-        <span class="legend-item"><span class="legend-swatch legend-swatch--clickable"></span> Browsable model (click to open)</span>
-        <span class="legend-item"><span class="legend-swatch legend-swatch--internal"></span> Internal model</span>
-        <span class="legend-item"><span class="legend-line legend-line--fk"></span> Foreign key</span>
-        <span class="legend-item"><span class="legend-line legend-line--m2m"></span> Many-to-many</span>
-    </div>
+<div class="mb-3">
+    <span class="legend-item"><span class="legend-swatch legend-swatch--clickable"></span> Browsable model (click to
+        open)</span>
+    <span class="legend-item"><span class="legend-swatch legend-swatch--internal"></span> Internal model</span>
+    <span class="legend-item"><span class="legend-line legend-line--fk"></span> Foreign key</span>
+    <span class="legend-item"><span class="legend-line legend-line--m2m"></span> Many-to-many</span>
+</div>
 
-    <div class="diagram-container">
-        <pre class="mermaid">
+<div class="diagram-container">
+    <pre class="mermaid">
 %%{init: {'securityLevel': 'loose', 'theme': 'default', 'flowchart': {'curve': 'basis', 'nodeSpacing': 30, 'rankSpacing': 60}}}%%
 flowchart TD
 
@@ -95,8 +104,7 @@ flowchart TD
         CollectionFrequency["CollectionFrequency"]
     end
 
-    subgraph streams["Waste Streams &amp; Components"]
-        WasteStream["WasteStream"]
+    subgraph streams["Waste Components"]
         WasteComponent["WasteComponent"]
     end
 
@@ -115,11 +123,10 @@ flowchart TD
     Collection -->|"collector"| Collector
     Collection -->|"catchment"| CollectionCatchment
     Collection -->|"collection_system"| CollectionSystem
-    Collection -->|"waste_stream"| WasteStream
+    Collection -->|"waste_category"| WasteCategory
     Collection -->|"frequency"| CollectionFrequency
     Collection -->|"fee_system"| FeeSystem
     Collector -->|"catchment"| CollectionCatchment
-    WasteStream -->|"category"| WasteCategory
     CollectionPropertyValue -->|"collection"| Collection
     CollectionCountOptions -->|"frequency"| CollectionFrequency
     CollectionCountOptions -->|"season"| CollectionSeason
@@ -128,9 +135,8 @@ flowchart TD
     Collection -.-|"flyers"| WasteFlyer
     Collection -.-|"samples"| Sample_ext["Sample &#40;ext&#41;"]
     Collection -.-|"predecessors"| Collection
-    WasteStream -.-|"allowed_materials"| WasteComponent
-    WasteStream -.-|"forbidden_materials"| WasteComponent
-    WasteStream -.-|"composition"| SampleSeries_ext["SampleSeries &#40;ext&#41;"]
+    Collection -.-|"allowed_materials"| WasteComponent
+    Collection -.-|"forbidden_materials"| WasteComponent
     AggCollPropValue -.-|"collections"| Collection
 
     %% ---- Styling ----
@@ -141,7 +147,7 @@ flowchart TD
     class Collection,CollectionCatchment,Collector clickable
     class WasteCategory,CollectionSystem,FeeSystem,CollectionFrequency clickable
     class WasteComponent,WasteFlyer clickable
-    class WasteStream,CollectionSeason,CollectionCountOptions,CollectionPropertyValue,AggCollPropValue internal
+    class CollectionSeason,CollectionCountOptions,CollectionPropertyValue,AggCollPropValue internal
     class Sample_ext,SampleSeries_ext external
 
     %% ---- Click handlers ----
@@ -155,23 +161,23 @@ flowchart TD
     click WasteComponent href "{% url 'wastecomponent-list' %}" _self
     click WasteFlyer href "{% url 'wasteflyer-list' %}" _self
         </pre>
-    </div>
+</div>
 {% endblock content %}
 
 {% block javascript %}
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            mermaid.initialize({
-                startOnLoad: true,
-                securityLevel: 'loose',
-                theme: 'default',
-                flowchart: {
-                    useMaxWidth: true,
-                    htmlLabels: true,
-                    curve: 'basis',
-                },
-            });
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        mermaid.initialize({
+            startOnLoad: true,
+            securityLevel: 'loose',
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis',
+            },
         });
-    </script>
+    });
+</script>
 {% endblock javascript %}

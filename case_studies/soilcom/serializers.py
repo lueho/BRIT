@@ -37,7 +37,7 @@ class WasteCollectionGeometrySerializer(GeoFeatureModelSerializer):
     """
 
     catchment = serializers.StringRelatedField(source="catchment.name")
-    waste_category = serializers.StringRelatedField(source="waste_stream.category.name")
+    waste_category = serializers.SerializerMethodField()
     collection_system = serializers.StringRelatedField(source="collection_system.name")
     geom = GeometrySerializerMethodField()
 
@@ -57,6 +57,13 @@ class WasteCollectionGeometrySerializer(GeoFeatureModelSerializer):
             return instance.simplified_geom
         # Fall back to original geometry
         return getattr(instance, "geom", None)
+
+    @staticmethod
+    def get_waste_category(instance):
+        category = getattr(instance, "effective_waste_category", None)
+        if category is None:
+            return None
+        return category.name
 
 
 class CollectorGeometrySerializer(GeoFeatureModelSerializer):
@@ -149,20 +156,9 @@ class WasteFlyerSerializer(FieldLabelModelSerializer):
         fields = ("url",)
 
 
-class WasteStreamSerializer(FieldLabelModelSerializer):
-    allowed_materials = serializers.StringRelatedField(
-        many=True, label="Allowed materials"
-    )
-    category = serializers.StringRelatedField(label="Waste category")
-
-    class Meta:
-        model = models.WasteStream
-        fields = ["category", "allowed_materials"]
-
-
 class CollectionModelSerializer(FieldLabelModelSerializer):
     """
-    Serializer for the Collection model, including all collection parameters and waste stream fields.
+    Serializer for the Collection model, including all collection parameters and inline waste fields.
     """
 
     id = serializers.IntegerField(label="id")
@@ -171,15 +167,11 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     collector = serializers.StringRelatedField()
     collection_system = serializers.StringRelatedField()
     sorting_method = serializers.StringRelatedField()
-    waste_category = serializers.CharField(source="waste_stream.category")
+    waste_category = serializers.SerializerMethodField()
     publication_status = serializers.CharField()
     connection_type = serializers.CharField(required=False, allow_null=True)
-    allowed_materials = serializers.StringRelatedField(
-        many=True, source="waste_stream.allowed_materials"
-    )
-    forbidden_materials = serializers.StringRelatedField(
-        many=True, source="waste_stream.forbidden_materials"
-    )
+    allowed_materials = serializers.SerializerMethodField()
+    forbidden_materials = serializers.SerializerMethodField()
     frequency = serializers.StringRelatedField()
     fee_system = serializers.StringRelatedField()
     min_bin_size = serializers.DecimalField(
@@ -235,6 +227,23 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
         return [flyer.url for flyer in obj.flyers.all() if flyer.url]
 
     @staticmethod
+    def get_waste_category(obj):
+        category = obj.effective_waste_category
+        return str(category) if category else None
+
+    @staticmethod
+    def get_allowed_materials(obj):
+        return sorted(
+            [str(m) for m in obj.effective_allowed_materials], key=str.casefold
+        )
+
+    @staticmethod
+    def get_forbidden_materials(obj):
+        return sorted(
+            [str(m) for m in obj.effective_forbidden_materials], key=str.casefold
+        )
+
+    @staticmethod
     def get_required_bin_capacity_reference(obj):
         value = obj.required_bin_capacity_reference
         if not value:
@@ -278,9 +287,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     )
     collector = serializers.StringRelatedField(label="Collector")
     collection_system = serializers.StringRelatedField(label="Collection System")
-    waste_category = serializers.StringRelatedField(
-        source="waste_stream.category", label="Waste Category"
-    )
+    waste_category = serializers.SerializerMethodField(label="Waste Category")
     allowed_materials = serializers.SerializerMethodField(label="Allowed Materials")
     forbidden_materials = serializers.SerializerMethodField(label="Forbidden Materials")
     fee_system = serializers.StringRelatedField(
@@ -339,15 +346,24 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allowed_materials(obj):
-        return ", ".join(
-            [m.name for m in obj.waste_stream.allowed_materials.all() if m.name]
+        material_names = sorted(
+            [m.name for m in obj.effective_allowed_materials if m.name],
+            key=str.casefold,
         )
+        return ", ".join(material_names)
 
     @staticmethod
     def get_forbidden_materials(obj):
-        return ", ".join(
-            [m.name for m in obj.waste_stream.forbidden_materials.all() if m.name]
+        material_names = sorted(
+            [m.name for m in obj.effective_forbidden_materials if m.name],
+            key=str.casefold,
         )
+        return ", ".join(material_names)
+
+    @staticmethod
+    def get_waste_category(obj):
+        category = obj.effective_waste_category
+        return str(category) if category else ""
 
     @staticmethod
     def get_flyer_urls(obj):

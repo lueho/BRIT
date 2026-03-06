@@ -50,8 +50,7 @@ def warm_collection_geojson_cache(self):
                 "catchment",
                 "catchment__region",
                 "catchment__region__borders",
-                "waste_stream",
-                "waste_stream__category",
+                "waste_category",
                 "collection_system",
             )
             .annotate(

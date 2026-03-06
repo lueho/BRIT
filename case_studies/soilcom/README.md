@@ -24,7 +24,10 @@ The SOILCOM module is a case study implementation within the Bioresource Invento
 ### Waste Classification
 - **WasteCategory**: Categories of waste (e.g., organic, recyclable)
 - **WasteComponent**: Specific components of waste, extending the Material model
-- **WasteStream**: Flows of waste through the collection system
+- Waste classification rules are configured directly on **Collection** via:
+  - `waste_category`
+  - `allowed_materials`
+  - `forbidden_materials`
 
 ### Documentation
 - **WasteFlyer**: Documentation related to waste collection, extending the Source model

@@ -45,7 +45,6 @@ from case_studies.soilcom.models import (
     WasteCategory,
     WasteComponent,
     WasteFlyer,
-    WasteStream,
     check_url_valid,
 )
 from case_studies.soilcom.renderers import CollectionCSVRenderer, CollectionXLSXRenderer
@@ -58,7 +57,6 @@ from case_studies.soilcom.tasks import (
     check_wasteflyer_url,
     check_wasteflyer_urls,
     check_wasteflyer_urls_callback,
-    cleanup_orphaned_waste_streams,
 )
 from case_studies.soilcom.views import (
     CollectionApproveItemView,
@@ -897,6 +895,18 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         cls.unpublished_object.flyers.add(cls.flyer2)
         cls.published_object.flyers.add(cls.flyer)
         cls.published_object.flyers.add(cls.flyer2)
+        cls.unpublished_object.allowed_materials.set(
+            [cls.allowed_material_1, cls.allowed_material_2]
+        )
+        cls.unpublished_object.forbidden_materials.set(
+            [cls.forbidden_material_1, cls.forbidden_material_2]
+        )
+        cls.published_object.allowed_materials.set(
+            [cls.allowed_material_1, cls.allowed_material_2]
+        )
+        cls.published_object.forbidden_materials.set(
+            [cls.forbidden_material_1, cls.forbidden_material_2]
+        )
 
     @classmethod
     def create_related_objects(cls):
@@ -927,58 +937,67 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         cls.forbidden_material_2 = WasteComponent.objects.create(
             name="Forbidden material 2", publication_status="published"
         )
-        waste_stream = WasteStream.objects.create(
-            name="Test waste stream",
-            publication_status="published",
-            category=waste_category,
-        )
-        waste_stream.allowed_materials.add(cls.allowed_material_1)
-        waste_stream.allowed_materials.add(cls.allowed_material_2)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
         frequency = CollectionFrequency.objects.create(
             name="Test Frequency", publication_status="published"
         )
-        Collection.objects.create(
+        predecessor_1 = Collection.objects.create(
             catchment=catchment,
             collector=collector,
             collection_system=collection_system,
-            waste_stream=waste_stream,
+            waste_category=waste_category,
             frequency=frequency,
             valid_from=date.today() - timedelta(days=365),
             valid_until=date.today() - timedelta(days=1),
             description="Predecessor Collection 1",
             publication_status="published",
         )
-        Collection.objects.create(
+        predecessor_2 = Collection.objects.create(
             catchment=catchment,
             collector=collector,
             collection_system=collection_system,
-            waste_stream=waste_stream,
+            waste_category=waste_category,
             frequency=frequency,
             valid_from=date.today() - timedelta(days=365),
             valid_until=date.today() - timedelta(days=1),
             description="Predecessor Collection 2",
             publication_status="published",
         )
+        predecessor_1.allowed_materials.set(
+            [cls.allowed_material_1, cls.allowed_material_2]
+        )
+        predecessor_1.forbidden_materials.set(
+            [cls.forbidden_material_1, cls.forbidden_material_2]
+        )
+        predecessor_2.allowed_materials.set(
+            [cls.allowed_material_1, cls.allowed_material_2]
+        )
+        predecessor_2.forbidden_materials.set(
+            [cls.forbidden_material_1, cls.forbidden_material_2]
+        )
         # Create a bunch of unused outdated collections
         for i in range(12):
-            Collection.objects.create(
+            collection = Collection.objects.create(
                 catchment=catchment,
                 collector=collector,
                 collection_system=collection_system,
-                waste_stream=waste_stream,
+                waste_category=waste_category,
                 frequency=frequency,
                 valid_from=date.today() - timedelta(days=365),
                 valid_until=date.today() - timedelta(days=1),
                 description=f"Oudated Collection {i}",
                 publication_status="published",
             )
+            collection.allowed_materials.set(
+                [cls.allowed_material_1, cls.allowed_material_2]
+            )
+            collection.forbidden_materials.set(
+                [cls.forbidden_material_1, cls.forbidden_material_2]
+            )
         return {
             "catchment": catchment,
             "collector": collector,
             "collection_system": collection_system,
-            "waste_stream": waste_stream,
+            "waste_category": waste_category,
             "frequency": frequency,
         }
 
@@ -1074,7 +1093,9 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Collection.objects.count(), initial_count + 1)
 
-    def test_post_with_unspecified_allowed_materials_creates_generic_waste_stream(self):
+    def test_post_with_unspecified_allowed_materials_creates_collection_without_allowed_materials(
+        self,
+    ):
         self.client.force_login(self.staff_user)
         data = {
             "catchment": CollectionCatchment.objects.first().id,
@@ -1104,7 +1125,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         self.assertRedirects(
             response, reverse("collection-detail", kwargs={"pk": new_collection.pk})
         )
-        self.assertFalse(new_collection.waste_stream.allowed_materials.exists())
+        self.assertFalse(new_collection.allowed_materials.exists())
 
     def test_template_contains_predecessor_collections(self):
         response = self.client.get(self.get_detail_url(self.published_object.pk))
@@ -1316,15 +1337,13 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             "catchment": self.unpublished_object.catchment.id,
             "collector": self.unpublished_object.collector.id,
             "collection_system": self.unpublished_object.collection_system.id,
-            "waste_category": self.unpublished_object.waste_stream.category.id,
+            "waste_category": self.unpublished_object.waste_category.id,
             "connection_type": "VOLUNTARY",
             "allowed_materials": [
-                m.id
-                for m in self.unpublished_object.waste_stream.allowed_materials.all()
+                m.id for m in self.unpublished_object.allowed_materials.all()
             ],
             "forbidden_materials": [
-                m.id
-                for m in self.unpublished_object.waste_stream.forbidden_materials.all()
+                m.id for m in self.unpublished_object.forbidden_materials.all()
             ],
             "frequency": self.related_objects["frequency"].id,
             "valid_from": date(2020, 1, 1),
@@ -1345,15 +1364,13 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             "catchment": self.unpublished_object.catchment.id,
             "collector": self.unpublished_object.collector.id,
             "collection_system": self.unpublished_object.collection_system.id,
-            "waste_category": self.unpublished_object.waste_stream.category.id,
+            "waste_category": self.unpublished_object.waste_category.id,
             "connection_type": "VOLUNTARY",
             "allowed_materials": [
-                m.id
-                for m in self.unpublished_object.waste_stream.allowed_materials.all()
+                m.id for m in self.unpublished_object.allowed_materials.all()
             ],
             "forbidden_materials": [
-                m.id
-                for m in self.unpublished_object.waste_stream.forbidden_materials.all()
+                m.id for m in self.unpublished_object.forbidden_materials.all()
             ],
             "frequency": self.unpublished_object.frequency.id,
             "valid_from": self.unpublished_object.valid_from,
@@ -1418,14 +1435,6 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
         cls.waste_category = WasteCategory.objects.create(
             name="Test category", publication_status="published"
         )
-        cls.waste_stream = WasteStream.objects.create(
-            name="Test waste stream",
-            category=cls.waste_category,
-        )
-        cls.waste_stream.allowed_materials.add(cls.allowed_material_1)
-        cls.waste_stream.allowed_materials.add(cls.allowed_material_2)
-        cls.waste_stream.forbidden_materials.add(cls.forbidden_material_1)
-        cls.waste_stream.forbidden_materials.add(cls.forbidden_material_2)
         with mute_signals(signals.post_save):
             cls.flyer = WasteFlyer.objects.create(
                 abbreviation="WasteFlyer123",
@@ -1454,10 +1463,16 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             catchment=cls.collection_catchment,
             collector=cls.collector,
             collection_system=cls.collection_system,
-            waste_stream=cls.waste_stream,
+            waste_category=cls.waste_category,
             frequency=cls.frequency,
             description="This is a test case.",
             publication_status="published",
+        )
+        cls.collection.allowed_materials.set(
+            [cls.allowed_material_1, cls.allowed_material_2]
+        )
+        cls.collection.forbidden_materials.set(
+            [cls.forbidden_material_1, cls.forbidden_material_2]
         )
         cls.collection.flyers.add(cls.flyer)
         cls.collection.flyers.add(cls.flyer2)
@@ -1562,7 +1577,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
                 name="New Test Collector", publication_status="published"
             ).id,
             "collection_system": self.collection_system.id,
-            "waste_category": self.waste_stream.category.id,
+            "waste_category": self.waste_category.id,
             "connection_type": "VOLUNTARY",
             "allowed_materials": [
                 self.allowed_material_1.id,
@@ -1788,16 +1803,9 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
         cls.forbidden_material_2 = WasteComponent.objects.create(
             name="Forbidden material 2", publication_status="published"
         )
-        waste_stream = WasteStream.objects.create(
-            name="Test waste stream",
-            category=WasteCategory.objects.create(
-                name="Test category", publication_status="published"
-            ),
+        waste_category = WasteCategory.objects.create(
+            name="Test category", publication_status="published"
         )
-        waste_stream.allowed_materials.add(cls.allowed_material_1)
-        waste_stream.allowed_materials.add(cls.allowed_material_2)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
         with mute_signals(signals.post_save):
             cls.flyer = WasteFlyer.objects.create(
                 abbreviation="WasteFlyer123",
@@ -1821,21 +1829,22 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
         cls.collection_system = CollectionSystem.objects.create(
             name="Test system", publication_status="published"
         )
-        cls.waste_stream = WasteStream.objects.create(
-            category=WasteCategory.objects.create(
-                name="Test category", publication_status="published"
-            ),
-            publication_status="published",
-        )
+        cls.waste_category = waste_category
         cls.collection = Collection.objects.create(
             name="collection1",
             catchment=cls.catchment,
             collector=cls.collector,
             collection_system=cls.collection_system,
-            waste_stream=waste_stream,
+            waste_category=waste_category,
             frequency=cls.frequency,
             description="This is a test case.",
             publication_status="published",
+        )
+        cls.collection.allowed_materials.set(
+            [cls.allowed_material_1, cls.allowed_material_2]
+        )
+        cls.collection.forbidden_materials.set(
+            [cls.forbidden_material_1, cls.forbidden_material_2]
         )
         cls.collection.flyers.add(cls.flyer)
         cls.collection.flyers.add(cls.flyer2)
@@ -1845,7 +1854,7 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
             catchment=cls.catchment,
             collector=cls.collector,
             collection_system=cls.collection_system,
-            waste_stream=waste_stream,
+            waste_category=waste_category,
             frequency=cls.frequency,
             description="Private predecessor",
             publication_status="private",
@@ -1883,7 +1892,7 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
             "catchment": self.catchment.id,
             "collector": self.collector.id,
             "collection_system": self.collection_system.id,
-            "waste_category": self.waste_stream.category.id,
+            "waste_category": self.waste_category.id,
             "connection_type": "VOLUNTARY",
             "allowed_materials": [
                 self.allowed_material_1.id,
@@ -1918,7 +1927,7 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
             "catchment": self.catchment.id,
             "collector": self.collector.id,
             "collection_system": self.collection_system.id,
-            "waste_category": self.waste_stream.category.id,
+            "waste_category": self.waste_category.id,
             "connection_type": "VOLUNTARY",
             "allowed_materials": [
                 self.allowed_material_1.id,
@@ -2262,7 +2271,7 @@ class CollectionPredecessorsViewTestCase(
             catchment=cls.related_objects["catchment"],
             collector=cls.related_objects["collector"],
             collection_system=cls.related_objects["collection_system"],
-            waste_stream=cls.related_objects["waste_stream"],
+            waste_category=cls.related_objects["waste_category"],
             publication_status="published",
         )
 
@@ -2278,11 +2287,8 @@ class CollectionPredecessorsViewTestCase(
             "collection_system": CollectionSystem.objects.create(
                 name="Test System", publication_status="published"
             ),
-            "waste_stream": WasteStream.objects.create(
-                name="Test Waste Stream",
-                category=WasteCategory.objects.create(
-                    name="Test Category", publication_status="published"
-                ),
+            "waste_category": WasteCategory.objects.create(
+                name="Test Category", publication_status="published"
             ),
         }
 
@@ -2467,13 +2473,6 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
         )
         cls.waste_component.categories.add(cls.soilcom_biowaste_material_category)
 
-        # Create WasteStream
-        cls.waste_stream = WasteStream.objects.create(
-            name="Test Stream", category=cls.waste_category, owner=cls.user
-        )
-
-        cls.waste_stream.allowed_materials.add(cls.waste_component)
-
         # Create MaterialCategory and Material (materials.models)
         cls.material_category = MaterialCategory.objects.create(
             name="Test Material Category", owner=cls.user
@@ -2484,22 +2483,22 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
         )
         cls.material.categories.add(cls.material_category)
 
-        # Add the Material to the WasteStream's allowed materials
-        cls.waste_stream.allowed_materials.add(cls.material)
-        cls.waste_stream.save()  # Save WasteStream after M2M modifications
-
         # Create a base published collection for use in tests
         # Assumes Collection.catchment is a ManyToManyField to CollectionCatchment
         cls.published_collection = Collection.objects.create(
             catchment=cls.catchment,
             collector=cls.collector,
             collection_system=cls.collection_system,
-            waste_stream=cls.waste_stream,
+            waste_category=cls.waste_category,
             valid_from=date.today() - timedelta(days=30),
             valid_until=date.today() + timedelta(days=30),
             publication_status=Collection.STATUS_PUBLISHED,
             owner=cls.user,
             connection_type="VOLUNTARY",
+        )
+        cls.published_collection.allowed_materials.add(
+            cls.waste_component,
+            cls.material,
         )
 
     def setUp(self):
@@ -2518,7 +2517,6 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
         )
         self.catchment = CollectionCatchment.objects.get(pk=self.catchment.pk)
         self.waste_category = WasteCategory.objects.get(pk=self.waste_category.pk)
-        self.waste_stream = WasteStream.objects.get(pk=self.waste_stream.pk)
 
         # Crucially, refresh the published_collection as its attributes (e.g., valid_until, status) can change
         self.published_collection = Collection.objects.get(
@@ -2536,7 +2534,7 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
             "collection_system": self.collection_system.pk,
             "waste_category": self.waste_category.pk,
             "connection_type": "VOLUNTARY",
-            "waste_stream": self.waste_stream.pk,
+            "allowed_materials": [self.waste_component.pk],
             "valid_from": date.today(),
             "form-TOTAL_FORMS": 1,
             "form-INITIAL_FORMS": 0,
@@ -2621,13 +2619,14 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
                 catchment=self.catchment,
                 collector=self.collector,
                 collection_system=self.collection_system,
-                waste_stream=self.waste_stream,
+                waste_category=self.waste_category,
                 valid_from=date.today() + timedelta(days=100),
                 valid_until=date.today() + timedelta(days=120),
                 publication_status=status,
                 owner=self.user,
                 connection_type="VOLUNTARY",
             )
+            collection.allowed_materials.add(self.waste_component, self.material)
             with self.assertRaises(ValidationError) as cm:
                 collection.approve(user=self.user)
             self.assertIn("Only objects in review can be approved", str(cm.exception))
@@ -2739,19 +2738,15 @@ class CollectionFilterWithCatchmentAndPropertiesRegressionTest(
         cls.waste_component = WasteComponent.objects.create(
             name="Food scraps for GroupBy Test"
         )
-        cls.waste_stream = WasteStream.objects.create(
-            name="Organic household waste for GroupBy Test", category=cls.waste_category
-        )
-        cls.waste_stream.allowed_materials.add(cls.waste_component)
-
         cls.collection1 = Collection.objects.create(
             name="Test Collection 1 for GroupBy Test",
             catchment=cls.catchment,
             collector=cls.collector,
             collection_system=cls.collection_system,
-            waste_stream=cls.waste_stream,
+            waste_category=cls.waste_category,
             publication_status="published",
         )
+        cls.collection1.allowed_materials.add(cls.waste_component)
         # Ensure this is the only published collection and has no published successors
         # (No successors created here)
         # If any other collections are created in the future, ensure they are not published or not successors of this one.
@@ -2829,12 +2824,11 @@ class CollectionAddPropertyValueAnchoringTestCase(ViewWithPermissionsTestCase):
         cls.catchment = CollectionCatchment.objects.create(name="C")
         cls.system = CollectionSystem.objects.create(name="S")
         cls.category = WasteCategory.objects.create(name="Cat")
-        cls.stream = WasteStream.objects.create(category=cls.category)
         cls.root = Collection.objects.create(
             name="Root",
             catchment=cls.catchment,
             collection_system=cls.system,
-            waste_stream=cls.stream,
+            waste_category=cls.category,
             valid_from=date(2020, 1, 1),
             publication_status="published",
             owner=cls.member,
@@ -2843,7 +2837,7 @@ class CollectionAddPropertyValueAnchoringTestCase(ViewWithPermissionsTestCase):
             name="Succ",
             catchment=cls.catchment,
             collection_system=cls.system,
-            waste_stream=cls.stream,
+            waste_category=cls.category,
             valid_from=date(2021, 1, 1),
             publication_status="published",
             owner=cls.member,
@@ -2891,11 +2885,10 @@ class CollectionPropertyValueUpdateReanchorTestCase(ViewWithPermissionsTestCase)
         cls.catchment = CollectionCatchment.objects.create(name="C")
         cls.system = CollectionSystem.objects.create(name="S")
         cls.category = WasteCategory.objects.create(name="Cat")
-        cls.stream = WasteStream.objects.create(category=cls.category)
         cls.root = Collection.objects.create(
             catchment=cls.catchment,
             collection_system=cls.system,
-            waste_stream=cls.stream,
+            waste_category=cls.category,
             valid_from=date(2020, 1, 1),
             publication_status="published",
             owner=cls.member,
@@ -2903,7 +2896,7 @@ class CollectionPropertyValueUpdateReanchorTestCase(ViewWithPermissionsTestCase)
         cls.succ = Collection.objects.create(
             catchment=cls.catchment,
             collection_system=cls.system,
-            waste_stream=cls.stream,
+            waste_category=cls.category,
             valid_from=date(2021, 1, 1),
             publication_status="published",
             owner=cls.member,
@@ -2960,11 +2953,10 @@ class CollectionPropertyValueDeleteAnchorSemanticsTestCase(ViewWithPermissionsTe
         cls.catchment = CollectionCatchment.objects.create(name="C")
         cls.system = CollectionSystem.objects.create(name="S")
         cls.category = WasteCategory.objects.create(name="Cat")
-        cls.stream = WasteStream.objects.create(category=cls.category)
         cls.root = Collection.objects.create(
             catchment=cls.catchment,
             collection_system=cls.system,
-            waste_stream=cls.stream,
+            waste_category=cls.category,
             valid_from=date(2020, 1, 1),
             publication_status="published",
             owner=cls.member,
@@ -2972,7 +2964,7 @@ class CollectionPropertyValueDeleteAnchorSemanticsTestCase(ViewWithPermissionsTe
         cls.succ = Collection.objects.create(
             catchment=cls.catchment,
             collection_system=cls.system,
-            waste_stream=cls.stream,
+            waste_category=cls.category,
             valid_from=date(2021, 1, 1),
             publication_status="published",
             owner=cls.member,
@@ -3030,18 +3022,17 @@ class CollectionDetailChainAwareValuesTestCase(ViewWithPermissionsTestCase):
         cls.catchment = CollectionCatchment.objects.create(name="C")
         cls.system = CollectionSystem.objects.create(name="S")
         cls.category = WasteCategory.objects.create(name="Cat")
-        cls.stream = WasteStream.objects.create(category=cls.category)
         cls.root = Collection.objects.create(
             catchment=cls.catchment,
             collection_system=cls.system,
-            waste_stream=cls.stream,
+            waste_category=cls.category,
             valid_from=date(2020, 1, 1),
             publication_status="published",
         )
         cls.succ = Collection.objects.create(
             catchment=cls.catchment,
             collection_system=cls.system,
-            waste_stream=cls.stream,
+            waste_category=cls.category,
             valid_from=date(2021, 1, 1),
             publication_status="published",
         )
@@ -3082,13 +3073,12 @@ class CollectionReviewDetailPropertiesTestCase(TestCase):
         cls.catchment = CollectionCatchment.objects.create(name="RC")
         cls.system = CollectionSystem.objects.create(name="RS")
         cls.category = WasteCategory.objects.create(name="RCat")
-        cls.stream = WasteStream.objects.create(category=cls.category)
         cls.collection = Collection.objects.create(
             name="R",
             catchment=cls.catchment,
             collection_system=cls.system,
-            waste_stream=cls.stream,
             sorting_method=cls.sorting_method,
+            waste_category=cls.category,
             publication_status="published",
         )
 
@@ -3145,13 +3135,12 @@ class CollectionPropertyValueReviewDetailRelatedCollectionsTestCase(TestCase):
         cls.catchment = CollectionCatchment.objects.create(name="CPV RC")
         cls.system = CollectionSystem.objects.create(name="CPV RS")
         cls.category = WasteCategory.objects.create(name="CPV RCat")
-        cls.stream = WasteStream.objects.create(category=cls.category)
 
         cls.root_collection = Collection.objects.create(
             name="CPV Root Collection",
             catchment=cls.catchment,
             collection_system=cls.system,
-            waste_stream=cls.stream,
+            waste_category=cls.category,
             publication_status="published",
             valid_from=date(2020, 1, 1),
         )
@@ -3159,7 +3148,7 @@ class CollectionPropertyValueReviewDetailRelatedCollectionsTestCase(TestCase):
             name="CPV Successor Collection",
             catchment=cls.catchment,
             collection_system=cls.system,
-            waste_stream=cls.stream,
+            waste_category=cls.category,
             publication_status="review",
             valid_from=date(2021, 1, 1),
         )
@@ -3207,12 +3196,11 @@ class CollectionDetailOnlyPublishedCpvsTestCase(TestCase):
         cls.catchment = CollectionCatchment.objects.create(name="PC")
         cls.system = CollectionSystem.objects.create(name="PS")
         cls.category = WasteCategory.objects.create(name="PCat")
-        cls.stream = WasteStream.objects.create(category=cls.category)
         cls.collection = Collection.objects.create(
             name="PublishedCollection",
             catchment=cls.catchment,
             collection_system=cls.system,
-            waste_stream=cls.stream,
+            waste_category=cls.category,
             publication_status="published",
         )
 
@@ -3274,12 +3262,11 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
         cls.catchment = CollectionCatchment.objects.create(name="RC")
         cls.system = CollectionSystem.objects.create(name="RS")
         cls.category = WasteCategory.objects.create(name="RCat")
-        cls.stream = WasteStream.objects.create(category=cls.category)
         cls.collection = Collection.objects.create(
             name="ReviewCollection",
             catchment=cls.catchment,
             collection_system=cls.system,
-            waste_stream=cls.stream,
+            waste_category=cls.category,
             publication_status="review",
         )
 
@@ -3362,8 +3349,8 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
 
         cls.allowed_material = Material.objects.create(name="Allowed Material")
         cls.forbidden_material = Material.objects.create(name="Forbidden Material")
-        cls.stream.allowed_materials.add(cls.allowed_material)
-        cls.stream.forbidden_materials.add(cls.forbidden_material)
+        cls.collection.allowed_materials.add(cls.allowed_material)
+        cls.collection.forbidden_materials.add(cls.forbidden_material)
 
     def test_review_preview_shows_published_and_review_only(self):
         self.client.force_login(self.staff)
@@ -3668,9 +3655,6 @@ class CollectionCascadeMixinTestCase(TestCase):
         cls.category = WasteCategory.objects.create(
             name="Test Category", publication_status="published"
         )
-        cls.stream = WasteStream.objects.create(
-            category=cls.category, publication_status="published"
-        )
 
         # Create properties
         cls.prop1 = Property.objects.create(
@@ -3692,7 +3676,7 @@ class CollectionCascadeMixinTestCase(TestCase):
             name=name,
             catchment=self.catchment,
             collection_system=self.system,
-            waste_stream=self.stream,
+            waste_category=self.category,
             valid_from=valid_from or date(2020, 1, 1),
             publication_status=status,
             owner=owner,
@@ -4499,14 +4483,7 @@ class CollectionCSVRendererTestCase(TestCase):
         cls.forbidden_material_2 = WasteComponent.objects.create(
             name="Forbidden Material 2"
         )
-        waste_stream = WasteStream.objects.create(
-            name="Test waste stream",
-            category=WasteCategory.objects.create(name="Test category"),
-        )
-        waste_stream.allowed_materials.add(cls.allowed_material_1)
-        waste_stream.allowed_materials.add(cls.allowed_material_2)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
+        waste_category = WasteCategory.objects.create(name="Test category")
         with mute_signals(signals.post_save):
             waste_flyer = WasteFlyer.objects.create(
                 abbreviation="WasteFlyer123", url="https://www.test-flyer.org"
@@ -4524,11 +4501,17 @@ class CollectionCSVRendererTestCase(TestCase):
                 catchment=catchment,
                 collector=Collector.objects.create(name=f"collector{1}"),
                 collection_system=CollectionSystem.objects.create(name="Test system"),
-                waste_stream=waste_stream,
+                waste_category=waste_category,
                 fee_system=FeeSystem.objects.create(name="Fixed fee"),
                 frequency=frequency,
                 valid_from=date(2020, 1, 1),
                 description="This is a test case.",
+            )
+            collection.allowed_materials.set(
+                [cls.allowed_material_1, cls.allowed_material_2]
+            )
+            collection.forbidden_materials.set(
+                [cls.forbidden_material_1, cls.forbidden_material_2]
             )
             collection.flyers.add(waste_flyer)
 
@@ -4649,14 +4632,7 @@ class CollectionXLSXRendererTestCase(TestCase):
         cls.forbidden_material_2 = WasteComponent.objects.create(
             name="Forbidden Material 2"
         )
-        waste_stream = WasteStream.objects.create(
-            name="Test waste stream",
-            category=WasteCategory.objects.create(name="Test category"),
-        )
-        waste_stream.allowed_materials.add(cls.allowed_material_1)
-        waste_stream.allowed_materials.add(cls.allowed_material_2)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
+        waste_category = WasteCategory.objects.create(name="Test category")
         with mute_signals(signals.post_save):
             waste_flyer = WasteFlyer.objects.create(
                 abbreviation="WasteFlyer123", url="https://www.test-flyer.org"
@@ -4674,9 +4650,15 @@ class CollectionXLSXRendererTestCase(TestCase):
                 catchment=catchment,
                 collector=Collector.objects.create(name=f"collector{1}"),
                 collection_system=CollectionSystem.objects.create(name="Test system"),
-                waste_stream=waste_stream,
+                waste_category=waste_category,
                 frequency=frequency,
                 description="This is a test case.",
+            )
+            collection.allowed_materials.set(
+                [cls.allowed_material_1, cls.allowed_material_2]
+            )
+            collection.forbidden_materials.set(
+                [cls.forbidden_material_1, cls.forbidden_material_2]
             )
             collection.flyers.add(waste_flyer)
 
@@ -4743,10 +4725,6 @@ class DerivedValuesTestCase(TestCase):
             name="Collection system"
         )
         cls.waste_category = WasteCategory.objects.create(name="Waste category")
-        cls.waste_stream = WasteStream.objects.create(
-            name="Waste stream",
-            category=cls.waste_category,
-        )
 
     def setUp(self):
         clear_derived_value_config_cache()
@@ -4763,7 +4741,7 @@ class DerivedValuesTestCase(TestCase):
         collection = Collection.objects.create(
             catchment=catchment,
             collection_system=self.collection_system,
-            waste_stream=self.waste_stream,
+            waste_category=self.waste_category,
             valid_from=date(2024, 1, 1),
             publication_status="published",
         )
@@ -5334,89 +5312,6 @@ def dict_to_querydict(data):
     return qd
 
 
-class DeleteUnusedWasteStreamsSignalTestCase(TestCase):
-    """Tests for the delete_unused_waste_streams signal handler."""
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.catchment = CollectionCatchment.objects.create(
-            name="Catchment", publication_status="published"
-        )
-        cls.collector = Collector.objects.create(
-            name="Collector", publication_status="published"
-        )
-        cls.system = CollectionSystem.objects.create(
-            name="System", publication_status="published"
-        )
-        cls.category = WasteCategory.objects.create(
-            name="Category", publication_status="published"
-        )
-        cls.waste_stream = WasteStream.objects.create(
-            name="Used Stream", category=cls.category
-        )
-        cls.collection = Collection.objects.create(
-            catchment=cls.catchment,
-            collector=cls.collector,
-            collection_system=cls.system,
-            waste_stream=cls.waste_stream,
-            valid_from=date(2024, 1, 1),
-        )
-
-    def test_orphan_waste_streams_are_deleted_on_waste_stream_change(self):
-        """Verify unused WasteStreams are cleaned up when waste_stream changes."""
-        orphan_stream = WasteStream.objects.create(
-            name="Orphan Stream", category=self.category
-        )
-        new_stream = WasteStream.objects.create(
-            name="New Stream", category=self.category
-        )
-
-        with patch(
-            "case_studies.soilcom.models.celery.current_app.send_task"
-        ) as mock_send_task:
-            self.collection.waste_stream = new_stream
-            self.collection.save(update_fields=["waste_stream"])
-
-        mock_send_task.assert_called_once_with("cleanup_orphaned_waste_streams")
-        cleanup_orphaned_waste_streams()
-
-        self.assertFalse(WasteStream.objects.filter(pk=orphan_stream.pk).exists())
-        self.assertFalse(WasteStream.objects.filter(pk=self.waste_stream.pk).exists())
-        self.assertTrue(WasteStream.objects.filter(pk=new_stream.pk).exists())
-
-    def test_orphan_cleanup_not_scheduled_when_waste_stream_unchanged(self):
-        """Verify cleanup is not scheduled when waste_stream is unchanged."""
-        orphan_stream = WasteStream.objects.create(
-            name="Orphan Stream 2", category=self.category
-        )
-        self.assertTrue(WasteStream.objects.filter(pk=orphan_stream.pk).exists())
-
-        with patch(
-            "case_studies.soilcom.models.celery.current_app.send_task"
-        ) as mock_send_task:
-            self.collection.description = "Updated"
-            self.collection.save()
-
-        mock_send_task.assert_not_called()
-        self.assertTrue(WasteStream.objects.filter(pk=orphan_stream.pk).exists())
-
-    def test_orphan_cleanup_not_scheduled_with_update_fields(self):
-        """Verify cleanup is not scheduled when update_fields excludes waste_stream."""
-        orphan_stream = WasteStream.objects.create(
-            name="Orphan Stream 3", category=self.category
-        )
-        self.assertTrue(WasteStream.objects.filter(pk=orphan_stream.pk).exists())
-
-        with patch(
-            "case_studies.soilcom.models.celery.current_app.send_task"
-        ) as mock_send_task:
-            self.collection.valid_until = date(2024, 12, 31)
-            self.collection.save(update_fields=["valid_until"])
-
-        mock_send_task.assert_not_called()
-        self.assertTrue(WasteStream.objects.filter(pk=orphan_stream.pk).exists())
-
-
 class InvalidateCollectionCacheSignalTestCase(TestCase):
     """Tests for the invalidate_collection_geojson_cache signal handler."""
 
@@ -5434,14 +5329,11 @@ class InvalidateCollectionCacheSignalTestCase(TestCase):
         cls.category = WasteCategory.objects.create(
             name="Category", publication_status="published"
         )
-        cls.waste_stream = WasteStream.objects.create(
-            name="Stream", category=cls.category
-        )
         cls.private_collection = Collection.objects.create(
             catchment=cls.catchment,
             collector=cls.collector,
             collection_system=cls.system,
-            waste_stream=cls.waste_stream,
+            waste_category=cls.category,
             valid_from=date(2024, 1, 1),
             publication_status="private",
         )
@@ -5449,7 +5341,7 @@ class InvalidateCollectionCacheSignalTestCase(TestCase):
             catchment=cls.catchment,
             collector=cls.collector,
             collection_system=cls.system,
-            waste_stream=cls.waste_stream,
+            waste_category=cls.category,
             valid_from=date(2024, 2, 1),
             publication_status="published",
         )
@@ -5536,14 +5428,11 @@ class UpdateCollectionNamesSignalTestCase(TestCase):
         cls.category = WasteCategory.objects.create(
             name="Category", publication_status="published"
         )
-        cls.waste_stream = WasteStream.objects.create(
-            name="Stream", category=cls.category
-        )
         cls.collection = Collection.objects.create(
             catchment=cls.catchment,
             collector=cls.collector,
             collection_system=cls.system,
-            waste_stream=cls.waste_stream,
+            waste_category=cls.category,
             valid_from=date(2024, 1, 1),
         )
 
@@ -5574,14 +5463,14 @@ class UpdateCollectionNamesSignalTestCase(TestCase):
             catchment=self.catchment,
             collector=self.collector,
             collection_system=self.system,
-            waste_stream=self.waste_stream,
+            waste_category=self.category,
             valid_from=date(2023, 1, 1),
         )
         Collection.objects.create(
             catchment=self.catchment,
             collector=self.collector,
             collection_system=self.system,
-            waste_stream=self.waste_stream,
+            waste_category=self.category,
             valid_from=date(2022, 1, 1),
         )
 
@@ -5618,10 +5507,6 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
         )
         biowaste_cat = MaterialCategory.objects.get(name="Biowaste component")
         cls.allowed_material.categories.add(biowaste_cat)
-        cls.waste_stream = WasteStream.objects.create(
-            name="Stream", category=cls.category
-        )
-        cls.waste_stream.allowed_materials.add(cls.allowed_material)
         cls.frequency = CollectionFrequency.objects.create(
             name="Frequency", publication_status="published"
         )
@@ -5629,18 +5514,20 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
             catchment=cls.catchment,
             collector=cls.collector,
             collection_system=cls.system,
-            waste_stream=cls.waste_stream,
+            waste_category=cls.category,
             valid_from=date(2023, 1, 1),
             publication_status="published",
         )
+        cls.predecessor.allowed_materials.add(cls.allowed_material)
         cls.collection = Collection.objects.create(
             catchment=cls.catchment,
             collector=cls.collector,
             collection_system=cls.system,
-            waste_stream=cls.waste_stream,
+            waste_category=cls.category,
             valid_from=date(2024, 1, 1),
             publication_status="published",
         )
+        cls.collection.allowed_materials.add(cls.allowed_material)
         cls.collection.predecessors.add(cls.predecessor)
 
     def test_predecessor_valid_until_updated_on_form_save(self):
@@ -5674,10 +5561,11 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
             catchment=self.catchment,
             collector=self.collector,
             collection_system=self.system,
-            waste_stream=self.waste_stream,
+            waste_category=self.category,
             valid_from=date(2022, 1, 1),
             publication_status="published",
         )
+        predecessor2.allowed_materials.add(self.allowed_material)
         self.collection.predecessors.add(predecessor2)
 
         mock_clear.reset_mock()
@@ -5702,8 +5590,8 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
         self.assertLessEqual(mock_clear.call_count, 1)
 
 
-class WasteStreamSaveOptimizationTestCase(TestCase):
-    """Tests for WasteStream save optimization in CollectionModelForm."""
+class CollectionInlineWasteFieldsSaveTestCase(TestCase):
+    """Tests inline waste field handling in CollectionModelForm."""
 
     @classmethod
     def setUpTestData(cls):
@@ -5725,16 +5613,19 @@ class WasteStreamSaveOptimizationTestCase(TestCase):
         cls.allowed_material = WasteComponent.objects.create(
             name="Allowed", publication_status="published"
         )
+        cls.forbidden_material = WasteComponent.objects.create(
+            name="Forbidden", publication_status="published"
+        )
         biowaste_cat = MaterialCategory.objects.get(name="Biowaste component")
         cls.allowed_material.categories.add(biowaste_cat)
+        cls.forbidden_material.categories.add(biowaste_cat)
         cls.frequency = CollectionFrequency.objects.create(
             name="Frequency", publication_status="published"
         )
+        cls.owner = User.objects.create_user(username="inline-waste-form-owner")
 
-    def test_new_waste_stream_created_when_needed(self):
-        """Verify a new WasteStream is created when no matching one exists."""
-        initial_count = WasteStream.objects.count()
-
+    def test_form_save_persists_inline_waste_fields(self):
+        """Verify form saves waste_category and material M2M fields directly on Collection."""
         form_data = {
             "catchment": self.catchment.id,
             "collector": self.collector.id,
@@ -5748,75 +5639,56 @@ class WasteStreamSaveOptimizationTestCase(TestCase):
         }
         form = CollectionModelForm(data=dict_to_querydict(form_data))
         self.assertTrue(form.is_valid(), form.errors)
-        form.instance.owner_id = 1
+        form.instance.owner = self.owner
         instance = form.save()
 
-        self.assertEqual(WasteStream.objects.count(), initial_count + 1)
-        self.assertIsNotNone(instance.waste_stream)
-
-    def test_existing_waste_stream_reused(self):
-        """Verify existing WasteStream is reused when a matching one exists."""
-        existing_stream = WasteStream.objects.create(
-            name="Existing", category=self.category
+        self.assertEqual(instance.waste_category, self.category)
+        self.assertQuerySetEqual(
+            instance.allowed_materials.order_by("pk"),
+            [self.allowed_material],
+            transform=lambda obj: obj,
         )
-        existing_stream.allowed_materials.add(self.allowed_material)
+        self.assertFalse(instance.forbidden_materials.exists())
 
-        initial_count = WasteStream.objects.count()
-
-        form_data = {
-            "catchment": self.catchment.id,
-            "collector": self.collector.id,
-            "collection_system": self.system.id,
-            "waste_category": self.category.id,
-            "allowed_materials": [self.allowed_material.id],
-            "forbidden_materials": [],
-            "frequency": self.frequency.id,
-            "valid_from": date(2024, 1, 1),
-            "connection_type": "VOLUNTARY",
-        }
-        form = CollectionModelForm(data=dict_to_querydict(form_data))
-        self.assertTrue(form.is_valid(), form.errors)
-        form.instance.owner_id = 1
-        instance = form.save()
-
-        self.assertEqual(WasteStream.objects.count(), initial_count)
-        self.assertEqual(instance.waste_stream.pk, existing_stream.pk)
-
-    @patch("case_studies.soilcom.signals.clear_geojson_cache_pattern")
-    def test_reusing_waste_stream_minimizes_cache_clears(self, mock_clear):
-        """Verify reusing WasteStream minimizes cache invalidation."""
-        existing_stream = WasteStream.objects.create(
-            name="Existing2", category=self.category
-        )
-        existing_stream.allowed_materials.add(self.allowed_material)
-
-        Collection.objects.create(
+    def test_form_update_replaces_inline_materials(self):
+        """Verify updating an existing collection rewrites inline material assignments."""
+        collection = Collection.objects.create(
             catchment=self.catchment,
             collector=self.collector,
             collection_system=self.system,
-            waste_stream=existing_stream,
+            waste_category=self.category,
+            frequency=self.frequency,
             valid_from=date(2023, 1, 1),
+            owner=self.owner,
+            publication_status="private",
         )
-
-        mock_clear.reset_mock()
+        collection.allowed_materials.add(self.allowed_material)
 
         form_data = {
             "catchment": self.catchment.id,
             "collector": self.collector.id,
             "collection_system": self.system.id,
             "waste_category": self.category.id,
-            "allowed_materials": [self.allowed_material.id],
-            "forbidden_materials": [],
+            "allowed_materials": [],
+            "forbidden_materials": [self.forbidden_material.id],
             "frequency": self.frequency.id,
             "valid_from": date(2024, 1, 1),
             "connection_type": "VOLUNTARY",
         }
-        form = CollectionModelForm(data=dict_to_querydict(form_data))
+        form = CollectionModelForm(
+            instance=collection, data=dict_to_querydict(form_data)
+        )
         self.assertTrue(form.is_valid(), form.errors)
-        form.instance.owner_id = 1
+        form.instance.owner = self.owner
         form.save()
 
-        self.assertLessEqual(mock_clear.call_count, 2)
+        collection.refresh_from_db()
+        self.assertFalse(collection.allowed_materials.exists())
+        self.assertQuerySetEqual(
+            collection.forbidden_materials.order_by("pk"),
+            [self.forbidden_material],
+            transform=lambda obj: obj,
+        )
 
 
 class SortingMethodModelTestCase(TestCase):

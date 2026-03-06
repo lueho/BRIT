@@ -13,7 +13,6 @@ from .models import (
     WasteCategory,
     WasteComponent,
     WasteFlyer,
-    WasteStream,
 )
 
 
@@ -55,15 +54,6 @@ class WasteComponentAdmin(admin.ModelAdmin):
     search_fields = ("name",)
     list_filter = ("publication_status",)
     ordering = ("name",)
-
-
-@admin.register(WasteStream)
-class WasteStreamAdmin(admin.ModelAdmin):
-    list_display = ("name", "category", "owner", "publication_status")
-    search_fields = ("name", "category__name")
-    list_filter = ("publication_status", "category")
-    ordering = ("name",)
-    filter_horizontal = ("allowed_materials", "forbidden_materials", "composition")
 
 
 @admin.register(WasteFlyer)

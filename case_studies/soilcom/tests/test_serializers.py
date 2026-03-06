@@ -19,7 +19,6 @@ from ..models import (
     WasteCategory,
     WasteComponent,
     WasteFlyer,
-    WasteStream,
 )
 from ..serializers import (
     CollectionFlatSerializer,
@@ -44,14 +43,7 @@ class CollectionModelSerializerTestCase(TestCase):
         cls.forbidden_material_2 = WasteComponent.objects.create(
             name="Forbidden Material 2"
         )
-        waste_stream = WasteStream.objects.create(
-            name="Test waste stream",
-            category=WasteCategory.objects.create(name="Test category"),
-        )
-        waste_stream.allowed_materials.add(cls.allowed_material_1)
-        waste_stream.allowed_materials.add(cls.allowed_material_2)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
+        waste_category = WasteCategory.objects.create(name="Test category")
 
         with mute_signals(models.signals.post_save):
             waste_flyer_1 = WasteFlyer.objects.create(
@@ -66,10 +58,16 @@ class CollectionModelSerializerTestCase(TestCase):
             catchment=CollectionCatchment.objects.create(name="Test catchment"),
             collector=Collector.objects.create(name="Test collector"),
             collection_system=CollectionSystem.objects.create(name="Test system"),
-            waste_stream=waste_stream,
+            waste_category=waste_category,
             frequency=frequency,
             valid_from=date(2020, 1, 1),
             description="This is a test case.",
+        )
+        cls.collection.allowed_materials.set(
+            [cls.allowed_material_1, cls.allowed_material_2]
+        )
+        cls.collection.forbidden_materials.set(
+            [cls.forbidden_material_1, cls.forbidden_material_2]
         )
         cls.collection.flyers.add(waste_flyer_1)
         cls.collection.flyers.add(waste_flyer_2)
@@ -184,14 +182,7 @@ class CollectionFlatSerializerTestCase(TestCase):
         cls.forbidden_material_2 = WasteComponent.objects.create(
             name="Forbidden Material 2"
         )
-        waste_stream = WasteStream.objects.create(
-            name="Test waste stream",
-            category=WasteCategory.objects.create(name="Test Category"),
-        )
-        waste_stream.allowed_materials.add(cls.allowed_material_1)
-        waste_stream.allowed_materials.add(cls.allowed_material_2)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
+        waste_category = WasteCategory.objects.create(name="Test Category")
 
         with mute_signals(models.signals.post_save):
             waste_flyer_1 = WasteFlyer.objects.create(
@@ -229,11 +220,17 @@ class CollectionFlatSerializerTestCase(TestCase):
             catchment=catchment1,
             collector=Collector.objects.create(name="Test Collector"),
             collection_system=CollectionSystem.objects.create(name="Test System"),
-            waste_stream=waste_stream,
+            waste_category=waste_category,
             fee_system=FeeSystem.objects.create(name="Test fee system"),
             frequency=frequency,
             valid_from=date(2020, 1, 1),
             description="This is a test case.",
+        )
+        cls.collection_nuts.allowed_materials.set(
+            [cls.allowed_material_1, cls.allowed_material_2]
+        )
+        cls.collection_nuts.forbidden_materials.set(
+            [cls.forbidden_material_1, cls.forbidden_material_2]
         )
         cls.collection_nuts.flyers.add(waste_flyer_1)
         cls.collection_nuts.flyers.add(waste_flyer_2)
@@ -249,12 +246,18 @@ class CollectionFlatSerializerTestCase(TestCase):
             catchment=catchment2,
             collector=Collector.objects.create(name="Test Collector"),
             collection_system=CollectionSystem.objects.create(name="Test System"),
-            waste_stream=waste_stream,
+            waste_category=waste_category,
             fee_system=FeeSystem.objects.create(
                 name="Fixed fee",
             ),
             frequency=frequency,
             description="This is a test case.",
+        )
+        cls.collection_lau.allowed_materials.set(
+            [cls.allowed_material_1, cls.allowed_material_2]
+        )
+        cls.collection_lau.forbidden_materials.set(
+            [cls.forbidden_material_1, cls.forbidden_material_2]
         )
         cls.collection_lau.flyers.add(waste_flyer_1)
         cls.collection_lau.flyers.add(waste_flyer_2)
@@ -353,10 +356,7 @@ class CollectionFlatSerializerTestCase(TestCase):
 class CollectionFlatSerializerChainAwareStatsTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        waste_stream = WasteStream.objects.create(
-            name="WS",
-            category=WasteCategory.objects.create(name="Cat"),
-        )
+        waste_category = WasteCategory.objects.create(name="Cat")
         frequency = CollectionFrequency.objects.create(name="F")
         nuts = NutsRegion.objects.create(name="Hamburg", country="DE", nuts_id="DE600")
         cls.collection_root = Collection.objects.create(
@@ -366,7 +366,7 @@ class CollectionFlatSerializerChainAwareStatsTestCase(TestCase):
             ),
             collector=Collector.objects.create(name="Col"),
             collection_system=CollectionSystem.objects.create(name="Sys"),
-            waste_stream=waste_stream,
+            waste_category=waste_category,
             frequency=frequency,
             valid_from=date(2020, 1, 1),
             publication_status="published",
@@ -376,7 +376,7 @@ class CollectionFlatSerializerChainAwareStatsTestCase(TestCase):
             catchment=cls.collection_root.catchment,
             collector=Collector.objects.create(name="Col2"),
             collection_system=CollectionSystem.objects.create(name="Sys2"),
-            waste_stream=waste_stream,
+            waste_category=waste_category,
             frequency=frequency,
             valid_from=date(2021, 1, 1),
             publication_status="published",

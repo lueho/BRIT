@@ -8,7 +8,7 @@ from bibliography.utils import check_url, find_wayback_snapshot_for_year
 from brit.celery import app
 
 from .filters import WasteFlyerFilter
-from .models import WasteFlyer, WasteStream
+from .models import WasteFlyer
 
 
 @app.task(name="check_wasteflyer_url", trail=True)
@@ -75,10 +75,3 @@ def cleanup_orphaned_waste_flyers():
         collectionpropertyvalue__isnull=True,
         aggregatedcollectionpropertyvalue__isnull=True,
     ).delete()
-
-
-@app.task(name="cleanup_orphaned_waste_streams", trail=True)
-def cleanup_orphaned_waste_streams():
-    """Delete WasteStreams that are no longer referenced by any collections."""
-
-    return WasteStream.objects.filter(collections__isnull=True).delete()

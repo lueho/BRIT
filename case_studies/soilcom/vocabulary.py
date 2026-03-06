@@ -19,7 +19,6 @@ from case_studies.soilcom.models import (
     FeeSystem,
     SortingMethod,
     WasteCategory,
-    WasteStream,
 )
 
 VOCABULARY_VERSION: Final[str] = "0.4.0"
@@ -153,14 +152,14 @@ def get_collection_frequency_names_for_collection_data() -> list[str]:
 
 
 def get_material_names_for_collection_data() -> list[str]:
-    """Return material names currently used in waste stream constraints."""
+    """Return material names currently used in collection material constraints."""
     allowed = set(
-        WasteStream.objects.exclude(allowed_materials__name__isnull=True)
+        Collection.objects.exclude(allowed_materials__name__isnull=True)
         .exclude(allowed_materials__name="")
         .values_list("allowed_materials__name", flat=True)
     )
     forbidden = set(
-        WasteStream.objects.exclude(forbidden_materials__name__isnull=True)
+        Collection.objects.exclude(forbidden_materials__name__isnull=True)
         .exclude(forbidden_materials__name="")
         .values_list("forbidden_materials__name", flat=True)
     )

@@ -35,12 +35,11 @@ from ..models import (
     WasteCategory,
     WasteComponent,
     WasteFlyer,
-    WasteStream,
 )
 from ..tasks import cleanup_orphaned_waste_flyers
 from .test_views import (  # noqa: F401
     CollectionFormPredecessorSaveTestCase,
-    WasteStreamSaveOptimizationTestCase,
+    CollectionInlineWasteFieldsSaveTestCase,
 )
 
 
@@ -283,20 +282,31 @@ class CollectionModelFormTestCase(TestCase):
         cls.frequency = CollectionFrequency.objects.create(
             name="fix", publication_status="published"
         )
-        waste_stream = WasteStream.objects.create(
-            category=cls.waste_category, publication_status="published"
+        cls.sample_material = Material.objects.create(
+            name="Sample Material", publication_status="published"
         )
-        waste_stream.allowed_materials.set(
-            [cls.allowed_material_1, cls.allowed_material_2]
+        cls.sample_series = SampleSeries.objects.create(
+            name="Sample Series",
+            material=cls.sample_material,
+            publication_status="published",
         )
-        waste_stream.forbidden_materials.set(
-            [cls.forbidden_material_1, cls.forbidden_material_2]
+        cls.sample_1 = Sample.objects.create(
+            name="Sample 1",
+            material=cls.sample_material,
+            series=cls.sample_series,
+            publication_status="published",
+        )
+        cls.sample_2 = Sample.objects.create(
+            name="Sample 2",
+            material=cls.sample_material,
+            series=cls.sample_series,
+            publication_status="published",
         )
         cls.predecessor_collection_1 = Collection.objects.create(
             catchment=cls.catchment,
             collector=cls.collector,
             collection_system=cls.collection_system,
-            waste_stream=waste_stream,
+            waste_category=cls.waste_category,
             frequency=cls.frequency,
             valid_from=date(2021, 1, 1),
             publication_status="published",
@@ -305,7 +315,7 @@ class CollectionModelFormTestCase(TestCase):
             catchment=cls.catchment,
             collector=cls.collector,
             collection_system=cls.collection_system,
-            waste_stream=waste_stream,
+            waste_category=cls.waste_category,
             frequency=cls.frequency,
             valid_from=date(2022, 1, 1),
             publication_status="published",
@@ -314,12 +324,23 @@ class CollectionModelFormTestCase(TestCase):
             catchment=cls.catchment,
             collector=cls.collector,
             collection_system=cls.collection_system,
-            waste_stream=waste_stream,
+            waste_category=cls.waste_category,
             frequency=cls.frequency,
             valid_from=date(2023, 1, 1),
             valid_until=date(2023, 12, 31),
             publication_status="published",
         )
+        for collection in (
+            cls.predecessor_collection_1,
+            cls.predecessor_collection_2,
+            cls.collection,
+        ):
+            collection.allowed_materials.set(
+                [cls.allowed_material_1, cls.allowed_material_2]
+            )
+            collection.forbidden_materials.set(
+                [cls.forbidden_material_1, cls.forbidden_material_2]
+            )
         cls.collection.predecessors.set(
             [cls.predecessor_collection_1, cls.predecessor_collection_2]
         )
@@ -335,7 +356,7 @@ class CollectionModelFormTestCase(TestCase):
         self.assertEqual(form.errors["waste_category"][0], "This field is required.")
         self.assertEqual(form.errors["valid_from"][0], "This field is required.")
 
-    def test_waste_stream_get_or_create_on_save(self):
+    def test_inline_waste_fields_are_assigned_on_save(self):
         form = CollectionModelForm(
             data=dict_to_querydict(
                 {
@@ -351,6 +372,7 @@ class CollectionModelFormTestCase(TestCase):
                         self.forbidden_material_1.id,
                         self.forbidden_material_2.id,
                     ],
+                    "samples": [self.sample_1.id, self.sample_2.id],
                     "frequency": self.frequency.id,
                     "valid_from": date(2023, 1, 1),
                     "description": "This is a test case",
@@ -366,8 +388,19 @@ class CollectionModelFormTestCase(TestCase):
             instance.name,
             f"{self.catchment} {self.waste_category} {self.collection_system} {self.collection.valid_from.year}",
         )
-        self.assertIsInstance(instance.waste_stream, WasteStream)
-        self.assertEqual(instance.waste_stream.category.id, self.waste_category.id)
+        self.assertEqual(instance.waste_category_id, self.waste_category.id)
+        self.assertEqual(
+            set(instance.allowed_materials.values_list("id", flat=True)),
+            {self.allowed_material_1.id, self.allowed_material_2.id},
+        )
+        self.assertEqual(
+            set(instance.forbidden_materials.values_list("id", flat=True)),
+            {self.forbidden_material_1.id, self.forbidden_material_2.id},
+        )
+        self.assertEqual(
+            set(instance.samples.values_list("id", flat=True)),
+            {self.sample_1.id, self.sample_2.id},
+        )
 
         equal_form = CollectionModelForm(
             data=dict_to_querydict(
@@ -384,6 +417,7 @@ class CollectionModelFormTestCase(TestCase):
                         self.forbidden_material_1.id,
                         self.forbidden_material_2.id,
                     ],
+                    "samples": [self.sample_1.id],
                     "frequency": self.frequency.id,
                     "valid_from": date(2023, 1, 1),
                     "flyer_url": "https://www.great-test-flyers.com",
@@ -395,10 +429,19 @@ class CollectionModelFormTestCase(TestCase):
         self.assertTrue(equal_form.is_valid())
         equal_form.instance.owner = self.collection.owner
         instance2 = equal_form.save()
-        self.assertIsInstance(instance2.waste_stream, WasteStream)
-        self.assertEqual(instance2.waste_stream.category.id, self.waste_category.id)
-        self.assertEqual(instance2.waste_stream.id, instance.waste_stream.id)
-        self.assertEqual(len(WasteStream.objects.all()), 1)
+        self.assertEqual(instance2.waste_category_id, self.waste_category.id)
+        self.assertEqual(
+            set(instance2.allowed_materials.values_list("id", flat=True)),
+            {self.allowed_material_1.id, self.allowed_material_2.id},
+        )
+        self.assertEqual(
+            set(instance2.forbidden_materials.values_list("id", flat=True)),
+            {self.forbidden_material_1.id, self.forbidden_material_2.id},
+        )
+        self.assertEqual(
+            set(instance2.samples.values_list("id", flat=True)),
+            {self.sample_1.id},
+        )
 
     def test_on_change_of_valid_from_date_predecessors_valid_until_date_is_updated(
         self,
@@ -573,19 +616,16 @@ class CollectionModelFormTestCase(TestCase):
         instance = form.save(commit=False)
         self.assertIn(instance.required_bin_capacity_reference, [None, ""])
 
-    def test_predecessor_waste_stream_reused_when_unchanged(self):
-        """Verify waste_stream is reused from predecessor when waste fields unchanged."""
+    def test_predecessor_waste_fields_preserved_when_unchanged(self):
+        """Verify predecessor waste fields are preserved when unchanged."""
         predecessor = self.predecessor_collection_1
-        initial_stream_count = WasteStream.objects.count()
         initial_waste_data = {
-            "waste_category": predecessor.waste_stream.category.id,
+            "waste_category": predecessor.waste_category.id,
             "allowed_materials": list(
-                predecessor.waste_stream.allowed_materials.values_list("id", flat=True)
+                predecessor.allowed_materials.values_list("id", flat=True)
             ),
             "forbidden_materials": list(
-                predecessor.waste_stream.forbidden_materials.values_list(
-                    "id", flat=True
-                )
+                predecessor.forbidden_materials.values_list("id", flat=True)
             ),
         }
 
@@ -615,16 +655,20 @@ class CollectionModelFormTestCase(TestCase):
             }.intersection(form.changed_data)
         )
         form.instance.owner = self.collection.owner
-        with patch.object(WasteStream.objects, "get_or_create") as get_or_create_mock:
-            instance = form.save()
-        get_or_create_mock.assert_not_called()
+        instance = form.save()
 
-        # No new WasteStream should be created - predecessor's stream reused
-        self.assertEqual(WasteStream.objects.count(), initial_stream_count)
-        self.assertEqual(instance.waste_stream_id, predecessor.waste_stream_id)
+        self.assertEqual(instance.waste_category_id, predecessor.waste_category_id)
+        self.assertEqual(
+            set(instance.allowed_materials.values_list("id", flat=True)),
+            set(predecessor.allowed_materials.values_list("id", flat=True)),
+        )
+        self.assertEqual(
+            set(instance.forbidden_materials.values_list("id", flat=True)),
+            set(predecessor.forbidden_materials.values_list("id", flat=True)),
+        )
 
-    def test_predecessor_waste_stream_not_reused_when_category_changed(self):
-        """Verify waste_stream is not reused when waste_category differs from predecessor."""
+    def test_predecessor_category_change_updates_inline_waste_fields(self):
+        """Verify inline waste category is updated when differing from predecessor."""
         new_category = WasteCategory.objects.create(
             name="New Category", publication_status="published"
         )
@@ -650,13 +694,12 @@ class CollectionModelFormTestCase(TestCase):
         form.instance.owner = self.collection.owner
         instance = form.save()
 
-        self.assertNotEqual(instance.waste_stream_id, predecessor.waste_stream_id)
-        self.assertEqual(instance.waste_stream.category_id, new_category.id)
-        self.assertEqual(instance.waste_stream.allowed_materials.count(), 0)
-        self.assertEqual(instance.waste_stream.forbidden_materials.count(), 0)
+        self.assertEqual(instance.waste_category_id, new_category.id)
+        self.assertEqual(instance.allowed_materials.count(), 0)
+        self.assertEqual(instance.forbidden_materials.count(), 0)
 
-    def test_predecessor_waste_stream_not_reused_when_allowed_materials_changed(self):
-        """Verify waste_stream is not reused when allowed_materials differs from predecessor."""
+    def test_predecessor_allowed_materials_change_updates_inline_waste_fields(self):
+        """Verify inline allowed materials are updated when differing from predecessor."""
         predecessor = self.predecessor_collection_1
 
         # Use only one of the two allowed materials (different from predecessor)
@@ -667,12 +710,10 @@ class CollectionModelFormTestCase(TestCase):
                     "catchment": self.catchment.id,
                     "collector": self.collector.id,
                     "collection_system": self.collection_system.id,
-                    "waste_category": predecessor.waste_stream.category.id,
+                    "waste_category": predecessor.waste_category.id,
                     "allowed_materials": [self.allowed_material_1.id],  # Changed
                     "forbidden_materials": list(
-                        predecessor.waste_stream.forbidden_materials.values_list(
-                            "id", flat=True
-                        )
+                        predecessor.forbidden_materials.values_list("id", flat=True)
                     ),
                     "frequency": self.frequency.id,
                     "valid_from": date(2024, 1, 1),
@@ -684,25 +725,18 @@ class CollectionModelFormTestCase(TestCase):
         form.instance.owner = self.collection.owner
         instance = form.save()
 
-        self.assertNotEqual(instance.waste_stream_id, predecessor.waste_stream_id)
+        self.assertEqual(instance.waste_category_id, predecessor.waste_category_id)
         self.assertEqual(
-            instance.waste_stream.category_id, predecessor.waste_stream.category_id
-        )
-        self.assertEqual(
-            set(instance.waste_stream.allowed_materials.values_list("id", flat=True)),
+            set(instance.allowed_materials.values_list("id", flat=True)),
             {self.allowed_material_1.id},
         )
         self.assertEqual(
-            set(instance.waste_stream.forbidden_materials.values_list("id", flat=True)),
-            set(
-                predecessor.waste_stream.forbidden_materials.values_list(
-                    "id", flat=True
-                )
-            ),
+            set(instance.forbidden_materials.values_list("id", flat=True)),
+            set(predecessor.forbidden_materials.values_list("id", flat=True)),
         )
 
-    def test_predecessor_waste_stream_not_reused_when_forbidden_materials_changed(self):
-        """Verify waste_stream is not reused when forbidden_materials differs from predecessor."""
+    def test_predecessor_forbidden_materials_change_updates_inline_waste_fields(self):
+        """Verify inline forbidden materials are updated when differing from predecessor."""
         predecessor = self.predecessor_collection_1
 
         form = CollectionModelForm(
@@ -712,11 +746,9 @@ class CollectionModelFormTestCase(TestCase):
                     "catchment": self.catchment.id,
                     "collector": self.collector.id,
                     "collection_system": self.collection_system.id,
-                    "waste_category": predecessor.waste_stream.category.id,
+                    "waste_category": predecessor.waste_category.id,
                     "allowed_materials": list(
-                        predecessor.waste_stream.allowed_materials.values_list(
-                            "id", flat=True
-                        )
+                        predecessor.allowed_materials.values_list("id", flat=True)
                     ),
                     "forbidden_materials": [self.forbidden_material_1.id],
                     "frequency": self.frequency.id,
@@ -729,26 +761,23 @@ class CollectionModelFormTestCase(TestCase):
         form.instance.owner = self.collection.owner
         instance = form.save()
 
-        self.assertNotEqual(instance.waste_stream_id, predecessor.waste_stream_id)
         self.assertEqual(
-            set(instance.waste_stream.allowed_materials.values_list("id", flat=True)),
-            set(
-                predecessor.waste_stream.allowed_materials.values_list("id", flat=True)
-            ),
+            set(instance.allowed_materials.values_list("id", flat=True)),
+            set(predecessor.allowed_materials.values_list("id", flat=True)),
         )
         self.assertEqual(
-            set(instance.waste_stream.forbidden_materials.values_list("id", flat=True)),
+            set(instance.forbidden_materials.values_list("id", flat=True)),
             {self.forbidden_material_1.id},
         )
 
-    def test_predecessor_without_waste_stream_assigns_waste_stream(self):
-        """Verify waste_stream is assigned when predecessor has no waste_stream."""
-        # Create a predecessor without a waste_stream
+    def test_predecessor_without_waste_fields_assigns_inline_fields(self):
+        """Verify inline waste fields are assigned when predecessor has none."""
+        # Create a predecessor without inline waste fields
         predecessor = Collection.objects.create(
             catchment=self.catchment,
             collector=self.collector,
             collection_system=self.collection_system,
-            waste_stream=None,
+            waste_category=None,
             frequency=self.frequency,
             valid_from=date(2022, 1, 1),
             publication_status="published",
@@ -774,13 +803,12 @@ class CollectionModelFormTestCase(TestCase):
         form.instance.owner = self.collection.owner
         instance = form.save()
 
-        self.assertIsNotNone(instance.waste_stream)
-        self.assertEqual(instance.waste_stream.category_id, self.waste_category.id)
+        self.assertEqual(instance.waste_category_id, self.waste_category.id)
         self.assertEqual(
-            set(instance.waste_stream.allowed_materials.values_list("id", flat=True)),
+            set(instance.allowed_materials.values_list("id", flat=True)),
             {self.allowed_material_1.id},
         )
-        self.assertEqual(instance.waste_stream.forbidden_materials.count(), 0)
+        self.assertEqual(instance.forbidden_materials.count(), 0)
 
 
 class WasteFlyerUrlFormSetTestCase(TestCase):
@@ -793,27 +821,27 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         CollectionCatchment.objects.create(name="Catchment")
         collector = Collector.objects.create(name="Collector")
         cls.collection_system = CollectionSystem.objects.create(name="System")
-        waste_category = WasteCategory.objects.create(name="Category")
+        cls.waste_category = WasteCategory.objects.create(name="Category")
         material_group = MaterialCategory.objects.create(name="Biowaste component")
         material1 = WasteComponent.objects.create(name="Material 1")
         material1.categories.add(material_group)
         material2 = WasteComponent.objects.create(name="Material 2")
         material2.categories.add(material_group)
-        cls.waste_stream = WasteStream.objects.create(category=waste_category)
-        cls.waste_stream.allowed_materials.set([material1, material2])
         cls.collection = Collection.objects.create(
             name="collection1",
             collector=collector,
             collection_system=cls.collection_system,
-            waste_stream=cls.waste_stream,
+            waste_category=cls.waste_category,
         )
+        cls.collection.allowed_materials.set([material1, material2])
         cls.collection.flyers.set([cls.flyer_1, cls.flyer_2, cls.flyer_3])
         cls.collection2 = Collection.objects.create(
             name="collection2",
             collector=collector,
             collection_system=cls.collection_system,
-            waste_stream=cls.waste_stream,
+            waste_category=cls.waste_category,
         )
+        cls.collection2.allowed_materials.set([material1, material2])
         cls.collection2.flyers.set([cls.flyer_1, cls.flyer_2])
 
     def test_associated_flyer_urls_are_shown_as_initial_values(self):
@@ -1133,6 +1161,13 @@ class CollectionAddWasteSampleFormTestCase(TestCase):
             ),
             publication_status="published",
         )
+        self.other_sample = Sample.objects.create(
+            name="Other Sample",
+            material=self.material,
+            series=self.sample.series,
+            publication_status="published",
+        )
+        self.collection = Collection.objects.create(name="Sample Test Collection")
 
     def test_form_is_valid_with_existing_sample(self):
         form = CollectionAddWasteSampleForm(data={"sample": self.sample.id})
@@ -1146,6 +1181,14 @@ class CollectionAddWasteSampleFormTestCase(TestCase):
         form = CollectionAddWasteSampleForm(data={})
         self.assertFalse(form.is_valid())
 
+    def test_form_queryset_excludes_samples_already_linked_to_collection(self):
+        self.collection.samples.add(self.sample)
+
+        form = CollectionAddWasteSampleForm(instance=self.collection)
+
+        self.assertNotIn(self.sample, form.fields["sample"].queryset)
+        self.assertIn(self.other_sample, form.fields["sample"].queryset)
+
 
 class CollectionRemoveWasteSampleFormTestCase(TestCase):
     @classmethod
@@ -1153,14 +1196,12 @@ class CollectionRemoveWasteSampleFormTestCase(TestCase):
         CollectionCatchment.objects.create(name="Catchment")
         collector = Collector.objects.create(name="Collector")
         collection_system = CollectionSystem.objects.create(name="System")
-        waste_stream = WasteStream.objects.create(
-            category=WasteCategory.objects.create(name="Category")
-        )
+        waste_category = WasteCategory.objects.create(name="Category")
         cls.collection = Collection.objects.create(
             name="collection1",
             collector=collector,
             collection_system=collection_system,
-            waste_stream=waste_stream,
+            waste_category=waste_category,
         )
         cls.material = Material.objects.create(name="Test Material")
         cls.sample = Sample.objects.create(
@@ -1226,18 +1267,15 @@ class CollectionAddPredecessorFormTestCase(TestCase):
         collection_system = CollectionSystem.objects.create(
             name="System", publication_status="published"
         )
-        waste_stream = WasteStream.objects.create(
-            category=WasteCategory.objects.create(
-                name="Category", publication_status="published"
-            ),
-            publication_status="published",
+        waste_category = WasteCategory.objects.create(
+            name="Category", publication_status="published"
         )
         cls.collection = Collection.objects.create(
             name="Current Collection",
             catchment=catchment1,
             collector=collector,
             collection_system=collection_system,
-            waste_stream=waste_stream,
+            waste_category=waste_category,
             publication_status="published",
         )
         cls.other_collection = Collection.objects.create(
@@ -1245,7 +1283,7 @@ class CollectionAddPredecessorFormTestCase(TestCase):
             catchment=catchment1,
             collector=collector,
             collection_system=collection_system,
-            waste_stream=waste_stream,
+            waste_category=waste_category,
             publication_status="published",
         )
         cls.predecessor_collection = Collection.objects.create(
@@ -1253,7 +1291,7 @@ class CollectionAddPredecessorFormTestCase(TestCase):
             catchment=catchment2,
             collector=collector,
             collection_system=collection_system,
-            waste_stream=waste_stream,
+            waste_category=waste_category,
             publication_status="published",
         )
 
@@ -1300,23 +1338,21 @@ class CollectionRemovePredecessorFormTestCase(TestCase):
         CollectionCatchment.objects.create(name="Catchment")
         collector = Collector.objects.create(name="Collector")
         collection_system = CollectionSystem.objects.create(name="System")
-        waste_stream = WasteStream.objects.create(
-            category=WasteCategory.objects.create(name="Category")
-        )
+        waste_category = WasteCategory.objects.create(name="Category")
         cls.collection = Collection.objects.create(
             collector=collector,
             collection_system=collection_system,
-            waste_stream=waste_stream,
+            waste_category=waste_category,
         )
         cls.predecessor_collection = Collection.objects.create(
             collector=collector,
             collection_system=collection_system,
-            waste_stream=waste_stream,
+            waste_category=waste_category,
         )
         cls.other_collection = Collection.objects.create(
             collector=collector,
             collection_system=collection_system,
-            waste_stream=waste_stream,
+            waste_category=waste_category,
         )
 
     def test_collection_remove_predecessor_form_valid(self):
@@ -1392,12 +1428,6 @@ class CollectionModelFormPermissionTestCase(TestCase):
             owner=self.user1,
             publication_status="published",
         )
-        self.waste_stream = WasteStream.objects.create(
-            name="Test Stream",
-            category=self.waste_category,
-            owner=self.user1,
-            publication_status="published",
-        )
 
         # Create a private source owned by user1 (not accessible to user2)
         self.private_source = Source.objects.create(
@@ -1446,7 +1476,6 @@ class CollectionModelFormPermissionTestCase(TestCase):
             "collector": self.collector.pk,
             "collection_system": self.collection_system.pk,
             "waste_category": self.waste_category.pk,
-            "waste_stream": self.waste_stream.pk,
             "valid_from": "2024-01-01",
             "sources": [self.private_source.pk],  # User2 shouldn't have access
         }
@@ -1469,7 +1498,6 @@ class CollectionModelFormPermissionTestCase(TestCase):
             "collector": self.collector.pk,
             "collection_system": self.collection_system.pk,
             "waste_category": self.waste_category.pk,
-            "waste_stream": self.waste_stream.pk,
             "valid_from": "2024-01-01",
             "sources": [self.public_source.pk],  # Public source should be accessible
         }
@@ -1490,7 +1518,6 @@ class CollectionModelFormPermissionTestCase(TestCase):
             "collector": self.collector.pk,
             "collection_system": self.collection_system.pk,
             "waste_category": self.waste_category.pk,
-            "waste_stream": self.waste_stream.pk,
             "valid_from": "2024-01-01",
             "sources": [self.private_source.pk],  # User1's own private source
         }
@@ -1511,7 +1538,6 @@ class CollectionModelFormPermissionTestCase(TestCase):
             "collector": self.collector.pk,
             "collection_system": self.collection_system.pk,
             "waste_category": self.waste_category.pk,
-            "waste_stream": self.waste_stream.pk,
             "valid_from": "2024-01-01",
             "sources": [
                 self.public_source.pk,
@@ -1532,7 +1558,6 @@ class CollectionModelFormPermissionTestCase(TestCase):
             "collector": self.collector.pk,
             "collection_system": self.collection_system.pk,
             "waste_category": self.waste_category.pk,
-            "waste_stream": self.waste_stream.pk,
             "valid_from": "2024-01-01",
             "sources": [self.private_source.pk],
         }

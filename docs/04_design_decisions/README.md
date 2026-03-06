@@ -6,6 +6,9 @@ This section contains Architecture Decision Records (ADRs) and major design rati
 - Record significant architectural and technology decisions.
 - Provide context and rationale for future contributors.
 
+## Recent ADRs
+- [2026-02-28: Inline WasteStream semantics into Collection](2026-02-28_inline_wastestream_semantics_collection.md)
+
 ## How to Add an ADR
 1. Copy the template below into a new file in this folder.
 2. Name your file `YYYY-MM-DD-title.md`.

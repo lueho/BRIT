@@ -4,7 +4,6 @@
 {% load static %}
 {% load file_export_tags %}
 {% load leaflet_tags %}
-
 {% block style_sheets %}
   {{ block.super }}
   {% if not review_mode %}
@@ -15,17 +14,14 @@
           href="{% static 'soilcom/css/collection_detail.css' %}">
   {% endif %}
 {% endblock style_sheets %}
-
 {# Confirm texts available to all blocks #}
 {% trans "Are you sure you want to submit this for review?" as submit_confirm %}
 {% trans "Are you sure you want to withdraw this from review?" as withdraw_confirm %}
 {% trans "Are you sure you want to approve this?" as approve_confirm %}
 {% trans "Are you sure you want to reject this?" as reject_confirm %}
-
 {% block detail_header_badge %}
   {% include "object_management/review_status_badge.html" with object=object %}
 {% endblock detail_header_badge %}
-
 {% block detail_header_actions %}
   <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
     {% block detail_header_primary_actions %}
@@ -125,13 +121,11 @@
   </div>
   {# Reject handled via global modal scaffold (modal-link in options pane) #}
 {% endblock detail_header_actions %}
-
 {% block detail_top_image %}
   {% if not review_mode %}
     <div class="card-img-top map-container">{% leaflet_map "main" %}</div>
   {% endif %}
 {% endblock detail_top_image %}
-
 {% block detail_body %}
   <p class="card-text">
     <strong>Catchment:</strong>
@@ -142,11 +136,6 @@
     <strong>Collector:</strong>
     <br>
     <a href="{{ object.collector.get_absolute_url }}">{{ object.collector.name }}</a>
-  </p>
-  <p class="card-text">
-    <strong>Catchment:</strong>
-    <br>
-    <a href="{{ object.catchment.get_absolute_url }}">{{ object.catchment.name }}</a>
   </p>
   <p class="card-text">
     <strong>Collection System:</strong>
@@ -163,7 +152,11 @@
   <p class="card-text">
     <strong>Waste Category:</strong>
     <br>
-    <a href="{{ object.waste_stream.category.get_absolute_url }}">{{ object.waste_stream.category }}</a>
+    {% if object.effective_waste_category %}
+      <a href="{{ object.effective_waste_category.get_absolute_url }}">{{ object.effective_waste_category }}</a>
+    {% else %}
+      <span class="text-muted">Not specified</span>
+    {% endif %}
   </p>
   <p class="card-text">
     <strong>Year:</strong>
@@ -201,7 +194,6 @@
       {{ object.min_bin_size }} L
     </p>
   {% endif %}
-
   {% if object.required_bin_capacity %}
     <p class="card-text">
       <strong>Minimum required specific bin capacity (L/reference unit):</strong>
@@ -216,7 +208,6 @@
       {% endif %}
     </p>
   {% endif %}
-
   {% if allowed_materials %}
     <p class="card-text">
       <strong>Allowed Materials:</strong>
@@ -241,7 +232,6 @@
       {% endfor %}
     </ul>
   {% endif %}
-
   {% if object.frequency %}
     <p class="card-text">
       <strong>Frequency:</strong>
@@ -264,7 +254,6 @@
       {% endfor %}
     </ul>
   {% endif %}
-
   {% if object.fee_system %}
     <p class="card-text">
       <strong>Fee System:</strong>
@@ -272,7 +261,6 @@
       {{ object.fee_system.name }}
     </p>
   {% endif %}
-
   {% if collection_property_values %}
     {% regroup collection_property_values by property as property_list %}
     {% for prop in property_list %}
@@ -294,7 +282,7 @@
                 {% if val.is_derived %}<span class="text-muted fst-italic">(derived)</span>{% endif %}
               {% endif %}
             </a>
-            {% if val_policy.can_submit_review or val_policy.can_withdraw_review or val_policy.can_approve or val_policy.can_reject %}
+            {% if val_policy.can_submit_review or val_policy.can_withdraw_review %}
               <div class="mt-1 d-flex flex-wrap gap-2">
                 {% if val_policy.can_submit_review %}
                   <a class="btn btn-xs btn-outline-primary modal-link"
@@ -318,13 +306,20 @@
                   </a>
                 {% endif %}
               </div>
+            {% elif val_policy.can_approve or val_policy.can_reject %}
+              <div class="mt-1 d-flex flex-wrap gap-2">
+                <a class="btn btn-xs btn-outline-secondary"
+                   href="{% url 'object_management:review_item_detail' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ object.get_absolute_url|urlencode }}">
+                  <i class="fas fa-clipboard-check"></i>
+                  Review view
+                </a>
+              </div>
             {% endif %}
           </li>
         {% endfor %}
       </ul>
     {% endfor %}
   {% endif %}
-
   {% if aggregated_collection_property_values %}
     {% regroup aggregated_collection_property_values by property as property_list %}
     {% for prop in property_list %}
@@ -344,7 +339,7 @@
                 {{ val.average }} {{ val.unit.name }} ({{ val.year }}) (aggregated)
               {% endif %}
             </a>
-            {% if agg_policy.can_submit_review or agg_policy.can_withdraw_review or agg_policy.can_approve or agg_policy.can_reject %}
+            {% if agg_policy.can_submit_review or agg_policy.can_withdraw_review %}
               <div class="mt-1 d-flex flex-wrap gap-2">
                 {% if agg_policy.can_submit_review %}
                   <a class="btn btn-xs btn-outline-primary modal-link"
@@ -368,13 +363,20 @@
                   </a>
                 {% endif %}
               </div>
+            {% elif agg_policy.can_approve or agg_policy.can_reject %}
+              <div class="mt-1 d-flex flex-wrap gap-2">
+                <a class="btn btn-xs btn-outline-secondary"
+                   href="{% url 'object_management:review_item_detail' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ object.get_absolute_url|urlencode }}">
+                  <i class="fas fa-clipboard-check"></i>
+                  Review view
+                </a>
+              </div>
             {% endif %}
           </li>
         {% endfor %}
       </ul>
     {% endfor %}
   {% endif %}
-
   {% if samples %}
     <p class="card-text">
       <strong>Samples</strong>
@@ -387,7 +389,6 @@
       {% endfor %}
     </ul>
   {% endif %}
-
   {% if all_sources %}
     <p class="card-text">
       <strong>Sources:</strong>
@@ -396,7 +397,6 @@
       {% for source in all_sources %}
         <li>
           {% if source.type == "waste_flyer" %}
-            {# Waste flyer: Keep full href, but compact visible label for better UX #}
             <i class="fas fa-file-alt text-muted"></i>
             <span class="badge bg-secondary text-white me-2">Waste Flyer</span>
             <a href="{{ source.url }}"
@@ -408,7 +408,6 @@
             </a>
             {% if "web.archive.org" in source.url %}<span class="badge text-bg-light border ms-2">Archived</span>{% endif %}
           {% else %}
-            {# Regular bibliographic source #}
             <a href="{{ source.get_absolute_url }}">{{ source.abbreviation }}</a>
             {% if source.title %}- {{ source.title }}{% endif %}
             {% if source.year %}({{ source.year }}){% endif %}
@@ -429,7 +428,6 @@
       {% endfor %}
     </ul>
   {% endif %}
-
   {% if object.description %}
     <p class="card-text">
       <strong>Comments:</strong>
@@ -437,7 +435,6 @@
       {{ object.description|markdown_to_html }}
     </p>
   {% endif %}
-
   <p class="card-text">
     <strong>Valid from:</strong>
     <br>
@@ -448,7 +445,6 @@
     <br>
     {{ object.valid_until|date:"d.m.Y" }}
   </p>
-
   <p class="card-text">
     <strong>Last update:</strong>
     <br>
@@ -499,7 +495,6 @@
     </ul>
   {% endif %}
 {% endblock detail_body %}
-
 {# Options for the integrated right column (new base) #}
 {% block options_pane %}
   {% object_policy object review_mode=review_mode as policy %}
@@ -517,7 +512,6 @@
       </a>
     {% endif %}
   {% endif %}
-
   {% if policy.can_manage_samples %}
     <a class="btn btn-outline-secondary w-100 mb-2"
        href="{% url 'collection-wastesamples' object.id %}">
@@ -530,7 +524,6 @@
       <i class="fas fa-circle-plus"></i> Add property
     </a>
   {% endif %}
-
   {% if policy.can_duplicate %}
     <a class="btn btn-outline-secondary w-100 mb-2"
        href="{% url 'collection-copy' object.id %}">
@@ -543,14 +536,12 @@
       <i class="fas fa-code-branch"></i> New version
     </a>
   {% endif %}
-
   {% if policy.can_archive %}
     <a class="btn btn-outline-secondary modal-link w-100 mb-2"
        href="{% url 'collection-archive-modal' object.id %}">
       <i class="fas fa-archive"></i> Archive
     </a>
   {% endif %}
-
   {# Delete #}
   {% if policy.can_delete %}
     <a class="btn btn-outline-danger modal-link w-100 mb-2"
@@ -558,9 +549,7 @@
       <i class="fas fa-trash"></i> Delete
     </a>
   {% endif %}
-
   {# Review navigation is exposed in the header action group to avoid duplication #}
-
   {# Review workflow #}
   {% if policy.can_submit_review %}
     <a class="btn btn-outline-primary w-100 mb-2 modal-link"
@@ -568,7 +557,6 @@
       <i class="fas fa-paper-plane"></i> {% trans "Submit for Review" %}
     </a>
   {% endif %}
-
   {% if object.is_in_review %}
     {% if policy.can_withdraw_review %}
       <a class="btn btn-outline-warning w-100 mb-2 modal-link"
@@ -589,22 +577,18 @@
       </a>
     {% endif %}
   {% endif %}
-
   {# Export #}
   {% if policy.can_export %}
     {% export_modal_button "collection-export" list_type=policy.export_list_type id=object.id button_classes="btn btn-outline-secondary w-100 mb-2" %}
   {% endif %}
 {% endblock options_pane %}
-
 {# Learning tab content (new base) #}
 {% block learning_content %}
   {% include "soilcom/includes/learning_materials.html" %}
 {% endblock learning_content %}
-
 {# Legacy block preserved but disabled #}
 {% block second_row %}
 {% endblock second_row %}
-
 {% block detail_with_options_scripts %}
   <script src="{% static 'js/file_export.min.js' %}" type="text/javascript"></script>
   <script src="{% static 'js/source_url_display.js' %}" type="text/javascript"></script>
@@ -612,10 +596,10 @@
     <script src="{% static 'js/maps.min.js' %}"></script>
     {{ map_config|json_script:"mapConfig" }}
     <script type="text/javascript">
-      const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
-      window.addEventListener('load', function() {
-        loadMap(mapConfig);
-      });
+  const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
+  window.addEventListener('load', function () {
+    loadMap(mapConfig);
+  });
     </script>
   {% endif %}
 {% endblock detail_with_options_scripts %}
