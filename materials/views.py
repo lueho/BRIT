@@ -10,7 +10,7 @@ from django.contrib.auth.mixins import (
 )
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
-from django.urls import reverse, reverse_lazy
+from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.views.generic import ListView, RedirectView, TemplateView
 from django.views.generic.detail import SingleObjectMixin
 from extra_views import UpdateWithInlinesView
@@ -602,19 +602,88 @@ class SampleSeriesAutoCompleteView(UserCreatedObjectAutocompleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SamplePublishedListView(PublishedObjectFilterView):
+class SampleRepresentationMixin:
+    model = Sample
+    filterset_class = SampleFilter
+    dashboard_url = reverse_lazy("materials-explorer")
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .select_related("material", "series", "timestep")
+            .prefetch_related("sources", "properties")
+        )
+
+    def get_gallery_context_urls(self):
+        try:
+            public_gallery_url = reverse("sample-gallery")
+        except NoReverseMatch:
+            public_gallery_url = None
+
+        try:
+            private_gallery_url = reverse("sample-gallery-owned")
+        except NoReverseMatch:
+            private_gallery_url = None
+
+        try:
+            review_gallery_url = reverse("sample-gallery-review")
+        except NoReverseMatch:
+            review_gallery_url = None
+
+        return {
+            "public_gallery_url": public_gallery_url,
+            "private_gallery_url": private_gallery_url,
+            "review_gallery_url": review_gallery_url,
+        }
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        gallery_urls = self.get_gallery_context_urls()
+        context.update(gallery_urls)
+        if getattr(self, "representation_mode", "list") == "gallery":
+            context.update(
+                {
+                    "representation_mode": "gallery",
+                    "public_representation_url": gallery_urls["public_gallery_url"]
+                    or context.get("public_url"),
+                    "private_representation_url": gallery_urls["private_gallery_url"]
+                    or context.get("private_url"),
+                    "review_representation_url": gallery_urls["review_gallery_url"]
+                    or context.get("review_url"),
+                }
+            )
+        return context
+
+
+class SamplePublishedGalleryView(SampleRepresentationMixin, PublishedObjectFilterView):
+    template_name = "materials/sample_gallery.html"
+    representation_mode = "gallery"
+
+
+class SamplePrivateGalleryView(SampleRepresentationMixin, PrivateObjectFilterView):
+    template_name = "materials/sample_gallery.html"
+    representation_mode = "gallery"
+
+
+class SampleReviewGalleryView(SampleRepresentationMixin, ReviewObjectFilterView):
+    template_name = "materials/sample_gallery.html"
+    representation_mode = "gallery"
+
+
+class SamplePublishedListView(SampleRepresentationMixin, PublishedObjectFilterView):
     model = Sample
     filterset_class = SampleFilter
     dashboard_url = reverse_lazy("materials-explorer")
 
 
-class SamplePrivateListView(PrivateObjectFilterView):
+class SamplePrivateListView(SampleRepresentationMixin, PrivateObjectFilterView):
     model = Sample
     filterset_class = SampleFilter
     dashboard_url = reverse_lazy("materials-explorer")
 
 
-class SampleReviewListView(ReviewObjectFilterView):
+class SampleReviewListView(SampleRepresentationMixin, ReviewObjectFilterView):
     model = Sample
     filterset_class = SampleFilter
     dashboard_url = reverse_lazy("materials-explorer")

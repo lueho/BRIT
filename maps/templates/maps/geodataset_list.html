@@ -1,18 +1,68 @@
 {% extends "filtered_list.html" %}
-
+{% load moderation_tags %}
 {% block list_intro %}
-<div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start" role="region" aria-label="Module introduction">
-    <div class="flex-grow-1">
-        <strong><i class="fas fa-globe-europe me-1"></i> Maps</strong>
-        <p class="mb-0 small text-muted">
-            Browse geographic datasets for spatial analysis of bioresource potentials.
-            View and manage geodata layers across European regions.
-        </p>
+    <div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start"
+         role="region"
+         aria-label="Module introduction">
+        <div class="flex-grow-1">
+            <strong><i class="fas fa-globe-europe me-1"></i> Maps</strong>
+            <p class="mb-0 small text-muted">
+                Browse geographic datasets for spatial analysis of bioresource potentials.
+                View and manage geodata layers across European regions.
+            </p>
+        </div>
+        <button type="button"
+                class="btn-close ms-3"
+                data-bs-dismiss="alert"
+                aria-label="Dismiss"></button>
     </div>
-    <button type="button" class="btn-close ms-3" data-bs-dismiss="alert" aria-label="Dismiss"></button>
-</div>
 {% endblock list_intro %}
-
+{% block list_card_header %}
+    GeoDatasets
+{% endblock list_card_header %}
+{% block list_table_head %}
+    <thead>
+        <tr>
+            <th>Dataset</th>
+            <th>Region</th>
+            <th>Type</th>
+            <th>Sources</th>
+            {% if object_list.model.user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
+        </tr>
+    </thead>
+{% endblock list_table_head %}
+{% block list_table_row %}
+    <tr tabindex="0"
+        role="link"
+        onclick="window.location='{% detail_or_review_url object use_back=True %}'"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.location='{% detail_or_review_url object use_back=True %}'}">
+        <td data-label="Dataset" class="ps-3">
+            <a href="{% detail_or_review_url object use_back=True %}"
+               class="text-decoration-none">
+                <strong class="d-block">{{ object.name }}</strong>
+                {% if object.description %}<span class="text-muted small">{{ object.description|truncatewords:18 }}</span>{% endif %}
+            </a>
+        </td>
+        <td data-label="Region">
+            {% if object.region %}
+                {{ object.region.name }}
+            {% else %}
+                <span class="text-muted">-</span>
+            {% endif %}
+        </td>
+        <td data-label="Type">
+            {% if object.model_name %}
+                {{ object.model_name }}
+            {% else %}
+                <span class="text-muted">-</span>
+            {% endif %}
+        </td>
+        <td data-label="Sources">{{ object.sources.count }}</td>
+        {% if object_list.model.user_created %}
+            <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
+        {% endif %}
+    </tr>
+{% endblock list_table_row %}
 {% block learning_pane_body %}
     {% include "maps/includes/learning_materials.html" %}
 {% endblock learning_pane_body %}

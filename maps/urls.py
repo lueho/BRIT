@@ -30,7 +30,9 @@ from .views import (
     GeoDataSetCreateView,
     GeoDataSetModalDeleteView,
     GeoDataSetPrivateFilterView,
+    GeoDataSetPrivateGalleryView,
     GeoDataSetPublishedFilterView,
+    GeoDataSetPublishedGalleryView,
     GeoDataSetUpdateView,
     LocationAutocompleteView,
     LocationCreateView,
@@ -68,7 +70,17 @@ from .views import (
 
 urlpatterns = [
     path("explorer/", MapsDashboardView.as_view(), name="maps-dashboard"),
-    path("list/", GeoDataSetPublishedFilterView.as_view(), name="maps_list"),
+    path("list/", GeoDataSetPublishedGalleryView.as_view(), name="maps_list"),
+    path(
+        "geodatasets/gallery/",
+        GeoDataSetPublishedGalleryView.as_view(),
+        name="geodataset-gallery",
+    ),
+    path(
+        "geodatasets/gallery/user/",
+        GeoDataSetPrivateGalleryView.as_view(),
+        name="geodataset-gallery-owned",
+    ),
     path(
         "geodatasets/", GeoDataSetPublishedFilterView.as_view(), name="geodataset-list"
     ),

@@ -998,11 +998,95 @@ class FeaturedSampleListViewTestCase(ViewWithPermissionsTestCase):
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse("sample-list-featured"))
         self.assertEqual(response.status_code, 301)
+        self.assertEqual(response.url, reverse("sample-gallery"))
 
     def test_get_http_200_ok_for_logged_in_users(self):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse("sample-list-featured"))
         self.assertEqual(response.status_code, 301)
+        self.assertEqual(response.url, reverse("sample-gallery"))
+
+
+class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.material = Material.objects.create(
+            owner=cls.owner,
+            name="Test Material",
+            publication_status="published",
+        )
+        cls.sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Test Sample",
+            publication_status="published",
+            material=cls.material,
+            standalone=True,
+        )
+
+    def test_public_list_includes_gallery_switch(self):
+        response = self.client.get(reverse("sample-list"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("sample-gallery"))
+        self.assertContains(response, self.sample.name)
+
+    def test_public_gallery_renders_and_links_back_to_list(self):
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("sample-list"))
+        self.assertContains(response, "Open sample")
+        self.assertContains(response, self.material.name)
+
+    def test_private_gallery_renders_for_owner(self):
+        self.sample.publication_status = "private"
+        self.sample.save(update_fields=["publication_status"])
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("sample-gallery-owned"), {"scope": "private"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("sample-list-owned"))
+        self.assertContains(response, "Edit metadata")
+
+    def test_public_gallery_uses_series_image_when_sample_image_missing(self):
+        series = SampleSeries.objects.create(
+            owner=self.owner,
+            name="Series With Image",
+            material=self.material,
+            image="materials_sampleseries/series-image.jpg",
+        )
+        sample = Sample.objects.create(
+            owner=self.owner,
+            name="Series-backed Sample",
+            publication_status="published",
+            material=self.material,
+            series=series,
+        )
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "materials_sampleseries/series-image.jpg")
+        self.assertContains(response, "Using series image")
+        self.assertContains(response, sample.name)
+
+    def test_detail_view_uses_series_image_when_sample_image_missing(self):
+        series = SampleSeries.objects.create(
+            owner=self.owner,
+            name="Series With Image",
+            material=self.material,
+            image="materials_sampleseries/series-image.jpg",
+        )
+        sample = Sample.objects.create(
+            owner=self.owner,
+            name="Series-backed Sample",
+            publication_status="published",
+            material=self.material,
+            series=series,
+        )
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "materials_sampleseries/series-image.jpg")
+        self.assertContains(response, "Showing the image from the linked sample series")
+        self.assertContains(response, sample.name)
 
 
 class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
@@ -2859,6 +2943,29 @@ class SampleDetailTemplateReviewUITests(TestCase):
         self.assertEqual(response.status_code, 200)
         template_names = [t.name for t in response.templates]
         self.assertIn("detail_with_options.html", template_names)
+
+    def test_sample_detail_uses_series_image_when_sample_image_missing(self):
+        with mute_signals(post_save, pre_save):
+            series = SampleSeries.objects.create(
+                name="Series With Image",
+                material=self.material,
+                owner=self.owner,
+                publication_status=UserCreatedObject.STATUS_PUBLISHED,
+                image="materials_sampleseries/detail-series-image.jpg",
+            )
+            sample = Sample.objects.create(
+                name="Sample Without Own Image",
+                material=self.material,
+                series=series,
+                owner=self.owner,
+                publication_status=UserCreatedObject.STATUS_PRIVATE,
+            )
+
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "materials_sampleseries/detail-series-image.jpg")
+        self.assertContains(response, "Showing the image from the linked sample series")
 
 
 class SampleSeriesDetailTemplateReviewUITests(TestCase):

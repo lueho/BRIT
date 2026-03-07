@@ -86,7 +86,7 @@
                     class="btn btn-sm btn-primary submit-filter"
                     type="submit">Filter</button>
             <a class="btn btn-sm btn-outline-secondary"
-               href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}"
+               href="{% if list_type == 'private' %}{{ private_representation_url }}?scope=private{% elif list_type == 'review' %}{{ review_representation_url }}?scope=review{% else %}{{ public_representation_url }}?scope=published{% endif %}"
                aria-label="Reset filters">Reset</a>
         </div>
     </form>

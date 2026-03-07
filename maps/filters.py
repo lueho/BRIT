@@ -1,15 +1,24 @@
 from django.forms import HiddenInput
-from django_filters import CharFilter, ModelChoiceFilter, NumberFilter
+from django_filters import CharFilter, ChoiceFilter, ModelChoiceFilter, NumberFilter
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
 
+from bibliography.models import Source
 from utils.filters import BaseCrispyFilterSet, UserCreatedObjectScopedFilterSet
 from utils.object_management.permissions import (
     apply_scope_filter,
     filter_queryset_for_user,
 )
 
-from .models import Attribute, Catchment, GeoDataset, Location, NutsRegion, Region
+from .models import (
+    GIS_SOURCE_MODELS,
+    Attribute,
+    Catchment,
+    GeoDataset,
+    Location,
+    NutsRegion,
+    Region,
+)
 
 
 class CatchmentFilterSet(UserCreatedObjectScopedFilterSet):
@@ -113,10 +122,66 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
         fields = ["level_0", "level_1", "level_2", "level_3"]
 
 
-class GeoDataSetFilterSet(BaseCrispyFilterSet):
+class GeoDataSetFilterSet(UserCreatedObjectScopedFilterSet):
+    name = CharFilter(lookup_expr="icontains", label="Name contains")
+    model_name = ChoiceFilter(choices=GIS_SOURCE_MODELS, label="Dataset type")
+    region = ModelChoiceFilter(
+        queryset=Region.objects.none(),
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="region-autocomplete",
+                label_field="name",
+                filter_by=("scope", "name"),
+            )
+        ),
+        label="Region",
+    )
+    source = ModelChoiceFilter(
+        queryset=Source.objects.none(),
+        field_name="sources",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="source-autocomplete",
+                label_field="text",
+                filter_by=("scope", "name"),
+            )
+        ),
+        label="Source",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+
+        region_queryset = Region.objects.all()
+        source_queryset = Source.objects.all()
+        if request and hasattr(request, "user"):
+            region_queryset = filter_queryset_for_user(region_queryset, request.user)
+            source_queryset = filter_queryset_for_user(source_queryset, request.user)
+
+        scope_value = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
+        except Exception:
+            scope_value = None
+
+        if scope_value:
+            region_queryset = apply_scope_filter(
+                region_queryset, scope_value, user=getattr(request, "user", None)
+            )
+            source_queryset = apply_scope_filter(
+                source_queryset, scope_value, user=getattr(request, "user", None)
+            )
+
+        self.filters["region"].queryset = region_queryset
+        self.filters["source"].queryset = source_queryset
+
     class Meta:
         model = GeoDataset
-        fields = ("id",)
+        fields = ("scope", "name", "model_name", "region", "source")
 
 
 class LocationListFilter(UserCreatedObjectScopedFilterSet):

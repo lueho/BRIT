@@ -188,6 +188,21 @@ urlpatterns = [
     ),
     path("samples/", views.SamplePublishedListView.as_view(), name="sample-list"),
     path(
+        "samples/gallery/",
+        views.SamplePublishedGalleryView.as_view(),
+        name="sample-gallery",
+    ),
+    path(
+        "samples/gallery/user/",
+        views.SamplePrivateGalleryView.as_view(),
+        name="sample-gallery-owned",
+    ),
+    path(
+        "samples/gallery/review/",
+        views.SampleReviewGalleryView.as_view(),
+        name="sample-gallery-review",
+    ),
+    path(
         "samples/autocomplete/",
         views.SampleAutocompleteView.as_view(),
         name="sample-autocomplete",
@@ -204,7 +219,7 @@ urlpatterns = [
     ),
     path(
         "samples/featured/",
-        RedirectView.as_view(pattern_name="sample-list", permanent=True),
+        RedirectView.as_view(pattern_name="sample-gallery", permanent=True),
         name="sample-list-featured",
     ),
     path(

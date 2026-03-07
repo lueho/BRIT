@@ -1,0 +1,92 @@
+{% extends "filtered_list.html" %}
+{% load moderation_tags %}
+{% block list_intro %}
+    <div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start"
+         role="region"
+         aria-label="Module introduction">
+        <div class="flex-grow-1">
+            <strong><i class="fas fa-globe-europe me-1"></i> Maps gallery</strong>
+            <p class="mb-0 small text-muted">
+                Discover geographic datasets through preview cards, then switch to the analytical list whenever you want deeper filtering.
+            </p>
+        </div>
+        <button type="button"
+                class="btn-close ms-3"
+                data-bs-dismiss="alert"
+                aria-label="Dismiss"></button>
+    </div>
+{% endblock list_intro %}
+{% block custom_style %}
+    {{ block.super }}
+    <style>
+  .geodataset-gallery-image {
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+  }
+    </style>
+{% endblock custom_style %}
+{% block list_card_header %}
+    GeoDatasets
+{% endblock list_card_header %}
+{% block list_table %}
+    <div class="row g-3">
+        {% for object in object_list %}
+            <div class="col-12 col-md-6 col-xl-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <a href="{% detail_or_review_url object use_back=True %}"
+                       class="text-decoration-none text-body">
+                        <img class="card-img-top geodataset-gallery-image"
+                             src="{{ object.preview.url }}"
+                             alt="{{ object.name }} preview"
+                             width="800"
+                             height="450">
+                    </a>
+                    <div class="card-body d-flex flex-column">
+                        <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                            <div>
+                                <h6 class="mb-1">
+                                    <a href="{% detail_or_review_url object use_back=True %}"
+                                       class="text-decoration-none text-body">{{ object.name }}</a>
+                                </h6>
+                            </div>
+                            {% if object.publication_status and list_type != 'published' and list_type != 'review' %}
+                                <span class="badge text-bg-light">{{ object.get_publication_status_display }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="small text-muted mb-3">
+                            {% if object.region %}
+                                <div>
+                                    <i class="fas fa-location-dot me-1"></i>{{ object.region.name }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <p class="card-text small text-muted mb-3">
+                            {{ object.description|default:"Open this dataset to explore the underlying geodata and map configuration."|truncatewords:24 }}
+                        </p>
+                        <div class="mt-auto d-flex align-items-center justify-content-between gap-2">
+                            <a class="btn btn-sm btn-outline-primary"
+                               href="{% detail_or_review_url object use_back=True %}">Open dataset</a>
+                            {% if object.update_url and list_type == 'private' %}
+                                <a class="btn btn-sm btn-outline-secondary"
+                                   href="{{ object.update_url }}">Edit metadata</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <div class="border rounded-3 bg-body-tertiary text-center text-muted py-5 px-4">
+                    <div class="mb-2">
+                        <i class="fas fa-filter me-1"></i> No datasets match your current filters.
+                        <a href="{% if list_type == 'private' %}{{ private_representation_url }}?scope=private{% else %}{{ public_representation_url }}?scope=published{% endif %}"
+                           class="ms-2">Reset filters</a>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% endblock list_table %}
+{% block learning_pane_body %}
+    {% include "maps/includes/learning_materials.html" %}
+{% endblock learning_pane_body %}

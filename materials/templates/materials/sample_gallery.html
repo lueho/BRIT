@@ -1,0 +1,108 @@
+{% extends "materials/sample_filter.html" %}
+{% load moderation_tags %}
+{% block custom_style %}
+    {{ block.super }}
+    <style>
+  .sample-gallery-image {
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+  }
+
+  .sample-gallery-placeholder {
+    aspect-ratio: 16 / 9;
+  }
+
+  .sample-gallery-placeholder-label {
+    max-width: 18rem;
+  }
+    </style>
+{% endblock custom_style %}
+{% block list_table %}
+    <div class="row g-3">
+        {% for object in object_list %}
+            <div class="col-12 col-md-6 col-xl-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    {% if object.display_image %}
+                        <a href="{% detail_or_review_url object use_back=True %}"
+                           class="text-decoration-none text-body">
+                            <img class="card-img-top sample-gallery-image"
+                                 src="{{ object.display_image.url }}"
+                                 alt="{% if object.display_image_source == 'series' %}Series image for {{ object.name }}{% else %}{{ object.name }} image{% endif %}"
+                                 width="800"
+                                 height="450">
+                        </a>
+                    {% else %}
+                        <a href="{% detail_or_review_url object use_back=True %}"
+                           class="card-img-top sample-gallery-placeholder d-flex align-items-center justify-content-center bg-body-tertiary text-muted text-decoration-none">
+                            <span class="sample-gallery-placeholder-label text-center px-3">
+                                <span class="d-block fw-semibold mb-1"><i class="fas fa-flask me-2"></i>{{ object.material.name }}</span>
+                                <span class="small">No sample photo available</span>
+                            </span>
+                        </a>
+                    {% endif %}
+                    <div class="card-body d-flex flex-column">
+                        <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                            <div>
+                                <h6 class="mb-1">
+                                    <a href="{% detail_or_review_url object use_back=True %}"
+                                       class="text-decoration-none text-body">{{ object.name }}</a>
+                                </h6>
+                                <div class="small text-muted">{{ object.material.name }}</div>
+                            </div>
+                            {% if object.publication_status %}
+                                <span class="badge text-bg-light">{{ object.get_publication_status_display }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="small text-muted mb-3">
+                            {% if object.created_at %}
+                                <div>
+                                    <i class="fas fa-calendar me-1"></i>{{ object.created_at|date:"Y-m-d" }}
+                                </div>
+                            {% endif %}
+                            {% if object.series %}
+                                <div>
+                                    <i class="fas fa-layer-group me-1"></i>{{ object.series.name }}
+                                </div>
+                            {% elif object.standalone %}
+                                <div>
+                                    <i class="fas fa-tag me-1"></i>Standalone
+                                </div>
+                            {% endif %}
+                            {% if object.display_image_source == 'series' %}
+                                <div>
+                                    <i class="fas fa-image me-1"></i>Using series image
+                                </div>
+                            {% endif %}
+                            {% if not object.display_image and object.series %}
+                                <div>
+                                    <i class="fas fa-circle-info me-1"></i>No sample or series image
+                                </div>
+                            {% endif %}
+                        </div>
+                        <p class="card-text small text-muted mb-3">
+                            {{ object.description|default:"Open this sample to review properties, compositions, and supporting metadata."|truncatewords:24 }}
+                        </p>
+                        <div class="mt-auto d-flex align-items-center justify-content-between gap-2">
+                            <a class="btn btn-sm btn-outline-primary"
+                               href="{% detail_or_review_url object use_back=True %}">Open sample</a>
+                            {% if object.update_url and list_type == 'private' %}
+                                <a class="btn btn-sm btn-outline-secondary"
+                                   href="{{ object.update_url }}">Edit metadata</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <div class="border rounded-3 bg-body-tertiary text-center text-muted py-5 px-4">
+                    <div class="mb-2">
+                        <i class="fas fa-filter me-1"></i> No samples match your current filters.
+                        <a href="{% if list_type == 'private' %}{{ private_representation_url }}?scope=private{% elif list_type == 'review' %}{{ review_representation_url }}?scope=review{% else %}{{ public_representation_url }}?scope=published{% endif %}"
+                           class="ms-2">Reset filters</a>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% endblock list_table %}

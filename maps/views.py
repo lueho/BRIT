@@ -335,16 +335,81 @@ class MapsDashboardView(TemplateView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class GeoDataSetPublishedFilterView(PublishedObjectFilterView):
+class GeoDataSetRepresentationMixin:
     model = GeoDataset
     filterset_class = GeoDataSetFilterSet
     dashboard_url = reverse_lazy("maps-dashboard")
 
+    def get_default_filters(self):
+        defaults = super().get_default_filters()
+        if "scope" in getattr(self.filterset_class, "base_filters", {}):
+            defaults["scope"] = self.get_list_type()
+        return defaults
 
-class GeoDataSetPrivateFilterView(PrivateObjectFilterView):
-    model = GeoDataset
-    filterset_class = GeoDataSetFilterSet
-    dashboard_url = reverse_lazy("maps-dashboard")
+    def get_queryset(self):
+        return (
+            super().get_queryset().select_related("region").prefetch_related("sources")
+        )
+
+    def get_gallery_context_urls(self):
+        try:
+            public_gallery_url = reverse("geodataset-gallery")
+        except NoReverseMatch:
+            public_gallery_url = None
+
+        try:
+            private_gallery_url = reverse("geodataset-gallery-owned")
+        except NoReverseMatch:
+            private_gallery_url = None
+
+        return {
+            "public_gallery_url": public_gallery_url,
+            "private_gallery_url": private_gallery_url,
+            "review_gallery_url": None,
+        }
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        gallery_urls = self.get_gallery_context_urls()
+        context.update(gallery_urls)
+        if getattr(self, "representation_mode", "list") == "gallery":
+            context.update(
+                {
+                    "representation_mode": "gallery",
+                    "public_representation_url": gallery_urls["public_gallery_url"]
+                    or context.get("public_url"),
+                    "private_representation_url": gallery_urls["private_gallery_url"]
+                    or context.get("private_url"),
+                    "review_representation_url": context.get("review_url"),
+                }
+            )
+        return context
+
+
+class GeoDataSetPublishedGalleryView(
+    GeoDataSetRepresentationMixin, PublishedObjectFilterView
+):
+    template_name = "maps/geodataset_gallery.html"
+    representation_mode = "gallery"
+
+
+class GeoDataSetPrivateGalleryView(
+    GeoDataSetRepresentationMixin, PrivateObjectFilterView
+):
+    template_name = "maps/geodataset_gallery.html"
+    representation_mode = "gallery"
+
+
+class GeoDataSetPublishedFilterView(
+    GeoDataSetRepresentationMixin, PublishedObjectFilterView
+):
+    template_name = "maps/geodataset_list.html"
+
+
+class GeoDataSetPrivateFilterView(
+    GeoDataSetRepresentationMixin, PrivateObjectFilterView
+):
+    template_name = "maps/geodataset_list.html"
 
 
 class GeoDataSetFormMixin(FormMixin):

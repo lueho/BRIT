@@ -590,6 +590,22 @@ class Sample(NamedUserCreatedObject):
             ]
         )
 
+    @property
+    def display_image(self):
+        if self.image:
+            return self.image
+        if self.series and self.series.image:
+            return self.series.image
+        return None
+
+    @property
+    def display_image_source(self):
+        if self.image:
+            return "sample"
+        if self.series and self.series.image:
+            return "series"
+        return None
+
     def duplicate(self, creator, **kwargs):
         post_save.disconnect(add_default_composition, sender=Sample)
         duplicate = Sample.objects.create(

@@ -9,13 +9,20 @@
   Sample: {{ object.name }}
 {% endblock detail_header %}
 {% block detail_top_image %}
-  {% if object.image %}
+  {% if object.display_image %}
     <div class="card-img-top">
       <img class="w-100 m-0"
-           src="{{ object.image.url }}"
-           alt="Image of sample"
+           src="{{ object.display_image.url }}"
+           alt="{% if object.display_image_source == 'series' %}Series image for {{ object.name }}{% else %}Image of sample{% endif %}"
+           width="1200"
+           height="300"
            style="max-height: 300px;
                   object-fit: cover">
+      {% if object.display_image_source == 'series' %}
+        <div class="small text-muted px-3 py-2 bg-body-tertiary border-top">
+          <i class="fas fa-image me-1"></i> Showing the image from the linked sample series.
+        </div>
+      {% endif %}
     </div>
   {% endif %}
 {% endblock detail_top_image %}

@@ -10,7 +10,8 @@
 {% block custom_style %}
 {% endblock custom_style %}
 {% block content %}
-  {% block list_intro %}{% endblock list_intro %}
+  {% block list_intro %}
+  {% endblock list_intro %}
   <div class="row">
     <div class="col-lg-8 order-2 order-lg-1">
       <div class="card shadow">
@@ -29,16 +30,86 @@
             </h5>
             <div class="d-flex align-items-center justify-content-end flex-wrap gap-2">
               {# View toggle (List / Map) – Map button shown only if a map URL exists for current scope #}
-              {% if public_map_url or private_map_url or review_map_url %}
+              {% if public_gallery_url or private_gallery_url or review_gallery_url or public_map_url or private_map_url or review_map_url %}
                 <div class="btn-group btn-group-sm" role="group" aria-label="View toggle">
-                  <a class="btn btn-outline-secondary active disabled"
-                     aria-current="page"
-                     role="button"
-                     aria-pressed="true"
-                     aria-disabled="true"
-                     tabindex="-1"
-                     title="View as list"
-                     href="{{ request.get_full_path }}"><i class="fas fa-list"></i></a>
+                  {% if representation_mode == 'gallery' %}
+                    {% if list_type == 'private' %}
+                      {% with list_base=private_url %}
+                        <a class="btn btn-outline-secondary"
+                           role="button"
+                           aria-pressed="false"
+                           title="View as list"
+                           href="{{ list_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private"><i class="fas fa-list"></i></a>
+                      {% endwith %}
+                    {% elif list_type == 'review' %}
+                      {% with list_base=review_url %}
+                        <a class="btn btn-outline-secondary"
+                           role="button"
+                           aria-pressed="false"
+                           title="View as list"
+                           href="{{ list_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review"><i class="fas fa-list"></i></a>
+                      {% endwith %}
+                    {% else %}
+                      {% with list_base=public_url %}
+                        <a class="btn btn-outline-secondary"
+                           role="button"
+                           aria-pressed="false"
+                           title="View as list"
+                           href="{{ list_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published"><i class="fas fa-list"></i></a>
+                      {% endwith %}
+                    {% endif %}
+                  {% else %}
+                    <a class="btn btn-outline-secondary active disabled"
+                       aria-current="page"
+                       role="button"
+                       aria-pressed="true"
+                       aria-disabled="true"
+                       tabindex="-1"
+                       title="View as list"
+                       href="{{ request.get_full_path }}"><i class="fas fa-list"></i></a>
+                  {% endif %}
+                  {% if public_gallery_url or private_gallery_url or review_gallery_url %}
+                    {% if representation_mode == 'gallery' %}
+                      <a class="btn btn-outline-secondary active disabled"
+                         aria-current="page"
+                         role="button"
+                         aria-pressed="true"
+                         aria-disabled="true"
+                         tabindex="-1"
+                         title="View as gallery"
+                         href="{{ request.get_full_path }}"><i class="fas fa-image"></i></a>
+                    {% elif list_type == 'private' %}
+                      {% with gallery_base=private_gallery_url %}
+                        {% if gallery_base %}
+                          <a class="btn btn-outline-secondary"
+                             role="button"
+                             aria-pressed="false"
+                             title="View as gallery"
+                             href="{{ gallery_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private"><i class="fas fa-image"></i></a>
+                        {% endif %}
+                      {% endwith %}
+                    {% elif list_type == 'review' %}
+                      {% with gallery_base=review_gallery_url %}
+                        {% if gallery_base %}
+                          <a class="btn btn-outline-secondary"
+                             role="button"
+                             aria-pressed="false"
+                             title="View as gallery"
+                             href="{{ gallery_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review"><i class="fas fa-image"></i></a>
+                        {% endif %}
+                      {% endwith %}
+                    {% else %}
+                      {% with gallery_base=public_gallery_url %}
+                        {% if gallery_base %}
+                          <a class="btn btn-outline-secondary"
+                             role="button"
+                             aria-pressed="false"
+                             title="View as gallery"
+                             href="{{ gallery_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published"><i class="fas fa-image"></i></a>
+                        {% endif %}
+                      {% endwith %}
+                    {% endif %}
+                  {% endif %}
                   {% if list_type == 'private' %}
                     {% with map_base=private_map_url %}
                       {% if map_base %}
@@ -80,7 +151,7 @@
                      title="Show published items"
                      aria-pressed="{% if list_type == 'published' %}true{% else %}false{% endif %}"
                      {% if list_type == 'published' %}aria-disabled="true" tabindex="-1"{% endif %}
-                     href="{{ object_list.model.public_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published">
+                     href="{{ public_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published">
                     Published
                   </a>
                   <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}"
@@ -88,16 +159,16 @@
                      title="Show only my items"
                      aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}"
                      {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
-                     href="{{ object_list.model.private_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
+                     href="{{ private_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
                     Mine
                   </a>
-                  {% if user|can_moderate:object_list.model and object_list.model.review_list_url %}
+                  {% if user|can_moderate:object_list.model and review_representation_url %}
                     <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"
                        role="button"
                        title="Show items pending review"
                        aria-pressed="{% if list_type == 'review' %}true{% else %}false{% endif %}"
                        {% if list_type == 'review' %}aria-disabled="true" tabindex="-1"{% endif %}
-                       href="{{ object_list.model.review_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review">
+                       href="{{ review_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review">
                       Review
                     </a>
                   {% endif %}
@@ -265,7 +336,7 @@
                                 class="btn btn-sm btn-primary submit-filter"
                                 type="submit">Filter</button>
                         <a class="btn btn-sm btn-outline-secondary"
-                           href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% elif list_type == 'review' %}{{ object_list.model.review_list_url }}?scope=review{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}"
+                           href="{% if list_type == 'private' %}{{ private_representation_url }}?scope=private{% elif list_type == 'review' %}{{ review_representation_url }}?scope=review{% else %}{{ public_representation_url }}?scope=published{% endif %}"
                            aria-label="Reset filters">Reset</a>
                       </div>
                     </form>

@@ -19,6 +19,7 @@ from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory, force_authenticate
 from rest_framework.viewsets import ModelViewSet
 
+from bibliography.models import Source
 from maps.mixins import GeoJSONMixin
 from maps.views import CatchmentCreateMergeLauView
 from utils.tests.testcases import (
@@ -233,6 +234,74 @@ class MapMixinTestCase(TestCase):
             second = self.view.get_map_configuration()
 
         self.assertEqual(first.pk, second.pk)
+
+
+# ----------- GeoDataSet representations -------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class GeoDataSetRepresentationViewsTestCase(ViewWithPermissionsTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.region = Region.objects.create(
+            name="Hamburg",
+            country="DE",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.source = Source.objects.create(
+            title="Roadside tree source",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.dataset = GeoDataset.objects.create(
+            name="Hamburg Tree Dataset",
+            owner=cls.owner,
+            publication_status="published",
+            region=cls.region,
+            model_name="NutsRegion",
+        )
+        cls.dataset.sources.add(cls.source)
+
+    def test_public_gallery_renders_preview_cards(self):
+        response = self.client.get(
+            reverse("geodataset-gallery"), {"scope": "published"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Maps gallery")
+        self.assertContains(response, reverse("geodataset-list"))
+        self.assertContains(response, self.dataset.name)
+
+    def test_public_list_renders_analytical_table(self):
+        response = self.client.get(reverse("geodataset-list"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "GeoDatasets")
+        self.assertContains(response, "Dataset")
+        self.assertContains(response, reverse("geodataset-gallery"))
+        self.assertContains(response, self.region.name)
+
+    def test_owned_gallery_requires_login(self):
+        response = self.client.get(
+            reverse("geodataset-gallery-owned"), {"scope": "private"}
+        )
+        self.assertRedirects(
+            response,
+            f"{settings.LOGIN_URL}?next={reverse('geodataset-gallery-owned')}%3Fscope%3Dprivate",
+        )
+
+    def test_owned_gallery_renders_for_owner(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("geodataset-gallery-owned"), {"scope": "private"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Edit metadata")
+
+    def test_maps_list_alias_points_to_gallery_representation(self):
+        response = self.client.get(reverse("maps_list"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Maps gallery")
 
 
 # ----------- Location CRUD---------------------------------------------------------------------------------------------
