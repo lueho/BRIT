@@ -16,6 +16,7 @@
         .nav {
             flex-direction: column;
             flex-wrap: nowrap;
+            min-width: 0;
 
             .sb-sidenav-menu-heading {
                 padding: 1.75rem 1rem 0.75rem;
@@ -31,6 +32,7 @@
                 padding-top: 0.75rem;
                 padding-bottom: 0.75rem;
                 position: relative;
+                min-width: 0;
 
                 .sb-nav-link-icon {
                     font-size: 0.9rem;
@@ -40,8 +42,35 @@
                     text-align: center;
                 }
 
+                .sb-nav-link-content {
+                    flex: 1 1 auto;
+                    min-width: 0;
+                }
+
+                .sb-nav-link-text {
+                    flex: 1 1 auto;
+                    min-width: 0;
+                    overflow-wrap: break-word;
+                    word-break: normal;
+                }
+
                 .badge {
                     flex-shrink: 0;
+                }
+
+                &.sb-nav-link-with-badge {
+                    align-items: flex-start;
+
+                    .sb-nav-link-content {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: flex-start;
+                        gap: 0.35rem;
+                    }
+
+                    .sb-nav-link-badge {
+                        max-width: 100%;
+                    }
                 }
 
                 .sb-sidenav-collapse-arrow {
@@ -67,5 +96,15 @@
     .sb-sidenav-footer {
         padding: 0.75rem;
         flex-shrink: 0;
+
+        .small {
+            min-width: 0;
+        }
+
+        .sb-sidenav-footer-link {
+            display: block;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
     }
 }

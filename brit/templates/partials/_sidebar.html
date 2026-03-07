@@ -6,21 +6,23 @@
         <div class="sb-nav-link-icon">
           <i class="fas fa-tachometer-alt"></i>
         </div>
-        Home
+        <span class="sb-nav-link-text">Home</span>
       </a>
       {% is_moderator_for_any_model user as is_moderator %}
       {% if is_moderator %}
         <div class="sb-sidenav-menu-heading">Moderation</div>
-        <a class="nav-link {% if '/object_management/review/' in request.path %}active{% endif %}"
+        <a class="nav-link sb-nav-link-with-badge {% if '/object_management/review/' in request.path %}active{% endif %}"
            href="{% url 'object_management:review_dashboard' %}">
           <div class="sb-nav-link-icon">
             <i class="fas fa-clipboard-check"></i>
           </div>
-          <span class="flex-fill">Review Dashboard</span>
-          {% pending_review_count_for_user user as pending_count %}
-          {% if pending_count > 0 %}
-            <span class="badge bg-warning text-dark rounded-pill flex-shrink-0">{{ pending_count }}</span>
-          {% endif %}
+          <div class="sb-nav-link-content">
+            <span class="sb-nav-link-text">Review Dashboard</span>
+            {% pending_review_count_for_user user as pending_count %}
+            {% if pending_count > 0 %}
+              <span class="badge bg-warning text-dark rounded-pill sb-nav-link-badge">{{ pending_count }}</span>
+            {% endif %}
+          </div>
         </a>
       {% endif %}
       <div class="sb-sidenav-menu-heading">Tools</div>
@@ -29,42 +31,42 @@
         <div class="sb-nav-link-icon">
           <i class="fas fa-globe-europe"></i>
         </div>
-        Maps
+        <span class="sb-nav-link-text">Maps</span>
       </a>
       <a class="nav-link {% if '/materials/' in request.path %}active{% endif %}"
          href="{% url 'sample-list' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-leaf"></i>
         </div>
-        Materials
+        <span class="sb-nav-link-text">Materials</span>
       </a>
       <a class="nav-link {% if '/sources/' in request.path %}active{% endif %}"
          href="{% url 'sources-explorer' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-expand-arrows-alt"></i>
         </div>
-        Sources
+        <span class="sb-nav-link-text">Sources</span>
       </a>
       <a class="nav-link {% if '/processes/' in request.path %}active{% endif %}"
          href="{% url 'processes:dashboard' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-flask"></i>
         </div>
-        Processes
+        <span class="sb-nav-link-text">Processes</span>
       </a>
       <a class="nav-link {% if '/inventories/' in request.path %}active{% endif %}"
          href="{% url 'scenario-list' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-chart-bar"></i>
         </div>
-        Inventories
+        <span class="sb-nav-link-text">Inventories</span>
       </a>
       <a class="nav-link {% if '/bibliography/' in request.path %}active{% endif %}"
          href="{% url 'bibliography-explorer' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-book"></i>
         </div>
-        Bibliography
+        <span class="sb-nav-link-text">Bibliography</span>
       </a>
       <div class="sb-sidenav-menu-heading">Sites</div>
       <a class="nav-link {% if '/learning/' in request.path %}active{% endif %}"
@@ -72,27 +74,28 @@
         <div class="sb-nav-link-icon">
           <i class="fas fa-graduation-cap"></i>
         </div>
-        Learning
+        <span class="sb-nav-link-text">Learning</span>
       </a>
       <a class="nav-link {% if '/about/' in request.path %}active{% endif %}"
          href="{% url 'about' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-info-circle"></i>
         </div>
-        About
+        <span class="sb-nav-link-text">About</span>
       </a>
       <a class="nav-link {% if '/privacy_policy/' in request.path %}active{% endif %}"
          href="{% url 'privacypolicy' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-shield-alt"></i>
         </div>
-        Privacy Policy
+        <span class="sb-nav-link-text">Privacy Policy</span>
       </a>
     </div>
   </div>
   <div class="sb-sidenav-footer">
     <div class="small">
-      <a href="mailto:info@bioresource-tools.net">Contact / Feedback</a>
+      <a class="sb-sidenav-footer-link"
+         href="mailto:info@bioresource-tools.net">Contact / Feedback</a>
     </div>
   </div>
 </nav>

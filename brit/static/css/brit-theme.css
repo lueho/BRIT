@@ -8990,12 +8990,27 @@ input[type=radio]:focus {
   z-index: 1038;
 }
 
+.sb-nav-fixed #layoutSidenav #layoutSidenav_nav {
+  overflow: hidden;
+}
+
 .sb-nav-fixed #layoutSidenav #layoutSidenav_nav .sb-sidenav {
   padding-top: 56px;
+  overflow: hidden;
 }
 
 .sb-nav-fixed #layoutSidenav #layoutSidenav_nav .sb-sidenav .sb-sidenav-menu {
   overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sb-nav-fixed #layoutSidenav #layoutSidenav_nav .sb-sidenav .sb-sidenav-menu::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .sb-nav-fixed #layoutSidenav #layoutSidenav_content {
@@ -9169,6 +9184,7 @@ input[type=radio]:focus {
 .sb-sidenav .sb-sidenav-menu .nav {
   flex-direction: column;
   flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .sb-sidenav .sb-sidenav-menu .nav .sb-sidenav-menu-heading {
@@ -9185,6 +9201,7 @@ input[type=radio]:focus {
   padding-top: 0.75rem;
   padding-bottom: 0.75rem;
   position: relative;
+  min-width: 0;
 }
 
 .sb-sidenav .sb-sidenav-menu .nav .nav-link .sb-nav-link-icon {
@@ -9195,8 +9212,35 @@ input[type=radio]:focus {
   text-align: center;
 }
 
+.sb-sidenav .sb-sidenav-menu .nav .nav-link .sb-nav-link-content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sb-sidenav .sb-sidenav-menu .nav .nav-link .sb-nav-link-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
 .sb-sidenav .sb-sidenav-menu .nav .nav-link .badge {
   flex-shrink: 0;
+}
+
+.sb-sidenav .sb-sidenav-menu .nav .nav-link.sb-nav-link-with-badge {
+  align-items: flex-start;
+}
+
+.sb-sidenav .sb-sidenav-menu .nav .nav-link.sb-nav-link-with-badge .sb-nav-link-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.sb-sidenav .sb-sidenav-menu .nav .nav-link.sb-nav-link-with-badge .sb-nav-link-badge {
+  max-width: 100%;
 }
 
 .sb-sidenav .sb-sidenav-menu .nav .nav-link .sb-sidenav-collapse-arrow {
@@ -9217,6 +9261,16 @@ input[type=radio]:focus {
 .sb-sidenav .sb-sidenav-footer {
   padding: 0.75rem;
   flex-shrink: 0;
+}
+
+.sb-sidenav .sb-sidenav-footer .small {
+  min-width: 0;
+}
+
+.sb-sidenav .sb-sidenav-footer .sb-sidenav-footer-link {
+  display: block;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .sb-sidenav-dark {
