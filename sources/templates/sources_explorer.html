@@ -1,92 +1,91 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block title %}
-BRIT | Sources Explorer
+    BRIT | Sources Explorer
 {% endblock title %}
-
 {% block content %}
-<div class="mb-4">
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <div>
-            <h2 class="mb-2">Sources Explorer</h2>
-            <p class="text-muted mb-0">Bioresources are generated in many different ways and from many different
-                sources. Each source type has two facets: a <strong>generation model</strong> describing how the source
-                produces bioresources, and a <strong>source distribution</strong> showing where instances are located
-                geographically. In inventories, both facets combine to estimate bioresource potentials.</p>
+    <div class="mb-4">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div>
+                <h2 class="mb-2">Sources Explorer</h2>
+                <p class="text-muted mb-0">
+                    Bioresources are generated in many different ways and from many different
+                    sources. Each source type has two facets: a <strong>generation model</strong> describing how the source
+                    produces bioresources, and a <strong>source distribution</strong> showing where instances are located
+                    geographically. In inventories, both facets combine to estimate bioresource potentials.
+                </p>
+            </div>
         </div>
     </div>
-</div>
-
-<h6 class="text-muted text-uppercase explorer-section-heading fw-bold mb-3">
-    <i class="fas fa-expand-arrows-alt me-1"></i> Source Types
-</h6>
-<div class="row g-3 mb-4">
-    <div class="col-12 col-sm-6 col-lg-4">
-        <div class="card shadow-sm h-100 explorer-card">
-            <div class="card-body d-flex flex-column">
-                <div class="d-flex align-items-center mb-2">
-                    <span class="explorer-icon bg-primary bg-opacity-10 text-primary"><i
-                            class="fas fa-recycle"></i></span>
-                    <h6 class="mb-0 ms-2">Household Waste Collection</h6>
+    <h6 class="text-muted text-uppercase explorer-section-heading fw-bold mb-3">
+        <i class="fas fa-expand-arrows-alt me-1"></i> Source Types
+    </h6>
+    <div class="row g-3 mb-4 sources-explorer-cards">
+        <div class="col-12 col-sm-6 col-xl-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-light border-0 py-3">
+                    <h5 class="mb-0">
+                        <a href="{% url 'collection-list' %}"
+                           class="text-decoration-none text-body text-decoration-underline-hover">
+                            <i class="fas fa-fw fa-recycle me-2"></i>Household Waste Collection
+                        </a>
+                    </h5>
                 </div>
-                <p class="card-text text-muted small flex-grow-1">Collection system parameters, waste streams,
-                    frequencies, and container types that determine biowaste volumes from households.</p>
-                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
-                    <span class="badge bg-light text-dark border">{{ collection_count }} published</span>
-                    <div class="btn-group btn-group-sm">
-                        <a href="{% url 'collection-list' %}" class="btn btn-sm btn-outline-primary card-link"
-                            title="Browse generation models">Browse models</a>
-                        <a href="#" class="btn btn-sm btn-outline-secondary card-link disabled"
-                            title="Source distribution not yet available">Map</a>
+                <div class="card-img">
+                    <a class="d-flex align-items-center justify-content-center stretched-link"
+                       href="{% url 'collection-list' %}">
+                        <img class="w-100 m-0 p-1"
+                             src="{% static 'img/waste_collection_cover_card.png' %}"
+                             alt="Household Waste Collection Cover Image"
+                             width="1772"
+                             height="1772">
+                    </a>
+                </div>
+                <div class="card-body d-flex flex-column">
+                    <p class="card-text flex-grow-1">
+                        Collection system parameters, waste streams, frequencies, and container types that determine biowaste volumes from households.
+                    </p>
+                    <p class="text-muted small mb-3">{{ collection_count }} published records</p>
+                    <div>
+                        <a href="{% url 'collection-list' %}"
+                           class="btn btn-sm btn-outline-primary"
+                           title="Open household waste collection list">Open list</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-light border-0 py-3">
+                    <h5 class="mb-0">
+                        <a href="{% url 'greenhouse-list' %}"
+                           class="text-decoration-none text-body text-decoration-underline-hover">
+                            <i class="fas fa-fw fa-seedling me-2"></i>Greenhouses
+                        </a>
+                    </h5>
+                </div>
+                <div class="card-img">
+                    <a class="d-flex align-items-center justify-content-center stretched-link"
+                       href="{% url 'greenhouse-list' %}">
+                        <img class="w-100 m-0 p-1"
+                             src="{% static 'img/greenhouses_cover_card.png' %}"
+                             alt="Greenhouses Cover Image"
+                             width="1772"
+                             height="1772">
+                    </a>
+                </div>
+                <div class="card-body d-flex flex-column">
+                    <p class="card-text flex-grow-1">
+                        Greenhouse facilities near Nantes, France, with growth cycles, cultures, and residue generation data from the FLEXIBI project.
+                    </p>
+                    <p class="text-muted small mb-3">{{ greenhouse_count }} published records</p>
+                    <div>
+                        <a href="{% url 'greenhouse-list' %}"
+                           class="btn btn-sm btn-outline-primary"
+                           title="Open greenhouse list">Open list</a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-12 col-sm-6 col-lg-4">
-        <div class="card shadow-sm h-100 explorer-card">
-            <div class="card-body d-flex flex-column">
-                <div class="d-flex align-items-center mb-2">
-                    <span class="explorer-icon bg-success bg-opacity-10 text-success"><i
-                            class="fas fa-seedling"></i></span>
-                    <h6 class="mb-0 ms-2">Greenhouses</h6>
-                </div>
-                <p class="card-text text-muted small flex-grow-1">Greenhouse facilities near Nantes, France,
-                    with growth cycles, cultures, and residue generation data from the FLEXIBI project.</p>
-                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
-                    <span class="badge bg-light text-dark border">{{ greenhouse_count }} published</span>
-                    <div class="btn-group btn-group-sm">
-                        <a href="{% url 'greenhouse-list' %}" class="btn btn-sm btn-outline-primary card-link"
-                            title="Browse generation models">Browse models</a>
-                        <a href="{% url 'NantesGreenhouses' %}" class="btn btn-sm btn-outline-secondary card-link"
-                            title="View source distribution on map">Map</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-12 col-sm-6 col-lg-4">
-        <div class="card shadow-sm h-100 explorer-card">
-            <div class="card-body d-flex flex-column">
-                <div class="d-flex align-items-center mb-2">
-                    <span class="explorer-icon bg-secondary bg-opacity-10 text-secondary"><i
-                            class="fas fa-tree"></i></span>
-                    <h6 class="mb-0 ms-2">Roadside Trees (Hamburg)</h6>
-                </div>
-                <p class="card-text text-muted small flex-grow-1">Urban roadside trees in Hamburg, Germany,
-                    used as a source of green residues. Growth and maintenance models from the FLEXIBI project.</p>
-                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
-                    <span class="badge bg-light text-dark border">Map view</span>
-                    <div class="btn-group btn-group-sm">
-                        <a href="#" class="btn btn-sm btn-outline-primary card-link disabled"
-                            title="Generation model not yet available">Models</a>
-                        <a href="{% url 'HamburgRoadsideTrees' %}" class="btn btn-sm btn-outline-secondary card-link"
-                            title="View source distribution on map">Map</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock content %}

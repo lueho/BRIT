@@ -1,13 +1,10 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block title %}
   BRIT | Process Overview: Pulping (Mock)
 {% endblock title %}
-
 {% block content %}
   <div class="container-fluid">
-
     <div class="card o-hidden border-0 shadow-lg my-5">
       <div class="card-body p-0">
         <div class="p-5">
@@ -15,9 +12,7 @@
             <h1 class="h4 text-gray-900 mb-4">Process Overview: Pulping (Mock)</h1>
             <p class="lead">Disintegration of biomass into individual fibres suitable for paper and packaging.</p>
           </div>
-
           <hr>
-
           <div class="row mb-4">
             <div class="col-md-8">
               <h5>Description</h5>
@@ -27,7 +22,6 @@
               <p>
                 Pulping is a general process for converting raw biomass like wood or straw into pulp, a key input for paper and other fibre-based products. It involves breaking down the fibrous material through mechanical, chemical, or semi-chemical means to separate the fibres. The resulting pulp can then be processed into various grades for different applications. This overview provides access to specific pulping technologies and related information.
               </p>
-
               <div class="mt-4">
                 <h5>Info Charts</h5>
                 <ul class="list-group">
@@ -39,7 +33,6 @@
                   </li>
                 </ul>
               </div>
-
             </div>
             <div class="col-md-4">
               <div class="card">
@@ -65,9 +58,7 @@
               </div>
             </div>
           </div>
-
           <h3 class="text-center mt-5 mb-4">Available Process Technologies</h3>
-
           <div class="row">
             <!-- Technology Cards: Generated Dynamically -->
             {% for tech in technologies %}
@@ -75,20 +66,28 @@
                 <div class="card h-100 shadow-sm">
                   {% if 'steam' in tech.name|lower %}
                     <img src="{% static 'img/steam_reactor.jpg' %}"
-                         class="card-img-top"
-                         alt="{{ tech.name }}" width="768" height="768">
+                         class="card-img-top img-fluid"
+                         alt="{{ tech.name }}"
+                         width="768"
+                         height="768">
                   {% elif 'horizontal tube' in tech.name|lower %}
                     <img src="{% static 'img/horizontal_tube_reactor.jpg' %}"
-                         class="card-img-top"
-                         alt="{{ tech.name }}" width="768" height="768">
+                         class="card-img-top img-fluid"
+                         alt="{{ tech.name }}"
+                         width="768"
+                         height="768">
                   {% elif 'liquor circulation' in tech.name|lower %}
                     <img src="{% static 'img/liquor_circulation_reactor.jpg' %}"
-                         class="card-img-top"
-                         alt="{{ tech.name }}" width="768" height="768">
+                         class="card-img-top img-fluid"
+                         alt="{{ tech.name }}"
+                         width="768"
+                         height="768">
                   {% else %}
                     <img src="{% static 'img/processes_cover_card.png' %}"
-                         class="card-img-top"
-                         alt="{{ tech.name }}" width="768" height="768">
+                         class="card-img-top img-fluid"
+                         alt="{{ tech.name }}"
+                         width="768"
+                         height="768">
                   {% endif %}
                   <div class="card-body d-flex flex-column">
                     <h5 class="card-title">{{ tech.name }}</h5>
@@ -102,10 +101,8 @@
               </div>
             {% endfor %}
           </div>
-
         </div>
       </div>
     </div>
-
   </div>
 {% endblock content %}

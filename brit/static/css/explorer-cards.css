@@ -33,3 +33,21 @@
     font-size: 0.7rem;
     letter-spacing: 0.08em;
 }
+
+.sources-explorer-cards .card-img {
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+}
+
+.sources-explorer-cards .card-img>a {
+    width: 100%;
+    height: 100%;
+}
+
+.sources-explorer-cards .card-img img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+}
