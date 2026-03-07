@@ -100,6 +100,44 @@ class ReviewWorkflowViewTests(TestCase):
             self.private_collection.publication_status, UserCreatedObject.STATUS_PRIVATE
         )
 
+    def test_submit_for_review_view_ajax_preflight_returns_204_without_state_change(
+        self,
+    ):
+        url = reverse(
+            "object_management:submit_for_review",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.private_collection.id,
+            },
+        )
+
+        self.client.force_login(self.owner)
+        response = self.client.post(url, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+
+        self.assertEqual(response.status_code, 204)
+        self.private_collection.refresh_from_db()
+        self.assertEqual(
+            self.private_collection.publication_status, UserCreatedObject.STATUS_PRIVATE
+        )
+
+    def test_submit_for_review_view_ajax_preflight_returns_403_without_permission(self):
+        url = reverse(
+            "object_management:submit_for_review",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.private_collection.id,
+            },
+        )
+
+        self.client.force_login(self.regular_user)
+        response = self.client.post(url, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+
+        self.assertEqual(response.status_code, 403)
+        self.private_collection.refresh_from_db()
+        self.assertEqual(
+            self.private_collection.publication_status, UserCreatedObject.STATUS_PRIVATE
+        )
+
     def test_withdraw_from_review_view(self):
         """Test the withdraw from review view."""
         url = reverse(
@@ -136,6 +174,35 @@ class ReviewWorkflowViewTests(TestCase):
         self.review_collection.refresh_from_db()
         self.assertEqual(
             self.review_collection.publication_status, UserCreatedObject.STATUS_REVIEW
+        )
+
+    def test_withdraw_from_review_view_redirects_to_detail_when_next_is_review_page(
+        self,
+    ):
+        url = reverse(
+            "object_management:withdraw_from_review",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.review_collection.id,
+            },
+        )
+        next_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.review_collection.id,
+            },
+        )
+
+        self.client.force_login(self.owner)
+        with mute_signals(post_save, pre_save):
+            response = self.client.post(url, {"next": next_url})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, self.review_collection.get_absolute_url())
+        self.review_collection.refresh_from_db()
+        self.assertEqual(
+            self.review_collection.publication_status, UserCreatedObject.STATUS_PRIVATE
         )
 
     def test_approve_view(self):

@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.db import models
 from django.test import TestCase
+from django.urls import reverse
 from factory.django import mute_signals
 
 from maps.models import Attribute, LauRegion, NutsRegion, RegionAttributeValue
@@ -95,6 +96,27 @@ class CollectionModelSerializerTestCase(TestCase):
         self.assertEqual(len(flyer_urls), 2)
         for url in flyer_urls:
             self.assertIsInstance(url, str)
+
+    def test_actions_contains_expected_urls(self):
+        serializer = CollectionModelSerializer(self.collection)
+        actions = serializer.data["actions"]
+
+        self.assertEqual(
+            actions["detail_url"],
+            reverse("collection-detail", kwargs={"pk": self.collection.pk}),
+        )
+        self.assertEqual(
+            actions["update_url"],
+            reverse("collection-update", kwargs={"pk": self.collection.pk}),
+        )
+        self.assertEqual(
+            actions["copy_url"],
+            reverse("collection-copy", kwargs={"pk": self.collection.pk}),
+        )
+        self.assertEqual(
+            actions["delete_url"],
+            reverse("collection-delete-modal", kwargs={"pk": self.collection.pk}),
+        )
 
     def test_required_bin_capacity_field_serialization(self):
         self.collection.required_bin_capacity = Decimal("120.0")

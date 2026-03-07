@@ -31,6 +31,31 @@ class UnitCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase)
         return unit
 
 
+class UnitAutocompleteViewTestCase(ViewWithPermissionsTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.matching_unit = Unit.objects.create(
+            name="Kilogram",
+            publication_status="published",
+        )
+        Unit.objects.create(
+            name="Litre",
+            publication_status="published",
+        )
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse("unit-autocomplete"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_returns_results_including_created_unit(self):
+        response = self.client.get(reverse("unit-autocomplete"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("results", response.json())
+        result_ids = {item["id"] for item in response.json()["results"]}
+        self.assertIn(self.matching_unit.pk, result_ids)
+
+
 # ----------- Property CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -68,7 +93,6 @@ class PropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
 
 
 class PropertyUnitOptionsViewTestCase(ViewWithPermissionsTestCase):
-
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
