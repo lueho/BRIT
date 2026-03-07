@@ -58,18 +58,18 @@ class StopwatchTestResult(unittest.TextTestResult):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.start = 0
-        self.stop = 0
+        self.start_time = 0
+        self.stop_time = 0
         self.elapsed = 0
 
     def startTest(self, test):
-        self.start = time.time()
+        self.start_time = time.time()
         super().startTest(test)
 
     def stopTest(self, test):
         super().stopTest(test)
-        self.stop = time.time()
-        self.elapsed = self.stop - self.start
+        self.stop_time = time.time()
+        self.elapsed = self.stop_time - self.start_time
         self.timings[test] = self.elapsed
 
     def getDescription(self, test):

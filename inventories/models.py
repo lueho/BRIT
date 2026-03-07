@@ -47,13 +47,45 @@ class InventoryAlgorithm(models.Model):
         return [name for name in dir(case_studies) if not name.startswith("__")]
 
     @staticmethod
+    def get_module_path(source_module):
+        return f"case_studies.{source_module}.algorithms"
+
+    @staticmethod
     def available_functions(module_name):
-        module = importlib.import_module("case_studies." + module_name + ".algorithms")
+        module = importlib.import_module(InventoryAlgorithm.get_module_path(module_name))
         return [
             alg
             for alg in module.InventoryAlgorithms.__dict__
             if not alg.startswith("__")
         ]
+
+    @staticmethod
+    def build_task_reference(source_module, function_name):
+        return f"{InventoryAlgorithm.get_module_path(source_module)}:{function_name}"
+
+    @staticmethod
+    def parse_task_reference(task_reference):
+        module_path, function_name = task_reference.split(":", 1)
+        source_module = module_path.removeprefix("case_studies.").removesuffix(
+            ".algorithms"
+        )
+        return source_module, function_name
+
+    @classmethod
+    def from_task_reference(cls, task_reference):
+        source_module, function_name = cls.parse_task_reference(task_reference)
+        return cls.objects.get(source_module=source_module, function_name=function_name)
+
+    @property
+    def module_path(self):
+        return self.get_module_path(self.source_module)
+
+    @property
+    def task_reference(self):
+        return self.build_task_reference(self.source_module, self.function_name)
+
+    def import_module(self):
+        return importlib.import_module(self.module_path)
 
     def default_values(self):
         """
@@ -480,16 +512,10 @@ class Scenario(NamedUserCreatedObject):
         all configuration information for the inventory.
         :return: None
         """
-
         inventory_config = {}
         for entry in ScenarioInventoryConfiguration.objects.filter(scenario=self):
             feedstock = entry.feedstock.id
-            function = (
-                "case_studies."
-                + entry.inventory_algorithm.source_module
-                + ".algorithms:"
-                + entry.inventory_algorithm.function_name
-            )
+            function = entry.inventory_algorithm.task_reference
             parameter = (
                 entry.inventory_parameter.short_name
                 if entry.inventory_parameter

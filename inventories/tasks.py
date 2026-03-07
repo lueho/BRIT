@@ -1,5 +1,3 @@
-import importlib
-
 from celery import chord
 
 from brit.celery import app
@@ -27,25 +25,18 @@ def run_inventory(scenario_id):
 
     # store uuids of running tasks in the database, so we can track the progress from anywhere
     for task in task_chord.tasks:
-        source_module = task.args[0].split(".")[1]
-        function_name = task.args[0].split(":")[1]
-        algorithm = InventoryAlgorithm.objects.get(
-            source_module=source_module, function_name=function_name
-        )
+        algorithm = InventoryAlgorithm.from_task_reference(task.args[0])
         RunningTask.objects.create(scenario=scenario, uuid=task.id, algorithm=algorithm)
 
     return result
 
 
 @app.task(bind=True)
-def run_inventory_algorithm(self, module_function, **kwargs):
-    source_module = module_function.split(":")[0]
-    function_name = module_function.split(":")[1]
-    module = importlib.import_module(source_module)
+def run_inventory_algorithm(self, task_reference, **kwargs):
+    algorithm = InventoryAlgorithm.from_task_reference(task_reference)
+    module = algorithm.import_module()
+    function_name = algorithm.function_name
     results = getattr(module.InventoryAlgorithms, function_name)(**kwargs)
-    algorithm = InventoryAlgorithm.objects.get(
-        source_module=source_module.split(".")[1], function_name=function_name
-    )
     kwargs = {
         "name": algorithm.function_name,
         "scenario": Scenario.objects.get(id=kwargs.get("scenario_id")),

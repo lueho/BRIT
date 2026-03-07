@@ -72,6 +72,31 @@ class ScenarioTestCase(TestCase):
             algorithms, InventoryAlgorithm.objects.filter(name="Test Algorithm")
         )
 
+    def test_inventory_algorithm_task_reference_round_trip(self):
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Resolver Algorithm",
+            source_module="flexibi_hamburg",
+            function_name="hamburg_roadside_tree_production",
+            geodataset=GeoDataset.objects.get(name="Test Dataset"),
+        )
+
+        self.assertEqual(
+            algorithm.module_path,
+            "case_studies.flexibi_hamburg.algorithms",
+        )
+        self.assertEqual(
+            algorithm.task_reference,
+            "case_studies.flexibi_hamburg.algorithms:hamburg_roadside_tree_production",
+        )
+        self.assertEqual(
+            InventoryAlgorithm.parse_task_reference(algorithm.task_reference),
+            ("flexibi_hamburg", "hamburg_roadside_tree_production"),
+        )
+        self.assertEqual(
+            InventoryAlgorithm.from_task_reference(algorithm.task_reference),
+            algorithm,
+        )
+
     @patch("inventories.models.AsyncResult")
     def test_running_scenario_save_stays_blocked_while_task_is_active(
         self, mock_async_result
