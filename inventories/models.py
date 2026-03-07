@@ -1,4 +1,6 @@
 import importlib
+from celery.result import AsyncResult
+from celery.states import READY_STATES
 
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
@@ -127,7 +129,7 @@ class InventoryAlgorithmParameterValue(models.Model):
 
 
 @receiver(pre_save, sender=InventoryAlgorithmParameterValue)
-def auto_default(_, instance, **kwargs):
+def auto_default(sender, instance, **kwargs):
     """
     Makes sure that defaults are always set correctly, even if the user provides incoherent input.
     """
@@ -580,9 +582,30 @@ class InventoryAmountShare(models.Model):
 @receiver(pre_save, sender=Scenario)
 def block_running_scenario(sender, instance, **kwargs):
     """Checks if a scenario is being evaluated before it can be saved."""
-    if hasattr(instance, "status"):
-        if instance.status == ScenarioStatus.Status.RUNNING:
+    if instance.pk is None:
+        return
+
+    scenario_status = ScenarioStatus.objects.filter(scenario_id=instance.pk).first()
+    if scenario_status is None:
+        return
+
+    if scenario_status.status != ScenarioStatus.Status.RUNNING:
+        return
+
+    running_tasks = list(RunningTask.objects.filter(scenario_id=instance.pk))
+    if not running_tasks:
+        raise BlockedRunningScenario
+
+    stale_task_ids = []
+    for task in running_tasks:
+        if AsyncResult(str(task.uuid)).state not in READY_STATES:
             raise BlockedRunningScenario
+        stale_task_ids.append(task.id)
+
+    if stale_task_ids:
+        RunningTask.objects.filter(id__in=stale_task_ids).delete()
+    scenario_status.status = ScenarioStatus.Status.CHANGED
+    scenario_status.save()
 
 
 @receiver(post_save, sender=Scenario)

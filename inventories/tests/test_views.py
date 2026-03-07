@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+from uuid import uuid4
 
 from django.contrib.auth.models import AnonymousUser
 from django.test import SimpleTestCase
@@ -12,7 +13,7 @@ from utils.object_management.views import (
 )
 from utils.tests.testcases import AbstractTestCases
 
-from ..models import Scenario
+from ..models import RunningTask, Scenario, ScenarioStatus
 from ..views import (
     InventoryAlgorithmAutocompleteView,
     ScenarioInventoryAlgorithmAutocompleteView,
@@ -54,6 +55,27 @@ class ScenarioCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
                 publication_status="published",
             ),
         }
+
+    @patch("inventories.models.AsyncResult")
+    def test_update_view_post_allows_edit_after_failed_inventory_run(
+        self, mock_async_result
+    ):
+        self.client.force_login(self.owner_user)
+        scenario = self.unpublished_object
+        scenario.set_status(ScenarioStatus.Status.RUNNING)
+        RunningTask.objects.create(scenario=scenario, uuid=uuid4())
+        mock_async_result.return_value.state = "FAILURE"
+
+        data = self.update_object_data.copy()
+        data.update(self.related_objects_post_data())
+        response = self.client.post(self.get_update_url(scenario.pk), data)
+
+        scenario.refresh_from_db()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(scenario.name, self.update_object_data["name"])
+        self.assertEqual(scenario.status, ScenarioStatus.Status.CHANGED)
+        self.assertFalse(RunningTask.objects.filter(scenario=scenario).exists())
 
 
 class InventoryAutocompleteInheritanceRegressionTests(SimpleTestCase):

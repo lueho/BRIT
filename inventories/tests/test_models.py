@@ -2,7 +2,17 @@ from django.test import TestCase
 
 from maps.models import Region
 
-from ..models import GeoDataset, InventoryAlgorithm, Material, Scenario
+from ..exceptions import BlockedRunningScenario
+from ..models import (
+    GeoDataset,
+    InventoryAlgorithm,
+    Material,
+    RunningTask,
+    Scenario,
+    ScenarioStatus,
+)
+from uuid import uuid4
+from unittest.mock import patch
 
 
 class ScenarioTestCase(TestCase):
@@ -11,7 +21,7 @@ class ScenarioTestCase(TestCase):
         feedstock1 = Material.objects.create(name="Feedstock 1")
         Material.objects.create(name="Feedstock 2")
         region = Region.objects.create(name="Test Region")
-        Scenario.objects.create(name="Test Scenario", region=region)
+        cls.scenario = Scenario.objects.create(name="Test Scenario", region=region)
 
         geodataset = GeoDataset.objects.create(name="Test Dataset", region=region)
         algorithm = InventoryAlgorithm.objects.create(
@@ -20,7 +30,7 @@ class ScenarioTestCase(TestCase):
         algorithm.feedstocks.add(feedstock1)
 
     def setUp(self):
-        self.scenario = Scenario.objects.get(name="Test Scenario")
+        self.scenario.refresh_from_db()
 
     def test_available_geodatasets_with_single_feedstock(self):
         feedstock = Material.objects.get(name="Feedstock 1")
@@ -61,3 +71,29 @@ class ScenarioTestCase(TestCase):
         self.assertQuerySetEqual(
             algorithms, InventoryAlgorithm.objects.filter(name="Test Algorithm")
         )
+
+    @patch("inventories.models.AsyncResult")
+    def test_running_scenario_save_stays_blocked_while_task_is_active(
+        self, mock_async_result
+    ):
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        RunningTask.objects.create(scenario=self.scenario, uuid=uuid4())
+        mock_async_result.return_value.state = "STARTED"
+        self.scenario.name = "Updated While Running"
+
+        with self.assertRaises(BlockedRunningScenario):
+            self.scenario.save()
+
+    @patch("inventories.models.AsyncResult")
+    def test_running_scenario_save_recovers_after_failed_tasks(self, mock_async_result):
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        running_task = RunningTask.objects.create(scenario=self.scenario, uuid=uuid4())
+        mock_async_result.return_value.state = "FAILURE"
+        self.scenario.name = "Recovered After Failure"
+
+        self.scenario.save()
+        self.scenario.refresh_from_db()
+
+        self.assertEqual(self.scenario.name, "Recovered After Failure")
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
+        self.assertFalse(RunningTask.objects.filter(id=running_task.id).exists())

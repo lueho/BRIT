@@ -80,12 +80,13 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
                     greenhouse_count += greenhouse_group.count()
                     for share in greenhouse_type.shares:
                         if share.timestepset.growth_cycle.culture.residue == feedstock:
+                            share_average = float(share.average)
                             distribution.add_share(
                                 share.timestepset.timestep,
                                 share.component,
-                                total_group_surface * share.average,
+                                total_group_surface * share_average,
                             )
-                            total_production += total_group_surface * share.average
+                            total_production += total_group_surface * share_average
 
         result["aggregated_distributions"].append(distribution.serialize())
 

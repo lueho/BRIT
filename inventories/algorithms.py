@@ -67,11 +67,11 @@ class InventoryAlgorithmsBase:
         - area_yield: {'value': <value>}
         """
         model = kwargs.get("source_model")
+        catchment = Catchment.objects.get(id=kwargs.get("catchment_id"))
         input_qs = model.objects.all()
-        mask_qs = Catchment.objects.filter(id=kwargs.get("catchment_id"))
         keep_columns = kwargs.get("keep_columns")
         clipped_polygons = InventoryAlgorithmsBase.clip_polygons(
-            input_qs, mask_qs, keep_columns=keep_columns
+            input_qs, catchment.geom, keep_columns=keep_columns
         )
 
         result = {
@@ -149,12 +149,12 @@ class InventoryAlgorithmsBase:
 
     @staticmethod
     def clip_polygons(
-        input_qs: QuerySet, mask_qs: QuerySet, keep_columns: [str] = None
+        input_qs: QuerySet, mask_geom: GEOSGeometry, keep_columns: [str] = None
     ):
         if not input_qs:
             raise EmptyQueryset
 
-        if not mask_qs:
+        if not mask_geom:
             raise EmptyQueryset
 
         # Clean up column names and remove any non existing column names
@@ -173,21 +173,18 @@ class InventoryAlgorithmsBase:
 
         # noinspection PyProtectedMember
         input_table_name = input_qs.model._meta.db_table
+        input_pk_name = input_qs.model._meta.pk.attname
         input_ids = (
             "("
-            + ", ".join(str(id_) for id_ in input_qs.values_list("id", flat=True))
-            + ")"
-        )
-        # noinspection PyProtectedMember
-        mask_table_name = mask_qs.model._meta.db_table
-        mask_ids = (
-            "("
-            + ", ".join(str(id_) for id_ in mask_qs.values_list("id", flat=True))
+            + ", ".join(
+                str(id_) for id_ in input_qs.values_list(input_pk_name, flat=True)
+            )
             + ")"
         )
 
         # Query based on: https://postgis.net/docs/ST_Intersection.html
         query = f"""-- noinspection SqlResolve
+                        WITH mask AS (SELECT ST_GeomFromEWKT(%s) AS geom)
                         SELECT clipped.*, ST_Area(clipped.geom::geography) AS area
                         FROM (
                             SELECT
@@ -195,14 +192,14 @@ class InventoryAlgorithmsBase:
                                 ST_Multi(
                                     ST_Buffer(ST_Intersection(mask.geom, input.geom), 0.0)
                                 ) AS geom
-                            FROM (SELECT * FROM {input_table_name} WHERE id IN {input_ids}) AS input
-                            INNER JOIN (SELECT geom FROM {mask_table_name} WHERE id IN {mask_ids}) mask
-                            ON ST_Intersects(mask.geom, input.geom)
-                            WHERE NOT ST_IsEmpty(ST_Buffer(ST_Intersection(mask.geom, input.geom), 0.0))) clipped;
+                            FROM (SELECT * FROM {input_table_name} WHERE {input_pk_name} IN {input_ids}) AS input
+                            CROSS JOIN mask
+                            WHERE ST_Intersects(mask.geom, input.geom)
+                            AND NOT ST_IsEmpty(ST_Buffer(ST_Intersection(mask.geom, input.geom), 0.0))) clipped;
                     """
 
         with connection.cursor() as cursor:
-            cursor.execute(query)
+            cursor.execute(query, [mask_geom.ewkt])
             columns = [column[0] for column in cursor.description]
             features = [
                 dict(zip(columns, row, strict=False)) for row in cursor.fetchall()

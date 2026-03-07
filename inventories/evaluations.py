@@ -142,7 +142,9 @@ class ScenarioResult:
         for layer in self.layers:
             agg_dist = layer.layeraggregateddistribution_set.filter(
                 name="Seasonal production per component"
-            )[0]
+            ).first()
+            if agg_dist is None:
+                continue
             for d in agg_dist.serialized:
                 d["label"] = f'{layer.feedstock.name}: {d["label"]}'
                 datasets.append(DataSet(**d))
