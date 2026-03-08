@@ -69,6 +69,8 @@ Validated and committed slices completed so far:
   through `sources` model adapters
 - routed waste-collection domain-model access in shared code and tests through
   `sources` model adapters
+- routed shared geojson and export serializer imports through `sources`
+  serializer adapters
 
 ## 3. Target State
 
@@ -259,22 +261,20 @@ External files that import from the three apps (outside their own code/tests):
   use them
 - [x] Add a waste-collection model adapter and rewire remaining shared imports
   and tests to it
-- [ ] Add serializer/filter/renderer adapter modules where shared code still
-  imports `case_studies.*` directly
+- [x] Add serializer adapter modules and rewire shared imports to them
+- [ ] Add filter and renderer adapter modules where shared code still imports
+  `case_studies.*` directly
 - [ ] Reduce remaining shared direct imports to a small, intentional set before
   starting `SeparateDatabaseAndState` model moves
 
 ### Near-term next steps
 
-1. Add serializer adapters under `sources` for remaining shared imports such as
-   `sources.roadside_trees.geojson` and any other shared code still reaching
-   into `case_studies.*.serializers`.
-2. Add filter and renderer adapters where shared code still depends directly on
+1. Add filter and renderer adapters where shared code still depends directly on
    `case_studies` modules, so `sources` becomes the stable integration surface.
-3. After the adapter surfaces are stable, start moving implementation bodies
+2. After the adapter surfaces are stable, start moving implementation bodies
    from thin re-exports toward source-owned modules while preserving legacy
    runtime compatibility.
-4. Only after the shared import graph is largely normalized through `sources`,
+3. Only after the shared import graph is largely normalized through `sources`,
    begin the heavier `SeparateDatabaseAndState`, ContentType, and URL-redirect
    consolidation phases described below.
 
