@@ -1,4 +1,5 @@
 from .settings import *
+from urllib.parse import urlparse, urlunparse
 
 SITE_ID = 1
 
@@ -22,6 +23,20 @@ DATABASES["default"] = {
     },
 }
 
+_test_redis_url = os.environ.get("TEST_REDIS_URL")
+if _test_redis_url:
+    CELERY_BROKER_URL = _test_redis_url
+    CELERY_RESULT_BACKEND = _test_redis_url
+else:
+    _parsed_redis_url = urlparse(os.environ.get("REDIS_URL", "rediss://redis:6379/0"))
+    _test_redis_url = urlunparse(_parsed_redis_url._replace(path="/15"))
+    CELERY_BROKER_URL = _test_redis_url
+    CELERY_RESULT_BACKEND = _test_redis_url
+
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
+
+AUTO_ENQUEUE_URL_CHECKS = False
 
 # Whitenoise is not suitable for serving static files during tests.
 # Fall back to Django's standard setting

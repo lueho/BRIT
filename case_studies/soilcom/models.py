@@ -2,6 +2,7 @@ from datetime import date
 from functools import cached_property
 
 import celery
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models, transaction
@@ -141,7 +142,7 @@ def set_source_type_and_check_url(sender, instance, **kwargs):
 
 @receiver(post_save, sender=WasteFlyer)
 def check_url_valid(sender, instance, created, **kwargs):
-    if created and instance.url:
+    if created and instance.url and settings.AUTO_ENQUEUE_URL_CHECKS:
         transaction.on_commit(
             lambda: celery.current_app.send_task("check_wasteflyer_url", (instance.pk,))
         )

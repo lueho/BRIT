@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 
 from django.contrib.auth.models import Permission
 from django.db.models.signals import post_save
@@ -532,11 +533,16 @@ class SourceListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(request_url)
         self.assertEqual(response.status_code, 403)
 
-    def test_get_http_200_ok_for_members(self):
+    @patch("bibliography.views.check_source_urls.delay")
+    def test_get_http_200_ok_for_members(self, mock_delay):
+        mock_task = mock_delay.return_value
+        mock_task.task_id = "scheduler-task-id"
         self.client.force_login(self.member)
         request_url = f"{reverse('source-list-check-urls')}?url_valid=False&page=1"
         response = self.client.get(request_url)
         self.assertEqual(200, response.status_code)
+        mock_delay.assert_called_once()
+        self.assertEqual(response.json()["task_id"], "scheduler-task-id")
 
 
 class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):

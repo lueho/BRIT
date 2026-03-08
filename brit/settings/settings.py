@@ -251,6 +251,15 @@ ENABLE_PDF_PARSING = os.environ.get("ENABLE_PDF_PARSING", "false").lower() in {
     "on",
 }
 
+AUTO_ENQUEUE_URL_CHECKS = os.environ.get(
+    "AUTO_ENQUEUE_URL_CHECKS", "true"
+).lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
 CRISPY_ALLOWED_TEMPLATE_PACKS = ("bootstrap5",)
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
