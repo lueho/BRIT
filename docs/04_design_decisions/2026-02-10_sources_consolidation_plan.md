@@ -120,6 +120,10 @@ Validated and committed slices completed so far:
 - added source-owned copies of the Hamburg roadside-tree JS assets under
   `sources.roadside_trees/static/js/` so Django now resolves those static files
   from the `sources` app path first as well
+- moved the remaining greenhouse implementation modules (`forms`, `filters`,
+  `serializers`, `viewsets`, `renderers`, and inventory `algorithms`) into
+  `sources.greenhouses`, leaving the legacy `case_studies.flexibi_nantes`
+  modules as thin compatibility re-exports
 
 ## 3. Target State
 
@@ -330,8 +334,9 @@ External files that import from the three apps (outside their own code/tests):
 
 1. Continue moving implementation bodies from thin re-exports toward
    source-owned modules while preserving legacy runtime compatibility.
-2. Continue the Hamburg phase by cleaning up the remaining app-registration
-   seam after the static and URL transitions.
+2. Continue the greenhouse and waste-collection phases by moving the remaining
+   model/template/static/test ownership seams after the implementation-module
+   moves.
 3. Reduce any remaining intentional direct `case_studies.*` imports behind
    `sources` adapters before starting model/state moves.
 4. Fill in any remaining top-level `sources` package scaffolding only where it
@@ -364,7 +369,7 @@ External files that import from the three apps (outside their own code/tests):
 ### Phase C: Move flexibi_nantes (medium size)
 
 - [ ] Move models to `sources/models/greenhouses.py` with `db_table` Meta
-- [ ] Move views, forms, filters, serializers, viewsets, renderers, algorithms
+- [x] Move views, forms, filters, serializers, viewsets, renderers, algorithms
 - [ ] Move templates and static files
 - [ ] Move tests
 - [ ] Create `SeparateDatabaseAndState` migrations
