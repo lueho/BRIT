@@ -1,4 +1,4 @@
-from case_studies.flexibi_nantes.models import Greenhouse
+from sources.greenhouses.models import Greenhouse
 
 
 def published_greenhouse_count():

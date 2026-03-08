@@ -4,7 +4,6 @@ from django.db import connection
 from django.db.models.query import QuerySet
 from django.test import TestCase
 
-from case_studies.flexibi_hamburg.models import HamburgGreenAreas
 from distributions.models import TemporalDistribution, Timestep
 from inventories.models import InventoryAlgorithm, Scenario
 from layer_manager.models import (
@@ -16,6 +15,7 @@ from layer_manager.models import (
 )
 from maps.models import Catchment, GeoDataset, Region
 from materials.models import Material, MaterialComponent, SampleSeries
+from sources.roadside_trees.models import HamburgGreenAreas
 
 
 class LayerTestCase(TestCase):

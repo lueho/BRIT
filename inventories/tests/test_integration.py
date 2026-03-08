@@ -4,15 +4,6 @@ from django.contrib.gis.geos import MultiPolygon, Point, Polygon
 from django.db import connection
 from django.test import TestCase, override_settings
 
-from case_studies.flexibi_hamburg.models import HamburgGreenAreas, HamburgRoadsideTrees
-from case_studies.flexibi_nantes.models import (
-    Culture,
-    Greenhouse,
-    GreenhouseGrowthCycle,
-    GrowthShare,
-    GrowthTimeStepSet,
-    NantesGreenhouses,
-)
 from distributions.models import TemporalDistribution, Timestep
 from inventories.evaluations import ScenarioResult
 from inventories.models import (
@@ -32,6 +23,15 @@ from materials.models import (
     MaterialComponentGroup,
     SampleSeries,
 )
+from sources.greenhouses.models import (
+    Culture,
+    Greenhouse,
+    GreenhouseGrowthCycle,
+    GrowthShare,
+    GrowthTimeStepSet,
+    NantesGreenhouses,
+)
+from sources.roadside_trees.models import HamburgGreenAreas, HamburgRoadsideTrees
 
 
 @override_settings(DEFAULT_OBJECT_OWNER_USERNAME="standard_user", ADMIN_USERNAME="admin")
