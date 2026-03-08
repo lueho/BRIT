@@ -124,6 +124,10 @@ Validated and committed slices completed so far:
   `serializers`, `viewsets`, `renderers`, and inventory `algorithms`) into
   `sources.greenhouses`, leaving the legacy `case_studies.flexibi_nantes`
   modules as thin compatibility re-exports
+- moved the waste-collection `renderers`, Celery `tasks`, and API `viewsets`
+  into `sources.waste_collection`, leaving the legacy
+  `case_studies.soilcom` modules as thin compatibility re-exports while
+  preserving the legacy task patch surface used by tests
 
 ## 3. Target State
 
@@ -390,6 +394,13 @@ External files that import from the three apps (outside their own code/tests):
 - [ ] Update all external imports (maps, utils, sources, layer_manager)
 - [ ] Add redirect patterns for old `/waste_collection/` URLs
 - [ ] Run full test suite
+
+Current incremental status for Phase D:
+
+- [x] Move API `viewsets` into `sources.waste_collection`
+- [x] Move export `renderers` into `sources.waste_collection`
+- [x] Move waste-flyer Celery `tasks` into `sources.waste_collection`
+- [ ] Move remaining `forms`, `filters`, and `serializers` into `sources.waste_collection`
 
 ### Phase E: Clean up
 
