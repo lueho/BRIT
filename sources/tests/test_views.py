@@ -1,4 +1,5 @@
 from django.test import SimpleTestCase
+from django.template.loader import get_template
 from django.urls import reverse
 from unittest.mock import patch
 
@@ -162,6 +163,16 @@ class RoadsideTreesOwnershipAdapterTestCase(SimpleTestCase):
         self.assertEqual(
             HamburgRoadsideTreeViewSet.__module__,
             "sources.roadside_trees.viewsets",
+        )
+
+    def test_roadside_tree_templates_resolve_from_sources(self):
+        self.assertIn(
+            "/sources/roadside_trees/templates/",
+            get_template("hamburg_roadside_trees_map.html").origin.name,
+        )
+        self.assertIn(
+            "/sources/roadside_trees/templates/",
+            get_template("hamburg_roadside_trees_map_iframe.html").origin.name,
         )
 
     def test_roadside_tree_export_view_uses_sources_model_label(self):
