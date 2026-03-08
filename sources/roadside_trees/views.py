@@ -30,7 +30,7 @@ class RoadsideTreesPublishedMapIframeView(GeoDataSetPublishedFilteredMapView):
 
 
 class HamburgRoadsideTreesListFileExportView(GenericUserCreatedObjectExportView):
-    model_label = "flexibi_hamburg.HamburgRoadsideTrees"
+    model_label = "roadside_trees.HamburgRoadsideTrees"
 
 
 class HamburgRoadsideTreeCatchmentAutocompleteView(CatchmentAutocompleteView):

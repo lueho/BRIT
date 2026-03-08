@@ -142,7 +142,7 @@ class ExportRegistryTestCase(SimpleTestCase):
         self.assertEqual(
             mock_register_export.call_args_list[1].args,
             (
-                "flexibi_hamburg.HamburgRoadsideTrees",
+                "roadside_trees.HamburgRoadsideTrees",
                 roadside_filterset,
                 roadside_serializer,
                 {"xlsx": roadside_xlsx, "csv": roadside_csv},

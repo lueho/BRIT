@@ -42,6 +42,18 @@ class SourcesModelAdapterTestCase(SimpleTestCase):
         self.assertIs(HamburgGreenAreas, LegacyHamburgGreenAreas)
         self.assertIs(HamburgRoadsideTrees, LegacyHamburgRoadsideTrees)
 
+    def test_roadside_tree_models_use_sources_app_label_and_preserve_db_tables(self):
+        self.assertEqual(HamburgGreenAreas._meta.app_label, "roadside_trees")
+        self.assertEqual(
+            HamburgGreenAreas._meta.db_table,
+            "flexibi_hamburg_hamburggreenareas",
+        )
+        self.assertEqual(HamburgRoadsideTrees._meta.app_label, "roadside_trees")
+        self.assertEqual(
+            HamburgRoadsideTrees._meta.db_table,
+            "flexibi_hamburg_hamburgroadsidetrees",
+        )
+
     def test_greenhouse_model_adapters_reexport_legacy_models(self):
         self.assertIs(Culture, LegacyCulture)
         self.assertIs(Greenhouse, LegacyGreenhouse)

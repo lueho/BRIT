@@ -26,7 +26,7 @@ register_export(
 )
 
 register_export(
-    "flexibi_hamburg.HamburgRoadsideTrees",
+    "roadside_trees.HamburgRoadsideTrees",
     HamburgRoadsideTreesFilterSet,
     HamburgRoadsideTreeFlatSerializer,
     {"xlsx": HamburgRoadsideTreesXLSXRenderer, "csv": HamburgRoadsideTreesCSVRenderer},

@@ -160,6 +160,12 @@ class RoadsideTreesOwnershipAdapterTestCase(SimpleTestCase):
     def test_roadside_tree_viewset_adapter_reexports_legacy_viewset(self):
         self.assertIs(HamburgRoadsideTreeViewSet, LegacyHamburgRoadsideTreeViewSet)
 
+    def test_roadside_tree_export_view_uses_sources_model_label(self):
+        self.assertEqual(
+            HamburgRoadsideTreesListFileExportView.model_label,
+            "roadside_trees.HamburgRoadsideTrees",
+        )
+
     def test_roadside_tree_views_are_owned_by_sources_and_reexported_legacy(self):
         self.assertIs(RoadsideTreesPublishedMapView, LegacyRoadsideTreesPublishedMapView)
         self.assertIs(
