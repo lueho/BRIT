@@ -48,6 +48,8 @@ class InventoryAlgorithm(models.Model):
 
     @staticmethod
     def get_module_path(source_module):
+        if "." in source_module:
+            return source_module
         return f"case_studies.{source_module}.algorithms"
 
     @staticmethod
@@ -66,9 +68,14 @@ class InventoryAlgorithm(models.Model):
     @staticmethod
     def parse_task_reference(task_reference):
         module_path, function_name = task_reference.split(":", 1)
-        source_module = module_path.removeprefix("case_studies.").removesuffix(
+        if module_path.startswith("case_studies.") and module_path.endswith(
             ".algorithms"
-        )
+        ):
+            source_module = module_path.removeprefix("case_studies.").removesuffix(
+                ".algorithms"
+            )
+        else:
+            source_module = module_path
         return source_module, function_name
 
     @classmethod
@@ -359,24 +366,21 @@ class Scenario(NamedUserCreatedObject):
             geodataset__region=self.region, default=True
         )
 
-    def inventory_algorithm_config(self, algorithm):
+    def inventory_algorithm_config(self, algorithm, feedstock):
+        configuration = self.configuration().filter(
+            inventory_algorithm=algorithm, feedstock=feedstock
+        )
         return {
             "scenario": self,
-            "feedstocks": Material.objects.filter(
-                id__in=[
-                    c["feedstock_id"]
-                    for c in self.scenarioinventoryconfiguration_set.filter(
-                        inventory_algorithm=algorithm
-                    ).values()
-                ]
-            ),
+            "feedstock": feedstock,
             "geodataset": algorithm.geodataset,
             "inventory_algorithm": algorithm,
             "parameters": [
-                {conf.inventory_parameter.id: conf.inventory_value.id}
-                for conf in ScenarioInventoryConfiguration.objects.filter(
-                    scenario=self, inventory_algorithm=algorithm
+                {conf.inventory_parameter.short_name: conf.inventory_value.id}
+                for conf in configuration.select_related(
+                    "inventory_parameter", "inventory_value"
                 )
+                if conf.inventory_parameter and conf.inventory_value
             ],
         }
 

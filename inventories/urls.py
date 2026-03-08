@@ -87,7 +87,7 @@ urlpatterns = [
         name="scenario-add-configuration",
     ),
     path(
-        "scenarios/<int:scenario_pk>/change_config/<int:algorithm_pk>/",
+        "scenarios/<int:scenario_pk>/configuration/<int:feedstock_pk>/<int:algorithm_pk>/change/",
         ScenarioAlgorithmConfigurationUpdateView.as_view(),
         name="scenario-update-config",
     ),

@@ -102,6 +102,34 @@ class ScenarioTestCase(TestCase):
             algorithm,
         )
 
+    def test_inventory_algorithm_task_reference_supports_fully_qualified_module_path(self):
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Resolver Algorithm",
+            source_module="sources.roadside_trees.inventory.algorithms",
+            function_name="roadside_tree_production",
+            geodataset=GeoDataset.objects.get(name="Test Dataset"),
+        )
+
+        self.assertEqual(
+            algorithm.module_path,
+            "sources.roadside_trees.inventory.algorithms",
+        )
+        self.assertEqual(
+            algorithm.task_reference,
+            "sources.roadside_trees.inventory.algorithms:roadside_tree_production",
+        )
+        self.assertEqual(
+            InventoryAlgorithm.parse_task_reference(algorithm.task_reference),
+            (
+                "sources.roadside_trees.inventory.algorithms",
+                "roadside_tree_production",
+            ),
+        )
+        self.assertEqual(
+            InventoryAlgorithm.from_task_reference(algorithm.task_reference),
+            algorithm,
+        )
+
     def test_inventory_algorithm_execute_uses_resolved_callable(self):
         algorithm = InventoryAlgorithm.objects.create(
             name="Resolver Algorithm",
@@ -212,6 +240,69 @@ class ScenarioTestCase(TestCase):
 
         with self.assertRaises(ScenarioConfigurationError):
             self.scenario.is_valid_configuration()
+
+    def test_inventory_algorithm_config_is_scoped_to_feedstock_and_uses_short_names(self):
+        material = Material.objects.get(name="Feedstock 1")
+        other_material = Material.objects.get(name="Feedstock 2")
+        feedstock = SampleSeries.objects.create(
+            material=material,
+            name="Feedstock 1 Series",
+        )
+        other_feedstock = SampleSeries.objects.create(
+            material=other_material,
+            name="Feedstock 2 Series",
+        )
+        geodataset = GeoDataset.objects.get(name="Test Dataset")
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Scoped Config Algorithm",
+            geodataset=geodataset,
+        )
+        algorithm.feedstocks.add(material, other_material)
+        parameter = InventoryAlgorithmParameter.objects.create(
+            descriptive_name="Point yield",
+            short_name="point_yield",
+            is_required=True,
+        )
+        parameter.inventory_algorithm.add(algorithm)
+        value = InventoryAlgorithmParameterValue.objects.create(
+            name="Feedstock 1 Value",
+            parameter=parameter,
+            value=1.0,
+            standard_deviation=0.1,
+            default=True,
+        )
+        other_value = InventoryAlgorithmParameterValue.objects.create(
+            name="Feedstock 2 Value",
+            parameter=parameter,
+            value=2.0,
+            standard_deviation=0.2,
+            default=False,
+        )
+
+        ScenarioInventoryConfiguration.objects.create(
+            scenario=self.scenario,
+            feedstock=feedstock,
+            geodataset=geodataset,
+            inventory_algorithm=algorithm,
+            inventory_parameter=parameter,
+            inventory_value=value,
+        )
+        ScenarioInventoryConfiguration.objects.create(
+            scenario=self.scenario,
+            feedstock=other_feedstock,
+            geodataset=geodataset,
+            inventory_algorithm=algorithm,
+            inventory_parameter=parameter,
+            inventory_value=other_value,
+        )
+
+        config = self.scenario.inventory_algorithm_config(algorithm, feedstock)
+
+        self.assertEqual(config["scenario"], self.scenario)
+        self.assertEqual(config["feedstock"], feedstock)
+        self.assertEqual(config["geodataset"], geodataset)
+        self.assertEqual(config["inventory_algorithm"], algorithm)
+        self.assertEqual(config["parameters"], [{"point_yield": value.id}])
 
     @patch("inventories.models.AsyncResult")
     def test_running_scenario_save_stays_blocked_while_task_is_active(

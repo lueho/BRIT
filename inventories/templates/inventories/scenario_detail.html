@@ -34,7 +34,7 @@
                                 <div class="card-footer">
                                     {% if policy.can_edit %}
                                         {% if not policy.is_published %}
-                                            <a href="{% url 'scenario-update-config' scenario.id algo.id %}" class="me-3">
+                                            <a href="{% url 'scenario-update-config' scenario.id feedstock.id algo.id %}" class="me-3">
                                                 <i class="fas fa-fw fa-edit"></i> Edit
                                             </a>
                                         {% endif %}

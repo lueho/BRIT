@@ -257,10 +257,11 @@ class ScenarioAlgorithmConfigurationUpdateView(
     def post(request, *args, **kwargs):
         scenario = Scenario.objects.get(id=request.POST.get("scenario"))
         current_algorithm = InventoryAlgorithm.objects.get(
-            id=request.POST.get("current_algorithm")
+            id=kwargs.get("algorithm_pk")
         )
+        current_feedstock = SampleSeries.objects.get(id=kwargs.get("feedstock_pk"))
+        scenario.remove_inventory_algorithm(current_algorithm, current_feedstock)
         feedstock = SampleSeries.objects.get(id=request.POST.get("feedstock"))
-        scenario.remove_inventory_algorithm(current_algorithm, feedstock)
         new_algorithm = InventoryAlgorithm.objects.get(
             id=request.POST.get("inventory_algorithm")
         )
@@ -283,7 +284,8 @@ class ScenarioAlgorithmConfigurationUpdateView(
     def get_initial(self):
         scenario = Scenario.objects.get(id=self.kwargs.get("scenario_pk"))
         algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get("algorithm_pk"))
-        config = scenario.inventory_algorithm_config(algorithm)
+        feedstock = SampleSeries.objects.get(id=self.kwargs.get("feedstock_pk"))
+        config = scenario.inventory_algorithm_config(algorithm, feedstock)
         return config
 
     def get_context_data(self, **kwargs):
