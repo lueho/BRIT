@@ -50,9 +50,13 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get("/maps/hamburg/roadside_trees/map/")
         self.assertEqual(response.status_code, 200)
 
-    def test_get_http_200_ok_via_case_studies_hamburg_prefix(self):
-        response = self.client.get("/case_studies/hamburg/roadside_trees/map/")
-        self.assertEqual(response.status_code, 200)
+    def test_get_http_301_redirect_via_case_studies_hamburg_prefix(self):
+        response = self.client.get(
+            "/case_studies/hamburg/roadside_trees/map/",
+            follow=False,
+        )
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response["Location"], "/sources/roadside_trees/map/")
 
 
 class HamburgRoadsideTreeCatchmentAutocompleteViewTests(ViewWithPermissionsTestCase):

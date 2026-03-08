@@ -196,9 +196,28 @@ class RoadsideTreesOwnershipAdapterTestCase(SimpleTestCase):
             LegacyHamburgRoadsideTreeCatchmentAutocompleteView,
         )
 
-    def test_roadside_tree_router_and_urls_are_owned_by_sources_and_reexported_legacy(self):
+    def test_roadside_tree_router_is_owned_by_sources_and_reexported_legacy(self):
         self.assertIs(HamburgRouter, LegacyHamburgRouter)
-        self.assertIs(HamburgUrlpatterns, LegacyHamburgUrlpatterns)
+
+    def test_legacy_hamburg_urls_redirect_to_sources(self):
+        self.assertIsNot(HamburgUrlpatterns, LegacyHamburgUrlpatterns)
+        response = self.client.get(
+            "/case_studies/hamburg/roadside_trees/map/",
+            follow=False,
+        )
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response["Location"], "/sources/roadside_trees/map/")
+
+    def test_legacy_hamburg_api_urls_redirect_to_sources(self):
+        response = self.client.get(
+            "/case_studies/hamburg/api/hamburg_roadside_trees/",
+            follow=False,
+        )
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(
+            response["Location"],
+            "/sources/api/hamburg_roadside_trees/",
+        )
 
 
 class GreenhousesOwnershipAdapterTestCase(SimpleTestCase):

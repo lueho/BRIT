@@ -44,7 +44,7 @@ urlpatterns = [
     path("sources/", include("sources.urls")),
     path("inventories/", include("inventories.urls")),
     path("interfaces/simucf/", include("interfaces.simucf.urls")),
-    path("case_studies/hamburg/", include("sources.roadside_trees.urls")),
+    path("case_studies/hamburg/", include("case_studies.flexibi_hamburg.urls")),
     path("case_studies/nantes/", include("sources.greenhouses.urls")),
     path("waste_collection/", include("sources.waste_collection.urls")),
     path("closecycle/", include("case_studies.closecycle.urls")),
