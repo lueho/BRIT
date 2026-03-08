@@ -3,6 +3,12 @@ from types import SimpleNamespace
 
 from maps.models import Region
 from materials.models import SampleSeries
+from case_studies.flexibi_nantes.algorithms import (
+    InventoryAlgorithms as LegacyGreenhouseInventoryAlgorithms,
+)
+from sources.greenhouses.inventory.algorithms import (
+    InventoryAlgorithms as GreenhouseInventoryAlgorithms,
+)
 
 from ..exceptions import BlockedRunningScenario
 from ..models import (
@@ -56,6 +62,13 @@ class ScenarioTestCase(TestCase):
         geodatasets = self.scenario.available_geodatasets()
         self.assertQuerySetEqual(
             geodatasets, GeoDataset.objects.filter(name="Test Dataset")
+        )
+
+    def test_greenhouse_inventory_algorithms_are_owned_by_sources_and_reexported_legacy(self):
+        self.assertIs(GreenhouseInventoryAlgorithms, LegacyGreenhouseInventoryAlgorithms)
+        self.assertEqual(
+            GreenhouseInventoryAlgorithms.__module__,
+            "sources.greenhouses.inventory.algorithms",
         )
 
     def test_available_inventory_algorithms_with_single_feedstock(self):

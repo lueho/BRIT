@@ -257,6 +257,34 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
         self.assertIs(NantesGreenhousesCSVRenderer, LegacyNantesGreenhousesCSVRenderer)
         self.assertIs(NantesGreenhousesXLSXRenderer, LegacyNantesGreenhousesXLSXRenderer)
 
+    def test_greenhouse_filters_serializers_and_renderers_are_owned_by_sources(self):
+        self.assertEqual(CultureListFilter.__module__, "sources.greenhouses.filters")
+        self.assertEqual(GreenhouseTypeFilter.__module__, "sources.greenhouses.filters")
+        self.assertEqual(
+            NantesGreenhousesFilterSet.__module__,
+            "sources.greenhouses.filters",
+        )
+        self.assertEqual(
+            NantesGreenhousesFlatSerializer.__module__,
+            "sources.greenhouses.serializers",
+        )
+        self.assertEqual(
+            NantesGreenhousesGeometrySerializer.__module__,
+            "sources.greenhouses.serializers",
+        )
+        self.assertEqual(
+            NantesGreenhousesModelSerializer.__module__,
+            "sources.greenhouses.serializers",
+        )
+        self.assertEqual(
+            NantesGreenhousesCSVRenderer.__module__,
+            "sources.greenhouses.renderers",
+        )
+        self.assertEqual(
+            NantesGreenhousesXLSXRenderer.__module__,
+            "sources.greenhouses.renderers",
+        )
+
     def test_greenhouse_form_adapters_reexport_legacy_symbols(self):
         self.assertIs(CultureModalModelForm, LegacyCultureModalModelForm)
         self.assertIs(CultureModelForm, LegacyCultureModelForm)
@@ -270,6 +298,30 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
         self.assertIs(
             UpdateGreenhouseGrowthCycleValuesForm,
             LegacyUpdateGreenhouseGrowthCycleValuesForm,
+        )
+
+    def test_greenhouse_forms_are_owned_by_sources(self):
+        self.assertEqual(CultureModalModelForm.__module__, "sources.greenhouses.forms")
+        self.assertEqual(CultureModelForm.__module__, "sources.greenhouses.forms")
+        self.assertEqual(
+            GreenhouseGrowthCycleModelForm.__module__,
+            "sources.greenhouses.forms",
+        )
+        self.assertEqual(
+            GreenhouseModalModelForm.__module__,
+            "sources.greenhouses.forms",
+        )
+        self.assertEqual(GreenhouseModelForm.__module__, "sources.greenhouses.forms")
+        self.assertEqual(GrowthCycleCreateForm.__module__, "sources.greenhouses.forms")
+        self.assertEqual(
+            GrowthShareFormSetHelper.__module__,
+            "sources.greenhouses.forms",
+        )
+        self.assertEqual(GrowthTimestepInline.__module__, "sources.greenhouses.forms")
+        self.assertEqual(InlineGrowthShare.__module__, "sources.greenhouses.forms")
+        self.assertEqual(
+            UpdateGreenhouseGrowthCycleValuesForm.__module__,
+            "sources.greenhouses.forms",
         )
 
     def test_waste_collection_form_and_task_adapters_reexport_legacy_symbols(self):

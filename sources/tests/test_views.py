@@ -230,6 +230,7 @@ class RoadsideTreesOwnershipAdapterTestCase(SimpleTestCase):
 class GreenhousesOwnershipAdapterTestCase(SimpleTestCase):
     def test_greenhouse_viewset_adapter_reexports_legacy_viewset(self):
         self.assertIs(NantesGreenhousesViewSet, LegacyNantesGreenhousesViewSet)
+        self.assertEqual(NantesGreenhousesViewSet.__module__, "sources.greenhouses.viewsets")
 
     def test_greenhouse_views_are_owned_by_sources_and_reexported_legacy(self):
         self.assertIs(CultureAutocompleteView, LegacyCultureAutocompleteView)
