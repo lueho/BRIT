@@ -114,6 +114,9 @@ Validated and committed slices completed so far:
 - exposed the Hamburg roadside-tree URL surface through the top-level
   `sources/urls.py` so `/sources/roadside_trees/...` now works alongside the
   existing `/maps/hamburg/...` and legacy `/case_studies/hamburg/...` routes
+- converted `/case_studies/hamburg/...` into a redirecting compatibility layer
+  that now forwards the legacy Hamburg routes to the canonical `sources`
+  entrypoints while preserving query strings
 
 ## 3. Target State
 
@@ -324,8 +327,8 @@ External files that import from the three apps (outside their own code/tests):
 
 1. Continue moving implementation bodies from thin re-exports toward
    source-owned modules while preserving legacy runtime compatibility.
-2. Continue the Hamburg phase by deciding and then implementing the legacy-route
-   transition for the remaining `/case_studies/hamburg/...` URLs.
+2. Continue the Hamburg phase by cleaning up the remaining static-file and app
+   registration seams after the URL transition.
 3. Reduce any remaining intentional direct `case_studies.*` imports behind
    `sources` adapters before starting model/state moves.
 4. Fill in any remaining top-level `sources` package scaffolding only where it
@@ -351,7 +354,7 @@ External files that import from the three apps (outside their own code/tests):
 - [x] Create `SeparateDatabaseAndState` migrations in both apps
 - [x] Update `brit/urls.py` — merge Hamburg URLs into `sources/urls.py`
 - [ ] Update all external imports (maps/tasks.py, registry_init.py, etc.)
-- [ ] Add redirect patterns for old `/case_studies/hamburg/` URLs
+- [x] Add redirect patterns for old `/case_studies/hamburg/` URLs
 - [ ] Update `INSTALLED_APPS`
 - [ ] Run full test suite
 
