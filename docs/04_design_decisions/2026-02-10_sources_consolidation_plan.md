@@ -117,6 +117,9 @@ Validated and committed slices completed so far:
 - converted `/case_studies/hamburg/...` into a redirecting compatibility layer
   that now forwards the legacy Hamburg routes to the canonical `sources`
   entrypoints while preserving query strings
+- added source-owned copies of the Hamburg roadside-tree JS assets under
+  `sources.roadside_trees/static/js/` so Django now resolves those static files
+  from the `sources` app path first as well
 
 ## 3. Target State
 
@@ -327,8 +330,8 @@ External files that import from the three apps (outside their own code/tests):
 
 1. Continue moving implementation bodies from thin re-exports toward
    source-owned modules while preserving legacy runtime compatibility.
-2. Continue the Hamburg phase by cleaning up the remaining static-file and app
-   registration seams after the URL transition.
+2. Continue the Hamburg phase by cleaning up the remaining app-registration
+   seam after the static and URL transitions.
 3. Reduce any remaining intentional direct `case_studies.*` imports behind
    `sources` adapters before starting model/state moves.
 4. Fill in any remaining top-level `sources` package scaffolding only where it
@@ -349,7 +352,7 @@ External files that import from the three apps (outside their own code/tests):
 - [x] Move models to `sources/models/roadside_trees.py` with `db_table` Meta
 - [x] Move views, filters, serializers, viewsets, renderers, algorithms
 - [x] Move templates from `flexibi_hamburg/` to `sources/roadside_trees/`
-- [ ] Move static files
+- [x] Move static files
 - [x] Move tests
 - [x] Create `SeparateDatabaseAndState` migrations in both apps
 - [x] Update `brit/urls.py` — merge Hamburg URLs into `sources/urls.py`
