@@ -1,5 +1,5 @@
-from case_studies.flexibi_hamburg.filters import HamburgRoadsideTreesFilterSet
-from case_studies.flexibi_hamburg.renderers import (
+from sources.roadside_trees.filters import HamburgRoadsideTreesFilterSet
+from sources.roadside_trees.renderers import (
     HamburgRoadsideTreesCSVRenderer,
     HamburgRoadsideTreesXLSXRenderer,
 )

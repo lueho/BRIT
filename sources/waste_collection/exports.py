@@ -1,3 +1,3 @@
-from case_studies.soilcom.filters import CollectionFilterSet
-from case_studies.soilcom.renderers import CollectionCSVRenderer, CollectionXLSXRenderer
+from sources.waste_collection.filters import CollectionFilterSet
+from sources.waste_collection.renderers import CollectionCSVRenderer, CollectionXLSXRenderer
 from sources.waste_collection.serializers import CollectionFlatSerializer
