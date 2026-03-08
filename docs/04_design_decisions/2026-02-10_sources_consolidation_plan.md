@@ -96,6 +96,11 @@ Validated and committed slices completed so far:
 - added the remaining empty top-level `sources` package scaffolding
   (`forms`, `filters`, `serializers`, `viewsets`, and `renderers`) so the
   package layout now matches the planned bridge-phase target shape more closely
+- moved the Hamburg model classes into `sources.roadside_trees.models` while
+  preserving the existing `flexibi_hamburg_*` physical table and index names,
+  converted `case_studies.flexibi_hamburg.models` into a compatibility
+  re-export, and added paired state/content-type migrations for the new
+  `roadside_trees` app label
 
 ## 3. Target State
 
@@ -306,11 +311,14 @@ External files that import from the three apps (outside their own code/tests):
 
 1. Continue moving implementation bodies from thin re-exports toward
    source-owned modules while preserving legacy runtime compatibility.
-2. Reduce any remaining intentional direct `case_studies.*` imports behind
+2. Continue the Hamburg phase by moving its remaining implementation modules
+   (filters, serializers, viewsets, algorithms, templates/tests) behind the new
+   `roadside_trees` app label.
+3. Reduce any remaining intentional direct `case_studies.*` imports behind
    `sources` adapters before starting model/state moves.
-3. Fill in any remaining top-level `sources` package scaffolding only where it
+4. Fill in any remaining top-level `sources` package scaffolding only where it
    makes upcoming model/state moves materially simpler.
-4. Only after the shared import graph is largely normalized through `sources`,
+5. Only after the shared import graph is largely normalized through `sources`,
    begin the heavier `SeparateDatabaseAndState`, ContentType, and URL-redirect
    consolidation phases described below.
 
@@ -323,12 +331,12 @@ External files that import from the three apps (outside their own code/tests):
 
 ### Phase B: Move flexibi_hamburg (smallest, lowest risk)
 
-- [ ] Move models to `sources/models/roadside_trees.py` with `db_table` Meta
+- [x] Move models to `sources/models/roadside_trees.py` with `db_table` Meta
 - [ ] Move views, filters, serializers, viewsets, renderers, algorithms
 - [ ] Move templates from `flexibi_hamburg/` to `sources/roadside_trees/`
 - [ ] Move static files
 - [ ] Move tests
-- [ ] Create `SeparateDatabaseAndState` migrations in both apps
+- [x] Create `SeparateDatabaseAndState` migrations in both apps
 - [ ] Update `brit/urls.py` — merge Hamburg URLs into `sources/urls.py`
 - [ ] Update all external imports (maps/tasks.py, registry_init.py, etc.)
 - [ ] Add redirect patterns for old `/case_studies/hamburg/` URLs
