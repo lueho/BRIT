@@ -1,14 +1,19 @@
 from django.test import TestCase
 
 from maps.models import Region
+from materials.models import SampleSeries
 
 from ..exceptions import BlockedRunningScenario
 from ..models import (
     GeoDataset,
     InventoryAlgorithm,
+    InventoryAlgorithmParameter,
+    InventoryAlgorithmParameterValue,
     Material,
     RunningTask,
     Scenario,
+    ScenarioConfigurationError,
+    ScenarioInventoryConfiguration,
     ScenarioStatus,
 )
 from uuid import uuid4
@@ -158,6 +163,55 @@ class ScenarioTestCase(TestCase):
             },
         )
         self.assertIsNot(config[7][algorithm.task_reference], execution_plan[0]["kwargs"])
+
+    def test_is_valid_configuration_scopes_required_parameters_to_current_scenario(self):
+        material = Material.objects.get(name="Feedstock 1")
+        feedstock = SampleSeries.objects.create(
+            material=material,
+            name="Feedstock 1 Series",
+        )
+        geodataset = GeoDataset.objects.get(name="Test Dataset")
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Scoped Validation Algorithm",
+            geodataset=geodataset,
+        )
+        algorithm.feedstocks.add(material)
+        parameter = InventoryAlgorithmParameter.objects.create(
+            descriptive_name="Point yield",
+            short_name="point_yield",
+            is_required=True,
+        )
+        parameter.inventory_algorithm.add(algorithm)
+        value = InventoryAlgorithmParameterValue.objects.create(
+            name="Default point yield",
+            parameter=parameter,
+            value=1.0,
+            standard_deviation=0.0,
+            default=True,
+        )
+
+        ScenarioInventoryConfiguration.objects.create(
+            scenario=self.scenario,
+            feedstock=feedstock,
+            geodataset=geodataset,
+            inventory_algorithm=algorithm,
+        )
+
+        other_scenario = Scenario.objects.create(
+            name="Other Scenario",
+            region=self.scenario.region,
+        )
+        ScenarioInventoryConfiguration.objects.create(
+            scenario=other_scenario,
+            feedstock=feedstock,
+            geodataset=geodataset,
+            inventory_algorithm=algorithm,
+            inventory_parameter=parameter,
+            inventory_value=value,
+        )
+
+        with self.assertRaises(ScenarioConfigurationError):
+            self.scenario.is_valid_configuration()
 
     @patch("inventories.models.AsyncResult")
     def test_running_scenario_save_stays_blocked_while_task_is_active(

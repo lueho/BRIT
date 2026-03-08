@@ -432,8 +432,8 @@ class Scenario(NamedUserCreatedObject):
         """
         Remove all entries from the configuration that are associated with the given algorithm.
         """
-        for config_entry in ScenarioInventoryConfiguration.objects.filter(
-            scenario=self, inventory_algorithm=algorithm, feedstock=feedstock
+        for config_entry in self.configuration().filter(
+            inventory_algorithm=algorithm, feedstock=feedstock
         ):
             config_entry.delete()
 
@@ -450,9 +450,7 @@ class Scenario(NamedUserCreatedObject):
         Removes all entries from the configuration that are associated with this scenario. Handle with care!
         An improperly configured scenario will lead to unexpected behaviour.
         """
-        for config_entry in ScenarioInventoryConfiguration.objects.filter(
-            scenario=self
-        ):
+        for config_entry in self.configuration():
             config_entry.delete()
 
     def reset_configuration(self):
@@ -460,25 +458,22 @@ class Scenario(NamedUserCreatedObject):
         self.create_default_configuration()
 
     def is_valid_configuration(self):
+        configuration = self.configuration()
         # At least one entry for a scenario
-        if not ScenarioInventoryConfiguration.objects.filter(scenario=self):
+        if not configuration:
             raise ScenarioConfigurationError("The scenario is not configured.")
 
         # Get all inventory algorithms that are used in this scenario
         algorithms = [
             c.inventory_algorithm
-            for c in ScenarioInventoryConfiguration.objects.filter(
-                scenario=self
-            ).distinct("inventory_algorithm")
+            for c in configuration.distinct("inventory_algorithm")
         ]
 
         # Are all required parameters included in the configuration?
         required = InventoryAlgorithmParameter.objects.filter(
             inventory_algorithm__in=algorithms, is_required=True
         ).values_list("id")
-        configured = ScenarioInventoryConfiguration.objects.filter(
-            inventory_algorithm__in=algorithms
-        ).values_list("inventory_parameter")
+        configured = configuration.values_list("inventory_parameter")
         if not set(required).issubset(configured):
             raise ScenarioConfigurationError("Not all required parameters are defined.")
 
@@ -512,9 +507,9 @@ class Scenario(NamedUserCreatedObject):
 
     def inventory_execution_plan(self):
         inventory_config = {}
-        for entry in ScenarioInventoryConfiguration.objects.filter(
-            scenario=self
-        ).select_related("inventory_algorithm", "inventory_parameter", "inventory_value"):
+        for entry in self.configuration().select_related(
+            "inventory_algorithm", "inventory_parameter", "inventory_value"
+        ):
             feedstock = entry.feedstock.id
             algorithm = entry.inventory_algorithm
             parameter = (
@@ -563,7 +558,9 @@ class Scenario(NamedUserCreatedObject):
     def configuration_for_template(self):
 
         config = {}
-        for entry in ScenarioInventoryConfiguration.objects.filter(scenario=self):
+        for entry in self.configuration().select_related(
+            "feedstock", "inventory_algorithm", "inventory_parameter", "inventory_value"
+        ):
             feedstock = entry.feedstock
             algorithm = entry.inventory_algorithm
             parameter = entry.inventory_parameter
