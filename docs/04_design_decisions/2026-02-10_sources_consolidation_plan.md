@@ -79,6 +79,9 @@ Validated and committed slices completed so far:
 - made `sources.roadside_trees` the authoritative owner of the Hamburg
   URL/view/router surface while preserving legacy `case_studies.flexibi_hamburg`
   modules as compatibility re-exports
+- made `sources.greenhouses` the authoritative owner of the Nantes
+  URL/view/router surface while preserving legacy `case_studies.flexibi_nantes`
+  modules as compatibility re-exports
 
 ## 3. Target State
 
@@ -276,12 +279,14 @@ External files that import from the three apps (outside their own code/tests):
   starting `SeparateDatabaseAndState` model moves
 - [x] Move the first domain URL/view/router ownership slice into `sources`
   while preserving legacy compatibility
+- [x] Extend URL/view/router ownership into the Nantes greenhouse domain while
+  preserving legacy compatibility
 
 ### Near-term next steps
 
-1. Extend the Hamburg URL/view/router ownership pattern to the remaining
-   domains, starting with the smaller Nantes surface before the larger
-   waste-collection module.
+1. Extend the established ownership pattern to the remaining waste-collection
+   URL/view surface, likely in smaller sub-slices rather than a single module
+   move.
 2. Continue moving implementation bodies from thin re-exports toward
    source-owned modules while preserving legacy runtime compatibility.
 3. Only after the shared import graph is largely normalized through `sources`,
