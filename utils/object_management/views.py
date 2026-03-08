@@ -302,9 +302,9 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             # This shouldn't happen in practice, but provides a fallback
             try:
                 # Try to get Collection as fallback
-                from case_studies.soilcom.models import Collection
+                from sources.waste_collection.selectors import empty_collection_queryset
 
-                kwargs["queryset"] = Collection.objects.none()
+                kwargs["queryset"] = empty_collection_queryset()
             except ImportError:
                 # If Collection doesn't exist, we have bigger problems
                 # Return empty list-like object
@@ -579,9 +579,9 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             return available_models[0].objects.none()
         # Fallback
         try:
-            from case_studies.soilcom.models import Collection
+            from sources.waste_collection.selectors import empty_collection_queryset
 
-            return Collection.objects.none()
+            return empty_collection_queryset()
         except ImportError:
             return UserCreatedObject.objects.none()
 

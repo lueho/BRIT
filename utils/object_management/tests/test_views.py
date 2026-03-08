@@ -1003,6 +1003,46 @@ class ReviewDashboardViewTests(TestCase):
 
         self.assertEqual(review_items, [])
 
+    def test_get_filterset_kwargs_uses_sources_collection_fallback_queryset(self):
+        request = RequestFactory().get(reverse("object_management:review_dashboard"))
+        request.user = self.staff_user
+
+        view = ReviewDashboardView()
+        view.setup(request)
+
+        fallback_queryset = Collection.objects.none()
+        with (
+            patch.object(view, "get_available_models", return_value=[]),
+            patch(
+                "sources.waste_collection.selectors.empty_collection_queryset",
+                return_value=fallback_queryset,
+            ) as mock_empty_queryset,
+        ):
+            kwargs = view.get_filterset_kwargs(view.filterset_class)
+
+        self.assertIs(kwargs["queryset"], fallback_queryset)
+        self.assertGreaterEqual(mock_empty_queryset.call_count, 1)
+
+    def test_get_queryset_uses_sources_collection_fallback_queryset(self):
+        request = RequestFactory().get(reverse("object_management:review_dashboard"))
+        request.user = self.staff_user
+
+        view = ReviewDashboardView()
+        view.setup(request)
+
+        fallback_queryset = Collection.objects.none()
+        with (
+            patch.object(view, "get_available_models", return_value=[]),
+            patch(
+                "sources.waste_collection.selectors.empty_collection_queryset",
+                return_value=fallback_queryset,
+            ) as mock_empty_queryset,
+        ):
+            queryset = view.get_queryset()
+
+        self.assertIs(queryset, fallback_queryset)
+        mock_empty_queryset.assert_called_once_with()
+
 
 class ReviewDashboardFilterTests(TestCase):
     """Review dashboard filter form behaviour."""
