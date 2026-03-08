@@ -35,6 +35,15 @@ from case_studies.soilcom.serializers import (
     WasteCollectionGeometrySerializer as LegacyWasteCollectionGeometrySerializer,
 )
 from case_studies.soilcom.filters import CollectionFilterSet as LegacyCollectionFilterSet
+from case_studies.soilcom.filters import (
+    CollectionFrequencyListFilter as LegacyCollectionFrequencyListFilter,
+    CollectionSystemListFilter as LegacyCollectionSystemListFilter,
+    CollectorFilter as LegacyCollectorFilter,
+    FeeSystemListFilter as LegacyFeeSystemListFilter,
+    WasteCategoryListFilter as LegacyWasteCategoryListFilter,
+    WasteComponentListFilter as LegacyWasteComponentListFilter,
+    WasteFlyerFilter as LegacyWasteFlyerFilter,
+)
 from case_studies.soilcom.renderers import (
     CollectionCSVRenderer as LegacyCollectionCSVRenderer,
     CollectionXLSXRenderer as LegacyCollectionXLSXRenderer,
@@ -63,7 +72,16 @@ from sources.roadside_trees.serializers import (
     HamburgRoadsideTreeGeometrySerializer,
     HamburgRoadsideTreeSimpleModelSerializer,
 )
-from sources.waste_collection.filters import CollectionFilterSet
+from sources.waste_collection.filters import (
+    CollectionFilterSet,
+    CollectionFrequencyListFilter,
+    CollectionSystemListFilter,
+    CollectorFilter,
+    FeeSystemListFilter,
+    WasteCategoryListFilter,
+    WasteComponentListFilter,
+    WasteFlyerFilter,
+)
 from sources.waste_collection.renderers import (
     CollectionCSVRenderer,
     CollectionXLSXRenderer,
@@ -110,7 +128,14 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
         )
 
     def test_waste_collection_filter_and_renderer_adapters_reexport_legacy_symbols(self):
+        self.assertIs(CollectionFrequencyListFilter, LegacyCollectionFrequencyListFilter)
         self.assertIs(CollectionFilterSet, LegacyCollectionFilterSet)
+        self.assertIs(CollectionSystemListFilter, LegacyCollectionSystemListFilter)
+        self.assertIs(CollectorFilter, LegacyCollectorFilter)
+        self.assertIs(FeeSystemListFilter, LegacyFeeSystemListFilter)
+        self.assertIs(WasteCategoryListFilter, LegacyWasteCategoryListFilter)
+        self.assertIs(WasteComponentListFilter, LegacyWasteComponentListFilter)
+        self.assertIs(WasteFlyerFilter, LegacyWasteFlyerFilter)
         self.assertIs(CollectionCSVRenderer, LegacyCollectionCSVRenderer)
         self.assertIs(CollectionXLSXRenderer, LegacyCollectionXLSXRenderer)
 

@@ -2,6 +2,7 @@ from django.test import SimpleTestCase
 from django.urls import reverse
 from unittest.mock import patch
 
+import case_studies.soilcom.views as legacy_waste_collection_views
 from case_studies.flexibi_hamburg.router import router as LegacyHamburgRouter
 from case_studies.flexibi_hamburg.urls import urlpatterns as LegacyHamburgUrlpatterns
 from case_studies.flexibi_hamburg.views import (
@@ -41,6 +42,8 @@ from case_studies.flexibi_nantes.views import (
     NantesGreenhousesListFileExportView as LegacyNantesGreenhousesListFileExportView,
     UpdateGreenhouseGrowthCycleValuesView as LegacyUpdateGreenhouseGrowthCycleValuesView,
 )
+from case_studies.soilcom.router import router as LegacyWasteCollectionRouter
+from case_studies.soilcom.urls import urlpatterns as LegacyWasteCollectionUrlpatterns
 from case_studies.soilcom.views import CollectionDetailView as LegacyCollectionDetailView
 from sources.greenhouses.router import router as NantesRouter
 from sources.greenhouses.urls import urlpatterns as NantesUrlpatterns
@@ -81,6 +84,9 @@ from sources.roadside_trees.views import (
     RoadsideTreesPublishedMapIframeView,
     RoadsideTreesPublishedMapView,
 )
+from sources.waste_collection.router import router as WasteCollectionRouter
+from sources.waste_collection.urls import urlpatterns as WasteCollectionUrlpatterns
+import sources.waste_collection.views as waste_collection_views
 from sources.waste_collection.views import CollectionDetailView
 from utils.tests.testcases import ViewWithPermissionsTestCase
 
@@ -206,3 +212,47 @@ class GreenhousesOwnershipAdapterTestCase(SimpleTestCase):
     def test_greenhouse_router_and_urls_are_owned_by_sources_and_reexported_legacy(self):
         self.assertIs(NantesRouter, LegacyNantesRouter)
         self.assertIs(NantesUrlpatterns, LegacyNantesUrlpatterns)
+
+
+class WasteCollectionOwnershipAdapterTestCase(SimpleTestCase):
+    def test_waste_collection_views_are_owned_by_sources_and_reexported_legacy(self):
+        view_names = [
+            "CollectionExplorerView",
+            "CollectionDiagramView",
+            "CollectorPublishedListView",
+            "CollectionSystemPublishedListView",
+            "WasteCategoryPublishedListView",
+            "WasteComponentPublishedListView",
+            "FeeSystemPublishedListView",
+            "WasteFlyerPublishedFilterView",
+            "FrequencyPublishedListView",
+            "CollectionPropertyValueCreateView",
+            "AggregatedCollectionPropertyValueCreateView",
+            "CollectionCatchmentPublishedFilterView",
+            "CollectionPublishedListView",
+            "CollectionDetailView",
+            "CollectionReviewItemDetailView",
+            "CollectionListFileExportView",
+            "WasteCollectionPublishedMapView",
+            "WasteCollectionPrivateMapView",
+            "WasteCollectionReviewMapView",
+            "WasteCollectionPublishedMapIframeView",
+            "CollectionSubmitForReviewView",
+            "CollectionWithdrawFromReviewView",
+            "CollectionApproveItemView",
+            "CollectionRejectItemView",
+            "CollectionSubmitForReviewModalView",
+            "CollectionWithdrawFromReviewModalView",
+            "CollectionApproveItemModalView",
+            "CollectionRejectItemModalView",
+        ]
+
+        for view_name in view_names:
+            self.assertIs(
+                getattr(waste_collection_views, view_name),
+                getattr(legacy_waste_collection_views, view_name),
+            )
+
+    def test_waste_collection_router_and_urls_are_owned_by_sources_and_reexported_legacy(self):
+        self.assertIs(WasteCollectionRouter, LegacyWasteCollectionRouter)
+        self.assertIs(WasteCollectionUrlpatterns, LegacyWasteCollectionUrlpatterns)
