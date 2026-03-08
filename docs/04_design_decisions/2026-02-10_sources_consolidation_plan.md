@@ -73,6 +73,9 @@ Validated and committed slices completed so far:
   serializer adapters
 - routed shared export filter and renderer imports through `sources`
   filter/renderer adapters
+- routed the remaining shared direct waste-collection view import through a
+  `sources` view adapter, leaving only intentional thin adapters and adapter
+  regression tests referencing `case_studies`
 
 ## 3. Target State
 
@@ -266,14 +269,15 @@ External files that import from the three apps (outside their own code/tests):
 - [x] Add serializer adapter modules and rewire shared imports to them
 - [x] Add filter and renderer adapter modules where shared code still imports
   `case_studies.*` directly
-- [ ] Reduce remaining shared direct imports to a small, intentional set before
+- [x] Reduce remaining shared direct imports to a small, intentional set before
   starting `SeparateDatabaseAndState` model moves
 
 ### Near-term next steps
 
-1. Reduce the remaining shared direct imports to a small, intentional set so
-   `sources` is the stable integration surface across the shared codebase.
-2. After the adapter surfaces are stable, start moving implementation bodies
+1. Decide whether to keep `sources.*.urls` and `sources.*.views` as thin
+   compatibility adapters while moving implementation bodies incrementally, or
+   to begin consolidating full URL/view ownership into `sources` now.
+2. After that boundary is chosen, start moving implementation bodies
    from thin re-exports toward source-owned modules while preserving legacy
    runtime compatibility.
 3. Only after the shared import graph is largely normalized through `sources`,
