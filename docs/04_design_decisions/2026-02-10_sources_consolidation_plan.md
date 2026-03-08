@@ -90,6 +90,9 @@ Validated and committed slices completed so far:
   seams directly from `case_studies.*`
 - added domain `viewsets` adapters so `sources`-owned routers no longer import
   those seams directly from `case_studies.*`
+- converted the top-level `sources.views` and `sources.models` shims into
+  package-backed entrypoints to prepare for the later package-based app
+  structure without changing runtime behavior
 
 ## 3. Target State
 
@@ -300,21 +303,20 @@ External files that import from the three apps (outside their own code/tests):
 
 1. Continue moving implementation bodies from thin re-exports toward
    source-owned modules while preserving legacy runtime compatibility.
-2. Convert the remaining top-level `sources` shims into package-based
-   structures where needed so the new domain ownership boundaries are easier to
-   maintain.
-3. Reduce any remaining intentional direct `case_studies.*` imports behind
+2. Reduce any remaining intentional direct `case_studies.*` imports behind
    `sources` adapters before starting model/state moves.
+3. Fill in any remaining top-level `sources` package scaffolding only where it
+   makes upcoming model/state moves materially simpler.
 4. Only after the shared import graph is largely normalized through `sources`,
    begin the heavier `SeparateDatabaseAndState`, ContentType, and URL-redirect
    consolidation phases described below.
 
 ### Phase A: Prepare the sources/ app structure
 
-- [ ] Convert `sources/models.py` to `sources/models/__init__.py` package
-- [ ] Convert `sources/views.py` to `sources/views/__init__.py` package
+- [x] Convert `sources/models.py` to `sources/models/__init__.py` package
+- [x] Convert `sources/views.py` to `sources/views/__init__.py` package
 - [ ] Create empty sub-module files (forms/, filters/, serializers/, etc.)
-- [ ] Verify tests still pass (no functional changes yet)
+- [x] Verify tests still pass (no functional changes yet)
 
 ### Phase B: Move flexibi_hamburg (smallest, lowest risk)
 
