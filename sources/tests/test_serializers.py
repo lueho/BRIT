@@ -222,6 +222,13 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
         self.assertIs(CollectionCSVRenderer, LegacyCollectionCSVRenderer)
         self.assertIs(CollectionXLSXRenderer, LegacyCollectionXLSXRenderer)
 
+    def test_waste_collection_renderers_are_owned_by_sources(self):
+        self.assertEqual(CollectionCSVRenderer.__module__, "sources.waste_collection.renderers")
+        self.assertEqual(
+            CollectionXLSXRenderer.__module__,
+            "sources.waste_collection.renderers",
+        )
+
     def test_roadside_tree_filter_and_renderer_adapters_reexport_legacy_symbols(self):
         self.assertIs(HamburgRoadsideTreesFilterSet, LegacyHamburgRoadsideTreesFilterSet)
         self.assertIs(HamburgRoadsideTreesCSVRenderer, LegacyHamburgRoadsideTreesCSVRenderer)
@@ -370,6 +377,16 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
         self.assertIs(WasteFlyerModelForm, LegacyWasteFlyerModelForm)
         self.assertIs(check_wasteflyer_url, LegacyCheckWasteflyerUrl)
         self.assertIs(check_wasteflyer_urls, LegacyCheckWasteflyerUrls)
+
+    def test_waste_collection_tasks_are_owned_by_sources(self):
+        self.assertEqual(
+            check_wasteflyer_url.run.__module__,
+            "sources.waste_collection.tasks",
+        )
+        self.assertEqual(
+            check_wasteflyer_urls.run.__module__,
+            "sources.waste_collection.tasks",
+        )
 
     def test_waste_collection_geojson_imports_serializer_from_sources_adapter(self):
         from sources.waste_collection import geojson

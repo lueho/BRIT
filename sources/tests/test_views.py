@@ -285,6 +285,8 @@ class WasteCollectionOwnershipAdapterTestCase(SimpleTestCase):
     def test_waste_collection_viewset_adapters_reexport_legacy_viewsets(self):
         self.assertIs(CollectionViewSet, LegacyCollectionViewSet)
         self.assertIs(CollectorViewSet, LegacyCollectorViewSet)
+        self.assertEqual(CollectionViewSet.__module__, "sources.waste_collection.viewsets")
+        self.assertEqual(CollectorViewSet.__module__, "sources.waste_collection.viewsets")
 
     def test_waste_collection_views_are_owned_by_sources_and_reexported_legacy(self):
         view_names = [
