@@ -235,12 +235,18 @@ class InventoryExecutionIntegrationTests(TestCase):
 
     def configure_and_run_single_inventory(self, scenario, feedstock, algorithm, values):
         scenario.add_inventory_algorithm(feedstock, algorithm, values)
+        execution_plan = scenario.inventory_execution_plan()
+        self.assertEqual(len(execution_plan), 1)
+        self.assertEqual(execution_plan[0]["algorithm"], algorithm)
+        self.assertEqual(execution_plan[0]["kwargs"]["feedstock_id"], feedstock.id)
+
         config = scenario.configuration_as_dict()
         self.assertIn(feedstock.id, config)
         self.assertEqual(len(config[feedstock.id]), 1)
 
-        module_function, kwargs = next(iter(config[feedstock.id].items()))
-        self.assertTrue(run_inventory_algorithm.run(module_function, **kwargs))
+        self.assertTrue(
+            run_inventory_algorithm.run(algorithm.id, **execution_plan[0]["kwargs"])
+        )
 
         return Layer.objects.get(scenario=scenario, feedstock=feedstock, algorithm=algorithm)
 

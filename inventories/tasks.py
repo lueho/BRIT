@@ -14,26 +14,31 @@ def run_inventory(scenario_id):
 
     scenario.delete_result_layers()
 
+    execution_plan = scenario.inventory_execution_plan()
     signatures = []
-    for _feedstock_id, config in scenario.configuration_as_dict().items():
-        for function_name, kwargs in config.items():
-            signatures.append(run_inventory_algorithm.s(function_name, **kwargs))
+    for execution in execution_plan:
+        signatures.append(
+            run_inventory_algorithm.s(execution["algorithm"].id, **execution["kwargs"])
+        )
 
     callback = finalize_inventory.s(scenario.id)
     task_chord = chord(signatures, callback)
     result = task_chord.delay()
 
     # store uuids of running tasks in the database, so we can track the progress from anywhere
-    for task in task_chord.tasks:
-        algorithm = InventoryAlgorithm.from_task_reference(task.args[0])
-        RunningTask.objects.create(scenario=scenario, uuid=task.id, algorithm=algorithm)
+    for task, execution in zip(task_chord.tasks, execution_plan, strict=False):
+        RunningTask.objects.create(
+            scenario=scenario,
+            uuid=task.id,
+            algorithm=execution["algorithm"],
+        )
 
     return result
 
 
 @app.task(bind=True)
-def run_inventory_algorithm(self, task_reference, **kwargs):
-    algorithm = InventoryAlgorithm.from_task_reference(task_reference)
+def run_inventory_algorithm(self, algorithm_id, **kwargs):
+    algorithm = InventoryAlgorithm.objects.get(id=algorithm_id)
     module = algorithm.import_module()
     function_name = algorithm.function_name
     results = getattr(module.InventoryAlgorithms, function_name)(**kwargs)

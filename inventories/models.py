@@ -506,16 +506,13 @@ class Scenario(NamedUserCreatedObject):
     def configuration(self):
         return ScenarioInventoryConfiguration.objects.filter(scenario=self)
 
-    def configuration_as_dict(self):
-        """
-        Fetches all configuration entries that are associated with this scenario and assembles a dictionary holding
-        all configuration information for the inventory.
-        :return: None
-        """
+    def inventory_execution_plan(self):
         inventory_config = {}
-        for entry in ScenarioInventoryConfiguration.objects.filter(scenario=self):
+        for entry in ScenarioInventoryConfiguration.objects.filter(
+            scenario=self
+        ).select_related("inventory_algorithm", "inventory_parameter", "inventory_value"):
             feedstock = entry.feedstock.id
-            function = entry.inventory_algorithm.task_reference
+            algorithm = entry.inventory_algorithm
             parameter = (
                 entry.inventory_parameter.short_name
                 if entry.inventory_parameter
@@ -527,18 +524,40 @@ class Scenario(NamedUserCreatedObject):
 
             if feedstock not in inventory_config.keys():
                 inventory_config[feedstock] = {}
-            if function not in inventory_config[feedstock].keys():
-                inventory_config[feedstock][function] = {}
-                inventory_config[feedstock][function][
-                    "catchment_id"
-                ] = self.catchment.id
-                inventory_config[feedstock][function]["scenario_id"] = self.id
-                inventory_config[feedstock][function]["feedstock_id"] = feedstock
-            if parameter and parameter not in inventory_config[feedstock][function]:
-                inventory_config[feedstock][function][parameter] = {
+            if algorithm.id not in inventory_config[feedstock].keys():
+                inventory_config[feedstock][algorithm.id] = {
+                    "algorithm": algorithm,
+                    "kwargs": {
+                        "catchment_id": self.catchment.id,
+                        "scenario_id": self.id,
+                        "feedstock_id": feedstock,
+                    },
+                }
+            if parameter and parameter not in inventory_config[feedstock][algorithm.id]["kwargs"]:
+                inventory_config[feedstock][algorithm.id]["kwargs"][parameter] = {
                     "value": value,
                     "standard_deviation": standard_deviation,
                 }
+
+        return [
+            execution
+            for feedstock_config in inventory_config.values()
+            for execution in feedstock_config.values()
+        ]
+
+    def configuration_as_dict(self):
+        """
+        Fetches all configuration entries that are associated with this scenario and assembles a dictionary holding
+        all configuration information for the inventory.
+        :return: None
+        """
+        inventory_config = {}
+        for execution in self.inventory_execution_plan():
+            feedstock = execution["kwargs"]["feedstock_id"]
+            function = execution["algorithm"].task_reference
+            if feedstock not in inventory_config.keys():
+                inventory_config[feedstock] = {}
+            inventory_config[feedstock][function] = execution["kwargs"].copy()
 
         return inventory_config
 
