@@ -159,6 +159,10 @@ class WasteCollectionViewAdapterTestCase(ViewWithPermissionsTestCase):
 class RoadsideTreesOwnershipAdapterTestCase(SimpleTestCase):
     def test_roadside_tree_viewset_adapter_reexports_legacy_viewset(self):
         self.assertIs(HamburgRoadsideTreeViewSet, LegacyHamburgRoadsideTreeViewSet)
+        self.assertEqual(
+            HamburgRoadsideTreeViewSet.__module__,
+            "sources.roadside_trees.viewsets",
+        )
 
     def test_roadside_tree_export_view_uses_sources_model_label(self):
         self.assertEqual(

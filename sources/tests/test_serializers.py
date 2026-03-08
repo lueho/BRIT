@@ -227,6 +227,29 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
         self.assertIs(HamburgRoadsideTreesCSVRenderer, LegacyHamburgRoadsideTreesCSVRenderer)
         self.assertIs(HamburgRoadsideTreesXLSXRenderer, LegacyHamburgRoadsideTreesXLSXRenderer)
 
+    def test_roadside_tree_filters_and_serializers_are_owned_by_sources(self):
+        self.assertEqual(HamburgRoadsideTreesFilterSet.__module__, "sources.roadside_trees.filters")
+        self.assertEqual(
+            HamburgRoadsideTreeFlatSerializer.__module__,
+            "sources.roadside_trees.serializers",
+        )
+        self.assertEqual(
+            HamburgRoadsideTreeGeometrySerializer.__module__,
+            "sources.roadside_trees.serializers",
+        )
+        self.assertEqual(
+            HamburgRoadsideTreeSimpleModelSerializer.__module__,
+            "sources.roadside_trees.serializers",
+        )
+        self.assertEqual(
+            HamburgRoadsideTreesCSVRenderer.__module__,
+            "sources.roadside_trees.renderers",
+        )
+        self.assertEqual(
+            HamburgRoadsideTreesXLSXRenderer.__module__,
+            "sources.roadside_trees.renderers",
+        )
+
     def test_greenhouse_filter_and_renderer_adapters_reexport_legacy_symbols(self):
         self.assertIs(CultureListFilter, LegacyCultureListFilter)
         self.assertIs(GreenhouseTypeFilter, LegacyGreenhouseTypeFilter)
