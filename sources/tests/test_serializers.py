@@ -63,6 +63,7 @@ from case_studies.soilcom.forms import (
     CollectionFrequencyModalModelForm as LegacyCollectionFrequencyModalModelForm,
     CollectionFrequencyModelForm as LegacyCollectionFrequencyModelForm,
     CollectionModelForm as LegacyCollectionModelForm,
+    CONNECTION_TYPE_CHOICES as LegacyWasteConnectionTypeChoices,
     CollectionPropertyValueModelForm as LegacyCollectionPropertyValueModelForm,
     CollectionRemovePredecessorForm as LegacyCollectionRemovePredecessorForm,
     CollectionRemoveWasteSampleForm as LegacyCollectionRemoveWasteSampleForm,
@@ -73,7 +74,11 @@ from case_studies.soilcom.forms import (
     CollectionSystemModelForm as LegacyCollectionSystemModelForm,
     CollectorModalModelForm as LegacyCollectorModalModelForm,
     CollectorModelForm as LegacyCollectorModelForm,
+    FeeSystemModalModelForm as LegacyFeeSystemModalModelForm,
     FeeSystemModelForm as LegacyFeeSystemModelForm,
+    REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES as LegacyRequiredBinCapacityReferenceChoices,
+    SortingMethodModalModelForm as LegacySortingMethodModalModelForm,
+    SortingMethodModelForm as LegacySortingMethodModelForm,
     WasteCategoryModalModelForm as LegacyWasteCategoryModalModelForm,
     WasteCategoryModelForm as LegacyWasteCategoryModelForm,
     WasteComponentModalModelForm as LegacyWasteComponentModalModelForm,
@@ -144,6 +149,7 @@ from sources.waste_collection.forms import (
     CollectionFrequencyModalModelForm,
     CollectionFrequencyModelForm,
     CollectionModelForm,
+    CONNECTION_TYPE_CHOICES,
     CollectionPropertyValueModelForm,
     CollectionRemovePredecessorForm,
     CollectionRemoveWasteSampleForm,
@@ -154,7 +160,11 @@ from sources.waste_collection.forms import (
     CollectionSystemModelForm,
     CollectorModalModelForm,
     CollectorModelForm,
+    FeeSystemModalModelForm,
     FeeSystemModelForm,
+    REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
+    SortingMethodModalModelForm,
+    SortingMethodModelForm,
     WasteCategoryModalModelForm,
     WasteCategoryModelForm,
     WasteComponentModalModelForm,
@@ -382,7 +392,10 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
         self.assertIs(CollectionSystemModelForm, LegacyCollectionSystemModelForm)
         self.assertIs(CollectorModalModelForm, LegacyCollectorModalModelForm)
         self.assertIs(CollectorModelForm, LegacyCollectorModelForm)
+        self.assertIs(FeeSystemModalModelForm, LegacyFeeSystemModalModelForm)
         self.assertIs(FeeSystemModelForm, LegacyFeeSystemModelForm)
+        self.assertIs(SortingMethodModalModelForm, LegacySortingMethodModalModelForm)
+        self.assertIs(SortingMethodModelForm, LegacySortingMethodModelForm)
         self.assertIs(WasteCategoryModalModelForm, LegacyWasteCategoryModalModelForm)
         self.assertIs(WasteCategoryModelForm, LegacyWasteCategoryModelForm)
         self.assertIs(WasteComponentModalModelForm, LegacyWasteComponentModalModelForm)
@@ -391,8 +404,29 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
         self.assertIs(WasteFlyerFormSetHelper, LegacyWasteFlyerFormSetHelper)
         self.assertIs(WasteFlyerModalModelForm, LegacyWasteFlyerModalModelForm)
         self.assertIs(WasteFlyerModelForm, LegacyWasteFlyerModelForm)
+        self.assertEqual(CONNECTION_TYPE_CHOICES, LegacyWasteConnectionTypeChoices)
+        self.assertEqual(
+            REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
+            LegacyRequiredBinCapacityReferenceChoices,
+        )
         self.assertIs(check_wasteflyer_url, LegacyCheckWasteflyerUrl)
         self.assertIs(check_wasteflyer_urls, LegacyCheckWasteflyerUrls)
+
+    def test_waste_collection_forms_are_owned_by_sources(self):
+        self.assertEqual(
+            AggregatedCollectionPropertyValueModelForm.__module__,
+            "sources.waste_collection.forms",
+        )
+        self.assertEqual(CollectionModelForm.__module__, "sources.waste_collection.forms")
+        self.assertEqual(
+            CollectionSeasonFormSet.__module__,
+            "sources.waste_collection.forms",
+        )
+        self.assertEqual(WasteFlyerFormSet.__module__, "sources.waste_collection.forms")
+        self.assertEqual(
+            SortingMethodModelForm.__module__,
+            "sources.waste_collection.forms",
+        )
 
     def test_waste_collection_tasks_are_owned_by_sources(self):
         self.assertEqual(

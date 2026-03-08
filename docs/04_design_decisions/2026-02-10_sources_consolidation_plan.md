@@ -132,6 +132,10 @@ Validated and committed slices completed so far:
   leaving the legacy `case_studies.soilcom.filters` module as a thin
   compatibility re-export while preserving the existing helper filter import
   surface used by tests and view patches
+- moved the waste-collection `forms` into `sources.waste_collection`, leaving
+  the legacy `case_studies.soilcom.forms` module as a thin compatibility
+  re-export while preserving the existing choice-constant and Celery task patch
+  surface used by tests
 
 ## 3. Target State
 
@@ -406,7 +410,7 @@ Current incremental status for Phase D:
 - [x] Move waste-flyer Celery `tasks` into `sources.waste_collection`
 - [x] Move `serializers` into `sources.waste_collection`
 - [x] Move `filters` into `sources.waste_collection`
-- [ ] Move remaining `forms` into `sources.waste_collection`
+- [x] Move `forms` into `sources.waste_collection`
 
 ### Phase E: Clean up
 
