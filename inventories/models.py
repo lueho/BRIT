@@ -29,6 +29,15 @@ class InventoryAlgorithm(models.Model):
     be done in InventoryAlgorithmParameter and InventoryAlgorithmParameterValue.
     """
 
+    SOURCE_MODULE_PATH_ALIASES = {
+        "flexibi_hamburg": "sources.roadside_trees.inventory.algorithms",
+        "flexibi_nantes": "sources.greenhouses.inventory.algorithms",
+    }
+    SOURCE_MODULE_PATH_ALIASES_REVERSED = {
+        "sources.roadside_trees.inventory.algorithms": "flexibi_hamburg",
+        "sources.greenhouses.inventory.algorithms": "flexibi_nantes",
+    }
+
     name = models.CharField(max_length=56)
     source_module = models.CharField(max_length=255, null=True)
     function_name = models.CharField(max_length=56, null=True)
@@ -43,6 +52,40 @@ class InventoryAlgorithm(models.Model):
     source = models.ForeignKey(Source, on_delete=models.PROTECT, null=True)
 
     # TODO: How are default values controlled?
+
+    @staticmethod
+    def normalize_source_module(source_module):
+        if source_module in InventoryAlgorithm.SOURCE_MODULE_PATH_ALIASES_REVERSED:
+            return InventoryAlgorithm.SOURCE_MODULE_PATH_ALIASES_REVERSED[source_module]
+        if source_module.startswith("case_studies.") and source_module.endswith(
+            ".algorithms"
+        ):
+            return source_module.removeprefix("case_studies.").removesuffix(
+                ".algorithms"
+            )
+        return source_module
+
+    @staticmethod
+    def get_module_path(source_module):
+        source_module = InventoryAlgorithm.normalize_source_module(source_module)
+        if "." in source_module:
+            return source_module
+        return InventoryAlgorithm.SOURCE_MODULE_PATH_ALIASES.get(
+            source_module, f"case_studies.{source_module}.algorithms"
+        )
+
+    @staticmethod
+    def task_reference_lookup_candidates(source_module):
+        normalized_source_module = InventoryAlgorithm.normalize_source_module(
+            source_module
+        )
+        candidates = [source_module]
+        if normalized_source_module not in candidates:
+            candidates.append(normalized_source_module)
+        module_path = InventoryAlgorithm.get_module_path(normalized_source_module)
+        if module_path not in candidates:
+            candidates.append(module_path)
+        return candidates
 
     @staticmethod
     def available_modules():
@@ -66,12 +109,6 @@ class InventoryAlgorithm(models.Model):
                 source_modules.append(module_path)
 
         return legacy_modules + sorted(source_modules)
-
-    @staticmethod
-    def get_module_path(source_module):
-        if "." in source_module:
-            return source_module
-        return f"case_studies.{source_module}.algorithms"
 
     @staticmethod
     def available_functions(module_name):
@@ -102,7 +139,16 @@ class InventoryAlgorithm(models.Model):
     @classmethod
     def from_task_reference(cls, task_reference):
         source_module, function_name = cls.parse_task_reference(task_reference)
-        return cls.objects.get(source_module=source_module, function_name=function_name)
+        for candidate in cls.task_reference_lookup_candidates(source_module):
+            try:
+                return cls.objects.get(
+                    source_module=candidate, function_name=function_name
+                )
+            except cls.DoesNotExist:
+                continue
+        raise cls.DoesNotExist(
+            f"InventoryAlgorithm matching query does not exist for {task_reference}."
+        )
 
     @property
     def module_path(self):

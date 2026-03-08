@@ -88,18 +88,43 @@ class ScenarioTestCase(TestCase):
 
         self.assertEqual(
             algorithm.module_path,
-            "case_studies.flexibi_hamburg.algorithms",
+            "sources.roadside_trees.inventory.algorithms",
         )
         self.assertEqual(
             algorithm.task_reference,
-            "case_studies.flexibi_hamburg.algorithms:hamburg_roadside_tree_production",
+            "sources.roadside_trees.inventory.algorithms:hamburg_roadside_tree_production",
         )
         self.assertEqual(
             InventoryAlgorithm.parse_task_reference(algorithm.task_reference),
-            ("flexibi_hamburg", "hamburg_roadside_tree_production"),
+            (
+                "sources.roadside_trees.inventory.algorithms",
+                "hamburg_roadside_tree_production",
+            ),
         )
         self.assertEqual(
             InventoryAlgorithm.from_task_reference(algorithm.task_reference),
+            algorithm,
+        )
+
+    def test_inventory_algorithm_from_task_reference_supports_legacy_case_studies_paths(self):
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Resolver Algorithm",
+            source_module="flexibi_hamburg",
+            function_name="hamburg_roadside_tree_production",
+            geodataset=GeoDataset.objects.get(name="Test Dataset"),
+        )
+
+        legacy_task_reference = (
+            "case_studies.flexibi_hamburg.algorithms:"
+            "hamburg_roadside_tree_production"
+        )
+
+        self.assertEqual(
+            InventoryAlgorithm.parse_task_reference(legacy_task_reference),
+            ("flexibi_hamburg", "hamburg_roadside_tree_production"),
+        )
+        self.assertEqual(
+            InventoryAlgorithm.from_task_reference(legacy_task_reference),
             algorithm,
         )
 
@@ -192,7 +217,7 @@ class ScenarioTestCase(TestCase):
         self.assertEqual(result, {"result": "ok"})
         execute.assert_called_once_with(example="value")
 
-    def test_serialize_inventory_execution_plan_builds_legacy_task_reference_shape(self):
+    def test_serialize_inventory_execution_plan_builds_sources_task_reference_shape(self):
         algorithm = InventoryAlgorithm.objects.create(
             name="Resolver Algorithm",
             source_module="flexibi_hamburg",

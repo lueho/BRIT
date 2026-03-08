@@ -1,0 +1,2 @@
+
+from case_studies.flexibi_nantes.algorithms import InventoryAlgorithms
