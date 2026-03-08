@@ -25,6 +25,18 @@ from case_studies.flexibi_nantes.filters import (
     GreenhouseTypeFilter as LegacyGreenhouseTypeFilter,
     NantesGreenhousesFilterSet as LegacyNantesGreenhousesFilterSet,
 )
+from case_studies.flexibi_nantes.forms import (
+    CultureModalModelForm as LegacyCultureModalModelForm,
+    CultureModelForm as LegacyCultureModelForm,
+    GreenhouseGrowthCycleModelForm as LegacyGreenhouseGrowthCycleModelForm,
+    GreenhouseModalModelForm as LegacyGreenhouseModalModelForm,
+    GreenhouseModelForm as LegacyGreenhouseModelForm,
+    GrowthCycleCreateForm as LegacyGrowthCycleCreateForm,
+    GrowthShareFormSetHelper as LegacyGrowthShareFormSetHelper,
+    GrowthTimestepInline as LegacyGrowthTimestepInline,
+    InlineGrowthShare as LegacyInlineGrowthShare,
+    UpdateGreenhouseGrowthCycleValuesForm as LegacyUpdateGreenhouseGrowthCycleValuesForm,
+)
 from case_studies.flexibi_nantes.renderers import (
     NantesGreenhousesCSVRenderer as LegacyNantesGreenhousesCSVRenderer,
     NantesGreenhousesXLSXRenderer as LegacyNantesGreenhousesXLSXRenderer,
@@ -44,9 +56,52 @@ from case_studies.soilcom.filters import (
     WasteComponentListFilter as LegacyWasteComponentListFilter,
     WasteFlyerFilter as LegacyWasteFlyerFilter,
 )
+from case_studies.soilcom.forms import (
+    AggregatedCollectionPropertyValueModelForm as LegacyAggregatedCollectionPropertyValueModelForm,
+    CollectionAddPredecessorForm as LegacyCollectionAddPredecessorForm,
+    CollectionAddWasteSampleForm as LegacyCollectionAddWasteSampleForm,
+    CollectionFrequencyModalModelForm as LegacyCollectionFrequencyModalModelForm,
+    CollectionFrequencyModelForm as LegacyCollectionFrequencyModelForm,
+    CollectionModelForm as LegacyCollectionModelForm,
+    CollectionPropertyValueModelForm as LegacyCollectionPropertyValueModelForm,
+    CollectionRemovePredecessorForm as LegacyCollectionRemovePredecessorForm,
+    CollectionRemoveWasteSampleForm as LegacyCollectionRemoveWasteSampleForm,
+    CollectionSeasonForm as LegacyCollectionSeasonForm,
+    CollectionSeasonFormHelper as LegacyCollectionSeasonFormHelper,
+    CollectionSeasonFormSet as LegacyCollectionSeasonFormSet,
+    CollectionSystemModalModelForm as LegacyCollectionSystemModalModelForm,
+    CollectionSystemModelForm as LegacyCollectionSystemModelForm,
+    CollectorModalModelForm as LegacyCollectorModalModelForm,
+    CollectorModelForm as LegacyCollectorModelForm,
+    FeeSystemModelForm as LegacyFeeSystemModelForm,
+    WasteCategoryModalModelForm as LegacyWasteCategoryModalModelForm,
+    WasteCategoryModelForm as LegacyWasteCategoryModelForm,
+    WasteComponentModalModelForm as LegacyWasteComponentModalModelForm,
+    WasteComponentModelForm as LegacyWasteComponentModelForm,
+    WasteFlyerFormSet as LegacyWasteFlyerFormSet,
+    WasteFlyerFormSetHelper as LegacyWasteFlyerFormSetHelper,
+    WasteFlyerModalModelForm as LegacyWasteFlyerModalModelForm,
+    WasteFlyerModelForm as LegacyWasteFlyerModelForm,
+)
 from case_studies.soilcom.renderers import (
     CollectionCSVRenderer as LegacyCollectionCSVRenderer,
     CollectionXLSXRenderer as LegacyCollectionXLSXRenderer,
+)
+from case_studies.soilcom.tasks import (
+    check_wasteflyer_url as LegacyCheckWasteflyerUrl,
+    check_wasteflyer_urls as LegacyCheckWasteflyerUrls,
+)
+from sources.greenhouses.forms import (
+    CultureModalModelForm,
+    CultureModelForm,
+    GreenhouseGrowthCycleModelForm,
+    GreenhouseModalModelForm,
+    GreenhouseModelForm,
+    GrowthCycleCreateForm,
+    GrowthShareFormSetHelper,
+    GrowthTimestepInline,
+    InlineGrowthShare,
+    UpdateGreenhouseGrowthCycleValuesForm,
 )
 from sources.greenhouses.filters import (
     CultureListFilter,
@@ -82,6 +137,33 @@ from sources.waste_collection.filters import (
     WasteComponentListFilter,
     WasteFlyerFilter,
 )
+from sources.waste_collection.forms import (
+    AggregatedCollectionPropertyValueModelForm,
+    CollectionAddPredecessorForm,
+    CollectionAddWasteSampleForm,
+    CollectionFrequencyModalModelForm,
+    CollectionFrequencyModelForm,
+    CollectionModelForm,
+    CollectionPropertyValueModelForm,
+    CollectionRemovePredecessorForm,
+    CollectionRemoveWasteSampleForm,
+    CollectionSeasonForm,
+    CollectionSeasonFormHelper,
+    CollectionSeasonFormSet,
+    CollectionSystemModalModelForm,
+    CollectionSystemModelForm,
+    CollectorModalModelForm,
+    CollectorModelForm,
+    FeeSystemModelForm,
+    WasteCategoryModalModelForm,
+    WasteCategoryModelForm,
+    WasteComponentModalModelForm,
+    WasteComponentModelForm,
+    WasteFlyerFormSet,
+    WasteFlyerFormSetHelper,
+    WasteFlyerModalModelForm,
+    WasteFlyerModelForm,
+)
 from sources.waste_collection.renderers import (
     CollectionCSVRenderer,
     CollectionXLSXRenderer,
@@ -91,6 +173,7 @@ from sources.waste_collection.serializers import (
     CollectionFlatSerializer,
     WasteCollectionGeometrySerializer,
 )
+from sources.waste_collection.tasks import check_wasteflyer_url, check_wasteflyer_urls
 
 
 class SourcesSerializerAdapterTestCase(SimpleTestCase):
@@ -150,6 +233,68 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
         self.assertIs(NantesGreenhousesFilterSet, LegacyNantesGreenhousesFilterSet)
         self.assertIs(NantesGreenhousesCSVRenderer, LegacyNantesGreenhousesCSVRenderer)
         self.assertIs(NantesGreenhousesXLSXRenderer, LegacyNantesGreenhousesXLSXRenderer)
+
+    def test_greenhouse_form_adapters_reexport_legacy_symbols(self):
+        self.assertIs(CultureModalModelForm, LegacyCultureModalModelForm)
+        self.assertIs(CultureModelForm, LegacyCultureModelForm)
+        self.assertIs(GreenhouseGrowthCycleModelForm, LegacyGreenhouseGrowthCycleModelForm)
+        self.assertIs(GreenhouseModalModelForm, LegacyGreenhouseModalModelForm)
+        self.assertIs(GreenhouseModelForm, LegacyGreenhouseModelForm)
+        self.assertIs(GrowthCycleCreateForm, LegacyGrowthCycleCreateForm)
+        self.assertIs(GrowthShareFormSetHelper, LegacyGrowthShareFormSetHelper)
+        self.assertIs(GrowthTimestepInline, LegacyGrowthTimestepInline)
+        self.assertIs(InlineGrowthShare, LegacyInlineGrowthShare)
+        self.assertIs(
+            UpdateGreenhouseGrowthCycleValuesForm,
+            LegacyUpdateGreenhouseGrowthCycleValuesForm,
+        )
+
+    def test_waste_collection_form_and_task_adapters_reexport_legacy_symbols(self):
+        self.assertIs(
+            AggregatedCollectionPropertyValueModelForm,
+            LegacyAggregatedCollectionPropertyValueModelForm,
+        )
+        self.assertIs(CollectionAddPredecessorForm, LegacyCollectionAddPredecessorForm)
+        self.assertIs(CollectionAddWasteSampleForm, LegacyCollectionAddWasteSampleForm)
+        self.assertIs(
+            CollectionFrequencyModalModelForm,
+            LegacyCollectionFrequencyModalModelForm,
+        )
+        self.assertIs(CollectionFrequencyModelForm, LegacyCollectionFrequencyModelForm)
+        self.assertIs(CollectionModelForm, LegacyCollectionModelForm)
+        self.assertIs(
+            CollectionPropertyValueModelForm,
+            LegacyCollectionPropertyValueModelForm,
+        )
+        self.assertIs(
+            CollectionRemovePredecessorForm,
+            LegacyCollectionRemovePredecessorForm,
+        )
+        self.assertIs(
+            CollectionRemoveWasteSampleForm,
+            LegacyCollectionRemoveWasteSampleForm,
+        )
+        self.assertIs(CollectionSeasonForm, LegacyCollectionSeasonForm)
+        self.assertIs(CollectionSeasonFormHelper, LegacyCollectionSeasonFormHelper)
+        self.assertIs(CollectionSeasonFormSet, LegacyCollectionSeasonFormSet)
+        self.assertIs(
+            CollectionSystemModalModelForm,
+            LegacyCollectionSystemModalModelForm,
+        )
+        self.assertIs(CollectionSystemModelForm, LegacyCollectionSystemModelForm)
+        self.assertIs(CollectorModalModelForm, LegacyCollectorModalModelForm)
+        self.assertIs(CollectorModelForm, LegacyCollectorModelForm)
+        self.assertIs(FeeSystemModelForm, LegacyFeeSystemModelForm)
+        self.assertIs(WasteCategoryModalModelForm, LegacyWasteCategoryModalModelForm)
+        self.assertIs(WasteCategoryModelForm, LegacyWasteCategoryModelForm)
+        self.assertIs(WasteComponentModalModelForm, LegacyWasteComponentModalModelForm)
+        self.assertIs(WasteComponentModelForm, LegacyWasteComponentModelForm)
+        self.assertIs(WasteFlyerFormSet, LegacyWasteFlyerFormSet)
+        self.assertIs(WasteFlyerFormSetHelper, LegacyWasteFlyerFormSetHelper)
+        self.assertIs(WasteFlyerModalModelForm, LegacyWasteFlyerModalModelForm)
+        self.assertIs(WasteFlyerModelForm, LegacyWasteFlyerModelForm)
+        self.assertIs(check_wasteflyer_url, LegacyCheckWasteflyerUrl)
+        self.assertIs(check_wasteflyer_urls, LegacyCheckWasteflyerUrls)
 
     def test_waste_collection_geojson_imports_serializer_from_sources_adapter(self):
         from sources.waste_collection import geojson

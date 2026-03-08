@@ -78,7 +78,7 @@ from sources.waste_collection.filters import (
     WasteComponentListFilter,
     WasteFlyerFilter,
 )
-from case_studies.soilcom.forms import (
+from sources.waste_collection.forms import (
     AggregatedCollectionPropertyValueModelForm,
     CollectionAddPredecessorForm,
     CollectionAddWasteSampleForm,
@@ -121,7 +121,7 @@ from sources.waste_collection.models import (
     WasteComponent,
     WasteFlyer,
 )
-from case_studies.soilcom.tasks import check_wasteflyer_url, check_wasteflyer_urls
+from sources.waste_collection.tasks import check_wasteflyer_url, check_wasteflyer_urls
 
 
 def _visible_collection_chain_for_user(collection, user):

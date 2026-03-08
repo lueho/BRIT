@@ -24,7 +24,7 @@ from utils.object_management.views import (
 )
 from utils.views import NextOrSuccessUrlMixin
 
-from case_studies.flexibi_nantes.forms import (
+from sources.greenhouses.forms import (
     CultureModalModelForm,
     CultureModelForm,
     GreenhouseGrowthCycleModelForm,
