@@ -7,7 +7,7 @@ from django.test import TestCase
 from django_filters import ChoiceFilter
 from factory.django import mute_signals
 
-from case_studies.soilcom.models import Collection
+from sources.waste_collection.models import Collection
 from utils.object_management.models import UserCreatedObject
 
 from ..filters import (

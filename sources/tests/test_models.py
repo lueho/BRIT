@@ -14,6 +14,12 @@ from case_studies.flexibi_nantes.models import (
     GrowthTimeStepSet as LegacyGrowthTimeStepSet,
     NantesGreenhouses as LegacyNantesGreenhouses,
 )
+from case_studies.soilcom.models import (
+    Collection as LegacyCollection,
+    CollectionPropertyValue as LegacyCollectionPropertyValue,
+    Collector as LegacyCollector,
+    WasteFlyer as LegacyWasteFlyer,
+)
 from sources.greenhouses.models import (
     Culture,
     Greenhouse,
@@ -23,6 +29,12 @@ from sources.greenhouses.models import (
     NantesGreenhouses,
 )
 from sources.roadside_trees.models import HamburgGreenAreas, HamburgRoadsideTrees
+from sources.waste_collection.models import (
+    Collection,
+    CollectionPropertyValue,
+    Collector,
+    WasteFlyer,
+)
 
 
 class SourcesModelAdapterTestCase(SimpleTestCase):
@@ -37,6 +49,12 @@ class SourcesModelAdapterTestCase(SimpleTestCase):
         self.assertIs(GrowthShare, LegacyGrowthShare)
         self.assertIs(GrowthTimeStepSet, LegacyGrowthTimeStepSet)
         self.assertIs(NantesGreenhouses, LegacyNantesGreenhouses)
+
+    def test_waste_collection_model_adapters_reexport_legacy_models(self):
+        self.assertIs(Collection, LegacyCollection)
+        self.assertIs(CollectionPropertyValue, LegacyCollectionPropertyValue)
+        self.assertIs(Collector, LegacyCollector)
+        self.assertIs(WasteFlyer, LegacyWasteFlyer)
 
     def test_greenhouse_selectors_import_greenhouse_from_sources_model_adapter(self):
         from sources.greenhouses import selectors
@@ -68,5 +86,39 @@ class SourcesModelAdapterTestCase(SimpleTestCase):
 
         try:
             self.assertIs(geojson.HamburgRoadsideTrees, roadside_tree_model)
+        finally:
+            importlib.reload(geojson)
+
+    def test_waste_collection_selectors_import_collection_from_sources_model_adapter(self):
+        from sources.waste_collection import selectors
+
+        collection_model = MagicMock()
+        collection_model.objects.none.return_value = []
+        collection_model.objects.filter.return_value.count.return_value = 11
+
+        with patch("sources.waste_collection.models.Collection", collection_model):
+            importlib.reload(selectors)
+
+        try:
+            self.assertIs(selectors.Collection, collection_model)
+            self.assertEqual(selectors.empty_collection_queryset(), [])
+            self.assertEqual(selectors.published_collection_count(), 11)
+            collection_model.objects.none.assert_called_once_with()
+            collection_model.objects.filter.assert_called_once_with(
+                publication_status="published"
+            )
+        finally:
+            importlib.reload(selectors)
+
+    def test_waste_collection_geojson_imports_model_from_sources_adapter(self):
+        from sources.waste_collection import geojson
+
+        collection_model = object()
+
+        with patch("sources.waste_collection.models.Collection", collection_model):
+            importlib.reload(geojson)
+
+        try:
+            self.assertIs(geojson.Collection, collection_model)
         finally:
             importlib.reload(geojson)

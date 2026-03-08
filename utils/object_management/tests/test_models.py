@@ -5,7 +5,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.utils import timezone
 
-from case_studies.soilcom.models import Collection, WasteCategory
+from sources.waste_collection.models import Collection, WasteCategory
 
 from ..models import ReviewAction, UserCreatedObject
 

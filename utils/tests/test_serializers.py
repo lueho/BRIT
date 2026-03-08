@@ -4,7 +4,7 @@ from django.test.utils import isolate_apps
 from rest_framework.fields import CharField, IntegerField
 from rest_framework.serializers import ModelSerializer, Serializer
 
-from case_studies.soilcom.models import Collector
+from sources.waste_collection.models import Collector
 from utils.serializers import FieldLabelMixin
 
 

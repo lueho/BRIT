@@ -1,4 +1,4 @@
-from case_studies.soilcom.models import Collection
+from sources.waste_collection.models import Collection
 
 
 def empty_collection_queryset():

@@ -13,10 +13,10 @@ from django_filters import CharFilter, FilterSet
 from django_filters.views import FilterView
 from factory.django import mute_signals
 
-from case_studies.soilcom.models import Collection, CollectionPropertyValue
 from case_studies.soilcom.views import CollectionDetailView
 from distributions.models import TemporalDistribution
 from maps.models import Catchment, Region
+from sources.waste_collection.models import Collection, CollectionPropertyValue
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.object_management.views import ReviewDashboardView
 from utils.properties.models import Property, Unit

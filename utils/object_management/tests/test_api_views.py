@@ -8,7 +8,7 @@ from django.urls import reverse
 from factory.django import mute_signals
 
 from bibliography.models import Source
-from case_studies.soilcom.models import Collection, CollectionPropertyValue
+from sources.waste_collection.models import Collection, CollectionPropertyValue
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.properties.models import Property, Unit
 

@@ -1,7 +1,7 @@
 from django.forms.models import inlineformset_factory
 from django.test import TestCase
 
-from case_studies.soilcom.models import WasteFlyer
+from sources.waste_collection.models import WasteFlyer
 
 from ..forms import SourceAuthorFormSet
 from ..models import Source, SourceAuthor

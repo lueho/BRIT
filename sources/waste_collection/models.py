@@ -1,0 +1,33 @@
+from case_studies.soilcom.models import (
+    AggregatedCollectionPropertyValue,
+    Collection,
+    CollectionCatchment,
+    CollectionCountOptions,
+    CollectionFrequency,
+    CollectionPropertyValue,
+    CollectionSeason,
+    CollectionSystem,
+    Collector,
+    FeeSystem,
+    SortingMethod,
+    WasteCategory,
+    WasteComponent,
+    WasteFlyer,
+)
+
+__all__ = [
+    "AggregatedCollectionPropertyValue",
+    "Collection",
+    "CollectionCatchment",
+    "CollectionCountOptions",
+    "CollectionFrequency",
+    "CollectionPropertyValue",
+    "CollectionSeason",
+    "CollectionSystem",
+    "Collector",
+    "FeeSystem",
+    "SortingMethod",
+    "WasteCategory",
+    "WasteComponent",
+    "WasteFlyer",
+]

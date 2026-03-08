@@ -8,7 +8,7 @@ from factory.django import mute_signals
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from case_studies.soilcom.models import Collection
+from sources.waste_collection.models import Collection
 from utils.object_management.models import UserCreatedObject
 
 from ..permissions import (
