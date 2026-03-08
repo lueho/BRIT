@@ -71,6 +71,8 @@ Validated and committed slices completed so far:
   `sources` model adapters
 - routed shared geojson and export serializer imports through `sources`
   serializer adapters
+- routed shared export filter and renderer imports through `sources`
+  filter/renderer adapters
 
 ## 3. Target State
 
@@ -262,15 +264,15 @@ External files that import from the three apps (outside their own code/tests):
 - [x] Add a waste-collection model adapter and rewire remaining shared imports
   and tests to it
 - [x] Add serializer adapter modules and rewire shared imports to them
-- [ ] Add filter and renderer adapter modules where shared code still imports
+- [x] Add filter and renderer adapter modules where shared code still imports
   `case_studies.*` directly
 - [ ] Reduce remaining shared direct imports to a small, intentional set before
   starting `SeparateDatabaseAndState` model moves
 
 ### Near-term next steps
 
-1. Add filter and renderer adapters where shared code still depends directly on
-   `case_studies` modules, so `sources` becomes the stable integration surface.
+1. Reduce the remaining shared direct imports to a small, intentional set so
+   `sources` is the stable integration surface across the shared codebase.
 2. After the adapter surfaces are stable, start moving implementation bodies
    from thin re-exports toward source-owned modules while preserving legacy
    runtime compatibility.
