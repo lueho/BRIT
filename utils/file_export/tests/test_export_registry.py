@@ -1,4 +1,5 @@
 from collections import OrderedDict, namedtuple
+import importlib
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
@@ -55,6 +56,107 @@ class ExportRegistryTestCase(SimpleTestCase):
 
         spec = get_export_spec("auth.User")
         self.assertIs(spec.serializer, new_serializer)
+
+    def test_registry_init_uses_sources_export_adapters(self):
+        """Registry init should import export classes through the sources adapters."""
+        from utils.file_export import registry_init
+
+        collection_filterset = object()
+        collection_serializer = object()
+        collection_csv = object()
+        collection_xlsx = object()
+        roadside_filterset = object()
+        roadside_serializer = object()
+        roadside_csv = object()
+        roadside_xlsx = object()
+        greenhouse_filterset = object()
+        greenhouse_serializer = object()
+        greenhouse_csv = object()
+        greenhouse_xlsx = object()
+
+        with (
+            patch(
+                "utils.file_export.export_registry.register_export"
+            ) as mock_register_export,
+            patch(
+                "sources.waste_collection.exports.CollectionFilterSet",
+                collection_filterset,
+            ),
+            patch(
+                "sources.waste_collection.exports.CollectionFlatSerializer",
+                collection_serializer,
+            ),
+            patch(
+                "sources.waste_collection.exports.CollectionCSVRenderer",
+                collection_csv,
+            ),
+            patch(
+                "sources.waste_collection.exports.CollectionXLSXRenderer",
+                collection_xlsx,
+            ),
+            patch(
+                "sources.roadside_trees.exports.HamburgRoadsideTreesFilterSet",
+                roadside_filterset,
+            ),
+            patch(
+                "sources.roadside_trees.exports.HamburgRoadsideTreeFlatSerializer",
+                roadside_serializer,
+            ),
+            patch(
+                "sources.roadside_trees.exports.HamburgRoadsideTreesCSVRenderer",
+                roadside_csv,
+            ),
+            patch(
+                "sources.roadside_trees.exports.HamburgRoadsideTreesXLSXRenderer",
+                roadside_xlsx,
+            ),
+            patch(
+                "sources.greenhouses.exports.NantesGreenhousesFilterSet",
+                greenhouse_filterset,
+            ),
+            patch(
+                "sources.greenhouses.exports.NantesGreenhousesFlatSerializer",
+                greenhouse_serializer,
+            ),
+            patch(
+                "sources.greenhouses.exports.NantesGreenhousesCSVRenderer",
+                greenhouse_csv,
+            ),
+            patch(
+                "sources.greenhouses.exports.NantesGreenhousesXLSXRenderer",
+                greenhouse_xlsx,
+            ),
+        ):
+            importlib.reload(registry_init)
+
+        self.assertEqual(mock_register_export.call_count, 3)
+        self.assertEqual(
+            mock_register_export.call_args_list[0].args,
+            (
+                "soilcom.Collection",
+                collection_filterset,
+                collection_serializer,
+                {"xlsx": collection_xlsx, "csv": collection_csv},
+            ),
+        )
+        self.assertEqual(
+            mock_register_export.call_args_list[1].args,
+            (
+                "flexibi_hamburg.HamburgRoadsideTrees",
+                roadside_filterset,
+                roadside_serializer,
+                {"xlsx": roadside_xlsx, "csv": roadside_csv},
+            ),
+        )
+        self.assertEqual(
+            mock_register_export.call_args_list[2].args,
+            (
+                "flexibi_nantes.NantesGreenhouses",
+                greenhouse_filterset,
+                greenhouse_serializer,
+                {"xlsx": greenhouse_xlsx, "csv": greenhouse_csv},
+            ),
+        )
 
 
 class BaseXLSXRendererTestCase(SimpleTestCase):
