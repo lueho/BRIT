@@ -229,6 +229,15 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
         self.assertIs(CollectionCSVRenderer, LegacyCollectionCSVRenderer)
         self.assertIs(CollectionXLSXRenderer, LegacyCollectionXLSXRenderer)
 
+    def test_waste_collection_filters_are_owned_by_sources(self):
+        self.assertEqual(CollectionFilterSet.__module__, "sources.waste_collection.filters")
+        self.assertEqual(
+            CollectionSystemListFilter.__module__,
+            "sources.waste_collection.filters",
+        )
+        self.assertEqual(CollectorFilter.__module__, "sources.waste_collection.filters")
+        self.assertEqual(WasteFlyerFilter.__module__, "sources.waste_collection.filters")
+
     def test_waste_collection_renderers_are_owned_by_sources(self):
         self.assertEqual(CollectionCSVRenderer.__module__, "sources.waste_collection.renderers")
         self.assertEqual(
