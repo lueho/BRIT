@@ -85,6 +85,9 @@ Validated and committed slices completed so far:
 - made `sources.waste_collection` the authoritative owner of the waste
   collection URL/view/router surface while preserving legacy
   `case_studies.soilcom` modules as compatibility re-exports
+- added `forms` and waste-collection `tasks` adapters so the new
+  `sources`-owned greenhouse and waste-collection views no longer import those
+  seams directly from `case_studies.*`
 
 ## 3. Target State
 
@@ -286,6 +289,8 @@ External files that import from the three apps (outside their own code/tests):
   preserving legacy compatibility
 - [x] Extend URL/view/router ownership into the waste-collection domain while
   preserving legacy compatibility
+- [x] Add forms/task adapters where `sources`-owned views still imported
+  directly from `case_studies.*`
 
 ### Near-term next steps
 
@@ -294,7 +299,9 @@ External files that import from the three apps (outside their own code/tests):
 2. Convert the remaining top-level `sources` shims into package-based
    structures where needed so the new domain ownership boundaries are easier to
    maintain.
-3. Only after the shared import graph is largely normalized through `sources`,
+3. Reduce any remaining intentional direct `case_studies.*` imports behind
+   `sources` adapters before starting model/state moves.
+4. Only after the shared import graph is largely normalized through `sources`,
    begin the heavier `SeparateDatabaseAndState`, ContentType, and URL-redirect
    consolidation phases described below.
 
