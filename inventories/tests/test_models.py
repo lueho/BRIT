@@ -1,4 +1,5 @@
 from django.test import TestCase
+from types import SimpleNamespace
 
 from maps.models import Region
 from materials.models import SampleSeries
@@ -128,6 +129,41 @@ class ScenarioTestCase(TestCase):
         self.assertEqual(
             InventoryAlgorithm.from_task_reference(algorithm.task_reference),
             algorithm,
+        )
+
+    @patch("inventories.models.importlib.import_module")
+    @patch("inventories.models.pkgutil.iter_modules")
+    def test_available_modules_includes_nested_sources_inventory_modules(
+        self, mock_iter_modules, mock_import_module
+    ):
+        mock_iter_modules.side_effect = [
+            [
+                SimpleNamespace(name="flexibi_hamburg"),
+                SimpleNamespace(name="flexibi_nantes"),
+            ],
+            [
+                SimpleNamespace(name="greenhouses", ispkg=True),
+                SimpleNamespace(name="tests", ispkg=True),
+                SimpleNamespace(name="views", ispkg=False),
+            ],
+        ]
+
+        def import_module_side_effect(module_path):
+            if module_path == "sources.greenhouses.inventory.algorithms":
+                return SimpleNamespace(InventoryAlgorithms=object())
+            if module_path == "sources.tests.inventory.algorithms":
+                raise ModuleNotFoundError(name="sources.tests.inventory")
+            raise AssertionError(f"Unexpected import attempt: {module_path}")
+
+        mock_import_module.side_effect = import_module_side_effect
+
+        self.assertEqual(
+            InventoryAlgorithm.available_modules(),
+            [
+                "flexibi_hamburg",
+                "flexibi_nantes",
+                "sources.greenhouses.inventory.algorithms",
+            ],
         )
 
     def test_inventory_algorithm_execute_uses_resolved_callable(self):

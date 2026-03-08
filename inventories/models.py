@@ -1,4 +1,5 @@
 import importlib
+import pkgutil
 from celery.result import AsyncResult
 from celery.states import READY_STATES
 
@@ -11,6 +12,7 @@ from django.dispatch import receiver
 from django.urls import reverse
 
 import case_studies
+import sources
 from bibliography.models import Source
 from distributions.models import Timestep
 from maps.models import Catchment, GeoDataset, Region
@@ -44,7 +46,26 @@ class InventoryAlgorithm(models.Model):
 
     @staticmethod
     def available_modules():
-        return [name for name in dir(case_studies) if not name.startswith("__")]
+        legacy_modules = sorted(
+            module.name for module in pkgutil.iter_modules(case_studies.__path__)
+        )
+        source_modules = []
+        for module in pkgutil.iter_modules(sources.__path__):
+            if not module.ispkg:
+                continue
+            module_path = f"sources.{module.name}.inventory.algorithms"
+            try:
+                inventory_module = importlib.import_module(module_path)
+            except ModuleNotFoundError as exc:
+                if exc.name != module_path and not module_path.startswith(
+                    f"{exc.name}."
+                ):
+                    raise
+                continue
+            if hasattr(inventory_module, "InventoryAlgorithms"):
+                source_modules.append(module_path)
+
+        return legacy_modules + sorted(source_modules)
 
     @staticmethod
     def get_module_path(source_module):
