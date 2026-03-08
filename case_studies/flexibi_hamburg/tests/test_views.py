@@ -46,6 +46,14 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse(self.url_name))
         self.assertEqual(response.status_code, 200)
 
+    def test_get_http_200_ok_via_maps_hamburg_prefix(self):
+        response = self.client.get("/maps/hamburg/roadside_trees/map/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_via_case_studies_hamburg_prefix(self):
+        response = self.client.get("/case_studies/hamburg/roadside_trees/map/")
+        self.assertEqual(response.status_code, 200)
+
 
 class HamburgRoadsideTreeCatchmentAutocompleteViewTests(ViewWithPermissionsTestCase):
     member_permissions = ["view_geodataset"]

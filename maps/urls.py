@@ -227,6 +227,16 @@ urlpatterns = [
         CatchmentOptionGeometryAPI.as_view(),
         name="data.catchment-options",
     ),
+    path(
+        "catchment_region_geometries/",
+        CatchmentRegionGeometryAPI.as_view(),
+        name="data.catchment_region_geometries",
+    ),
+    path(
+        "catchment_regions_summaries/",
+        CatchmentRegionSummaryAPIView.as_view(),
+        name="data.catchment_region_summaries",
+    ),
     path("regions/", RegionPublishedFilterView.as_view(), name="region-list"),
     path("regions/user/", RegionPrivateFilterView.as_view(), name="region-list-owned"),
     path("regions/create/", RegionCreateView.as_view(), name="region-create"),
@@ -284,19 +294,8 @@ urlpatterns = [
         NutsAndLauCatchmentPedigreeAPI.as_view(),
         name="data.nuts_lau_catchment_options",
     ),
-    path(
-        "catchment_region_geometries/",
-        CatchmentRegionGeometryAPI.as_view(),
-        name="data.catchment_region_geometries",
-    ),
-    path(
-        "catchment_regions_summaries/",
-        CatchmentRegionSummaryAPIView.as_view(),
-        name="data.catchment_region_summaries",
-    ),
-    # TODO: Can case study urls be detected and added automatically?
-    path("nantes/", include("case_studies.flexibi_nantes.urls")),
-    path("hamburg/", include("case_studies.flexibi_hamburg.urls")),
+    path("nantes/", include("sources.greenhouses.urls")),
+    path("hamburg/", include("sources.roadside_trees.urls")),
     path("locations/", LocationPublishedListView.as_view(), name="location-list"),
     path(
         "locations/user/", LocationPrivateListView.as_view(), name="location-list-owned"

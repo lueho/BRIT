@@ -2421,6 +2421,10 @@ class WasteCollectionPublishedMapViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(self.url, follow=True)
         self.assertEqual(response.status_code, 200)
 
+    def test_http_200_ok_via_waste_collection_root_path(self):
+        response = self.client.get("/waste_collection/collections/map/", follow=True)
+        self.assertEqual(response.status_code, 200)
+
     def test_uses_correct_template(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url, follow=True)
