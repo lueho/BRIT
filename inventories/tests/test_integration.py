@@ -240,10 +240,6 @@ class InventoryExecutionIntegrationTests(TestCase):
         self.assertEqual(execution_plan[0]["algorithm"], algorithm)
         self.assertEqual(execution_plan[0]["kwargs"]["feedstock_id"], feedstock.id)
 
-        config = scenario.configuration_as_dict()
-        self.assertIn(feedstock.id, config)
-        self.assertEqual(len(config[feedstock.id]), 1)
-
         self.assertTrue(
             run_inventory_algorithm.run(algorithm.id, **execution_plan[0]["kwargs"])
         )

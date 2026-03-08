@@ -12,7 +12,7 @@ from ..models import (
     ScenarioStatus,
 )
 from uuid import uuid4
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 
 class ScenarioTestCase(TestCase):
@@ -96,6 +96,71 @@ class ScenarioTestCase(TestCase):
             InventoryAlgorithm.from_task_reference(algorithm.task_reference),
             algorithm,
         )
+
+    def test_inventory_algorithm_execute_uses_resolved_callable(self):
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Resolver Algorithm",
+            source_module="flexibi_hamburg",
+            function_name="hamburg_roadside_tree_production",
+            geodataset=GeoDataset.objects.get(name="Test Dataset"),
+        )
+        execute = Mock(return_value={"result": "ok"})
+        module = type(
+            "FakeModule",
+            (),
+            {
+                "InventoryAlgorithms": type(
+                    "FakeInventoryAlgorithms",
+                    (),
+                    {"hamburg_roadside_tree_production": staticmethod(execute)},
+                )
+            },
+        )
+
+        with patch.object(algorithm, "import_module", return_value=module):
+            result = algorithm.execute(example="value")
+
+        self.assertEqual(result, {"result": "ok"})
+        execute.assert_called_once_with(example="value")
+
+    def test_configuration_as_dict_serializes_execution_plan_for_legacy_callers(self):
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Resolver Algorithm",
+            source_module="flexibi_hamburg",
+            function_name="hamburg_roadside_tree_production",
+            geodataset=GeoDataset.objects.get(name="Test Dataset"),
+        )
+        execution_plan = [
+            {
+                "algorithm": algorithm,
+                "kwargs": {
+                    "catchment_id": 11,
+                    "scenario_id": self.scenario.id,
+                    "feedstock_id": 7,
+                    "point_yield": {"value": 1.0, "standard_deviation": 0.1},
+                },
+            }
+        ]
+
+        with patch.object(
+            self.scenario, "inventory_execution_plan", return_value=execution_plan
+        ):
+            config = self.scenario.configuration_as_dict()
+
+        self.assertEqual(
+            config,
+            {
+                7: {
+                    algorithm.task_reference: {
+                        "catchment_id": 11,
+                        "scenario_id": self.scenario.id,
+                        "feedstock_id": 7,
+                        "point_yield": {"value": 1.0, "standard_deviation": 0.1},
+                    }
+                }
+            },
+        )
+        self.assertIsNot(config[7][algorithm.task_reference], execution_plan[0]["kwargs"])
 
     @patch("inventories.models.AsyncResult")
     def test_running_scenario_save_stays_blocked_while_task_is_active(

@@ -87,6 +87,10 @@ class InventoryAlgorithm(models.Model):
     def import_module(self):
         return importlib.import_module(self.module_path)
 
+    def execute(self, **kwargs):
+        module = self.import_module()
+        return getattr(module.InventoryAlgorithms, self.function_name)(**kwargs)
+
     def default_values(self):
         """
         Returns a queryset of all default values of parameters of this algorithm.
@@ -545,14 +549,9 @@ class Scenario(NamedUserCreatedObject):
             for execution in feedstock_config.values()
         ]
 
-    def configuration_as_dict(self):
-        """
-        Fetches all configuration entries that are associated with this scenario and assembles a dictionary holding
-        all configuration information for the inventory.
-        :return: None
-        """
+    def serialize_inventory_execution_plan(self, execution_plan):
         inventory_config = {}
-        for execution in self.inventory_execution_plan():
+        for execution in execution_plan:
             feedstock = execution["kwargs"]["feedstock_id"]
             function = execution["algorithm"].task_reference
             if feedstock not in inventory_config.keys():
@@ -560,6 +559,14 @@ class Scenario(NamedUserCreatedObject):
             inventory_config[feedstock][function] = execution["kwargs"].copy()
 
         return inventory_config
+
+    def configuration_as_dict(self):
+        """
+        Fetches all configuration entries that are associated with this scenario and assembles a dictionary holding
+        all configuration information for the inventory.
+        :return: None
+        """
+        return self.serialize_inventory_execution_plan(self.inventory_execution_plan())
 
     def configuration_for_template(self):
 

@@ -39,9 +39,7 @@ def run_inventory(scenario_id):
 @app.task(bind=True)
 def run_inventory_algorithm(self, algorithm_id, **kwargs):
     algorithm = InventoryAlgorithm.objects.get(id=algorithm_id)
-    module = algorithm.import_module()
-    function_name = algorithm.function_name
-    results = getattr(module.InventoryAlgorithms, function_name)(**kwargs)
+    results = algorithm.execute(**kwargs)
     kwargs = {
         "name": algorithm.function_name,
         "scenario": Scenario.objects.get(id=kwargs.get("scenario_id")),
