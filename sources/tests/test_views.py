@@ -1,7 +1,24 @@
+from django.test import SimpleTestCase
 from django.urls import reverse
 from unittest.mock import patch
 
+from case_studies.flexibi_hamburg.router import router as LegacyHamburgRouter
+from case_studies.flexibi_hamburg.urls import urlpatterns as LegacyHamburgUrlpatterns
+from case_studies.flexibi_hamburg.views import (
+    HamburgRoadsideTreeCatchmentAutocompleteView as LegacyHamburgRoadsideTreeCatchmentAutocompleteView,
+    HamburgRoadsideTreesListFileExportView as LegacyHamburgRoadsideTreesListFileExportView,
+    RoadsideTreesPublishedMapIframeView as LegacyRoadsideTreesPublishedMapIframeView,
+    RoadsideTreesPublishedMapView as LegacyRoadsideTreesPublishedMapView,
+)
 from case_studies.soilcom.views import CollectionDetailView as LegacyCollectionDetailView
+from sources.roadside_trees.router import router as HamburgRouter
+from sources.roadside_trees.urls import urlpatterns as HamburgUrlpatterns
+from sources.roadside_trees.views import (
+    HamburgRoadsideTreeCatchmentAutocompleteView,
+    HamburgRoadsideTreesListFileExportView,
+    RoadsideTreesPublishedMapIframeView,
+    RoadsideTreesPublishedMapView,
+)
 from sources.waste_collection.views import CollectionDetailView
 from utils.tests.testcases import ViewWithPermissionsTestCase
 
@@ -56,3 +73,24 @@ class SourcesListViewTestCase(ViewWithPermissionsTestCase):
 class WasteCollectionViewAdapterTestCase(ViewWithPermissionsTestCase):
     def test_collection_detail_view_adapter_reexports_legacy_view(self):
         self.assertIs(CollectionDetailView, LegacyCollectionDetailView)
+
+
+class RoadsideTreesOwnershipAdapterTestCase(SimpleTestCase):
+    def test_roadside_tree_views_are_owned_by_sources_and_reexported_legacy(self):
+        self.assertIs(RoadsideTreesPublishedMapView, LegacyRoadsideTreesPublishedMapView)
+        self.assertIs(
+            RoadsideTreesPublishedMapIframeView,
+            LegacyRoadsideTreesPublishedMapIframeView,
+        )
+        self.assertIs(
+            HamburgRoadsideTreesListFileExportView,
+            LegacyHamburgRoadsideTreesListFileExportView,
+        )
+        self.assertIs(
+            HamburgRoadsideTreeCatchmentAutocompleteView,
+            LegacyHamburgRoadsideTreeCatchmentAutocompleteView,
+        )
+
+    def test_roadside_tree_router_and_urls_are_owned_by_sources_and_reexported_legacy(self):
+        self.assertIs(HamburgRouter, LegacyHamburgRouter)
+        self.assertIs(HamburgUrlpatterns, LegacyHamburgUrlpatterns)
