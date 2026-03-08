@@ -1,7 +1,6 @@
 from django.views.generic import TemplateView
-
-from case_studies.flexibi_nantes.models import Greenhouse
-from case_studies.soilcom.models import Collection
+from sources.greenhouses.selectors import published_greenhouse_count
+from sources.waste_collection.selectors import published_collection_count
 
 
 class SourcesExplorerView(TemplateView):
@@ -9,12 +8,8 @@ class SourcesExplorerView(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["collection_count"] = Collection.objects.filter(
-            publication_status="published"
-        ).count()
-        context["greenhouse_count"] = Greenhouse.objects.filter(
-            publication_status="published"
-        ).count()
+        context["collection_count"] = published_collection_count()
+        context["greenhouse_count"] = published_greenhouse_count()
         return context
 
 
