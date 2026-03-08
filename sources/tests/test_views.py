@@ -1,6 +1,8 @@
 from django.urls import reverse
 from unittest.mock import patch
 
+from case_studies.soilcom.views import CollectionDetailView as LegacyCollectionDetailView
+from sources.waste_collection.views import CollectionDetailView
 from utils.tests.testcases import ViewWithPermissionsTestCase
 
 
@@ -49,3 +51,8 @@ class SourcesListViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse(self.url_name))
         self.assertEqual(response.status_code, 301)
+
+
+class WasteCollectionViewAdapterTestCase(ViewWithPermissionsTestCase):
+    def test_collection_detail_view_adapter_reexports_legacy_view(self):
+        self.assertIs(CollectionDetailView, LegacyCollectionDetailView)
