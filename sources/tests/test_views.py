@@ -3,6 +3,9 @@ from django.urls import reverse
 from unittest.mock import patch
 
 import case_studies.soilcom.views as legacy_waste_collection_views
+from case_studies.flexibi_hamburg.viewsets import (
+    HamburgRoadsideTreeViewSet as LegacyHamburgRoadsideTreeViewSet,
+)
 from case_studies.flexibi_hamburg.router import router as LegacyHamburgRouter
 from case_studies.flexibi_hamburg.urls import urlpatterns as LegacyHamburgUrlpatterns
 from case_studies.flexibi_hamburg.views import (
@@ -13,6 +16,9 @@ from case_studies.flexibi_hamburg.views import (
 )
 from case_studies.flexibi_nantes.rounter import router as LegacyNantesRouter
 from case_studies.flexibi_nantes.urls import urlpatterns as LegacyNantesUrlpatterns
+from case_studies.flexibi_nantes.viewsets import (
+    NantesGreenhousesViewSet as LegacyNantesGreenhousesViewSet,
+)
 from case_studies.flexibi_nantes.views import (
     CultureAutocompleteView as LegacyCultureAutocompleteView,
     CultureCreateView as LegacyCultureCreateView,
@@ -44,6 +50,10 @@ from case_studies.flexibi_nantes.views import (
 )
 from case_studies.soilcom.router import router as LegacyWasteCollectionRouter
 from case_studies.soilcom.urls import urlpatterns as LegacyWasteCollectionUrlpatterns
+from case_studies.soilcom.viewsets import (
+    CollectionViewSet as LegacyCollectionViewSet,
+    CollectorViewSet as LegacyCollectorViewSet,
+)
 from case_studies.soilcom.views import CollectionDetailView as LegacyCollectionDetailView
 from sources.greenhouses.router import router as NantesRouter
 from sources.greenhouses.urls import urlpatterns as NantesUrlpatterns
@@ -78,6 +88,7 @@ from sources.greenhouses.views import (
 )
 from sources.roadside_trees.router import router as HamburgRouter
 from sources.roadside_trees.urls import urlpatterns as HamburgUrlpatterns
+from sources.roadside_trees.viewsets import HamburgRoadsideTreeViewSet
 from sources.roadside_trees.views import (
     HamburgRoadsideTreeCatchmentAutocompleteView,
     HamburgRoadsideTreesListFileExportView,
@@ -86,8 +97,10 @@ from sources.roadside_trees.views import (
 )
 from sources.waste_collection.router import router as WasteCollectionRouter
 from sources.waste_collection.urls import urlpatterns as WasteCollectionUrlpatterns
+from sources.waste_collection.viewsets import CollectionViewSet, CollectorViewSet
 import sources.waste_collection.views as waste_collection_views
 from sources.waste_collection.views import CollectionDetailView
+from sources.greenhouses.viewsets import NantesGreenhousesViewSet
 from utils.tests.testcases import ViewWithPermissionsTestCase
 
 
@@ -144,6 +157,9 @@ class WasteCollectionViewAdapterTestCase(ViewWithPermissionsTestCase):
 
 
 class RoadsideTreesOwnershipAdapterTestCase(SimpleTestCase):
+    def test_roadside_tree_viewset_adapter_reexports_legacy_viewset(self):
+        self.assertIs(HamburgRoadsideTreeViewSet, LegacyHamburgRoadsideTreeViewSet)
+
     def test_roadside_tree_views_are_owned_by_sources_and_reexported_legacy(self):
         self.assertIs(RoadsideTreesPublishedMapView, LegacyRoadsideTreesPublishedMapView)
         self.assertIs(
@@ -165,6 +181,9 @@ class RoadsideTreesOwnershipAdapterTestCase(SimpleTestCase):
 
 
 class GreenhousesOwnershipAdapterTestCase(SimpleTestCase):
+    def test_greenhouse_viewset_adapter_reexports_legacy_viewset(self):
+        self.assertIs(NantesGreenhousesViewSet, LegacyNantesGreenhousesViewSet)
+
     def test_greenhouse_views_are_owned_by_sources_and_reexported_legacy(self):
         self.assertIs(CultureAutocompleteView, LegacyCultureAutocompleteView)
         self.assertIs(CultureCreateView, LegacyCultureCreateView)
@@ -215,6 +234,10 @@ class GreenhousesOwnershipAdapterTestCase(SimpleTestCase):
 
 
 class WasteCollectionOwnershipAdapterTestCase(SimpleTestCase):
+    def test_waste_collection_viewset_adapters_reexport_legacy_viewsets(self):
+        self.assertIs(CollectionViewSet, LegacyCollectionViewSet)
+        self.assertIs(CollectorViewSet, LegacyCollectorViewSet)
+
     def test_waste_collection_views_are_owned_by_sources_and_reexported_legacy(self):
         view_names = [
             "CollectionExplorerView",

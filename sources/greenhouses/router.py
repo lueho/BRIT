@@ -1,6 +1,6 @@
 from rest_framework.routers import DefaultRouter
 
-from case_studies.flexibi_nantes.viewsets import NantesGreenhousesViewSet
+from sources.greenhouses.viewsets import NantesGreenhousesViewSet
 
 router = DefaultRouter()
 router.register(

@@ -1,6 +1,6 @@
 from rest_framework import routers
 
-from case_studies.soilcom.viewsets import CollectionViewSet, CollectorViewSet
+from sources.waste_collection.viewsets import CollectionViewSet, CollectorViewSet
 
 router = routers.DefaultRouter()
 router.register('collection', CollectionViewSet, basename='api-waste-collection')

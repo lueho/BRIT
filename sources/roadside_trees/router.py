@@ -1,6 +1,6 @@
 from rest_framework import routers
 
-from case_studies.flexibi_hamburg.viewsets import HamburgRoadsideTreeViewSet
+from sources.roadside_trees.viewsets import HamburgRoadsideTreeViewSet
 
 router = routers.DefaultRouter()
 router.register(
