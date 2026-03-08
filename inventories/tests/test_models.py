@@ -123,7 +123,7 @@ class ScenarioTestCase(TestCase):
         self.assertEqual(result, {"result": "ok"})
         execute.assert_called_once_with(example="value")
 
-    def test_configuration_as_dict_serializes_execution_plan_for_legacy_callers(self):
+    def test_serialize_inventory_execution_plan_builds_legacy_task_reference_shape(self):
         algorithm = InventoryAlgorithm.objects.create(
             name="Resolver Algorithm",
             source_module="flexibi_hamburg",
@@ -142,10 +142,7 @@ class ScenarioTestCase(TestCase):
             }
         ]
 
-        with patch.object(
-            self.scenario, "inventory_execution_plan", return_value=execution_plan
-        ):
-            config = self.scenario.configuration_as_dict()
+        config = self.scenario.serialize_inventory_execution_plan(execution_plan)
 
         self.assertEqual(
             config,

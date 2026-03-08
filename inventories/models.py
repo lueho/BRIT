@@ -560,14 +560,6 @@ class Scenario(NamedUserCreatedObject):
 
         return inventory_config
 
-    def configuration_as_dict(self):
-        """
-        Fetches all configuration entries that are associated with this scenario and assembles a dictionary holding
-        all configuration information for the inventory.
-        :return: None
-        """
-        return self.serialize_inventory_execution_plan(self.inventory_execution_plan())
-
     def configuration_for_template(self):
 
         config = {}
