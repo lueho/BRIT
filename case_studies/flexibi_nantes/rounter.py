@@ -1,6 +1,3 @@
-from rest_framework.routers import DefaultRouter
+from sources.greenhouses.router import router
 
-from .viewsets import NantesGreenhousesViewSet
-
-router = DefaultRouter()
-router.register(r'nantes_greenhouses', NantesGreenhousesViewSet, basename='api-nantes-greenhouses')
+__all__ = ["router"]

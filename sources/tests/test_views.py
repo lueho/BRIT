@@ -10,7 +10,69 @@ from case_studies.flexibi_hamburg.views import (
     RoadsideTreesPublishedMapIframeView as LegacyRoadsideTreesPublishedMapIframeView,
     RoadsideTreesPublishedMapView as LegacyRoadsideTreesPublishedMapView,
 )
+from case_studies.flexibi_nantes.rounter import router as LegacyNantesRouter
+from case_studies.flexibi_nantes.urls import urlpatterns as LegacyNantesUrlpatterns
+from case_studies.flexibi_nantes.views import (
+    CultureAutocompleteView as LegacyCultureAutocompleteView,
+    CultureCreateView as LegacyCultureCreateView,
+    CultureDetailView as LegacyCultureDetailView,
+    CultureModalCreateView as LegacyCultureModalCreateView,
+    CultureModalDeleteView as LegacyCultureModalDeleteView,
+    CultureModalUpdateView as LegacyCultureModalUpdateView,
+    CulturePrivateListView as LegacyCulturePrivateListView,
+    CulturePublishedListView as LegacyCulturePublishedListView,
+    CultureUpdateView as LegacyCultureUpdateView,
+    GreenhouseCreateView as LegacyGreenhouseCreateView,
+    GreenhouseDetailView as LegacyGreenhouseDetailView,
+    GreenhouseGrowthCycleCreateView as LegacyGreenhouseGrowthCycleCreateView,
+    GreenhouseModalCreateView as LegacyGreenhouseModalCreateView,
+    GreenhouseModalDeleteView as LegacyGreenhouseModalDeleteView,
+    GreenhouseModalUpdateView as LegacyGreenhouseModalUpdateView,
+    GreenhousePrivateFilterView as LegacyGreenhousePrivateFilterView,
+    GreenhousePublishedFilterView as LegacyGreenhousePublishedFilterView,
+    GreenhousesPublishedMapView as LegacyGreenhousesPublishedMapView,
+    GreenhouseUpdateView as LegacyGreenhouseUpdateView,
+    GrowthCycleDetailView as LegacyGrowthCycleDetailView,
+    GrowthCycleModalCreateView as LegacyGrowthCycleModalCreateView,
+    GrowthCycleModalDeleteView as LegacyGrowthCycleModalDeleteView,
+    GrowthCycleUpdateView as LegacyGrowthCycleUpdateView,
+    GrowthTimeStepSetModalUpdateView as LegacyGrowthTimeStepSetModalUpdateView,
+    NantesGreenhousesCatchmentAutocompleteView as LegacyNantesGreenhousesCatchmentAutocompleteView,
+    NantesGreenhousesListFileExportView as LegacyNantesGreenhousesListFileExportView,
+    UpdateGreenhouseGrowthCycleValuesView as LegacyUpdateGreenhouseGrowthCycleValuesView,
+)
 from case_studies.soilcom.views import CollectionDetailView as LegacyCollectionDetailView
+from sources.greenhouses.router import router as NantesRouter
+from sources.greenhouses.urls import urlpatterns as NantesUrlpatterns
+from sources.greenhouses.views import (
+    CultureAutocompleteView,
+    CultureCreateView,
+    CultureDetailView,
+    CultureModalCreateView,
+    CultureModalDeleteView,
+    CultureModalUpdateView,
+    CulturePrivateListView,
+    CulturePublishedListView,
+    CultureUpdateView,
+    GreenhouseCreateView,
+    GreenhouseDetailView,
+    GreenhouseGrowthCycleCreateView,
+    GreenhouseModalCreateView,
+    GreenhouseModalDeleteView,
+    GreenhouseModalUpdateView,
+    GreenhousePrivateFilterView,
+    GreenhousePublishedFilterView,
+    GreenhousesPublishedMapView,
+    GreenhouseUpdateView,
+    GrowthCycleDetailView,
+    GrowthCycleModalCreateView,
+    GrowthCycleModalDeleteView,
+    GrowthCycleUpdateView,
+    GrowthTimeStepSetModalUpdateView,
+    NantesGreenhousesCatchmentAutocompleteView,
+    NantesGreenhousesListFileExportView,
+    UpdateGreenhouseGrowthCycleValuesView,
+)
 from sources.roadside_trees.router import router as HamburgRouter
 from sources.roadside_trees.urls import urlpatterns as HamburgUrlpatterns
 from sources.roadside_trees.views import (
@@ -94,3 +156,53 @@ class RoadsideTreesOwnershipAdapterTestCase(SimpleTestCase):
     def test_roadside_tree_router_and_urls_are_owned_by_sources_and_reexported_legacy(self):
         self.assertIs(HamburgRouter, LegacyHamburgRouter)
         self.assertIs(HamburgUrlpatterns, LegacyHamburgUrlpatterns)
+
+
+class GreenhousesOwnershipAdapterTestCase(SimpleTestCase):
+    def test_greenhouse_views_are_owned_by_sources_and_reexported_legacy(self):
+        self.assertIs(CultureAutocompleteView, LegacyCultureAutocompleteView)
+        self.assertIs(CultureCreateView, LegacyCultureCreateView)
+        self.assertIs(CultureDetailView, LegacyCultureDetailView)
+        self.assertIs(CultureModalCreateView, LegacyCultureModalCreateView)
+        self.assertIs(CultureModalDeleteView, LegacyCultureModalDeleteView)
+        self.assertIs(CultureModalUpdateView, LegacyCultureModalUpdateView)
+        self.assertIs(CulturePrivateListView, LegacyCulturePrivateListView)
+        self.assertIs(CulturePublishedListView, LegacyCulturePublishedListView)
+        self.assertIs(CultureUpdateView, LegacyCultureUpdateView)
+        self.assertIs(GreenhouseCreateView, LegacyGreenhouseCreateView)
+        self.assertIs(GreenhouseDetailView, LegacyGreenhouseDetailView)
+        self.assertIs(
+            GreenhouseGrowthCycleCreateView,
+            LegacyGreenhouseGrowthCycleCreateView,
+        )
+        self.assertIs(GreenhouseModalCreateView, LegacyGreenhouseModalCreateView)
+        self.assertIs(GreenhouseModalDeleteView, LegacyGreenhouseModalDeleteView)
+        self.assertIs(GreenhouseModalUpdateView, LegacyGreenhouseModalUpdateView)
+        self.assertIs(GreenhousePrivateFilterView, LegacyGreenhousePrivateFilterView)
+        self.assertIs(GreenhousePublishedFilterView, LegacyGreenhousePublishedFilterView)
+        self.assertIs(GreenhousesPublishedMapView, LegacyGreenhousesPublishedMapView)
+        self.assertIs(GreenhouseUpdateView, LegacyGreenhouseUpdateView)
+        self.assertIs(GrowthCycleDetailView, LegacyGrowthCycleDetailView)
+        self.assertIs(GrowthCycleModalCreateView, LegacyGrowthCycleModalCreateView)
+        self.assertIs(GrowthCycleModalDeleteView, LegacyGrowthCycleModalDeleteView)
+        self.assertIs(GrowthCycleUpdateView, LegacyGrowthCycleUpdateView)
+        self.assertIs(
+            GrowthTimeStepSetModalUpdateView,
+            LegacyGrowthTimeStepSetModalUpdateView,
+        )
+        self.assertIs(
+            NantesGreenhousesCatchmentAutocompleteView,
+            LegacyNantesGreenhousesCatchmentAutocompleteView,
+        )
+        self.assertIs(
+            NantesGreenhousesListFileExportView,
+            LegacyNantesGreenhousesListFileExportView,
+        )
+        self.assertIs(
+            UpdateGreenhouseGrowthCycleValuesView,
+            LegacyUpdateGreenhouseGrowthCycleValuesView,
+        )
+
+    def test_greenhouse_router_and_urls_are_owned_by_sources_and_reexported_legacy(self):
+        self.assertIs(NantesRouter, LegacyNantesRouter)
+        self.assertIs(NantesUrlpatterns, LegacyNantesUrlpatterns)

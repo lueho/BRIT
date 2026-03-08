@@ -21,6 +21,8 @@ from case_studies.flexibi_nantes.serializers import (
     NantesGreenhousesModelSerializer as LegacyNantesGreenhousesModelSerializer,
 )
 from case_studies.flexibi_nantes.filters import (
+    CultureListFilter as LegacyCultureListFilter,
+    GreenhouseTypeFilter as LegacyGreenhouseTypeFilter,
     NantesGreenhousesFilterSet as LegacyNantesGreenhousesFilterSet,
 )
 from case_studies.flexibi_nantes.renderers import (
@@ -37,7 +39,11 @@ from case_studies.soilcom.renderers import (
     CollectionCSVRenderer as LegacyCollectionCSVRenderer,
     CollectionXLSXRenderer as LegacyCollectionXLSXRenderer,
 )
-from sources.greenhouses.filters import NantesGreenhousesFilterSet
+from sources.greenhouses.filters import (
+    CultureListFilter,
+    GreenhouseTypeFilter,
+    NantesGreenhousesFilterSet,
+)
 from sources.greenhouses.renderers import (
     NantesGreenhousesCSVRenderer,
     NantesGreenhousesXLSXRenderer,
@@ -114,6 +120,8 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
         self.assertIs(HamburgRoadsideTreesXLSXRenderer, LegacyHamburgRoadsideTreesXLSXRenderer)
 
     def test_greenhouse_filter_and_renderer_adapters_reexport_legacy_symbols(self):
+        self.assertIs(CultureListFilter, LegacyCultureListFilter)
+        self.assertIs(GreenhouseTypeFilter, LegacyGreenhouseTypeFilter)
         self.assertIs(NantesGreenhousesFilterSet, LegacyNantesGreenhousesFilterSet)
         self.assertIs(NantesGreenhousesCSVRenderer, LegacyNantesGreenhousesCSVRenderer)
         self.assertIs(NantesGreenhousesXLSXRenderer, LegacyNantesGreenhousesXLSXRenderer)
