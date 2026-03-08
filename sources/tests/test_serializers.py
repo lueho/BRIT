@@ -185,6 +185,13 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
             LegacyWasteCollectionGeometrySerializer,
         )
 
+    def test_waste_collection_serializers_are_owned_by_sources(self):
+        self.assertEqual(CollectionFlatSerializer.__module__, "sources.waste_collection.serializers")
+        self.assertEqual(
+            WasteCollectionGeometrySerializer.__module__,
+            "sources.waste_collection.serializers",
+        )
+
     def test_roadside_tree_serializer_adapters_reexport_legacy_serializers(self):
         self.assertIs(
             HamburgRoadsideTreeFlatSerializer,
