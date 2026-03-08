@@ -3,4 +3,4 @@ from case_studies.flexibi_nantes.renderers import (
     NantesGreenhousesCSVRenderer,
     NantesGreenhousesXLSXRenderer,
 )
-from case_studies.flexibi_nantes.serializers import NantesGreenhousesFlatSerializer
+from sources.greenhouses.serializers import NantesGreenhousesFlatSerializer

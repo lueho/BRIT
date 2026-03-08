@@ -1,4 +1,4 @@
-from case_studies.soilcom.serializers import (
+from sources.waste_collection.serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
     WasteCollectionGeometrySerializer,
 )

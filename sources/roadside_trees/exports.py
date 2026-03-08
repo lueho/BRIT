@@ -3,4 +3,4 @@ from case_studies.flexibi_hamburg.renderers import (
     HamburgRoadsideTreesCSVRenderer,
     HamburgRoadsideTreesXLSXRenderer,
 )
-from case_studies.flexibi_hamburg.serializers import HamburgRoadsideTreeFlatSerializer
+from sources.roadside_trees.serializers import HamburgRoadsideTreeFlatSerializer
