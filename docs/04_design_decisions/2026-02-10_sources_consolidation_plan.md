@@ -105,6 +105,9 @@ Validated and committed slices completed so far:
   `serializers`, `viewsets`, `renderers`, and inventory `algorithms`) into
   `sources.roadside_trees`, leaving the legacy `case_studies.flexibi_hamburg`
   modules as thin compatibility re-exports
+- added source-owned copies of the Hamburg map templates under
+  `sources.roadside_trees/templates/` so Django now resolves those templates
+  from the `sources` app path first while preserving behavior
 
 ## 3. Target State
 
@@ -315,8 +318,8 @@ External files that import from the three apps (outside their own code/tests):
 
 1. Continue moving implementation bodies from thin re-exports toward
    source-owned modules while preserving legacy runtime compatibility.
-2. Continue the Hamburg phase by moving its remaining templates, tests, and URL
-   integration behind the new `roadside_trees` app label.
+2. Continue the Hamburg phase by moving its remaining tests and URL integration
+   behind the new `roadside_trees` app label.
 3. Reduce any remaining intentional direct `case_studies.*` imports behind
    `sources` adapters before starting model/state moves.
 4. Fill in any remaining top-level `sources` package scaffolding only where it
@@ -336,7 +339,7 @@ External files that import from the three apps (outside their own code/tests):
 
 - [x] Move models to `sources/models/roadside_trees.py` with `db_table` Meta
 - [x] Move views, filters, serializers, viewsets, renderers, algorithms
-- [ ] Move templates from `flexibi_hamburg/` to `sources/roadside_trees/`
+- [x] Move templates from `flexibi_hamburg/` to `sources/roadside_trees/`
 - [ ] Move static files
 - [ ] Move tests
 - [x] Create `SeparateDatabaseAndState` migrations in both apps
