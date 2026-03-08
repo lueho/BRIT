@@ -88,6 +88,8 @@ Validated and committed slices completed so far:
 - added `forms` and waste-collection `tasks` adapters so the new
   `sources`-owned greenhouse and waste-collection views no longer import those
   seams directly from `case_studies.*`
+- added domain `viewsets` adapters so `sources`-owned routers no longer import
+  those seams directly from `case_studies.*`
 
 ## 3. Target State
 
@@ -290,6 +292,8 @@ External files that import from the three apps (outside their own code/tests):
 - [x] Extend URL/view/router ownership into the waste-collection domain while
   preserving legacy compatibility
 - [x] Add forms/task adapters where `sources`-owned views still imported
+  directly from `case_studies.*`
+- [x] Add viewset adapters where `sources`-owned routers still imported
   directly from `case_studies.*`
 
 ### Near-term next steps
