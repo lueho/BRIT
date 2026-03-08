@@ -232,7 +232,7 @@ def compute_collection_dataset_version(scope="published", user=None):
     """
     from django.db.models import Count, Max, Min
 
-    from case_studies.soilcom.models import Collection
+    from sources.waste_collection.geojson import Collection
 
     qs = Collection.objects.all()
 

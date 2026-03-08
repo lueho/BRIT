@@ -33,8 +33,8 @@ def warm_collection_geojson_cache(self):
     """
     from django.db.models import F
 
-    from case_studies.soilcom.models import Collection
-    from case_studies.soilcom.serializers import (
+    from sources.waste_collection.geojson import (
+        Collection,
         GEOMETRY_SIMPLIFY_TOLERANCE,
         WasteCollectionGeometrySerializer,
     )
@@ -102,9 +102,9 @@ def warm_roadside_tree_geojson_cache(self):
     the cache is populated before users request the data. This prevents
     H12 timeout errors on first requests with ~250k tree points.
     """
-    from case_studies.flexibi_hamburg.models import HamburgRoadsideTrees
-    from case_studies.flexibi_hamburg.serializers import (
+    from sources.roadside_trees.geojson import (
         HamburgRoadsideTreeGeometrySerializer,
+        HamburgRoadsideTrees,
     )
 
     logger.info("Starting Roadside Trees GeoJSON cache warm-up")
