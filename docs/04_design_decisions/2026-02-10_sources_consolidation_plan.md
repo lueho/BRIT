@@ -76,6 +76,9 @@ Validated and committed slices completed so far:
 - routed the remaining shared direct waste-collection view import through a
   `sources` view adapter, leaving only intentional thin adapters and adapter
   regression tests referencing `case_studies`
+- made `sources.roadside_trees` the authoritative owner of the Hamburg
+  URL/view/router surface while preserving legacy `case_studies.flexibi_hamburg`
+  modules as compatibility re-exports
 
 ## 3. Target State
 
@@ -271,15 +274,16 @@ External files that import from the three apps (outside their own code/tests):
   `case_studies.*` directly
 - [x] Reduce remaining shared direct imports to a small, intentional set before
   starting `SeparateDatabaseAndState` model moves
+- [x] Move the first domain URL/view/router ownership slice into `sources`
+  while preserving legacy compatibility
 
 ### Near-term next steps
 
-1. Decide whether to keep `sources.*.urls` and `sources.*.views` as thin
-   compatibility adapters while moving implementation bodies incrementally, or
-   to begin consolidating full URL/view ownership into `sources` now.
-2. After that boundary is chosen, start moving implementation bodies
-   from thin re-exports toward source-owned modules while preserving legacy
-   runtime compatibility.
+1. Extend the Hamburg URL/view/router ownership pattern to the remaining
+   domains, starting with the smaller Nantes surface before the larger
+   waste-collection module.
+2. Continue moving implementation bodies from thin re-exports toward
+   source-owned modules while preserving legacy runtime compatibility.
 3. Only after the shared import graph is largely normalized through `sources`,
    begin the heavier `SeparateDatabaseAndState`, ContentType, and URL-redirect
    consolidation phases described below.
