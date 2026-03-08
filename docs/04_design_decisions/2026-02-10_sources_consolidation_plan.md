@@ -93,6 +93,9 @@ Validated and committed slices completed so far:
 - converted the top-level `sources.views` and `sources.models` shims into
   package-backed entrypoints to prepare for the later package-based app
   structure without changing runtime behavior
+- added the remaining empty top-level `sources` package scaffolding
+  (`forms`, `filters`, `serializers`, `viewsets`, and `renderers`) so the
+  package layout now matches the planned bridge-phase target shape more closely
 
 ## 3. Target State
 
@@ -315,7 +318,7 @@ External files that import from the three apps (outside their own code/tests):
 
 - [x] Convert `sources/models.py` to `sources/models/__init__.py` package
 - [x] Convert `sources/views.py` to `sources/views/__init__.py` package
-- [ ] Create empty sub-module files (forms/, filters/, serializers/, etc.)
+- [x] Create empty sub-module files (forms/, filters/, serializers/, etc.)
 - [x] Verify tests still pass (no functional changes yet)
 
 ### Phase B: Move flexibi_hamburg (smallest, lowest risk)
