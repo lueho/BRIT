@@ -82,6 +82,9 @@ Validated and committed slices completed so far:
 - made `sources.greenhouses` the authoritative owner of the Nantes
   URL/view/router surface while preserving legacy `case_studies.flexibi_nantes`
   modules as compatibility re-exports
+- made `sources.waste_collection` the authoritative owner of the waste
+  collection URL/view/router surface while preserving legacy
+  `case_studies.soilcom` modules as compatibility re-exports
 
 ## 3. Target State
 
@@ -281,14 +284,16 @@ External files that import from the three apps (outside their own code/tests):
   while preserving legacy compatibility
 - [x] Extend URL/view/router ownership into the Nantes greenhouse domain while
   preserving legacy compatibility
+- [x] Extend URL/view/router ownership into the waste-collection domain while
+  preserving legacy compatibility
 
 ### Near-term next steps
 
-1. Extend the established ownership pattern to the remaining waste-collection
-   URL/view surface, likely in smaller sub-slices rather than a single module
-   move.
-2. Continue moving implementation bodies from thin re-exports toward
+1. Continue moving implementation bodies from thin re-exports toward
    source-owned modules while preserving legacy runtime compatibility.
+2. Convert the remaining top-level `sources` shims into package-based
+   structures where needed so the new domain ownership boundaries are easier to
+   maintain.
 3. Only after the shared import graph is largely normalized through `sources`,
    begin the heavier `SeparateDatabaseAndState`, ContentType, and URL-redirect
    consolidation phases described below.
