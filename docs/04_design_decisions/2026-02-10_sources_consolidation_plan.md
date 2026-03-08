@@ -1,7 +1,7 @@
 # Sources Module Consolidation Plan
 
 **Date:** 2026-02-10
-**Status:** Approved
+**Status:** In progress (adapter-first transition underway)
 **Decision:** Option A — consolidate all source-type apps into `sources/`
 **Context:** Sources domain ontology (Section 9 of UX Harmonization Guideline),
 Geodataset Harmonization Pipeline proposal
@@ -33,6 +33,42 @@ case_studies/
 Total: ~7,800 lines source + ~8,800 lines tests = ~16,600 lines to move.
 
 Database tables: `soilcom_*`, `flexibi_nantes_*`, `flexibi_hamburg_*`.
+
+## 2a. Current Execution Strategy
+
+Rather than moving models, app labels, and URL ownership all at once, the
+refactor is currently proceeding through small compatibility slices that:
+
+- introduce thin `sources.*` adapter modules around existing
+  `case_studies.*` implementations
+- rewire shared entrypoints to import through `sources` first
+- preserve legacy runtime compatibility where serialized paths or URL prefixes
+  still exist
+- validate each slice with focused Docker `web` tests and a full Docker `web`
+  suite run before commit
+
+This reduces blast radius and prepares the codebase for the later
+`SeparateDatabaseAndState` migration phases without forcing model or app-label
+moves prematurely.
+
+## 2b. Progress Update (2026-03-08)
+
+Validated and committed slices completed so far:
+
+- scaffolded nested domain apps under `sources`
+- routed Sources explorer counts through domain selectors
+- discovered nested `sources.*.inventory.algorithms` modules during inventory
+  discovery
+- routed maps GeoJSON helpers through `sources` adapters
+- routed the review dashboard fallback through `sources` selectors
+- routed the export registry through `sources` export adapters
+- routed case-study URLs through `sources` URL adapters
+- delegated inventory entrypoints through `sources` inventory adapters while
+  preserving legacy task-reference lookup compatibility
+- routed Hamburg and Nantes domain-model access in shared code and tests
+  through `sources` model adapters
+- routed waste-collection domain-model access in shared code and tests through
+  `sources` model adapters
 
 ## 3. Target State
 
@@ -208,6 +244,39 @@ External files that import from the three apps (outside their own code/tests):
 | `brit/settings/*.py` | `case_studies.soilcom` in INSTALLED_APPS | `sources` |
 
 ## 7. Implementation Phases
+
+### Bridge Phase: adapter-first transition (current)
+
+- [x] Scaffold nested domain apps under `sources`
+- [x] Add selector adapters for shared source-domain entrypoints
+- [x] Add GeoJSON helper adapters for shared map entrypoints
+- [x] Add export adapters for shared file-export entrypoints
+- [x] Add URL adapters for existing Hamburg, Nantes, and waste-collection
+  mount points
+- [x] Add inventory-algorithm adapters and route inventory resolution through
+  them
+- [x] Add Hamburg and Nantes model adapters and rewire shared imports/tests to
+  use them
+- [x] Add a waste-collection model adapter and rewire remaining shared imports
+  and tests to it
+- [ ] Add serializer/filter/renderer adapter modules where shared code still
+  imports `case_studies.*` directly
+- [ ] Reduce remaining shared direct imports to a small, intentional set before
+  starting `SeparateDatabaseAndState` model moves
+
+### Near-term next steps
+
+1. Add serializer adapters under `sources` for remaining shared imports such as
+   `sources.roadside_trees.geojson` and any other shared code still reaching
+   into `case_studies.*.serializers`.
+2. Add filter and renderer adapters where shared code still depends directly on
+   `case_studies` modules, so `sources` becomes the stable integration surface.
+3. After the adapter surfaces are stable, start moving implementation bodies
+   from thin re-exports toward source-owned modules while preserving legacy
+   runtime compatibility.
+4. Only after the shared import graph is largely normalized through `sources`,
+   begin the heavier `SeparateDatabaseAndState`, ContentType, and URL-redirect
+   consolidation phases described below.
 
 ### Phase A: Prepare the sources/ app structure
 
