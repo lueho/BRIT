@@ -1,4 +1,6 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.utils.decorators import method_decorator
+from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
 WASTE_ATLAS_GROUP_NAME = "waste_atlas"
@@ -40,6 +42,38 @@ class WasteAtlasOverviewView(WasteAtlasGroupMixin, TemplateView):
     """Overview page linking to all waste atlas maps."""
 
     template_name = "waste_atlas/overview.html"
+
+
+class EuropeDataCoverageContextMixin:
+    """Provide shared context for the Europe coverage map page variants."""
+
+    template_name = "waste_atlas/karte0_europe_data_coverage.html"
+    base_template = "base.html"
+    iframe_mode = False
+
+    def get_context_data(self, **kwargs):
+        """Provide page title, layout mode, and overview label context."""
+        ctx = super().get_context_data(**kwargs)
+        ctx["map_title"] = "Waste collection data coverage in Europe"
+        ctx["map_overview_label"] = "Map overview"
+        ctx["base_template"] = self.base_template
+        ctx["iframe_mode"] = self.iframe_mode
+        return ctx
+
+
+class EuropeDataCoverageMapView(
+    WasteAtlasGroupMixin, EuropeDataCoverageContextMixin, TemplateView
+):
+    """Map 0 — Waste collection data coverage in Europe."""
+
+
+@method_decorator(xframe_options_exempt, name="dispatch")
+class EuropeDataCoverageMapIframeView(EuropeDataCoverageContextMixin, TemplateView):
+    """Iframe-friendly Europe coverage map for third-party embedding."""
+
+    template_name = "waste_atlas/karte0_europe_data_coverage_iframe.html"
+    base_template = "base_iframe.html"
+    iframe_mode = True
 
 
 class PopulationDensityMapView(AtlasMapView):

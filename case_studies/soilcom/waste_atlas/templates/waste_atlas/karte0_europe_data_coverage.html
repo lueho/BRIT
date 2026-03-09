@@ -1,0 +1,456 @@
+{% extends base_template %}
+
+{% block title %}
+  Waste Atlas — {{ map_title }}
+{% endblock title %}
+
+{% block style_sheets %}
+  {{ block.super }}
+  <style>
+    #map-container {
+      background: #fff;
+      border: 1px solid #dee2e6;
+      border-radius: .375rem;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 1rem;
+    }
+    .coverage-page {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .coverage-page.coverage-page--iframe {
+      max-width: none;
+      padding: 1rem 0;
+    }
+    #europe-coverage-svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #fff;
+    }
+    #loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      font-size: 1.1rem;
+      color: #555;
+    }
+    .atlas-legend text {
+      font-family: 'Nunito', sans-serif;
+      font-size: 12px;
+    }
+    .coverage-region-list li + li {
+      margin-top: .25rem;
+    }
+  </style>
+{% endblock style_sheets %}
+
+{% block content %}
+  <div class="coverage-page{% if iframe_mode %} coverage-page--iframe{% endif %}">
+    {% if not iframe_mode %}
+      <h1>Waste Atlas — {{ map_title }}</h1>
+      <p class="lead">
+        Overview of European countries and regions for which waste collection data is already available in the atlas.
+      </p>
+
+      <div class="mb-3">
+        <a href="{% url 'waste-atlas-overview' %}"
+           class="btn btn-outline-secondary btn-sm">
+          <i class="fas fa-th-list"></i> {{ map_overview_label }}
+        </a>
+      </div>
+    {% endif %}
+
+    <div id="map-container">
+      <div id="loading-overlay">
+        <i class="fas fa-spinner fa-spin me-2"></i> Loading map data…
+      </div>
+      <svg id="europe-coverage-svg">
+      </svg>
+    </div>
+
+    {% if not iframe_mode %}
+      <div class="card">
+        <div class="card-header">
+          <strong>Highlighted regions</strong>
+        </div>
+        <div class="card-body">
+          <ul class="coverage-region-list mb-0">
+            <li>Germany</li>
+            <li>Denmark</li>
+            <li>Sweden</li>
+            <li>Flanders + Brussels</li>
+            <li>The Netherlands</li>
+            <li>Italy</li>
+            <li>Catalonia</li>
+          </ul>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+{% endblock content %}
+
+{% block javascript %}
+  {{ block.super }}
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var svgEl = document.getElementById('europe-coverage-svg');
+      var mapContainer = document.getElementById('map-container');
+      var loadingEl = document.getElementById('loading-overlay');
+      var highlightedCountries = new Set(['DE', 'DK', 'SE', 'NL', 'IT']);
+      var highlightedRegions = new Set(['BE1', 'BE2', 'ES51']);
+      var highlightFill = '#6dbb5a';
+      var neutralFill = '#eceff3';
+      var neutralStroke = '#7a8694';
+      var highlightStroke = '#1f5f2c';
+      var continentalEuropeExtent = {
+        west: -10,
+        south: 34,
+        east: 32,
+        north: 72
+      };
+
+      function fetchJson(url) {
+        return fetch(url, { credentials: 'same-origin' }).then(function (response) {
+          if (!response.ok) {
+            throw new Error(response.status + ' ' + response.statusText);
+          }
+          return response.json();
+        });
+      }
+
+      function drawLegend(svg, width, height) {
+        var legend = svg.append('g')
+          .attr('class', 'atlas-legend')
+          .attr('transform', 'translate(40,' + (height - 96) + ')');
+
+        legend.append('rect')
+          .attr('x', -10)
+          .attr('y', -26)
+          .attr('width', 244)
+          .attr('height', 100)
+          .attr('fill', '#ffffff')
+          .attr('fill-opacity', 0.92)
+          .attr('stroke', '#c9ced6')
+          .attr('rx', 4);
+
+        legend.append('text')
+          .attr('x', 0)
+          .attr('y', -8)
+          .attr('font-weight', 'bold')
+          .text('Coverage status');
+
+        legend.append('rect')
+          .attr('x', 0)
+          .attr('y', 10)
+          .attr('width', 22)
+          .attr('height', 16)
+          .attr('fill', highlightFill)
+          .attr('stroke', highlightStroke);
+
+        legend.append('text')
+          .attr('x', 32)
+          .attr('y', 23)
+          .text('Data available');
+
+        legend.append('rect')
+          .attr('x', 0)
+          .attr('y', 38)
+          .attr('width', 22)
+          .attr('height', 16)
+          .attr('fill', neutralFill)
+          .attr('stroke', neutralStroke);
+
+        legend.append('text')
+          .attr('x', 32)
+          .attr('y', 51)
+          .text('No highlighted coverage');
+      }
+
+      function sameCoordinate(a, b) {
+        return a[0] === b[0] && a[1] === b[1];
+      }
+
+      function closeRing(ring) {
+        if (!ring.length) {
+          return ring;
+        }
+        if (!sameCoordinate(ring[0], ring[ring.length - 1])) {
+          ring.push([ring[0][0], ring[0][1]]);
+        }
+        return ring;
+      }
+
+      function clipSegmentToVertical(pointA, pointB, x) {
+        var dx = pointB[0] - pointA[0];
+
+        if (dx === 0) {
+          return [x, pointA[1]];
+        }
+
+        return [
+          x,
+          pointA[1] + (pointB[1] - pointA[1]) * (x - pointA[0]) / dx
+        ];
+      }
+
+      function clipSegmentToHorizontal(pointA, pointB, y) {
+        var dy = pointB[1] - pointA[1];
+
+        if (dy === 0) {
+          return [pointA[0], y];
+        }
+
+        return [
+          pointA[0] + (pointB[0] - pointA[0]) * (y - pointA[1]) / dy,
+          y
+        ];
+      }
+
+      function clipRingAgainstEdge(ring, isInside, intersect) {
+        var output = [];
+
+        if (!ring.length) {
+          return output;
+        }
+
+        var previousPoint = ring[ring.length - 1];
+
+        ring.forEach(function (currentPoint) {
+          var currentInside = isInside(currentPoint);
+          var previousInside = isInside(previousPoint);
+
+          if (currentInside) {
+            if (!previousInside) {
+              output.push(intersect(previousPoint, currentPoint));
+            }
+            output.push(currentPoint);
+          } else if (previousInside) {
+            output.push(intersect(previousPoint, currentPoint));
+          }
+
+          previousPoint = currentPoint;
+        });
+
+        return output;
+      }
+
+      function clipLinearRingToExtent(ring) {
+        if (!ring || ring.length < 4) {
+          return null;
+        }
+
+        var openRing = ring.slice();
+
+        if (sameCoordinate(openRing[0], openRing[openRing.length - 1])) {
+          openRing.pop();
+        }
+
+        var clipped = clipRingAgainstEdge(
+          openRing,
+          function (point) { return point[0] >= continentalEuropeExtent.west; },
+          function (pointA, pointB) {
+            return clipSegmentToVertical(pointA, pointB, continentalEuropeExtent.west);
+          }
+        );
+        clipped = clipRingAgainstEdge(
+          clipped,
+          function (point) { return point[0] <= continentalEuropeExtent.east; },
+          function (pointA, pointB) {
+            return clipSegmentToVertical(pointA, pointB, continentalEuropeExtent.east);
+          }
+        );
+        clipped = clipRingAgainstEdge(
+          clipped,
+          function (point) { return point[1] >= continentalEuropeExtent.south; },
+          function (pointA, pointB) {
+            return clipSegmentToHorizontal(pointA, pointB, continentalEuropeExtent.south);
+          }
+        );
+        clipped = clipRingAgainstEdge(
+          clipped,
+          function (point) { return point[1] <= continentalEuropeExtent.north; },
+          function (pointA, pointB) {
+            return clipSegmentToHorizontal(pointA, pointB, continentalEuropeExtent.north);
+          }
+        );
+
+        if (clipped.length < 3) {
+          return null;
+        }
+
+        return closeRing(clipped);
+      }
+
+      function clipPolygonCoordinatesToExtent(polygonCoordinates) {
+        if (!polygonCoordinates || !polygonCoordinates.length) {
+          return null;
+        }
+
+        var clippedOuterRing = clipLinearRingToExtent(polygonCoordinates[0]);
+
+        if (!clippedOuterRing) {
+          return null;
+        }
+
+        var clippedPolygon = [clippedOuterRing];
+
+        polygonCoordinates.slice(1).forEach(function (ring) {
+          var clippedRing = clipLinearRingToExtent(ring);
+
+          if (clippedRing) {
+            clippedPolygon.push(clippedRing);
+          }
+        });
+
+        return clippedPolygon;
+      }
+
+      function clipFeatureToExtent(feature) {
+        if (!feature || !feature.geometry) {
+          return null;
+        }
+
+        if (feature.geometry.type === 'Polygon') {
+          var clippedPolygon = clipPolygonCoordinatesToExtent(feature.geometry.coordinates);
+
+          if (!clippedPolygon) {
+            return null;
+          }
+
+          return {
+            type: 'Feature',
+            id: feature.id,
+            properties: feature.properties,
+            geometry: {
+              type: 'Polygon',
+              coordinates: clippedPolygon
+            }
+          };
+        }
+
+        if (feature.geometry.type === 'MultiPolygon') {
+          var clippedMultiPolygon = feature.geometry.coordinates
+            .map(clipPolygonCoordinatesToExtent)
+            .filter(function (polygonCoordinates) {
+              return polygonCoordinates !== null;
+            });
+
+          if (!clippedMultiPolygon.length) {
+            return null;
+          }
+
+          return {
+            type: 'Feature',
+            id: feature.id,
+            properties: feature.properties,
+            geometry: {
+              type: clippedMultiPolygon.length === 1 ? 'Polygon' : 'MultiPolygon',
+              coordinates: clippedMultiPolygon.length === 1 ? clippedMultiPolygon[0] : clippedMultiPolygon
+            }
+          };
+        }
+
+        return null;
+      }
+
+      function trimFeatureCollectionToExtent(collection) {
+        return {
+          type: 'FeatureCollection',
+          features: (collection.features || []).map(clipFeatureToExtent).filter(function (feature) {
+            return feature !== null;
+          })
+        };
+      }
+
+      Promise.all([
+        fetchJson('/maps/api/nuts_region/geojson/?levl_code=0'),
+        fetchJson('/maps/api/nuts_region/geojson/?levl_code=1&cntr_code=BE'),
+        fetchJson('/maps/api/nuts_region/geojson/?levl_code=2&cntr_code=ES')
+      ]).then(function (results) {
+        var countries = trimFeatureCollectionToExtent(results[0]);
+        var belgiumRegions = trimFeatureCollectionToExtent(results[1]);
+        var spainRegions = trimFeatureCollectionToExtent(results[2]);
+        var highlightedRegionFeatures = (belgiumRegions.features || []).concat(spainRegions.features || [])
+          .filter(function (feature) {
+            var nutsId = feature.properties && feature.properties.nuts_id;
+            return highlightedRegions.has(nutsId);
+          });
+        var width = mapContainer.clientWidth || 1100;
+        var height = Math.round(width * 0.72);
+        var svg = d3.select(svgEl)
+          .attr('xmlns', 'http://www.w3.org/2000/svg')
+          .attr('width', width)
+          .attr('height', height);
+
+        svg.selectAll('*').remove();
+
+        var projection = d3.geoMercator().fitExtent(
+          [[35, 55], [width - 35, height - 80]],
+          countries
+        );
+        var path = d3.geoPath().projection(projection);
+
+        svg.append('g')
+          .selectAll('path')
+          .data(countries.features || [])
+          .enter()
+          .append('path')
+          .attr('d', path)
+          .attr('fill', function (feature) {
+            var nutsId = feature.properties && feature.properties.nuts_id;
+            return highlightedCountries.has(nutsId) ? highlightFill : neutralFill;
+          })
+          .attr('stroke', function (feature) {
+            var nutsId = feature.properties && feature.properties.nuts_id;
+            return highlightedCountries.has(nutsId) ? highlightStroke : neutralStroke;
+          })
+          .attr('stroke-width', function (feature) {
+            var nutsId = feature.properties && feature.properties.nuts_id;
+            return highlightedCountries.has(nutsId) ? 1.2 : 0.9;
+          });
+
+        svg.append('g')
+          .selectAll('path')
+          .data(highlightedRegionFeatures)
+          .enter()
+          .append('path')
+          .attr('d', path)
+          .attr('fill', highlightFill)
+          .attr('stroke', highlightStroke)
+          .attr('stroke-width', 1.2);
+
+        svg.append('text')
+          .attr('x', width / 2)
+          .attr('y', 30)
+          .attr('text-anchor', 'middle')
+          .attr('font-family', "'Nunito', sans-serif")
+          .attr('font-size', 20)
+          .attr('font-weight', 'bold')
+          .text('{{ map_title|escapejs }}');
+
+        svg.append('text')
+          .attr('x', width / 2)
+          .attr('y', 50)
+          .attr('text-anchor', 'middle')
+          .attr('font-family', "'Nunito', sans-serif")
+          .attr('font-size', 13)
+          .attr('fill', '#5c6670')
+          .text('Germany, Denmark, Sweden, Flanders + Brussels, the Netherlands, Italy, and Catalonia');
+
+        drawLegend(svg, width, height);
+        loadingEl.style.display = 'none';
+      }).catch(function (error) {
+        loadingEl.style.display = 'none';
+        mapContainer.innerHTML = '<div class="alert alert-danger m-3"><strong>Error loading map data:</strong> '
+          + error.message + '</div>';
+      });
+    });
+  </script>
+{% endblock javascript %}

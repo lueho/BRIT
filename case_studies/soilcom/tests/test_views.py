@@ -3414,6 +3414,38 @@ class WasteAtlasMapViewsTestCase(TestCase):
     def setUp(self):
         self.client.force_login(self.user)
 
+    def test_europe_data_coverage_map_lists_requested_regions(self):
+        """Europe coverage map renders the requested highlighted regions."""
+        response = self.client.get(reverse("waste-atlas-europe-data-coverage-map"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Waste collection data coverage in Europe")
+        self.assertContains(response, "Map overview")
+        self.assertContains(response, "Germany")
+        self.assertContains(response, "Denmark")
+        self.assertContains(response, "Sweden")
+        self.assertContains(response, "Flanders + Brussels")
+        self.assertContains(response, "The Netherlands")
+        self.assertContains(response, "Italy")
+        self.assertContains(response, "Catalonia")
+        self.assertContains(response, "BE1")
+        self.assertContains(response, "BE2")
+        self.assertContains(response, "ES51")
+
+    def test_europe_data_coverage_map_iframe_is_public_and_frameable(self):
+        """Iframe Europe coverage map is public and exempt from X-Frame-Options."""
+        self.client.logout()
+
+        response = self.client.get(
+            reverse("waste-atlas-europe-data-coverage-map-iframe")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Waste collection data coverage in Europe")
+        self.assertNotContains(response, "Map overview")
+        self.assertNotContains(response, "Highlighted regions")
+        self.assertIsNone(response.headers.get("X-Frame-Options"))
+
     def test_italy_orga_level_map_defaults_to_it_and_english_labels(self):
         """Italy orga-level map defaults to country IT and English text."""
         response = self.client.get(reverse("waste-atlas-orga-level-italy-map"))
@@ -3509,6 +3541,14 @@ class WasteAtlasMapViewsTestCase(TestCase):
         response = self.client.get(reverse("waste-atlas-overview"))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse("waste-atlas-europe-data-coverage-map"),
+        )
+        self.assertContains(
+            response,
+            "Map 0 — Waste collection data coverage in Europe",
+        )
         self.assertContains(response, reverse("waste-atlas-orga-level-italy-map"))
         self.assertContains(
             response,

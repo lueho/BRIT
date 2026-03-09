@@ -17,6 +17,8 @@ from .views import (
     CombinedFrequencyMapView,
     ConnectionRateMapView,
     DenmarkOrgaLevelMapView,
+    EuropeDataCoverageMapIframeView,
+    EuropeDataCoverageMapView,
     FoodWasteCategoryMapView,
     GreenWasteCollectionAmountMapView,
     GreenWasteCollectionSystemCountMapView,
@@ -51,6 +53,16 @@ urlpatterns = [
         "map/",
         WasteAtlasOverviewView.as_view(),
         name="waste-atlas-overview",
+    ),
+    path(
+        "map/europe-data-coverage/",
+        EuropeDataCoverageMapView.as_view(),
+        name="waste-atlas-europe-data-coverage-map",
+    ),
+    path(
+        "map/europe-data-coverage/iframe/",
+        EuropeDataCoverageMapIframeView.as_view(),
+        name="waste-atlas-europe-data-coverage-map-iframe",
     ),
     path(
         "map/orga-level/",
