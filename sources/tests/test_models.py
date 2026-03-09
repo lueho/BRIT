@@ -1,10 +1,20 @@
 import importlib
+from django.apps import apps
+from django.conf import settings
 from django.test import SimpleTestCase
 from unittest.mock import MagicMock, patch
 
+from case_studies.flexibi_hamburg.admin import (
+    HamburgGreenAreasAdmin as LegacyHamburgGreenAreasAdmin,
+    HamburgRoadsideTreesAdmin as LegacyHamburgRoadsideTreesAdmin,
+)
 from case_studies.flexibi_hamburg.models import (
     HamburgGreenAreas as LegacyHamburgGreenAreas,
     HamburgRoadsideTrees as LegacyHamburgRoadsideTrees,
+)
+from sources.roadside_trees.admin import (
+    HamburgGreenAreasAdmin,
+    HamburgRoadsideTreesAdmin,
 )
 from case_studies.flexibi_nantes.models import (
     Culture as LegacyCulture,
@@ -53,6 +63,19 @@ class SourcesModelAdapterTestCase(SimpleTestCase):
             HamburgRoadsideTrees._meta.db_table,
             "flexibi_hamburg_hamburgroadsidetrees",
         )
+
+    def test_flexibi_hamburg_app_label_is_provided_by_migration_shim(self):
+        app_config = apps.get_app_config("flexibi_hamburg")
+
+        self.assertEqual(app_config.name, "sources.legacy_flexibi_hamburg")
+        self.assertEqual(
+            settings.MIGRATION_MODULES["flexibi_hamburg"],
+            "case_studies.flexibi_hamburg.migrations",
+        )
+
+    def test_roadside_tree_admin_adapters_reexport_source_owned_admin(self):
+        self.assertIs(HamburgRoadsideTreesAdmin, LegacyHamburgRoadsideTreesAdmin)
+        self.assertIs(HamburgGreenAreasAdmin, LegacyHamburgGreenAreasAdmin)
 
     def test_greenhouse_model_adapters_reexport_legacy_models(self):
         self.assertIs(Culture, LegacyCulture)

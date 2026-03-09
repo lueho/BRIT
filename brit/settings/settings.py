@@ -53,9 +53,9 @@ INSTALLED_APPS = [
     "sources.roadside_trees.apps.RoadsideTreesConfig",
     "sources.greenhouses.apps.GreenhousesConfig",
     "sources.waste_collection.apps.WasteCollectionConfig",
+    "sources.legacy_flexibi_hamburg.apps.LegacyFlexibiHamburgMigrationsConfig",
     "layer_manager.apps.LayerManagerConfig",
     "case_studies.flexibi_nantes.apps.CaseStudyNantesConfig",
-    "case_studies.flexibi_hamburg.apps.FlexibiHamburgConfig",
     "case_studies.soilcom.apps.SoilcomConfig",
     "case_studies.soilcom.waste_atlas.apps.WasteAtlasConfig",
     "case_studies.closecycle.apps.ClosecycleConfig",
@@ -108,6 +108,10 @@ WSGI_APPLICATION = "brit.wsgi.application"
 # Database settings
 DATABASES = {}  # Specified in local.py for development and heroku.py for production
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
+
+MIGRATION_MODULES = {
+    "flexibi_hamburg": "case_studies.flexibi_hamburg.migrations",
+}
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
