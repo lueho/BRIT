@@ -10,7 +10,7 @@ from case_studies.soilcom.crosswalk import (
     get_crosswalk_equivalences,
     get_ttl_concept_registry,
 )
-from case_studies.soilcom.models import (
+from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
     Collection,
     CollectionFrequency,

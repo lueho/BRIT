@@ -1,0 +1,110 @@
+{% extends "filtered_list.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load file_export_tags %}
+{% load moderation_tags %}
+{% block list_intro %}
+    <div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start"
+         role="region"
+         aria-label="Module introduction">
+        <div class="flex-grow-1">
+            <strong><i class="fas fa-recycle me-1"></i> Waste Collection</strong>
+            <p class="mb-0 small text-muted">
+                Explore household biowaste collection systems across European regions.
+                Compare collectors, waste streams, and collection frequencies.
+            </p>
+        </div>
+        <button type="button"
+                class="btn-close ms-3"
+                data-bs-dismiss="alert"
+                aria-label="Dismiss"></button>
+    </div>
+{% endblock list_intro %}
+{% block title %}
+    BRIT | Household waste collections
+{% endblock title %}
+{% block list_table %}
+    {% load custom_tags %}
+    {% if chips %}
+        <div class="mb-2 d-flex flex-wrap gap-2">
+            {% for chip in chips %}
+                <a class="badge rounded-pill text-bg-light border text-decoration-none"
+                   title="Remove filter"
+                   href="?{{ chip.remove_query }}">
+                    {{ chip.text }} <i class="fas fa-xmark ms-1" aria-hidden="true"></i>
+                    <span class="visually-hidden">Remove filter</span>
+                </a>
+            {% endfor %}
+            <a class="badge rounded-pill bg-secondary text-decoration-none"
+               title="Clear all filters"
+               href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% elif list_type == 'review' %}{{ object_list.model.review_list_url }}?scope=review{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}">
+                Clear all
+            </a>
+        </div>
+    {% endif %}
+    <div class="collection-list-min-height">
+        <div class="table-responsive">
+            <table class="table modern-table">
+                <thead>
+                    <tr>
+                        <th>Collection</th>
+                        <th class="actions-column">Status/Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for object in object_list %}
+                        <tr>
+                            <td data-label="Collection" class="ps-3">
+                                <a href="{% detail_or_review_url object use_back=True %}"
+                                   class="collection-link">
+                                    <strong class="d-block">{{ object.catchment.region.name }} - {{ object.effective_waste_category }} collection</strong>
+                                    <span class="text-muted small">
+                                        {{ object.collector }} · {{ object.collection_system }} · {{ object.valid_from.year }}
+                                    </span>
+                                </a>
+                            </td>
+                            <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
+                        </tr>
+                    {% empty %}
+                        {% include "includes/list_empty_state.html" %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock list_table %}
+{% block filters_pane_body %}
+    <form method="get">
+        {% crispy filter.form %}
+        <div class="d-flex justify-content-end gap-2 mt-2">
+            <button id="btn-filter" class="btn btn-primary submit-filter" type="submit">Filter</button>
+            <a class="btn btn-outline-secondary"
+               href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% elif list_type == 'review' %}{{ object_list.model.review_list_url }}?scope=review{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}"
+               aria-label="Reset filters">Reset</a>
+        </div>
+    </form>
+{% endblock filters_pane_body %}
+{% block options_pane_body %}
+    {% if create_permission in perms or user.is_staff %}
+        <a class="btn btn-success w-100 mb-2"
+           href="{{ object_list.model.create_url }}"
+           aria-label="Create new {{ object_list.model.get_verbose_name }}">
+            <i class="fas fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
+        </a>
+    {% endif %}
+    {% if "soilcom.add_aggregatedcollectionpropertyvalue" in perms %}
+        <a class="btn btn-outline-secondary w-100 mb-2"
+           href="{% url 'aggregatedcollectionpropertyvalue-create' %}"
+           aria-label="Add property to collection group">
+            <i class="fas fa-circle-plus"></i> Add property to collection group
+        </a>
+    {% endif %}
+    {% export_modal_button "collection-export" list_type=list_type button_classes="btn btn-outline-secondary w-100" %}
+{% endblock options_pane_body %}
+{% block learning_pane_body %}
+    {% include "soilcom/includes/learning_materials.html" %}
+{% endblock learning_pane_body %}
+{% block javascript %}
+    {{ block.super }}
+    <script src="{% static 'js/file_export.min.js' %}" type="text/javascript"></script>
+{% endblock javascript %}

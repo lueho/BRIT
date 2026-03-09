@@ -1,0 +1,30 @@
+{% extends "simple_list_card.html" %}
+{% load user_created_object_tags %}
+{% load moderation_tags %}
+
+{% block list_table %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for object in object_list %}
+                <tr>
+                    <td>
+                        <a href="{% detail_or_review_url object use_back=True %}">{{ object.name }}</a>
+                    </td>
+                    <td>{{ object.type }}</td>
+                    {% if object_list.model|is_user_created %}
+                        <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
+                    {% endif %}
+                </tr>
+            {% empty %}
+                {% include "includes/list_empty_state.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock list_table %}

@@ -145,6 +145,21 @@ Validated and committed slices completed so far:
   their legacy app names, migrations, admin autodiscovery, and Soilcom signal
   registration active while decoupling settings registration from the
   `case_studies` package
+- completed the Nantes and Soilcom model-ownership handoff into
+  `sources.greenhouses` and `sources.waste_collection` while preserving the
+  legacy `flexibi_nantes_*` and `soilcom_*` table names plus the legacy
+  migration-module labels through `SeparateDatabaseAndState` handoff migrations
+- copied the required Nantes and Soilcom template/static assets into `sources`,
+  added source-side Soilcom management-command wrappers, and pinned the moved
+  waste-collection views to their copied legacy template paths where Django
+  could no longer infer them from the new app labels
+- updated the review-context API enrichment checks so source-owned
+  `waste_collection` review objects receive the same Collection flyer and
+  CollectionPropertyValue parent/timeline context as the legacy Soilcom models
+- validated the Nantes and Soilcom ownership-transfer slice with focused
+  Nantes/Soilcom suites, the full Docker `web` suite, and
+  `makemigrations --check --dry-run` for `greenhouses`, `waste_collection`,
+  `flexibi_nantes`, and `soilcom`
 
 ## 3. Target State
 
@@ -353,18 +368,18 @@ External files that import from the three apps (outside their own code/tests):
 
 ### Near-term next steps
 
-1. Continue moving implementation bodies from thin re-exports toward
-   source-owned modules while preserving legacy runtime compatibility.
-2. Continue the greenhouse and waste-collection phases by moving the remaining
-   model/template/static/test ownership seams after the implementation-module
-   moves.
-3. Reduce any remaining intentional direct `case_studies.*` imports behind
-   `sources` adapters before starting model/state moves.
-4. Fill in any remaining top-level `sources` package scaffolding only where it
-   makes upcoming model/state moves materially simpler.
-5. Only after the shared import graph is largely normalized through `sources`,
-   begin the heavier `SeparateDatabaseAndState`, ContentType, and URL-redirect
-   consolidation phases described below.
+1. Collapse the remaining intentional compatibility re-exports only after the
+   migration-shim phase can be retired without breaking fresh database setup.
+2. Move the last legacy-only greenhouse and waste-collection runtime seams
+   (notably signal/admin/management-command ownership) fully into `sources` so
+   the empty `case_studies` apps can be deleted rather than shimmed.
+3. Convert the remaining legacy URL prefixes into pure redirects once the
+   canonical entrypoints live only under `sources`.
+4. Trim any remaining direct `case_studies.*` imports behind `sources`
+   adapters and keep the full Docker `web` suite green as those seams are
+   removed.
+5. Update the remaining documentation/README surfaces and then remove the
+   legacy shim apps/packages at the end of the migration-history transition.
 
 ### Phase A: Prepare the sources/ app structure
 
@@ -389,28 +404,28 @@ External files that import from the three apps (outside their own code/tests):
 
 ### Phase C: Move flexibi_nantes (medium size)
 
-- [ ] Move models to `sources/models/greenhouses.py` with `db_table` Meta
+- [x] Move models to `sources/models/greenhouses.py` with `db_table` Meta
 - [x] Move views, forms, filters, serializers, viewsets, renderers, algorithms
-- [ ] Move templates and static files
+- [x] Move templates and static files
 - [ ] Move tests
-- [ ] Create `SeparateDatabaseAndState` migrations
+- [x] Create `SeparateDatabaseAndState` migrations
 - [ ] Update `brit/urls.py` — merge Nantes URLs into `sources/urls.py`
 - [ ] Update all external imports
 - [ ] Add redirect patterns for old `/case_studies/nantes/` URLs
-- [ ] Run full test suite
+- [x] Run full test suite
 
 ### Phase D: Move soilcom (largest, highest risk)
 
-- [ ] Move models to `sources/models/waste_collection.py` with `db_table` Meta
-- [ ] Move views, forms, filters, serializers, viewsets, renderers
+- [x] Move models to `sources/models/waste_collection.py` with `db_table` Meta
+- [x] Move views, forms, filters, serializers, viewsets, renderers
 - [ ] Move signals, tasks, utils
-- [ ] Move templates and static files
+- [x] Move templates and static files
 - [ ] Move tests (~8,300 lines)
-- [ ] Create `SeparateDatabaseAndState` migrations
+- [x] Create `SeparateDatabaseAndState` migrations
 - [ ] Update `brit/urls.py` — merge waste collection URLs into `sources/urls.py`
 - [ ] Update all external imports (maps, utils, sources, layer_manager)
 - [ ] Add redirect patterns for old `/waste_collection/` URLs
-- [ ] Run full test suite
+- [x] Run full test suite
 
 Current incremental status for Phase D:
 

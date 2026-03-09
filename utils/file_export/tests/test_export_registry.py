@@ -133,7 +133,7 @@ class ExportRegistryTestCase(SimpleTestCase):
         self.assertEqual(
             mock_register_export.call_args_list[0].args,
             (
-                "soilcom.Collection",
+                "waste_collection.Collection",
                 collection_filterset,
                 collection_serializer,
                 {"xlsx": collection_xlsx, "csv": collection_csv},
@@ -151,7 +151,7 @@ class ExportRegistryTestCase(SimpleTestCase):
         self.assertEqual(
             mock_register_export.call_args_list[2].args,
             (
-                "flexibi_nantes.NantesGreenhouses",
+                "greenhouses.NantesGreenhouses",
                 greenhouse_filterset,
                 greenhouse_serializer,
                 {"xlsx": greenhouse_xlsx, "csv": greenhouse_csv},

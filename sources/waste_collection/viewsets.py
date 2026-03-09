@@ -9,15 +9,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
-from case_studies.soilcom.importers import CollectionImporter
-from case_studies.soilcom.models import (
-    AggregatedCollectionPropertyValue,
-    CollectionPropertyValue,
-)
-from case_studies.soilcom.serializers import (
-    AggregatedCollectionPropertyValueMutationSerializer,
-    CollectionPropertyValueMutationSerializer,
-)
+from sources.waste_collection.importers import CollectionImporter
 from maps.db_functions import SimplifyPreserveTopology
 from maps.mixins import CachedGeoJSONMixin
 from maps.utils import build_collection_cache_key
@@ -26,14 +18,22 @@ from utils.object_management.permissions import UserCreatedObjectPermission
 from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 from sources.waste_collection.filters import CollectionFilterSet
-from sources.waste_collection.models import Collection, Collector, WasteFlyer
+from sources.waste_collection.models import (
+    AggregatedCollectionPropertyValue,
+    Collection,
+    CollectionPropertyValue,
+    Collector,
+    WasteFlyer,
+)
 from sources.waste_collection.serializers import (
+    AggregatedCollectionPropertyValueMutationSerializer,
     GEOMETRY_SIMPLIFY_TOLERANCE,
     CollectionFlatSerializer,
     CollectionImportRecordSerializer,
     CollectionModelSerializer,
     CollectionMutationCreateSerializer,
     CollectionMutationVersionSerializer,
+    CollectionPropertyValueMutationSerializer,
     CollectorGeometrySerializer,
     WasteCollectionGeometrySerializer,
 )

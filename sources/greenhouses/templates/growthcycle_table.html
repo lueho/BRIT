@@ -1,0 +1,37 @@
+{% load moderation_tags %}
+<table class="table">
+    <thead>
+    <tr>
+        {% for header in table_data.0.keys %}
+            <th class="orderable"><a href="?sort={{ header }}">{{ header }}</a></th>
+        {% endfor %}
+    </tr>
+    </thead>
+    <tbody>
+    {% for row in table_data %}
+        <tr class="odd">
+            {% for cell in row.values %}
+                <td>{{ cell }}</td>
+            {% endfor %}
+        </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot>
+    {% if growth_cycle %}
+        {% object_policy growth_cycle as cycle_policy %}
+    {% endif %}
+    {% if cycle_policy.can_edit %}
+        <tr>
+            <td></td>
+            {% for timestep in growth_cycle.growthtimestepset_set.all %}
+                <td>
+                    <a href="{% url 'greenhousegrowthcycle-timestep-update-modal' pk=timestep.id %}"
+                       class="modal-link">
+                        <i class="fas fa-fw fa-pen-to-square"></i>
+                    </a>
+                </td>
+            {% endfor %}
+        </tr>
+    {% endif %}
+    </tfoot>
+</table>

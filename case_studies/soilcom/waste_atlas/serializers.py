@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework_gis.fields import GeometrySerializerMethodField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
-from case_studies.soilcom.models import CollectionCatchment
+from sources.waste_collection.models import CollectionCatchment
 
 # Geometry simplification tolerance in degrees (approx 100m at equator)
 # Lower values = more detail, higher values = more simplification

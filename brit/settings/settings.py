@@ -317,13 +317,13 @@ TOMSELECT = {
 }
 
 # Review Dashboard Configuration
-# Priority models always shown in review dashboard filters if user has permissions
+# Prioritize waste collection collection and its values for the review dashboard
 # (even if no items currently in review). This helps moderators quickly access
 # the most commonly reviewed content types.
 REVIEW_DASHBOARD_PRIORITY_MODELS = [
-    "soilcom.Collection",
-    "soilcom.CollectionPropertyValue",
-    "soilcom.AggregatedCollectionPropertyValue",
+    "waste_collection.Collection",
+    "waste_collection.CollectionPropertyValue",
+    "waste_collection.AggregatedCollectionPropertyValue",
 ]
 
 # Number of items to display per page in review dashboard

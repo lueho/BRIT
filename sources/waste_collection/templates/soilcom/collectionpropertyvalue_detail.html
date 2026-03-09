@@ -1,0 +1,154 @@
+{% extends "detail_with_options.html" %}
+{% load static %}
+{% load moderation_tags %}
+{% block style_sheets %}
+    {{ block.super }}
+    <link rel="stylesheet"
+          href="{% static 'soilcom/css/collection_detail.css' %}">
+{% endblock style_sheets %}
+{% block detail_header_badge %}
+    {% include "object_management/review_status_badge.html" with object=object %}
+{% endblock detail_header_badge %}
+{% block detail_header_actions %}
+    <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
+        <div class="btn-group me-2" role="group">
+            {% with back_url=request.GET.back %}
+                {% if back_url %}
+                    <a class="btn btn-sm btn-outline-secondary"
+                       href="{{ back_url }}"
+                       title="Back to results">
+                        <i class="fas fa-arrow-left"></i>
+                        <span class="d-none d-md-inline">Back to results</span>
+                    </a>
+                {% endif %}
+            {% endwith %}
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{{ object.collection.get_absolute_url }}"
+               title="Collection">
+                <i class="fas fa-arrow-left"></i>
+                <span class="d-none d-md-inline">Collection</span>
+            </a>
+            {% if object.list_url %}
+                <a class="btn btn-sm btn-outline-secondary"
+                   href="{{ object.list_url }}"
+                   title="List">
+                    <i class="fas fa-list-ul"></i>
+                    <span class="d-none d-md-inline">List</span>
+                </a>
+            {% endif %}
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{% url 'wastecollection-explorer' %}"
+               title="Open Explorer (dashboard)">
+                <i class="fas fa-table-cells-large"></i>
+                <span class="d-none d-md-inline">Explorer</span>
+            </a>
+        </div>
+        {{ block.super }}
+    </div>
+{% endblock detail_header_actions %}
+{% block detail_body %}
+    {% if visible_related_collections %}
+        <p class="card-text">
+            <strong>Related collections:</strong>
+        </p>
+        <ul>
+            {% for related_collection in visible_related_collections %}
+                <li>
+                    <a href="{{ related_collection.get_absolute_url }}">{{ related_collection }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="card-text">
+            <strong>Collection:</strong>
+            <br>
+            <a href="{{ object.collection.get_absolute_url }}">{{ object.collection }}</a>
+        </p>
+    {% endif %}
+    <p class="card-text">
+        <strong>Property:</strong>
+        <br>
+        {{ object.property }}
+    </p>
+    <p class="card-text">
+        <strong>Year:</strong>
+        <br>
+        {{ object.year }}
+    </p>
+    {% if object.standard_deviation %}
+        <p class="card-text">
+            <strong>Value:</strong>
+            <br>
+            {{ object.average }}
+            ± {{ object.standard_deviation }} {{ object.unit }}
+        </p>
+    {% else %}
+        <p class="card-text">
+            <strong>Value:</strong>
+            <br>
+            {{ object.average }} {{ object.unit }}
+        </p>
+    {% endif %}
+    {% if object.sources.exists %}
+        <p class="card-text">
+            <strong>Sources:</strong>
+        </p>
+        <ul>
+            {% for source in object.sources.all %}
+                <li>
+                    {% if source.type == "waste_flyer" %}
+                        {# Waste flyer: Keep full href, but compact visible label for better UX #}
+                        <i class="fas fa-file-alt text-muted"></i>
+                        <span class="badge bg-secondary text-white me-2">Waste Flyer</span>
+                        <a href="{{ source.url }}"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="source-url-line js-compact-url">
+                            <span class="source-url-label">{{ source.url }}</span>
+                            <i class="fas fa-external-link-alt ms-1 small"></i>
+                        </a>
+                        {% if "web.archive.org" in source.url %}<span class="badge text-bg-light border ms-2">Archived</span>{% endif %}
+                    {% else %}
+                        {# Regular bibliographic source #}
+                        <a href="{{ source.get_absolute_url }}">{{ source.abbreviation }}</a>
+                        {% if source.title %}- {{ source.title }}{% endif %}
+                        {% if source.year %}({{ source.year }}){% endif %}
+                        {% if source.url %}
+                            <br>
+                            <span class="text-muted small source-url-meta">
+                                <a href="{{ source.url }}"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   class="source-url-line js-compact-url">
+                                    <i class="fas fa-external-link-alt"></i>
+                                    <span class="source-url-label">{{ source.url }}</span>
+                                </a>
+                            </span>
+                        {% endif %}
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+    <p class="card-text">
+        <strong>Owner:</strong>
+        <br>
+        {{ object.owner }}
+    </p>
+    {% if object.publication_status != 'published' %}
+        <p class="card-text text-muted small">
+            {% if object.publication_status == 'private' %}
+                Visible only to you (owner) and moderators until submitted.
+            {% elif object.publication_status == 'review' %}
+                Awaiting moderator review.
+            {% elif object.publication_status == 'declined' %}
+                Changes were declined; update and resubmit after addressing feedback.
+            {% endif %}
+        </p>
+    {% endif %}
+{% endblock detail_body %}
+{% block detail_card_footer %}
+{% endblock detail_card_footer %}
+{% block detail_with_options_scripts %}
+    <script src="{% static 'js/source_url_display.js' %}" type="text/javascript"></script>
+{% endblock detail_with_options_scripts %}

@@ -19,7 +19,7 @@ from sources.waste_collection.exports import (
 from utils.file_export.export_registry import register_export
 
 register_export(
-    "soilcom.Collection",
+    "waste_collection.Collection",
     CollectionFilterSet,
     CollectionFlatSerializer,
     {"xlsx": CollectionXLSXRenderer, "csv": CollectionCSVRenderer},
@@ -33,7 +33,7 @@ register_export(
 )
 
 register_export(
-    "flexibi_nantes.NantesGreenhouses",
+    "greenhouses.NantesGreenhouses",
     NantesGreenhousesFilterSet,
     NantesGreenhousesFlatSerializer,
     {"xlsx": NantesGreenhousesXLSXRenderer, "csv": NantesGreenhousesCSVRenderer},

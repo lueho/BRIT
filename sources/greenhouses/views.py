@@ -66,12 +66,12 @@ class CultureAutocompleteView(UserCreatedObjectAutocompleteView):
 class CultureCreateView(UserCreatedObjectCreateView):
     model = Culture
     fields = ("name", "residue", "description")
-    permission_required = "flexibi_nantes.add_culture"
+    permission_required = "greenhouses.add_culture"
 
 
 class CultureModalCreateView(UserCreatedObjectModalCreateView):
     form_class = CultureModalModelForm
-    permission_required = "flexibi_nantes.add_culture"
+    permission_required = "greenhouses.add_culture"
 
 
 class CultureDetailView(UserCreatedObjectDetailView):
@@ -104,12 +104,12 @@ class GreenhousePrivateFilterView(PrivateObjectFilterView):
 
 class GreenhouseCreateView(UserCreatedObjectCreateView):
     form_class = GreenhouseModelForm
-    permission_required = "flexibi_nantes.add_greenhouse"
+    permission_required = "greenhouses.add_greenhouse"
 
 
 class GreenhouseModalCreateView(UserCreatedObjectModalCreateView):
     form_class = GreenhouseModalModelForm
-    permission_required = "flexibi_nantes.add_greenhouse"
+    permission_required = "greenhouses.add_greenhouse"
 
 
 class GreenhouseDetailView(UserCreatedObjectDetailView):
@@ -154,7 +154,7 @@ class GreenhouseGrowthCycleCreateView(LoginRequiredMixin, CreateWithInlinesView)
 
 class GrowthCycleModalCreateView(UserCreatedObjectModalCreateView):
     form_class = GrowthCycleCreateForm
-    permission_required = "flexibi_nantes.add_greenhousegrowthcycle"
+    permission_required = "greenhouses.add_greenhousegrowthcycle"
 
     def form_valid(self, form):
         if not self.request.is_ajax():
@@ -275,7 +275,7 @@ class GreenhousesPublishedMapView(GeoDataSetPublishedFilteredMapView):
 
 
 class NantesGreenhousesListFileExportView(GenericUserCreatedObjectExportView):
-    model_label = "flexibi_nantes.NantesGreenhouses"
+    model_label = "greenhouses.NantesGreenhouses"
 
 
 __all__ = [

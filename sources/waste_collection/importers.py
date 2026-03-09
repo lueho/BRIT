@@ -1,0 +1,973 @@
+"""Collection import logic shared by the management command and the API endpoint."""
+
+from __future__ import annotations
+
+import re
+from datetime import timedelta
+
+from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
+
+from sources.waste_collection.models import (
+    Collection,
+    CollectionCatchment,
+    CollectionCountOptions,
+    CollectionFrequency,
+    CollectionPropertyValue,
+    CollectionSeason,
+    CollectionSystem,
+    Collector,
+    FeeSystem,
+    SortingMethod,
+    WasteCategory,
+    WasteFlyer,
+)
+from materials.models import Material
+from utils.object_management.models import ReviewAction
+from utils.properties.models import Property, Unit
+
+# ---------------------------------------------------------------------------
+# Value mappings
+# ---------------------------------------------------------------------------
+
+_CONNECTION_TYPE_MAP = {
+    "mandatory": "MANDATORY",
+    "mandatory with exception": "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION",
+    "mandatory with exception for home composters": "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION",
+    "voluntary": "VOLUNTARY",
+    "not specified": "not_specified",
+}
+
+_COLLECTION_SYSTEM_ALIAS = {
+    "on demand": "On demand kerbside collection",
+}
+
+_BIN_CAPACITY_REF_MAP = {
+    "per person": "person",
+    "person": "person",
+    "persons": "person",
+    "per household": "household",
+    "household": "household",
+    "households": "household",
+    "per property": "property",
+    "property": "property",
+    "properties": "property",
+    "non": "not_specified",
+    "not specified": "not_specified",
+    "not_specified": "not_specified",
+}
+
+_KNOWN_UNRESOLVED_BW_FREQUENCIES = {
+    "Fixed-Seasonal; 39 per year (1 per 2 weeks from March - November)",
+}
+
+
+def _normalize_frequency_lookup_key(value: str) -> str:
+    normalized = re.sub(r"\s+", " ", (value or "").strip())
+    normalized = normalized.replace("Fixed:", "Fixed;")
+    normalized = re.sub(r"\s*;\s*", "; ", normalized)
+    normalized = re.sub(r"\s*,\s*", ", ", normalized)
+    normalized = re.sub(r"\(\s+", "(", normalized)
+    normalized = re.sub(r"\s+\)", ")", normalized)
+    normalized = re.sub(r"\bMay\b", "Mai", normalized, flags=re.IGNORECASE)
+    return normalized.strip()
+
+
+class CollectionImporter:
+    """
+    Import waste collection records from validated data dicts.
+
+    Usage::
+
+        importer = CollectionImporter(owner=user, publication_status="private")
+        result = importer.run(records)  # list of dicts from serializer.validated_data
+        # result = {"created": N, "skipped": N, "predecessor_links": N,
+        #           "cpv_created": N, "cpv_skipped": N, "flyers_created": N,
+        #           "warnings": [...]}
+    """
+
+    def __init__(self, owner, publication_status: str = "private"):
+        if owner is None or not getattr(owner, "is_authenticated", False):
+            raise ValueError("owner must be an authenticated user")
+        self.owner = owner
+        self.publication_status = publication_status
+        self.dry_run = False
+        self._lookups_loaded = False
+
+    # ------------------------------------------------------------------
+    # Public interface
+    # ------------------------------------------------------------------
+
+    def run(self, records: list[dict], dry_run: bool = False) -> dict:
+        """Import *records* inside a single atomic transaction.
+
+        Args:
+            records: List of validated data dicts (CollectionImportRecordSerializer).
+            dry_run: If True the transaction is rolled back at the end.
+
+        Returns:
+            Statistics dict.
+        """
+        self.dry_run = dry_run
+        self._load_lookups()
+
+        stats = {
+            "created": 0,
+            "skipped": 0,
+            "predecessor_links": 0,
+            "cpv_created": 0,
+            "cpv_skipped": 0,
+            "flyers_created": 0,
+            "warnings": [],
+        }
+
+        with transaction.atomic():
+            for i, record in enumerate(records):
+                self._import_record(record, i, stats)
+            if dry_run:
+                transaction.set_rollback(True)
+
+        return stats
+
+    # ------------------------------------------------------------------
+    # Lookup tables
+    # ------------------------------------------------------------------
+
+    def _load_lookups(self):
+        if self._lookups_loaded:
+            return
+
+        self._waste_categories: dict[str, WasteCategory] = {
+            o.name: o for o in WasteCategory.objects.all()
+        }
+        self._collection_systems: dict[str, CollectionSystem] = {
+            o.name: o for o in CollectionSystem.objects.all()
+        }
+        self._sorting_methods: dict[str, SortingMethod] = {
+            o.name: o for o in SortingMethod.objects.all()
+        }
+        self._fee_systems: dict[str, FeeSystem] = {
+            o.name: o for o in FeeSystem.objects.all()
+        }
+        frequency_objects = list(CollectionFrequency.objects.all())
+        self._frequencies: dict[str, CollectionFrequency] = {
+            o.name: o for o in frequency_objects
+        }
+        self._normalized_frequencies: dict[str, CollectionFrequency] = {
+            _normalize_frequency_lookup_key(o.name): o for o in frequency_objects
+        }
+        self._collectors: dict[str, Collector] = {
+            o.name: o for o in Collector.objects.all()
+        }
+        self._materials: dict[str, Material] = {
+            o.name: o for o in Material.objects.all()
+        }
+        self._properties: dict[int, Property] = {
+            o.id: o for o in Property.objects.all()
+        }
+        self._units: dict[str, Unit] = {o.name: o for o in Unit.objects.all()}
+
+        # NUTS id → CollectionCatchment  (single JOIN, no per-row queries)
+        nuts_rows = (
+            CollectionCatchment.objects.filter(region__nutsregion__isnull=False)
+            .select_related("region__nutsregion")
+            .values_list("region__nutsregion__nuts_id", "id")
+        )
+        catchment_pks = {pk for _, pk in nuts_rows}
+        _catchment_objs = {
+            c.pk: c for c in CollectionCatchment.objects.filter(pk__in=catchment_pks)
+        }
+        self._nuts_catchments: dict[str, CollectionCatchment] = {
+            nuts_id: _catchment_objs[pk] for nuts_id, pk in nuts_rows if nuts_id
+        }
+
+        # LAU id → CollectionCatchment  (single JOIN, no per-row queries)
+        lau_rows = (
+            CollectionCatchment.objects.filter(region__lauregion__isnull=False)
+            .select_related("region__lauregion")
+            .values_list("region__lauregion__lau_id", "id")
+        )
+        catchment_pks = {pk for _, pk in lau_rows}
+        _catchment_objs = {
+            c.pk: c for c in CollectionCatchment.objects.filter(pk__in=catchment_pks)
+        }
+        self._lau_catchments: dict[str, CollectionCatchment] = {
+            lau_id: _catchment_objs[pk] for lau_id, pk in lau_rows if lau_id
+        }
+
+        self._lookups_loaded = True
+
+    # ------------------------------------------------------------------
+    # Record processing
+    # ------------------------------------------------------------------
+
+    def _import_record(self, record: dict, index: int, stats: dict) -> None:
+        label = f"record[{index}]"
+
+        catchment = self._resolve_catchment(record, label, stats)
+        if catchment is None:
+            stats["skipped"] += 1
+            return
+
+        collection_system = self._resolve_collection_system(record, label, stats)
+        if collection_system is None:
+            stats["skipped"] += 1
+            return
+
+        waste_category = self._resolve_waste_category(record, label, stats)
+        if waste_category is None:
+            stats["skipped"] += 1
+            return
+
+        collector = self._resolve_collector(record, label, stats)
+        fee_system = self._resolve_fee_system(record, label, stats)
+        frequency = self._resolve_frequency(record, label, stats)
+        connection_type = self._resolve_connection_type(record, label, stats)
+        sorting_method = self._resolve_sorting_method(record, label, stats)
+        established = record.get("established")
+        bin_cap_ref = self._resolve_bin_capacity_reference(record)
+        allowed_materials, forbidden_materials = self._resolve_material_lists(
+            record, label, stats
+        )
+        allowed_material_ids = self._material_ids(allowed_materials)
+        forbidden_material_ids = self._material_ids(forbidden_materials)
+
+        valid_from = record.get("valid_from")
+        if valid_from is None:
+            stats["warnings"].append(f"{label}: No valid_from date — record skipped.")
+            stats["skipped"] += 1
+            return
+        valid_until = record.get("valid_until")
+        description = record.get("description") or ""
+        raw_frequency_name = record.get("frequency") or ""
+        min_bin_size = record.get("min_bin_size")
+        required_bin_capacity = record.get("required_bin_capacity")
+
+        # Check for existing collection with same identity
+        existing = self._find_existing_collection(
+            catchment=catchment,
+            collection_system=collection_system,
+            waste_category=waste_category,
+            valid_from=valid_from,
+            allowed_material_ids=allowed_material_ids,
+            forbidden_material_ids=forbidden_material_ids,
+        )
+
+        if existing:
+            collection = existing
+            update_fields = []
+            changes = []
+            manual_review_note = self._manual_review_note_for_frequency(
+                raw_frequency_name, frequency
+            )
+            if manual_review_note and manual_review_note not in description:
+                description = (
+                    f"{description}\n\n{manual_review_note}"
+                    if description
+                    else manual_review_note
+                )
+                stats["warnings"].append(
+                    f"{label}: Added manual-review note to description for unresolved frequency '{raw_frequency_name}'."
+                )
+
+            # Update collector if different
+            if collector and collection.collector_id != (
+                collector.pk if collector else None
+            ):
+                changes.append(
+                    f"collector: {collection.collector or 'None'} → {collector}"
+                )
+                collection.collector = collector
+                update_fields.append("collector")
+
+            # Update fee_system if different
+            if fee_system and collection.fee_system_id != (
+                fee_system.pk if fee_system else None
+            ):
+                changes.append(
+                    f"fee_system: {collection.fee_system or 'None'} → {fee_system}"
+                )
+                collection.fee_system = fee_system
+                update_fields.append("fee_system")
+
+            # Update frequency if different
+            if frequency and collection.frequency_id != (
+                frequency.pk if frequency else None
+            ):
+                changes.append(
+                    f"frequency: {collection.frequency or 'None'} → {frequency}"
+                )
+                collection.frequency = frequency
+                update_fields.append("frequency")
+
+            # Update connection_type if different
+            if connection_type and collection.connection_type != connection_type:
+                changes.append(
+                    f"connection_type: {collection.connection_type or 'None'} → {connection_type}"
+                )
+                collection.connection_type = connection_type
+                update_fields.append("connection_type")
+
+            # Update sorting_method if different
+            if sorting_method and collection.sorting_method_id != (
+                sorting_method.pk if sorting_method else None
+            ):
+                changes.append(
+                    f"sorting_method: {collection.sorting_method or 'None'} → {sorting_method}"
+                )
+                collection.sorting_method = sorting_method
+                update_fields.append("sorting_method")
+
+            # Update established if different
+            if established is not None and collection.established != established:
+                changes.append(f"established: {collection.established} → {established}")
+                collection.established = established
+                update_fields.append("established")
+
+            if min_bin_size is not None and collection.min_bin_size != min_bin_size:
+                changes.append(
+                    f"min_bin_size: {collection.min_bin_size} → {min_bin_size}"
+                )
+                collection.min_bin_size = min_bin_size
+                update_fields.append("min_bin_size")
+
+            # Update required_bin_capacity if different
+            if (
+                required_bin_capacity is not None
+                and collection.required_bin_capacity != required_bin_capacity
+            ):
+                changes.append(
+                    f"required_bin_capacity: {collection.required_bin_capacity} → {required_bin_capacity}"
+                )
+                collection.required_bin_capacity = required_bin_capacity
+                update_fields.append("required_bin_capacity")
+
+            # Update required_bin_capacity_reference if different
+            if (
+                bin_cap_ref is not None
+                and collection.required_bin_capacity_reference != bin_cap_ref
+            ):
+                changes.append(
+                    f"required_bin_capacity_reference: {collection.required_bin_capacity_reference or 'None'} → {bin_cap_ref}"
+                )
+                collection.required_bin_capacity_reference = bin_cap_ref
+                update_fields.append("required_bin_capacity_reference")
+
+            # Update description if different
+            if description and collection.description != description:
+                changes.append("description updated")
+                collection.description = description
+                update_fields.append("description")
+
+            # Update valid_until if different
+            if valid_until != collection.valid_until:
+                changes.append(f"valid_until: {collection.valid_until} → {valid_until}")
+                collection.valid_until = valid_until
+                update_fields.append("valid_until")
+
+            # Ensure inline waste fields stay in sync with imported payload.
+            if collection.waste_category_id != waste_category.id:
+                changes.append(
+                    f"waste_category: {collection.effective_waste_category or 'None'} → {waste_category}"
+                )
+                collection.waste_category = waste_category
+                update_fields.append("waste_category")
+
+            current_allowed_ids, current_forbidden_ids = (
+                self._effective_material_ids_for_collection(collection)
+            )
+            update_allowed_materials = current_allowed_ids != allowed_material_ids
+            update_forbidden_materials = current_forbidden_ids != forbidden_material_ids
+
+            if update_allowed_materials:
+                changes.append("allowed_materials updated")
+            if update_forbidden_materials:
+                changes.append("forbidden_materials updated")
+
+            if update_fields or update_allowed_materials or update_forbidden_materials:
+                if not self.dry_run:
+                    if update_fields:
+                        collection.save(
+                            update_fields=[*update_fields, "lastmodified_at"]
+                        )
+                    if update_allowed_materials:
+                        collection.allowed_materials.set(allowed_materials)
+                    if update_forbidden_materials:
+                        collection.forbidden_materials.set(forbidden_materials)
+                stats["updated"] = stats.get("updated", 0) + 1
+                stats["changes"] = stats.get("changes", [])
+                stats["changes"].append(f"{label}: {', '.join(changes)}")
+            else:
+                stats["skipped"] += 1
+
+            if (
+                self.publication_status == "review"
+                and collection.publication_status
+                in (collection.STATUS_PRIVATE, collection.STATUS_DECLINED)
+                and not self.dry_run
+            ):
+                self._submit_for_review(collection)
+        else:
+            predecessor = self._find_predecessor(
+                catchment,
+                waste_category,
+                allowed_material_ids,
+                forbidden_material_ids,
+                collection_system,
+                valid_from,
+            )
+
+            collection_name = (
+                f"{catchment.name} {waste_category.name} "
+                f"{collection_system.name} {valid_from.year}"
+            )
+            collection = Collection(
+                name=collection_name,
+                owner=self.owner,
+                publication_status="private",
+                catchment=catchment,
+                collector=collector,
+                collection_system=collection_system,
+                waste_category=waste_category,
+                frequency=frequency,
+                fee_system=fee_system,
+                valid_from=valid_from,
+                valid_until=valid_until,
+                connection_type=connection_type,
+                sorting_method=sorting_method,
+                established=established,
+                description=description,
+            )
+            if min_bin_size is not None:
+                collection.min_bin_size = min_bin_size
+            if required_bin_capacity is not None:
+                collection.required_bin_capacity = required_bin_capacity
+            if bin_cap_ref:
+                collection.required_bin_capacity_reference = bin_cap_ref
+            collection.save()
+            collection.allowed_materials.set(allowed_materials)
+            collection.forbidden_materials.set(forbidden_materials)
+
+            if self.publication_status == "review":
+                self._submit_for_review(collection)
+
+            if predecessor:
+                collection.predecessors.add(predecessor)
+                if not predecessor.valid_until:
+                    predecessor.valid_until = valid_from - timedelta(days=1)
+                    predecessor.save(update_fields=["valid_until", "lastmodified_at"])
+                stats["predecessor_links"] += 1
+
+            stats["created"] += 1
+
+        # Flyers — skip URLs that exceed the DB column limit (2083 chars)
+        for url in record.get("flyer_urls") or []:
+            if len(url) > 2083:
+                stats["warnings"].append(
+                    f"{label}: Flyer URL too long ({len(url)} chars), skipped."
+                )
+                continue
+            flyer, created = WasteFlyer.objects.get_or_create(
+                url=url,
+                defaults={
+                    "owner": self.owner,
+                    "title": self._flyer_title(url),
+                    "publication_status": "private",
+                },
+            )
+            collection.flyers.add(flyer)
+            if created:
+                stats["flyers_created"] += 1
+                if self.publication_status == "review":
+                    self._submit_for_review(flyer)
+
+        # Property values
+        for pv in record.get("property_values") or []:
+            self._import_property_value(collection, pv, stats)
+
+    def _attach_cpv_sources(
+        self, cpv: CollectionPropertyValue, urls: list[str], stats: dict
+    ) -> None:
+        """Attach WasteFlyer sources to a CollectionPropertyValue.
+
+        Only adds flyers not already linked.  Creates new WasteFlyer objects
+        as needed and submits them for review when the importer is in review
+        mode.
+        """
+        existing_urls = set(cpv.sources.values_list("url", flat=True))
+        for url in urls:
+            if url in existing_urls:
+                continue
+            if len(url) > 2083:
+                stats["warnings"].append(
+                    f"CPV source URL too long ({len(url)} chars), skipped."
+                )
+                continue
+            flyer, created = WasteFlyer.objects.get_or_create(
+                url=url,
+                defaults={
+                    "owner": self.owner,
+                    "title": self._flyer_title(url),
+                    "publication_status": "private",
+                },
+            )
+            cpv.sources.add(flyer)
+            if created:
+                stats["flyers_created"] += 1
+                if self.publication_status == "review":
+                    self._submit_for_review(flyer)
+
+    def _import_property_value(
+        self, collection: Collection, pv: dict, stats: dict
+    ) -> None:
+        prop = self._properties.get(pv["property_id"])
+        unit = self._units.get(pv["unit_name"])
+
+        if prop is None:
+            stats["cpv_skipped"] += 1
+            stats["warnings"].append(
+                f"Property id={pv['property_id']} not found — CPV skipped."
+            )
+            return
+        if unit is None:
+            stats["cpv_skipped"] += 1
+            stats["warnings"].append(
+                f"Unit '{pv['unit_name']}' not found — CPV skipped."
+            )
+            return
+
+        year = pv["year"]
+        existing_cpv = CollectionPropertyValue.objects.filter(
+            collection=collection, property=prop, unit=unit, year=year
+        ).first()
+        if existing_cpv is not None:
+            flyer_urls = pv.get("flyer_urls") or []
+            self._attach_cpv_sources(existing_cpv, flyer_urls, stats)
+            derived = CollectionPropertyValue.objects.filter(
+                collection=collection, year=year, is_derived=True
+            ).first()
+            if derived is not None:
+                self._attach_cpv_sources(derived, flyer_urls, stats)
+            if self.publication_status == "review" and not self.dry_run:
+                if derived is not None and derived.publication_status in (
+                    derived.STATUS_PRIVATE,
+                    derived.STATUS_DECLINED,
+                ):
+                    self._submit_cpv_for_review(derived)
+                if existing_cpv.publication_status in (
+                    existing_cpv.STATUS_PRIVATE,
+                    existing_cpv.STATUS_DECLINED,
+                ):
+                    self._submit_cpv_for_review(existing_cpv)
+            stats["cpv_skipped"] += 1
+            return
+
+        cpv_name = f"{collection.name} {prop.name} {year}"
+        cpv = CollectionPropertyValue.objects.create(
+            name=cpv_name,
+            owner=self.owner,
+            publication_status="private",
+            collection=collection,
+            property=prop,
+            unit=unit,
+            year=year,
+            average=pv["average"],
+            standard_deviation=pv.get("standard_deviation"),
+        )
+        stats["cpv_created"] += 1
+        self._attach_cpv_sources(cpv, pv.get("flyer_urls") or [], stats)
+
+        flyer_urls = pv.get("flyer_urls") or []
+        derived = CollectionPropertyValue.objects.filter(
+            collection=collection,
+            year=year,
+            is_derived=True,
+        ).first()
+        if derived is not None:
+            self._attach_cpv_sources(derived, flyer_urls, stats)
+
+        if self.publication_status == "review":
+            # Submit the derived counterpart first (created by the post_save signal
+            # during .create() above).  We must do this before calling
+            # submit_for_review() on the source CPV, because that triggers the
+            # signal a second time and would overwrite the derived CPV's
+            # publication_status to 'review' without setting submitted_at.
+            if derived is not None and derived.submitted_at is None:
+                self._submit_cpv_for_review(derived)
+            self._submit_cpv_for_review(cpv)
+
+    # ------------------------------------------------------------------
+    # Lookup helpers
+    # ------------------------------------------------------------------
+
+    def _resolve_catchment(
+        self, record: dict, label: str, stats: dict
+    ) -> CollectionCatchment | None:
+        nuts_lau_id = record.get("nuts_or_lau_id") or ""
+        catchment_name = record.get("catchment_name") or ""
+
+        if nuts_lau_id:
+            catchment = self._nuts_catchments.get(nuts_lau_id)
+            if catchment is None:
+                catchment = self._lau_catchments.get(nuts_lau_id)
+            if catchment is None:
+                stats["warnings"].append(
+                    f"{label}: No catchment for NUTS/LAU id '{nuts_lau_id}'."
+                )
+            return catchment
+
+        if catchment_name:
+            catchment = CollectionCatchment.objects.filter(name=catchment_name).first()
+            if catchment is None:
+                stats["warnings"].append(
+                    f"{label}: No catchment named '{catchment_name}'."
+                )
+            return catchment
+
+        stats["warnings"].append(
+            f"{label}: nuts_or_lau_id and catchment_name both empty."
+        )
+        return None
+
+    def _resolve_collection_system(
+        self, record: dict, label: str, stats: dict
+    ) -> CollectionSystem | None:
+        name = record.get("collection_system") or ""
+        normalized = _COLLECTION_SYSTEM_ALIAS.get(name.lower(), name)
+        system = self._collection_systems.get(normalized)
+        if system is None:
+            stats["warnings"].append(
+                f"{label}: CollectionSystem '{name}' not found — record skipped."
+            )
+        return system
+
+    def _resolve_sorting_method(
+        self, record: dict, label: str, stats: dict
+    ) -> SortingMethod | None:
+        name = record.get("sorting_method") or ""
+        if not name:
+            return None
+        method = self._sorting_methods.get(name)
+        if method is None:
+            stats["warnings"].append(
+                f"{label}: SortingMethod '{name}' not found — field left empty."
+            )
+        return method
+
+    def _resolve_waste_category(
+        self, record: dict, label: str, stats: dict
+    ) -> WasteCategory | None:
+        name = record.get("waste_category") or ""
+        cat = self._waste_categories.get(name)
+        if cat is None:
+            stats["warnings"].append(
+                f"{label}: WasteCategory '{name}' not found — record skipped."
+            )
+        return cat
+
+    def _resolve_collector(
+        self, record: dict, label: str, stats: dict
+    ) -> Collector | None:
+        name = record.get("collector_name") or ""
+        website = record.get("collector_website") or ""
+
+        if not name and not website:
+            return None
+
+        # Primary: look up by name
+        if name:
+            collector = self._collectors.get(name)
+            if collector is not None:
+                return collector
+
+        # Secondary: look up by website URL
+        if website:
+            collector = next(
+                (c for c in self._collectors.values() if c.website == website),
+                None,
+            )
+            if collector is not None:
+                return collector
+
+            # Auto-create a Collector keyed by website domain
+            from urllib.parse import urlparse  # noqa: PLC0415
+
+            domain = urlparse(website).netloc or website
+            new_name = name or domain
+            collector, created = Collector.objects.get_or_create(
+                website=website,
+                defaults={"name": new_name, "owner": self.owner},
+            )
+            if created:
+                stats.setdefault("collectors_created", 0)
+                stats["collectors_created"] += 1
+            self._collectors[collector.name] = collector
+            return collector
+
+        stats["warnings"].append(
+            f"{label}: Collector '{name}' not found — field left empty."
+        )
+        return None
+
+    def _resolve_fee_system(
+        self, record: dict, label: str, stats: dict
+    ) -> FeeSystem | None:
+        name = record.get("fee_system") or ""
+        if not name:
+            return None
+        fee = self._fee_systems.get(name)
+        if fee is None:
+            stats["warnings"].append(
+                f"{label}: FeeSystem '{name}' not found — field left empty."
+            )
+        return fee
+
+    def _resolve_frequency(
+        self, record: dict, label: str, stats: dict
+    ) -> CollectionFrequency | None:
+        name = record.get("frequency") or ""
+        if not name:
+            return None
+
+        normalized_name = _normalize_frequency_lookup_key(name)
+        freq = self._normalized_frequencies.get(normalized_name)
+        if freq is not None:
+            stats["warnings"].append(
+                f"{label}: CollectionFrequency '{name}' not found — "
+                f"normalized to '{freq.name}'."
+            )
+            return freq
+
+        match = re.fullmatch(r"Fixed;\s*(\d+)\s+per\s+year", normalized_name)
+        if match:
+            count = int(match.group(1))
+            canonical_name = f"Fixed; {count} per year"
+            freq = self._frequencies.get(canonical_name)
+            if freq is None:
+                freq = self._get_or_create_fixed_frequency(count, canonical_name)
+                self._frequencies[canonical_name] = freq
+                self._normalized_frequencies[
+                    _normalize_frequency_lookup_key(canonical_name)
+                ] = freq
+            if name != canonical_name:
+                stats["warnings"].append(
+                    f"{label}: CollectionFrequency '{name}' not found — "
+                    f"normalized to '{canonical_name}'."
+                )
+            return freq
+
+        stats["warnings"].append(
+            f"{label}: CollectionFrequency '{name}' not found — field left empty."
+        )
+        return None
+
+    def _get_or_create_fixed_frequency(
+        self, count: int, canonical_name: str
+    ) -> CollectionFrequency:
+        """Return (or create) a Fixed CollectionFrequency for *count* per year.
+
+        Uses the whole-year season (January–December).  If that season does not
+        exist for some reason the frequency is still created but without a
+        CollectionCountOptions row.
+        """
+        freq, created = CollectionFrequency.objects.get_or_create(
+            name=canonical_name,
+            defaults={
+                "type": "Fixed",
+                "owner": self.owner,
+                "publication_status": "private",
+            },
+        )
+        if created:
+            whole_year = CollectionSeason.objects.filter(
+                first_timestep__name="January",
+                last_timestep__name="December",
+            ).first()
+            if whole_year:
+                cco = CollectionCountOptions.objects.create(
+                    frequency=freq,
+                    season=whole_year,
+                    standard=count,
+                    owner=self.owner,
+                    publication_status="private",
+                )
+                if self.publication_status == "review":
+                    self._submit_for_review(cco)
+            if self.publication_status == "review":
+                self._submit_for_review(freq)
+        return freq
+
+    def _resolve_connection_type(
+        self, record: dict, label: str, stats: dict
+    ) -> str | None:
+        value = record.get("connection_type") or ""
+        if not value:
+            return None
+        mapped = _CONNECTION_TYPE_MAP.get(value.lower())
+        if mapped is None:
+            stats["warnings"].append(
+                f"{label}: Unknown connection_type '{value}' — field left empty."
+            )
+        return mapped
+
+    @staticmethod
+    def _resolve_bin_capacity_reference(record: dict) -> str | None:
+        raw = str(record.get("required_bin_capacity_reference") or "").lower().strip()
+        if not raw:
+            return None
+        mapped = _BIN_CAPACITY_REF_MAP.get(raw)
+        if mapped:
+            return mapped
+        if "inh" in raw:
+            return "person"
+        if "person" in raw:
+            return "person"
+        if "household" in raw:
+            return "household"
+        if "propert" in raw:
+            return "property"
+        return None
+
+    def _resolve_material_lists(
+        self,
+        record: dict,
+        label: str,
+        stats: dict,
+    ) -> tuple[list[Material], list[Material]]:
+        def _normalise(value) -> list[str]:
+            if not value:
+                return []
+            if isinstance(value, str):
+                parts = [p.strip() for p in re.split(r"[,;\n]+", value) if p.strip()]
+                return [
+                    p for p in parts if p.lower() not in {"none", "nan", "null", "-"}
+                ]
+            if isinstance(value, list):
+                return [str(v).strip() for v in value if str(v).strip()]
+            return [str(value).strip()]
+
+        allowed_names = _normalise(record.get("allowed_materials"))
+        forbidden_names = _normalise(record.get("forbidden_materials"))
+
+        def _resolve(names: list[str], side: str) -> list[Material]:
+            resolved = []
+            seen_ids: set[int] = set()
+            for name in names:
+                material = self._materials.get(name)
+                if material is None:
+                    stats["warnings"].append(
+                        f"{label}: {side} material '{name}' not found — ignored."
+                    )
+                    continue
+                if material.id not in seen_ids:
+                    resolved.append(material)
+                    seen_ids.add(material.id)
+            return resolved
+
+        return _resolve(allowed_names, "Allowed"), _resolve(
+            forbidden_names, "Forbidden"
+        )
+
+    @staticmethod
+    def _material_ids(materials: list[Material]) -> set[int]:
+        return {material.id for material in materials if material and material.id}
+
+    @staticmethod
+    def _effective_material_ids_for_collection(
+        collection: Collection,
+    ) -> tuple[set[int], set[int]]:
+        allowed_ids = set(collection.allowed_materials.values_list("id", flat=True))
+        forbidden_ids = set(collection.forbidden_materials.values_list("id", flat=True))
+        return allowed_ids, forbidden_ids
+
+    def _find_existing_collection(
+        self,
+        *,
+        catchment: CollectionCatchment,
+        collection_system: CollectionSystem,
+        waste_category: WasteCategory,
+        valid_from,
+        allowed_material_ids: set[int],
+        forbidden_material_ids: set[int],
+    ) -> Collection | None:
+        return (
+            Collection.objects.filter(
+                catchment=catchment,
+                collection_system=collection_system,
+                valid_from=valid_from,
+                waste_category=waste_category,
+            )
+            .match_materials(
+                allowed_materials=allowed_material_ids,
+                forbidden_materials=forbidden_material_ids,
+            )
+            .order_by("-id")
+            .first()
+        )
+
+    @staticmethod
+    def _flyer_title(url: str) -> str:
+        """Return a short title derived from the URL hostname (max 255 chars)."""
+        from urllib.parse import urlparse
+
+        try:
+            hostname = urlparse(url).hostname or url
+        except Exception:
+            hostname = url
+        return hostname[:255]
+
+    def _submit_for_review(self, obj) -> None:
+        """Submit any UserCreatedObject for review and create the ReviewAction."""
+        obj.submit_for_review()
+        ReviewAction.objects.create(
+            content_type=ContentType.objects.get_for_model(obj.__class__),
+            object_id=obj.pk,
+            user=self.owner,
+            action=ReviewAction.ACTION_SUBMITTED,
+            comment="",
+        )
+
+    def _submit_cpv_for_review(self, cpv: CollectionPropertyValue) -> None:
+        """Submit a CPV for review and create the corresponding ReviewAction."""
+        self._submit_for_review(cpv)
+
+    @staticmethod
+    def _manual_review_note_for_frequency(
+        raw_frequency_name: str,
+        resolved_frequency: CollectionFrequency | None,
+    ) -> str | None:
+        if resolved_frequency is not None or not raw_frequency_name:
+            return None
+        if (
+            _normalize_frequency_lookup_key(raw_frequency_name)
+            not in _KNOWN_UNRESOLVED_BW_FREQUENCIES
+        ):
+            return None
+        return (
+            "SYNC NOTE (BW 2024 SW1 one-off import): "
+            f"Frequency '{raw_frequency_name}' requires manual review."
+        )
+
+    @staticmethod
+    def _find_predecessor(
+        catchment: CollectionCatchment,
+        waste_category: WasteCategory,
+        allowed_material_ids: set[int],
+        forbidden_material_ids: set[int],
+        collection_system: CollectionSystem,
+        valid_from,
+    ) -> Collection | None:
+        qs = Collection.objects.filter(
+            catchment=catchment,
+            collection_system=collection_system,
+        ).filter(waste_category=waste_category)
+        if valid_from:
+            qs = qs.filter(valid_from__lt=valid_from)
+        return (
+            qs.match_materials(
+                allowed_materials=allowed_material_ids,
+                forbidden_materials=forbidden_material_ids,
+            )
+            .order_by("-valid_from")
+            .first()
+        )

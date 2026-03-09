@@ -184,31 +184,33 @@ class CollectionDiagramView(TemplateView):
 # ----------- Collector CRUD -------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-
 class CollectorPublishedListView(PublishedObjectFilterView):
     model = Collector
     filterset_class = CollectorFilter
     dashboard_url = reverse_lazy("wastecollection-explorer")
+    template_name = "soilcom/collector_filter.html"
 
 
 class CollectorPrivateListView(PrivateObjectFilterView):
     model = Collector
     filterset_class = CollectorFilter
     dashboard_url = reverse_lazy("wastecollection-explorer")
+    template_name = "soilcom/collector_filter.html"
 
 
 class CollectorCreateView(UserCreatedObjectCreateView):
     form_class = CollectorModelForm
-    permission_required = "soilcom.add_collector"
+    permission_required = "waste_collection.add_collector"
 
 
 class CollectorModalCreateView(UserCreatedObjectModalCreateView):
     form_class = CollectorModalModelForm
-    permission_required = "soilcom.add_collector"
+    permission_required = "waste_collection.add_collector"
 
 
 class CollectorDetailView(UserCreatedObjectDetailView):
     model = Collector
+    template_name = "soilcom/collector_detail.html"
 
 
 class CollectorModalDetailView(UserCreatedObjectModalDetailView):
@@ -232,7 +234,6 @@ class CollectorModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------- Collector Utils ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-
 class CollectorAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Collector
 
@@ -240,17 +241,18 @@ class CollectorAutocompleteView(UserCreatedObjectAutocompleteView):
 # ----------- Collection System CRUD -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-
 class CollectionSystemPublishedListView(PublishedObjectFilterView):
     model = CollectionSystem
     filterset_class = CollectionSystemListFilter
     dashboard_url = reverse_lazy("wastecollection-explorer")
+    template_name = "soilcom/collectionsystem_filter.html"
 
 
 class CollectionSystemPrivateListView(PrivateObjectFilterView):
     model = CollectionSystem
     filterset_class = CollectionSystemListFilter
     dashboard_url = reverse_lazy("wastecollection-explorer")
+    template_name = "soilcom/collectionsystem_filter.html"
 
 
 class CollectionSystemAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -259,12 +261,12 @@ class CollectionSystemAutocompleteView(UserCreatedObjectAutocompleteView):
 
 class CollectionSystemCreateView(UserCreatedObjectCreateView):
     form_class = CollectionSystemModelForm
-    permission_required = "soilcom.add_collectionsystem"
+    permission_required = "waste_collection.add_collectionsystem"
 
 
 class CollectionSystemModalCreateView(UserCreatedObjectModalCreateView):
     form_class = CollectionSystemModalModelForm
-    permission_required = "soilcom.add_collectionsystem"
+    permission_required = "waste_collection.add_collectionsystem"
 
 
 class CollectionSystemDetailView(UserCreatedObjectDetailView):
@@ -292,17 +294,18 @@ class CollectionSystemModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------- Waste Category CRUD --------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-
 class WasteCategoryPublishedListView(PublishedObjectFilterView):
     model = WasteCategory
     filterset_class = WasteCategoryListFilter
     dashboard_url = reverse_lazy("wastecollection-explorer")
+    template_name = "soilcom/wastecategory_filter.html"
 
 
 class WasteCategoryPrivateListView(PrivateObjectFilterView):
     model = WasteCategory
     filterset_class = WasteCategoryListFilter
     dashboard_url = reverse_lazy("wastecollection-explorer")
+    template_name = "soilcom/wastecategory_filter.html"
 
 
 class WasteCategoryAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -311,12 +314,12 @@ class WasteCategoryAutocompleteView(UserCreatedObjectAutocompleteView):
 
 class WasteCategoryCreateView(UserCreatedObjectCreateView):
     form_class = WasteCategoryModelForm
-    permission_required = "soilcom.add_wastecategory"
+    permission_required = "waste_collection.add_wastecategory"
 
 
 class WasteCategoryModalCreateView(UserCreatedObjectModalCreateView):
     form_class = WasteCategoryModalModelForm
-    permission_required = "soilcom.add_wastecategory"
+    permission_required = "waste_collection.add_wastecategory"
 
 
 class WasteCategoryDetailView(UserCreatedObjectDetailView):
@@ -340,21 +343,21 @@ class WasteCategoryModalUpdateView(UserCreatedObjectModalUpdateView):
 class WasteCategoryModalDeleteView(UserCreatedObjectModalDeleteView):
     model = WasteCategory
 
-
 # ----------- Waste Component CRUD -------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
-
 
 class WasteComponentPublishedListView(PublishedObjectFilterView):
     model = WasteComponent
     filterset_class = WasteComponentListFilter
     dashboard_url = reverse_lazy("wastecollection-explorer")
+    template_name = "soilcom/wastecomponent_filter.html"
 
 
 class WasteComponentPrivateListView(PrivateObjectFilterView):
     model = WasteComponent
     filterset_class = WasteComponentListFilter
     dashboard_url = reverse_lazy("wastecollection-explorer")
+    template_name = "soilcom/wastecomponent_filter.html"
 
 
 class WasteComponentAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -363,12 +366,12 @@ class WasteComponentAutocompleteView(UserCreatedObjectAutocompleteView):
 
 class WasteComponentCreateView(UserCreatedObjectCreateView):
     form_class = WasteComponentModelForm
-    permission_required = "soilcom.add_wastecomponent"
+    permission_required = "waste_collection.add_wastecomponent"
 
 
 class WasteComponentModalCreateView(UserCreatedObjectModalCreateView):
     form_class = WasteComponentModalModelForm
-    permission_required = "soilcom.add_wastecomponent"
+    permission_required = "waste_collection.add_wastecomponent"
 
 
 class WasteComponentDetailView(UserCreatedObjectDetailView):
@@ -396,17 +399,18 @@ class WasteComponentModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------- Fee System CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-
 class FeeSystemPublishedListView(PublishedObjectFilterView):
     model = FeeSystem
     filterset_class = FeeSystemListFilter
     dashboard_url = reverse_lazy("wastecollection-explorer")
+    template_name = "soilcom/feesystem_filter.html"
 
 
 class FeeSystemPrivateListView(PrivateObjectFilterView):
     model = FeeSystem
     filterset_class = FeeSystemListFilter
     dashboard_url = reverse_lazy("wastecollection-explorer")
+    template_name = "soilcom/feesystem_filter.html"
 
 
 class FeeSystemAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -415,7 +419,7 @@ class FeeSystemAutocompleteView(UserCreatedObjectAutocompleteView):
 
 class FeeSystemCreateView(UserCreatedObjectCreateView):
     form_class = FeeSystemModelForm
-    permission_required = "soilcom.add_feesystem"
+    permission_required = "waste_collection.add_feesystem"
 
 
 class FeeSystemDetailView(UserCreatedObjectDetailView):
@@ -434,12 +438,12 @@ class FeeSystemModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------- Waste Collection Flyer CRUD ------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-
 class WasteFlyerPublishedFilterView(PublishedObjectFilterView):
     model = WasteFlyer
     filterset_class = WasteFlyerFilter
     dashboard_url = reverse_lazy("wastecollection-explorer")
     ordering = "id"
+    template_name = "soilcom/wasteflyer_filter.html"
 
 
 class WasteFlyerPrivateFilterView(PrivateObjectFilterView):
@@ -447,12 +451,13 @@ class WasteFlyerPrivateFilterView(PrivateObjectFilterView):
     filterset_class = WasteFlyerFilter
     dashboard_url = reverse_lazy("wastecollection-explorer")
     ordering = "id"
+    template_name = "soilcom/wasteflyer_filter.html"
 
 
 class WasteFlyerCreateView(SourceCreateView):
     form_class = WasteFlyerModelForm
     success_url = reverse_lazy("wasteflyer-list")
-    permission_required = "soilcom.add_wasteflyer"
+    permission_required = "waste_collection.add_wasteflyer"
 
     def form_valid(self, form):
         form.instance.type = "waste_flyer"
@@ -462,7 +467,7 @@ class WasteFlyerCreateView(SourceCreateView):
 class WasteFlyerModalCreateView(SourceModalCreateView):
     form_class = WasteFlyerModalModelForm
     success_url = reverse_lazy("wasteflyer-list")
-    permission_required = "soilcom.add_wasteflyer"
+    permission_required = "waste_collection.add_wasteflyer"
 
     def form_valid(self, form):
         form.instance.type = "waste_flyer"
@@ -471,6 +476,7 @@ class WasteFlyerModalCreateView(SourceModalCreateView):
 
 class WasteFlyerDetailView(UserCreatedObjectDetailView):
     model = WasteFlyer
+    template_name = "soilcom/wasteflyer_detail.html"
 
 
 class WasteFlyerModalDetailView(SourceModalDetailView):
@@ -492,7 +498,7 @@ class WasteFlyerModalDeleteView(SourceModalDeleteView):
 
 class WasteFlyerCheckUrlView(SourceCheckUrlView):
     model = WasteFlyer
-    permission_required = "soilcom.change_wasteflyer"
+    permission_required = "waste_collection.change_wasteflyer"
 
     def get(self, request, *args, **kwargs):
         self.object = self.model.objects.get(pk=kwargs.get("pk"))
@@ -523,7 +529,7 @@ class WasteFlyerCheckUrlProgressView(LoginRequiredMixin, View):
 class WasteFlyerListCheckUrlsView(PermissionRequiredMixin, View):
     model = WasteFlyer
     filterset_class = WasteFlyerFilter
-    permission_required = "soilcom.change_wasteflyer"
+    permission_required = "waste_collection.change_wasteflyer"
 
     @staticmethod
     def get(request, *args, **kwargs):
@@ -610,7 +616,7 @@ class FrequencyCreateView(
     formset_helper_class = CollectionSeasonFormHelper
     formset_factory_kwargs = {"extra": 0}
     relation_field_name = "seasons"
-    permission_required = "soilcom.add_collectionfrequency"
+    permission_required = "waste_collection.add_collectionfrequency"
     template_name = "soilcom/collectionfrequency_form.html"
 
     def post(self, request, *args, **kwargs):
@@ -632,6 +638,7 @@ class FrequencyCreateView(
 
 class FrequencyDetailView(UserCreatedObjectDetailView):
     model = CollectionFrequency
+    template_name = "soilcom/collectionfrequency_detail.html"
 
 
 class FrequencyModalDetailView(UserCreatedObjectModalDetailView):
@@ -696,7 +703,7 @@ class CollectionPropertyValueCreateView(
     formset_form_class = WasteFlyerModelForm
     formset_helper_class = WasteFlyerFormSetHelper
     relation_field_name = "sources"
-    permission_required = "soilcom.add_collectionpropertyvalue"
+    permission_required = "waste_collection.add_collectionpropertyvalue"
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -732,6 +739,7 @@ class CollectionPropertyValueCreateView(
 
 class CollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = CollectionPropertyValue
+    template_name = "soilcom/collectionpropertyvalue_detail.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -745,6 +753,7 @@ class CollectionPropertyValueReviewItemDetailView(ReviewItemDetailView):
     """Review detail view for CPVs with collection-chain context."""
 
     model = CollectionPropertyValue
+    template_name = "soilcom/collectionpropertyvalue_detail.html"
 
     def get_object(self, queryset=None):
         """Fetch the CPV and related objects used by detail/review templates."""
@@ -882,7 +891,7 @@ class AggregatedCollectionPropertyValueCreateView(
     formset_form_class = WasteFlyerModelForm
     formset_helper_class = WasteFlyerFormSetHelper
     relation_field_name = "sources"
-    permission_required = "soilcom.add_aggregatedcollectionpropertyvalue"
+    permission_required = "waste_collection.add_aggregatedcollectionpropertyvalue"
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -897,6 +906,7 @@ class AggregatedCollectionPropertyValueCreateView(
 
 class AggregatedCollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = AggregatedCollectionPropertyValue
+    template_name = "soilcom/aggregatedcollectionpropertyvalue_detail.html"
 
 
 class AggregatedCollectionPropertyValueUpdateView(
@@ -980,11 +990,12 @@ class CollectionCatchmentPrivateFilterView(PrivateObjectFilterView):
 
 
 class CollectionCatchmentCreateView(CatchmentCreateView):
-    permission_required = "soilcom.add_collectioncatchment"
+    permission_required = "waste_collection.add_collectioncatchment"
 
 
 class CollectionCatchmentDetailView(CatchmentDetailView):
     model = CollectionCatchment
+    template_name = "soilcom/collectioncatchment_detail.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1081,10 +1092,6 @@ class CollectionPrivateListView(CollectionListMixin, PrivateObjectFilterView):
 
 class CollectionReviewListView(CollectionListMixin, ReviewObjectFilterView):
     model = Collection
-    filterset_class = CollectionFilterSet
-    template_name = "collection_review_filter.html"
-    dashboard_url = reverse_lazy("wastecollection-explorer")
-
 
 class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
     model = Collection
@@ -1094,7 +1101,8 @@ class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
     formset_form_class = WasteFlyerModelForm
     formset_helper_class = WasteFlyerFormSetHelper
     relation_field_name = "flyers"
-    permission_required = "soilcom.add_collection"
+    permission_required = "waste_collection.add_collection"
+    template_name = "soilcom/collection_form.html"
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -1249,6 +1257,7 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
     model = Collection
     features_layer_api_basename = "api-waste-collection"
     map_title = "Collection"
+    template_name = "soilcom/collection_detail.html"
 
     def get_queryset(self):
         """Optimize queries by prefetching related sources and flyers."""
@@ -1401,6 +1410,7 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
     """
 
     model = Collection
+    template_name = "soilcom/collection_detail.html"
 
     def get_object(self, queryset=None):
         """Fetch the Collection with all related objects prefetched to minimize queries."""
@@ -1614,6 +1624,7 @@ class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
     formset_form_class = WasteFlyerModelForm
     formset_helper_class = WasteFlyerFormSetHelper
     relation_field_name = "flyers"
+    template_name = "soilcom/collection_form.html"
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -1680,7 +1691,7 @@ class CollectionAutocompleteView(UserCreatedObjectAutocompleteView):
 
 
 class CollectionListFileExportView(GenericUserCreatedObjectExportView):
-    model_label = "soilcom.Collection"
+    model_label = "waste_collection.Collection"
 
 
 class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
@@ -1756,22 +1767,22 @@ class SelectNewlyCreatedObjectModelSelectOptionsView(OwnedObjectModelSelectOptio
 
 class CollectorOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     model = Collector
-    permission_required = "soilcom.view_collector"
+    permission_required = "waste_collection.view_collector"
 
 
 class CollectionSystemOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     model = CollectionSystem
-    permission_required = "soilcom.view_collectionsystem"
+    permission_required = "waste_collection.view_collectionsystem"
 
 
 class CollectionFrequencyOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     model = CollectionFrequency
-    permission_required = "soilcom.view_collectionfrequency"
+    permission_required = "waste_collection.view_collectionfrequency"
 
 
 class WasteCategoryOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     model = WasteCategory
-    permission_required = "soilcom.view_wastecategory"
+    permission_required = "waste_collection.view_wastecategory"
     template_name = "detail_with_options.html"
 
 

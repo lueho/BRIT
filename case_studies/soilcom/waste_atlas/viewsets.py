@@ -17,11 +17,11 @@ from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from case_studies.soilcom.derived_values import (
+from sources.waste_collection.derived_values import (
     convert_total_to_specific,
     get_derived_property_config,
 )
-from case_studies.soilcom.models import (
+from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
     Collection,
     CollectionCatchment,

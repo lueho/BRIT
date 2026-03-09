@@ -135,14 +135,17 @@ def validate_draft_payload(payload: dict[str, Any]) -> dict[str, Any]:
 def _is_collection_property_value(obj: Any) -> bool:
     """Check whether *obj* is a CollectionPropertyValue instance."""
     return (
-        obj._meta.app_label == "soilcom"
+        obj._meta.app_label in {"soilcom", "waste_collection"}
         and obj._meta.model_name == "collectionpropertyvalue"
     )
 
 
 def _is_collection(obj: Any) -> bool:
     """Check whether *obj* is a Collection instance."""
-    return obj._meta.app_label == "soilcom" and obj._meta.model_name == "collection"
+    return (
+        obj._meta.app_label in {"soilcom", "waste_collection"}
+        and obj._meta.model_name == "collection"
+    )
 
 
 def _serialize_m2m_sources(obj: Any) -> list[dict[str, Any]]:

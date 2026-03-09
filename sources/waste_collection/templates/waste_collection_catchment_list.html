@@ -1,0 +1,32 @@
+{% extends 'nuts_region_map.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Maps | Catchments{% endblock %}
+
+{% block filter_form_buttons %}
+    <a href="{% url 'collection-create' %}"
+       id="btn-collection-create"
+       class="btn btn-primary mt-2"
+       data-href-template="{% url 'collection-create' %}">
+        Create collection
+    </a>
+{% endblock filter_form_buttons %}
+
+{% block javascript %}
+    {{ block.super }}
+
+    <script type="text/javascript">
+
+        async function updateUrls(region_id) {
+            const next = new URLSearchParams(window.location.search).get('next')
+            const params = new URLSearchParams({'region_id': region_id.toString()});
+            if (next !== null) {params.append('next', next.toString())}
+            const create_button = document.getElementById('btn-collection-create');
+            const url = create_button.dataset.hrefTemplate + '?' + params.toString();
+            create_button.setAttribute('href', url);
+        }
+
+    </script>
+
+{% endblock javascript %}
