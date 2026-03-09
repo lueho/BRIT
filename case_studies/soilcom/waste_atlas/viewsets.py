@@ -848,7 +848,13 @@ class CombinedFeeSystemViewSet(viewsets.ViewSet):
 _2022_AMOUNT_YEARS = (2020, 2021)
 
 
-def _get_collection_amount(country, year, waste_categories, nuts_prefixes=()):
+def _get_collection_amount(
+    country,
+    year,
+    waste_categories,
+    nuts_prefixes=(),
+    include_value_source=False,
+):
     """Return per-catchment collection amount in kg/person/year.
 
     Strategy varies by atlas year:
@@ -911,9 +917,11 @@ def _get_collection_amount(country, year, waste_categories, nuts_prefixes=()):
     # Step 3: look up amounts (strategy depends on year)
     # ------------------------------------------------------------------
     if year == 2022:
-        amounts = _amounts_for_2022(all_collection_ids, col_to_cid)
+        amounts, value_sources = _amounts_for_2022(all_collection_ids, col_to_cid)
     else:
-        amounts = _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids)
+        amounts, value_sources = _amounts_for_2024(
+            year, all_collection_ids, col_to_cid, catchment_ids
+        )
 
     # ------------------------------------------------------------------
     # Step 4: build result list
@@ -927,6 +935,11 @@ def _get_collection_amount(country, year, waste_categories, nuts_prefixes=()):
                 "catchment_id": cid,
                 "amount": amount,
                 "no_collection": no_collection,
+                **(
+                    {"value_source": None if no_collection else value_sources.get(cid)}
+                    if include_value_source
+                    else {}
+                ),
             }
         )
     return data
@@ -945,10 +958,12 @@ def _amounts_for_2022(all_collection_ids, col_to_cid):
         .values_list("collection_id", "average")
     )
     cpv_by_catchment: dict[int, list[float]] = {}
+    value_sources: dict[int, str] = {}
     for col_id, avg in cpv_qs:
         cid = col_to_cid.get(col_id)
         if cid is not None:
             cpv_by_catchment.setdefault(cid, []).append(avg)
+            value_sources[cid] = "cpv"
 
     # Aggregated fallback
     missing_cols = {
@@ -968,8 +983,12 @@ def _amounts_for_2022(all_collection_ids, col_to_cid):
             cid = col_to_cid.get(col_id)
             if cid is not None and cid not in cpv_by_catchment:
                 cpv_by_catchment.setdefault(cid, []).append(avg)
+                value_sources[cid] = "acpv"
 
-    return {cid: sum(vals) / len(vals) for cid, vals in cpv_by_catchment.items()}
+    return (
+        {cid: sum(vals) / len(vals) for cid, vals in cpv_by_catchment.items()},
+        value_sources,
+    )
 
 
 def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
@@ -992,15 +1011,17 @@ def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
         .values_list("collection_id", "average")
     )
     result: dict[int, float] = {}
+    value_sources: dict[int, str] = {}
     for col_id, avg in cpv_qs:
         cid = col_to_cid.get(col_id)
         if cid is not None and cid not in result:
             result[cid] = avg
+            value_sources[cid] = "cpv"
 
     # Runtime fallback for missing catchments: total_Mg * 1000 / population.
     missing_cids = [cid for cid in catchment_ids if cid not in result]
     if not missing_cids:
-        return result
+        return result, value_sources
 
     missing_cid_set = set(missing_cids)
     missing_cols = {
@@ -1022,7 +1043,7 @@ def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
             total_by_catchment[cid] = avg
 
     if not total_by_catchment:
-        return result
+        return result, value_sources
 
     pop_qs = (
         RegionAttributeValue.objects.filter(
@@ -1047,7 +1068,8 @@ def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
         pop = region_pop.get(region_id)
         if pop and pop > 0:
             result[cid] = convert_total_to_specific(total_mg, pop, ndigits=1)
-    return result
+            value_sources[cid] = "cpv"
+    return result, value_sources
 
 
 def _get_green_waste_collection_amount(country, year, nuts_prefixes=()):
@@ -1270,7 +1292,11 @@ class BiowasteCollectionAmountViewSet(viewsets.ViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         data = _get_collection_amount(
-            country, year, ["Biowaste", "Food waste"], nuts_prefixes
+            country,
+            year,
+            ["Biowaste", "Food waste"],
+            nuts_prefixes,
+            include_value_source=True,
         )
         serializer = CatchmentCollectionAmountSerializer(data, many=True)
         return Response(serializer.data)
