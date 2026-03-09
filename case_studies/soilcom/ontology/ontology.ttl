@@ -13,14 +13,15 @@
 
 soilcom:Collection a owl:Class ;
     rdfs:label "Collection"@en ;
-    rdfs:comment "Waste collection configuration for a catchment and waste stream in a validity period."@en .
-
-soilcom:WasteStream a owl:Class ;
-    rdfs:label "Waste stream"@en .
+    rdfs:comment "Waste collection configuration for a catchment, waste category, and material constraints in a validity period."@en .
 
 soilcom:WasteCategory a owl:Class ;
     rdfs:label "Waste category"@en ;
     rdfs:seeAlso <https://brit.bioresource-tools.net/vocab/soilcom/scheme/waste-category> .
+
+soilcom:Material a owl:Class ;
+    rdfs:label "Material"@en ;
+    rdfs:seeAlso <https://brit.bioresource-tools.net/vocab/soilcom/scheme/material> .
 
 soilcom:CollectionSystem a owl:Class ;
     rdfs:label "Collection system"@en ;
@@ -37,15 +38,24 @@ soilcom:FeeSystem a owl:Class ;
 soilcom:Catchment a owl:Class ;
     rdfs:label "Catchment"@en .
 
-soilcom:hasWasteStream a owl:ObjectProperty ;
-    rdfs:label "has waste stream"@en ;
-    rdfs:domain soilcom:Collection ;
-    rdfs:range soilcom:WasteStream .
-
 soilcom:hasWasteCategory a owl:ObjectProperty ;
     rdfs:label "has waste category"@en ;
-    rdfs:domain soilcom:WasteStream ;
+    rdfs:domain soilcom:Collection ;
     rdfs:range soilcom:WasteCategory .
+
+soilcom:hasAllowedMaterial a owl:ObjectProperty ;
+    rdfs:label "has allowed material"@en ;
+    rdfs:comment "Material that is explicitly accepted by a collection configuration."@en ;
+    rdfs:domain soilcom:Collection ;
+    rdfs:range soilcom:Material ;
+    rdfs:seeAlso <https://brit.bioresource-tools.net/vocab/soilcom/concept/material-role/allowed> .
+
+soilcom:hasForbiddenMaterial a owl:ObjectProperty ;
+    rdfs:label "has forbidden material"@en ;
+    rdfs:comment "Material that is explicitly excluded by a collection configuration."@en ;
+    rdfs:domain soilcom:Collection ;
+    rdfs:range soilcom:Material ;
+    rdfs:seeAlso <https://brit.bioresource-tools.net/vocab/soilcom/concept/material-role/forbidden> .
 
 soilcom:hasCollectionSystem a owl:ObjectProperty ;
     rdfs:label "has collection system"@en ;

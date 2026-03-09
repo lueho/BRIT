@@ -1,6 +1,6 @@
-# WasteStream Removal Rollout & Rollback Checklist
+# Collection Waste Semantics Simplification Rollout & Rollback Checklist
 
-**Scope:** Issue #80 hardening for epic #71 (`WasteStream` removal in soilcom)
+**Scope:** Issue #80 hardening for epic #71 (removal of `WasteStream` and direct `Collection` waste semantics in soilcom)
 **Date:** 2026-02-28
 **Owners:** Maintainer + reviewer on duty
 
@@ -42,7 +42,7 @@ docker compose exec web python manage.py migrate
 - [ ] Collection detail/review pages render with inline material data.
 - [ ] API payloads include expected waste fields.
 - [ ] Waste-atlas endpoints return expected classification semantics.
-- [ ] Import workflow succeeds without `WasteStream` creation logic.
+- [ ] Import workflow succeeds using direct `Collection` waste fields without legacy `WasteStream` logic.
 
 ## 5) Monitoring window (first 24h)
 

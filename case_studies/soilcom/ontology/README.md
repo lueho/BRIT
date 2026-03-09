@@ -11,7 +11,7 @@ This directory starts the semantic harmonization layer for the Soilcom module.
 ## Current artifacts
 
 - `vocabulary.ttl` — SKOS concept schemes and controlled concepts.
-- `ontology.ttl` — OWL ontology draft for core Soilcom classes and properties.
+- `ontology.ttl` — OWL ontology draft for core Soilcom classes and properties, with waste semantics modeled directly on `Collection` via `waste_category`, `allowed_materials`, and `forbidden_materials`.
 - `shapes/collection_import_record.shacl.ttl` — SHACL draft for import-record validation.
 - `mappings/` — source-term crosswalk files (country/language specific).
   - `sweden_raw_term_crosswalk.csv`

@@ -635,7 +635,7 @@ Every source type has (or will have) both facets:
 |---|---|---|
 | **Roadside trees** | Growth model, pruning/maintenance schedule → green residue yield | GIS point dataset of tree locations (Hamburg) |
 | **Greenhouses** | Growth cycles, cultures → organic residue output | GIS dataset of greenhouse locations (Nantes) |
-| **Household waste collection** | Collection system parameters, waste streams, frequencies → biowaste volume | Catchment polygons (future) |
+| **Household waste collection** | Collection system parameters, waste categories, material constraints, and frequencies → biowaste volume | Catchment polygons (future) |
 
 Current implementation status:
 

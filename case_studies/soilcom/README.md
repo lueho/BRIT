@@ -1,7 +1,7 @@
 # SOILCOM Case Study Module
 
 ## Overview
-The SOILCOM module is a case study implementation within the Bioresource Inventory Tool (BRIT) focused on sustainable soil management through the utilization of waste streams as a resource for custom-made composts. It was developed as part of the Interreg North Sea Region Programme's SOILCOM project, co-funded by the European Union.
+The SOILCOM module is a case study implementation within the Bioresource Inventory Tool (BRIT) focused on sustainable soil management through the utilization of separately collected organic waste as a resource for custom-made composts. It was developed as part of the Interreg North Sea Region Programme's SOILCOM project, co-funded by the European Union.
 
 ## Features
 - Comprehensive waste collection system management
@@ -61,8 +61,9 @@ erDiagram
     Collection ||--o{ CollectionCatchment : "covers"
     Collection }o--|| CollectionSystem : "uses"
     Collection }o--|| Collector : "managed_by"
-    Collection }o--o{ WasteCategory : "collects"
-    Collection }o--o{ WasteComponent : "contains"
+    Collection }o--|| WasteCategory : "classifies"
+    Collection }o--o{ WasteComponent : "allows"
+    Collection }o--o{ WasteComponent : "forbids"
     Collection }o--o{ CollectionPropertyValue : "has"
     Collection }o--o{ AggregatedCollectionPropertyValue : "has"
     Collection }o--o{ CollectionSeason : "operates_in"
