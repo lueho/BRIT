@@ -54,9 +54,9 @@ INSTALLED_APPS = [
     "sources.greenhouses.apps.GreenhousesConfig",
     "sources.waste_collection.apps.WasteCollectionConfig",
     "sources.legacy_flexibi_hamburg.apps.LegacyFlexibiHamburgMigrationsConfig",
+    "sources.legacy_flexibi_nantes.apps.LegacyFlexibiNantesConfig",
+    "sources.legacy_soilcom.apps.LegacySoilcomConfig",
     "layer_manager.apps.LayerManagerConfig",
-    "case_studies.flexibi_nantes.apps.CaseStudyNantesConfig",
-    "case_studies.soilcom.apps.SoilcomConfig",
     "case_studies.soilcom.waste_atlas.apps.WasteAtlasConfig",
     "case_studies.closecycle.apps.ClosecycleConfig",
     "interfaces.simucf.apps.SimucfConfig",
@@ -111,6 +111,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 MIGRATION_MODULES = {
     "flexibi_hamburg": "case_studies.flexibi_hamburg.migrations",
+    "flexibi_nantes": "case_studies.flexibi_nantes.migrations",
+    "soilcom": "case_studies.soilcom.migrations",
 }
 
 # Password validation

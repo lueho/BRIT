@@ -140,6 +140,11 @@ Validated and committed slices completed so far:
   `sources.legacy_flexibi_hamburg` migration shim that keeps the
   `flexibi_hamburg` migration label mapped to the legacy migration module while
   moving Hamburg admin registration into `sources.roadside_trees.admin`
+- removed `case_studies.flexibi_nantes` and `case_studies.soilcom` from
+  `INSTALLED_APPS` by introducing shim app configs under `sources` that keep
+  their legacy app names, migrations, admin autodiscovery, and Soilcom signal
+  registration active while decoupling settings registration from the
+  `case_studies` package
 
 ## 3. Target State
 
@@ -420,8 +425,11 @@ Current incremental status for Phase D:
 
 - [ ] Remove empty `case_studies/flexibi_hamburg/` app after replacing the
   legacy migration-module shim with source-owned migration history
-- [ ] Remove empty `case_studies/flexibi_nantes/` app
-- [ ] Remove empty `case_studies/soilcom/` app
+- [ ] Remove empty `case_studies/flexibi_nantes/` app after moving model
+  ownership and any remaining admin/runtime registration out of the legacy app
+- [ ] Remove empty `case_studies/soilcom/` app after moving model ownership,
+  signal registration, and any remaining admin/runtime registration out of the
+  legacy app
 - [ ] Remove `case_studies/` package if no other apps remain (check closecycle)
 - [ ] Update documentation, READMEs
 - [ ] Verify all old URLs redirect correctly

@@ -85,11 +85,34 @@ class SourcesModelAdapterTestCase(SimpleTestCase):
         self.assertIs(GrowthTimeStepSet, LegacyGrowthTimeStepSet)
         self.assertIs(NantesGreenhouses, LegacyNantesGreenhouses)
 
+    def test_flexibi_nantes_app_label_is_provided_by_installed_app_shim(self):
+        app_config = apps.get_app_config("flexibi_nantes")
+
+        self.assertEqual(
+            app_config.__class__.__module__,
+            "sources.legacy_flexibi_nantes.apps",
+        )
+        self.assertEqual(app_config.name, "case_studies.flexibi_nantes")
+        self.assertEqual(
+            settings.MIGRATION_MODULES["flexibi_nantes"],
+            "case_studies.flexibi_nantes.migrations",
+        )
+
     def test_waste_collection_model_adapters_reexport_legacy_models(self):
         self.assertIs(Collection, LegacyCollection)
         self.assertIs(CollectionPropertyValue, LegacyCollectionPropertyValue)
         self.assertIs(Collector, LegacyCollector)
         self.assertIs(WasteFlyer, LegacyWasteFlyer)
+
+    def test_soilcom_app_label_is_provided_by_installed_app_shim(self):
+        app_config = apps.get_app_config("soilcom")
+
+        self.assertEqual(app_config.__class__.__module__, "sources.legacy_soilcom.apps")
+        self.assertEqual(app_config.name, "case_studies.soilcom")
+        self.assertEqual(
+            settings.MIGRATION_MODULES["soilcom"],
+            "case_studies.soilcom.migrations",
+        )
 
     def test_greenhouse_selectors_import_greenhouse_from_sources_model_adapter(self):
         from sources.greenhouses import selectors
