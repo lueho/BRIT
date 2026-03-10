@@ -1,5 +1,6 @@
 from datetime import date
 
+from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -13,7 +14,7 @@ from case_studies.soilcom.models import (
     CollectionSystem,
     WasteCategory,
 )
-from maps.models import Attribute, Region
+from maps.models import Attribute, GeoPolygon, Region
 from utils.properties.models import Property, Unit
 
 
@@ -33,6 +34,10 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
     """Regression tests for Karte 18 biowaste amount provenance output."""
 
     endpoint = "/waste_collection/api/waste-atlas/biowaste-collection-amount/"
+    outline_endpoint = (
+        "/waste_collection/api/waste-atlas/biowaste-collection-amount/"
+        "acpv-outline-geojson/"
+    )
 
     @classmethod
     def setUpTestData(cls):
@@ -50,35 +55,75 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
             unit="cap",
         )
 
-        cls.region = Region.objects.create(
-            name="Region DE Biowaste Amount", country="DE"
-        )
         cls.biowaste, _ = WasteCategory.objects.get_or_create(name="Biowaste")
         cls.d2d, _ = CollectionSystem.objects.get_or_create(name="Door to door")
         cls.no_collection, _ = CollectionSystem.objects.get_or_create(
             name="No separate collection"
         )
 
-        cls.catchment_acpv = CollectionCatchment.objects.create(
-            name="Biowaste Amount Aggregated",
-            region=cls.region,
+        cls.catchment_acpv_group_a_1 = CollectionCatchment.objects.create(
+            name="Biowaste Amount Aggregated A1",
+            region=cls._make_region(
+                "Region DE Biowaste Amount Aggregated A1",
+                ((0, 0), (0, 1), (1, 1), (1, 0), (0, 0)),
+            ),
+        )
+        cls.catchment_acpv_group_a_2 = CollectionCatchment.objects.create(
+            name="Biowaste Amount Aggregated A2",
+            region=cls._make_region(
+                "Region DE Biowaste Amount Aggregated A2",
+                ((1, 0), (1, 1), (2, 1), (2, 0), (1, 0)),
+            ),
+        )
+        cls.catchment_acpv_group_b = CollectionCatchment.objects.create(
+            name="Biowaste Amount Aggregated B",
+            region=cls._make_region(
+                "Region DE Biowaste Amount Aggregated B",
+                ((2, 0), (2, 1), (3, 1), (3, 0), (2, 0)),
+            ),
         )
         cls.catchment_cpv = CollectionCatchment.objects.create(
             name="Biowaste Amount Direct",
-            region=cls.region,
+            region=cls._make_region(
+                "Region DE Biowaste Amount Direct",
+                ((0, 1), (0, 2), (1, 2), (1, 1), (0, 1)),
+            ),
         )
         cls.catchment_no_collection = CollectionCatchment.objects.create(
             name="Biowaste Amount No Collection",
-            region=cls.region,
+            region=cls._make_region(
+                "Region DE Biowaste Amount No Collection",
+                ((1, 1), (1, 2), (2, 2), (2, 1), (1, 1)),
+            ),
         )
 
         cls._create_collection(
-            catchment=cls.catchment_acpv,
+            catchment=cls.catchment_acpv_group_a_1,
             collection_system=cls.d2d,
             year=2022,
         )
-        cls.acpv_source_collection = cls._create_collection(
-            catchment=cls.catchment_acpv,
+        cls._create_collection(
+            catchment=cls.catchment_acpv_group_a_2,
+            collection_system=cls.d2d,
+            year=2022,
+        )
+        cls._create_collection(
+            catchment=cls.catchment_acpv_group_b,
+            collection_system=cls.d2d,
+            year=2022,
+        )
+        cls.acpv_group_a_source_collection_1 = cls._create_collection(
+            catchment=cls.catchment_acpv_group_a_1,
+            collection_system=cls.d2d,
+            year=2020,
+        )
+        cls.acpv_group_a_source_collection_2 = cls._create_collection(
+            catchment=cls.catchment_acpv_group_a_2,
+            collection_system=cls.d2d,
+            year=2020,
+        )
+        cls.acpv_group_b_source_collection = cls._create_collection(
+            catchment=cls.catchment_acpv_group_b,
             collection_system=cls.d2d,
             year=2020,
         )
@@ -98,12 +143,22 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
             year=2022,
         )
 
-        cls._create_agg_value(
-            collections=[cls.acpv_source_collection],
+        cls.acpv_group_a = cls._create_agg_value(
+            collections=[
+                cls.acpv_group_a_source_collection_1,
+                cls.acpv_group_a_source_collection_2,
+            ],
             property_obj=cls.specific_property,
             unit_obj=cls.specific_unit,
             year=2020,
             average=85.0,
+        )
+        cls.acpv_group_b = cls._create_agg_value(
+            collections=[cls.acpv_group_b_source_collection],
+            property_obj=cls.specific_property,
+            unit_obj=cls.specific_unit,
+            year=2020,
+            average=95.0,
         )
         cls._create_cpv(
             collection=cls.cpv_source_collection,
@@ -120,6 +175,16 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
     def tearDown(self):
         """Clear derived-value config cache after each test."""
         clear_derived_value_config_cache()
+
+    @classmethod
+    def _make_region(cls, name, polygon_coords):
+        return Region.objects.create(
+            name=name,
+            country="DE",
+            borders=GeoPolygon.objects.create(
+                geom=MultiPolygon(Polygon(polygon_coords))
+            ),
+        )
 
     @classmethod
     def _create_collection(cls, *, catchment, collection_system, year):
@@ -168,17 +233,89 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
 
         data_by_catchment = {row["catchment_id"]: row for row in response.data}
 
-        self.assertEqual(data_by_catchment[self.catchment_acpv.id]["amount"], 85.0)
         self.assertEqual(
-            data_by_catchment[self.catchment_acpv.id]["value_source"], "acpv"
+            data_by_catchment[self.catchment_acpv_group_a_1.id]["amount"], 85.0
+        )
+        self.assertEqual(
+            data_by_catchment[self.catchment_acpv_group_a_1.id]["value_source"],
+            "acpv",
+        )
+        self.assertEqual(
+            data_by_catchment[self.catchment_acpv_group_a_1.id]["acpv_group_key"],
+            f"acpv-{self.acpv_group_a.id}",
+        )
+        self.assertEqual(
+            data_by_catchment[self.catchment_acpv_group_a_2.id]["amount"], 85.0
+        )
+        self.assertEqual(
+            data_by_catchment[self.catchment_acpv_group_a_2.id]["value_source"],
+            "acpv",
+        )
+        self.assertEqual(
+            data_by_catchment[self.catchment_acpv_group_a_2.id]["acpv_group_key"],
+            f"acpv-{self.acpv_group_a.id}",
+        )
+        self.assertEqual(
+            data_by_catchment[self.catchment_acpv_group_b.id]["amount"], 95.0
+        )
+        self.assertEqual(
+            data_by_catchment[self.catchment_acpv_group_b.id]["value_source"],
+            "acpv",
+        )
+        self.assertEqual(
+            data_by_catchment[self.catchment_acpv_group_b.id]["acpv_group_key"],
+            f"acpv-{self.acpv_group_b.id}",
         )
         self.assertEqual(data_by_catchment[self.catchment_cpv.id]["amount"], 110.0)
         self.assertEqual(
             data_by_catchment[self.catchment_cpv.id]["value_source"], "cpv"
         )
+        self.assertIsNone(data_by_catchment[self.catchment_cpv.id]["acpv_group_key"])
         self.assertTrue(
             data_by_catchment[self.catchment_no_collection.id]["no_collection"]
         )
         self.assertIsNone(
             data_by_catchment[self.catchment_no_collection.id]["value_source"]
+        )
+        self.assertIsNone(
+            data_by_catchment[self.catchment_no_collection.id]["acpv_group_key"]
+        )
+
+    def test_returns_dissolved_outline_features_per_acpv_group(self):
+        response = self.client.get(
+            self.outline_endpoint,
+            {"country": "DE", "year": 2022},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        features_by_group = {
+            feature["properties"]["acpv_group_key"]: feature
+            for feature in response.data["features"]
+        }
+
+        self.assertEqual(
+            set(features_by_group),
+            {f"acpv-{self.acpv_group_a.id}", f"acpv-{self.acpv_group_b.id}"},
+        )
+        self.assertEqual(
+            features_by_group[f"acpv-{self.acpv_group_a.id}"]["properties"][
+                "catchment_ids"
+            ],
+            sorted(
+                [
+                    self.catchment_acpv_group_a_1.id,
+                    self.catchment_acpv_group_a_2.id,
+                ]
+            ),
+        )
+        self.assertEqual(
+            features_by_group[f"acpv-{self.acpv_group_b.id}"]["properties"][
+                "catchment_ids"
+            ],
+            [self.catchment_acpv_group_b.id],
+        )
+        self.assertIn(
+            features_by_group[f"acpv-{self.acpv_group_a.id}"]["geometry"]["type"],
+            {"Polygon", "MultiPolygon"},
         )

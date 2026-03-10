@@ -1,3 +1,5 @@
+import json
+
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import (
     Case,
@@ -854,6 +856,7 @@ def _get_collection_amount(
     waste_categories,
     nuts_prefixes=(),
     include_value_source=False,
+    include_acpv_group_key=False,
 ):
     """Return per-catchment collection amount in kg/person/year.
 
@@ -917,9 +920,11 @@ def _get_collection_amount(
     # Step 3: look up amounts (strategy depends on year)
     # ------------------------------------------------------------------
     if year == 2022:
-        amounts, value_sources = _amounts_for_2022(all_collection_ids, col_to_cid)
+        amounts, value_sources, acpv_group_keys = _amounts_for_2022(
+            all_collection_ids, col_to_cid
+        )
     else:
-        amounts, value_sources = _amounts_for_2024(
+        amounts, value_sources, acpv_group_keys = _amounts_for_2024(
             year, all_collection_ids, col_to_cid, catchment_ids
         )
 
@@ -940,9 +945,24 @@ def _get_collection_amount(
                     if include_value_source
                     else {}
                 ),
+                **(
+                    {
+                        "acpv_group_key": None
+                        if no_collection
+                        else acpv_group_keys.get(cid)
+                    }
+                    if include_acpv_group_key
+                    else {}
+                ),
             }
         )
     return data
+
+
+def _build_acpv_group_key(acpv_ids):
+    if not acpv_ids:
+        return None
+    return "acpv-" + "-".join(str(acpv_id) for acpv_id in sorted(acpv_ids))
 
 
 def _amounts_for_2022(all_collection_ids, col_to_cid):
@@ -959,6 +979,7 @@ def _amounts_for_2022(all_collection_ids, col_to_cid):
     )
     cpv_by_catchment: dict[int, list[float]] = {}
     value_sources: dict[int, str] = {}
+    acpv_ids_by_catchment: dict[int, set[int]] = {}
     for col_id, avg in cpv_qs:
         cid = col_to_cid.get(col_id)
         if cid is not None:
@@ -977,17 +998,22 @@ def _amounts_for_2022(all_collection_ids, col_to_cid):
                 year__in=_2022_AMOUNT_YEARS,
             )
             .exclude(average=0)
-            .values_list("collections__id", "average")
+            .values_list("collections__id", "average", "id")
         )
-        for col_id, avg in agg_qs:
+        for col_id, avg, acpv_id in agg_qs:
             cid = col_to_cid.get(col_id)
             if cid is not None and cid not in cpv_by_catchment:
                 cpv_by_catchment.setdefault(cid, []).append(avg)
                 value_sources[cid] = "acpv"
+                acpv_ids_by_catchment.setdefault(cid, set()).add(acpv_id)
 
     return (
         {cid: sum(vals) / len(vals) for cid, vals in cpv_by_catchment.items()},
         value_sources,
+        {
+            cid: _build_acpv_group_key(acpv_ids)
+            for cid, acpv_ids in acpv_ids_by_catchment.items()
+        },
     )
 
 
@@ -1021,7 +1047,7 @@ def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
     # Runtime fallback for missing catchments: total_Mg * 1000 / population.
     missing_cids = [cid for cid in catchment_ids if cid not in result]
     if not missing_cids:
-        return result, value_sources
+        return result, value_sources, {}
 
     missing_cid_set = set(missing_cids)
     missing_cols = {
@@ -1043,7 +1069,7 @@ def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
             total_by_catchment[cid] = avg
 
     if not total_by_catchment:
-        return result, value_sources
+        return result, value_sources, {}
 
     pop_qs = (
         RegionAttributeValue.objects.filter(
@@ -1069,7 +1095,69 @@ def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
         if pop and pop > 0:
             result[cid] = convert_total_to_specific(total_mg, pop, ndigits=1)
             value_sources[cid] = "cpv"
-    return result, value_sources
+    return result, value_sources, {}
+
+
+def _build_feature_collection(features):
+    return {"type": "FeatureCollection", "features": features}
+
+
+def _get_biowaste_acpv_outline_geojson(country, year, nuts_prefixes=()):
+    amount_rows = _get_collection_amount(
+        country,
+        year,
+        ["Biowaste", "Food waste"],
+        nuts_prefixes,
+        include_value_source=True,
+        include_acpv_group_key=True,
+    )
+    catchment_ids_by_group: dict[str, list[int]] = {}
+    for row in amount_rows:
+        group_key = row.get("acpv_group_key")
+        if group_key:
+            catchment_ids_by_group.setdefault(group_key, []).append(row["catchment_id"])
+
+    if not catchment_ids_by_group:
+        return _build_feature_collection([])
+
+    catchments = {
+        catchment.id: catchment
+        for catchment in CollectionCatchment.objects.filter(
+            id__in=[cid for cids in catchment_ids_by_group.values() for cid in cids],
+            region__borders__isnull=False,
+        ).select_related("region", "region__borders")
+    }
+
+    features = []
+    for group_key in sorted(catchment_ids_by_group):
+        group_catchment_ids = sorted(catchment_ids_by_group[group_key])
+        geoms = [
+            catchments[catchment_id].region.borders.geom
+            for catchment_id in group_catchment_ids
+            if catchment_id in catchments
+            and catchments[catchment_id].region
+            and catchments[catchment_id].region.borders
+            and catchments[catchment_id].region.borders.geom
+        ]
+        if not geoms:
+            continue
+
+        dissolved_geom = geoms[0].clone()
+        for geom in geoms[1:]:
+            dissolved_geom = dissolved_geom.union(geom)
+        dissolved_geom.normalize()
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "acpv_group_key": group_key,
+                    "catchment_ids": group_catchment_ids,
+                },
+                "geometry": json.loads(dissolved_geom.geojson),
+            }
+        )
+
+    return _build_feature_collection(features)
 
 
 def _get_green_waste_collection_amount(country, year, nuts_prefixes=()):
@@ -1297,9 +1385,18 @@ class BiowasteCollectionAmountViewSet(viewsets.ViewSet):
             ["Biowaste", "Food waste"],
             nuts_prefixes,
             include_value_source=True,
+            include_acpv_group_key=True,
         )
         serializer = CatchmentCollectionAmountSerializer(data, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="acpv-outline-geojson")
+    def acpv_outline_geojson(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        return Response(
+            _get_biowaste_acpv_outline_geojson(country, year, nuts_prefixes)
+        )
 
 
 class GreenWasteCollectionAmountViewSet(viewsets.ViewSet):

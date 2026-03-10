@@ -76,18 +76,18 @@ var WasteAtlasChoropleth = (function () {
       .append('pattern')
       .attr('id', _overlayPatternId(cfg))
       .attr('patternUnits', 'userSpaceOnUse')
-      .attr('width', 8)
-      .attr('height', 8)
+      .attr('width', 6)
+      .attr('height', 6)
       .attr('patternTransform', 'rotate(45)');
 
     pattern.append('line')
       .attr('x1', 0)
       .attr('y1', 0)
       .attr('x2', 0)
-      .attr('y2', 8)
+      .attr('y2', 6)
       .attr('stroke', '#ffffff')
-      .attr('stroke-opacity', 0.45)
-      .attr('stroke-width', 1.5);
+      .attr('stroke-opacity', 0.6)
+      .attr('stroke-width', 2);
   }
 
   // ---- data fetching --------------------------------------------------------
@@ -100,14 +100,19 @@ var WasteAtlasChoropleth = (function () {
     var nuts0Url = '/maps/api/nuts_region/geojson/?levl_code=0&cntr_code=' + cfg.country;
     var nuts1Url = '/maps/api/nuts_region/geojson/?levl_code=1&cntr_code=' + cfg.country;
     var dataUrl = cfg.dataUrl + '?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix;
-
-    return Promise.all([
+    var outlineUrl = cfg.outlineGeoJsonUrl
+      ? cfg.outlineGeoJsonUrl + '?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix
+      : null;
+    var requests = [
       _fetchJSON(catchUrl),
       _fetchJSON(dataUrl),
       _fetchJSON(nuts0Url),
       _fetchJSON(nuts1Url),
-      _fetchJSON(allCatchUrl),
-    ]).then(function (results) {
+      _fetchJSON(allCatchUrl)
+    ];
+    if (outlineUrl) requests.push(_fetchJSON(outlineUrl));
+
+    return Promise.all(requests).then(function (results) {
       var bundeslaender = results[3];
       if (cfg.nutsPrefix && bundeslaender && bundeslaender.features) {
         var prefixes = cfg.nutsPrefix
@@ -127,6 +132,7 @@ var WasteAtlasChoropleth = (function () {
         countryBorder: results[2],
         bundeslaender: bundeslaender,
         allCatchments: results[4],
+        acpvOutlines: outlineUrl ? results[5] : null,
       };
     });
   }
@@ -232,6 +238,21 @@ var WasteAtlasChoropleth = (function () {
         .attr('d', path)
         .attr('fill', 'url(#' + _overlayPatternId(cfg) + ')')
         .attr('stroke', 'none')
+        .style('pointer-events', 'none');
+    }
+
+    if (data.acpvOutlines && data.acpvOutlines.features) {
+      _svg.append('g').attr('class', 'layer-acpv-outlines')
+        .selectAll('path')
+        .data(data.acpvOutlines.features)
+        .enter().append('path')
+        .attr('d', path)
+        .attr('fill', 'none')
+        .attr('stroke', cfg.outlineStrokeColor || '#ffffff')
+        .attr('stroke-opacity', cfg.outlineStrokeOpacity == null ? 0.95 : cfg.outlineStrokeOpacity)
+        .attr('stroke-width', cfg.outlineStrokeWidth || 1.35)
+        .attr('stroke-linejoin', 'round')
+        .attr('stroke-linecap', 'round')
         .style('pointer-events', 'none');
     }
 

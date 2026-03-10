@@ -153,6 +153,7 @@ class CatchmentCollectionAmountSerializer(serializers.Serializer):
     amount = serializers.FloatField(allow_null=True)
     no_collection = serializers.BooleanField(default=False)
     value_source = serializers.CharField(allow_null=True, required=False)
+    acpv_group_key = serializers.CharField(allow_null=True, required=False)
 
 
 class CatchmentWasteRatioSerializer(serializers.Serializer):

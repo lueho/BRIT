@@ -25,6 +25,10 @@
       legendTitle: 'Sammelmenge (kg/P/a)',
       overlayPatternField: '_has_acpv_overlay',
       overlayPatternLegendLabel: 'Schraffur = aggregierter Wert (ACPV)',
+      outlineGeoJsonUrl: '/waste_collection/api/waste-atlas/biowaste-collection-amount/acpv-outline-geojson/',
+      outlineStrokeColor: '#ffffff',
+      outlineStrokeOpacity: 0.95,
+      outlineStrokeWidth: 1.35,
       fileBase:    'karte18_sammelmengen_bioabfall',
       transformData: function (records) {
         return records.map(function (r) {
@@ -45,7 +49,8 @@
           return {
             catchment_id: r.catchment_id,
             _classified: cls,
-            _has_acpv_overlay: r.value_source === 'acpv'
+            _has_acpv_overlay: r.value_source === 'acpv',
+            _acpv_group_key: r.acpv_group_key
           };
         });
       }
