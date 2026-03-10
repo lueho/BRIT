@@ -188,6 +188,17 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
 
         return queryset.filter(publication_status=UserCreatedObject.STATUS_REVIEW)
 
+    @staticmethod
+    def _is_primary_model_module(model):
+        """Return whether a model is defined in the app's models module tree."""
+        module_name = getattr(model, "__module__", "")
+        app_config = getattr(model._meta, "app_config", None)
+        app_name = getattr(app_config, "name", None) or model._meta.app_label
+        expected_prefix = f"{app_name}.models"
+        return module_name == expected_prefix or module_name.startswith(
+            f"{expected_prefix}."
+        )
+
     def get_available_models(self):
         """Discover all concrete UserCreatedObject subclasses that have items in review.
 
@@ -259,7 +270,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             if (
                 issubclass(model, UserCreatedObject)
                 and not model._meta.abstract
-                and model.__module__.startswith(f"{model._meta.app_label}.models")
+                and self._is_primary_model_module(model)
                 and hasattr(model, "objects")
                 and model not in available_models  # Don't duplicate priority models
             ):

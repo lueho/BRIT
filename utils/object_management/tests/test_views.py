@@ -15,7 +15,7 @@ from factory.django import mute_signals
 
 from distributions.models import TemporalDistribution
 from maps.models import Catchment, Region
-from sources.waste_collection.models import Collection, CollectionPropertyValue
+from sources.waste_collection.models import Collection, CollectionPropertyValue, Collector
 from sources.waste_collection.views import CollectionDetailView
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.object_management.views import ReviewDashboardView
@@ -965,6 +965,21 @@ class ReviewDashboardViewTests(TestCase):
         review_items = list(response.context["review_items"])
         self.assertTrue(any(isinstance(item, Catchment) for item in review_items))
 
+    def test_dashboard_includes_collector_from_nested_sources_app(self):
+        owner = User.objects.create_user(username="collector_owner", password="test123")
+        Collector.objects.create(
+            name="Review Collector",
+            owner=owner,
+            publication_status=UserCreatedObject.STATUS_REVIEW,
+        )
+
+        self.client.force_login(self.staff_user)
+        response = self.client.get(reverse("object_management:review_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        review_items = list(response.context["review_items"])
+        self.assertTrue(any(isinstance(item, Collector) for item in review_items))
+
     def test_get_available_models_accepts_models_module_subpackages(self):
         request = RequestFactory().get(reverse("object_management:review_dashboard"))
         request.user = self.moderator_user
@@ -972,7 +987,7 @@ class ReviewDashboardViewTests(TestCase):
         view = ReviewDashboardView()
         view.setup(request)
 
-        submodule_path = f"{Collection._meta.app_label}.models.submodule"
+        submodule_path = f"{Collection._meta.app_config.name}.models.submodule"
         with (
             patch("django.apps.apps.get_models", return_value=[Collection]),
             patch.object(Collection, "__module__", submodule_path),
