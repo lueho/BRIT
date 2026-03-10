@@ -6,6 +6,9 @@
 */__pycache__/
 .env
 
+compose.override.yml
+compose.local.yml
+
 # windsurf rules
 .windsurfrules
 *code-workspace*
