@@ -1,3 +1,4 @@
+from datetime import timedelta
 from unittest.mock import patch
 from urllib.parse import urlencode
 
@@ -7,6 +8,7 @@ from django.db.models.signals import post_save, pre_save
 from django.http import HttpResponseRedirect
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
+from django.utils import timezone
 from django_filters import CharFilter, FilterSet
 from django_filters.views import FilterView
 from factory.django import mute_signals
@@ -857,6 +859,53 @@ class ReviewDashboardViewTests(TestCase):
         item_names = [item.name for item in review_items]
         self.assertIn("Review Collection Alpha", item_names)
         self.assertNotIn("Review Collection Beta", item_names)
+
+    def test_collect_review_items_searches_collections_beyond_prefetch_window(self):
+        region = Region.objects.create(
+            name="Search Region",
+            country="DE",
+            owner=self.owner_user,
+        )
+        catchment = Catchment.objects.create(
+            name="Ostalbkreis (DE11D)",
+            owner=self.owner_user,
+            region=region,
+        )
+        submitted_at = timezone.now() - timedelta(days=30)
+
+        with mute_signals(post_save, pre_save):
+            target = Collection.objects.create(
+                name="Legacy Green Waste 2024",
+                owner=self.owner_user,
+                catchment=catchment,
+                publication_status=UserCreatedObject.STATUS_REVIEW,
+                submitted_at=submitted_at,
+            )
+            for index in range(11):
+                Collection.objects.create(
+                    name=f"Newer Review Collection {index}",
+                    owner=self.owner_user,
+                    publication_status=UserCreatedObject.STATUS_REVIEW,
+                    submitted_at=submitted_at + timedelta(minutes=index + 1),
+                )
+
+        request = RequestFactory().get(
+            reverse("object_management:review_dashboard"),
+            {"search": "Ostalbkreis"},
+        )
+        request.user = self.staff_user
+
+        view = ReviewDashboardView()
+        view.setup(request)
+        view.request = request
+
+        with (
+            patch.object(view, "get_available_models", return_value=[Collection]),
+            patch.object(view, "paginate_by", 1),
+        ):
+            review_items = view.collect_review_items()
+
+        self.assertEqual([item.id for item in review_items], [target.id])
 
     def test_dashboard_model_type_filter(self):
         self.client.force_login(self.moderator_user)

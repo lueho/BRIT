@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from urllib.parse import unquote, urlparse
 
 from bootstrap_modal_forms.generic import (
@@ -22,6 +23,7 @@ from django.core.exceptions import (
     ObjectDoesNotExist,
     PermissionDenied,
 )
+from django.db.models import Q
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string, select_template
@@ -311,6 +313,170 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         kwargs["available_models"] = available_models
         return kwargs
 
+    def _has_active_query_filters(self):
+        """Return whether any non-ordering filters are active."""
+        return bool(
+            self.request.GET.get("search", "").strip()
+            or self.request.GET.getlist("model_type")
+            or self.request.GET.get("owner")
+            or self.request.GET.get("submitted_after")
+            or self.request.GET.get("submitted_before")
+        )
+
+    def _get_selected_model_type_ids(self):
+        """Return valid selected content type IDs from the request."""
+        return {
+            int(model_type)
+            for model_type in self.request.GET.getlist("model_type")
+            if model_type.isdigit()
+        }
+
+    @staticmethod
+    def _get_select_related_fields(model_class):
+        """Return common foreign keys that are safe to select_related."""
+        select_fields = ["owner", "approved_by"]
+        for field_name in (
+            "property",
+            "unit",
+            "material",
+            "sample",
+            "catchment",
+            "waste_category",
+            "collection_system",
+        ):
+            try:
+                field = model_class._meta.get_field(field_name)
+            except FieldDoesNotExist:
+                continue
+            if field.is_relation and field.many_to_one:
+                select_fields.append(field_name)
+        return select_fields
+
+    def _parse_submitted_date(self, parameter_name):
+        """Parse a submitted date filter, returning None for invalid values."""
+        raw_value = (self.request.GET.get(parameter_name) or "").strip()
+        if not raw_value:
+            return None
+        try:
+            return datetime.strptime(raw_value, "%Y-%m-%d").date()
+        except ValueError as exc:
+            logger.warning("Invalid date filter value '%s': %s", raw_value, exc)
+            return None
+
+    @staticmethod
+    def _matches_selected_model_types(model_class, selected_model_type_ids):
+        """Return whether a model is included by the selected model_type filter."""
+        if not selected_model_type_ids:
+            return True
+        return (
+            ContentType.objects.get_for_model(model_class).id in selected_model_type_ids
+        )
+
+    def _apply_search_filter(self, queryset, model_class, search):
+        """Apply model-specific search filters at the database level."""
+        search_filters = []
+
+        try:
+            model_class._meta.get_field("name")
+            search_filters.append(Q(name__icontains=search))
+        except FieldDoesNotExist:
+            pass
+
+        if (
+            model_class._meta.app_label == "soilcom"
+            and model_class._meta.model_name == "collection"
+        ):
+            search_filters.extend(
+                [
+                    Q(catchment__name__icontains=search),
+                    Q(waste_category__name__icontains=search),
+                    Q(collection_system__name__icontains=search),
+                ]
+            )
+
+        if not search_filters:
+            return queryset.none()
+
+        combined_filter = search_filters[0]
+        for search_filter in search_filters[1:]:
+            combined_filter |= search_filter
+        return queryset.filter(combined_filter)
+
+    def _apply_database_review_filters(self, queryset, model_class):
+        """Apply active dashboard filters directly to a model queryset."""
+        queryset = queryset.exclude(owner=self.request.user)
+
+        owner_id = (self.request.GET.get("owner") or "").strip()
+        if owner_id:
+            if owner_id.isdigit():
+                queryset = queryset.filter(owner_id=int(owner_id))
+            else:
+                logger.warning("Invalid owner_id filter value: %s", owner_id)
+
+        submitted_after = self._parse_submitted_date("submitted_after")
+        if submitted_after is not None:
+            queryset = queryset.filter(submitted_at__date__gte=submitted_after)
+
+        submitted_before = self._parse_submitted_date("submitted_before")
+        if submitted_before is not None:
+            queryset = queryset.filter(submitted_at__date__lte=submitted_before)
+
+        search = self.request.GET.get("search", "").strip()
+        if search:
+            queryset = self._apply_search_filter(queryset, model_class, search)
+
+        return queryset
+
+    def _apply_requested_ordering(self, items):
+        """Sort heterogeneous review items using the dashboard ordering option."""
+        ordering = self.request.GET.get("ordering", "-submitted_at")
+        filter_obj = ReviewItemFilter([], self.request.GET)
+        return filter_obj._apply_ordering(list(items), ordering)
+
+    def _collect_filtered_review_items(self, available_models):
+        """Collect review items using DB filters when the user is actively filtering."""
+        review_items = []
+        selected_model_type_ids = self._get_selected_model_type_ids()
+
+        for model_class in available_models:
+            if not self._matches_selected_model_types(
+                model_class, selected_model_type_ids
+            ):
+                continue
+
+            try:
+                review_queryset = self._in_review_queryset_for_model(model_class)
+            except Exception as exc:
+                logger.warning(
+                    "Could not build in-review queryset for %s: %s",
+                    model_class.__name__,
+                    exc,
+                )
+                continue
+
+            try:
+                select_fields = self._get_select_related_fields(model_class)
+                items = self._apply_database_review_filters(
+                    review_queryset, model_class
+                ).select_related(*select_fields)
+                review_items.extend(list(items))
+            except (FieldDoesNotExist, AttributeError) as e:
+                logger.debug(
+                    f"Could not use select_related for {model_class.__name__}: {e}. "
+                    "Trying without select_related."
+                )
+                try:
+                    items = self._apply_database_review_filters(
+                        review_queryset, model_class
+                    )
+                    review_items.extend(list(items))
+                except Exception as e2:
+                    logger.warning(
+                        f"Could not collect review items for {model_class.__name__}: {e2}"
+                    )
+
+        return self._apply_requested_ordering(review_items)
+
     def collect_review_items(self):
         """Collect review items from models the user can moderate.
 
@@ -326,6 +492,9 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         """
         review_items = []
         available_models = self.get_available_models()
+
+        if self._has_active_query_filters():
+            return self._collect_filtered_review_items(available_models)
 
         # Calculate a reasonable fetch limit per model to prevent loading
         # thousands of items into memory. Multiply by number of models
@@ -346,17 +515,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
 
             # Get items in review for this model, excluding current user's own items
             try:
-                # Build select_related fields dynamically based on model's FK fields
-                select_fields = ["owner", "approved_by"]
-                # Add common FK fields that may exist on specific models
-                for field_name in ("property", "unit", "material", "sample"):
-                    if hasattr(model_class, field_name):
-                        try:
-                            field = model_class._meta.get_field(field_name)
-                            if field.is_relation and field.many_to_one:
-                                select_fields.append(field_name)
-                        except FieldDoesNotExist:
-                            pass
+                select_fields = self._get_select_related_fields(model_class)
 
                 # Apply database-level ordering and limit to reduce memory usage
                 items = (
@@ -2088,7 +2247,7 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
                 and isinstance(value, str)
                 and value.lower() in {"en-us", "en", "de", "fr"}
             ):
-                logger.warning(
+                logger.debug(
                     "Invalid language code %s supplied for lookup %s – skipping this filter to "
                     "avoid EmptyQuerySet and widget validation errors.",
                     value,
@@ -2098,7 +2257,7 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
 
             # Additional guard for *_id style lookups that require an integer value.
             if lookup.endswith("_id") and value and not value.isdigit():
-                logger.warning(
+                logger.debug(
                     "Non-numeric value %s supplied for integer lookup %s – skipping filter.",
                     value,
                     lookup,
@@ -2108,7 +2267,7 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
             try:
                 queryset = queryset.filter(**{lookup: value})
             except Exception as e:
-                logger.error(f"Error applying filter {lookup}={value!r}: {e}")
+                logger.debug("Error applying filter %s=%r: %s", lookup, value, e)
                 return queryset.none()
 
         return queryset
