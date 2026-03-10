@@ -510,6 +510,42 @@ class CollectionImportPropertyValueSerializer(serializers.Serializer):
     )
 
 
+class CollectionPropertyValueMutationSerializer(serializers.Serializer):
+    collection = serializers.PrimaryKeyRelatedField(
+        queryset=models.Collection.objects.all()
+    )
+    property_id = serializers.IntegerField()
+    unit_name = serializers.CharField()
+    year = serializers.IntegerField(min_value=1900, max_value=2100)
+    average = serializers.FloatField()
+    standard_deviation = serializers.FloatField(required=False, allow_null=True)
+    sources = serializers.PrimaryKeyRelatedField(
+        queryset=Source.objects.all(), many=True, required=False, default=list
+    )
+    flyer_urls = serializers.ListField(
+        child=serializers.URLField(), required=False, default=list
+    )
+    submit_for_review = serializers.BooleanField(required=False, default=True)
+
+
+class AggregatedCollectionPropertyValueMutationSerializer(serializers.Serializer):
+    collections = serializers.PrimaryKeyRelatedField(
+        queryset=models.Collection.objects.all(), many=True
+    )
+    property_id = serializers.IntegerField()
+    unit_name = serializers.CharField()
+    year = serializers.IntegerField(min_value=1900, max_value=2100)
+    average = serializers.FloatField()
+    standard_deviation = serializers.FloatField(required=False, allow_null=True)
+    sources = serializers.PrimaryKeyRelatedField(
+        queryset=Source.objects.all(), many=True, required=False, default=list
+    )
+    flyer_urls = serializers.ListField(
+        child=serializers.URLField(), required=False, default=list
+    )
+    submit_for_review = serializers.BooleanField(required=False, default=True)
+
+
 class CollectionImportRecordSerializer(serializers.Serializer):
     """
     Validates a single collection record for the bulk import endpoint.
