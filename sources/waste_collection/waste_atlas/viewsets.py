@@ -925,7 +925,11 @@ def _get_collection_amount(
         )
     else:
         amounts, value_sources, acpv_group_keys = _amounts_for_2024(
-            year, all_collection_ids, col_to_cid, catchment_ids
+            year,
+            all_collection_ids,
+            col_to_cid,
+            catchment_ids,
+            include_metadata=True,
         )
 
     # ------------------------------------------------------------------
@@ -1017,7 +1021,14 @@ def _amounts_for_2022(all_collection_ids, col_to_cid):
     )
 
 
-def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
+def _amounts_for_2024(
+    year,
+    all_collection_ids,
+    col_to_cid,
+    catchment_ids,
+    *,
+    include_metadata=False,
+):
     """Specific waste collected for *year*, with total/population fallback.
 
     Derived CPV records (computed from total waste / population) are
@@ -1047,7 +1058,9 @@ def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
     # Runtime fallback for missing catchments: total_Mg * 1000 / population.
     missing_cids = [cid for cid in catchment_ids if cid not in result]
     if not missing_cids:
-        return result, value_sources, {}
+        if include_metadata:
+            return result, value_sources, {}
+        return result
 
     missing_cid_set = set(missing_cids)
     missing_cols = {
@@ -1069,7 +1082,9 @@ def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
             total_by_catchment[cid] = avg
 
     if not total_by_catchment:
-        return result, value_sources, {}
+        if include_metadata:
+            return result, value_sources, {}
+        return result
 
     pop_qs = (
         RegionAttributeValue.objects.filter(
@@ -1095,7 +1110,9 @@ def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
         if pop and pop > 0:
             result[cid] = convert_total_to_specific(total_mg, pop, ndigits=1)
             value_sources[cid] = "cpv"
-    return result, value_sources, {}
+    if include_metadata:
+        return result, value_sources, {}
+    return result
 
 
 def _build_feature_collection(features):

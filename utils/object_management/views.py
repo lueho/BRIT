@@ -382,10 +382,10 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         except FieldDoesNotExist:
             pass
 
-        if (
-            model_class._meta.app_label == "soilcom"
-            and model_class._meta.model_name == "collection"
-        ):
+        if model_class._meta.model_name == "collection" and model_class._meta.app_label in {
+            "soilcom",
+            "waste_collection",
+        }:
             search_filters.extend(
                 [
                     Q(catchment__name__icontains=search),
