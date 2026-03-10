@@ -71,7 +71,7 @@
             No collections so far
         </p>
     {% endif %}
-    {% if 'soilcom.add_collection' in perms %}
+    {% if 'waste_collection.add_collection' in perms %}
         <a href="{% url 'collection-create' %}?collector={{ object.pk }}">
             <i class="fas fa-fw fa-plus"></i> Create a new collection for this collector
         </a>

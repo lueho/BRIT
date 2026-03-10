@@ -138,6 +138,41 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     update_object_data = {"name": "Updated Test Collector"}
 
 
+class CollectorDetailPermissionRegressionTest(ViewWithPermissionsTestCase):
+    member_permissions = "add_collection"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.collector = Collector.objects.create(
+            owner=cls.owner,
+            name="Published collector",
+            publication_status="published",
+        )
+
+    def test_detail_shows_create_collection_link_for_user_with_permission(self):
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("collector-detail", kwargs={"pk": self.collector.pk})
+        )
+
+        self.assertContains(
+            response,
+            f"{reverse('collection-create')}?collector={self.collector.pk}",
+        )
+
+    def test_detail_hides_create_collection_link_without_permission(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(
+            reverse("collector-detail", kwargs={"pk": self.collector.pk})
+        )
+
+        self.assertNotContains(
+            response,
+            f"{reverse('collection-create')}?collector={self.collector.pk}",
+        )
+
+
 # ----------- Collection System CRUD -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -799,6 +834,64 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(
         self.assertSetEqual(
             set(self.unpublished_object.sources.values_list("pk", flat=True)),
             {bibliographic_source.pk, flyer.pk},
+        )
+
+
+class CollectionMapOptionsPermissionRegressionTest(ViewWithPermissionsTestCase):
+    member_permissions = "add_aggregatedcollectionpropertyvalue"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        style = MapLayerStyle.objects.create(name="permission-regression-default")
+        layer = MapLayerConfiguration.objects.create(
+            name="permission-regression-default",
+            layer_type="features",
+            style=style,
+        )
+        map_config = MapConfiguration.objects.create(
+            name="permission-regression-default"
+        )
+        map_config.layers.add(layer)
+        region = Region.objects.create(name="Permission Regression Region")
+        dataset, _ = GeoDataset.objects.get_or_create(
+            model_name="WasteCollection",
+            defaults={
+                "name": "Waste Collections Europe",
+                "description": "Waste Collection Systems of Europe",
+                "region": region,
+            },
+        )
+        dataset.map_configuration = map_config
+        dataset.save()
+        catchment = CollectionCatchment.objects.create(
+            name="Permission Regression Catchment",
+            region=region,
+            publication_status="published",
+        )
+        cls.collection = Collection.objects.create(
+            owner=cls.owner,
+            name="Published collection",
+            catchment=catchment,
+            publication_status="published",
+        )
+
+    def test_map_shows_add_aggregated_property_link_for_user_with_permission(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse("WasteCollection"), follow=True)
+
+        self.assertContains(
+            response,
+            reverse("aggregatedcollectionpropertyvalue-create"),
+        )
+
+    def test_map_hides_add_aggregated_property_link_without_permission(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse("WasteCollection"), follow=True)
+
+        self.assertNotContains(
+            response,
+            reverse("aggregatedcollectionpropertyvalue-create"),
         )
 
 

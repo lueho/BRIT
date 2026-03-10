@@ -164,7 +164,7 @@
             </a>
           {% endif %}
 
-          {% if "waste_collection.add_aggregatedcollectionpropertyvalue" in perms %}
+          {% if "waste_collection.add_aggregatedcollectionpropertyvalue" in perms or "soilcom.add_aggregatedcollectionpropertyvalue" in perms %}
             <a class="btn btn-outline-secondary w-100 mb-2"
                href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
               <i class="fas fa-circle-plus"></i> Add property to collection group

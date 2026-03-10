@@ -7,7 +7,7 @@ from materials.models import (
     Sample,
     SampleSeries,
 )
-from utils.tests.testcases import AbstractTestCases
+from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 from ..models import Culture, Greenhouse, GreenhouseGrowthCycle, GrowthTimeStepSet
 
 
@@ -132,4 +132,39 @@ class GrowthCycleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
     def get_delete_success_url(self, publication_status=None):
         return reverse(
             "greenhouse-detail", kwargs={"pk": self.related_objects["greenhouse"].pk}
+        )
+
+
+class GreenhouseDetailPermissionRegressionTest(ViewWithPermissionsTestCase):
+    member_permissions = "add_greenhousegrowthcycle"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.greenhouse = Greenhouse.objects.create(
+            owner=cls.owner,
+            name="Published greenhouse",
+            publication_status="published",
+        )
+
+    def test_detail_shows_add_growth_cycle_link_for_user_with_permission(self):
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("greenhouse-detail", kwargs={"pk": self.greenhouse.pk})
+        )
+
+        self.assertContains(
+            response,
+            reverse("greenhousegrowthcycle-create", kwargs={"pk": self.greenhouse.pk}),
+        )
+
+    def test_detail_hides_add_growth_cycle_link_without_permission(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(
+            reverse("greenhouse-detail", kwargs={"pk": self.greenhouse.pk})
+        )
+
+        self.assertNotContains(
+            response,
+            reverse("greenhousegrowthcycle-create", kwargs={"pk": self.greenhouse.pk}),
         )
