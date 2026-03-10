@@ -4,44 +4,9 @@ from django.conf import settings
 from django.test import SimpleTestCase
 from unittest.mock import MagicMock, patch
 
-from case_studies.flexibi_hamburg.admin import (
-    HamburgGreenAreasAdmin as LegacyHamburgGreenAreasAdmin,
-    HamburgRoadsideTreesAdmin as LegacyHamburgRoadsideTreesAdmin,
-)
-from case_studies.flexibi_hamburg.models import (
-    HamburgGreenAreas as LegacyHamburgGreenAreas,
-    HamburgRoadsideTrees as LegacyHamburgRoadsideTrees,
-)
-from case_studies.flexibi_nantes.admin import (
-    CultureAdmin as LegacyCultureAdmin,
-    GreenhouseAdmin as LegacyGreenhouseAdmin,
-    GreenhouseGrowthCycleAdmin as LegacyGreenhouseGrowthCycleAdmin,
-    GrowthShareAdmin as LegacyGrowthShareAdmin,
-    GrowthTimeStepSetAdmin as LegacyGrowthTimeStepSetAdmin,
-)
 from sources.roadside_trees.admin import (
     HamburgGreenAreasAdmin,
     HamburgRoadsideTreesAdmin,
-)
-from case_studies.flexibi_nantes.models import (
-    Culture as LegacyCulture,
-    Greenhouse as LegacyGreenhouse,
-    GreenhouseGrowthCycle as LegacyGreenhouseGrowthCycle,
-    GrowthShare as LegacyGrowthShare,
-    GrowthTimeStepSet as LegacyGrowthTimeStepSet,
-    NantesGreenhouses as LegacyNantesGreenhouses,
-)
-from case_studies.soilcom.admin import (
-    CollectionAdmin as LegacyCollectionAdmin,
-    CollectionPropertyValueAdmin as LegacyCollectionPropertyValueAdmin,
-    CollectorAdmin as LegacyCollectorAdmin,
-    WasteFlyerAdmin as LegacyWasteFlyerAdmin,
-)
-from case_studies.soilcom.models import (
-    Collection as LegacyCollection,
-    CollectionPropertyValue as LegacyCollectionPropertyValue,
-    Collector as LegacyCollector,
-    WasteFlyer as LegacyWasteFlyer,
 )
 from sources.greenhouses.admin import (
     CultureAdmin,
@@ -74,9 +39,11 @@ from sources.waste_collection.models import (
 
 
 class SourcesModelAdapterTestCase(SimpleTestCase):
-    def test_roadside_tree_model_adapters_reexport_legacy_models(self):
-        self.assertIs(HamburgGreenAreas, LegacyHamburgGreenAreas)
-        self.assertIs(HamburgRoadsideTrees, LegacyHamburgRoadsideTrees)
+    def test_roadside_tree_models_are_owned_by_sources_modules(self):
+        self.assertEqual(HamburgGreenAreas.__module__, "sources.roadside_trees.models")
+        self.assertEqual(
+            HamburgRoadsideTrees.__module__, "sources.roadside_trees.models"
+        )
 
     def test_roadside_tree_models_use_sources_app_label_and_preserve_db_tables(self):
         self.assertEqual(HamburgGreenAreas._meta.app_label, "roadside_trees")
@@ -96,20 +63,24 @@ class SourcesModelAdapterTestCase(SimpleTestCase):
         self.assertEqual(app_config.name, "sources.legacy_flexibi_hamburg")
         self.assertEqual(
             settings.MIGRATION_MODULES["flexibi_hamburg"],
-            "case_studies.flexibi_hamburg.migrations",
+            "sources.legacy_flexibi_hamburg.migrations",
         )
 
-    def test_roadside_tree_admin_adapters_reexport_source_owned_admin(self):
-        self.assertIs(HamburgRoadsideTreesAdmin, LegacyHamburgRoadsideTreesAdmin)
-        self.assertIs(HamburgGreenAreasAdmin, LegacyHamburgGreenAreasAdmin)
+    def test_roadside_tree_admin_is_owned_by_sources_module(self):
+        self.assertEqual(
+            HamburgRoadsideTreesAdmin.__module__, "sources.roadside_trees.admin"
+        )
+        self.assertEqual(HamburgGreenAreasAdmin.__module__, "sources.roadside_trees.admin")
 
-    def test_greenhouse_model_adapters_reexport_legacy_models(self):
-        self.assertIs(Culture, LegacyCulture)
-        self.assertIs(Greenhouse, LegacyGreenhouse)
-        self.assertIs(GreenhouseGrowthCycle, LegacyGreenhouseGrowthCycle)
-        self.assertIs(GrowthShare, LegacyGrowthShare)
-        self.assertIs(GrowthTimeStepSet, LegacyGrowthTimeStepSet)
-        self.assertIs(NantesGreenhouses, LegacyNantesGreenhouses)
+    def test_greenhouse_models_are_owned_by_sources_modules(self):
+        self.assertEqual(Culture.__module__, "sources.greenhouses.models")
+        self.assertEqual(Greenhouse.__module__, "sources.greenhouses.models")
+        self.assertEqual(
+            GreenhouseGrowthCycle.__module__, "sources.greenhouses.models"
+        )
+        self.assertEqual(GrowthShare.__module__, "sources.greenhouses.models")
+        self.assertEqual(GrowthTimeStepSet.__module__, "sources.greenhouses.models")
+        self.assertEqual(NantesGreenhouses.__module__, "sources.greenhouses.models")
 
     def test_greenhouse_models_use_sources_app_label_and_preserve_db_tables(self):
         self.assertEqual(Culture._meta.app_label, "greenhouses")
@@ -144,21 +115,27 @@ class SourcesModelAdapterTestCase(SimpleTestCase):
         self.assertEqual(app_config.name, "sources.legacy_flexibi_nantes")
         self.assertEqual(
             settings.MIGRATION_MODULES["flexibi_nantes"],
-            "case_studies.flexibi_nantes.migrations",
+            "sources.legacy_flexibi_nantes.migrations",
         )
 
-    def test_greenhouse_admin_adapters_reexport_source_owned_admin(self):
-        self.assertIs(CultureAdmin, LegacyCultureAdmin)
-        self.assertIs(GreenhouseAdmin, LegacyGreenhouseAdmin)
-        self.assertIs(GreenhouseGrowthCycleAdmin, LegacyGreenhouseGrowthCycleAdmin)
-        self.assertIs(GrowthShareAdmin, LegacyGrowthShareAdmin)
-        self.assertIs(GrowthTimeStepSetAdmin, LegacyGrowthTimeStepSetAdmin)
+    def test_greenhouse_admin_is_owned_by_sources_module(self):
+        self.assertEqual(CultureAdmin.__module__, "sources.greenhouses.admin")
+        self.assertEqual(GreenhouseAdmin.__module__, "sources.greenhouses.admin")
+        self.assertEqual(
+            GreenhouseGrowthCycleAdmin.__module__, "sources.greenhouses.admin"
+        )
+        self.assertEqual(GrowthShareAdmin.__module__, "sources.greenhouses.admin")
+        self.assertEqual(
+            GrowthTimeStepSetAdmin.__module__, "sources.greenhouses.admin"
+        )
 
-    def test_waste_collection_model_adapters_reexport_legacy_models(self):
-        self.assertIs(Collection, LegacyCollection)
-        self.assertIs(CollectionPropertyValue, LegacyCollectionPropertyValue)
-        self.assertIs(Collector, LegacyCollector)
-        self.assertIs(WasteFlyer, LegacyWasteFlyer)
+    def test_waste_collection_models_are_owned_by_sources_modules(self):
+        self.assertEqual(Collection.__module__, "sources.waste_collection.models")
+        self.assertEqual(
+            CollectionPropertyValue.__module__, "sources.waste_collection.models"
+        )
+        self.assertEqual(Collector.__module__, "sources.waste_collection.models")
+        self.assertEqual(WasteFlyer.__module__, "sources.waste_collection.models")
 
     def test_waste_collection_models_use_sources_app_label_and_preserve_db_tables(self):
         self.assertEqual(Collection._meta.app_label, "waste_collection")
@@ -180,14 +157,16 @@ class SourcesModelAdapterTestCase(SimpleTestCase):
         self.assertEqual(app_config.name, "sources.legacy_soilcom")
         self.assertEqual(
             settings.MIGRATION_MODULES["soilcom"],
-            "case_studies.soilcom.migrations",
+            "sources.legacy_soilcom.migrations",
         )
 
-    def test_waste_collection_admin_adapters_reexport_source_owned_admin(self):
-        self.assertIs(CollectionAdmin, LegacyCollectionAdmin)
-        self.assertIs(CollectionPropertyValueAdmin, LegacyCollectionPropertyValueAdmin)
-        self.assertIs(CollectorAdmin, LegacyCollectorAdmin)
-        self.assertIs(WasteFlyerAdmin, LegacyWasteFlyerAdmin)
+    def test_waste_collection_admin_is_owned_by_sources_module(self):
+        self.assertEqual(CollectionAdmin.__module__, "sources.waste_collection.admin")
+        self.assertEqual(
+            CollectionPropertyValueAdmin.__module__, "sources.waste_collection.admin"
+        )
+        self.assertEqual(CollectorAdmin.__module__, "sources.waste_collection.admin")
+        self.assertEqual(WasteFlyerAdmin.__module__, "sources.waste_collection.admin")
 
     def test_greenhouse_selectors_import_greenhouse_from_sources_model_adapter(self):
         from sources.greenhouses import selectors

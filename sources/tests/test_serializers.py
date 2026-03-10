@@ -3,99 +3,6 @@ from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
-from case_studies.flexibi_hamburg.serializers import (
-    HamburgRoadsideTreeFlatSerializer as LegacyHamburgRoadsideTreeFlatSerializer,
-    HamburgRoadsideTreeGeometrySerializer as LegacyHamburgRoadsideTreeGeometrySerializer,
-    HamburgRoadsideTreeSimpleModelSerializer as LegacyHamburgRoadsideTreeSimpleModelSerializer,
-)
-from case_studies.flexibi_hamburg.filters import (
-    HamburgRoadsideTreesFilterSet as LegacyHamburgRoadsideTreesFilterSet,
-)
-from case_studies.flexibi_hamburg.renderers import (
-    HamburgRoadsideTreesCSVRenderer as LegacyHamburgRoadsideTreesCSVRenderer,
-    HamburgRoadsideTreesXLSXRenderer as LegacyHamburgRoadsideTreesXLSXRenderer,
-)
-from case_studies.flexibi_nantes.serializers import (
-    NantesGreenhousesFlatSerializer as LegacyNantesGreenhousesFlatSerializer,
-    NantesGreenhousesGeometrySerializer as LegacyNantesGreenhousesGeometrySerializer,
-    NantesGreenhousesModelSerializer as LegacyNantesGreenhousesModelSerializer,
-)
-from case_studies.flexibi_nantes.filters import (
-    CultureListFilter as LegacyCultureListFilter,
-    GreenhouseTypeFilter as LegacyGreenhouseTypeFilter,
-    NantesGreenhousesFilterSet as LegacyNantesGreenhousesFilterSet,
-)
-from case_studies.flexibi_nantes.forms import (
-    CultureModalModelForm as LegacyCultureModalModelForm,
-    CultureModelForm as LegacyCultureModelForm,
-    GreenhouseGrowthCycleModelForm as LegacyGreenhouseGrowthCycleModelForm,
-    GreenhouseModalModelForm as LegacyGreenhouseModalModelForm,
-    GreenhouseModelForm as LegacyGreenhouseModelForm,
-    GrowthCycleCreateForm as LegacyGrowthCycleCreateForm,
-    GrowthShareFormSetHelper as LegacyGrowthShareFormSetHelper,
-    GrowthTimestepInline as LegacyGrowthTimestepInline,
-    InlineGrowthShare as LegacyInlineGrowthShare,
-    UpdateGreenhouseGrowthCycleValuesForm as LegacyUpdateGreenhouseGrowthCycleValuesForm,
-)
-from case_studies.flexibi_nantes.renderers import (
-    NantesGreenhousesCSVRenderer as LegacyNantesGreenhousesCSVRenderer,
-    NantesGreenhousesXLSXRenderer as LegacyNantesGreenhousesXLSXRenderer,
-)
-from case_studies.soilcom.serializers import (
-    GEOMETRY_SIMPLIFY_TOLERANCE as LegacyGeometrySimplifyTolerance,
-    CollectionFlatSerializer as LegacyCollectionFlatSerializer,
-    WasteCollectionGeometrySerializer as LegacyWasteCollectionGeometrySerializer,
-)
-from case_studies.soilcom.filters import CollectionFilterSet as LegacyCollectionFilterSet
-from case_studies.soilcom.filters import (
-    CollectionFrequencyListFilter as LegacyCollectionFrequencyListFilter,
-    CollectionSystemListFilter as LegacyCollectionSystemListFilter,
-    CollectorFilter as LegacyCollectorFilter,
-    FeeSystemListFilter as LegacyFeeSystemListFilter,
-    WasteCategoryListFilter as LegacyWasteCategoryListFilter,
-    WasteComponentListFilter as LegacyWasteComponentListFilter,
-    WasteFlyerFilter as LegacyWasteFlyerFilter,
-)
-from case_studies.soilcom.forms import (
-    AggregatedCollectionPropertyValueModelForm as LegacyAggregatedCollectionPropertyValueModelForm,
-    CollectionAddPredecessorForm as LegacyCollectionAddPredecessorForm,
-    CollectionAddWasteSampleForm as LegacyCollectionAddWasteSampleForm,
-    CollectionFrequencyModalModelForm as LegacyCollectionFrequencyModalModelForm,
-    CollectionFrequencyModelForm as LegacyCollectionFrequencyModelForm,
-    CollectionModelForm as LegacyCollectionModelForm,
-    CONNECTION_TYPE_CHOICES as LegacyWasteConnectionTypeChoices,
-    CollectionPropertyValueModelForm as LegacyCollectionPropertyValueModelForm,
-    CollectionRemovePredecessorForm as LegacyCollectionRemovePredecessorForm,
-    CollectionRemoveWasteSampleForm as LegacyCollectionRemoveWasteSampleForm,
-    CollectionSeasonForm as LegacyCollectionSeasonForm,
-    CollectionSeasonFormHelper as LegacyCollectionSeasonFormHelper,
-    CollectionSeasonFormSet as LegacyCollectionSeasonFormSet,
-    CollectionSystemModalModelForm as LegacyCollectionSystemModalModelForm,
-    CollectionSystemModelForm as LegacyCollectionSystemModelForm,
-    CollectorModalModelForm as LegacyCollectorModalModelForm,
-    CollectorModelForm as LegacyCollectorModelForm,
-    FeeSystemModalModelForm as LegacyFeeSystemModalModelForm,
-    FeeSystemModelForm as LegacyFeeSystemModelForm,
-    REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES as LegacyRequiredBinCapacityReferenceChoices,
-    SortingMethodModalModelForm as LegacySortingMethodModalModelForm,
-    SortingMethodModelForm as LegacySortingMethodModelForm,
-    WasteCategoryModalModelForm as LegacyWasteCategoryModalModelForm,
-    WasteCategoryModelForm as LegacyWasteCategoryModelForm,
-    WasteComponentModalModelForm as LegacyWasteComponentModalModelForm,
-    WasteComponentModelForm as LegacyWasteComponentModelForm,
-    WasteFlyerFormSet as LegacyWasteFlyerFormSet,
-    WasteFlyerFormSetHelper as LegacyWasteFlyerFormSetHelper,
-    WasteFlyerModalModelForm as LegacyWasteFlyerModalModelForm,
-    WasteFlyerModelForm as LegacyWasteFlyerModelForm,
-)
-from case_studies.soilcom.renderers import (
-    CollectionCSVRenderer as LegacyCollectionCSVRenderer,
-    CollectionXLSXRenderer as LegacyCollectionXLSXRenderer,
-)
-from case_studies.soilcom.tasks import (
-    check_wasteflyer_url as LegacyCheckWasteflyerUrl,
-    check_wasteflyer_urls as LegacyCheckWasteflyerUrls,
-)
 from sources.greenhouses.forms import (
     CultureModalModelForm,
     CultureModelForm,
@@ -187,57 +94,53 @@ from sources.waste_collection.tasks import check_wasteflyer_url, check_wasteflye
 
 
 class SourcesSerializerAdapterTestCase(SimpleTestCase):
-    def test_waste_collection_serializer_adapters_reexport_legacy_symbols(self):
-        self.assertEqual(GEOMETRY_SIMPLIFY_TOLERANCE, LegacyGeometrySimplifyTolerance)
-        self.assertIs(CollectionFlatSerializer, LegacyCollectionFlatSerializer)
-        self.assertIs(
-            WasteCollectionGeometrySerializer,
-            LegacyWasteCollectionGeometrySerializer,
-        )
-
     def test_waste_collection_serializers_are_owned_by_sources(self):
+        self.assertGreater(GEOMETRY_SIMPLIFY_TOLERANCE, 0)
         self.assertEqual(CollectionFlatSerializer.__module__, "sources.waste_collection.serializers")
         self.assertEqual(
             WasteCollectionGeometrySerializer.__module__,
             "sources.waste_collection.serializers",
         )
 
-    def test_roadside_tree_serializer_adapters_reexport_legacy_serializers(self):
-        self.assertIs(
-            HamburgRoadsideTreeFlatSerializer,
-            LegacyHamburgRoadsideTreeFlatSerializer,
+    def test_roadside_tree_serializers_are_owned_by_sources(self):
+        self.assertEqual(
+            HamburgRoadsideTreeFlatSerializer.__module__,
+            "sources.roadside_trees.serializers",
         )
-        self.assertIs(
-            HamburgRoadsideTreeGeometrySerializer,
-            LegacyHamburgRoadsideTreeGeometrySerializer,
+        self.assertEqual(
+            HamburgRoadsideTreeGeometrySerializer.__module__,
+            "sources.roadside_trees.serializers",
         )
-        self.assertIs(
-            HamburgRoadsideTreeSimpleModelSerializer,
-            LegacyHamburgRoadsideTreeSimpleModelSerializer,
-        )
-
-    def test_greenhouse_serializer_adapters_reexport_legacy_serializers(self):
-        self.assertIs(NantesGreenhousesFlatSerializer, LegacyNantesGreenhousesFlatSerializer)
-        self.assertIs(
-            NantesGreenhousesGeometrySerializer,
-            LegacyNantesGreenhousesGeometrySerializer,
-        )
-        self.assertIs(
-            NantesGreenhousesModelSerializer,
-            LegacyNantesGreenhousesModelSerializer,
+        self.assertEqual(
+            HamburgRoadsideTreeSimpleModelSerializer.__module__,
+            "sources.roadside_trees.serializers",
         )
 
-    def test_waste_collection_filter_and_renderer_adapters_reexport_legacy_symbols(self):
-        self.assertIs(CollectionFrequencyListFilter, LegacyCollectionFrequencyListFilter)
-        self.assertIs(CollectionFilterSet, LegacyCollectionFilterSet)
-        self.assertIs(CollectionSystemListFilter, LegacyCollectionSystemListFilter)
-        self.assertIs(CollectorFilter, LegacyCollectorFilter)
-        self.assertIs(FeeSystemListFilter, LegacyFeeSystemListFilter)
-        self.assertIs(WasteCategoryListFilter, LegacyWasteCategoryListFilter)
-        self.assertIs(WasteComponentListFilter, LegacyWasteComponentListFilter)
-        self.assertIs(WasteFlyerFilter, LegacyWasteFlyerFilter)
-        self.assertIs(CollectionCSVRenderer, LegacyCollectionCSVRenderer)
-        self.assertIs(CollectionXLSXRenderer, LegacyCollectionXLSXRenderer)
+    def test_greenhouse_serializers_are_owned_by_sources(self):
+        self.assertEqual(
+            NantesGreenhousesFlatSerializer.__module__,
+            "sources.greenhouses.serializers",
+        )
+        self.assertEqual(
+            NantesGreenhousesGeometrySerializer.__module__,
+            "sources.greenhouses.serializers",
+        )
+        self.assertEqual(
+            NantesGreenhousesModelSerializer.__module__,
+            "sources.greenhouses.serializers",
+        )
+
+    def test_waste_collection_filters_and_renderers_are_owned_by_sources(self):
+        self.assertEqual(CollectionFrequencyListFilter.__module__, "sources.waste_collection.filters")
+        self.assertEqual(CollectionFilterSet.__module__, "sources.waste_collection.filters")
+        self.assertEqual(CollectionSystemListFilter.__module__, "sources.waste_collection.filters")
+        self.assertEqual(CollectorFilter.__module__, "sources.waste_collection.filters")
+        self.assertEqual(FeeSystemListFilter.__module__, "sources.waste_collection.filters")
+        self.assertEqual(WasteCategoryListFilter.__module__, "sources.waste_collection.filters")
+        self.assertEqual(WasteComponentListFilter.__module__, "sources.waste_collection.filters")
+        self.assertEqual(WasteFlyerFilter.__module__, "sources.waste_collection.filters")
+        self.assertEqual(CollectionCSVRenderer.__module__, "sources.waste_collection.renderers")
+        self.assertEqual(CollectionXLSXRenderer.__module__, "sources.waste_collection.renderers")
 
     def test_waste_collection_filters_are_owned_by_sources(self):
         self.assertEqual(CollectionFilterSet.__module__, "sources.waste_collection.filters")
@@ -254,11 +157,6 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
             CollectionXLSXRenderer.__module__,
             "sources.waste_collection.renderers",
         )
-
-    def test_roadside_tree_filter_and_renderer_adapters_reexport_legacy_symbols(self):
-        self.assertIs(HamburgRoadsideTreesFilterSet, LegacyHamburgRoadsideTreesFilterSet)
-        self.assertIs(HamburgRoadsideTreesCSVRenderer, LegacyHamburgRoadsideTreesCSVRenderer)
-        self.assertIs(HamburgRoadsideTreesXLSXRenderer, LegacyHamburgRoadsideTreesXLSXRenderer)
 
     def test_roadside_tree_filters_and_serializers_are_owned_by_sources(self):
         self.assertEqual(HamburgRoadsideTreesFilterSet.__module__, "sources.roadside_trees.filters")
@@ -282,13 +180,6 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
             HamburgRoadsideTreesXLSXRenderer.__module__,
             "sources.roadside_trees.renderers",
         )
-
-    def test_greenhouse_filter_and_renderer_adapters_reexport_legacy_symbols(self):
-        self.assertIs(CultureListFilter, LegacyCultureListFilter)
-        self.assertIs(GreenhouseTypeFilter, LegacyGreenhouseTypeFilter)
-        self.assertIs(NantesGreenhousesFilterSet, LegacyNantesGreenhousesFilterSet)
-        self.assertIs(NantesGreenhousesCSVRenderer, LegacyNantesGreenhousesCSVRenderer)
-        self.assertIs(NantesGreenhousesXLSXRenderer, LegacyNantesGreenhousesXLSXRenderer)
 
     def test_greenhouse_filters_serializers_and_renderers_are_owned_by_sources(self):
         self.assertEqual(CultureListFilter.__module__, "sources.greenhouses.filters")
@@ -318,21 +209,6 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
             "sources.greenhouses.renderers",
         )
 
-    def test_greenhouse_form_adapters_reexport_legacy_symbols(self):
-        self.assertIs(CultureModalModelForm, LegacyCultureModalModelForm)
-        self.assertIs(CultureModelForm, LegacyCultureModelForm)
-        self.assertIs(GreenhouseGrowthCycleModelForm, LegacyGreenhouseGrowthCycleModelForm)
-        self.assertIs(GreenhouseModalModelForm, LegacyGreenhouseModalModelForm)
-        self.assertIs(GreenhouseModelForm, LegacyGreenhouseModelForm)
-        self.assertIs(GrowthCycleCreateForm, LegacyGrowthCycleCreateForm)
-        self.assertIs(GrowthShareFormSetHelper, LegacyGrowthShareFormSetHelper)
-        self.assertIs(GrowthTimestepInline, LegacyGrowthTimestepInline)
-        self.assertIs(InlineGrowthShare, LegacyInlineGrowthShare)
-        self.assertIs(
-            UpdateGreenhouseGrowthCycleValuesForm,
-            LegacyUpdateGreenhouseGrowthCycleValuesForm,
-        )
-
     def test_greenhouse_forms_are_owned_by_sources(self):
         self.assertEqual(CultureModalModelForm.__module__, "sources.greenhouses.forms")
         self.assertEqual(CultureModelForm.__module__, "sources.greenhouses.forms")
@@ -357,72 +233,93 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
             "sources.greenhouses.forms",
         )
 
-    def test_waste_collection_form_and_task_adapters_reexport_legacy_symbols(self):
-        self.assertIs(
-            AggregatedCollectionPropertyValueModelForm,
-            LegacyAggregatedCollectionPropertyValueModelForm,
-        )
-        self.assertIs(CollectionAddPredecessorForm, LegacyCollectionAddPredecessorForm)
-        self.assertIs(CollectionAddWasteSampleForm, LegacyCollectionAddWasteSampleForm)
-        self.assertIs(
-            CollectionFrequencyModalModelForm,
-            LegacyCollectionFrequencyModalModelForm,
-        )
-        self.assertIs(CollectionFrequencyModelForm, LegacyCollectionFrequencyModelForm)
-        self.assertIs(CollectionModelForm, LegacyCollectionModelForm)
-        self.assertIs(
-            CollectionPropertyValueModelForm,
-            LegacyCollectionPropertyValueModelForm,
-        )
-        self.assertIs(
-            CollectionRemovePredecessorForm,
-            LegacyCollectionRemovePredecessorForm,
-        )
-        self.assertIs(
-            CollectionRemoveWasteSampleForm,
-            LegacyCollectionRemoveWasteSampleForm,
-        )
-        self.assertIs(CollectionSeasonForm, LegacyCollectionSeasonForm)
-        self.assertIs(CollectionSeasonFormHelper, LegacyCollectionSeasonFormHelper)
-        self.assertIs(CollectionSeasonFormSet, LegacyCollectionSeasonFormSet)
-        self.assertIs(
-            CollectionSystemModalModelForm,
-            LegacyCollectionSystemModalModelForm,
-        )
-        self.assertIs(CollectionSystemModelForm, LegacyCollectionSystemModelForm)
-        self.assertIs(CollectorModalModelForm, LegacyCollectorModalModelForm)
-        self.assertIs(CollectorModelForm, LegacyCollectorModelForm)
-        self.assertIs(FeeSystemModalModelForm, LegacyFeeSystemModalModelForm)
-        self.assertIs(FeeSystemModelForm, LegacyFeeSystemModelForm)
-        self.assertIs(SortingMethodModalModelForm, LegacySortingMethodModalModelForm)
-        self.assertIs(SortingMethodModelForm, LegacySortingMethodModelForm)
-        self.assertIs(WasteCategoryModalModelForm, LegacyWasteCategoryModalModelForm)
-        self.assertIs(WasteCategoryModelForm, LegacyWasteCategoryModelForm)
-        self.assertIs(WasteComponentModalModelForm, LegacyWasteComponentModalModelForm)
-        self.assertIs(WasteComponentModelForm, LegacyWasteComponentModelForm)
-        self.assertIs(WasteFlyerFormSet, LegacyWasteFlyerFormSet)
-        self.assertIs(WasteFlyerFormSetHelper, LegacyWasteFlyerFormSetHelper)
-        self.assertIs(WasteFlyerModalModelForm, LegacyWasteFlyerModalModelForm)
-        self.assertIs(WasteFlyerModelForm, LegacyWasteFlyerModelForm)
-        self.assertEqual(CONNECTION_TYPE_CHOICES, LegacyWasteConnectionTypeChoices)
-        self.assertEqual(
-            REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
-            LegacyRequiredBinCapacityReferenceChoices,
-        )
-        self.assertIs(check_wasteflyer_url, LegacyCheckWasteflyerUrl)
-        self.assertIs(check_wasteflyer_urls, LegacyCheckWasteflyerUrls)
-
     def test_waste_collection_forms_are_owned_by_sources(self):
+        self.assertTrue(CONNECTION_TYPE_CHOICES)
+        self.assertTrue(REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES)
         self.assertEqual(
             AggregatedCollectionPropertyValueModelForm.__module__,
             "sources.waste_collection.forms",
         )
+        self.assertEqual(
+            CollectionAddPredecessorForm.__module__,
+            "sources.waste_collection.forms",
+        )
+        self.assertEqual(
+            CollectionAddWasteSampleForm.__module__,
+            "sources.waste_collection.forms",
+        )
+        self.assertEqual(
+            CollectionFrequencyModalModelForm.__module__,
+            "sources.waste_collection.forms",
+        )
+        self.assertEqual(
+            CollectionFrequencyModelForm.__module__,
+            "sources.waste_collection.forms",
+        )
         self.assertEqual(CollectionModelForm.__module__, "sources.waste_collection.forms")
+        self.assertEqual(
+            CollectionPropertyValueModelForm.__module__,
+            "sources.waste_collection.forms",
+        )
+        self.assertEqual(
+            CollectionRemovePredecessorForm.__module__,
+            "sources.waste_collection.forms",
+        )
+        self.assertEqual(
+            CollectionRemoveWasteSampleForm.__module__,
+            "sources.waste_collection.forms",
+        )
+        self.assertEqual(CollectionSeasonForm.__module__, "sources.waste_collection.forms")
+        self.assertEqual(
+            CollectionSeasonFormHelper.__module__,
+            "sources.waste_collection.forms",
+        )
         self.assertEqual(
             CollectionSeasonFormSet.__module__,
             "sources.waste_collection.forms",
         )
+        self.assertEqual(
+            CollectionSystemModalModelForm.__module__,
+            "sources.waste_collection.forms",
+        )
+        self.assertEqual(
+            CollectionSystemModelForm.__module__,
+            "sources.waste_collection.forms",
+        )
+        self.assertEqual(
+            CollectorModalModelForm.__module__,
+            "sources.waste_collection.forms",
+        )
+        self.assertEqual(CollectorModelForm.__module__, "sources.waste_collection.forms")
+        self.assertEqual(
+            FeeSystemModalModelForm.__module__,
+            "sources.waste_collection.forms",
+        )
+        self.assertEqual(FeeSystemModelForm.__module__, "sources.waste_collection.forms")
+        self.assertEqual(
+            SortingMethodModalModelForm.__module__,
+            "sources.waste_collection.forms",
+        )
         self.assertEqual(WasteFlyerFormSet.__module__, "sources.waste_collection.forms")
+        self.assertEqual(
+            WasteFlyerFormSetHelper.__module__,
+            "sources.waste_collection.forms",
+        )
+        self.assertEqual(
+            WasteFlyerModalModelForm.__module__,
+            "sources.waste_collection.forms",
+        )
+        self.assertEqual(WasteFlyerModelForm.__module__, "sources.waste_collection.forms")
+        self.assertEqual(
+            WasteCategoryModalModelForm.__module__,
+            "sources.waste_collection.forms",
+        )
+        self.assertEqual(WasteCategoryModelForm.__module__, "sources.waste_collection.forms")
+        self.assertEqual(
+            WasteComponentModalModelForm.__module__,
+            "sources.waste_collection.forms",
+        )
+        self.assertEqual(WasteComponentModelForm.__module__, "sources.waste_collection.forms")
         self.assertEqual(
             SortingMethodModelForm.__module__,
             "sources.waste_collection.forms",

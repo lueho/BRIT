@@ -57,7 +57,7 @@ INSTALLED_APPS = [
     "sources.legacy_flexibi_nantes.apps.LegacyFlexibiNantesConfig",
     "sources.legacy_soilcom.apps.LegacySoilcomConfig",
     "layer_manager.apps.LayerManagerConfig",
-    "case_studies.soilcom.waste_atlas.apps.WasteAtlasConfig",
+    "sources.waste_collection.waste_atlas.apps.WasteAtlasConfig",
     "case_studies.closecycle.apps.ClosecycleConfig",
     "interfaces.simucf.apps.SimucfConfig",
     "utils.file_export.apps.FileExportConfig",
@@ -110,9 +110,9 @@ DATABASES = {}  # Specified in local.py for development and heroku.py for produc
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 MIGRATION_MODULES = {
-    "flexibi_hamburg": "case_studies.flexibi_hamburg.migrations",
-    "flexibi_nantes": "case_studies.flexibi_nantes.migrations",
-    "soilcom": "case_studies.soilcom.migrations",
+    "flexibi_hamburg": "sources.legacy_flexibi_hamburg.migrations",
+    "flexibi_nantes": "sources.legacy_flexibi_nantes.migrations",
+    "soilcom": "sources.legacy_soilcom.migrations",
 }
 
 # Password validation

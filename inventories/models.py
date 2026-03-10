@@ -11,7 +11,6 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
 
-import case_studies
 import sources
 from bibliography.models import Source
 from distributions.models import Timestep
@@ -70,9 +69,7 @@ class InventoryAlgorithm(models.Model):
         source_module = InventoryAlgorithm.normalize_source_module(source_module)
         if "." in source_module:
             return source_module
-        return InventoryAlgorithm.SOURCE_MODULE_PATH_ALIASES.get(
-            source_module, f"case_studies.{source_module}.algorithms"
-        )
+        return InventoryAlgorithm.SOURCE_MODULE_PATH_ALIASES.get(source_module, source_module)
 
     @staticmethod
     def task_reference_lookup_candidates(source_module):
@@ -89,9 +86,7 @@ class InventoryAlgorithm(models.Model):
 
     @staticmethod
     def available_modules():
-        legacy_modules = sorted(
-            module.name for module in pkgutil.iter_modules(case_studies.__path__)
-        )
+        legacy_modules = sorted(InventoryAlgorithm.SOURCE_MODULE_PATH_ALIASES)
         source_modules = []
         for module in pkgutil.iter_modules(sources.__path__):
             if not module.ispkg:

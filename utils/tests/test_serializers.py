@@ -18,7 +18,7 @@ class FieldLabelMixinTestCase(TestCase):
         cls.data = {"char": "abc", "integer": 123}
         cls.serializer = TestSerializer
 
-        with isolate_apps("case_studies.soilcom"):
+        with isolate_apps("sources.waste_collection"):
 
             class TestModel(models.Model):
                 char = models.CharField(verbose_name="Text")

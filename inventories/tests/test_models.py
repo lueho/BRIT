@@ -3,9 +3,6 @@ from types import SimpleNamespace
 
 from maps.models import Region
 from materials.models import SampleSeries
-from case_studies.flexibi_nantes.algorithms import (
-    InventoryAlgorithms as LegacyGreenhouseInventoryAlgorithms,
-)
 from sources.greenhouses.inventory.algorithms import (
     InventoryAlgorithms as GreenhouseInventoryAlgorithms,
 )
@@ -64,8 +61,7 @@ class ScenarioTestCase(TestCase):
             geodatasets, GeoDataset.objects.filter(name="Test Dataset")
         )
 
-    def test_greenhouse_inventory_algorithms_are_owned_by_sources_and_reexported_legacy(self):
-        self.assertIs(GreenhouseInventoryAlgorithms, LegacyGreenhouseInventoryAlgorithms)
+    def test_greenhouse_inventory_algorithms_are_owned_by_sources(self):
         self.assertEqual(
             GreenhouseInventoryAlgorithms.__module__,
             "sources.greenhouses.inventory.algorithms",
@@ -174,16 +170,10 @@ class ScenarioTestCase(TestCase):
     def test_available_modules_includes_nested_sources_inventory_modules(
         self, mock_iter_modules, mock_import_module
     ):
-        mock_iter_modules.side_effect = [
-            [
-                SimpleNamespace(name="flexibi_hamburg"),
-                SimpleNamespace(name="flexibi_nantes"),
-            ],
-            [
-                SimpleNamespace(name="greenhouses", ispkg=True),
-                SimpleNamespace(name="tests", ispkg=True),
-                SimpleNamespace(name="views", ispkg=False),
-            ],
+        mock_iter_modules.return_value = [
+            SimpleNamespace(name="greenhouses", ispkg=True),
+            SimpleNamespace(name="tests", ispkg=True),
+            SimpleNamespace(name="views", ispkg=False),
         ]
 
         def import_module_side_effect(module_path):
@@ -203,6 +193,7 @@ class ScenarioTestCase(TestCase):
                 "sources.greenhouses.inventory.algorithms",
             ],
         )
+        mock_iter_modules.assert_called_once()
 
     def test_inventory_algorithm_execute_uses_resolved_callable(self):
         algorithm = InventoryAlgorithm.objects.create(
