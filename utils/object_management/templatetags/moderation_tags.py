@@ -7,6 +7,7 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
+from django.test import RequestFactory
 from django.urls import reverse
 from django.utils.html import escape, mark_safe
 
@@ -481,47 +482,15 @@ def pending_review_count_for_user(user):
         return cached_count
 
     try:
-        from utils.object_management.models import UserCreatedObject
-        from utils.object_management.permissions import user_is_moderator_for_model
+        from utils.object_management.views import ReviewDashboardView
 
-        total_count = 0
-        models_to_check = []
+        request = RequestFactory().get("/")
+        request.user = user
 
-        # First, collect all models the user can moderate.
-        for model in apps.get_models():
-            if (
-                issubclass(model, UserCreatedObject)
-                and not model._meta.abstract
-                and hasattr(model, "objects")
-            ):
-                if user_is_moderator_for_model(user, model):
-                    models_to_check.append(model)
-
-        # Count review items while deduplicating identical querysets.
-        #
-        # Multiple proxy models can map to the same underlying table and manager
-        # filter, which otherwise produces duplicate COUNT(*) queries.
-        if models_to_check:
-            from django.db.models import Q
-
-            query_signatures = set()
-            for model in models_to_check:
-                try:
-                    queryset = model.objects.filter(
-                        Q(publication_status="review") & ~Q(owner=user)
-                    )
-                    # Ignore model-level ordering when building the signature,
-                    # because COUNT(*) drops ORDER BY and would otherwise run
-                    # duplicate count queries for equivalent filters.
-                    signature = str(queryset.order_by().query)
-                    if signature in query_signatures:
-                        continue
-
-                    query_signatures.add(signature)
-                    total_count += queryset.count()
-                except Exception:
-                    # Skip models that don't support the query
-                    continue
+        view = ReviewDashboardView()
+        view.setup(request)
+        view.request = request
+        total_count = len(view.collect_review_items())
 
         # Cache the result for 5 minutes (300 seconds)
         cache.set(cache_key, total_count, 300)

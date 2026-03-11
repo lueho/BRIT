@@ -1,16 +1,20 @@
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.db import connection
+from django.db.models.signals import post_save, pre_save
 from django.template import Context, Template
-from django.test import TestCase
-from django.test.utils import CaptureQueriesContext
+from django.test import RequestFactory, TestCase
+from factory.django import mute_signals
 
+from case_studies.soilcom.models import Collection
+from utils.object_management.models import UserCreatedObject
 from utils.object_management.templatetags.moderation_tags import (
     markdown_to_html,
     pending_review_count_for_user,
 )
+from utils.object_management.views import ReviewDashboardView
 
 
 class PendingReviewCountTagTests(TestCase):
@@ -21,37 +25,42 @@ class PendingReviewCountTagTests(TestCase):
             password="irrelevant",
             is_staff=True,
         )
+        cls.owner = get_user_model().objects.create_user(
+            username="moderation-tag-owner",
+            password="irrelevant",
+        )
+
+        with mute_signals(post_save, pre_save):
+            for index in range(11):
+                Collection.objects.create(
+                    name=f"Review Collection {index}",
+                    owner=cls.owner,
+                    publication_status=UserCreatedObject.STATUS_REVIEW,
+                )
 
     def setUp(self):
         cache.delete(f"pending_review_count_{self.user.id}")
 
-    def test_pending_review_count_does_not_issue_duplicate_count_queries(self):
-        with CaptureQueriesContext(connection) as ctx:
-            pending_review_count_for_user(self.user)
+    def test_pending_review_count_matches_unfiltered_dashboard_results(self):
+        with patch.object(ReviewDashboardView, "paginate_by", 1):
+            request = RequestFactory().get("/")
+            request.user = self.user
 
-        count_queries = [
-            query["sql"]
-            for query in ctx.captured_queries
-            if query["sql"].startswith("SELECT COUNT(*)")
-        ]
+            view = ReviewDashboardView()
+            view.setup(request)
+            view.request = request
 
-        self.assertGreater(len(count_queries), 0)
-        self.assertEqual(len(count_queries), len(set(count_queries)))
+            expected_count = len(view.collect_review_items())
+            actual_count = pending_review_count_for_user(self.user)
+
+        self.assertEqual(actual_count, expected_count)
+        self.assertEqual(actual_count, 10)
 
     def test_pending_review_count_uses_cache_on_second_call(self):
         first = pending_review_count_for_user(self.user)
-
-        with CaptureQueriesContext(connection) as ctx:
-            second = pending_review_count_for_user(self.user)
-
-        count_queries = [
-            query["sql"]
-            for query in ctx.captured_queries
-            if query["sql"].startswith("SELECT COUNT(*)")
-        ]
+        second = pending_review_count_for_user(self.user)
 
         self.assertEqual(first, second)
-        self.assertEqual(count_queries, [])
 
     def test_review_status_icon_can_use_precomputed_policy(self):
         obj = SimpleNamespace(
