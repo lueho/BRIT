@@ -3352,6 +3352,27 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
         cls.collection.allowed_materials.add(cls.allowed_material)
         cls.collection.forbidden_materials.add(cls.forbidden_material)
 
+        cls.predecessor_collection = Collection.objects.create(
+            name="Predecessor ReviewCollection",
+            catchment=cls.catchment,
+            collection_system=cls.system,
+            waste_category=cls.category,
+            publication_status="published",
+            valid_from=date(2023, 1, 1),
+        )
+        cls.predecessor_collection.allowed_materials.add(cls.allowed_material)
+        cls.predecessor_collection.forbidden_materials.add(cls.forbidden_material)
+
+        cls.versioned_review_collection = Collection.objects.create(
+            name="Versioned ReviewCollection",
+            catchment=cls.catchment,
+            collection_system=cls.system,
+            waste_category=cls.category,
+            publication_status="review",
+            valid_from=date(2024, 1, 1),
+        )
+        cls.versioned_review_collection.predecessors.add(cls.predecessor_collection)
+
     def test_review_preview_shows_published_and_review_only(self):
         self.client.force_login(self.staff)
         url = reverse(
@@ -3394,6 +3415,34 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
         self.assertEqual(len(forbidden_materials), 1)
         self.assertEqual(allowed_materials[0].name, "Allowed Material")
         self.assertEqual(forbidden_materials[0].name, "Forbidden Material")
+
+        body = response.content.decode()
+        self.assertIn("Allowed Materials", body)
+        self.assertIn("Forbidden Materials", body)
+        self.assertIn("Allowed Material", body)
+        self.assertIn("Forbidden Material", body)
+
+    def test_review_detail_falls_back_to_predecessor_materials(self):
+        self.client.force_login(self.staff)
+        url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": self.ct_id,
+                "object_id": self.versioned_review_collection.pk,
+            },
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        allowed_materials = response.context["allowed_materials"]
+        forbidden_materials = response.context["forbidden_materials"]
+
+        self.assertEqual(
+            [material.name for material in allowed_materials], ["Allowed Material"]
+        )
+        self.assertEqual(
+            [material.name for material in forbidden_materials], ["Forbidden Material"]
+        )
 
         body = response.content.decode()
         self.assertIn("Allowed Materials", body)

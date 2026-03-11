@@ -1434,6 +1434,26 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
         self.object = obj
         return obj
 
+    def _get_review_materials(self, relation_name):
+        materials = list(getattr(self.object, relation_name).all())
+        if materials:
+            return materials
+
+        fallback_versions = (
+            self.object.all_versions()
+            .exclude(pk=self.object.pk)
+            .filter(valid_from__lte=self.object.valid_from)
+            .prefetch_related(relation_name)
+            .order_by("-valid_from", "-pk")
+        )
+
+        for version in fallback_versions:
+            version_materials = list(getattr(version, relation_name).all())
+            if version_materials:
+                return version_materials
+
+        return materials
+
     def get_review_specific_context(self, context):
         """Add collection property values for review preview."""
         obj = self.object
@@ -1553,8 +1573,12 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
         except Exception:
             pass
 
-        review_context["allowed_materials"] = list(obj.effective_allowed_materials)
-        review_context["forbidden_materials"] = list(obj.effective_forbidden_materials)
+        review_context["allowed_materials"] = self._get_review_materials(
+            "allowed_materials"
+        )
+        review_context["forbidden_materials"] = self._get_review_materials(
+            "forbidden_materials"
+        )
 
         # review_logs is set on the parent context before this method is called
         review_logs = context.get("review_logs") or []
