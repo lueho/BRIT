@@ -1,5 +1,6 @@
+from django.contrib.auth.models import User
 from django.db.models import Q, signals
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.utils import timezone
 from factory.django import mute_signals
 
@@ -406,6 +407,35 @@ class CollectionFilterTestCase(TestCase):
         self.data.update({"catchment": self.catchment.pk})
         qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
         self.assertEqual(3, qs.count())
+
+    def test_review_scope_catchment_filter_matches_exact_catchment_only(self):
+        Collection.objects.filter(
+            pk__in=[
+                self.collection1.pk,
+                self.predecessor_collection.pk,
+                self.child_collection.pk,
+                self.collection2.pk,
+            ]
+        ).update(publication_status="review")
+        self.data.update({"catchment": self.catchment.pk, "scope": "review"})
+        request_data = {k: v for k, v in self.data.items() if v is not None}
+        request = RequestFactory().get(
+            "/waste_collection/collections/review/", request_data
+        )
+        request.user = User.objects.create_user(
+            username="review-filter-moderator", is_staff=True
+        )
+        qs = CollectionFilterSet(
+            self.data,
+            queryset=Collection.objects.all(),
+            request=request,
+        ).qs
+        self.assertQuerySetEqual(
+            qs.order_by("id"),
+            Collection.objects.filter(
+                pk__in=[self.collection1.pk, self.predecessor_collection.pk]
+            ).order_by("id"),
+        )
 
     def test_filter_includes_child_catchments(self):
         self.data.update({"catchment": self.catchment.pk})

@@ -15,6 +15,12 @@ for `UserCreatedObject` data in BRIT.
   - review transition API actions delegate to permission helpers
 - `utils/object_management/views.py`
   - `UserCreatedObjectAutocompleteView` uses visibility filtering + fail-closed filter handling
+  - `UserCreatedObjectListMixin` applies shared scope filtering for HTML lists
+  - `PublishedObjectFilterView` / `PrivateObjectFilterView` / `ReviewObjectFilterView`
+    provide the shared scoped list representations
+- `maps/views.py`
+  - `GeoDataSetPublishedFilteredMapView` / `GeoDataSetPrivateFilteredMapView` /
+    `GeoDataSetReviewFilteredMapView` reuse the same scoped filter views for maps
 - `utils/forms.py`
   - `UserCreatedObjectFormMixin.clean()` enforces backend validation of referenced objects
 
@@ -56,6 +62,59 @@ User input (UI or API)
                     +--> DB mutation / response
 ```
 
+## General rules for filtered lists and maps
+
+These rules are intended to hold for every filtered list or filtered map over a
+`UserCreatedObject` model unless an app documents and tests a specific
+deviation.
+
+1. **Scope semantics are generic, not app-specific.**
+
+   The meaning of `published`, `private`, `review`, `declined`, and `archived`
+   comes from `apply_scope_filter(...)` and must stay aligned with the
+   permission helpers in `utils/object_management/permissions.py`.
+
+2. **Views select scope through shared mixins, not ad-hoc queryset logic.**
+
+   - HTML lists should use `PublishedObjectFilterView`,
+     `PrivateObjectFilterView`, or `ReviewObjectFilterView`.
+   - Filtered maps should use `GeoDataSetPublishedFilteredMapView`,
+     `GeoDataSetPrivateFilteredMapView`, or `GeoDataSetReviewFilteredMapView`.
+   - These shared views set the effective `list_type` and default `scope`
+     parameter for the representation.
+
+3. **Base queryset scoping is centralized.**
+
+   `UserCreatedObjectListMixin.get_queryset()` is the shared entry point for
+   scoped list and map representations. When `list_type` is one of the known
+   scopes, it applies `apply_scope_filter(...)`; otherwise it falls back to
+   `filter_queryset_for_user(...)`.
+
+4. **Lists and maps should expose the same scoped result set.**
+
+   Filtered map views inherit from the same shared scoped filter views as HTML
+   lists. If a map and list use the same model, scope, and filterset, their
+   visible object set should stay aligned.
+
+5. **Related filter options must be visibility-safe.**
+
+   Querysets used to populate filter controls or autocomplete fields should
+   start from `filter_queryset_for_user(...)`. If the current scope is known,
+   they should then be narrowed with `apply_scope_filter(...)` so selectable
+   filter values do not expose objects outside the active visibility rules.
+
+6. **Scope switchers, counts, and exports must use the same policy helpers.**
+
+   Scope-specific counts and scope-switch URLs in shared views should derive
+   from the same helpers. Export and autocomplete flows must not reimplement a
+   looser visibility model.
+
+7. **App-specific deviations must be narrow, documented, and tested.**
+
+   App code may add domain-specific filtering semantics only after the shared
+   visibility rules are applied. Any such deviation must be explicitly
+   documented in the app and covered by regression tests.
+
 ## Read visibility policy
 
 ### General read filter (`filter_queryset_for_user`)
@@ -81,6 +140,7 @@ Notes:
 
 - Unknown scopes currently return the queryset unchanged.
 - Scope filtering requires a model with `publication_status`; owner-restricted scopes also require an `owner` field.
+- The shared `UserCreatedObjectScopedFilterSet` currently exposes `published`, `private`, and `review` as the generic UI scopes for filtered list/map views.
 
 ### Object-level safe-method reads (`_check_safe_permissions`)
 

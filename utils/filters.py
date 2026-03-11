@@ -130,11 +130,10 @@ class NullablePercentageRangeFilter(NullableRangeFilter):
 class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
     """FilterSet base class for user-created objects supporting a `scope` parameter.
 
-    Adds a hidden ``scope`` ChoiceFilter that can take the values ``published`` or
-    ``private``. When ``private`` is selected, only objects owned by the
-    requesting user are returned (and an empty queryset for anonymous users).
-    When ``published`` (the default) is selected, only objects with
-    ``publication_status='published'`` are returned.
+    Adds a hidden ``scope`` ChoiceFilter for the shared filtered list/map UI
+    scopes: ``published``, ``private``, and ``review``. Scope handling is
+    delegated to ``apply_scope_filter`` so visibility rules stay aligned with
+    the centralized permission policy.
     """
 
     scope = ChoiceFilter(

@@ -54,6 +54,44 @@ The module provides a complete set of views for managing waste collection data:
 - Waste sample management
 - Collection predecessor tracking
 
+## Scoped Collection Filtering
+
+The generic scope rules for filtered lists and maps are defined in
+[`docs/02_developer_guide/security_permission_validation.md`](../../docs/02_developer_guide/security_permission_validation.md).
+SOILCOM collections are expected to follow those shared rules first.
+
+### Shared behavior reused by SOILCOM collections
+
+- `CollectionPublishedListView`, `CollectionPrivateListView`, and
+  `CollectionReviewListView` / `CollectionReviewFilterView` build on the shared
+  `PublishedObjectFilterView`, `PrivateObjectFilterView`, and
+  `ReviewObjectFilterView` scope mixins.
+- `WasteCollectionPublishedMapView`, `WasteCollectionPrivateMapView`, and
+  `WasteCollectionReviewMapView` reuse the same shared scope pattern for the
+  map representation.
+- `CollectionFilterSet` extends `UserCreatedObjectScopedFilterSet`, so the
+  `scope` parameter is resolved through `apply_scope_filter(...)` before
+  collection-specific filters narrow the queryset further.
+
+### SOILCOM-specific deviations
+
+- `catchment` is not a simple foreign-key filter. In
+  `CollectionFilterSet.catchment_filter(...)`, non-review scopes expand the
+  selected catchment to domain-specific related collections:
+  - `custom` catchments use `inside_collections`
+  - otherwise the filter prefers `downstream_collections`
+  - if none exist, it falls back to `upstream_collections`
+  - country-level `nuts` catchments fall back to filtering by country when
+    hierarchy links are incomplete
+- For `scope=review`, catchment filtering is intentionally exact
+  (`queryset.filter(catchment=value)`) so moderation views do not broaden to
+  related catchments.
+- `CollectionFilterSet` hides the `publication_status` control outside the
+  private scope. This is a collection-specific UI choice layered on top of the
+  shared scope model.
+- Regression tests for the collection-specific catchment behavior live in
+  `case_studies/soilcom/tests/test_filters.py`.
+
 ## Entity Relationship Diagram
 
 ```mermaid

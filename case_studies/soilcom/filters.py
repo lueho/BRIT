@@ -650,8 +650,19 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
             except KeyError:
                 pass
 
-    @staticmethod
-    def catchment_filter(queryset, _, value):
+    def catchment_filter(self, queryset, _, value):
+        scope_val = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_val = self.data.get("scope")
+            if not scope_val and hasattr(self.form, "initial"):
+                scope_val = self.form.initial.get("scope")
+        except Exception:
+            scope_val = None
+
+        if scope_val == "review":
+            return queryset.filter(catchment=value)
+
         if value.type == "custom":
             spatially_related_qs = value.inside_collections.order_by("name")
         else:
