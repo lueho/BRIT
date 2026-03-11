@@ -17,6 +17,7 @@ import argparse
 import json
 import sys
 from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -186,10 +187,13 @@ def _collect_property_values(row) -> list[dict]:
 
 
 def _to_decimal_or_none(value):
+    """Return numeric value rounded to one decimal place, otherwise None."""
     if value is None:
         return None
     if isinstance(value, int | float):
-        return value
+        return float(
+            Decimal(str(value)).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+        )
     return None
 
 
