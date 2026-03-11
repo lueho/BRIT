@@ -133,7 +133,9 @@ class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
     Adds a hidden ``scope`` ChoiceFilter for the shared filtered list/map UI
     scopes: ``published``, ``private``, and ``review``. Scope handling is
     delegated to ``apply_scope_filter`` so visibility rules stay aligned with
-    the centralized permission policy.
+    the centralized permission policy. If a subclass exposes a
+    ``publication_status`` field, that control is hidden outside the private
+    scope.
     """
 
     scope = ChoiceFilter(
@@ -147,6 +149,32 @@ class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
         label="",
         initial="published",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._apply_shared_field_visibility()
+
+    def _get_scope_value(self):
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_val = self.data.get("scope")
+                if scope_val:
+                    return scope_val
+            form_initial = getattr(getattr(self, "form", None), "initial", None)
+            if form_initial:
+                return form_initial.get("scope")
+        except Exception:
+            return None
+        return None
+
+    def _apply_shared_field_visibility(self):
+        if "publication_status" not in self.filters:
+            return
+        if self._get_scope_value() == "private":
+            return
+        self.filters["publication_status"].field.widget = HiddenInput()
+        self.filters["publication_status"].field.label = ""
+        self.filters["publication_status"].extra["help_text"] = ""
 
     def filter_scope(self, queryset, name, value):
         """Filter *queryset* according to *value* of ``scope``.

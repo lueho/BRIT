@@ -72,23 +72,26 @@ SOILCOM collections are expected to follow those shared rules first.
 - `CollectionFilterSet` extends `UserCreatedObjectScopedFilterSet`, so the
   `scope` parameter is resolved through `apply_scope_filter(...)` before
   collection-specific filters narrow the queryset further.
+- If a scoped filterset exposes a `publication_status` field, the shared base
+  filterset hides that control outside the private scope.
+- Hierarchical spatial search is treated as a shared rule. In the collection
+  implementation, `catchment` expands through related catchments across scopes
+  rather than switching to exact matching in review views.
 
-### SOILCOM-specific deviations
+### SOILCOM-specific collection aspects
 
-- `catchment` is not a simple foreign-key filter. In
-  `CollectionFilterSet.catchment_filter(...)`, non-review scopes expand the
-  selected catchment to domain-specific related collections:
+- `catchment` is implemented on top of the shared hierarchical spatial-search
+  rule. In `CollectionFilterSet.catchment_filter(...)`, the selected catchment
+  expands to collection-specific related catchments:
   - `custom` catchments use `inside_collections`
   - otherwise the filter prefers `downstream_collections`
   - if none exist, it falls back to `upstream_collections`
-  - country-level `nuts` catchments fall back to filtering by country when
-    hierarchy links are incomplete
-- For `scope=review`, catchment filtering is intentionally exact
-  (`queryset.filter(catchment=value)`) so moderation views do not broaden to
-  related catchments.
-- `CollectionFilterSet` hides the `publication_status` control outside the
-  private scope. This is a collection-specific UI choice layered on top of the
-  shared scope model.
+- country-level `nuts` catchments fall back to filtering by country when
+  hierarchy links are incomplete
+- Collection-specific filter dimensions include waste category, allowed and
+  forbidden materials, connection type, connection rate, seasonal and optional
+  frequency, bin capacities, collections per year, and specific waste
+  collected.
 - Regression tests for the collection-specific catchment behavior live in
   `case_studies/soilcom/tests/test_filters.py`.
 

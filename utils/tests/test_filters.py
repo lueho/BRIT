@@ -2,7 +2,9 @@ from crispy_forms.helper import FormHelper
 from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.db.models.signals import post_save
+from django.forms import HiddenInput
 from django.test import TestCase
+from django_filters import ChoiceFilter
 from factory.django import mute_signals
 
 from case_studies.soilcom.models import Collection
@@ -149,6 +151,19 @@ class CollectionScopeFilterSet(UserCreatedObjectScopedFilterSet):
         fields = ("scope",)
 
 
+class CollectionScopeWithPublicationStatusFilterSet(UserCreatedObjectScopedFilterSet):
+    publication_status = ChoiceFilter(
+        choices=(
+            (UserCreatedObject.STATUS_PRIVATE, "Private"),
+            (UserCreatedObject.STATUS_PUBLISHED, "Published"),
+        )
+    )
+
+    class Meta:
+        model = Collection
+        fields = ("scope", "publication_status")
+
+
 class UserCreatedObjectScopedFilterSetTestCase(TestCase):
     """Regression tests for scope filtering on user-created objects."""
 
@@ -228,3 +243,23 @@ class UserCreatedObjectScopedFilterSetTestCase(TestCase):
     def test_private_scope_for_staff_user_is_owner_only(self):
         result_ids = self._filtered_ids(self.staff_user, "private")
         self.assertEqual(result_ids, set())
+
+    def test_publication_status_field_hidden_outside_private_scope(self):
+        filterset = CollectionScopeWithPublicationStatusFilterSet(
+            data={"scope": "published"},
+            queryset=Collection.objects.all(),
+        )
+        self.assertIsInstance(
+            filterset.filters["publication_status"].field.widget,
+            HiddenInput,
+        )
+
+    def test_publication_status_field_visible_in_private_scope(self):
+        filterset = CollectionScopeWithPublicationStatusFilterSet(
+            data={"scope": "private"},
+            queryset=Collection.objects.all(),
+        )
+        self.assertNotIsInstance(
+            filterset.filters["publication_status"].field.widget,
+            HiddenInput,
+        )

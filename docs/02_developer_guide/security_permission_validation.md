@@ -96,20 +96,35 @@ deviation.
    lists. If a map and list use the same model, scope, and filterset, their
    visible object set should stay aligned.
 
-5. **Related filter options must be visibility-safe.**
+5. **Hierarchical spatial searches should behave consistently across scopes.**
+
+   If a filtered representation exposes a hierarchical spatial filter
+   (for example catchments or regions), the default expectation is that the
+   filter expands through the relevant spatial hierarchy rather than switching
+   to exact matching for a specific scope. Any scope-specific deviation from
+   that rule must be explicitly documented and regression-tested.
+
+6. **Related filter options must be visibility-safe.**
 
    Querysets used to populate filter controls or autocomplete fields should
    start from `filter_queryset_for_user(...)`. If the current scope is known,
    they should then be narrowed with `apply_scope_filter(...)` so selectable
    filter values do not expose objects outside the active visibility rules.
 
-6. **Scope switchers, counts, and exports must use the same policy helpers.**
+7. **`publication_status` is a private-scope refinement control.**
+
+   If a scoped filterset exposes a `publication_status` field, that control
+   should be hidden outside the private scope. The generic `scope` selection
+   decides the visibility bucket; `publication_status` is only for refining the
+   owner's private list within that bucket.
+
+8. **Scope switchers, counts, and exports must use the same policy helpers.**
 
    Scope-specific counts and scope-switch URLs in shared views should derive
    from the same helpers. Export and autocomplete flows must not reimplement a
    looser visibility model.
 
-7. **App-specific deviations must be narrow, documented, and tested.**
+9. **App-specific deviations must be narrow, documented, and tested.**
 
    App code may add domain-specific filtering semantics only after the shared
    visibility rules are applied. Any such deviation must be explicitly

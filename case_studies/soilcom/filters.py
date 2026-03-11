@@ -4,7 +4,7 @@ from crispy_forms.bootstrap import Accordion
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row
 from django.db.models import Avg, Count, Max, Q, Sum
-from django.forms import CheckboxSelectMultiple, DateInput, HiddenInput, RadioSelect
+from django.forms import CheckboxSelectMultiple, DateInput, RadioSelect
 from django_filters import (
     BooleanFilter,
     CharFilter,
@@ -629,40 +629,7 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
             self.filters["required_bin_capacity"].set_min_max()
             self.filters["min_bin_size"].set_min_max()
 
-        # Only show publication_status filter when scope is private ("My collections")
-        try:
-            scope_val = None
-            # django_filters passes data in .data (QueryDict)
-            if hasattr(self, "data") and self.data:
-                scope_val = self.data.get("scope")
-            # Fallback to initial on form if provided by view defaults
-            if not scope_val and hasattr(self.form, "initial"):
-                scope_val = self.form.initial.get("scope")
-        except Exception:
-            scope_val = None
-
-        if scope_val != "private":
-            # Hide the field visually; it will still be in the form to carry defaults if any
-            try:
-                self.filters["publication_status"].field.widget = HiddenInput()
-                self.filters["publication_status"].field.label = ""
-                self.filters["publication_status"].extra["help_text"] = ""
-            except KeyError:
-                pass
-
     def catchment_filter(self, queryset, _, value):
-        scope_val = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_val = self.data.get("scope")
-            if not scope_val and hasattr(self.form, "initial"):
-                scope_val = self.form.initial.get("scope")
-        except Exception:
-            scope_val = None
-
-        if scope_val == "review":
-            return queryset.filter(catchment=value)
-
         if value.type == "custom":
             spatially_related_qs = value.inside_collections.order_by("name")
         else:

@@ -408,7 +408,7 @@ class CollectionFilterTestCase(TestCase):
         qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
         self.assertEqual(3, qs.count())
 
-    def test_review_scope_catchment_filter_matches_exact_catchment_only(self):
+    def test_review_scope_catchment_filter_expands_hierarchically(self):
         Collection.objects.filter(
             pk__in=[
                 self.collection1.pk,
@@ -433,7 +433,11 @@ class CollectionFilterTestCase(TestCase):
         self.assertQuerySetEqual(
             qs.order_by("id"),
             Collection.objects.filter(
-                pk__in=[self.collection1.pk, self.predecessor_collection.pk]
+                pk__in=[
+                    self.collection1.pk,
+                    self.predecessor_collection.pk,
+                    self.child_collection.pk,
+                ]
             ).order_by("id"),
         )
 
