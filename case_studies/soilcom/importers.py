@@ -26,9 +26,6 @@ from materials.models import Material
 from utils.object_management.models import ReviewAction
 from utils.properties.models import Property, Unit
 
-# Regex: capture the first integer followed by "per year" anywhere in the string.
-_PER_YEAR_RE = re.compile(r"\b(\d+)\s+per\s+year\b", re.IGNORECASE)
-
 # ---------------------------------------------------------------------------
 # Value mappings
 # ---------------------------------------------------------------------------
@@ -60,6 +57,21 @@ _BIN_CAPACITY_REF_MAP = {
     "not_specified": "not_specified",
 }
 
+_KNOWN_UNRESOLVED_BW_FREQUENCIES = {
+    "Fixed-Seasonal; 39 per year (1 per 2 weeks from March - November)",
+}
+
+
+def _normalize_frequency_lookup_key(value: str) -> str:
+    normalized = re.sub(r"\s+", " ", (value or "").strip())
+    normalized = normalized.replace("Fixed:", "Fixed;")
+    normalized = re.sub(r"\s*;\s*", "; ", normalized)
+    normalized = re.sub(r"\s*,\s*", ", ", normalized)
+    normalized = re.sub(r"\(\s+", "(", normalized)
+    normalized = re.sub(r"\s+\)", ")", normalized)
+    normalized = re.sub(r"\bMay\b", "Mai", normalized, flags=re.IGNORECASE)
+    return normalized.strip()
+
 
 class CollectionImporter:
     """
@@ -75,6 +87,8 @@ class CollectionImporter:
     """
 
     def __init__(self, owner, publication_status: str = "private"):
+        if owner is None or not getattr(owner, "is_authenticated", False):
+            raise ValueError("owner must be an authenticated user")
         self.owner = owner
         self.publication_status = publication_status
         self.dry_run = False
@@ -135,8 +149,12 @@ class CollectionImporter:
         self._fee_systems: dict[str, FeeSystem] = {
             o.name: o for o in FeeSystem.objects.all()
         }
+        frequency_objects = list(CollectionFrequency.objects.all())
         self._frequencies: dict[str, CollectionFrequency] = {
-            o.name: o for o in CollectionFrequency.objects.all()
+            o.name: o for o in frequency_objects
+        }
+        self._normalized_frequencies: dict[str, CollectionFrequency] = {
+            _normalize_frequency_lookup_key(o.name): o for o in frequency_objects
         }
         self._collectors: dict[str, Collector] = {
             o.name: o for o in Collector.objects.all()
@@ -221,6 +239,7 @@ class CollectionImporter:
             return
         valid_until = record.get("valid_until")
         description = record.get("description") or ""
+        raw_frequency_name = record.get("frequency") or ""
         min_bin_size = record.get("min_bin_size")
         required_bin_capacity = record.get("required_bin_capacity")
 
@@ -238,6 +257,18 @@ class CollectionImporter:
             collection = existing
             update_fields = []
             changes = []
+            manual_review_note = self._manual_review_note_for_frequency(
+                raw_frequency_name, frequency
+            )
+            if manual_review_note and manual_review_note not in description:
+                description = (
+                    f"{description}\n\n{manual_review_note}"
+                    if description
+                    else manual_review_note
+                )
+                stats["warnings"].append(
+                    f"{label}: Added manual-review note to description for unresolved frequency '{raw_frequency_name}'."
+                )
 
             # Update collector if different
             if collector and collection.collector_id != (
@@ -293,6 +324,14 @@ class CollectionImporter:
                 collection.established = established
                 update_fields.append("established")
 
+            # Update min_bin_size if different
+            if min_bin_size is not None and collection.min_bin_size != min_bin_size:
+                changes.append(
+                    f"min_bin_size: {collection.min_bin_size} → {min_bin_size}"
+                )
+                collection.min_bin_size = min_bin_size
+                update_fields.append("min_bin_size")
+
             # Update required_bin_capacity if different
             if (
                 required_bin_capacity is not None
@@ -340,11 +379,6 @@ class CollectionImporter:
             )
             update_allowed_materials = current_allowed_ids != allowed_material_ids
             update_forbidden_materials = current_forbidden_ids != forbidden_material_ids
-
-            if update_allowed_materials:
-                changes.append("allowed_materials updated")
-            if update_forbidden_materials:
-                changes.append("forbidden_materials updated")
 
             if update_fields or update_allowed_materials or update_forbidden_materials:
                 if not self.dry_run:
@@ -510,6 +544,17 @@ class CollectionImporter:
             ).first()
             if derived is not None:
                 self._attach_cpv_sources(derived, flyer_urls, stats)
+            if self.publication_status == "review" and not self.dry_run:
+                if derived is not None and derived.publication_status in (
+                    derived.STATUS_PRIVATE,
+                    derived.STATUS_DECLINED,
+                ):
+                    self._submit_cpv_for_review(derived)
+                if existing_cpv.publication_status in (
+                    existing_cpv.STATUS_PRIVATE,
+                    existing_cpv.STATUS_DECLINED,
+                ):
+                    self._submit_cpv_for_review(existing_cpv)
             stats["cpv_skipped"] += 1
             return
 
@@ -680,26 +725,31 @@ class CollectionImporter:
         if not name:
             return None
 
-        # 1. Exact name match against the loaded cache.
-        freq = self._frequencies.get(name)
+        normalized_name = _normalize_frequency_lookup_key(name)
+        freq = self._normalized_frequencies.get(normalized_name)
         if freq is not None:
+            stats["warnings"].append(
+                f"{label}: CollectionFrequency '{name}' not found — "
+                f"normalized to '{freq.name}'."
+            )
             return freq
 
-        # 2. Fallback: extract the first "N per year" from the raw string and
-        #    look up / create a canonical "Fixed; N per year" frequency.
-        match = _PER_YEAR_RE.search(name)
+        match = re.fullmatch(r"Fixed;\s*(\d+)\s+per\s+year", normalized_name)
         if match:
             count = int(match.group(1))
             canonical_name = f"Fixed; {count} per year"
             freq = self._frequencies.get(canonical_name)
             if freq is None:
                 freq = self._get_or_create_fixed_frequency(count, canonical_name)
-                # Cache so subsequent records reuse the same object.
                 self._frequencies[canonical_name] = freq
-            stats["warnings"].append(
-                f"{label}: CollectionFrequency '{name}' not found — "
-                f"mapped to '{canonical_name}' ({count} per year)."
-            )
+                self._normalized_frequencies[
+                    _normalize_frequency_lookup_key(canonical_name)
+                ] = freq
+            if name != canonical_name:
+                stats["warnings"].append(
+                    f"{label}: CollectionFrequency '{name}' not found — "
+                    f"normalized to '{canonical_name}'."
+                )
             return freq
 
         stats["warnings"].append(
@@ -764,6 +814,8 @@ class CollectionImporter:
         mapped = _BIN_CAPACITY_REF_MAP.get(raw)
         if mapped:
             return mapped
+        if "inh" in raw:
+            return "person"
         if "person" in raw:
             return "person"
         if "household" in raw:
@@ -836,6 +888,7 @@ class CollectionImporter:
     ) -> Collection | None:
         return (
             Collection.objects.filter(
+                owner=self.owner,
                 catchment=catchment,
                 collection_system=collection_system,
                 valid_from=valid_from,
@@ -874,6 +927,23 @@ class CollectionImporter:
     def _submit_cpv_for_review(self, cpv: CollectionPropertyValue) -> None:
         """Submit a CPV for review and create the corresponding ReviewAction."""
         self._submit_for_review(cpv)
+
+    @staticmethod
+    def _manual_review_note_for_frequency(
+        raw_frequency_name: str,
+        resolved_frequency: CollectionFrequency | None,
+    ) -> str | None:
+        if resolved_frequency is not None or not raw_frequency_name:
+            return None
+        if (
+            _normalize_frequency_lookup_key(raw_frequency_name)
+            not in _KNOWN_UNRESOLVED_BW_FREQUENCIES
+        ):
+            return None
+        return (
+            "SYNC NOTE (BW 2024 SW1 one-off import): "
+            f"Frequency '{raw_frequency_name}' requires manual review."
+        )
 
     @staticmethod
     def _find_predecessor(

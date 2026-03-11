@@ -40,6 +40,11 @@ from utils.forms import (
 )
 from utils.object_management.models import get_default_owner
 
+from .frequency_service import (
+    CADENCE_CHOICES,
+    CADENCE_CUSTOM,
+    CollectionFrequencyScheduleService,
+)
 from .models import (
     CONNECTION_TYPE_CHOICES,
     REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
@@ -136,10 +141,20 @@ class FeeSystemModalModelForm(ModalModelFormMixin, FeeSystemModelForm):
 
 
 class CollectionFrequencyModelForm(SimpleModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["name"].required = False
+        self.fields["description"].widget.attrs["rows"] = 4
+
     class Meta:
         model = CollectionFrequency
         fields = ("name", "type", "description")
-        help_texts = {"description": MARKDOWN_HELP_TEXT}
+        labels = {"name": "Label"}
+        help_texts = {
+            "name": "Optional. Leave blank to generate a canonical label from the schedule.",
+            "description": MARKDOWN_HELP_TEXT,
+        }
+        widgets = {"type": HiddenInput()}
 
 
 class CollectionFrequencyModalModelForm(
@@ -160,11 +175,21 @@ class CollectionSeasonFormHelper(FormHelper):
                 ),
                 "distribution",
                 Row(Column(Field("first_timestep")), Column(Field("last_timestep"))),
-                HTML("<p>Total collections in this season</p>"),
+                HTML(
+                    "<p>Choose a cadence or enter a custom annual total for this period.</p>"
+                ),
                 Row(
+                    Column(Field("standard_cadence")),
                     Column(Field("standard")),
+                    css_class="formset-form",
+                ),
+                HTML("<p>Optional service levels</p>"),
+                Row(
+                    Column(Field("option_1_cadence")),
                     Column(Field("option_1")),
+                    Column(Field("option_2_cadence")),
                     Column(Field("option_2")),
+                    Column(Field("option_3_cadence")),
                     Column(Field("option_3")),
                     css_class="formset-form",
                 ),
@@ -181,19 +206,49 @@ class CollectionSeasonForm(SimpleForm):
     )
     first_timestep = ModelChoiceField(queryset=Timestep.objects.none(), label="Start")
     last_timestep = ModelChoiceField(queryset=Timestep.objects.none(), label="End")
-    standard = IntegerField(required=False, min_value=0)
-    option_1 = IntegerField(required=False, min_value=0)
-    option_2 = IntegerField(required=False, min_value=0)
-    option_3 = IntegerField(required=False, min_value=0)
+    standard_cadence = ChoiceField(
+        choices=CADENCE_CHOICES,
+        required=False,
+        label="Standard cadence",
+    )
+    standard = IntegerField(required=False, min_value=0, label="Standard annual total")
+    option_1_cadence = ChoiceField(
+        choices=CADENCE_CHOICES,
+        required=False,
+        label="Optional cadence 1",
+    )
+    option_1 = IntegerField(
+        required=False, min_value=0, label="Optional annual total 1"
+    )
+    option_2_cadence = ChoiceField(
+        choices=CADENCE_CHOICES,
+        required=False,
+        label="Optional cadence 2",
+    )
+    option_2 = IntegerField(
+        required=False, min_value=0, label="Optional annual total 2"
+    )
+    option_3_cadence = ChoiceField(
+        choices=CADENCE_CHOICES,
+        required=False,
+        label="Optional cadence 3",
+    )
+    option_3 = IntegerField(
+        required=False, min_value=0, label="Optional annual total 3"
+    )
 
     class Meta:
         fields = (
             "distribution",
             "first_timestep",
             "last_timestep",
+            "standard_cadence",
             "standard",
+            "option_1_cadence",
             "option_1",
+            "option_2_cadence",
             "option_2",
+            "option_3_cadence",
             "option_3",
         )
 
@@ -221,6 +276,40 @@ class CollectionSeasonForm(SimpleForm):
             self.fields["first_timestep"].queryset = Timestep.objects.none()
             self.fields["last_timestep"].queryset = Timestep.objects.none()
 
+        first_timestep = self.initial.get("first_timestep")
+        last_timestep = self.initial.get("last_timestep")
+        if first_timestep and last_timestep:
+            for field_name in ("standard", "option_1", "option_2", "option_3"):
+                cadence_field = f"{field_name}_cadence"
+                if self.initial.get(cadence_field) in (None, ""):
+                    self.initial[cadence_field] = (
+                        CollectionFrequencyScheduleService.infer_cadence(
+                            self.initial.get(field_name),
+                            first_timestep,
+                            last_timestep,
+                        )
+                    )
+
+        for field_name in ("standard", "option_1", "option_2", "option_3"):
+            self.fields[field_name].help_text = ""
+            self.fields[field_name].widget.attrs["placeholder"] = "Only for custom"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        cleaned_data = CollectionFrequencyScheduleService.populate_counts_from_cadences(
+            cleaned_data
+        )
+        for field_name in ("standard", "option_1", "option_2", "option_3"):
+            cadence_field = f"{field_name}_cadence"
+            if cleaned_data.get(cadence_field) == CADENCE_CUSTOM and cleaned_data.get(
+                field_name
+            ) in (None, ""):
+                self.add_error(
+                    field_name,
+                    "Enter a custom annual total or choose a cadence preset.",
+                )
+        return cleaned_data
+
     def save(self):
         self.instance, _ = CollectionSeason.objects.get_or_create(
             distribution=self.cleaned_data["distribution"],
@@ -235,6 +324,8 @@ class CollectionSeasonFormSet(M2MInlineFormSet):
         for i, _form in enumerate(self.forms):
             if (
                 i > 0
+                and self.forms[i - 1].cleaned_data.get("last_timestep")
+                and self.forms[i].cleaned_data.get("first_timestep")
                 and self.forms[i - 1].cleaned_data.get("last_timestep").order
                 >= self.forms[i].cleaned_data.get("first_timestep").order
             ):

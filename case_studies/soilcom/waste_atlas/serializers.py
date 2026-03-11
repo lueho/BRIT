@@ -9,6 +9,12 @@ from case_studies.soilcom.models import CollectionCatchment
 GEOMETRY_SIMPLIFY_TOLERANCE = 0.001
 
 
+def _round_one_decimal(value):
+    if value is None:
+        return None
+    return round(value, 1)
+
+
 class CatchmentGeometrySerializer(GeoFeatureModelSerializer):
     """GeoJSON serializer for catchments that have waste collections.
 
@@ -76,6 +82,11 @@ class CatchmentConnectionRateSerializer(serializers.Serializer):
     catchment_id = serializers.IntegerField()
     connection_rate = serializers.FloatField(allow_null=True)
     is_door_to_door = serializers.BooleanField()
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["connection_rate"] = _round_one_decimal(data.get("connection_rate"))
+        return data
 
 
 class CatchmentFoodWasteCategorySerializer(serializers.Serializer):
@@ -154,6 +165,11 @@ class CatchmentCollectionAmountSerializer(serializers.Serializer):
     no_collection = serializers.BooleanField(default=False)
     value_source = serializers.CharField(allow_null=True, required=False)
     acpv_group_key = serializers.CharField(allow_null=True, required=False)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["amount"] = _round_one_decimal(data.get("amount"))
+        return data
 
 
 class CatchmentWasteRatioSerializer(serializers.Serializer):

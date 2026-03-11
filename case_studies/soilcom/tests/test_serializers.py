@@ -456,6 +456,52 @@ class CollectionFlatSerializerChainAwareStatsTestCase(TestCase):
 
         self.assertTrue(data.get("aggregated", False))
 
+    def test_dynamic_columns_round_special_property_values_to_one_decimal(self):
+        from case_studies.soilcom.models import (
+            AggregatedCollectionPropertyValue,
+            CollectionPropertyValue,
+        )
+        from utils.properties.models import Property
+
+        prop_total = Property.objects.create(
+            name="total waste collected", publication_status="published"
+        )
+        prop_total.allowed_units.add(self.unit)
+
+        CollectionPropertyValue.objects.filter(
+            collection=self.collection_succ,
+            property=self.prop_specific,
+            year=2022,
+        ).update(average=12.54)
+
+        AggregatedCollectionPropertyValue.objects.filter(
+            property=self.prop_conn,
+            year=2021,
+        ).update(average=88.16)
+
+        agg_total = AggregatedCollectionPropertyValue.objects.create(
+            property=prop_total,
+            unit=self.unit,
+            year=2023,
+            average=55.55,
+            publication_status="published",
+        )
+        agg_total.collections.add(self.collection_root)
+
+        serializer = CollectionFlatSerializer(self.collection_succ)
+        data = serializer.data
+
+        self.assertEqual(data["specific_waste_collected_2022"], 12.5)
+        self.assertEqual(data["connection_rate_2021"], 88.2)
+
+        display_values = (
+            self.collection_succ.aggregatedcollectionpropertyvalues_for_display()
+        )
+        total_values = [
+            value for value in display_values if value.property_id == prop_total.pk
+        ]
+        self.assertEqual(total_values[0].display_average, 55.5)
+
 
 class CollectionImportRecordSerializerTestCase(TestCase):
     def test_required_bin_capacity_field_label(self):

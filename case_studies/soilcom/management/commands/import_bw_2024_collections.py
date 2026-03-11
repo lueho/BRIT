@@ -45,10 +45,8 @@ _COL = {
     "required_bin_capacity_reference": 17,
     "conn_rate_basis": 26,
     "description": 37,
-    "sources": 38,
-    "sources_new": 39,
-    "valid_from": 40,
-    "valid_until": 41,
+    "sources_new": 38,
+    "valid_from": 39,
 }
 
 # (column_index, year, unit_name)
@@ -61,7 +59,7 @@ _CONN_RATE_COLS = [
     (25, 2024, None),
 ]
 
-_SPECIFIC_KG_COLS = [
+_TOTAL_MG_COLS = [
     (27, 2015),
     (28, 2016),
     (29, 2017),
@@ -69,11 +67,6 @@ _SPECIFIC_KG_COLS = [
     (31, 2019),
     (32, 2020),
     (33, 2021),
-]
-
-# The BW sheet labels these as "Specific ... [t/year]", but the values are
-# total annual amounts and must map to "total waste collected" (Mg/a).
-_TOTAL_MG_COLS = [
     (34, 2022),
     (35, 2023),
     (36, 2024),
@@ -88,11 +81,9 @@ _BASIS_TO_UNIT = {
 _CONN_RATE_FALLBACK_UNIT = "% (of unknown reference)"
 
 # Property IDs (verified against live DB)
-_PROP_SPECIFIC = 1  # specific waste collected
 _PROP_TOTAL = 9  # total waste collected
 _PROP_CONN_RATE = 4  # Connection rate
 
-_UNIT_KG = "kg/(cap.*a)"
 _UNIT_MG = "Mg/a"
 
 _VALID_STATUSES = ("private", "review")
@@ -140,7 +131,7 @@ def _collect_flyer_urls(row) -> list[str]:
 
 
 def _collect_property_values(row) -> list[dict]:
-    """Build property-value dicts from connection-rate and specific-waste columns."""
+    """Build property-value dicts from connection-rate and total-waste columns."""
     pvs = []
 
     basis_raw = row[_COL["conn_rate_basis"]]
@@ -157,18 +148,6 @@ def _collect_property_values(row) -> list[dict]:
                 {
                     "property_id": _PROP_CONN_RATE,
                     "unit_name": conn_rate_unit_name,
-                    "year": year,
-                    "average": float(value),
-                }
-            )
-
-    for col, year in _SPECIFIC_KG_COLS:
-        value = row[col]
-        if value is not None:
-            pvs.append(
-                {
-                    "property_id": _PROP_SPECIFIC,
-                    "unit_name": _UNIT_KG,
                     "year": year,
                     "average": float(value),
                 }
@@ -203,8 +182,6 @@ def _to_decimal_or_none(value):
 def _row_to_record(row) -> dict:
     """Convert a raw Excel row tuple into a CollectionImporter-compatible dict."""
     valid_from = _resolve_date(row[_COL["valid_from"]])
-    valid_until_raw = row[_COL["valid_until"]]
-    valid_until = _resolve_date(valid_until_raw) if valid_until_raw else None
 
     return {
         "nuts_or_lau_id": row[_COL["nuts_or_lau_id"]] or "",
@@ -225,7 +202,7 @@ def _row_to_record(row) -> dict:
         or "",
         "description": row[_COL["description"]] or "",
         "valid_from": valid_from,
-        "valid_until": valid_until,
+        "valid_until": None,
         "flyer_urls": _collect_flyer_urls(row),
         "property_values": _collect_property_values(row),
     }

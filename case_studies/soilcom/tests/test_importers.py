@@ -26,7 +26,6 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
             name="Importer Material System"
         )
         cls.waste_category = WasteCategory.objects.create(name="Importer Material Cat")
-
         cls.allowed_1 = Material.objects.create(name="Importer Allowed 1")
         cls.allowed_2 = Material.objects.create(name="Importer Allowed 2")
         cls.allowed_3 = Material.objects.create(name="Importer Allowed 3")

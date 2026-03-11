@@ -1,0 +1,678 @@
+{
+  "collection_frequencies": [
+    "Fixed; 104 per year (2 per week)",
+    "Fixed; 13 per year",
+    "Fixed; 13 per year (1 per 4 weeks)",
+    "Fixed; 18 per year (1 per 3 weeks)",
+    "Fixed; 1 per year",
+    "Fixed; 26 per year",
+    "Fixed; 26 per year (1 per 2 weeks)",
+    "Fixed; 2 per year",
+    "Fixed; 39 per year",
+    "Fixed; 3 per year",
+    "Fixed; 4 per year",
+    "Fixed; 52 per year (1 per week)",
+    "Fixed; 5 per year",
+    "Fixed; 6 per year",
+    "Fixed; 8 per year",
+    "Fixed-Flexible; Standard: 13 per year (1 per 4 weeks); Optional: 26 per year (1 per 2 weeks)",
+    "Fixed-Flexible; Standard: 13 per year (1 per 4 weeks); Optional: 26 per year (1 per 2 weeks), 52 per year (1 per week)",
+    "Fixed-Flexible; Standard: 13 per year (1 per 4 weeks); Optional: 26 per year (1 per 2 weeks), 52 per year (1 per week), 104 per year (2 per week)",
+    "Fixed-Flexible; Standard: 13 per year (1 per 4 weeks); Optional: 26 per year (1 per 2 weeks), 8 per year (1 per 6 weeks), 52 per year (1 per week)",
+    "Fixed-Flexible; Standard: 13 per year (1 per 4 weeks); Optional: 26 per year (1 per 2 weeks), 8 per year (1 per 6 weeks), 52 per year (1 per week), 104 per year (2 per week)",
+    "Fixed-Flexible; Standard: 13 per year (1 per 4 weeks); Optional: 6 per year (1 per 8 weeks)",
+    "Fixed-Flexible; Standard: 18 per year (1 per 3 weeks); Optional: 26 per year (1 per 2 weeks), 52 per year (1 per week), 104 per year (2 per week)",
+    "Fixed-Flexible; Standard: 18 per year (1 per 3 weeks); Optional: 52 per year (1 per week)",
+    "Fixed-Flexible; Standard: 26 per year (1 per 2 weeks), 13 per year (1 per 4 weeks)",
+    "Fixed-Flexible; Standard: 26 per year (1 per 2 weeks), 13 per year (1 per 4 weeks); Optional: 52 per year (1 per week)",
+    "Fixed-Flexible; Standard: 26 per year (1 per 2 weeks), 52 per year (1 per week); Optional: 104 per year (2 per week)",
+    "Fixed-Flexible; Standard: 26 per year (1 per 2 weeks), 52 per year (1 per week); Optional: 13 per year (1 per 4 weeks), 104 per year (2 per week)",
+    "Fixed-Flexible; Standard: 26 per year (1 per 2 weeks); Optional: 13 per year (1 per 4 weeks)",
+    "Fixed-Flexible; Standard: 26 per year (1 per 2 weeks); Optional: 13 per year (1 per 4 weeks), 52 per year (1 per week)",
+    "Fixed-Flexible; Standard: 26 per year (1 per 2 weeks); Optional: 13 per year (1 per 4 weeks), 52 per year (1 per week), 104 per year (2 per week)",
+    "Fixed-Flexible; Standard: 26 per year (1 per 2 weeks); Optional: 13 per year (1 per 4 weeks), 8 per year (1 per 6 weeks)",
+    "Fixed-Flexible; Standard: 26 per year (1 per 2 weeks); Optional: 13 per year (1 per 4 weeks), 8 per year (1 per 6 weeks), 6 per year (1 per 8 weeks)",
+    "Fixed-Flexible; Standard: 26 per year (1 per 2 weeks); Optional: 52 per year (1 per week)",
+    "Fixed-Flexible; Standard: 26 per year (1 per 2 weeks); Optional: 52 per year (1 per week)",
+    "Fixed-Flexible; Standard: 26 per year (1 per 2 weeks); Optional: 52 per year (1 per week), 104 per year (2 per week)",
+    "Fixed-Flexible; Standard: 26 per year (1 per 2 weeks); Optional: 52 per year (1 per week), 104 per year (2 per week), 156 per year (3 per week)",
+    "Fixed-Flexible; Standard: 26 per year (1 per 2 weeks); Optional: 6 per year (1 per 8 weeks), 13 per year (1 per 4 weeks), 52 per year (1 per week)",
+    "Fixed-Flexible; Standard: 52 per year (1 per week), 26 per year (1 per 2 weeks)",
+    "Fixed-Flexible; Standard: 52 per year (1 per week), 26 per year (1 per 2 weeks), 13 per year (1 per 4 weeks); Optional: 104 per year (2 per week)",
+    "Fixed-Flexible; Standard: 52 per year (1 per week), 26 per year (1 per 2 weeks), 18 per year (1 per 3 weeks)",
+    "Fixed-Flexible; Standard: 52 per year (1 per week), 26 per year (1 per 2 weeks), 18 per year (1 per 3 weeks), 13 per year (1 per 4 weeks)",
+    "Fixed-Flexible; Standard: 52 per year (1 per week); Optional: 26 per year (1 per 2 weeks)",
+    "Fixed-Flexible; Standard: 52 per year (1 per week); Optional: 26 per year (1 per 2 weeks), 104 per year (2 per week)",
+    "Fixed-Flexible; Standard: 52 per year (1 per week); Optional: 26 per year (1 per 2 weeks), 13 per year (1 per 4 weeks)",
+    "Fixed-Seasonal; 19 per year (1 per 3 weeks from October - May, 1 per 2 weeks from June - September)",
+    "Fixed-Seasonal; 21 per year (1 per 4 weeks from December - March, 1 per 2 weeks from April - November)",
+    "Fixed-Seasonal; 21 per year (1 per 4 weeks from November - March, 1 per 2 weeks from April - October)",
+    "Fixed-Seasonal; 22 per year (1 per 4 weeks from December - February, 1 per 2 weeks from March - November)",
+    "Fixed-Seasonal; 22 per year (1 per 4 weeks from December - March, 1 per 2 weeks from April - November)",
+    "Fixed-Seasonal; 23 per year (1 per 3 weeks from December - March, 1 per 2 weeks from April - November)",
+    "Fixed-Seasonal; 23 per year (1 per 4 weeks from December - February, 1 per 2 weeks from March - November)",
+    "Fixed-Seasonal; 24 per year (1 per 3 weeks from December - February, 1 per 2 weeks from March - November)",
+    "Fixed-Seasonal; 29 per year (1 per 2 weeks from September - June, 1 per week from July - August)",
+    "Fixed-Seasonal; 30 per year (1 per 2 weeks from August - May, 1 per week from June - July)",
+    "Fixed-Seasonal; 30 per year (1 per 2 weeks from September - June, 1 per week from July - August)",
+    "Fixed-Seasonal; 30 per year (1 per 2 weeks from September - June, 1 per week from July - August)",
+    "Fixed-Seasonal; 31 per year (1 per 2 weeks from September - June, 1 per week from July - August)",
+    "Fixed-Seasonal; 31 per year (1 per 2 weeks from September - May, 1 per week from June - August)",
+    "Fixed-Seasonal; 31 per year (1 per 3 weeks from November - March, 1 per 2 weeks from April - May, 1 per week from June - October)",
+    "Fixed-Seasonal; 32 per year (1 per 2 weeks from October - May, 1 per week from June - September)",
+    "Fixed-Seasonal; 32 per year (1 per 2 weeks from September - May, 1 per week from June - August)",
+    "Fixed-Seasonal; 33 per year (1 per 2 weeks from December - May & August - October, 1 per week from June - July & November)",
+    "Fixed-Seasonal; 33 per year (1 per 2 weeks from September - May, 1 per week from June - August)",
+    "Fixed-Seasonal; 33 per year (1 per 2 weeks from September - May, 1 per week from June - August)",
+    "Fixed-Seasonal; 34 per year (1 per 2 weeks from October - April, 1 per week from May - September)",
+    "Fixed-Seasonal; 34 per year (1 per 2 weeks from October - June, 1 per week from July - September)",
+    "Fixed-Seasonal; 34 per year (1 per 2 weeks from October - May, 1 per week from June - September)",
+    "Fixed-Seasonal; 34 per year (1 per 2 weeks from September - April, 1 per week from May - August)",
+    "Fixed-Seasonal; 34 per year (1 per 2 weeks from September - May, 1 per week from June - August)",
+    "Fixed-Seasonal; 35 per year (1 per 2 weeks from November - May, 1 per week from June - October)",
+    "Fixed-Seasonal; 35 per year (1 per 2 weeks from October - April, 1 per week from May - September)",
+    "Fixed-Seasonal; 35 per year (1 per 2 weeks from October - June, 1 per week from July - September)",
+    "Fixed-Seasonal; 35 per year (1 per 2 weeks from October - May, 1 per week from June - September)",
+    "Fixed-Seasonal; 35 per year (1 per 2 weeks from October - May, 1 per week from June - September)",
+    "Fixed-Seasonal; 36 per year (1 per 2 weeks from November - May, 1 per week from June - October)",
+    "Fixed-Seasonal; 36 per year (1 per 2 weeks from October - April, 1 per week from May - September)",
+    "Fixed-Seasonal; 36 per year (1 per 2 weeks from October - May, 1 per week from June - September)",
+    "Fixed-Seasonal; 37 per year (1 per 2 weeks from November - April, 1 per week from Mai - October)",
+    "Fixed-Seasonal; 37 per year (1 per 2 weeks from November - May, 1 per week from June - October)",
+    "Fixed-Seasonal; 37 per year (1 per 2 weeks from October - April, 1 per week from May - September)",
+    "Fixed-Seasonal; 38 per year (1 per 2 weeks from November - April, 1 per week from Mai - October)",
+    "Fixed-Seasonal; 38 per year (1 per 3 weeks from January - March, 1 per 2 weeks from November - December, 1 per week from April - October)",
+    "Fixed-Seasonal; 39 per year (1 per 2 weeks from November - April, 1 per week from Mai - October)",
+    "Fixed-Seasonal; 39 per year (1 per 2 weeks from November - March, 1 per week from April - October)",
+    "Fixed-Seasonal; 39 per year (1 per 2 weeks from October - April, 1 per week from May - September)",
+    "Fixed-Seasonal; 40 per year (1 per 2 weeks from December - April, 1 per week from May - November)",
+    "Fixed-Seasonal; 40 per year (1 per 2 weeks from November - April, 1 per week from Mai - October)",
+    "Fixed-Seasonal; 40 per year (1 per 2 weeks from November - March, 1 per week from April - October)",
+    "Fixed-Seasonal; 41 per year (1 per 2 weeks from December - April, 1 per week from May - November)",
+    "Fixed-Seasonal; 41 per year (1 per 2 weeks from December - March, 1 per week from April - November)",
+    "Fixed-Seasonal; 41 per year (1 per 2 weeks from November - April, 1 per week from Mai - October)",
+    "Fixed-Seasonal; 41 per year (1 per 2 weeks from November - March, 1 per week from April - October)",
+    "Fixed-Seasonal; 42 per year (1 per 2 weeks from December - March, 1 per week from April - November)",
+    "Fixed-Seasonal; 42 per year (1 per 2 weeks from November - April, 1 per week from Mai - October)",
+    "Fixed-Seasonal; 42 per year (1 per 2 weeks from November - March, 1 per week from April - October)",
+    "Fixed-Seasonal; 43 per year (1 per 2 weeks from December - March, 1 per week from April - November)",
+    "Fixed-Seasonal; 43 per year (1 per 2 weeks from November - April, 1 per week from Mai - October)",
+    "Fixed-Seasonal; 43 per year (1 per 2 weeks from November - March, 1 per week from April - October)",
+    "Fixed-Seasonal; 44 per year (1 per 2 weeks from December - April, 1 per week from May - November)",
+    "Fixed-Seasonal; 44 per year (1 per 2 weeks from December - February, 1 per week from March - November)",
+    "Fixed-Seasonal; 44 per year (1 per 2 weeks from December - March, 1 per week from April - November)",
+    "Fixed-Seasonal; 44 per year (1 per 2 weeks from November - March, 1 per week from April - October)",
+    "Fixed-Seasonal; 45 per year (1 per 2 weeks from December - February, 1 per week from March - November)",
+    "Fixed-Seasonal; 45 per year (1 per 3 weeks from December - January, 1 per week from February - November)",
+    "Fixed-Seasonal; 46 per year (1 per 2 weeks from December - February, 1 per week from March - November)",
+    "Fixed-Seasonal; 48 per year (1 per 2 weeks from January - February, 1 per week from March - December)",
+    "Seasonal; 18 per year (1 per 2 weeks from April - November, 0 from December - March)",
+    "Seasonal; 19 per year (1 per 2 weeks from March - November, 0 from December - February)",
+    "Seasonal; 35 per year (1 per week from March - October, 0 from November - February)"
+  ],
+  "collection_properties": [
+    "Connection rate",
+    "specific waste collected",
+    "specific waste treated",
+    "total waste collected",
+    "total waste treated"
+  ],
+  "collection_systems": [
+    "Bring point",
+    "Door to door",
+    "Home-composting",
+    "No separate collection",
+    "On demand kerbside collection",
+    "Recycling centre"
+  ],
+  "concept_schemes": {
+    "collection_frequencies": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/collection-frequency",
+    "collection_properties": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/collection-property",
+    "collection_systems": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/collection-system",
+    "connection_types": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/connection-type",
+    "country_languages": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/country-language",
+    "fee_systems": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/fee-system",
+    "material_roles": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/material-role",
+    "materials": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/material",
+    "required_bin_capacity_references": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/required-bin-capacity-reference",
+    "sorting_methods": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/sorting-method",
+    "units": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/unit",
+    "waste_categories": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/waste-category"
+  },
+  "connection_types": [
+    {
+      "label": "mandatory",
+      "value": "MANDATORY"
+    },
+    {
+      "label": "mandatory with exception for home composters",
+      "value": "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION"
+    },
+    {
+      "label": "voluntary",
+      "value": "VOLUNTARY"
+    },
+    {
+      "label": "not specified",
+      "value": "not_specified"
+    }
+  ],
+  "country_languages": {
+    "BE": [
+      "nl",
+      "fr",
+      "de"
+    ],
+    "DE": [
+      "de"
+    ],
+    "DK": [
+      "da"
+    ],
+    "NL": [
+      "nl"
+    ],
+    "SE": [
+      "sv"
+    ],
+    "UK": [
+      "en"
+    ]
+  },
+  "crosswalk_equivalences": {
+    "collection_system": {
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/collection-system/bring-point": {
+        "source_terms": [
+          {
+            "language": "da",
+            "term": "Bringeordning"
+          },
+          {
+            "language": "en",
+            "term": "Bring bank"
+          },
+          {
+            "language": "en",
+            "term": "Bring point"
+          },
+          {
+            "language": "nl",
+            "term": "Brengpunt"
+          }
+        ],
+        "target_label": "Bring point"
+      },
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/collection-system/door-to-door": {
+        "source_terms": [
+          {
+            "language": "da",
+            "term": "Husstandsindsamling"
+          },
+          {
+            "language": "en",
+            "term": "Door to door"
+          },
+          {
+            "language": "en",
+            "term": "Kerbside collection"
+          },
+          {
+            "language": "fr",
+            "term": "Porte-a-porte"
+          },
+          {
+            "language": "nl",
+            "term": "Huis-aan-huis"
+          }
+        ],
+        "target_label": "Door to door"
+      },
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/collection-system/no-separate-collection": {
+        "source_terms": [
+          {
+            "language": "sv",
+            "term": "Ingen utsortering"
+          },
+          {
+            "language": "sv",
+            "term": "Non"
+          }
+        ],
+        "target_label": "No separate collection"
+      },
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/collection-system/recycling-centre": {
+        "source_terms": [
+          {
+            "language": "da",
+            "term": "Genbrugsstation"
+          },
+          {
+            "language": "en",
+            "term": "Household waste recycling centre"
+          },
+          {
+            "language": "fr",
+            "term": "Recyparc"
+          },
+          {
+            "language": "nl",
+            "term": "Containerpark"
+          },
+          {
+            "language": "nl",
+            "term": "Milieustraat"
+          }
+        ],
+        "target_label": "Recycling centre"
+      }
+    },
+    "connection_type": {
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/connection-type/mandatory": {
+        "source_terms": [
+          {
+            "language": "da",
+            "term": "Obligatorisk"
+          },
+          {
+            "language": "en",
+            "term": "Mandatory"
+          },
+          {
+            "language": "fr",
+            "term": "Obligatoire"
+          },
+          {
+            "language": "nl",
+            "term": "Verplicht"
+          },
+          {
+            "language": "sv",
+            "term": "Obl"
+          }
+        ],
+        "target_label": "mandatory"
+      },
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/connection-type/voluntary": {
+        "source_terms": [
+          {
+            "language": "da",
+            "term": "Frivillig"
+          },
+          {
+            "language": "en",
+            "term": "Voluntary"
+          },
+          {
+            "language": "fr",
+            "term": "Facultatif"
+          },
+          {
+            "language": "nl",
+            "term": "Vrijwillig"
+          },
+          {
+            "language": "sv",
+            "term": "Friv"
+          }
+        ],
+        "target_label": "voluntary"
+      }
+    },
+    "fee_system": {
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/fee-system/flat-fee": {
+        "source_terms": [
+          {
+            "language": "da",
+            "term": "Fast gebyr"
+          },
+          {
+            "language": "en",
+            "term": "Fixed"
+          },
+          {
+            "language": "fr",
+            "term": "Redevance fixe"
+          }
+        ],
+        "target_label": "Flat fee"
+      },
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/fee-system/pay-as-you-throw": {
+        "source_terms": [
+          {
+            "language": "da",
+            "term": "Maengdebaseret gebyr"
+          },
+          {
+            "language": "en",
+            "term": "PAYT"
+          },
+          {
+            "language": "en",
+            "term": "Pay by weight"
+          },
+          {
+            "language": "nl",
+            "term": "DIFTAR"
+          }
+        ],
+        "target_label": "Pay as you throw (PAYT)"
+      }
+    },
+    "required_bin_capacity_reference": {
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/required-bin-capacity-reference/household": {
+        "source_terms": [
+          {
+            "language": "da",
+            "term": "Per husstand"
+          },
+          {
+            "language": "en",
+            "term": "Per household"
+          },
+          {
+            "language": "fr",
+            "term": "Par menage"
+          },
+          {
+            "language": "nl",
+            "term": "Per huishouden"
+          }
+        ],
+        "target_label": "household"
+      },
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/required-bin-capacity-reference/person": {
+        "source_terms": [
+          {
+            "language": "da",
+            "term": "Per indbygger"
+          },
+          {
+            "language": "en",
+            "term": "Per person"
+          },
+          {
+            "language": "fr",
+            "term": "Par habitant"
+          },
+          {
+            "language": "nl",
+            "term": "Per inwoner"
+          }
+        ],
+        "target_label": "person"
+      }
+    },
+    "sorting_method": {
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/sorting-method/four-compartments-bin": {
+        "source_terms": [
+          {
+            "language": "sv",
+            "term": "Fyrfackskärl"
+          }
+        ],
+        "target_label": "Four compartments bin"
+      },
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/sorting-method/optical-bag-sorting": {
+        "source_terms": [
+          {
+            "language": "sv",
+            "term": "Optisk sortering"
+          }
+        ],
+        "target_label": "Optical bag sorting"
+      },
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/sorting-method/separate-bins": {
+        "source_terms": [
+          {
+            "language": "da",
+            "term": "Kildesortering"
+          },
+          {
+            "language": "en",
+            "term": "Source separated"
+          },
+          {
+            "language": "fr",
+            "term": "Tri a la source"
+          },
+          {
+            "language": "nl",
+            "term": "Gescheiden inzameling"
+          },
+          {
+            "language": "sv",
+            "term": "Separata kärl"
+          }
+        ],
+        "target_label": "Separate bins"
+      },
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/sorting-method/two-compartments-bin": {
+        "source_terms": [
+          {
+            "language": "sv",
+            "term": "Tvådelade kärl"
+          }
+        ],
+        "target_label": "Two compartments bin"
+      }
+    },
+    "waste_category": {
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/waste-category/biowaste": {
+        "source_terms": [
+          {
+            "language": "da",
+            "term": "Bioaffald"
+          },
+          {
+            "language": "de",
+            "term": "Bioabfall/Biotonne"
+          },
+          {
+            "language": "nl",
+            "term": "Bioafval"
+          },
+          {
+            "language": "nl",
+            "term": "GFT"
+          },
+          {
+            "language": "nl",
+            "term": "Groente fruit en tuinafval"
+          }
+        ],
+        "target_label": "Biowaste"
+      },
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/waste-category/food-waste": {
+        "source_terms": [
+          {
+            "language": "da",
+            "term": "Madaffald"
+          },
+          {
+            "language": "en",
+            "term": "Food waste"
+          },
+          {
+            "language": "fr",
+            "term": "Dechets alimentaires"
+          }
+        ],
+        "target_label": "Food waste"
+      },
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/waste-category/green-waste": {
+        "source_terms": [
+          {
+            "language": "da",
+            "term": "Haveaffald"
+          },
+          {
+            "language": "de",
+            "term": "Gruenabfall"
+          },
+          {
+            "language": "de",
+            "term": "Grünabfall"
+          },
+          {
+            "language": "en",
+            "term": "Garden waste"
+          },
+          {
+            "language": "fr",
+            "term": "Dechets verts"
+          },
+          {
+            "language": "nl",
+            "term": "Groenafval"
+          },
+          {
+            "language": "nl",
+            "term": "Tuinafval"
+          }
+        ],
+        "target_label": "Green waste"
+      },
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/waste-category/residual-waste": {
+        "source_terms": [
+          {
+            "language": "da",
+            "term": "Restaffald"
+          },
+          {
+            "language": "de",
+            "term": "Hausmuell"
+          },
+          {
+            "language": "de",
+            "term": "Hausmüll"
+          },
+          {
+            "language": "de",
+            "term": "Restabfall"
+          },
+          {
+            "language": "de",
+            "term": "Restabfall/Hausmuell"
+          },
+          {
+            "language": "de",
+            "term": "Restabfall/Hausmüll"
+          },
+          {
+            "language": "de",
+            "term": "Restmuell"
+          },
+          {
+            "language": "de",
+            "term": "Restmüll"
+          },
+          {
+            "language": "en",
+            "term": "General waste"
+          },
+          {
+            "language": "en",
+            "term": "Residual waste"
+          },
+          {
+            "language": "fr",
+            "term": "Dechets residuels"
+          },
+          {
+            "language": "nl",
+            "term": "Restafval"
+          }
+        ],
+        "target_label": "Residual waste"
+      }
+    }
+  },
+  "fee_systems": [
+    "Flat fee",
+    "Flexible",
+    "Flexible+",
+    "No fee",
+    "Pay as you throw (PAYT)"
+  ],
+  "material_roles": [
+    "allowed",
+    "forbidden"
+  ],
+  "materials": [
+    "Collection Support Item: Biodegradable plastic bags",
+    "Collection Support Item: Newspaper",
+    "Collection Support Item: Paper bags",
+    "Collection Support Item: Plastic bags",
+    "Food waste: Non-processed animal-based",
+    "Food waste: Non-processed plant-based",
+    "Food waste: Processed animal-based",
+    "Food waste: Processed plant-based",
+    "Garden waste: Hard materials",
+    "Garden waste: Soft materials",
+    "Other: Paper tissue",
+    "Other: Soil"
+  ],
+  "required_bin_capacity_references": [
+    {
+      "label": "per person",
+      "value": "person"
+    },
+    {
+      "label": "per household",
+      "value": "household"
+    },
+    {
+      "label": "per property",
+      "value": "property"
+    },
+    {
+      "label": "not specified",
+      "value": "not_specified"
+    }
+  ],
+  "semantic_contract": {
+    "canonical_identifier_field": "target_concept_uri",
+    "change_types": [
+      "new_concept",
+      "label_only",
+      "deprecate",
+      "semantic_split",
+      "semantic_merge"
+    ],
+    "concept_lifecycle_statuses": [
+      "active",
+      "deprecated",
+      "superseded"
+    ],
+    "equivalence_policy": {
+      "agent_matching_must_use_concept_uri": true,
+      "crosswalk_rows_must_reference_existing_concept_uri": true,
+      "lexical_equivalents_share_concept_uri": true
+    },
+    "equivalence_source_key": "crosswalk_equivalences"
+  },
+  "sorting_methods": [
+    "Four compartments bin",
+    "Optical bag sorting",
+    "Separate bins",
+    "Two compartments bin"
+  ],
+  "units": [
+    "% (of unknown reference)",
+    "% of households",
+    "% of population",
+    "% of residential properties",
+    "% of residual waste bins",
+    "Mg/a",
+    "kg/(cap.*a)"
+  ],
+  "unmapped_countries": [],
+  "uri_base": "https://brit.bioresource-tools.net/vocab/soilcom",
+  "version": "0.4.0",
+  "waste_categories": [
+    "Biowaste",
+    "Food waste",
+    "Green waste",
+    "Residual waste"
+  ]
+}

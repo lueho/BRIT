@@ -650,10 +650,37 @@ class CollectionImporterWorkflowTestCase(APITestCase):
             name="Importer Test System"
         )
         cls.waste_category = WasteCategory.objects.create(name="Importer Test Category")
+        cls.property_unit = Unit.objects.create(
+            name="Importer Property Unit", owner=cls.owner
+        )
+        cls.import_property = Property.objects.create(
+            name="Importer Property",
+            unit=cls.property_unit.name,
+            owner=cls.owner,
+        )
+        cls.import_property.allowed_units.add(cls.property_unit)
+        cls.frequency_flexible_optional, _ = CollectionFrequency.objects.get_or_create(
+            name=(
+                "Fixed-Flexible; Standard: 26 per year (1 per 2 weeks); "
+                "Optional: 52 per year (1 per week)"
+            ),
+            defaults={"owner": cls.owner, "publication_status": "private"},
+        )
+        cls.frequency_seasonal_mai, _ = CollectionFrequency.objects.get_or_create(
+            name=(
+                "Fixed-Seasonal; 37 per year (1 per 2 weeks from November - April, "
+                "1 per week from Mai - October)"
+            ),
+            defaults={"owner": cls.owner, "publication_status": "private"},
+        )
+        cls.frequency_fixed_13, _ = CollectionFrequency.objects.get_or_create(
+            name="Fixed; 13 per year (1 per 4 weeks)",
+            defaults={"owner": cls.owner, "publication_status": "private"},
+        )
         cls.valid_from = datetime.date(2099, 6, 1)
 
-    def _make_record(self):
-        return {
+    def _make_record(self, *, property_values=None, **overrides):
+        record = {
             "nuts_or_lau_id": None,
             "catchment_name": self.catchment.name,
             "collection_system": self.collection_system.name,
@@ -670,9 +697,11 @@ class CollectionImporterWorkflowTestCase(APITestCase):
             "allowed_materials": "",
             "forbidden_materials": "",
             "description": "",
-            "property_values": [],
+            "property_values": property_values or [],
             "flyer_urls": [],
         }
+        record.update(overrides)
+        return record
 
     def test_import_as_private_stays_private(self):
         """Collections imported with publication_status='private' have no ReviewAction."""
@@ -726,6 +755,327 @@ class CollectionImporterWorkflowTestCase(APITestCase):
                 valid_from=self.valid_from,
                 collection_system=self.collection_system,
             ).exists()
+        )
+
+    def test_import_ignores_existing_collection_owned_by_another_user(self):
+        """Importer must not mutate or reuse records owned by a different user."""
+        other_user = User.objects.create_user(username="importer-other-owner")
+        foreign_collection = Collection.objects.create(
+            owner=other_user,
+            publication_status="private",
+            catchment=self.catchment,
+            collection_system=self.collection_system,
+            waste_category=self.waste_category,
+            valid_from=self.valid_from,
+        )
+
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        stats = importer.run([self._make_record()])
+
+        self.assertEqual(stats["created"], 1)
+        self.assertTrue(
+            Collection.objects.filter(
+                owner=self.owner,
+                catchment=self.catchment,
+                collection_system=self.collection_system,
+                valid_from=self.valid_from,
+            ).exists()
+        )
+        foreign_collection.refresh_from_db()
+        self.assertEqual(foreign_collection.owner, other_user)
+        self.assertEqual(foreign_collection.publication_status, "private")
+
+    def test_importer_rejects_unauthenticated_owner(self):
+        """CollectionImporter must raise ValueError when given an unauthenticated user."""
+        from django.contrib.auth.models import AnonymousUser
+
+        with self.assertRaises(ValueError):
+            CollectionImporter(owner=AnonymousUser(), publication_status="private")
+
+    def test_importer_rejects_none_owner(self):
+        """CollectionImporter must raise ValueError when owner is None."""
+        with self.assertRaises(ValueError):
+            CollectionImporter(owner=None, publication_status="private")
+
+    def test_importer_review_action_actor_is_importer_owner(self):
+        """ReviewAction created during review import must have user == importer.owner."""
+        importer = CollectionImporter(owner=self.owner, publication_status="review")
+        stats = importer.run([self._make_record()])
+        self.assertEqual(stats["created"], 1)
+
+        collection = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        review_action = (
+            ReviewAction.for_object(collection)
+            .filter(action=ReviewAction.ACTION_SUBMITTED)
+            .first()
+        )
+        self.assertIsNotNone(review_action)
+        self.assertEqual(review_action.user, self.owner)
+        collection.delete()
+
+    def test_import_review_submits_existing_cpv(self):
+        """Review import must submit already-existing CPVs together with the collection."""
+        property_values = [
+            {
+                "property_id": self.import_property.id,
+                "unit_name": self.property_unit.name,
+                "year": self.valid_from.year,
+                "average": 12.5,
+                "standard_deviation": None,
+                "flyer_urls": [],
+            }
+        ]
+        private_importer = CollectionImporter(
+            owner=self.owner, publication_status="private"
+        )
+        private_importer.run([self._make_record(property_values=property_values)])
+
+        collection = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        cpv = CollectionPropertyValue.objects.get(
+            collection=collection,
+            property=self.import_property,
+            year=self.valid_from.year,
+            unit=self.property_unit,
+        )
+        self.assertEqual(cpv.publication_status, "private")
+        self.assertIsNone(cpv.submitted_at)
+
+        review_importer = CollectionImporter(
+            owner=self.owner, publication_status="review"
+        )
+        review_importer.run([self._make_record(property_values=property_values)])
+
+        collection.refresh_from_db()
+        cpv.refresh_from_db()
+        self.assertEqual(collection.publication_status, "review")
+        self.assertIsNotNone(collection.submitted_at)
+        self.assertEqual(cpv.publication_status, "review")
+        self.assertIsNotNone(cpv.submitted_at)
+        self.assertTrue(
+            ReviewAction.for_object(cpv)
+            .filter(action=ReviewAction.ACTION_SUBMITTED)
+            .exists()
+        )
+
+    def test_bin_capacity_reference_inh_maps_to_person(self):
+        """Abbreviation-based references (Inh.) normalize to person."""
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        stats = importer.run(
+            [
+                self._make_record(
+                    required_bin_capacity=15,
+                    required_bin_capacity_reference="Inh. & month",
+                )
+            ]
+        )
+        self.assertEqual(stats["created"], 1)
+
+        collection = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertEqual(collection.required_bin_capacity_reference, "person")
+
+    def test_import_updates_min_bin_size_on_existing_collection(self):
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        importer.run([self._make_record()])
+
+        collection = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertIsNone(collection.min_bin_size)
+
+        update_stats = importer.run([self._make_record(min_bin_size=140)])
+
+        collection.refresh_from_db()
+        self.assertEqual(update_stats.get("updated"), 1)
+        self.assertEqual(collection.min_bin_size, 140)
+
+    def test_frequency_resolution_does_not_use_approximate_fallback(self):
+        """Unknown frequency labels must stay unresolved to preserve seasonality semantics."""
+        unknown_frequency = (
+            "Fixed-Seasonal; 39 per year (1 per 2 weeks from March - November)"
+        )
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        stats = importer.run([self._make_record(frequency=unknown_frequency)])
+        self.assertEqual(stats["created"], 1)
+
+        collection = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertIsNone(collection.frequency)
+        self.assertTrue(
+            any(
+                f"CollectionFrequency '{unknown_frequency}' not found" in warning
+                for warning in stats["warnings"]
+            )
+        )
+        self.assertFalse(
+            any("mapped to 'Fixed;" in warning for warning in stats["warnings"])
+        )
+
+    def test_frequency_resolution_normalizes_formatting_only(self):
+        """Formatting-only variations normalize to an existing exact frequency."""
+        raw_frequency = (
+            "Fixed-Flexible; Standard: 26 per year (1 per 2 weeks) ; "
+            "Optional: 52 per year (1 per week)"
+        )
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        stats = importer.run([self._make_record(frequency=raw_frequency)])
+        self.assertEqual(stats["created"], 1)
+
+        collection = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertEqual(collection.frequency, self.frequency_flexible_optional)
+        self.assertTrue(
+            any("normalized to" in warning for warning in stats["warnings"])
+        )
+
+    def test_frequency_resolution_normalizes_may_month_variant(self):
+        """Month spelling variants normalize without dropping seasonal detail."""
+        raw_frequency = (
+            "Fixed-Seasonal; 37 per year (1 per 2 weeks from November - April, "
+            "1 per week from May - October)"
+        )
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        stats = importer.run([self._make_record(frequency=raw_frequency)])
+        self.assertEqual(stats["created"], 1)
+
+        collection = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertEqual(collection.frequency, self.frequency_seasonal_mai)
+        self.assertTrue(
+            any("normalized to" in warning for warning in stats["warnings"])
+        )
+
+    def test_frequency_resolution_normalizes_fixed_prefix(self):
+        """Legacy 'Fixed:' notation maps to canonical 'Fixed;' exact frequency."""
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        stats = importer.run(
+            [self._make_record(frequency="Fixed: 13 per year (1 per 4 weeks)")]
+        )
+        self.assertEqual(stats["created"], 1)
+
+        collection = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertEqual(collection.frequency, self.frequency_fixed_13)
+        self.assertTrue(
+            any("normalized to" in warning for warning in stats["warnings"])
+        )
+
+    def test_unresolved_bw_frequency_adds_manual_review_note_on_update(self):
+        """Updating an existing collection with the known unresolved BW frequency adds a manual note."""
+        unresolved_frequency = (
+            "Fixed-Seasonal; 39 per year (1 per 2 weeks from March - November)"
+        )
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+
+        importer.run([self._make_record(description="Initial import description")])
+        update_stats = importer.run(
+            [
+                self._make_record(
+                    description="Updated import description",
+                    frequency=unresolved_frequency,
+                )
+            ]
+        )
+
+        collection = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertEqual(update_stats.get("updated"), 1)
+        self.assertIn("Updated import description", collection.description)
+        self.assertIn("SYNC NOTE (BW 2024 SW1 one-off import)", collection.description)
+        self.assertIn(unresolved_frequency, collection.description)
+        self.assertTrue(
+            any(
+                "Added manual-review note to description" in warning
+                for warning in update_stats["warnings"]
+            )
+        )
+
+
+class CollectionBulkImportApiTestCase(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create_user(
+            username="bulk-import-staff", is_staff=True
+        )
+        cls.catchment = CollectionCatchment.objects.create(name="Bulk Import Catchment")
+        cls.collection_system = CollectionSystem.objects.create(
+            name="Bulk Import System"
+        )
+        cls.waste_category = WasteCategory.objects.create(name="Bulk Import Waste")
+        cls.allowed_material_1 = Material.objects.create(name="Bulk Allowed 1")
+        cls.allowed_material_2 = Material.objects.create(name="Bulk Allowed 2")
+        cls.forbidden_material = Material.objects.create(name="Bulk Forbidden 1")
+
+    def test_bulk_import_preserves_material_lists_from_string_input(self):
+        self.client.force_login(self.staff)
+
+        response = self.client.post(
+            reverse("api-waste-collection-bulk-import"),
+            {
+                "publication_status": "private",
+                "dry_run": False,
+                "records": [
+                    {
+                        "catchment_name": self.catchment.name,
+                        "collection_system": self.collection_system.name,
+                        "waste_category": self.waste_category.name,
+                        "valid_from": "2024-01-01",
+                        "allowed_materials": (
+                            f"{self.allowed_material_1.name}, {self.allowed_material_2.name}"
+                        ),
+                        "forbidden_materials": self.forbidden_material.name,
+                        "description": "bulk import material regression",
+                    }
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["stats"]["created"], 1)
+
+        collection = Collection.objects.get(
+            owner=self.staff,
+            catchment=self.catchment,
+            collection_system=self.collection_system,
+            waste_category=self.waste_category,
+            valid_from=date(2024, 1, 1),
+        )
+        self.assertEqual(
+            set(collection.allowed_materials.values_list("name", flat=True)),
+            {self.allowed_material_1.name, self.allowed_material_2.name},
+        )
+        self.assertEqual(
+            set(collection.forbidden_materials.values_list("name", flat=True)),
+            {self.forbidden_material.name},
         )
 
 
@@ -981,6 +1331,8 @@ class CollectionMutationApiTestCase(APITestCase):
             valid_from=date(2024, 7, 1),
             description="own private predecessor",
         )
+        own_predecessor.allowed_materials.add(self.allowed_material)
+        own_predecessor.forbidden_materials.add(self.forbidden_material)
         self.client.force_login(user)
 
         response = self.client.post(
@@ -1029,6 +1381,102 @@ class CollectionMutationApiTestCase(APITestCase):
             .filter(action=ReviewAction.ACTION_SUBMITTED)
             .exists()
         )
+
+    def test_create_endpoint_owner_is_authenticated_user(self):
+        """Created collection must be owned by the authenticated user, never the predecessor owner."""
+        self.client.force_login(self.other_user)
+
+        response = self.client.post(
+            reverse("api-waste-collection-create"),
+            {
+                "catchment": self.catchment.pk,
+                "waste_category": self.waste_category.pk,
+                "collection_system": self.collection_system.pk,
+                "valid_from": "2025-06-01",
+                "submit_for_review": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        collection = Collection.objects.get(pk=response.data["id"])
+        self.assertEqual(collection.owner, self.other_user)
+        self.assertNotEqual(collection.owner, self.owner)
+
+    def test_create_endpoint_review_action_actor_is_authenticated_user(self):
+        """ReviewAction submitted by create endpoint must have user == authenticated user."""
+        self.client.force_login(self.other_user)
+
+        response = self.client.post(
+            reverse("api-waste-collection-create"),
+            {
+                "catchment": self.catchment.pk,
+                "waste_category": self.waste_category.pk,
+                "collection_system": self.collection_system.pk,
+                "valid_from": "2025-07-01",
+                "submit_for_review": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        collection = Collection.objects.get(pk=response.data["id"])
+        review_action = (
+            ReviewAction.for_object(collection)
+            .filter(action=ReviewAction.ACTION_SUBMITTED)
+            .first()
+        )
+        self.assertIsNotNone(review_action)
+        self.assertEqual(review_action.user, self.other_user)
+        self.assertNotEqual(review_action.user, self.owner)
+
+    def test_new_version_owner_is_authenticated_user_not_predecessor_owner(self):
+        """New version must be owned by the authenticated user even when predecessor has a different owner."""
+        self.client.force_login(self.other_user)
+
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-new-version",
+                kwargs={"pk": self.predecessor.pk},
+            ),
+            {
+                "valid_from": "2025-08-01",
+                "submit_for_review": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        successor = Collection.objects.get(pk=response.data["id"])
+        self.assertEqual(successor.owner, self.other_user)
+        self.assertNotEqual(successor.owner, self.predecessor.owner)
+
+    def test_new_version_review_action_actor_is_authenticated_user(self):
+        """ReviewAction on new version must have user == authenticated user, not predecessor owner."""
+        self.client.force_login(self.other_user)
+
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-new-version",
+                kwargs={"pk": self.predecessor.pk},
+            ),
+            {
+                "valid_from": "2025-09-01",
+                "submit_for_review": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        successor = Collection.objects.get(pk=response.data["id"])
+        review_action = (
+            ReviewAction.for_object(successor)
+            .filter(action=ReviewAction.ACTION_SUBMITTED)
+            .first()
+        )
+        self.assertIsNotNone(review_action)
+        self.assertEqual(review_action.user, self.other_user)
+        self.assertNotEqual(review_action.user, self.predecessor.owner)
 
 
 class GreenWasteCollectionSystemCountViewSetTests(APITestCase):

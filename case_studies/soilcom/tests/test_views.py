@@ -91,6 +91,7 @@ from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
 from .. import views
 from ..forms import CollectionModelForm, WasteFlyerFormSet
+from ..frequency_service import CADENCE_CUSTOM, CADENCE_WEEKLY
 from ..models import (
     AggregatedCollectionPropertyValue,
     CollectionCountOptions,
@@ -429,11 +430,21 @@ class CollectionFrequencyCRUDViewsTestCase(
         months = TemporalDistribution.objects.get(name="Months of the year")
         first = months.timestep_set.get(name="January")
         last = months.timestep_set.get(name="December")
-        initial = list(
-            CollectionSeason.objects.filter(
-                distribution=months, first_timestep=first, last_timestep=last
-            ).values("distribution", "first_timestep", "last_timestep")
-        )
+        initial = [
+            {
+                "distribution": months,
+                "first_timestep": first,
+                "last_timestep": last,
+                "standard": None,
+                "standard_cadence": "",
+                "option_1": None,
+                "option_1_cadence": "",
+                "option_2": None,
+                "option_2_cadence": "",
+                "option_3": None,
+                "option_3_cadence": "",
+            }
+        ]
         self.assertListEqual(initial, view.get_formset_initial())
 
     def test_post_with_valid_data_creates_and_relates_seasons(self):
@@ -494,21 +505,59 @@ class CollectionFrequencyCRUDViewsTestCase(
                 "first_timestep": self.january,
                 "last_timestep": self.may,
                 "standard": 100,
+                "standard_cadence": CADENCE_CUSTOM,
                 "option_1": 150,
+                "option_1_cadence": CADENCE_CUSTOM,
                 "option_2": None,
+                "option_2_cadence": "",
                 "option_3": None,
+                "option_3_cadence": "",
             },
             {
                 "distribution": self.distribution,
                 "first_timestep": self.june,
                 "last_timestep": self.december,
                 "standard": 150,
+                "standard_cadence": CADENCE_CUSTOM,
                 "option_1": None,
+                "option_1_cadence": "",
                 "option_2": None,
+                "option_2_cadence": "",
                 "option_3": None,
+                "option_3_cadence": "",
             },
         ]
         self.assertListEqual(expected, formset.initial)
+
+    def test_update_view_renders_schedule_editor_without_helper_artifact(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_update_url(self.unpublished_object.pk))
+        self.assertContains(response, "Season schedule")
+        self.assertNotContains(response, "LayoutSlice object")
+
+    def test_post_without_name_generates_canonical_label_from_schedule(self):
+        self.client.force_login(self.staff_user)
+        data = {
+            "name": "",
+            "type": "Fixed",
+            "form-INITIAL_FORMS": 1,
+            "form-TOTAL_FORMS": 1,
+            "form-0-distribution": self.distribution.id,
+            "form-0-first_timestep": self.january.id,
+            "form-0-last_timestep": self.december.id,
+            "form-0-standard_cadence": CADENCE_WEEKLY,
+            "form-0-standard": "",
+            "form-0-option_1_cadence": "",
+            "form-0-option_1": "",
+            "form-0-option_2_cadence": "",
+            "form-0-option_2": "",
+            "form-0-option_3_cadence": "",
+            "form-0-option_3": "",
+        }
+        response = self.client.post(self.get_create_url(), data)
+        self.assertEqual(response.status_code, 302)
+        frequency = CollectionFrequency.objects.get(name="Fixed; 52 per year")
+        self.assertEqual("Fixed", frequency.type)
 
     def test_post_http_302_options_are_changed_on_save(self):
         self.client.force_login(self.owner_user)
@@ -3059,6 +3108,55 @@ class CollectionDetailChainAwareValuesTestCase(ViewWithPermissionsTestCase):
         vals = response.context["collection_property_values"]
         self.assertTrue(any(v.pk == self.anchor_value.pk for v in vals))
 
+    def test_detail_renders_special_property_values_with_one_decimal(self):
+        prop_specific = Property.objects.create(
+            name="specific waste collected", publication_status="published"
+        )
+        prop_total = Property.objects.create(
+            name="total waste collected", publication_status="published"
+        )
+        prop_connection = Property.objects.create(
+            name="Connection rate", publication_status="published"
+        )
+        prop_specific.allowed_units.add(self.unit)
+        prop_total.allowed_units.add(self.unit)
+        prop_connection.allowed_units.add(self.unit)
+
+        CollectionPropertyValue.objects.create(
+            collection=self.succ,
+            property=prop_specific,
+            unit=self.unit,
+            year=2022,
+            average=12.54,
+            publication_status="published",
+        )
+        CollectionPropertyValue.objects.create(
+            collection=self.succ,
+            property=prop_total,
+            unit=self.unit,
+            year=2023,
+            average=55.55,
+            standard_deviation=1.44,
+            publication_status="published",
+        )
+        agg = AggregatedCollectionPropertyValue.objects.create(
+            property=prop_connection,
+            unit=self.unit,
+            year=2021,
+            average=88.16,
+            standard_deviation=0.44,
+            publication_status="published",
+        )
+        agg.collections.add(self.root)
+
+        response = self.client.get(reverse(self.url_name, kwargs={"pk": self.succ.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+        self.assertIn("12.5 ViewUnit (2022)", body)
+        self.assertIn("55.5 ± 1.4 ViewUnit (", body)
+        self.assertIn("88.2 ± 0.4 ViewUnit (", body)
+
 
 class CollectionReviewDetailPropertiesTestCase(TestCase):
     @classmethod
@@ -4988,13 +5086,15 @@ class DerivedValuesTestCase(TestCase):
             is_derived=False,
         )
 
-        amounts = _amounts_for_2024(
+        amounts, value_sources, acpv_group_keys = _amounts_for_2024(
             year=2024,
             all_collection_ids={collection.pk},
             col_to_cid={collection.pk: catchment.pk},
             catchment_ids=[catchment.pk],
         )
         self.assertEqual(amounts[catchment.pk], round(6.5 * 1000 / 2500, 1))
+        self.assertEqual(value_sources[catchment.pk], "cpv")
+        self.assertEqual(acpv_group_keys, {})
 
     def test_compute_counterpart_value_returns_none_for_non_convertible_property(self):
         other_property = Property.objects.create(name="other property [test]")

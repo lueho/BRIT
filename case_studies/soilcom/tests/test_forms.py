@@ -24,6 +24,12 @@ from ..forms import (
     WasteFlyerFormSet,
     WasteFlyerModelForm,
 )
+from ..frequency_service import (
+    CADENCE_CUSTOM,
+    CADENCE_EVERY_TWO_WEEKS,
+    CADENCE_WEEKLY,
+    CollectionFrequencyScheduleService,
+)
 from ..models import (
     Collection,
     CollectionCatchment,
@@ -243,6 +249,122 @@ class CollectionSeasonFormSetTestCase(TestCase):
         self.assertEqual(150, options.option_1)
         self.assertEqual(200, options.option_2)
         self.assertEqual(250, options.option_3)
+
+    def test_formset_saves_cadence_derived_counts(self):
+        data = {
+            "form-INITIAL_FORMS": 1,
+            "form-TOTAL_FORMS": 1,
+            "form-0-distribution": self.distribution,
+            "form-0-first_timestep": self.january,
+            "form-0-last_timestep": self.december,
+            "form-0-standard_cadence": CADENCE_WEEKLY,
+            "form-0-standard": "",
+            "form-0-option_1_cadence": "",
+            "form-0-option_1": "",
+            "form-0-option_2_cadence": "",
+            "form-0-option_2": "",
+            "form-0-option_3_cadence": "",
+            "form-0-option_3": "",
+        }
+        FormSet = formset_factory(CollectionSeasonForm, formset=CollectionSeasonFormSet)
+        frequency = CollectionFrequency.objects.create(
+            name="Test Frequency", type="Fixed"
+        )
+        formset = FormSet(data, parent_object=frequency, relation_field_name="seasons")
+        self.assertTrue(formset.is_valid())
+        formset.save()
+        options = CollectionCountOptions.objects.get(
+            frequency=frequency, season=formset.forms[0].instance
+        )
+        self.assertEqual(52, options.standard)
+
+
+class CollectionFrequencyScheduleServiceTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.distribution = TemporalDistribution.objects.get(name="Months of the year")
+        cls.january = Timestep.objects.get(name="January")
+        cls.may = Timestep.objects.get(name="May")
+        cls.june = Timestep.objects.get(name="June")
+        cls.september = Timestep.objects.get(name="September")
+        cls.october = Timestep.objects.get(name="October")
+        cls.december = Timestep.objects.get(name="December")
+        cls.april = Timestep.objects.get(name="April")
+
+    def test_count_from_cadence_weekly_whole_year_returns_52(self):
+        self.assertEqual(
+            52,
+            CollectionFrequencyScheduleService.count_from_cadence(
+                CADENCE_WEEKLY,
+                self.january,
+                self.december,
+            ),
+        )
+
+    def test_infer_cadence_returns_custom_for_non_canonical_existing_count(self):
+        self.assertEqual(
+            CADENCE_CUSTOM,
+            CollectionFrequencyScheduleService.infer_cadence(
+                100,
+                self.january,
+                self.april,
+            ),
+        )
+
+    def test_canonical_name_for_fixed_schedule_uses_per_year_pattern(self):
+        rows = [
+            {
+                "distribution": self.distribution,
+                "first_timestep": self.january,
+                "last_timestep": self.december,
+                "standard": 52,
+                "standard_cadence": CADENCE_WEEKLY,
+                "option_1": None,
+                "option_1_cadence": "",
+                "option_2": None,
+                "option_2_cadence": "",
+                "option_3": None,
+                "option_3_cadence": "",
+            }
+        ]
+        self.assertEqual(
+            "Fixed; 52 per year",
+            CollectionFrequencyScheduleService.canonical_name(rows, "Fixed"),
+        )
+
+    def test_rows_from_frequency_uses_cadence_hints_from_name_for_seasonal_rows(self):
+        frequency = CollectionFrequency.objects.create(
+            name=(
+                "Fixed-Seasonal; 36 per year "
+                "(1 per 2 weeks from October - May, 1 per week from June - September)"
+            ),
+            type="Fixed-Seasonal",
+        )
+        june_to_september = CollectionSeason.objects.create(
+            distribution=self.distribution,
+            first_timestep=self.june,
+            last_timestep=self.september,
+        )
+        october_to_may = CollectionSeason.objects.create(
+            distribution=self.distribution,
+            first_timestep=self.october,
+            last_timestep=self.may,
+        )
+        CollectionCountOptions.objects.create(
+            frequency=frequency,
+            season=june_to_september,
+            standard=18,
+        )
+        CollectionCountOptions.objects.create(
+            frequency=frequency,
+            season=october_to_may,
+            standard=18,
+        )
+
+        rows = CollectionFrequencyScheduleService.rows_from_frequency(frequency)
+
+        self.assertEqual(CADENCE_WEEKLY, rows[0]["standard_cadence"])
+        self.assertEqual(CADENCE_EVERY_TWO_WEEKS, rows[1]["standard_cadence"])
 
 
 class CollectionModelFormTestCase(TestCase):

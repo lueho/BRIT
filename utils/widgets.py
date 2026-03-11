@@ -120,14 +120,25 @@ class RangeSliderWidget(SuffixedMultiWidget):
         if not isinstance(value, list):
             value = self.decompress(value)
         context = super().get_context(name, value, attrs)
+        widget_attrs = context["widget"]["attrs"]
+        range_min = widget_attrs.get("data-range_min", self.range_min)
+        range_max = widget_attrs.get("data-range_max", self.range_max)
+        step = widget_attrs.get("data-step", self.range_step)
+        if range_min is None:
+            range_min = self.default_range_min
+        if range_max is None:
+            range_max = self.default_range_max
+        if step is None:
+            step = self.default_range_step
         cur_min, cur_max = value[0], value[1]
         if cur_min is None:
-            cur_min = context["widget"]["attrs"]["data-range_min"]
+            cur_min = range_min
         if cur_max is None:
-            cur_max = context["widget"]["attrs"]["data-range_max"]
-        step = context["widget"]["attrs"].get("data-step", 1)
-        context["widget"]["attrs"].update(
+            cur_max = range_max
+        widget_attrs.update(
             {
+                "data-range_min": range_min,
+                "data-range_max": range_max,
                 "data-cur_min": cur_min,
                 "data-cur_max": cur_max,
                 "data-step": step,
@@ -135,7 +146,7 @@ class RangeSliderWidget(SuffixedMultiWidget):
                 "data-number_format": self.number_format,
             }
         )
-        base_id = context["widget"]["attrs"].get("id", context["widget"]["name"])
+        base_id = widget_attrs.get("id", context["widget"]["name"])
         for idx, subwidget in enumerate(context["widget"]["subwidgets"]):
             subwidget["attrs"]["id"] = f"{base_id}_{self.suffixes[idx]}"
         context["widget"]["value_text"] = f"{cur_min}{self.unit} - {cur_max}{self.unit}"

@@ -1,3 +1,4 @@
+from builtins import property as builtin_property
 from functools import cached_property
 
 from django.conf import settings
@@ -138,6 +139,33 @@ class PropertyValue(NamedUserCreatedObject):
     class Meta:
         abstract = True
         ordering = ["property__name"]
+
+    @staticmethod
+    def _should_round_to_one_decimal(property_name):
+        normalized = (property_name or "").strip().lower()
+        return normalized.startswith(
+            (
+                "connection rate",
+                "specific waste collected",
+                "total waste collected",
+            )
+        )
+
+    @builtin_property
+    def display_average(self):
+        if self.average is None:
+            return None
+        if self._should_round_to_one_decimal(getattr(self.property, "name", "")):
+            return round(self.average, 1)
+        return self.average
+
+    @builtin_property
+    def display_standard_deviation(self):
+        if self.standard_deviation is None:
+            return None
+        if self._should_round_to_one_decimal(getattr(self.property, "name", "")):
+            return round(self.standard_deviation, 1)
+        return self.standard_deviation
 
     def __str__(self):
         name = f"{self.property}: {self.average}"

@@ -470,7 +470,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
 
             for value in values:
                 column_name = f"{property_name.lower().replace(' ', '_')}_{value.year}"
-                ordered_representation[column_name] = value.average
+                ordered_representation[column_name] = value.display_average
                 ordered_representation[f"{column_name}_unit"] = (
                     str(value.unit) if value.unit else ""
                 )
@@ -544,6 +544,25 @@ class AggregatedCollectionPropertyValueMutationSerializer(serializers.Serializer
         child=serializers.URLField(), required=False, default=list
     )
     submit_for_review = serializers.BooleanField(required=False, default=True)
+
+
+class ImportMaterialListField(serializers.Field):
+    def to_internal_value(self, data):
+        if data is None:
+            return ""
+        if isinstance(data, str):
+            return data
+        if isinstance(data, list):
+            values = []
+            for item in data:
+                if item is None:
+                    continue
+                values.append(str(item))
+            return values
+        raise serializers.ValidationError("Expected a string or list of strings.")
+
+    def to_representation(self, value):
+        return value
 
 
 class CollectionImportRecordSerializer(serializers.Serializer):
@@ -627,6 +646,8 @@ class CollectionImportRecordSerializer(serializers.Serializer):
     required_bin_capacity_reference = serializers.CharField(
         required=False, allow_null=True, allow_blank=True
     )
+    allowed_materials = ImportMaterialListField(required=False, default="")
+    forbidden_materials = ImportMaterialListField(required=False, default="")
     description = serializers.CharField(required=False, allow_blank=True, default="")
     flyer_urls = serializers.ListField(
         child=serializers.URLField(), required=False, default=list

@@ -79,14 +79,14 @@
         <p class="card-text">
             <strong>Value:</strong>
             <br>
-            {{ object.average }}
-            ± {{ object.standard_deviation }} {{ object.unit }}
+            {{ object.display_average }}
+            ± {{ object.display_standard_deviation }} {{ object.unit }}
         </p>
     {% else %}
         <p class="card-text">
             <strong>Value:</strong>
             <br>
-            {{ object.average }} {{ object.unit }}
+            {{ object.display_average }} {{ object.unit }}
         </p>
     {% endif %}
     {% if object.sources.exists %}

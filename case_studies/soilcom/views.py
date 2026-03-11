@@ -105,6 +105,7 @@ from .forms import (
     WasteFlyerModalModelForm,
     WasteFlyerModelForm,
 )
+from .frequency_service import CollectionFrequencyScheduleService
 from .models import (
     AggregatedCollectionPropertyValue,
     Collection,
@@ -570,7 +571,38 @@ class FrequencyPrivateListView(PrivateObjectFilterView):
     dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
-class FrequencyCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
+class FrequencyScheduleMixin:
+    def _whole_year_initial(self):
+        season = CollectionSeason.objects.get(
+            distribution__name="Months of the year",
+            first_timestep__name="January",
+            last_timestep__name="December",
+        )
+        return CollectionFrequencyScheduleService.initial_row(
+            season.distribution,
+            season.first_timestep,
+            season.last_timestep,
+        )
+
+    def get_formset_initial(self):
+        if getattr(self, "object", None):
+            return CollectionFrequencyScheduleService.rows_from_frequency(self.object)
+        return [self._whole_year_initial()]
+
+    def _apply_schedule_metadata(self, form, formset):
+        rows = CollectionFrequencyScheduleService.rows_from_formset(formset)
+        frequency_type = CollectionFrequencyScheduleService.frequency_type(rows)
+        form.instance.type = frequency_type
+        if not form.cleaned_data.get("name"):
+            form.instance.name = CollectionFrequencyScheduleService.canonical_name(
+                rows, frequency_type
+            )
+        return rows
+
+
+class FrequencyCreateView(
+    FrequencyScheduleMixin, M2MInlineFormSetMixin, UserCreatedObjectCreateView
+):
     form_class = CollectionFrequencyModelForm
     formset_model = CollectionSeason
     formset_class = CollectionSeasonFormSet
@@ -579,16 +611,7 @@ class FrequencyCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
     formset_factory_kwargs = {"extra": 0}
     relation_field_name = "seasons"
     permission_required = "soilcom.add_collectionfrequency"
-    template_name = "formsets_card.html"
-
-    def get_formset_initial(self):
-        return list(
-            CollectionSeason.objects.filter(
-                distribution__name="Months of the year",
-                first_timestep__name="January",
-                last_timestep__name="December",
-            ).values("distribution", "first_timestep", "last_timestep")
-        )
+    template_name = "soilcom/collectionfrequency_form.html"
 
     def post(self, request, *args, **kwargs):
         form = self.get_form()
@@ -596,6 +619,7 @@ class FrequencyCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
 
         if form.is_valid() and formset.is_valid():
             form.instance.owner = self.request.user
+            self._apply_schedule_metadata(form, formset)
             self.object = form.save()
             # Update formset's parent_object so it can set the M2M relationship
             formset.parent_object = self.object
@@ -614,7 +638,9 @@ class FrequencyModalDetailView(UserCreatedObjectModalDetailView):
     model = CollectionFrequency
 
 
-class FrequencyUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
+class FrequencyUpdateView(
+    FrequencyScheduleMixin, M2MInlineFormSetMixin, UserCreatedObjectUpdateView
+):
     model = CollectionFrequency
     form_class = CollectionFrequencyModelForm
     formset_model = CollectionSeason
@@ -623,26 +649,7 @@ class FrequencyUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
     formset_helper_class = CollectionSeasonFormHelper
     formset_factory_kwargs = {"extra": 0}
     relation_field_name = "seasons"
-    template_name = "formsets_card.html"
-
-    def get_formset_initial(self):
-        initial = []
-        for season in self.object.seasons.all():
-            options = CollectionCountOptions.objects.get(
-                frequency=self.object, season=season
-            )
-            initial.append(
-                {
-                    "distribution": season.distribution,
-                    "first_timestep": season.first_timestep,
-                    "last_timestep": season.last_timestep,
-                    "standard": options.standard,
-                    "option_1": options.option_1,
-                    "option_2": options.option_2,
-                    "option_3": options.option_3,
-                }
-            )
-        return initial
+    template_name = "soilcom/collectionfrequency_form.html"
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -650,6 +657,7 @@ class FrequencyUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
         formset = self.get_formset()
 
         if form.is_valid() and formset.is_valid():
+            self._apply_schedule_metadata(form, formset)
             form.save()
             formset.save()
             return HttpResponseRedirect(self.get_success_url())
