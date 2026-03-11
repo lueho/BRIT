@@ -90,10 +90,10 @@
       {% object_policy object review_mode=review_mode as policy %}
       <div class="btn-group me-2" role="group">
         {% if policy.can_view_review_feedback %}
-          <a class="btn btn-sm btn-outline-danger"
+          <a class="btn btn-sm {% if policy.is_declined %}btn-outline-danger{% else %}btn-outline-info{% endif %}"
              href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}"
-             title="Review feedback">
-            <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review feedback</span>
+             title="{{ policy.review_feedback_label }}">
+            <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">{{ policy.review_feedback_label }}</span>
           </a>
         {% elif policy.is_in_review %}
           {% if policy.is_owner or policy.is_staff or policy.is_moderator %}

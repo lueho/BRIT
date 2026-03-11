@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from case_studies.soilcom.models import Collection, WasteCategory
 
-from ..models import UserCreatedObject
+from ..models import ReviewAction, UserCreatedObject
 
 
 class ReviewWorkflowModelTests(TestCase):
@@ -112,3 +112,69 @@ class ReviewWorkflowModelTests(TestCase):
             self.collection.publication_status, UserCreatedObject.STATUS_PRIVATE
         )
         self.assertIsNone(self.collection.submitted_at)
+
+    def test_has_review_feedback_only_reflects_current_submission_cycle(self):
+        self.assertFalse(self.collection.has_review_feedback)
+        self.assertIsNone(self.collection.latest_review_feedback_action)
+
+        first_submission = ReviewAction.objects.create(
+            content_type=ContentType.objects.get_for_model(Collection),
+            object_id=self.collection.pk,
+            action=ReviewAction.ACTION_SUBMITTED,
+            user=self.owner,
+        )
+        ReviewAction.objects.create(
+            content_type=ContentType.objects.get_for_model(Collection),
+            object_id=self.collection.pk,
+            action=ReviewAction.ACTION_COMMENT,
+            comment="owner follow-up",
+            user=self.owner,
+        )
+        moderator_comment = ReviewAction.objects.create(
+            content_type=ContentType.objects.get_for_model(Collection),
+            object_id=self.collection.pk,
+            action=ReviewAction.ACTION_COMMENT,
+            comment="moderator note",
+            user=self.moderator,
+        )
+
+        self.collection.__dict__.pop("latest_submission_action", None)
+        self.collection.__dict__.pop("latest_review_feedback_action", None)
+
+        self.assertEqual(
+            self.collection.latest_submission_action.pk, first_submission.pk
+        )
+        self.assertTrue(self.collection.has_review_feedback)
+        self.assertEqual(
+            self.collection.latest_review_feedback_action.pk,
+            moderator_comment.pk,
+        )
+
+        second_submission = ReviewAction.objects.create(
+            content_type=ContentType.objects.get_for_model(Collection),
+            object_id=self.collection.pk,
+            action=ReviewAction.ACTION_SUBMITTED,
+            user=self.owner,
+        )
+
+        self.collection.__dict__.pop("latest_submission_action", None)
+        self.collection.__dict__.pop("latest_review_feedback_action", None)
+
+        self.assertEqual(
+            self.collection.latest_submission_action.pk, second_submission.pk
+        )
+        self.assertFalse(self.collection.has_review_feedback)
+        self.assertIsNone(self.collection.latest_review_feedback_action)
+
+        rejection = ReviewAction.objects.create(
+            content_type=ContentType.objects.get_for_model(Collection),
+            object_id=self.collection.pk,
+            action=ReviewAction.ACTION_REJECTED,
+            comment="needs changes",
+            user=self.moderator,
+        )
+
+        self.collection.__dict__.pop("latest_review_feedback_action", None)
+
+        self.assertTrue(self.collection.has_review_feedback)
+        self.assertEqual(self.collection.latest_review_feedback_action.pk, rejection.pk)

@@ -27,10 +27,10 @@
                   {% object_policy object as policy %}
                   {% block detail_header_review_actions %}
                     {% if policy.can_view_review_feedback %}
-                      <a class="btn btn-sm btn-outline-danger"
+                      <a class="btn btn-sm {% if policy.is_declined %}btn-outline-danger{% else %}btn-outline-info{% endif %}"
                          href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
-                         title="Review feedback">
-                        <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review feedback</span>
+                         title="{{ policy.review_feedback_label }}">
+                        <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">{{ policy.review_feedback_label }}</span>
                       </a>
                     {% else %}
                       {% if policy.is_in_review %}
@@ -186,8 +186,12 @@
                       </button>
                     </form>
                   {% endif %}
-                  {# Link to open the Review view when item is in review #}
-                  {% if policy.is_in_review and not review_mode %}
+                  {% if policy.can_view_review_feedback %}
+                    <a class="btn {% if policy.is_declined %}btn-outline-danger{% else %}btn-outline-info{% endif %} w-100 mb-2"
+                       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+                      <i class="fas fa-clipboard-check"></i> {{ policy.review_feedback_label }}
+                    </a>
+                  {% elif policy.is_in_review and not review_mode %}
                     {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
                       <a class="btn btn-outline-secondary w-100 mb-2"
                          href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">

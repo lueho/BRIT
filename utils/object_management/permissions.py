@@ -353,7 +353,7 @@ def get_object_policy(user, obj, request=None, review_mode=False):
       - can_archive, can_delete
       - can_submit_review, can_withdraw_review, can_approve, can_reject
       - can_export, export_list_type ('published'|'private'|None)
-      - can_view_review_feedback
+      - has_review_feedback, review_feedback_label, can_view_review_feedback
     """
     perm = UserCreatedObjectPermission()
 
@@ -481,8 +481,11 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         else ("private" if (is_owner or is_staff) else None)
     )
 
-    # Review feedback visibility (declined and owner, outside explicit review mode UIs)
-    can_view_review_feedback = is_owner and is_declined and (not bool(review_mode))
+    has_review_feedback = bool(is_owner and getattr(obj, "has_review_feedback", False))
+    review_feedback_label = "Review feedback" if is_declined else "Review activity"
+    can_view_review_feedback = bool(
+        is_owner and (is_declined or has_review_feedback) and (not bool(review_mode))
+    )
 
     return {
         "is_authenticated": is_authenticated,
@@ -507,6 +510,8 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         "can_reject": can_reject,
         "can_export": can_export,
         "export_list_type": export_list_type,
+        "has_review_feedback": has_review_feedback,
+        "review_feedback_label": review_feedback_label,
         "can_view_review_feedback": can_view_review_feedback,
     }
 

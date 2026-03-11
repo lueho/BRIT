@@ -8,6 +8,12 @@
   {% if list_type == 'private' %}
     <div class="status-badge-container">{% include "object_management/review_status_badge.html" with object=object %}</div>
   {% endif %}
+  {% if list_type == 'private' and policy.has_review_feedback %}
+    <a class="badge rounded-pill {% if policy.is_declined %}text-bg-danger{% else %}text-bg-info{% endif %} text-decoration-none me-2"
+       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+      <i class="fas fa-clipboard-check"></i> {{ policy.review_feedback_label }}
+    </a>
+  {% endif %}
 
   <div class="dropdown d-inline-block ms-auto">
     <button class="btn btn-sm btn-secondary dropdown-toggle"
@@ -27,7 +33,7 @@
       {% if policy.can_view_review_feedback %}
         <a class="dropdown-item"
            href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
-          <i class="fas fa-clipboard-check"></i> Review feedback
+          <i class="fas fa-clipboard-check"></i> {{ policy.review_feedback_label }}
         </a>
       {% endif %}
 
@@ -43,7 +49,8 @@
 
       {# Edit via policy #}
       {% if policy.can_edit %}
-        <a class="dropdown-item" href="{{ object.update_url }}?next={{ request.get_full_path|urlencode }}">
+        <a class="dropdown-item"
+           href="{{ object.update_url }}?next={{ request.get_full_path|urlencode }}">
           <i class="fas fa-pen-to-square"></i> Edit
         </a>
       {% endif %}

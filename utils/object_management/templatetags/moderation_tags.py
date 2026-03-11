@@ -137,6 +137,9 @@ def _safe_policy_fallback(user, obj, review_mode=False):
         else ("private" if (is_owner or is_staff) else None)
     )
 
+    has_review_feedback = bool(is_owner and getattr(obj, "has_review_feedback", False))
+    review_feedback_label = "Review feedback" if is_declined else "Review activity"
+
     policy = {
         "is_authenticated": is_authenticated,
         "is_owner": is_owner,
@@ -162,8 +165,10 @@ def _safe_policy_fallback(user, obj, review_mode=False):
         "can_export": (is_published or is_archived)
         or (is_authenticated and (is_owner or is_staff)),
         "export_list_type": export_list_type,
+        "has_review_feedback": has_review_feedback,
+        "review_feedback_label": review_feedback_label,
         "can_view_review_feedback": bool(
-            is_owner and is_declined and not bool(review_mode)
+            is_owner and (is_declined or has_review_feedback) and not bool(review_mode)
         ),
         # Fallback marker
         "fallback": True,

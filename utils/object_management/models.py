@@ -6,6 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
+from django.utils.functional import cached_property
 
 from ..models import CRUDUrlsMixin
 
@@ -24,10 +25,10 @@ def get_default_owner():
         )
     try:
         return User.objects.get(username=username)
-    except User.DoesNotExist:
+    except User.DoesNotExist as err:
         raise RuntimeError(
             f"Default owner user '{username}' does not exist. Run ensure_initial_data."
-        )
+        ) from err
 
 
 def get_default_owner_pk():
@@ -298,6 +299,18 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         return self._meta.verbose_name
 
     # --- Review helper flags ---
+    @cached_property
+    def latest_submission_action(self):
+        """Return the most recent submission action for this object, if any."""
+        if not getattr(self, "pk", None):
+            return None
+        return (
+            ReviewAction.for_object(self)
+            .filter(action=ReviewAction.ACTION_SUBMITTED)
+            .order_by("-created_at", "-id")
+            .first()
+        )
+
     def _get_last_review_action(self):
         """
         Returns the most recent ReviewAction for this object, or None.
@@ -310,6 +323,33 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
             .order_by("-created_at", "-id")
             .first()
         )
+
+    @cached_property
+    def latest_review_feedback_action(self):
+        """Return the newest non-owner review action since the latest submission."""
+        latest_submission = self.latest_submission_action
+        if latest_submission is None or not getattr(self, "owner_id", None):
+            return None
+
+        return (
+            ReviewAction.for_object(self)
+            .exclude(user_id=self.owner_id)
+            .exclude(action=ReviewAction.ACTION_SUBMITTED)
+            .filter(
+                Q(created_at__gt=latest_submission.created_at)
+                | Q(
+                    created_at=latest_submission.created_at,
+                    id__gt=latest_submission.id,
+                )
+            )
+            .order_by("-created_at", "-id")
+            .first()
+        )
+
+    @property
+    def has_review_feedback(self):
+        """Return whether a newer non-owner review action exists for this cycle."""
+        return self.latest_review_feedback_action is not None
 
     @property
     def is_rejected(self):

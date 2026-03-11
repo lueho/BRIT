@@ -2889,6 +2889,7 @@ class SampleDetailTemplateReviewUITests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.owner = User.objects.create_user(username="owner", password="test123")
+        cls.reviewer = User.objects.create_user(username="reviewer", password="test123")
 
         with mute_signals(post_save, pre_save):
             cls.material = Material.objects.create(
@@ -2928,6 +2929,49 @@ class SampleDetailTemplateReviewUITests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Review view")
+
+    def test_review_sample_shows_review_activity_when_feedback_exists(self):
+        ReviewAction.objects.create(
+            content_type=ContentType.objects.get_for_model(Sample),
+            object_id=self.review_sample.pk,
+            action=ReviewAction.ACTION_SUBMITTED,
+            user=self.owner,
+        )
+        ReviewAction.objects.create(
+            content_type=ContentType.objects.get_for_model(Sample),
+            object_id=self.review_sample.pk,
+            action=ReviewAction.ACTION_COMMENT,
+            comment="Please clarify the sampling date.",
+            user=self.reviewer,
+        )
+
+        self.client.force_login(self.owner)
+        url = reverse("sample-detail", kwargs={"pk": self.review_sample.pk})
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Review activity")
+
+    def test_owned_sample_list_shows_review_activity_badge_when_feedback_exists(self):
+        ReviewAction.objects.create(
+            content_type=ContentType.objects.get_for_model(Sample),
+            object_id=self.review_sample.pk,
+            action=ReviewAction.ACTION_SUBMITTED,
+            user=self.owner,
+        )
+        ReviewAction.objects.create(
+            content_type=ContentType.objects.get_for_model(Sample),
+            object_id=self.review_sample.pk,
+            action=ReviewAction.ACTION_COMMENT,
+            comment="Needs one more source.",
+            user=self.reviewer,
+        )
+
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("sample-list-owned"), {"scope": "private"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Review activity")
 
     def test_published_sample_does_not_show_submit_button(self):
         self.client.force_login(self.owner)
