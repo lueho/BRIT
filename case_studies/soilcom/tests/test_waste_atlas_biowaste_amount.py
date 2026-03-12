@@ -5,8 +5,8 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from case_studies.soilcom.derived_values import clear_derived_value_config_cache
-from case_studies.soilcom.models import (
+from sources.waste_collection.derived_values import clear_derived_value_config_cache
+from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
     Collection,
     CollectionCatchment,

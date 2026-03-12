@@ -2,7 +2,7 @@ from datetime import date
 
 from django.test import SimpleTestCase
 
-from case_studies.soilcom.management.commands import (
+from sources.waste_collection.management.commands import (
     import_bw_2024_collections,
     import_bw_2024_standalone,
 )

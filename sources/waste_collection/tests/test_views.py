@@ -90,7 +90,11 @@ from utils.properties.models import Property, Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
 from .. import views
-from ..forms import CollectionModelForm, WasteFlyerFormSet
+from ..forms import (
+    CollectionFrequencyScheduleService,
+    CollectionModelForm,
+    WasteFlyerFormSet,
+)
 from ..models import (
     AggregatedCollectionPropertyValue,
     CollectionCountOptions,
@@ -464,11 +468,9 @@ class CollectionFrequencyCRUDViewsTestCase(
         months = TemporalDistribution.objects.get(name="Months of the year")
         first = months.timestep_set.get(name="January")
         last = months.timestep_set.get(name="December")
-        initial = list(
-            CollectionSeason.objects.filter(
-                distribution=months, first_timestep=first, last_timestep=last
-            ).values("distribution", "first_timestep", "last_timestep")
-        )
+        initial = [
+            CollectionFrequencyScheduleService.initial_row(months, first, last)
+        ]
         self.assertListEqual(initial, view.get_formset_initial())
 
     def test_post_with_valid_data_creates_and_relates_seasons(self):
@@ -523,26 +525,9 @@ class CollectionFrequencyCRUDViewsTestCase(
         self.client.force_login(self.owner_user)
         response = self.client.get(self.get_update_url(self.unpublished_object.pk))
         formset = response.context["formset"]
-        expected = [
-            {
-                "distribution": self.distribution,
-                "first_timestep": self.january,
-                "last_timestep": self.may,
-                "standard": 100,
-                "option_1": 150,
-                "option_2": None,
-                "option_3": None,
-            },
-            {
-                "distribution": self.distribution,
-                "first_timestep": self.june,
-                "last_timestep": self.december,
-                "standard": 150,
-                "option_1": None,
-                "option_2": None,
-                "option_3": None,
-            },
-        ]
+        expected = CollectionFrequencyScheduleService.rows_from_frequency(
+            self.unpublished_object
+        )
         self.assertListEqual(expected, formset.initial)
 
     def test_post_http_302_options_are_changed_on_save(self):

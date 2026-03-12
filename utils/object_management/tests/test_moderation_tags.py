@@ -8,7 +8,7 @@ from django.template import Context, Template
 from django.test import RequestFactory, TestCase
 from factory.django import mute_signals
 
-from case_studies.soilcom.models import Collection
+from sources.waste_collection.models import Collection
 from utils.object_management.models import UserCreatedObject
 from utils.object_management.templatetags.moderation_tags import (
     markdown_to_html,
