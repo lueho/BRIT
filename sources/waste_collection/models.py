@@ -358,6 +358,7 @@ CONNECTION_TYPE_CHOICES = [
 
 REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES = [
     ("person", "per person"),
+    ("per person & week"),
     ("household", "per household"),
     ("property", "per property"),
     ("not_specified", "not specified"),
