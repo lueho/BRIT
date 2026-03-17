@@ -10,7 +10,7 @@ from sources.waste_collection.management.commands import (
 
 class BW2024ImportMappingTests(SimpleTestCase):
     def _build_row(self):
-        row = [None] * 40
+        row = [None] * (max(import_bw_2024_collections._COL.values()) + 1)
         row[import_bw_2024_collections._COL["catchment_name"]] = "Test Catchment"
         row[import_bw_2024_collections._COL["nuts_or_lau_id"]] = "DE123"
         row[import_bw_2024_collections._COL["collector"]] = "Test Collector"
@@ -63,6 +63,7 @@ class BW2024ImportMappingTests(SimpleTestCase):
         self.assertEqual(record["description"], "Updated import description")
         self.assertEqual(record["valid_from"], date(2024, 1, 1))
         self.assertIsNone(record["valid_until"])
+        self.assertEqual(record["sources"], ["not-a-url"])
         self.assertEqual(
             record["flyer_urls"],
             ["https://example.com/a.pdf", "https://example.com/b.pdf"],
@@ -75,6 +76,7 @@ class BW2024ImportMappingTests(SimpleTestCase):
         self.assertEqual(record["description"], "Updated import description")
         self.assertEqual(record["valid_from"], "2024-01-01")
         self.assertIsNone(record["valid_until"])
+        self.assertEqual(record["sources"], ["not-a-url"])
         self.assertEqual(
             record["flyer_urls"],
             ["https://example.com/a.pdf", "https://example.com/b.pdf"],

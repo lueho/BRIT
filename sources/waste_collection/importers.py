@@ -8,6 +8,8 @@ from datetime import timedelta
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 
+from bibliography.models import Source
+from materials.models import Material
 from sources.waste_collection.models import (
     Collection,
     CollectionCatchment,
@@ -22,7 +24,6 @@ from sources.waste_collection.models import (
     WasteCategory,
     WasteFlyer,
 )
-from materials.models import Material
 from utils.object_management.models import ReviewAction
 from utils.properties.models import Property, Unit
 
@@ -118,6 +119,7 @@ class CollectionImporter:
             "cpv_created": 0,
             "cpv_skipped": 0,
             "flyers_created": 0,
+            "sources_created": 0,
             "warnings": [],
         }
 
@@ -460,6 +462,8 @@ class CollectionImporter:
 
             stats["created"] += 1
 
+        self._attach_collection_sources(collection, record.get("sources") or [], stats)
+
         # Flyers — skip URLs that exceed the DB column limit (2083 chars)
         for url in record.get("flyer_urls") or []:
             if len(url) > 2083:
@@ -484,6 +488,30 @@ class CollectionImporter:
         # Property values
         for pv in record.get("property_values") or []:
             self._import_property_value(collection, pv, stats)
+
+    def _attach_collection_sources(
+        self, collection: Collection, source_titles: list[str], stats: dict
+    ) -> None:
+        existing_titles = set(collection.sources.values_list("title", flat=True))
+        for raw_title in source_titles:
+            title = " ".join(str(raw_title).split())[:500]
+            if not title or title in existing_titles:
+                continue
+            source, created = Source.objects.get_or_create(
+                owner=self.owner,
+                type="custom",
+                title=title,
+                defaults={"publication_status": "private"},
+            )
+            collection.sources.add(source)
+            existing_titles.add(title)
+            if created:
+                stats["sources_created"] += 1
+            if self.publication_status == "review" and source.publication_status in (
+                source.STATUS_PRIVATE,
+                source.STATUS_DECLINED,
+            ):
+                self._submit_for_review(source)
 
     def _attach_cpv_sources(
         self, cpv: CollectionPropertyValue, urls: list[str], stats: dict

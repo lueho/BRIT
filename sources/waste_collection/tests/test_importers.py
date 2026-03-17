@@ -5,6 +5,7 @@ from datetime import date
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from bibliography.models import Source
 from materials.models import Material
 
 from ..importers import CollectionImporter
@@ -57,6 +58,7 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
             "required_bin_capacity_reference": None,
             "allowed_materials": allowed_materials,
             "forbidden_materials": forbidden_materials,
+            "sources": [],
             "description": "",
             "property_values": [],
             "flyer_urls": [],
@@ -109,3 +111,47 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
 
         self.assertEqual(stats_second["created"], 1)
         self.assertEqual(Collection.objects.filter(owner=self.owner).count(), 2)
+
+    def test_reimport_reuses_custom_source_notes(self):
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+
+        stats_first = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_2.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {"sources": ["Private correspondence with district office"]}
+            ]
+        )
+
+        self.assertEqual(stats_first["sources_created"], 1)
+        collection = Collection.objects.get(
+            owner=self.owner, valid_from=date(2024, 1, 1)
+        )
+        self.assertEqual(
+            list(collection.sources.values_list("title", flat=True)),
+            ["Private correspondence with district office"],
+        )
+        self.assertTrue(
+            Source.objects.filter(
+                owner=self.owner,
+                type="custom",
+                title="Private correspondence with district office",
+            ).exists()
+        )
+
+        stats_second = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_2.name, self.allowed_1.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {"sources": ["Private correspondence with district office"]}
+            ]
+        )
+
+        collection.refresh_from_db()
+        self.assertEqual(stats_second["created"], 0)
+        self.assertEqual(stats_second["sources_created"], 0)
+        self.assertEqual(collection.sources.count(), 1)

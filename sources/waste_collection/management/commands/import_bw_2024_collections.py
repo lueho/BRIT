@@ -125,17 +125,28 @@ def _resolve_date(value):
     return None
 
 
-def _collect_flyer_urls(row) -> list[str]:
-    """Extract HTTP URLs from the Sources_new column."""
-    urls = []
+def _split_sources_new_parts(row) -> list[str]:
     raw = row[_COL["sources_new"]]
     if not raw:
-        return urls
-    for part in str(raw).split(","):
-        part = part.strip()
-        if part.startswith("http"):
-            urls.append(part)
-    return urls
+        return []
+    return [part.strip() for part in str(raw).split(",") if part and part.strip()]
+
+
+def _collect_flyer_urls(row) -> list[str]:
+    """Extract HTTP URLs from the Sources_new column."""
+    return [
+        part
+        for part in _split_sources_new_parts(row)
+        if part.lower().startswith("http")
+    ]
+
+
+def _collect_sources(row) -> list[str]:
+    return [
+        part
+        for part in _split_sources_new_parts(row)
+        if not part.lower().startswith("http")
+    ]
 
 
 def _collect_property_values(row) -> list[dict]:
@@ -223,6 +234,7 @@ def _row_to_record(row) -> dict:
         "description": row[_COL["description"]] or "",
         "valid_from": valid_from,
         "valid_until": valid_until,
+        "sources": _collect_sources(row),
         "flyer_urls": _collect_flyer_urls(row),
         "property_values": _collect_property_values(row),
     }
