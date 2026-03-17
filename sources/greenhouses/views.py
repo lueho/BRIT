@@ -9,6 +9,29 @@ from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDataSetPublishedFilteredMapView
 from materials.models import MaterialComponentGroup
+from sources.greenhouses.filters import (
+    CultureListFilter,
+    GreenhouseTypeFilter,
+    NantesGreenhousesFilterSet,
+)
+from sources.greenhouses.forms import (
+    CultureModalModelForm,
+    CultureModelForm,
+    GreenhouseGrowthCycleModelForm,
+    GreenhouseModalModelForm,
+    GreenhouseModelForm,
+    GrowthCycleCreateForm,
+    GrowthShareFormSetHelper,
+    GrowthTimestepInline,
+    InlineGrowthShare,
+    UpdateGreenhouseGrowthCycleValuesForm,
+)
+from sources.greenhouses.models import (
+    Culture,
+    Greenhouse,
+    GreenhouseGrowthCycle,
+    GrowthTimeStepSet,
+)
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.object_management.views import (
     PrivateObjectFilterView,
@@ -23,30 +46,6 @@ from utils.object_management.views import (
     UserOwnsObjectMixin,
 )
 from utils.views import NextOrSuccessUrlMixin
-
-from sources.greenhouses.forms import (
-    CultureModalModelForm,
-    CultureModelForm,
-    GreenhouseGrowthCycleModelForm,
-    GreenhouseModalModelForm,
-    GreenhouseModelForm,
-    GrowthCycleCreateForm,
-    GrowthShareFormSetHelper,
-    GrowthTimestepInline,
-    InlineGrowthShare,
-    UpdateGreenhouseGrowthCycleValuesForm,
-)
-from sources.greenhouses.filters import (
-    CultureListFilter,
-    GreenhouseTypeFilter,
-    NantesGreenhousesFilterSet,
-)
-from sources.greenhouses.models import (
-    Culture,
-    Greenhouse,
-    GreenhouseGrowthCycle,
-    GrowthTimeStepSet,
-)
 
 
 class CulturePublishedListView(PublishedObjectFilterView):
@@ -114,7 +113,6 @@ class GreenhouseModalCreateView(UserCreatedObjectModalCreateView):
 
 class GreenhouseDetailView(UserCreatedObjectDetailView):
     model = Greenhouse
-    template_name = "greenhouse_detail.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -146,7 +144,7 @@ class GreenhouseGrowthCycleCreateView(LoginRequiredMixin, CreateWithInlinesView)
         "greenhouse",
         "group_settings",
     )
-    template_name = "growth_cycle_inline_create.html"
+    template_name = "greenhouses/growth_cycle_inline_create.html"
 
     def get_success_url(self):
         return self.object.get_absolute_url()
@@ -186,7 +184,6 @@ class GrowthCycleModalCreateView(UserCreatedObjectModalCreateView):
 
 class GrowthCycleDetailView(UserCreatedObjectDetailView):
     model = GreenhouseGrowthCycle
-    template_name = "growthcycle_detail.html"
 
     def get_context_data(self, **kwargs):
         kwargs["table_data"] = self.object.table_data
@@ -237,7 +234,7 @@ class GrowthTimeStepSetModalUpdateView(
 class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
     model = GreenhouseGrowthCycle
     form_class = UpdateGreenhouseGrowthCycleValuesForm
-    template_name = "greenhouse_growth_cycle_update_values.html"
+    template_name = "greenhouses/greenhouse_growth_cycle_update_values.html"
     object = None
 
     def form_valid(self, form):
@@ -268,7 +265,7 @@ class NantesGreenhousesCatchmentAutocompleteView(UserCreatedObjectAutocompleteVi
 
 class GreenhousesPublishedMapView(GeoDataSetPublishedFilteredMapView):
     model_name = "NantesGreenhouses"
-    template_name = "nantes_greenhouses_map.html"
+    template_name = "greenhouses/nantes_greenhouses_map.html"
     filterset_class = NantesGreenhousesFilterSet
     features_layer_api_basename = "api-nantes-greenhouses"
     map_title = "Nantes Greenhouses"

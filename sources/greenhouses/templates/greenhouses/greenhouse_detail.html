@@ -33,10 +33,10 @@
                         <div class="card-header">
                             <h6 class="m-0 fw-bold text-primary">{{ growth_cycle.cycle_number }}: {{ content.culture.name }}</h6>
                         </div>
-                        <div class="card-body">{% include "growthcycle_table.html" with table_data=content.table %}</div>
+                        <div class="card-body">{% include "greenhouses/growthcycle_table.html" with table_data=content.table %}</div>
                         <div class="card-footer">
                             {% if cycle_policy.can_delete %}
-                                <a href="javascript:void(0);"
+                                <a href="{% url 'greenhousegrowthcycle-delete-modal' growth_cycle.id %}?next={{ request.path }}"
                                    class="modal-link"
                                    data-link="{% url 'greenhousegrowthcycle-delete-modal' growth_cycle.id %}?next={{ request.path }}">
                                     <i class="fas fa-fw fa-trash"></i> Remove this cycle
@@ -51,7 +51,7 @@
                             <h5 class="mb-0">Add growth cycle</h5>
                         </div>
                         <div class="card-body">
-                            <a href="javascript:void(0);"
+                            <a href="{% url 'greenhousegrowthcycle-create' object.id %}?next={{ request.path }}"
                                class="modal-link"
                                data-link="{% url 'greenhousegrowthcycle-create' object.id %}?next={{ request.path }}">
                                 <i class="fas fa-fw fa-plus"></i> Add growth cycle
