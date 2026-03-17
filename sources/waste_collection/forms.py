@@ -24,26 +24,15 @@ from django_tomselect.forms import (
     TomSelectModelMultipleChoiceField,
 )
 
-from distributions.models import TemporalDistribution, Timestep
-from materials.models import Sample
-from utils.crispy_fields import ForeignkeyField
-from utils.forms import (
-    MARKDOWN_HELP_TEXT,
-    CreateInlineMixin,
-    DynamicTableInlineFormSetHelper,
-    M2MInlineFormSet,
-    ModalModelFormMixin,
-    SimpleForm,
-    SimpleModelForm,
-    SourcesFieldMixin,
-    UserCreatedObjectFormMixin,
-)
-from utils.object_management.models import get_default_owner
-
 from case_studies.soilcom.frequency_service import (
     CADENCE_CHOICES,
     CADENCE_CUSTOM,
     CollectionFrequencyScheduleService,
+)
+from distributions.models import TemporalDistribution, Timestep
+from materials.models import Sample
+from sources.waste_collection.description_formatting import (
+    normalize_collection_description,
 )
 from sources.waste_collection.models import (
     CONNECTION_TYPE_CHOICES,
@@ -63,6 +52,19 @@ from sources.waste_collection.models import (
     WasteFlyer,
 )
 from sources.waste_collection.tasks import cleanup_orphaned_waste_flyers
+from utils.crispy_fields import ForeignkeyField
+from utils.forms import (
+    MARKDOWN_HELP_TEXT,
+    CreateInlineMixin,
+    DynamicTableInlineFormSetHelper,
+    M2MInlineFormSet,
+    ModalModelFormMixin,
+    SimpleForm,
+    SimpleModelForm,
+    SourcesFieldMixin,
+    UserCreatedObjectFormMixin,
+)
+from utils.object_management.models import get_default_owner
 
 
 class CollectorModelForm(SimpleModelForm):
@@ -553,6 +555,17 @@ class CollectionModelForm(
         qs = self._ordered_waste_component_qs()
         self.fields["allowed_materials"].queryset = qs
         self.fields["forbidden_materials"].queryset = qs
+        if not self.is_bound:
+            description = self.initial.get("description")
+            if description is None and getattr(self.instance, "description", None):
+                description = self.instance.description
+            if description:
+                normalized_description = normalize_collection_description(description)
+                self.initial["description"] = normalized_description
+                self.fields["description"].initial = normalized_description
+
+    def clean_description(self):
+        return normalize_collection_description(self.cleaned_data.get("description"))
 
     @classmethod
     def _ordered_waste_component_qs(cls):

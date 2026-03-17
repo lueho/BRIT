@@ -7,11 +7,14 @@ from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from bibliography.models import Source
 from materials.models import Material
+from sources.waste_collection import models
+from sources.waste_collection.description_formatting import (
+    flatten_collection_description,
+    normalize_collection_description,
+)
 from utils.object_management.permissions import get_object_policy
 from utils.properties.models import Property
 from utils.serializers import FieldLabelModelSerializer
-
-from sources.waste_collection import models
 
 # Geometry simplification tolerance in degrees (approx 100m at equator)
 # Lower values = more detail, higher values = more simplification
@@ -186,9 +189,7 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     required_bin_capacity_reference = serializers.SerializerMethodField(
         label="Minimum required specific bin capacity reference unit"
     )
-    comments = serializers.CharField(
-        source="description", required=False, allow_blank=True
-    )
+    comments = serializers.SerializerMethodField()
     sources = serializers.SerializerMethodField()
     actions = serializers.SerializerMethodField()
     policy = serializers.SerializerMethodField()
@@ -223,6 +224,10 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
 
     def get_sources(self, obj):
         return [flyer.url for flyer in obj.flyers.all() if flyer.url]
+
+    @staticmethod
+    def get_comments(obj):
+        return normalize_collection_description(obj.description)
 
     @staticmethod
     def get_waste_category(obj):
@@ -382,14 +387,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_comments(obj):
-        if obj.description:
-            comments = obj.description
-            comments = comments.replace("\r\n", "; ")
-            comments = comments.replace("\r", "; ")
-            comments = comments.replace("\n", "; ")
-            return comments
-        else:
-            return ""
+        return flatten_collection_description(obj.description)
 
     @staticmethod
     def get_required_bin_capacity_reference(obj):
@@ -565,6 +563,7 @@ class CollectionImportRecordSerializer(serializers.Serializer):
     required_bin_capacity  Decimal (litres).
     required_bin_capacity_reference  One of 'person', 'household', 'property', 'not_specified'.
     description         Free-text comments.
+    sources             List of free-text bibliography sources.
     flyer_urls          List of URL strings to attach as WasteFlyers.
     property_values     List of CollectionImportPropertyValueSerializer records.
     """
@@ -613,12 +612,20 @@ class CollectionImportRecordSerializer(serializers.Serializer):
         required=False, allow_null=True, allow_blank=True
     )
     description = serializers.CharField(required=False, allow_blank=True, default="")
+    sources = serializers.ListField(
+        child=serializers.CharField(allow_blank=False, max_length=500),
+        required=False,
+        default=list,
+    )
     flyer_urls = serializers.ListField(
         child=serializers.URLField(), required=False, default=list
     )
     property_values = CollectionImportPropertyValueSerializer(
         many=True, required=False, default=list
     )
+
+    def validate_description(self, value):
+        return normalize_collection_description(value)
 
     def validate(self, attrs):
         if not attrs.get("nuts_or_lau_id") and not attrs.get("catchment_name"):
@@ -699,6 +706,9 @@ class CollectionMutationCreateSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_blank=True, default="")
     submit_for_review = serializers.BooleanField(required=False, default=True)
 
+    def validate_description(self, value):
+        return normalize_collection_description(value)
+
     def validate(self, attrs):
         valid_from = attrs.get("valid_from")
         valid_until = attrs.get("valid_until")
@@ -777,6 +787,9 @@ class CollectionMutationVersionSerializer(serializers.Serializer):
     )
     description = serializers.CharField(required=False, allow_blank=True)
     submit_for_review = serializers.BooleanField(required=False, default=True)
+
+    def validate_description(self, value):
+        return normalize_collection_description(value)
 
     def validate(self, attrs):
         predecessor = self.context.get("predecessor")

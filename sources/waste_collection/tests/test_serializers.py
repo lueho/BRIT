@@ -97,6 +97,22 @@ class CollectionModelSerializerTestCase(TestCase):
         for url in flyer_urls:
             self.assertIsInstance(url, str)
 
+    def test_comments_are_normalized_in_representation(self):
+        self.collection.description = "First comment ;; Second comment"
+        self.collection.save()
+
+        serializer = CollectionModelSerializer(self.collection)
+
+        self.assertEqual(serializer.data["comments"], "First comment\nSecond comment")
+
+    def test_spaced_legacy_comments_are_normalized_in_representation(self):
+        self.collection.description = "First comment ; ; Second comment"
+        self.collection.save()
+
+        serializer = CollectionModelSerializer(self.collection)
+
+        self.assertEqual(serializer.data["comments"], "First comment\nSecond comment")
+
     def test_actions_contains_expected_urls(self):
         serializer = CollectionModelSerializer(self.collection)
         actions = serializer.data["actions"]
@@ -373,6 +389,26 @@ class CollectionFlatSerializerTestCase(TestCase):
         serializer = CollectionFlatSerializer(self.collection_nuts)
         self.assertNotIn("\n", serializer.data["comments"])
         self.assertNotIn("\r", serializer.data["comments"])
+        self.assertEqual(
+            serializer.data["comments"],
+            "This; contains; no newline; characters.",
+        )
+
+    def test_legacy_double_semicolons_are_flattened_in_comments(self):
+        self.collection_nuts.description = "First comment ;; Second comment"
+        self.collection_nuts.save()
+
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+
+        self.assertEqual(serializer.data["comments"], "First comment; Second comment")
+
+    def test_spaced_legacy_semicolons_are_flattened_in_comments(self):
+        self.collection_nuts.description = "First comment ; ; Second comment"
+        self.collection_nuts.save()
+
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+
+        self.assertEqual(serializer.data["comments"], "First comment; Second comment")
 
 
 class CollectionFlatSerializerChainAwareStatsTestCase(TestCase):

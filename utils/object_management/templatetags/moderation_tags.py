@@ -11,6 +11,10 @@ from django.test import RequestFactory
 from django.urls import reverse
 from django.utils.html import escape, mark_safe
 
+from sources.waste_collection.description_formatting import (
+    normalize_collection_description,
+)
+
 register = template.Library()
 
 _BOLD_PATTERN = re.compile(r"\*\*(.+?)\*\*")
@@ -28,6 +32,12 @@ def markdown_to_html(value):
     Any other markdown syntax (e.g. headings) is rendered as plain text.
     """
     text = "" if value is None else str(value)
+    return mark_safe(_render_limited_markdown(text))
+
+
+@register.filter
+def collection_description_to_html(value):
+    text = normalize_collection_description(value)
     return mark_safe(_render_limited_markdown(text))
 
 

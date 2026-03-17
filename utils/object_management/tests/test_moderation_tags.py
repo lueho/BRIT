@@ -11,6 +11,7 @@ from factory.django import mute_signals
 from sources.waste_collection.models import Collection
 from utils.object_management.models import UserCreatedObject
 from utils.object_management.templatetags.moderation_tags import (
+    collection_description_to_html,
     markdown_to_html,
     pending_review_count_for_user,
 )
@@ -88,6 +89,20 @@ class MarkdownToHtmlFilterTests(TestCase):
         self.assertIn("<ul>", rendered)
         self.assertIn("<ol>", rendered)
         self.assertIn("<li>one</li>", rendered)
+
+    def test_collection_description_filter_normalizes_legacy_double_semicolons(self):
+        rendered = collection_description_to_html("First comment ;; Second comment")
+
+        self.assertIn("<p>First comment</p>", rendered)
+        self.assertIn("<p>Second comment</p>", rendered)
+        self.assertNotIn(";;", rendered)
+
+    def test_collection_description_filter_normalizes_spaced_legacy_semicolons(self):
+        rendered = collection_description_to_html("First comment ; ; Second comment")
+
+        self.assertIn("<p>First comment</p>", rendered)
+        self.assertIn("<p>Second comment</p>", rendered)
+        self.assertNotIn("; ;", rendered)
 
     def test_headings_are_not_rendered_as_h_tags(self):
         rendered = markdown_to_html("## Heading\nNormal")

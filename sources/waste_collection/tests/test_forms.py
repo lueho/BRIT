@@ -443,6 +443,82 @@ class CollectionModelFormTestCase(TestCase):
             {self.sample_1.id},
         )
 
+    def test_existing_legacy_description_is_normalized_for_initial_display(self):
+        self.collection.description = "First comment ;; Second comment"
+
+        form = CollectionModelForm(instance=self.collection)
+
+        self.assertEqual(form.initial["description"], "First comment\nSecond comment")
+
+    def test_existing_spaced_legacy_description_is_normalized_for_initial_display(self):
+        self.collection.description = "First comment ; ; Second comment"
+
+        form = CollectionModelForm(instance=self.collection)
+
+        self.assertEqual(form.initial["description"], "First comment\nSecond comment")
+
+    def test_legacy_description_is_normalized_on_save(self):
+        form = CollectionModelForm(
+            instance=self.collection,
+            data=dict_to_querydict(
+                {
+                    "catchment": self.catchment.id,
+                    "collector": self.collector.id,
+                    "collection_system": self.collection_system.id,
+                    "waste_category": self.waste_category.id,
+                    "allowed_materials": [
+                        self.allowed_material_1.id,
+                        self.allowed_material_2.id,
+                    ],
+                    "forbidden_materials": [
+                        self.forbidden_material_1.id,
+                        self.forbidden_material_2.id,
+                    ],
+                    "frequency": self.frequency.id,
+                    "valid_from": date(2023, 1, 1),
+                    "valid_until": date(2023, 12, 31),
+                    "description": "First comment ;; Second comment",
+                    "connection_type": "VOLUNTARY",
+                }
+            ),
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        instance = form.save(commit=False)
+
+        self.assertEqual(instance.description, "First comment\nSecond comment")
+
+    def test_spaced_legacy_description_is_normalized_on_save(self):
+        form = CollectionModelForm(
+            instance=self.collection,
+            data=dict_to_querydict(
+                {
+                    "catchment": self.catchment.id,
+                    "collector": self.collector.id,
+                    "collection_system": self.collection_system.id,
+                    "waste_category": self.waste_category.id,
+                    "allowed_materials": [
+                        self.allowed_material_1.id,
+                        self.allowed_material_2.id,
+                    ],
+                    "forbidden_materials": [
+                        self.forbidden_material_1.id,
+                        self.forbidden_material_2.id,
+                    ],
+                    "frequency": self.frequency.id,
+                    "valid_from": date(2023, 1, 1),
+                    "valid_until": date(2023, 12, 31),
+                    "description": "First comment ; ; Second comment",
+                    "connection_type": "VOLUNTARY",
+                }
+            ),
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        instance = form.save(commit=False)
+
+        self.assertEqual(instance.description, "First comment\nSecond comment")
+
     def test_on_change_of_valid_from_date_predecessors_valid_until_date_is_updated(
         self,
     ):
