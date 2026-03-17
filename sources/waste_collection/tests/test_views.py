@@ -23,6 +23,22 @@ from factory.django import mute_signals
 from openpyxl import load_workbook
 
 from bibliography.models import Source
+from distributions.models import TemporalDistribution, Timestep
+from maps.models import (
+    Attribute,
+    GeoDataset,
+    MapConfiguration,
+    MapLayerConfiguration,
+    MapLayerStyle,
+    NutsRegion,
+    Region,
+    RegionAttributeValue,
+)
+from materials.models import (
+    Material,
+    Sample,
+    SampleSeries,
+)
 from sources.waste_collection.derived_values import (
     backfill_derived_values,
     clear_derived_value_config_cache,
@@ -47,7 +63,10 @@ from sources.waste_collection.models import (
     WasteFlyer,
     check_url_valid,
 )
-from sources.waste_collection.renderers import CollectionCSVRenderer, CollectionXLSXRenderer
+from sources.waste_collection.renderers import (
+    CollectionCSVRenderer,
+    CollectionXLSXRenderer,
+)
 from sources.waste_collection.serializers import CollectionFlatSerializer
 from sources.waste_collection.signals import (
     sync_derived_cpv_on_delete,
@@ -68,22 +87,6 @@ from sources.waste_collection.waste_atlas.viewsets import (
     POPULATION_ATTRIBUTE_ID,
     _amounts_for_2024,
     _resolved_population_attribute_id,
-)
-from distributions.models import TemporalDistribution, Timestep
-from maps.models import (
-    Attribute,
-    GeoDataset,
-    MapConfiguration,
-    MapLayerConfiguration,
-    MapLayerStyle,
-    NutsRegion,
-    Region,
-    RegionAttributeValue,
-)
-from materials.models import (
-    Material,
-    Sample,
-    SampleSeries,
 )
 from utils.object_management.models import ReviewAction
 from utils.properties.models import Property, Unit
@@ -468,9 +471,7 @@ class CollectionFrequencyCRUDViewsTestCase(
         months = TemporalDistribution.objects.get(name="Months of the year")
         first = months.timestep_set.get(name="January")
         last = months.timestep_set.get(name="December")
-        initial = [
-            CollectionFrequencyScheduleService.initial_row(months, first, last)
-        ]
+        initial = [CollectionFrequencyScheduleService.initial_row(months, first, last)]
         self.assertListEqual(initial, view.get_formset_initial())
 
     def test_post_with_valid_data_creates_and_relates_seasons(self):
@@ -1251,7 +1252,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
     def test_uses_custom_template(self):
         self.client.force_login(self.owner_user)
         response = self.client.get(self.get_update_url(self.unpublished_object.pk))
-        self.assertTemplateUsed(response, "soilcom/collection_form.html")
+        self.assertTemplateUsed(response, "waste_collection/collection_form.html")
 
     def test_get_get_formset_kwargs(self):
         request = RequestFactory().get(self.get_update_url(self.unpublished_object.pk))
