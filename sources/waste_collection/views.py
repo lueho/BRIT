@@ -661,6 +661,7 @@ class FrequencyUpdateView(
     formset_helper_class = CollectionSeasonFormHelper
     formset_factory_kwargs = {"extra": 0}
     relation_field_name = "seasons"
+    template_name = "waste_collection/collectionfrequency_form.html"
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -1306,7 +1307,11 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
             and hasattr(user, "id")
             and self.object.owner_id == user.id
         )
-        if self.object.publication_status == "published" and not is_owner:
+        if (
+            self.object.publication_status == "published"
+            and not is_owner
+            and not getattr(user, "is_authenticated", False)
+        ):
             cpvs = [
                 v for v in cpvs if getattr(v, "publication_status", None) == "published"
             ]

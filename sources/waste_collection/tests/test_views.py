@@ -474,6 +474,15 @@ class CollectionFrequencyCRUDViewsTestCase(
         initial = [CollectionFrequencyScheduleService.initial_row(months, first, last)]
         self.assertListEqual(initial, view.get_formset_initial())
 
+    def test_create_uses_schedule_template(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.get(self.get_create_url())
+
+        self.assertTemplateUsed(
+            response, "waste_collection/collectionfrequency_form.html"
+        )
+        self.assertContains(response, "Season schedule")
+
     def test_post_with_valid_data_creates_and_relates_seasons(self):
         self.client.force_login(self.staff_user)
         data = {
@@ -530,6 +539,15 @@ class CollectionFrequencyCRUDViewsTestCase(
             self.unpublished_object
         )
         self.assertListEqual(expected, formset.initial)
+
+    def test_update_uses_schedule_template(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_update_url(self.unpublished_object.pk))
+
+        self.assertTemplateUsed(
+            response, "waste_collection/collectionfrequency_form.html"
+        )
+        self.assertContains(response, "Season schedule")
 
     def test_post_http_302_options_are_changed_on_save(self):
         self.client.force_login(self.owner_user)
@@ -3134,6 +3152,16 @@ class CollectionDetailChainAwareValuesTestCase(ViewWithPermissionsTestCase):
             average=77,
             publication_status="published",
         )
+        cls.review_owner = User.objects.create(username="chain-review-owner")
+        cls.review_anchor_value = CollectionPropertyValue.objects.create(
+            collection=cls.root,
+            property=cls.prop,
+            unit=cls.unit,
+            year=2021,
+            average=88,
+            publication_status="review",
+            owner=cls.review_owner,
+        )
 
     def test_detail_context_includes_chain_values(self):
         response = self.client.get(reverse(self.url_name, kwargs={"pk": self.succ.pk}))
@@ -3141,6 +3169,14 @@ class CollectionDetailChainAwareValuesTestCase(ViewWithPermissionsTestCase):
         self.assertIn("collection_property_values", response.context)
         vals = response.context["collection_property_values"]
         self.assertTrue(any(v.pk == self.anchor_value.pk for v in vals))
+
+    def test_published_successor_detail_shows_owned_review_anchor_value(self):
+        self.client.force_login(self.review_owner)
+        response = self.client.get(reverse(self.url_name, kwargs={"pk": self.succ.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        vals = response.context["collection_property_values"]
+        self.assertTrue(any(v.pk == self.review_anchor_value.pk for v in vals))
 
 
 class CollectionFrequencyDisplayTestCase(TestCase):
@@ -3481,8 +3517,11 @@ class CollectionDetailOnlyPublishedCpvsTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         context_vals = response.context["collection_property_values"]
-        self.assertTrue(all(v.publication_status == "published" for v in context_vals))
-        self.assertNotIn("PrivateUnit", response.content.decode())
+        self.assertEqual(
+            {v.pk for v in context_vals},
+            {self.published_value.pk, self.private_value.pk},
+        )
+        self.assertIn("PrivateUnit", response.content.decode())
 
     def test_detail_renders_collection_property_values_rounded_to_one_decimal(self):
         rounded_property = Property.objects.create(

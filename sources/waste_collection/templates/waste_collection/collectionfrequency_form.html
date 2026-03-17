@@ -1,0 +1,153 @@
+{% extends "simple_form_card.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load crispy_forms_filters %}
+
+{% block extra_post_form_content %}
+  {% if formset.non_form_errors %}
+    <div class="alert alert-danger mt-4">
+      <ul class="mb-0">
+        {{ formset.non_form_errors|unordered_list }}
+      </ul>
+    </div>
+  {% endif %}
+  {{ formset.management_form }}
+  <div class="card border mt-4">
+    <div class="card-header bg-body-tertiary py-3 d-flex justify-content-between align-items-center">
+      <div>
+        <h6 class="mb-1">Season schedule</h6>
+        <p class="text-muted small mb-0">
+          Choose a cadence preset for each period, or enter a custom annual total when the pattern is not regular.
+        </p>
+      </div>
+    </div>
+    <div class="card-body">
+      <div id="formset-container"
+           class="d-grid gap-3"
+           data-formset="{{ formset.prefix }}"
+           data-formset-type="standard">
+        <div id="empty-form-row"
+             class="d-none formset-form-row card border bg-body-tertiary shadow-sm">
+          <div class="card-body">
+            {% for hidden_field in formset.empty_form.hidden_fields %}{{ hidden_field }}{% endfor %}
+            <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+              <div>
+                <h6 class="mb-1">New season</h6>
+                <p class="text-muted small mb-0">Define the period and its standard schedule first.</p>
+              </div>
+              <button type="button"
+                      class="btn btn-sm btn-outline-danger remove-form"
+                      aria-label="Remove season">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+            <div class="row g-3 align-items-start">
+              <div class="col-lg-2 col-md-6">{{ formset.empty_form.first_timestep|as_crispy_field }}</div>
+              <div class="col-lg-2 col-md-6">{{ formset.empty_form.last_timestep|as_crispy_field }}</div>
+              <div class="col-lg-4 col-md-6">{{ formset.empty_form.standard_cadence|as_crispy_field }}</div>
+              <div class="col-lg-4 col-md-6">{{ formset.empty_form.standard|as_crispy_field }}</div>
+            </div>
+            <div class="border-top mt-4 pt-3">
+              <h6 class="mb-3">Optional service levels</h6>
+              <div class="row g-3">
+                <div class="col-xl-4">
+                  <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                      {{ formset.empty_form.option_1_cadence|as_crispy_field }}
+                      {{ formset.empty_form.option_1|as_crispy_field }}
+                    </div>
+                  </div>
+                </div>
+                <div class="col-xl-4">
+                  <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                      {{ formset.empty_form.option_2_cadence|as_crispy_field }}
+                      {{ formset.empty_form.option_2|as_crispy_field }}
+                    </div>
+                  </div>
+                </div>
+                <div class="col-xl-4">
+                  <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                      {{ formset.empty_form.option_3_cadence|as_crispy_field }}
+                      {{ formset.empty_form.option_3|as_crispy_field }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% for season_form in formset %}
+          <div class="formset-form-row card border bg-body-tertiary shadow-sm">
+            <div class="card-body">
+              {% for hidden_field in season_form.hidden_fields %}{{ hidden_field }}{% endfor %}
+              {% if season_form.non_field_errors %}
+                <div class="alert alert-danger mb-3">{{ season_form.non_field_errors }}</div>
+              {% endif %}
+              <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                  <h6 class="mb-1">Season {{ forloop.counter }}</h6>
+                  <p class="text-muted small mb-0">Define the period and its standard schedule first.</p>
+                </div>
+                <button type="button"
+                        class="btn btn-sm btn-outline-danger remove-form"
+                        aria-label="Remove season">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+              <div class="row g-3 align-items-start">
+                <div class="col-lg-2 col-md-6">{{ season_form.first_timestep|as_crispy_field }}</div>
+                <div class="col-lg-2 col-md-6">{{ season_form.last_timestep|as_crispy_field }}</div>
+                <div class="col-lg-4 col-md-6">{{ season_form.standard_cadence|as_crispy_field }}</div>
+                <div class="col-lg-4 col-md-6">{{ season_form.standard|as_crispy_field }}</div>
+              </div>
+              <div class="border-top mt-4 pt-3">
+                <h6 class="mb-3">Optional service levels</h6>
+                <div class="row g-3">
+                  <div class="col-xl-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                      <div class="card-body">
+                        {{ season_form.option_1_cadence|as_crispy_field }}
+                        {{ season_form.option_1|as_crispy_field }}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-xl-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                      <div class="card-body">
+                        {{ season_form.option_2_cadence|as_crispy_field }}
+                        {{ season_form.option_2|as_crispy_field }}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-xl-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                      <div class="card-body">
+                        {{ season_form.option_3_cadence|as_crispy_field }}
+                        {{ season_form.option_3|as_crispy_field }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      <button type="button" id="add-form" class="btn btn-outline-success mt-3">
+        <i class="fas fa-plus"></i> Add season
+      </button>
+    </div>
+  </div>
+{% endblock extra_post_form_content %}
+
+{% block javascript %}
+  {{ block.super }}
+  <script src="{% static "js/formset.js" %}"></script>
+{% endblock javascript %}
+
+{% block form_media %}
+  {{ block.super }}
+  {{ formset.media }}
+{% endblock form_media %}
