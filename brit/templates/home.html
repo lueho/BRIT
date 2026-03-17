@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static custom_tags %}
 {% block title %}
   BRIT | Bioresource Information Tool
 {% endblock title %}
 {% block content %}
+  {% user_in_group user "process-team" as can_view_processes %}
   <div class="row g-4 mb-4">
     <div class="col-12 col-md-6">
       <div class="card shadow h-100">
@@ -204,31 +205,33 @@
       </div>
     </div>
     <!-- Processes Card -->
-    <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
-      <div class="card shadow h-100">
-        <div class="card-header bg-light border-0 py-3">
-          <h5 class="mb-0">
-            <a href="{% url 'processes:dashboard' %}"
-               class="text-decoration-none text-body text-decoration-underline-hover">
-              <i class="fas fa-fw fa-flask me-2"></i>Processes
+    {% if can_view_processes %}
+      <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
+        <div class="card shadow h-100">
+          <div class="card-header bg-light border-0 py-3">
+            <h5 class="mb-0">
+              <a href="{% url 'processes:dashboard' %}"
+                 class="text-decoration-none text-body text-decoration-underline-hover">
+                <i class="fas fa-fw fa-flask me-2"></i>Processes
+              </a>
+            </h5>
+          </div>
+          <div class="card-img">
+            <a class="d-flex align-items-center justify-content-center stretched-link"
+               href="{% url 'processes:dashboard' %}">
+              <img class="w-100 m-0"
+                   src="{% static 'img/processes_cover_card.png' %}"
+                   alt="Processes Module Cover Image">
             </a>
-          </h5>
-        </div>
-        <div class="card-img">
-          <a class="d-flex align-items-center justify-content-center stretched-link"
-             href="{% url 'processes:dashboard' %}">
-            <img class="w-100 m-0"
-                 src="{% static 'img/processes_cover_card.png' %}"
-                 alt="Processes Module Cover Image">
-          </a>
-        </div>
-        <div class="card-body">
-          <p class="card-text">
-            Explore and compare material-conversion processes with operating parameters, input/output materials, and
-            literature references.
-          </p>
+          </div>
+          <div class="card-body">
+            <p class="card-text">
+              Explore and compare material-conversion processes with operating parameters, input/output materials, and
+              literature references.
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    {% endif %}
   </div>
 {% endblock content %}

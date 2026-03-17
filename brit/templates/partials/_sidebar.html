@@ -1,4 +1,4 @@
-{% load moderation_tags %}
+{% load moderation_tags custom_tags %}
 <nav class="sb-sidenav accordion sb-sidenav-light" id="sidenavAccordion">
   <div class="sb-sidenav-menu">
     <div class="nav">
@@ -25,6 +25,7 @@
           </div>
         </a>
       {% endif %}
+      {% user_in_group user "process-team" as can_view_processes %}
       <div class="sb-sidenav-menu-heading">Tools</div>
       <a class="nav-link {% if '/maps/' in request.path %}active{% endif %}"
          href="{% url 'maps_list' %}">
@@ -47,13 +48,15 @@
         </div>
         <span class="sb-nav-link-text">Sources</span>
       </a>
-      <a class="nav-link {% if '/processes/' in request.path %}active{% endif %}"
-         href="{% url 'processes:dashboard' %}">
-        <div class="sb-nav-link-icon">
-          <i class="fas fa-flask"></i>
-        </div>
-        <span class="sb-nav-link-text">Processes</span>
-      </a>
+      {% if can_view_processes %}
+        <a class="nav-link {% if '/processes/' in request.path %}active{% endif %}"
+           href="{% url 'processes:dashboard' %}">
+          <div class="sb-nav-link-icon">
+            <i class="fas fa-flask"></i>
+          </div>
+          <span class="sb-nav-link-text">Processes</span>
+        </a>
+      {% endif %}
       <a class="nav-link {% if '/inventories/' in request.path %}active{% endif %}"
          href="{% url 'scenario-list' %}">
         <div class="sb-nav-link-icon">

@@ -5,6 +5,13 @@ from django import template
 register = template.Library()
 
 
+@register.simple_tag
+def user_in_group(user, group_name):
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    return user.groups.filter(name=group_name).exists()
+
+
 @register.filter
 def verbose_name(obj):
     return obj._meta.verbose_name
