@@ -261,6 +261,10 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             codename = f"can_moderate_{model._meta.model_name}"
             return codename in user_permission_codenames
 
+        def has_visible_review_items(model):
+            queryset = self._in_review_queryset_for_model(model)
+            return queryset.exclude(owner=self.request.user).exists()
+
         for model in apps.get_models():
             # Check if model inherits from UserCreatedObject and is not abstract
             if (
@@ -274,7 +278,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                 if can_moderate(model):
                     # Check if there are any items in review for this model
                     try:
-                        if self._in_review_queryset_for_model(model).exists():
+                        if has_visible_review_items(model):
                             available_models.append(model)
                     except (AttributeError, Exception) as e:
                         # Model may not have in_review() manager method or other issues

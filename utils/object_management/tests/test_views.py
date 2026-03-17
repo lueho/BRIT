@@ -940,6 +940,40 @@ class ReviewDashboardViewTests(TestCase):
         for item in review_items:
             self.assertIsInstance(item, Collection)
 
+    def test_model_type_filter_hides_models_with_only_own_review_items(self):
+        owner = User.objects.create_user(
+            username="collector_owner_only", password="test123"
+        )
+        collector_ct = ContentType.objects.get_for_model(Collector)
+        collector_permission, _ = Permission.objects.get_or_create(
+            codename="can_moderate_collector",
+            content_type=collector_ct,
+            defaults={"name": "Can moderate collectors"},
+        )
+        self.collection_moderator.user_permissions.add(collector_permission)
+
+        with mute_signals(post_save, pre_save):
+            Collector.objects.create(
+                name="Own Review Collector",
+                owner=self.collection_moderator,
+                publication_status=UserCreatedObject.STATUS_REVIEW,
+            )
+            Collection.objects.create(
+                name="Visible Review Collection",
+                owner=owner,
+                publication_status=UserCreatedObject.STATUS_REVIEW,
+            )
+
+        self.client.force_login(self.collection_moderator)
+        response = self.client.get(reverse("object_management:review_dashboard"))
+        self.assertEqual(response.status_code, 200)
+
+        filter_obj = response.context["filter"]
+        model_type_choices = filter_obj.filters["model_type"].queryset
+        collection_ct = ContentType.objects.get_for_model(Collection)
+        self.assertIn(collection_ct, model_type_choices)
+        self.assertNotIn(collector_ct, model_type_choices)
+
     def test_dashboard_uses_correct_template(self):
         self.client.force_login(self.moderator_user)
         response = self.client.get(reverse("object_management:review_dashboard"))
