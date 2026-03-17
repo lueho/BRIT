@@ -279,11 +279,11 @@
             {% include "object_management/review_status_icon.html" with object=val policy=val_policy %}
             <a href="{{ val.get_absolute_url }}">
               {% if val.standard_deviation %}
-                {{ val.average }} ± {{ val.standard_deviation }} {{ val.unit.name }} (
+                {{ val.display_average }} ± {{ val.display_standard_deviation }} {{ val.unit.name }} (
                 {{ val.year }})
                 {% if val.is_derived %}<span class="text-muted fst-italic">(derived)</span>{% endif %}
               {% else %}
-                {{ val.average }} {{ val.unit.name }} ({{ val.year }})
+                {{ val.display_average }} {{ val.unit.name }} ({{ val.year }})
                 {% if val.is_derived %}<span class="text-muted fst-italic">(derived)</span>{% endif %}
               {% endif %}
             </a>
@@ -338,10 +338,10 @@
             {% include "object_management/review_status_icon.html" with object=val policy=agg_policy %}
             <a href="{{ val.get_absolute_url }}">
               {% if val.standard_deviation %}
-                {{ val.average }} ± {{ val.standard_deviation }} {{ val.unit.name }} (
+                {{ val.display_average }} ± {{ val.display_standard_deviation }} {{ val.unit.name }} (
                 {{ val.year }}) (aggregated)
               {% else %}
-                {{ val.average }} {{ val.unit.name }} ({{ val.year }}) (aggregated)
+                {{ val.display_average }} {{ val.unit.name }} ({{ val.year }}) (aggregated)
               {% endif %}
             </a>
             {% if agg_policy.can_submit_review or agg_policy.can_withdraw_review %}

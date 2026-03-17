@@ -3407,6 +3407,35 @@ class CollectionDetailOnlyPublishedCpvsTestCase(TestCase):
         self.assertTrue(all(v.publication_status == "published" for v in context_vals))
         self.assertNotIn("PrivateUnit", response.content.decode())
 
+    def test_detail_renders_collection_property_values_rounded_to_one_decimal(self):
+        rounded_property = Property.objects.create(
+            name="Total waste collected in 2024",
+            publication_status="published",
+        )
+        rounded_unit = Unit.objects.create(
+            name="RoundedUnit",
+            publication_status="published",
+        )
+        rounded_property.allowed_units.add(rounded_unit)
+        CollectionPropertyValue.objects.create(
+            collection=self.collection,
+            property=rounded_property,
+            unit=rounded_unit,
+            year=2024,
+            average=12.34,
+            standard_deviation=0.26,
+            publication_status="published",
+        )
+
+        response = self.client.get(
+            reverse("collection-detail", kwargs={"pk": self.collection.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+        self.assertIn("12.3 ± 0.3 RoundedUnit (", body)
+        self.assertNotIn("12.34 ± 0.26 RoundedUnit (", body)
+
 
 class CollectionReviewDetailPreviewTestCase(TestCase):
     @classmethod
@@ -3554,6 +3583,41 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
         self.assertIn("Forbidden Materials", body)
         self.assertIn("Allowed Material", body)
         self.assertIn("Forbidden Material", body)
+
+    def test_review_detail_renders_collection_property_values_rounded_to_one_decimal(
+        self,
+    ):
+        rounded_property = Property.objects.create(
+            name="Specific waste collected in 2024",
+            publication_status="published",
+        )
+        rounded_unit = Unit.objects.create(
+            name="ReviewRoundedUnit",
+            publication_status="published",
+        )
+        rounded_property.allowed_units.add(rounded_unit)
+        CollectionPropertyValue.objects.create(
+            collection=self.collection,
+            property=rounded_property,
+            unit=rounded_unit,
+            year=2024,
+            average=45.67,
+            standard_deviation=1.24,
+            publication_status="review",
+        )
+
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse(
+                "object_management:review_item_detail",
+                kwargs={"content_type_id": self.ct_id, "object_id": self.collection.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+        self.assertIn("45.7 ± 1.2 ReviewRoundedUnit (", body)
+        self.assertNotIn("45.67 ± 1.24 ReviewRoundedUnit (", body)
 
 
 class WasteAtlasMapViewsTestCase(TestCase):
