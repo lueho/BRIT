@@ -15,7 +15,11 @@ from factory.django import mute_signals
 
 from distributions.models import TemporalDistribution
 from maps.models import Catchment, Region
-from sources.waste_collection.models import Collection, CollectionPropertyValue, Collector
+from sources.waste_collection.models import (
+    Collection,
+    CollectionPropertyValue,
+    Collector,
+)
 from sources.waste_collection.views import CollectionDetailView
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.object_management.views import ReviewDashboardView
@@ -764,6 +768,22 @@ class CollectionPropertyValueReviewDashboardTest(TestCase):
         model_type_choices = filter_obj.filters["model_type"].queryset
         cpv_ct = ContentType.objects.get_for_model(CollectionPropertyValue)
         self.assertIn(cpv_ct, model_type_choices)
+
+    def test_declined_only_cpv_model_is_hidden_from_filter_options(self):
+        with mute_signals(post_save, pre_save):
+            self.cpv.publication_status = UserCreatedObject.STATUS_DECLINED
+            self.cpv.save()
+
+        self.client.force_login(self.staff_user)
+        response = self.client.get(reverse("object_management:review_dashboard"))
+        self.assertEqual(response.status_code, 200)
+
+        filter_obj = response.context["filter"]
+        model_type_choices = filter_obj.filters["model_type"].queryset
+        cpv_ct = ContentType.objects.get_for_model(CollectionPropertyValue)
+        collection_ct = ContentType.objects.get_for_model(Collection)
+        self.assertNotIn(cpv_ct, model_type_choices)
+        self.assertIn(collection_ct, model_type_choices)
 
 
 class ReviewDashboardViewTests(TestCase):

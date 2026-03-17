@@ -229,6 +229,9 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                 logger.warning(f"Could not load priority model '{model_path}': {e}")
 
         available_models = []
+        priority_positions = {
+            model: index for index, model in enumerate(priority_models)
+        }
 
         # Optimize: Pre-fetch all user permissions in a single query
         # This avoids N+1 queries when checking permissions for each model
@@ -258,13 +261,6 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             codename = f"can_moderate_{model._meta.model_name}"
             return codename in user_permission_codenames
 
-        # First, add priority models if user has permissions (even if no items in review)
-        for model in priority_models:
-            if can_moderate(model):
-                if model not in available_models:
-                    available_models.append(model)
-
-        # Then discover other models with items in review
         for model in apps.get_models():
             # Check if model inherits from UserCreatedObject and is not abstract
             if (
@@ -272,7 +268,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                 and not model._meta.abstract
                 and self._is_primary_model_module(model)
                 and hasattr(model, "objects")
-                and model not in available_models  # Don't duplicate priority models
+                and model not in available_models
             ):
                 # Check if user can moderate this model type
                 if can_moderate(model):
@@ -286,6 +282,13 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                             f"Could not check review items for {model.__name__}: {e}"
                         )
                         pass
+
+        available_models.sort(
+            key=lambda model: (
+                priority_positions.get(model, len(priority_positions)),
+                model._meta.verbose_name,
+            )
+        )
 
         # Cache for subsequent calls within the same request
         self._available_models_cache = available_models
@@ -393,10 +396,14 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         except FieldDoesNotExist:
             pass
 
-        if model_class._meta.model_name == "collection" and model_class._meta.app_label in {
-            "soilcom",
-            "waste_collection",
-        }:
+        if (
+            model_class._meta.model_name == "collection"
+            and model_class._meta.app_label
+            in {
+                "soilcom",
+                "waste_collection",
+            }
+        ):
             search_filters.extend(
                 [
                     Q(catchment__name__icontains=search),
