@@ -12,6 +12,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY", default=get_random_secret_key())
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 # Use custom test runner that loads initial data
 TEST_RUNNER = "utils.tests.testrunner.SerialAwareTestRunner"
@@ -260,9 +261,7 @@ ENABLE_PDF_PARSING = os.environ.get("ENABLE_PDF_PARSING", "false").lower() in {
     "on",
 }
 
-AUTO_ENQUEUE_URL_CHECKS = os.environ.get(
-    "AUTO_ENQUEUE_URL_CHECKS", "true"
-).lower() in {
+AUTO_ENQUEUE_URL_CHECKS = os.environ.get("AUTO_ENQUEUE_URL_CHECKS", "true").lower() in {
     "1",
     "true",
     "yes",
