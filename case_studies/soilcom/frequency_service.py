@@ -23,6 +23,13 @@ CADENCE_TO_ANNUAL_COUNT = {
     CADENCE_MONTHLY: 12,
 }
 
+CADENCE_DISPLAY_LABELS = {
+    CADENCE_WEEKLY: "Weekly",
+    CADENCE_EVERY_TWO_WEEKS: "Every 2 weeks",
+    CADENCE_EVERY_FOUR_WEEKS: "Every 4 weeks",
+    CADENCE_MONTHLY: "Monthly",
+}
+
 COUNT_FIELDS = ("standard", "option_1", "option_2", "option_3")
 OPTION_FIELDS = COUNT_FIELDS[1:]
 TIMESTEP_NAME_ALIASES = {"mai": "may"}
@@ -208,6 +215,69 @@ class CollectionFrequencyScheduleService:
         if first_timestep.name == "January" and last_timestep.name == "December":
             return "Year-round"
         return f"{first_timestep.name}-{last_timestep.name}"
+
+    @classmethod
+    def segment_display_label(cls, first_timestep, last_timestep):
+        if not first_timestep or not last_timestep:
+            return "Unspecified period"
+        if first_timestep.name == "January" and last_timestep.name == "December":
+            return "All year"
+        return f"{first_timestep.name} to {last_timestep.name}"
+
+    @classmethod
+    def count_display_label(cls, count, first_timestep, last_timestep):
+        if count in (None, ""):
+            return "Not specified"
+        count = int(count)
+        if (
+            first_timestep
+            and last_timestep
+            and first_timestep.name == "January"
+            and last_timestep.name == "December"
+        ):
+            suffix = "per year"
+        else:
+            suffix = "during this period"
+        noun = "collection" if count == 1 else "collections"
+        return f"{count} {noun} {suffix}"
+
+    @classmethod
+    def display_label(cls, cadence, count, first_timestep, last_timestep):
+        if cadence and cadence != CADENCE_CUSTOM:
+            cadence_label = CADENCE_DISPLAY_LABELS.get(cadence)
+            if cadence_label:
+                return cadence_label
+        return cls.count_display_label(count, first_timestep, last_timestep)
+
+    @classmethod
+    def display_rows(cls, frequency):
+        rows = cls.rows_from_frequency(frequency)
+        display_rows = []
+        for row in rows:
+            first_timestep = row.get("first_timestep")
+            last_timestep = row.get("last_timestep")
+            display_rows.append(
+                {
+                    "segment": cls.segment_display_label(first_timestep, last_timestep),
+                    "standard": cls.display_label(
+                        row.get("standard_cadence"),
+                        row.get("standard"),
+                        first_timestep,
+                        last_timestep,
+                    ),
+                    "options": [
+                        cls.display_label(
+                            row.get(f"{field_name}_cadence"),
+                            row.get(field_name),
+                            first_timestep,
+                            last_timestep,
+                        )
+                        for field_name in OPTION_FIELDS
+                        if row.get(field_name) is not None
+                    ],
+                }
+            )
+        return display_rows
 
     @classmethod
     def cadence_or_count_label(cls, cadence, count):

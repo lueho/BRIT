@@ -232,32 +232,30 @@
       {% endfor %}
     </ul>
   {% endif %}
-  {% if object.frequency %}
-    <p class="card-text">
-      <strong>Frequency:</strong>
-      <br>
-      <span>Type: {{ object.frequency.get_type_display }}</span>
-    </p>
-    {% with frequency_options=object.frequency.collectioncountoptions_set.all %}
-      {% if frequency_options %}
-        <p class="card-text mb-1">Total number of collections per season:</p>
-        <ul>
-          {% for opt in frequency_options %}
-            <li>
-              {{ opt.season }}: Standard: {{ opt.standard }}
-              {% if opt.non_standard_options %}
-                (Options:
-                {% for non_standard_option in opt.non_standard_options %}
-                  {{ non_standard_option }}
-                  {% if not forloop.last %},{% endif %}
-                {% endfor %}
-                )
-              {% endif %}
-            </li>
-          {% endfor %}
-        </ul>
+  {% if object.frequency and frequency_display %}
+    {% if frequency_display.is_year_round %}
+      <p class="card-text">
+        <strong>Collection frequency:</strong> {{ frequency_display.summary }}
+      </p>
+      {% if frequency_display.options %}
+        <p class="card-text text-muted small mt-0">Alternatively: {{ frequency_display.options|join:", " }}</p>
       {% endif %}
-    {% endwith %}
+    {% elif frequency_display.rows %}
+      <p class="card-text mb-1">
+        <strong>Collection frequency:</strong>
+      </p>
+      <ul class="mb-2">
+        {% for frequency_row in frequency_display.rows %}
+          <li>
+            <strong>{{ frequency_row.segment }}:</strong> {{ frequency_row.standard }}
+            {% if frequency_row.options %}
+              <br>
+              <span class="text-muted small">Alternatively: {{ frequency_row.options|join:", " }}</span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
   {% endif %}
   {% if object.fee_system %}
     <p class="card-text">

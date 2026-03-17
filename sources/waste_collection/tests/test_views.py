@@ -3152,6 +3152,11 @@ class CollectionFrequencyDisplayTestCase(TestCase):
         june = Timestep.objects.get(name="June")
         july = Timestep.objects.get(name="July")
         december = Timestep.objects.get(name="December")
+        full_year, _ = CollectionSeason.objects.get_or_create(
+            distribution=distribution,
+            first_timestep=january,
+            last_timestep=december,
+        )
         first_half_year, _ = CollectionSeason.objects.get_or_create(
             distribution=distribution,
             first_timestep=january,
@@ -3189,18 +3194,61 @@ class CollectionFrequencyDisplayTestCase(TestCase):
             frequency=cls.frequency,
             publication_status="published",
         )
+        cls.custom_frequency = CollectionFrequency.objects.create(
+            name="Custom annual collection",
+            type="Fixed",
+            publication_status="published",
+        )
+        CollectionCountOptions.objects.create(
+            frequency=cls.custom_frequency,
+            season=full_year,
+            standard=5,
+        )
+        cls.custom_collection = Collection.objects.create(
+            name="Custom frequency collection",
+            catchment=cls.catchment,
+            collection_system=cls.system,
+            waste_category=cls.category,
+            frequency=cls.custom_frequency,
+            publication_status="published",
+        )
+        cls.year_round_options_frequency = CollectionFrequency.objects.create(
+            name="Year-round with options",
+            type="Fixed-Flexible",
+            publication_status="published",
+        )
+        CollectionCountOptions.objects.create(
+            frequency=cls.year_round_options_frequency,
+            season=full_year,
+            standard=13,
+            option_1=26,
+            option_2=52,
+        )
+        cls.year_round_options_collection = Collection.objects.create(
+            name="Year-round options collection",
+            catchment=cls.catchment,
+            collection_system=cls.system,
+            waste_category=cls.category,
+            frequency=cls.year_round_options_frequency,
+            publication_status="published",
+        )
         cls.ct_id = ContentType.objects.get_for_model(Collection).pk
 
-    def test_detail_shows_frequency_name_and_type(self):
+    def test_detail_shows_readable_seasonal_frequency(self):
         response = self.client.get(
             reverse("collection-detail", kwargs={"pk": self.collection.pk})
         )
         self.assertEqual(response.status_code, 200)
         body = response.content.decode()
-        self.assertIn("Type: Fixed-Seasonal", body)
-        self.assertIn("January - June: Standard: 26", body)
+        self.assertIn("Collection frequency:", body)
+        self.assertIn("January to June:", body)
+        self.assertIn("Weekly", body)
+        self.assertIn("July to December:", body)
+        self.assertIn("Every 2 weeks", body)
+        self.assertIn("Alternatively:", body)
+        self.assertIn("52 collections during this period", body)
 
-    def test_review_detail_shows_frequency_name_and_type(self):
+    def test_review_detail_shows_readable_seasonal_frequency(self):
         self.client.force_login(self.staff)
         response = self.client.get(
             reverse(
@@ -3210,8 +3258,37 @@ class CollectionFrequencyDisplayTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         body = response.content.decode()
-        self.assertIn("Type: Fixed-Seasonal", body)
-        self.assertIn("July - December: Standard: 13", body)
+        self.assertIn("Collection frequency:", body)
+        self.assertIn("January to June:", body)
+        self.assertIn("Weekly", body)
+        self.assertIn("July to December:", body)
+        self.assertIn("Every 2 weeks", body)
+
+    def test_detail_shows_simple_frequency_inline(self):
+        response = self.client.get(
+            reverse("collection-detail", kwargs={"pk": self.custom_collection.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+        self.assertIn("Collection frequency:", body)
+        self.assertIn("5 collections per year", body)
+        self.assertNotIn("All year", body)
+
+    def test_detail_shows_year_round_with_options_inline(self):
+        response = self.client.get(
+            reverse(
+                "collection-detail",
+                kwargs={"pk": self.year_round_options_collection.pk},
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+        self.assertIn("Collection frequency:", body)
+        self.assertIn("Every 4 weeks", body)
+        self.assertNotIn("All year", body)
+        self.assertIn("Alternatively:", body)
+        self.assertIn("Every 2 weeks", body)
+        self.assertIn("Weekly", body)
 
 
 class CollectionReviewDetailPropertiesTestCase(TestCase):

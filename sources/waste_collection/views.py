@@ -141,6 +141,19 @@ def _visible_collection_chain_for_user(collection, user):
     return list(related_qs)
 
 
+def _frequency_display_context(frequency):
+    if not frequency:
+        return None
+    rows = CollectionFrequencyScheduleService.display_rows(frequency)
+    is_year_round = len(rows) == 1 and rows[0]["segment"] == "All year"
+    return {
+        "rows": rows,
+        "is_year_round": is_year_round,
+        "summary": rows[0]["standard"] if is_year_round else None,
+        "options": rows[0]["options"] if is_year_round else None,
+    }
+
+
 class CollectionExplorerView(TemplateView):
     template_name = "wastecollection_dashboard.html"
 
@@ -1309,6 +1322,7 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
         context["allowed_materials"] = list(self.object.effective_allowed_materials)
         context["forbidden_materials"] = list(self.object.effective_forbidden_materials)
         context["samples"] = list(self.object.samples.all())
+        context["frequency_display"] = _frequency_display_context(self.object.frequency)
 
         # Collect all sources from collection, flyers, CPVs, and ACPVs
         all_sources = set()
@@ -1583,6 +1597,7 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
         review_context["forbidden_materials"] = self._get_review_materials(
             "forbidden_materials"
         )
+        review_context["frequency_display"] = _frequency_display_context(obj.frequency)
 
         # review_logs is set on the parent context before this method is called
         review_logs = context.get("review_logs") or []
