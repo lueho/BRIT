@@ -3143,6 +3143,77 @@ class CollectionDetailChainAwareValuesTestCase(ViewWithPermissionsTestCase):
         self.assertTrue(any(v.pk == self.anchor_value.pk for v in vals))
 
 
+class CollectionFrequencyDisplayTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create(username="frequency-moderator", is_staff=True)
+        distribution = TemporalDistribution.objects.get(name="Months of the year")
+        january = Timestep.objects.get(name="January")
+        june = Timestep.objects.get(name="June")
+        july = Timestep.objects.get(name="July")
+        december = Timestep.objects.get(name="December")
+        first_half_year, _ = CollectionSeason.objects.get_or_create(
+            distribution=distribution,
+            first_timestep=january,
+            last_timestep=june,
+        )
+        second_half_year, _ = CollectionSeason.objects.get_or_create(
+            distribution=distribution,
+            first_timestep=july,
+            last_timestep=december,
+        )
+        cls.frequency = CollectionFrequency.objects.create(
+            name="Seasonal flexibility",
+            type="Fixed-Seasonal",
+            publication_status="published",
+        )
+        CollectionCountOptions.objects.create(
+            frequency=cls.frequency,
+            season=first_half_year,
+            standard=26,
+            option_1=52,
+        )
+        CollectionCountOptions.objects.create(
+            frequency=cls.frequency,
+            season=second_half_year,
+            standard=13,
+        )
+        cls.catchment = CollectionCatchment.objects.create(name="FC")
+        cls.system = CollectionSystem.objects.create(name="FS")
+        cls.category = WasteCategory.objects.create(name="FCat")
+        cls.collection = Collection.objects.create(
+            name="Frequency collection",
+            catchment=cls.catchment,
+            collection_system=cls.system,
+            waste_category=cls.category,
+            frequency=cls.frequency,
+            publication_status="published",
+        )
+        cls.ct_id = ContentType.objects.get_for_model(Collection).pk
+
+    def test_detail_shows_frequency_name_and_type(self):
+        response = self.client.get(
+            reverse("collection-detail", kwargs={"pk": self.collection.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+        self.assertIn("Type: Fixed-Seasonal", body)
+        self.assertIn("January - June: Standard: 26", body)
+
+    def test_review_detail_shows_frequency_name_and_type(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse(
+                "object_management:review_item_detail",
+                kwargs={"content_type_id": self.ct_id, "object_id": self.collection.pk},
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+        self.assertIn("Type: Fixed-Seasonal", body)
+        self.assertIn("July - December: Standard: 13", body)
+
+
 class CollectionReviewDetailPropertiesTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
