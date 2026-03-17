@@ -4,8 +4,7 @@
 {% object_policy object as policy %}
 {% block style_sheets %}
     {{ block.super }}
-    <link rel="stylesheet"
-          href="{% static 'soilcom/css/collection_detail.css' %}">
+    <link rel="stylesheet" href="{% static 'css/source_url_display.css' %}">
 {% endblock style_sheets %}
 {% block detail_header_badge %}
     {% include "object_management/review_status_badge.html" with object=object %}

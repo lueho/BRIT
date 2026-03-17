@@ -6,12 +6,12 @@
 {% load leaflet_tags %}
 {% block style_sheets %}
   {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/source_url_display.css' %}">
   {% if not review_mode %}
     {% leaflet_js %}
     {% leaflet_css %}
     <link rel="stylesheet" href="{% static 'css/maps.min.css' %}">
-    <link rel="stylesheet"
-          href="{% static 'soilcom/css/collection_detail.css' %}">
+    <link rel="stylesheet" href="{% static 'css/collection_detail.min.css' %}">
   {% endif %}
 {% endblock style_sheets %}
 {# Confirm texts available to all blocks #}
