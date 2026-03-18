@@ -124,6 +124,12 @@ class WasteFlyerManager(UserCreatedObjectManager):
     def get_queryset(self):
         return super().get_queryset().filter(type="waste_flyer")
 
+    def get_or_create_by_url(self, url: str, defaults: dict | None = None):
+        flyer = self.filter(url=url).order_by("id").first()
+        if flyer is not None:
+            return flyer, False
+        return self.get_or_create(url=url, defaults=defaults or {})
+
 
 class WasteFlyer(Source):
     objects = WasteFlyerManager()
