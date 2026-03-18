@@ -1,13 +1,14 @@
 import json
 
 from celery.result import AsyncResult
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
 from django.views import View
-from django.views.generic import TemplateView
+from django.views.generic import FormView, TemplateView
 
 from utils.forms import TomSelectFormsetHelper
 from utils.object_management.permissions import get_object_policy
@@ -32,6 +33,7 @@ from .forms import (
     AuthorModelForm,
     LicenceModalModelForm,
     LicenceModelForm,
+    SourceBibtexArticleImportForm,
     SourceModalModelForm,
     SourceModelForm,
 )
@@ -212,11 +214,38 @@ class SourceCreateView(UserCreatedObjectCreateWithInlinesView):
     inlines = [SourceAuthorInline]
     permission_required = "bibliography.add_source"
     formset_helper_class = TomSelectFormsetHelper
+    template_name = "bibliography/source_create_form.html"
 
 
 class SourceModalCreateView(UserCreatedObjectModalCreateView):
     form_class = SourceModalModelForm
     permission_required = "bibliography.add_source"
+
+
+class SourceBibtexArticleImportView(PermissionRequiredMixin, FormView):
+    form_class = SourceBibtexArticleImportForm
+    permission_required = "bibliography.add_source"
+    template_name = "bibliography/source_bibtex_article_import_form.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "form_title": "Create New Source from BibTeX @article",
+                "submit_button_text": "Import",
+            }
+        )
+        return context
+
+    def form_valid(self, form):
+        try:
+            source = form.create_source(owner=self.request.user)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            return self.form_invalid(form)
+
+        messages.success(self.request, "Source created successfully.")
+        return HttpResponseRedirect(source.get_absolute_url())
 
 
 class SourceDetailView(UserCreatedObjectDetailView):

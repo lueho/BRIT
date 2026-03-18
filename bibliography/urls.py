@@ -25,6 +25,7 @@ from .views import (
     LicencePublishedListView,
     LicenceUpdateView,
     SourceAutocompleteView,
+    SourceBibtexArticleImportView,
     SourceCheckUrlProgressView,
     SourceCheckUrlView,
     SourceCreateView,
@@ -133,6 +134,11 @@ urlpatterns = [
         "sources/create/modal/",
         SourceModalCreateView.as_view(),
         name="source-create-modal",
+    ),
+    path(
+        "sources/create/bibtex/article/",
+        SourceBibtexArticleImportView.as_view(),
+        name="source-bibtex-article-import",
     ),
     path("sources/<int:pk>/", SourceDetailView.as_view(), name="source-detail"),
     path(

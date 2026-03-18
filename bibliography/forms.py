@@ -1,10 +1,16 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.forms import BaseInlineFormSet, DateInput
+from django.forms import BaseInlineFormSet, CharField, DateInput, Textarea
 from django_tomselect.forms import TomSelectConfig, TomSelectModelChoiceField
 
-from utils.forms import MARKDOWN_HELP_TEXT, ModalModelFormMixin, SimpleModelForm
+from utils.forms import (
+    MARKDOWN_HELP_TEXT,
+    ModalModelFormMixin,
+    SimpleForm,
+    SimpleModelForm,
+)
 
+from .bibtex import BibtexArticleParseError, parse_bibtex_article_entry
 from .models import Author, Licence, Source, SourceAuthor
 
 
@@ -60,6 +66,90 @@ class SourceModelForm(SimpleModelForm):
 
 class SourceModalModelForm(ModalModelFormMixin, SourceModelForm):
     pass
+
+
+class SourceBibtexArticleImportForm(SimpleForm):
+    bibtex_entry = CharField(widget=Textarea(attrs={"rows": 18}))
+
+    def clean_bibtex_entry(self):
+        bibtex_entry = self.cleaned_data["bibtex_entry"]
+        try:
+            self.parsed_entry = parse_bibtex_article_entry(bibtex_entry)
+        except BibtexArticleParseError as exc:
+            raise ValidationError(str(exc)) from exc
+        return bibtex_entry
+
+    def create_source(self, *, owner):
+        parsed_entry = getattr(self, "parsed_entry", None)
+        if parsed_entry is None:
+            raise ValueError("The BibTeX import form must be validated before saving.")
+
+        authors = self._resolve_authors(
+            owner=owner, parsed_authors=parsed_entry["authors"]
+        )
+
+        with transaction.atomic():
+            source = Source.objects.create(
+                owner=owner,
+                type="article",
+                abbreviation=parsed_entry["citation_key"] or "",
+                publisher=parsed_entry["publisher"],
+                title=parsed_entry["title"],
+                journal=parsed_entry["journal"],
+                volume=parsed_entry["volume"],
+                issue=parsed_entry["number"],
+                pages=parsed_entry["pages"],
+                month=parsed_entry["month"],
+                year=parsed_entry["year"],
+                abstract=parsed_entry["abstract"],
+                url=parsed_entry["url"],
+                doi=parsed_entry["doi"],
+            )
+            for position, author in enumerate(authors, start=1):
+                SourceAuthor.objects.create(
+                    source=source,
+                    author=author,
+                    position=position,
+                )
+
+        return source
+
+    def _resolve_authors(self, *, owner, parsed_authors):
+        authors = []
+        author_ids = set()
+
+        for parsed_author in parsed_authors:
+            first_names = " ".join(str(parsed_author.get("first_names") or "").split())
+            last_names = " ".join(str(parsed_author.get("last_names") or "").split())
+            suffix = " ".join(str(parsed_author.get("suffix") or "").split())
+            if not last_names:
+                continue
+
+            author_queryset = Author.objects.filter(
+                first_names__iexact=first_names,
+                last_names__iexact=last_names,
+            )
+            if suffix:
+                author_queryset = author_queryset.filter(suffix__iexact=suffix)
+
+            author = author_queryset.first()
+            if author is None:
+                if not owner.has_perm("bibliography.add_author"):
+                    raise ValidationError(
+                        "You need permission to create missing authors from BibTeX imports."
+                    )
+                author = Author.objects.create(
+                    owner=owner,
+                    first_names=first_names,
+                    last_names=last_names,
+                    suffix=suffix,
+                )
+
+            if author.pk not in author_ids:
+                authors.append(author)
+                author_ids.add(author.pk)
+
+        return authors
 
 
 class SourceAuthorForm(SimpleModelForm):

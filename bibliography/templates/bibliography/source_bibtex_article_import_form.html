@@ -1,0 +1,6 @@
+{% extends "simple_form_card.html" %}
+
+{% block card_footer %}
+  {% url "source-create" as source_create_url %}
+  <a href="{{ source_create_url }}">Create a source manually instead</a>
+{% endblock card_footer %}

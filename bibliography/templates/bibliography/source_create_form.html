@@ -1,0 +1,6 @@
+{% extends "formsets_card.html" %}
+
+{% block card_footer %}
+  {% url "source-bibtex-article-import" as bibtex_import_url %}
+  <a href="{{ bibtex_import_url }}">Create a source from a BibTeX @article entry</a>
+{% endblock card_footer %}
