@@ -78,6 +78,16 @@ _FREQUENCY_COUNT_FRAGMENT_RE = re.compile(
 _IMPORTED_REFERENCE_URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 
 
+def _should_warn_on_frequency_normalization(
+    raw_name: str,
+    resolved_name: str,
+) -> bool:
+    canonical_fixed_name = _canonicalize_fixed_frequency_name(raw_name)
+    if canonical_fixed_name is not None and canonical_fixed_name == resolved_name:
+        return False
+    return raw_name != resolved_name
+
+
 def _normalize_frequency_display_text(value: str) -> str:
     normalized = re.sub(r"\s+", " ", (value or "").strip())
     normalized = normalized.replace("Fixed:", "Fixed;")
@@ -195,9 +205,11 @@ class CollectionImporter:
 
         stats = {
             "created": 0,
+            "unchanged": 0,
             "skipped": 0,
             "predecessor_links": 0,
             "cpv_created": 0,
+            "cpv_unchanged": 0,
             "cpv_skipped": 0,
             "flyers_created": 0,
             "sources_created": 0,
@@ -503,7 +515,7 @@ class CollectionImporter:
                 stats["changes"] = stats.get("changes", [])
                 stats["changes"].append(f"{label}: {', '.join(changes)}")
             else:
-                stats["skipped"] += 1
+                stats["unchanged"] += 1
 
             if (
                 self.publication_status == "review"
@@ -711,7 +723,7 @@ class CollectionImporter:
                     existing_cpv.STATUS_DECLINED,
                 ):
                     self._submit_cpv_for_review(existing_cpv)
-            stats["cpv_skipped"] += 1
+            stats["cpv_unchanged"] += 1
             return
 
         cpv_name = f"{collection.name} {prop.name} {year}"
@@ -824,9 +836,6 @@ class CollectionImporter:
         valid_from,
     ) -> CollectionCatchment | None:
         if collector and collector.catchment_id:
-            stats["warnings"].append(
-                f"{label}: No direct catchment for combined NUTS/LAU id '{nuts_lau_id}' — using collector catchment '{collector.catchment}'."
-            )
             return collector.catchment
 
         predecessor = self._find_predecessor_for_catchment_fallback(
@@ -838,9 +847,6 @@ class CollectionImporter:
             valid_from=valid_from,
         )
         if predecessor and predecessor.catchment_id:
-            stats["warnings"].append(
-                f"{label}: No direct catchment for combined NUTS/LAU id '{nuts_lau_id}' — using predecessor catchment '{predecessor.catchment}'."
-            )
             return predecessor.catchment
 
         return None
@@ -961,10 +967,11 @@ class CollectionImporter:
         if translated_name is not None:
             freq = self._frequencies.get(translated_name)
             if freq is not None:
-                stats["warnings"].append(
-                    f"{label}: CollectionFrequency '{name}' not found — "
-                    f"normalized to '{freq.name}'."
-                )
+                if _should_warn_on_frequency_normalization(name, freq.name):
+                    stats["warnings"].append(
+                        f"{label}: CollectionFrequency '{name}' not found — "
+                        f"normalized to '{freq.name}'."
+                    )
                 return freq
 
         exact_match = self._frequencies.get(name)
@@ -974,7 +981,7 @@ class CollectionImporter:
         normalized_name = _normalize_frequency_lookup_key(name)
         freq = self._normalized_frequencies.get(normalized_name)
         if freq is not None:
-            if name != freq.name:
+            if _should_warn_on_frequency_normalization(name, freq.name):
                 stats["warnings"].append(
                     f"{label}: CollectionFrequency '{name}' not found — "
                     f"normalized to '{freq.name}'."
@@ -987,7 +994,7 @@ class CollectionImporter:
                 parsed_flexible["signature"]
             )
             if freq is not None:
-                if name != freq.name:
+                if _should_warn_on_frequency_normalization(name, freq.name):
                     stats["warnings"].append(
                         f"{label}: CollectionFrequency '{name}' not found — "
                         f"normalized to '{freq.name}'."
@@ -1002,7 +1009,7 @@ class CollectionImporter:
                 _normalize_frequency_lookup_key(canonical_name)
             )
             if freq is not None:
-                if name != freq.name:
+                if _should_warn_on_frequency_normalization(name, freq.name):
                     stats["warnings"].append(
                         f"{label}: CollectionFrequency '{name}' not found — "
                         f"normalized to '{freq.name}'."
@@ -1025,7 +1032,7 @@ class CollectionImporter:
                 self._whole_year_fixed_flexible_frequencies[
                     parsed_flexible["signature"]
                 ] = freq
-            if name != freq.name:
+            if _should_warn_on_frequency_normalization(name, freq.name):
                 stats["warnings"].append(
                     f"{label}: CollectionFrequency '{name}' not found — "
                     f"normalized to '{freq.name}'."
@@ -1042,7 +1049,7 @@ class CollectionImporter:
                 self._normalized_frequencies[
                     _normalize_frequency_lookup_key(canonical_name)
                 ] = freq
-            if name != canonical_name:
+            if _should_warn_on_frequency_normalization(name, canonical_name):
                 stats["warnings"].append(
                     f"{label}: CollectionFrequency '{name}' not found — "
                     f"normalized to '{canonical_name}'."

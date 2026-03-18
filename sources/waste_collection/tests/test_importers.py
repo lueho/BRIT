@@ -97,6 +97,8 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
         )
 
         self.assertEqual(stats_second["created"], 0)
+        self.assertEqual(stats_second["unchanged"], 1)
+        self.assertEqual(stats_second["skipped"], 0)
         self.assertEqual(Collection.objects.filter(owner=self.owner).count(), 1)
 
     def test_different_material_set_creates_new_collection(self):
@@ -315,10 +317,7 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
         )
         self.assertEqual(stats["created"], 1)
         self.assertEqual(collection.catchment, self.catchment)
-        self.assertIn(
-            "record[0]: No direct catchment for combined NUTS/LAU id 'DEG02, DEG0L' — using collector catchment 'Importer Material Catch'.",
-            stats["warnings"],
-        )
+        self.assertEqual(stats["warnings"], [])
 
     def test_combined_lookup_codes_fall_back_to_predecessor_catchment(self):
         importer = CollectionImporter(owner=self.owner, publication_status="private")
@@ -362,10 +361,7 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
         self.assertEqual(stats["predecessor_links"], 1)
         self.assertEqual(collection.catchment, predecessor_catchment)
         self.assertEqual(list(collection.predecessors.all()), [predecessor])
-        self.assertIn(
-            "record[0]: No direct catchment for combined NUTS/LAU id 'DEG0I, DEG0K' — using predecessor catchment 'Importer Predecessor Catch'.",
-            stats["warnings"],
-        )
+        self.assertEqual(stats["warnings"], [])
 
 
 class CollectionImporterFrequencyResolutionTestCase(TestCase):
@@ -384,6 +380,11 @@ class CollectionImporterFrequencyResolutionTestCase(TestCase):
         )
         cls.fixed_frequency = CollectionFrequency.objects.create(
             name="Fixed; 26 per year (1 per 2 weeks)",
+            type="Fixed",
+            owner=cls.owner,
+        )
+        cls.fixed_simple_frequency = CollectionFrequency.objects.create(
+            name="Fixed; 52 per year",
             type="Fixed",
             owner=cls.owner,
         )
@@ -482,6 +483,20 @@ class CollectionImporterFrequencyResolutionTestCase(TestCase):
         self.assertTrue(
             CollectionFrequency.objects.filter(name="Fixed; 9 per year").exists()
         )
+        self.assertEqual(stats["warnings"], [])
+
+    def test_resolve_frequency_silently_canonicalizes_simple_fixed_variant(self):
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        importer._load_lookups()
+        stats = {"warnings": []}
+
+        frequency = importer._resolve_frequency(
+            self._record("Fixed; 52 per year (1 per 2 week)"),
+            label="record[2a]",
+            stats=stats,
+        )
+
+        self.assertEqual(frequency, self.fixed_simple_frequency)
         self.assertEqual(stats["warnings"], [])
 
     def test_resolve_frequency_translates_misleading_bw_seasonal_label(self):

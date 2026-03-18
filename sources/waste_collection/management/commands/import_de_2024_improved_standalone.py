@@ -488,6 +488,7 @@ def main():
     totals = {
         "created": 0,
         "updated": 0,
+        "unchanged": 0,
         "skipped": len(
             [
                 warning
@@ -497,6 +498,7 @@ def main():
         ),
         "predecessor_links": 0,
         "cpv_created": 0,
+        "cpv_unchanged": 0,
         "cpv_skipped": 0,
         "flyers_created": 0,
         "sources_created": 0,
@@ -526,9 +528,11 @@ def main():
         for key in (
             "created",
             "updated",
+            "unchanged",
             "skipped",
             "predecessor_links",
             "cpv_created",
+            "cpv_unchanged",
             "cpv_skipped",
             "flyers_created",
             "sources_created",
@@ -540,15 +544,17 @@ def main():
             stats.get("unresolved_frequencies", {}),
         )
         print(
-            f"created={stats.get('created', 0)} updated={stats.get('updated', 0)} skipped={stats.get('skipped', 0)}"
+            f"created={stats.get('created', 0)} updated={stats.get('updated', 0)} unchanged={stats.get('unchanged', 0)} skipped={stats.get('skipped', 0)}"
         )
 
     print("\n=== Import Summary ===")
     print(f"  Collections created:  {totals['created']}")
     print(f"  Collections updated:  {totals['updated']}")
+    print(f"  Collections unchanged:{totals['unchanged']:>4}")
     print(f"  Collections skipped:  {totals['skipped']}")
     print(f"  Predecessor links:    {totals['predecessor_links']}")
     print(f"  CPVs created:         {totals['cpv_created']}")
+    print(f"  CPVs unchanged:       {totals['cpv_unchanged']}")
     print(f"  CPVs skipped:         {totals['cpv_skipped']}")
     print(f"  Flyers created:       {totals['flyers_created']}")
     print(f"  Sources created:      {totals['sources_created']}")
