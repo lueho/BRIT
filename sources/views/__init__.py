@@ -1,6 +1,6 @@
 from django.views.generic import TemplateView
-from sources.greenhouses.selectors import published_greenhouse_count
-from sources.waste_collection.selectors import published_collection_count
+
+from sources.registry import get_explorer_context
 
 
 class SourcesExplorerView(TemplateView):
@@ -8,8 +8,7 @@ class SourcesExplorerView(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["collection_count"] = published_collection_count()
-        context["greenhouse_count"] = published_greenhouse_count()
+        context.update(get_explorer_context())
         return context
 
 

@@ -1,10 +1,14 @@
 from django.urls import include, path
 from django.views.generic import RedirectView
 
+from .registry import get_hub_source_domain_plugins
 from .views import SourcesExplorerView
 
 urlpatterns = [
-    path("", include("sources.roadside_trees.urls")),
+    *[
+        path(plugin.mount_path, include(plugin.urlconf))
+        for plugin in get_hub_source_domain_plugins()
+    ],
     path("explorer/", SourcesExplorerView.as_view(), name="sources-explorer"),
     path(
         "list/",
