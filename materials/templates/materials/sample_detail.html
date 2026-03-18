@@ -248,6 +248,7 @@
                       <th>Value</th>
                       <th>Method</th>
                       <th>Sources</th>
+                      {% if user.is_authenticated %}<th class="text-end">Edit</th>{% endif %}
                       {% if policy.can_add_property %}<th class="remove-property collapse multi-collapse">Remove</th>{% endif %}
                     </tr>
                   </thead>
@@ -277,6 +278,19 @@
                             -
                           {% endfor %}
                         </td>
+                        {% if user.is_authenticated %}
+                          {% object_policy property as property_policy %}
+                          <td class="text-end text-nowrap">
+                            {% if property_policy.can_edit %}
+                              <a href="{% url 'materialpropertyvalue-update' property.id %}"
+                                 title="Edit property value">
+                                <i class="fas fa-fw fa-pen-to-square"></i>
+                              </a>
+                            {% else %}
+                              <span class="text-muted">-</span>
+                            {% endif %}
+                          </td>
+                        {% endif %}
                         {% if policy.can_add_property %}
                           <td class="remove-property collapse multi-collapse">
                             <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}"

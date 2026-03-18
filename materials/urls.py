@@ -498,6 +498,11 @@ urlpatterns = [
         name="materialpropertyvalue-delete-modal",
     ),
     path(
+        "property_values/<int:pk>/update/",
+        views.MaterialPropertyValueUpdateView.as_view(),
+        name="materialpropertyvalue-update",
+    ),
+    path(
         "component_measurements/<int:pk>/update/",
         views.ComponentMeasurementUpdateView.as_view(),
         name="componentmeasurement-update",

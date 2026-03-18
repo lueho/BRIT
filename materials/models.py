@@ -499,6 +499,12 @@ class MaterialPropertyValue(UserCreatedObject):
 
         return duplicate
 
+    def get_absolute_url(self):
+        sample = self.sample_set.first()
+        if sample is None:
+            return ""
+        return sample.get_absolute_url()
+
 
 class Sample(NamedUserCreatedObject):
     """

@@ -813,6 +813,95 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
             MaterialPropertyValue.objects.get(pk=self.value.pk)
 
 
+class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.unit = Unit.objects.create(name="mg/L", owner=cls.owner)
+        cls.property = MaterialProperty.objects.create(
+            owner=cls.owner,
+            name="Dry Matter",
+            unit="mg/L",
+            publication_status="published",
+        )
+        cls.property.allowed_units.add(cls.unit)
+        cls.material = Material.objects.create(
+            owner=cls.owner,
+            name="Digestate",
+            publication_status="published",
+        )
+        cls.sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Sample with properties",
+            material=cls.material,
+            publication_status="published",
+        )
+        cls.value = MaterialPropertyValue.objects.create(
+            owner=cls.owner,
+            property=cls.property,
+            unit=cls.unit,
+            average=Decimal("12.5"),
+            standard_deviation=Decimal("0.5"),
+            publication_status="private",
+        )
+        cls.sample.properties.add(cls.value)
+
+    def test_sample_detail_shows_property_edit_link_for_owner(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse("materialpropertyvalue-update", kwargs={"pk": self.value.pk}),
+        )
+
+    def test_sample_detail_hides_property_edit_link_for_outsider(self):
+        self.client.force_login(self.outsider)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(
+            response,
+            reverse("materialpropertyvalue-update", kwargs={"pk": self.value.pk}),
+        )
+
+    def test_property_value_absolute_url_points_to_sample_detail(self):
+        self.assertEqual(
+            self.value.get_absolute_url(),
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+        )
+
+    def test_update_view_redirects_back_to_sample_detail(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse("materialpropertyvalue-update", kwargs={"pk": self.value.pk}),
+            data={
+                "property": self.property.pk,
+                "unit": self.unit.pk,
+                "analytical_method": "",
+                "sources": [],
+                "average": "14.25",
+                "standard_deviation": "0.75",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+        )
+        self.value.refresh_from_db()
+        self.assertEqual(self.value.average, Decimal("14.25"))
+        self.assertEqual(self.value.standard_deviation, Decimal("0.75"))
+
+
 class ComponentMeasurementUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):

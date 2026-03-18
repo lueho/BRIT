@@ -473,6 +473,14 @@ class MaterialPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
         )
 
 
+class MaterialPropertyValueUpdateView(UserCreatedObjectUpdateView):
+    model = MaterialPropertyValue
+    form_class = MaterialPropertyValueModelForm
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+
 class ComponentMeasurementUpdateView(UserCreatedObjectUpdateView):
     model = ComponentMeasurement
     form_class = ComponentMeasurementModelForm
