@@ -113,7 +113,7 @@ class HyperlinkedAuthorSerializer(HyperlinkedModelSerializer):
 
 
 class HyperlinkedSourceSerializer(HyperlinkedModelSerializer):
-    authors = HyperlinkedAuthorSerializer(many=True)
+    authors = SerializerMethodField()
     licence = HyperlinkedLicenceSerializer()
     url_checked = SerializerMethodField()
     doi = SerializerMethodField()
@@ -142,6 +142,13 @@ class HyperlinkedSourceSerializer(HyperlinkedModelSerializer):
             "doi",
             "last_accessed",
         )
+
+    def get_authors(self, instance):
+        return HyperlinkedAuthorSerializer(
+            instance.authors_ordered,
+            many=True,
+            context=self.context,
+        ).data
 
     @staticmethod
     def get_url_checked(instance):

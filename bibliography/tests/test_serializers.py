@@ -296,6 +296,40 @@ class HyperlinkedSourceSerializerTestCase(TestCase):
         }
         self.assertDictEqual(expected, serializer.data)
 
+    def test_authors_follow_sourceauthor_position_order(self):
+        factory = RequestFactory()
+        request = factory.get(reverse("home"))
+        licence = Licence.objects.create(
+            name="Ordered Licence",
+            reference_url="https://www.ordered-licence.com",
+        )
+        with mute_signals(post_save):
+            ordered_source = Source.objects.create(
+                type="custom",
+                title="Ordered Source",
+                abbreviation="OS1",
+                licence=licence,
+            )
+        SourceAuthor.objects.create(
+            source=ordered_source,
+            author=self.author1,
+            position=2,
+        )
+        SourceAuthor.objects.create(
+            source=ordered_source,
+            author=self.author2,
+            position=1,
+        )
+
+        serializer = HyperlinkedSourceSerializer(
+            ordered_source, context={"request": request}
+        )
+
+        self.assertEqual(
+            [author["name"] for author in serializer.data["authors"]],
+            ["Test Author, Two", "Test Author, One"],
+        )
+
 
 class SourceAbbreviationSerializerTestCase(TestCase):
     @classmethod
