@@ -813,6 +813,116 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
             MaterialPropertyValue.objects.get(pk=self.value.pk)
 
 
+class ComponentMeasurementUpdateViewTestCase(ViewWithPermissionsTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.unit = Unit.objects.filter(name="%").first()
+        if cls.unit is None:
+            cls.unit = Unit.objects.create(name="%", symbol="percent", owner=cls.owner)
+        elif not cls.unit.symbol:
+            cls.unit.symbol = "percent"
+            cls.unit.save(update_fields=["symbol"])
+
+        cls.group = MaterialComponentGroup.objects.create(
+            owner=cls.owner,
+            name="Composition group",
+            publication_status="published",
+        )
+        cls.component = MaterialComponent.objects.create(
+            owner=cls.owner,
+            name="Carbon",
+            publication_status="published",
+        )
+        cls.material = Material.objects.create(
+            owner=cls.owner,
+            name="Digestate",
+            publication_status="published",
+        )
+        cls.sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Sample with measurements",
+            material=cls.material,
+            publication_status="published",
+        )
+        cls.measurement = ComponentMeasurement.objects.create(
+            owner=cls.owner,
+            sample=cls.sample,
+            group=cls.group,
+            component=cls.component,
+            unit=cls.unit,
+            average=Decimal("12.5"),
+            standard_deviation=Decimal("0.5"),
+            publication_status="private",
+        )
+
+    def test_sample_detail_shows_measurement_edit_link_for_owner(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse(
+                "componentmeasurement-update",
+                kwargs={"pk": self.measurement.pk},
+            ),
+        )
+
+    def test_sample_detail_hides_measurement_edit_link_for_outsider(self):
+        self.client.force_login(self.outsider)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(
+            response,
+            reverse(
+                "componentmeasurement-update",
+                kwargs={"pk": self.measurement.pk},
+            ),
+        )
+
+    def test_measurement_absolute_url_points_to_sample_detail(self):
+        self.assertEqual(
+            self.measurement.get_absolute_url(),
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+        )
+
+    def test_update_view_redirects_back_to_sample_detail(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse("componentmeasurement-update", kwargs={"pk": self.measurement.pk}),
+            data={
+                "group": self.group.pk,
+                "component": self.component.pk,
+                "basis_component": "",
+                "analytical_method": "",
+                "sources": [],
+                "unit": self.unit.pk,
+                "average": "14.25",
+                "standard_deviation": "0.75",
+                "sample_size": "3",
+                "comment": "Updated from sample detail",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+        )
+        self.measurement.refresh_from_db()
+        self.assertEqual(self.measurement.average, Decimal("14.25"))
+        self.assertEqual(self.measurement.sample_size, 3)
+        self.assertEqual(self.measurement.comment, "Updated from sample detail")
+
+
 # ----------- Analytical Method CRUD -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 

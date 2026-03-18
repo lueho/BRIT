@@ -62,6 +62,8 @@ from .forms import (
     AnalyticalMethodModelForm,
     ComponentGroupModalModelForm,
     ComponentGroupModelForm,
+    ComponentMeasurementModalModelForm,
+    ComponentMeasurementModelForm,
     ComponentModalModelForm,
     ComponentModelForm,
     ComponentShareDistributionFormSetHelper,
@@ -88,6 +90,7 @@ from .forms import (
 )
 from .models import (
     AnalyticalMethod,
+    ComponentMeasurement,
     Material,
     MaterialCategory,
     MaterialComponent,
@@ -468,6 +471,22 @@ class MaterialPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
         return reverse(
             "sample-detail", kwargs={"pk": self.object.sample_set.first().pk}
         )
+
+
+class ComponentMeasurementUpdateView(UserCreatedObjectUpdateView):
+    model = ComponentMeasurement
+    form_class = ComponentMeasurementModelForm
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+
+class ComponentMeasurementModalUpdateView(UserCreatedObjectModalUpdateView):
+    model = ComponentMeasurement
+    form_class = ComponentMeasurementModalModelForm
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
 
 
 # ----------- Analytical Method CRUD -----------------------------------------------------------------------------------

@@ -887,6 +887,9 @@ class ComponentMeasurement(UserCreatedObject):
         duplicate.sources.set(self.sources.all())
         return duplicate
 
+    def get_absolute_url(self):
+        return self.sample.get_absolute_url()
+
     def __str__(self):
         return f"Raw measurement of {self.component.name} for sample {self.sample.name}"
 

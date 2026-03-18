@@ -32,6 +32,7 @@ from utils.properties.models import Unit, get_default_unit_pk
 
 from .models import (
     AnalyticalMethod,
+    ComponentMeasurement,
     Composition,
     Material,
     MaterialCategory,
@@ -92,6 +93,74 @@ class MaterialPropertyModelForm(SimpleModelForm):
 
 
 class MaterialPropertyModalModelForm(ModalModelFormMixin, MaterialPropertyModelForm):
+    pass
+
+
+class ComponentMeasurementModelForm(
+    UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
+):
+    group = TomSelectModelChoiceField(
+        queryset=MaterialComponentGroup.objects.all(),
+        config=TomSelectConfig(
+            url="materialcomponentgroup-autocomplete",
+            label_field="name",
+        ),
+        label="Group",
+    )
+    component = TomSelectModelChoiceField(
+        queryset=MaterialComponent.objects.all(),
+        config=TomSelectConfig(
+            url="materialcomponent-autocomplete",
+            label_field="name",
+        ),
+        label="Component",
+    )
+    basis_component = TomSelectModelChoiceField(
+        queryset=MaterialComponent.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="materialcomponent-autocomplete",
+            label_field="name",
+        ),
+        label="Basis component",
+    )
+    analytical_method = TomSelectModelChoiceField(
+        queryset=AnalyticalMethod.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="analyticalmethod-autocomplete",
+            label_field="name",
+        ),
+        label="Analytical method",
+    )
+    unit = TomSelectModelChoiceField(
+        queryset=Unit.objects.all(),
+        config=TomSelectConfig(
+            url="unit-autocomplete",
+            label_field="name",
+        ),
+        label="Unit",
+    )
+
+    class Meta:
+        model = ComponentMeasurement
+        fields = (
+            "group",
+            "component",
+            "basis_component",
+            "analytical_method",
+            "sources",
+            "unit",
+            "average",
+            "standard_deviation",
+            "sample_size",
+            "comment",
+        )
+
+
+class ComponentMeasurementModalModelForm(
+    ModalModelFormMixin, ComponentMeasurementModelForm
+):
     pass
 
 

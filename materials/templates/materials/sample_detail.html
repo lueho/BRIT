@@ -369,6 +369,7 @@
                                 <th>Method</th>
                                 <th>Sources</th>
                                 <th class="pe-3">Comments</th>
+                                {% if user.is_authenticated %}<th class="pe-3 text-end">Edit</th>{% endif %}
                               </tr>
                             </thead>
                             <tbody>
@@ -415,6 +416,19 @@
                                       <span class="text-muted">-</span>
                                     {% endif %}
                                   </td>
+                                  {% if user.is_authenticated %}
+                                    {% object_policy measurement as measurement_policy %}
+                                    <td class="pe-3 text-end text-nowrap">
+                                      {% if measurement_policy.can_edit %}
+                                        <a href="{% url 'componentmeasurement-update' measurement.pk %}"
+                                           title="Edit measurement">
+                                          <i class="fas fa-fw fa-pen-to-square"></i>
+                                        </a>
+                                      {% else %}
+                                        <span class="text-muted">-</span>
+                                      {% endif %}
+                                    </td>
+                                  {% endif %}
                                 </tr>
                               {% endfor %}
                             </tbody>
