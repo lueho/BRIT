@@ -216,9 +216,11 @@ class MaterialPrivateListView(PrivateObjectFilterView):
     dashboard_url = reverse_lazy("materials-explorer")
 
 
-class MaterialReviewListView(ReviewObjectListView):
+class MaterialReviewListView(ReviewObjectFilterView):
     model = Material
     queryset = Material.objects.filter(type="material")
+    filterset_class = MaterialListFilter
+    template_name = "materials/material_list.html"
     dashboard_url = reverse_lazy("materials-explorer")
 
 

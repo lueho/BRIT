@@ -2154,6 +2154,25 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertNotContains(response, "Create your first material")
         self.assertNotContains(response, "Log in to create")
 
+    def test_material_review_list_renders_filter_context_for_staff(self):
+        Material.objects.create(
+            name="Review Material",
+            type="material",
+            owner=self.regular_user,
+            publication_status="review",
+        )
+
+        self.client.force_login(self.staff_user)
+        response = self.client.get(reverse("material-list-review"), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.redirect_chain,
+            [(f"{reverse('material-list-review')}?scope=review", 302)],
+        )
+        self.assertContains(response, "Reset filters")
+        self.assertContains(response, "Review Material")
+
     def test_sample_detail_empty_properties_anonymous(self):
         sample = Sample.objects.create(
             name="Test Sample",
