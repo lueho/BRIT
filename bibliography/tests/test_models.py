@@ -256,3 +256,23 @@ class SourceUpdateAbbreviationTestCase(TestCase):
         source.update_abbreviation()
         source.refresh_from_db()
         self.assertEqual(source.abbreviation, "Wonder 2020")
+
+
+class SourceArticleCompatibilityTestCase(TestCase):
+    def test_citation_key_alias_maps_to_abbreviation(self):
+        with mute_signals(post_save):
+            source = Source.objects.create(title="Article", abbreviation="Article2024")
+
+        self.assertEqual(source.citation_key, "Article2024")
+
+        source.citation_key = "UpdatedKey"
+        self.assertEqual(source.abbreviation, "UpdatedKey")
+
+    def test_number_alias_maps_to_issue(self):
+        with mute_signals(post_save):
+            source = Source.objects.create(title="Article", issue="4")
+
+        self.assertEqual(source.number, "4")
+
+        source.number = "7"
+        self.assertEqual(source.issue, "7")

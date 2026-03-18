@@ -96,7 +96,10 @@ class Source(UserCreatedObject):
     publisher = models.CharField(max_length=127, blank=True, null=True)
     title = models.CharField(max_length=500)
     journal = models.CharField(max_length=500, blank=True, null=True)
+    volume = models.CharField(max_length=255, blank=True, null=True)
     issue = models.CharField(max_length=255, blank=True, null=True)
+    pages = models.CharField(max_length=255, blank=True, null=True)
+    month = models.CharField(max_length=50, blank=True, null=True)
     year = models.IntegerField(blank=True, null=True)
     abbreviation = models.CharField(max_length=50, blank=True)
     abstract = models.TextField(blank=True, null=True)
@@ -122,6 +125,22 @@ class Source(UserCreatedObject):
 
     def __str__(self):
         return self.abbreviation or self.title or f"Source #{self.pk}"
+
+    @property
+    def citation_key(self):
+        return self.abbreviation
+
+    @citation_key.setter
+    def citation_key(self, value):
+        self.abbreviation = value
+
+    @property
+    def number(self):
+        return self.issue
+
+    @number.setter
+    def number(self, value):
+        self.issue = value
 
     def generate_abbreviation(self):
         """Generate a citation key from authors and year.

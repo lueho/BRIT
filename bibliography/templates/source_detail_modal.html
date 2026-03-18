@@ -52,11 +52,32 @@
             {{ object_data.journal }}
         </p>
     {% endif %}
+    {% if 'volume' in object_data and object_data.volume %}
+        <p>
+            <strong>Volume:</strong>
+            <br>
+            {{ object_data.volume }}
+        </p>
+    {% endif %}
     {% if 'issue' in object_data and object_data.issue %}
         <p>
             <strong>Issue:</strong>
             <br>
             {{ object_data.issue }}
+        </p>
+    {% endif %}
+    {% if 'pages' in object_data and object_data.pages %}
+        <p>
+            <strong>Pages:</strong>
+            <br>
+            {{ object_data.pages }}
+        </p>
+    {% endif %}
+    {% if 'month' in object_data and object_data.month %}
+        <p>
+            <strong>Month:</strong>
+            <br>
+            {{ object_data.month }}
         </p>
     {% endif %}
     {% if 'year' in object_data and object_data.year %}

@@ -51,11 +51,32 @@
             {{ object.journal }}
         </p>
     {% endif %}
+    {% if object.volume %}
+        <p class="card-text">
+            <strong>Volume:</strong>
+            <br>
+            {{ object.volume }}
+        </p>
+    {% endif %}
     {% if object.issue %}
         <p class="card-text">
             <strong>Issue:</strong>
             <br>
             {{ object.issue }}
+        </p>
+    {% endif %}
+    {% if object.pages %}
+        <p class="card-text">
+            <strong>Pages:</strong>
+            <br>
+            {{ object.pages }}
+        </p>
+    {% endif %}
+    {% if object.month %}
+        <p class="card-text">
+            <strong>Month:</strong>
+            <br>
+            {{ object.month }}
         </p>
     {% endif %}
     {% if object.year %}
