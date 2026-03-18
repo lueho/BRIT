@@ -500,3 +500,8 @@ class CollectionImportRecordSerializerTestCase(TestCase):
             serializer.fields["required_bin_capacity"].label,
             "Minimum required specific bin capacity (L/reference unit)",
         )
+
+    def test_material_list_fields_are_available_for_bulk_import(self):
+        serializer = CollectionImportRecordSerializer()
+        self.assertIn("allowed_materials", serializer.fields)
+        self.assertIn("forbidden_materials", serializer.fields)

@@ -17,6 +17,7 @@ Usage::
 from __future__ import annotations
 
 import json
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -43,11 +44,11 @@ _COL = {
     "required_bin_capacity": 16,
     "required_bin_capacity_reference": 17,
     "conn_rate_basis": 26,
-    "description": 37,
-    "sources": 38,
-    "sources_new": 39,
-    "valid_from": 40,
-    "valid_until": 41,
+    "description": 38,
+    "sources": 39,
+    "sources_new": 40,
+    "valid_from": 41,
+    "valid_until": 42,
 }
 
 # (column_index, year, unit_name)
@@ -73,9 +74,10 @@ _SPECIFIC_KG_COLS = [
 # The BW sheet labels these as "Specific ... [t/year]", but the values are
 # total annual amounts and must map to "total waste collected" (Mg/a).
 _TOTAL_MG_COLS = [
-    (34, 2022),
-    (35, 2023),
-    (36, 2024),
+    (34, 2021),
+    (35, 2022),
+    (36, 2023),
+    (37, 2024),
 ]
 
 _BASIS_TO_UNIT = {
@@ -97,6 +99,11 @@ _UNIT_MG = "Mg/a"
 _VALID_STATUSES = ("private", "review")
 
 _BATCH_SIZE = 50  # records per POST request
+_BROKEN_WEBARCHIVE_RE = re.compile(
+    r"(https?://web\.archive\.org/web/\d{6}),\s*(\d{6,}/https?://)",
+    re.IGNORECASE,
+)
+_URL_START_RE = re.compile(r"https?://", re.IGNORECASE)
 
 
 def _merge_unresolved_frequencies(target: dict, source: dict) -> None:
@@ -125,35 +132,74 @@ def _resolve_date(value):
     return None
 
 
-def _split_sources_new_parts(row) -> list[str]:
-    raw = row[_COL["sources_new"]]
-    if not raw:
-        return []
-    return [part.strip() for part in str(raw).split(",") if part and part.strip()]
+def _row_value(row, column):
+    index = _COL[column] if isinstance(column, str) else column
+    if index >= len(row):
+        return None
+    return row[index]
+
+
+def _dedupe_preserve_order(values: list[str]) -> list[str]:
+    seen = set()
+    result = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
+
+
+def _split_source_cell(raw) -> tuple[list[str], list[str]]:
+    text = " ".join(str(raw).split())
+    if not text:
+        return [], []
+
+    text = _BROKEN_WEBARCHIVE_RE.sub(r"\1\2", text)
+    if _URL_START_RE.search(text) is None:
+        return [], [text]
+
+    urls = []
+    notes = []
+    for part in text.split(", "):
+        part = part.strip(" ,;")
+        if not part:
+            continue
+        if part.lower().startswith("http"):
+            urls.append(part)
+        else:
+            notes.append(part)
+
+    return urls, notes
+
+
+def _collect_source_entries(row) -> tuple[list[str], list[str]]:
+    urls = []
+    notes = []
+    for column_name in ("sources", "sources_new"):
+        raw = _row_value(row, column_name)
+        if not raw:
+            continue
+        column_urls, column_notes = _split_source_cell(raw)
+        urls.extend(column_urls)
+        notes.extend(column_notes)
+    return _dedupe_preserve_order(urls), _dedupe_preserve_order(notes)
 
 
 def _collect_flyer_urls(row) -> list[str]:
-    """Extract HTTP URLs from the Sources_new column."""
-    return [
-        part
-        for part in _split_sources_new_parts(row)
-        if part.lower().startswith("http")
-    ]
+    """Extract HTTP URLs from the legacy and new sources columns."""
+    return _collect_source_entries(row)[0]
 
 
 def _collect_sources(row) -> list[str]:
-    return [
-        part
-        for part in _split_sources_new_parts(row)
-        if not part.lower().startswith("http")
-    ]
+    return _collect_source_entries(row)[1]
 
 
 def _collect_property_values(row) -> list[dict]:
     """Build property-value dicts from connection-rate and specific-waste columns."""
     pvs = []
 
-    basis_raw = row[_COL["conn_rate_basis"]]
+    basis_raw = _row_value(row, "conn_rate_basis")
     conn_rate_unit_name = _CONN_RATE_FALLBACK_UNIT
     if basis_raw:
         mapped = _BASIS_TO_UNIT.get(str(basis_raw).lower().strip())
@@ -161,7 +207,7 @@ def _collect_property_values(row) -> list[dict]:
             conn_rate_unit_name = mapped
 
     for col, year, _ in _CONN_RATE_COLS:
-        value = row[col]
+        value = _row_value(row, col)
         if value is not None:
             pvs.append(
                 {
@@ -173,7 +219,7 @@ def _collect_property_values(row) -> list[dict]:
             )
 
     for col, year in _SPECIFIC_KG_COLS:
-        value = row[col]
+        value = _row_value(row, col)
         if value is not None:
             pvs.append(
                 {
@@ -185,7 +231,7 @@ def _collect_property_values(row) -> list[dict]:
             )
 
     for col, year in _TOTAL_MG_COLS:
-        value = row[col]
+        value = _row_value(row, col)
         if value is not None:
             pvs.append(
                 {
@@ -204,34 +250,36 @@ def _to_decimal_or_none(value):
     if value is None:
         return None
     if isinstance(value, int | float):
-        return value
+        return round(float(value), 1)
     return None
 
 
 def _row_to_record(row) -> dict:
     """Convert a raw Excel row tuple into a CollectionImporter-compatible dict."""
-    valid_from = _resolve_date(row[_COL["valid_from"]])
-    valid_until_raw = row[_COL["valid_until"]]
+    valid_from = _resolve_date(_row_value(row, "valid_from"))
+    valid_until_raw = _row_value(row, "valid_until")
     valid_until = _resolve_date(valid_until_raw) if valid_until_raw else None
 
     return {
-        "nuts_or_lau_id": row[_COL["nuts_or_lau_id"]] or "",
-        "catchment_name": row[_COL["catchment_name"]] or "",
-        "collector_name": row[_COL["collector"]] or "",
-        "collection_system": row[_COL["collection_system"]] or "",
-        "waste_category": row[_COL["waste_category"]] or "",
-        "allowed_materials": row[_COL["allowed_materials"]] or "",
-        "forbidden_materials": row[_COL["forbidden_materials"]] or "",
-        "fee_system": row[_COL["fee_system"]] or "",
-        "frequency": row[_COL["frequency"]] or "",
-        "connection_type": row[_COL["connection_type"]] or "",
-        "min_bin_size": _to_decimal_or_none(row[_COL["min_bin_size"]]),
+        "nuts_or_lau_id": _row_value(row, "nuts_or_lau_id") or "",
+        "catchment_name": _row_value(row, "catchment_name") or "",
+        "collector_name": _row_value(row, "collector") or "",
+        "collection_system": _row_value(row, "collection_system") or "",
+        "waste_category": _row_value(row, "waste_category") or "",
+        "allowed_materials": _row_value(row, "allowed_materials") or "",
+        "forbidden_materials": _row_value(row, "forbidden_materials") or "",
+        "fee_system": _row_value(row, "fee_system") or "",
+        "frequency": _row_value(row, "frequency") or "",
+        "connection_type": _row_value(row, "connection_type") or "",
+        "min_bin_size": _to_decimal_or_none(_row_value(row, "min_bin_size")),
         "required_bin_capacity": _to_decimal_or_none(
-            row[_COL["required_bin_capacity"]]
+            _row_value(row, "required_bin_capacity")
         ),
-        "required_bin_capacity_reference": row[_COL["required_bin_capacity_reference"]]
+        "required_bin_capacity_reference": _row_value(
+            row, "required_bin_capacity_reference"
+        )
         or "",
-        "description": row[_COL["description"]] or "",
+        "description": _row_value(row, "description") or "",
         "valid_from": valid_from,
         "valid_until": valid_until,
         "sources": _collect_sources(row),
@@ -442,6 +490,7 @@ class Command(BaseCommand):
             "cpv_created": 0,
             "cpv_skipped": 0,
             "flyers_created": 0,
+            "sources_created": 0,
             "warnings": [],
             "unresolved_frequencies": {},
         }
@@ -466,6 +515,7 @@ class Command(BaseCommand):
                 "cpv_created",
                 "cpv_skipped",
                 "flyers_created",
+                "sources_created",
             ):
                 totals[key] += stats.get(key, 0)
             totals["warnings"].extend(stats.get("warnings", []))
@@ -484,6 +534,7 @@ class Command(BaseCommand):
         self.stdout.write(f"  CPVs created:         {totals['cpv_created']}\n")
         self.stdout.write(f"  CPVs skipped:         {totals['cpv_skipped']}\n")
         self.stdout.write(f"  Flyers created:       {totals['flyers_created']}\n")
+        self.stdout.write(f"  Sources created:      {totals['sources_created']}\n")
         all_warnings = pre_skip_warnings + totals["warnings"]
         if all_warnings:
             self.stdout.write(f"\n  Warnings ({len(all_warnings)}):\n")

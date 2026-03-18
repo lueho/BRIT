@@ -611,6 +611,12 @@ class CollectionImportRecordSerializer(serializers.Serializer):
     required_bin_capacity_reference = serializers.CharField(
         required=False, allow_null=True, allow_blank=True
     )
+    allowed_materials = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True
+    )
+    forbidden_materials = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True
+    )
     description = serializers.CharField(required=False, allow_blank=True, default="")
     sources = serializers.ListField(
         child=serializers.CharField(allow_blank=False, max_length=500),

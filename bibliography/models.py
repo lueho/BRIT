@@ -5,7 +5,11 @@ from django.db import models, transaction
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
-from utils.object_management.models import NamedUserCreatedObject, UserCreatedObject
+from utils.object_management.models import (
+    NamedUserCreatedObject,
+    UserCreatedObject,
+    UserCreatedObjectManager,
+)
 
 
 class Author(UserCreatedObject):
@@ -88,7 +92,30 @@ SOURCE_TYPES = (
 )
 
 
+class SourceManager(UserCreatedObjectManager):
+    def get_or_create_custom_by_title(
+        self,
+        *,
+        owner,
+        title: str,
+        defaults: dict | None = None,
+    ) -> tuple[object, bool]:
+        source = (
+            self.filter(owner=owner, type="custom", title=title).order_by("id").first()
+        )
+        if source is not None:
+            return source, False
+        return self.get_or_create(
+            owner=owner,
+            type="custom",
+            title=title,
+            defaults=defaults or {},
+        )
+
+
 class Source(UserCreatedObject):
+    objects = SourceManager()
+
     type = models.CharField(max_length=255, choices=SOURCE_TYPES, default="custom")
     authors = models.ManyToManyField(
         Author, through="SourceAuthor", related_name="sources"

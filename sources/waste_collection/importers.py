@@ -58,12 +58,27 @@ _BIN_CAPACITY_REF_MAP = {
     "not_specified": "not_specified",
 }
 
-_KNOWN_UNRESOLVED_BW_FREQUENCIES = {
-    "Fixed-Seasonal; 39 per year (1 per 2 weeks from March - November)",
+_KNOWN_UNRESOLVED_BW_FREQUENCIES = set()
+_FREQUENCY_NAME_TRANSLATIONS = {
+    "Fixed-Seasonal; 39 per year (1 per 2 weeks from March - November)": (
+        "Seasonal; 19 per year (1 per 2 weeks from March - November, 0 from "
+        "December - February)"
+    ),
 }
+_FREQUENCY_TYPE_CANONICAL_NAMES = {
+    "fixed": "Fixed",
+    "fixed-flexible": "Fixed-Flexible",
+    "fixed-seasonal": "Fixed-Seasonal",
+    "seasonal": "Seasonal",
+}
+_FREQUENCY_COUNT_FRAGMENT_RE = re.compile(
+    r"\d+\s+per\s+year(?:\s*\([^)]*\))?",
+    re.IGNORECASE,
+)
+_IMPORTED_REFERENCE_URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 
 
-def _normalize_frequency_lookup_key(value: str) -> str:
+def _normalize_frequency_display_text(value: str) -> str:
     normalized = re.sub(r"\s+", " ", (value or "").strip())
     normalized = normalized.replace("Fixed:", "Fixed;")
     normalized = re.sub(r"\s*;\s*", "; ", normalized)
@@ -71,7 +86,73 @@ def _normalize_frequency_lookup_key(value: str) -> str:
     normalized = re.sub(r"\(\s+", "(", normalized)
     normalized = re.sub(r"\s+\)", ")", normalized)
     normalized = re.sub(r"\bMay\b", "Mai", normalized, flags=re.IGNORECASE)
+    type_match = re.match(
+        r"^(fixed(?:-seasonal|-flexible)?|seasonal)\b",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if type_match:
+        canonical_type = _FREQUENCY_TYPE_CANONICAL_NAMES.get(
+            type_match.group(1).lower(), type_match.group(1)
+        )
+        normalized = canonical_type + normalized[type_match.end() :]
     return normalized.strip()
+
+
+def _normalize_frequency_lookup_key(value: str) -> str:
+    return _normalize_frequency_display_text(value).casefold()
+
+
+def _canonicalize_fixed_frequency_name(value: str) -> str | None:
+    normalized = _normalize_frequency_display_text(value)
+    match = re.fullmatch(
+        r"Fixed;\s*(\d+)\s+per\s+year(?:\s*\([^)]*\))?",
+        normalized,
+    )
+    if match is None:
+        return None
+    return f"Fixed; {int(match.group(1))} per year"
+
+
+def _split_imported_reference_entry(value: str) -> tuple[list[str], list[str]]:
+    text = " ".join(str(value).split())
+    if not text:
+        return [], []
+
+    urls = [
+        match.group(0).strip(" ,;")
+        for match in _IMPORTED_REFERENCE_URL_RE.finditer(text)
+    ]
+    notes_text = _IMPORTED_REFERENCE_URL_RE.sub(" ", text)
+    notes_text = re.sub(r"\s*,\s*,+\s*", ", ", notes_text)
+    notes_text = re.sub(r"\s{2,}", " ", notes_text).strip(" ,;")
+    notes = [notes_text] if notes_text else []
+    return urls, notes
+
+
+def _parse_whole_year_fixed_flexible_frequency(value: str) -> dict | None:
+    normalized = _normalize_frequency_display_text(value)
+    if not normalized.lower().startswith("fixed-flexible;"):
+        return None
+    if " from " in normalized.lower():
+        return None
+
+    fragments = _FREQUENCY_COUNT_FRAGMENT_RE.findall(normalized)
+    if len(fragments) < 2:
+        return None
+    counts = [int(re.search(r"(\d+)", fragment).group(1)) for fragment in fragments]
+    option_counts = counts[1:]
+    if len(option_counts) > 3:
+        return None
+    return {
+        "canonical_name": (
+            f"Fixed-Flexible; Standard: {fragments[0]}; Optional: "
+            f"{', '.join(fragments[1:])}"
+        ),
+        "signature": (counts[0], tuple(sorted(option_counts))),
+        "standard_count": counts[0],
+        "option_counts": option_counts,
+    }
 
 
 class CollectionImporter:
@@ -158,6 +239,16 @@ class CollectionImporter:
         self._normalized_frequencies: dict[str, CollectionFrequency] = {
             _normalize_frequency_lookup_key(o.name): o for o in frequency_objects
         }
+        self._whole_year_fixed_flexible_frequencies: dict[
+            tuple[int, tuple[int, ...]], CollectionFrequency
+        ] = {}
+        for frequency in frequency_objects:
+            parsed_flexible = _parse_whole_year_fixed_flexible_frequency(frequency.name)
+            if parsed_flexible is not None:
+                self._whole_year_fixed_flexible_frequencies.setdefault(
+                    parsed_flexible["signature"],
+                    frequency,
+                )
         self._collectors: dict[str, Collector] = {
             o.name: o for o in Collector.objects.all()
         }
@@ -206,11 +297,6 @@ class CollectionImporter:
     def _import_record(self, record: dict, index: int, stats: dict) -> None:
         label = f"record[{index}]"
 
-        catchment = self._resolve_catchment(record, label, stats)
-        if catchment is None:
-            stats["skipped"] += 1
-            return
-
         collection_system = self._resolve_collection_system(record, label, stats)
         if collection_system is None:
             stats["skipped"] += 1
@@ -221,6 +307,33 @@ class CollectionImporter:
             stats["skipped"] += 1
             return
 
+        valid_from = record.get("valid_from")
+        if valid_from is None:
+            stats["warnings"].append(f"{label}: No valid_from date — record skipped.")
+            stats["skipped"] += 1
+            return
+
+        allowed_materials, forbidden_materials = self._resolve_material_lists(
+            record, label, stats
+        )
+        allowed_material_ids = self._material_ids(allowed_materials)
+        forbidden_material_ids = self._material_ids(forbidden_materials)
+
+        catchment = self._resolve_catchment(
+            record,
+            label,
+            stats,
+            collector=self._lookup_known_collector(record),
+            collection_system=collection_system,
+            waste_category=waste_category,
+            allowed_material_ids=allowed_material_ids,
+            forbidden_material_ids=forbidden_material_ids,
+            valid_from=valid_from,
+        )
+        if catchment is None:
+            stats["skipped"] += 1
+            return
+
         collector = self._resolve_collector(record, label, stats)
         fee_system = self._resolve_fee_system(record, label, stats)
         frequency = self._resolve_frequency(record, label, stats)
@@ -228,17 +341,7 @@ class CollectionImporter:
         sorting_method = self._resolve_sorting_method(record, label, stats)
         established = record.get("established")
         bin_cap_ref = self._resolve_bin_capacity_reference(record)
-        allowed_materials, forbidden_materials = self._resolve_material_lists(
-            record, label, stats
-        )
-        allowed_material_ids = self._material_ids(allowed_materials)
-        forbidden_material_ids = self._material_ids(forbidden_materials)
 
-        valid_from = record.get("valid_from")
-        if valid_from is None:
-            stats["warnings"].append(f"{label}: No valid_from date — record skipped.")
-            stats["skipped"] += 1
-            return
         valid_until = record.get("valid_until")
         description = record.get("description") or ""
         raw_frequency_name = record.get("frequency") or ""
@@ -464,54 +567,75 @@ class CollectionImporter:
 
         self._attach_collection_sources(collection, record.get("sources") or [], stats)
 
-        # Flyers — skip URLs that exceed the DB column limit (2083 chars)
-        for url in record.get("flyer_urls") or []:
-            if len(url) > 2083:
-                stats["warnings"].append(
-                    f"{label}: Flyer URL too long ({len(url)} chars), skipped."
-                )
-                continue
-            flyer, created = WasteFlyer.objects.get_or_create(
-                url=url,
-                defaults={
-                    "owner": self.owner,
-                    "title": self._flyer_title(url),
-                    "publication_status": "private",
-                },
-            )
-            collection.flyers.add(flyer)
-            if created:
-                stats["flyers_created"] += 1
-                if self.publication_status == "review":
-                    self._submit_for_review(flyer)
+        self._attach_collection_flyers(
+            collection, record.get("flyer_urls") or [], stats
+        )
 
         # Property values
         for pv in record.get("property_values") or []:
             self._import_property_value(collection, pv, stats)
 
+    def _attach_collection_flyers(
+        self, collection: Collection, urls: list[str], stats: dict
+    ) -> None:
+        existing_urls = set(collection.flyers.values_list("url", flat=True))
+        for url in urls:
+            normalized_url = " ".join(str(url).split())
+            if not normalized_url or normalized_url in existing_urls:
+                continue
+            if len(normalized_url) > 2083:
+                stats["warnings"].append(
+                    f"{collection}: Flyer URL too long ({len(normalized_url)} chars), skipped."
+                )
+                continue
+            flyer, created = WasteFlyer.objects.get_or_create_by_url(
+                url=normalized_url,
+                defaults={
+                    "owner": self.owner,
+                    "title": self._flyer_title(normalized_url),
+                    "publication_status": "private",
+                },
+            )
+            collection.flyers.add(flyer)
+            existing_urls.add(normalized_url)
+            if created:
+                stats["flyers_created"] += 1
+                if self.publication_status == "review":
+                    self._submit_for_review(flyer)
+
     def _attach_collection_sources(
         self, collection: Collection, source_titles: list[str], stats: dict
     ) -> None:
         existing_titles = set(collection.sources.values_list("title", flat=True))
+        reclassified_urls = []
         for raw_title in source_titles:
-            title = " ".join(str(raw_title).split())[:500]
-            if not title or title in existing_titles:
-                continue
-            source, created = Source.objects.get_or_create(
-                owner=self.owner,
-                type="custom",
-                title=title,
-                defaults={"publication_status": "private"},
-            )
-            collection.sources.add(source)
-            existing_titles.add(title)
-            if created:
-                stats["sources_created"] += 1
-            if self.publication_status == "review" and source.publication_status in (
-                source.STATUS_PRIVATE,
-                source.STATUS_DECLINED,
-            ):
-                self._submit_for_review(source)
+            urls, notes = _split_imported_reference_entry(raw_title)
+            reclassified_urls.extend(urls)
+            for title in notes:
+                title = title[:500]
+                if not title or title in existing_titles:
+                    continue
+                source, created = Source.objects.get_or_create_custom_by_title(
+                    owner=self.owner,
+                    title=title,
+                    defaults={"publication_status": "private"},
+                )
+                collection.sources.add(source)
+                existing_titles.add(title)
+                if created:
+                    stats["sources_created"] += 1
+                if (
+                    self.publication_status == "review"
+                    and source.publication_status
+                    in (
+                        source.STATUS_PRIVATE,
+                        source.STATUS_DECLINED,
+                    )
+                ):
+                    self._submit_for_review(source)
+
+        if reclassified_urls:
+            self._attach_collection_flyers(collection, reclassified_urls, stats)
 
     def _attach_cpv_sources(
         self, cpv: CollectionPropertyValue, urls: list[str], stats: dict
@@ -531,7 +655,7 @@ class CollectionImporter:
                     f"CPV source URL too long ({len(url)} chars), skipped."
                 )
                 continue
-            flyer, created = WasteFlyer.objects.get_or_create(
+            flyer, created = WasteFlyer.objects.get_or_create_by_url(
                 url=url,
                 defaults={
                     "owner": self.owner,
@@ -629,7 +753,17 @@ class CollectionImporter:
     # ------------------------------------------------------------------
 
     def _resolve_catchment(
-        self, record: dict, label: str, stats: dict
+        self,
+        record: dict,
+        label: str,
+        stats: dict,
+        *,
+        collector: Collector | None = None,
+        collection_system: CollectionSystem | None = None,
+        waste_category: WasteCategory | None = None,
+        allowed_material_ids: set[int] | None = None,
+        forbidden_material_ids: set[int] | None = None,
+        valid_from=None,
     ) -> CollectionCatchment | None:
         nuts_lau_id = record.get("nuts_or_lau_id") or ""
         catchment_name = record.get("catchment_name") or ""
@@ -638,11 +772,26 @@ class CollectionImporter:
             catchment = self._nuts_catchments.get(nuts_lau_id)
             if catchment is None:
                 catchment = self._lau_catchments.get(nuts_lau_id)
-            if catchment is None:
-                stats["warnings"].append(
-                    f"{label}: No catchment for NUTS/LAU id '{nuts_lau_id}'."
+            if catchment is not None:
+                return catchment
+            if self._has_combined_lookup_codes(nuts_lau_id):
+                catchment = self._resolve_combined_lookup_catchment(
+                    nuts_lau_id,
+                    label,
+                    stats,
+                    collector=collector,
+                    collection_system=collection_system,
+                    waste_category=waste_category,
+                    allowed_material_ids=allowed_material_ids or set(),
+                    forbidden_material_ids=forbidden_material_ids or set(),
+                    valid_from=valid_from,
                 )
-            return catchment
+                if catchment is not None:
+                    return catchment
+            stats["warnings"].append(
+                f"{label}: No catchment for NUTS/LAU id '{nuts_lau_id}'."
+            )
+            return None
 
         if catchment_name:
             catchment = CollectionCatchment.objects.filter(name=catchment_name).first()
@@ -655,6 +804,45 @@ class CollectionImporter:
         stats["warnings"].append(
             f"{label}: nuts_or_lau_id and catchment_name both empty."
         )
+        return None
+
+    @staticmethod
+    def _has_combined_lookup_codes(value: str) -> bool:
+        return bool(re.search(r"\s*[,;/]\s*", (value or "").strip()))
+
+    def _resolve_combined_lookup_catchment(
+        self,
+        nuts_lau_id: str,
+        label: str,
+        stats: dict,
+        *,
+        collector: Collector | None,
+        collection_system: CollectionSystem | None,
+        waste_category: WasteCategory | None,
+        allowed_material_ids: set[int],
+        forbidden_material_ids: set[int],
+        valid_from,
+    ) -> CollectionCatchment | None:
+        if collector and collector.catchment_id:
+            stats["warnings"].append(
+                f"{label}: No direct catchment for combined NUTS/LAU id '{nuts_lau_id}' — using collector catchment '{collector.catchment}'."
+            )
+            return collector.catchment
+
+        predecessor = self._find_predecessor_for_catchment_fallback(
+            collector=collector,
+            waste_category=waste_category,
+            allowed_material_ids=allowed_material_ids,
+            forbidden_material_ids=forbidden_material_ids,
+            collection_system=collection_system,
+            valid_from=valid_from,
+        )
+        if predecessor and predecessor.catchment_id:
+            stats["warnings"].append(
+                f"{label}: No direct catchment for combined NUTS/LAU id '{nuts_lau_id}' — using predecessor catchment '{predecessor.catchment}'."
+            )
+            return predecessor.catchment
+
         return None
 
     def _resolve_collection_system(
@@ -693,6 +881,27 @@ class CollectionImporter:
             )
         return cat
 
+    def _lookup_known_collector(self, record: dict) -> Collector | None:
+        name = record.get("collector_name") or ""
+        website = record.get("collector_website") or ""
+
+        if name:
+            collector = self._collectors.get(name)
+            if collector is not None:
+                return collector
+
+        if website:
+            return next(
+                (
+                    candidate
+                    for candidate in self._collectors.values()
+                    if candidate.website == website
+                ),
+                None,
+            )
+
+        return None
+
     def _resolve_collector(
         self, record: dict, label: str, stats: dict
     ) -> Collector | None:
@@ -702,21 +911,12 @@ class CollectionImporter:
         if not name and not website:
             return None
 
-        # Primary: look up by name
-        if name:
-            collector = self._collectors.get(name)
-            if collector is not None:
-                return collector
+        collector = self._lookup_known_collector(record)
+        if collector is not None:
+            return collector
 
         # Secondary: look up by website URL
         if website:
-            collector = next(
-                (c for c in self._collectors.values() if c.website == website),
-                None,
-            )
-            if collector is not None:
-                return collector
-
             # Auto-create a Collector keyed by website domain
             from urllib.parse import urlparse  # noqa: PLC0415
 
@@ -757,19 +957,84 @@ class CollectionImporter:
         if not name:
             return None
 
+        translated_name = _FREQUENCY_NAME_TRANSLATIONS.get(name)
+        if translated_name is not None:
+            freq = self._frequencies.get(translated_name)
+            if freq is not None:
+                stats["warnings"].append(
+                    f"{label}: CollectionFrequency '{name}' not found — "
+                    f"normalized to '{freq.name}'."
+                )
+                return freq
+
+        exact_match = self._frequencies.get(name)
+        if exact_match is not None:
+            return exact_match
+
         normalized_name = _normalize_frequency_lookup_key(name)
         freq = self._normalized_frequencies.get(normalized_name)
         if freq is not None:
-            stats["warnings"].append(
-                f"{label}: CollectionFrequency '{name}' not found — "
-                f"normalized to '{freq.name}'."
-            )
+            if name != freq.name:
+                stats["warnings"].append(
+                    f"{label}: CollectionFrequency '{name}' not found — "
+                    f"normalized to '{freq.name}'."
+                )
             return freq
 
-        match = re.fullmatch(r"Fixed;\s*(\d+)\s+per\s+year", normalized_name)
-        if match:
-            count = int(match.group(1))
-            canonical_name = f"Fixed; {count} per year"
+        parsed_flexible = _parse_whole_year_fixed_flexible_frequency(name)
+        if parsed_flexible is not None:
+            freq = self._whole_year_fixed_flexible_frequencies.get(
+                parsed_flexible["signature"]
+            )
+            if freq is not None:
+                if name != freq.name:
+                    stats["warnings"].append(
+                        f"{label}: CollectionFrequency '{name}' not found — "
+                        f"normalized to '{freq.name}'."
+                    )
+                return freq
+
+        for canonical_name in filter(
+            None,
+            (_canonicalize_fixed_frequency_name(name),),
+        ):
+            freq = self._normalized_frequencies.get(
+                _normalize_frequency_lookup_key(canonical_name)
+            )
+            if freq is not None:
+                if name != freq.name:
+                    stats["warnings"].append(
+                        f"{label}: CollectionFrequency '{name}' not found — "
+                        f"normalized to '{freq.name}'."
+                    )
+                return freq
+
+        if parsed_flexible is not None:
+            canonical_name = parsed_flexible["canonical_name"]
+            freq = self._frequencies.get(canonical_name)
+            if freq is None:
+                freq = self._get_or_create_fixed_flexible_frequency(
+                    parsed_flexible["standard_count"],
+                    parsed_flexible["option_counts"],
+                    canonical_name,
+                )
+                self._frequencies[canonical_name] = freq
+                self._normalized_frequencies[
+                    _normalize_frequency_lookup_key(canonical_name)
+                ] = freq
+                self._whole_year_fixed_flexible_frequencies[
+                    parsed_flexible["signature"]
+                ] = freq
+            if name != freq.name:
+                stats["warnings"].append(
+                    f"{label}: CollectionFrequency '{name}' not found — "
+                    f"normalized to '{freq.name}'."
+                )
+            return freq
+
+        canonical_name = _canonicalize_fixed_frequency_name(name)
+        if canonical_name is not None:
+            count = int(re.search(r"(\d+)", canonical_name).group(1))
             freq = self._frequencies.get(canonical_name)
             if freq is None:
                 freq = self._get_or_create_fixed_frequency(count, canonical_name)
@@ -819,6 +1084,42 @@ class CollectionImporter:
                     owner=self.owner,
                     publication_status="private",
                 )
+                if self.publication_status == "review":
+                    self._submit_for_review(cco)
+            if self.publication_status == "review":
+                self._submit_for_review(freq)
+        return freq
+
+    def _get_or_create_fixed_flexible_frequency(
+        self,
+        standard_count: int,
+        option_counts: list[int],
+        canonical_name: str,
+    ) -> CollectionFrequency:
+        freq, created = CollectionFrequency.objects.get_or_create(
+            name=canonical_name,
+            defaults={
+                "type": "Fixed-Flexible",
+                "owner": self.owner,
+                "publication_status": "private",
+            },
+        )
+        if created:
+            whole_year = CollectionSeason.objects.filter(
+                first_timestep__name="January",
+                last_timestep__name="December",
+            ).first()
+            if whole_year:
+                cco_kwargs = {
+                    "frequency": freq,
+                    "season": whole_year,
+                    "standard": standard_count,
+                    "owner": self.owner,
+                    "publication_status": "private",
+                }
+                for index, count in enumerate(option_counts[:3], start=1):
+                    cco_kwargs[f"option_{index}"] = count
+                cco = CollectionCountOptions.objects.create(**cco_kwargs)
                 if self.publication_status == "review":
                     self._submit_for_review(cco)
             if self.publication_status == "review":
@@ -966,10 +1267,10 @@ class CollectionImporter:
     ) -> str | None:
         if resolved_frequency is not None or not raw_frequency_name:
             return None
-        if (
-            _normalize_frequency_lookup_key(raw_frequency_name)
-            not in _KNOWN_UNRESOLVED_BW_FREQUENCIES
-        ):
+        if _normalize_frequency_lookup_key(raw_frequency_name) not in {
+            _normalize_frequency_lookup_key(value)
+            for value in _KNOWN_UNRESOLVED_BW_FREQUENCIES
+        }:
             return None
         return (
             "SYNC NOTE (BW 2024 SW1 one-off import): "
@@ -989,6 +1290,34 @@ class CollectionImporter:
             catchment=catchment,
             collection_system=collection_system,
         ).filter(waste_category=waste_category)
+        if valid_from:
+            qs = qs.filter(valid_from__lt=valid_from)
+        return (
+            qs.match_materials(
+                allowed_materials=allowed_material_ids,
+                forbidden_materials=forbidden_material_ids,
+            )
+            .order_by("-valid_from")
+            .first()
+        )
+
+    @staticmethod
+    def _find_predecessor_for_catchment_fallback(
+        *,
+        collector: Collector | None,
+        waste_category: WasteCategory | None,
+        allowed_material_ids: set[int],
+        forbidden_material_ids: set[int],
+        collection_system: CollectionSystem | None,
+        valid_from,
+    ) -> Collection | None:
+        if collector is None or collection_system is None or waste_category is None:
+            return None
+        qs = Collection.objects.filter(
+            collector=collector,
+            collection_system=collection_system,
+            waste_category=waste_category,
+        )
         if valid_from:
             qs = qs.filter(valid_from__lt=valid_from)
         return (

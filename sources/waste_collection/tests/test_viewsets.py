@@ -9,6 +9,8 @@ from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 
 from bibliography.models import Source
+from maps.models import Attribute, GeoPolygon, NutsRegion, Region, RegionAttributeValue
+from materials.models import Material
 from sources.waste_collection.derived_values import clear_derived_value_config_cache
 from sources.waste_collection.importers import CollectionImporter
 from sources.waste_collection.models import (
@@ -26,8 +28,6 @@ from sources.waste_collection.models import (
     WasteFlyer,
 )
 from sources.waste_collection.viewsets import CollectionViewSet
-from maps.models import Attribute, GeoPolygon, NutsRegion, Region, RegionAttributeValue
-from materials.models import Material
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.properties.models import Property, Unit
 
@@ -479,7 +479,9 @@ class CollectionViewSetTestCase(APITestCase):
         """
         from unittest.mock import MagicMock
 
-        from sources.waste_collection.serializers import WasteCollectionGeometrySerializer
+        from sources.waste_collection.serializers import (
+            WasteCollectionGeometrySerializer,
+        )
 
         # Create a mock instance with both original and simplified geometry
         mock_instance = MagicMock()
@@ -496,7 +498,9 @@ class CollectionViewSetTestCase(APITestCase):
         """Verify serializer falls back to original geom when simplified is not available."""
         from unittest.mock import MagicMock
 
-        from sources.waste_collection.serializers import WasteCollectionGeometrySerializer
+        from sources.waste_collection.serializers import (
+            WasteCollectionGeometrySerializer,
+        )
 
         # Create a mock instance without simplified geometry
         mock_instance = MagicMock(spec=["geom"])
@@ -643,6 +647,9 @@ class CollectionImporterWorkflowTestCase(APITestCase):
         import datetime
 
         cls.owner = User.objects.create_user(username="importer-owner")
+        cls.staff_owner = User.objects.create_user(
+            username="importer-staff", is_staff=True
+        )
         cls.catchment = CollectionCatchment.objects.create(
             name="Importer Test Catchment"
         )
@@ -650,6 +657,14 @@ class CollectionImporterWorkflowTestCase(APITestCase):
             name="Importer Test System"
         )
         cls.waste_category = WasteCategory.objects.create(name="Importer Test Category")
+        cls.allowed_material = Material.objects.create(
+            name="Importer Allowed Material",
+            owner=cls.owner,
+        )
+        cls.forbidden_material = Material.objects.create(
+            name="Importer Forbidden Material",
+            owner=cls.owner,
+        )
         cls.valid_from = datetime.date(2099, 6, 1)
 
     def _make_record(self):
@@ -726,6 +741,40 @@ class CollectionImporterWorkflowTestCase(APITestCase):
                 valid_from=self.valid_from,
                 collection_system=self.collection_system,
             ).exists()
+        )
+
+    def test_bulk_import_endpoint_preserves_material_lists(self):
+        self.client.force_login(self.staff_owner)
+
+        response = self.client.post(
+            reverse("api-waste-collection-bulk-import"),
+            {
+                "records": [
+                    self._make_record()
+                    | {
+                        "allowed_materials": self.allowed_material.name,
+                        "forbidden_materials": self.forbidden_material.name,
+                    }
+                ],
+                "publication_status": "private",
+                "dry_run": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        collection = Collection.objects.get(
+            owner=self.staff_owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertEqual(
+            list(collection.allowed_materials.values_list("name", flat=True)),
+            [self.allowed_material.name],
+        )
+        self.assertEqual(
+            list(collection.forbidden_materials.values_list("name", flat=True)),
+            [self.forbidden_material.name],
         )
 
 

@@ -25,12 +25,17 @@ class BW2024ImportMappingTests(SimpleTestCase):
         row[import_bw_2024_collections._COL["description"]] = (
             "Updated import description"
         )
+        row[import_bw_2024_collections._COL["sources"]] = (
+            "Collection of soft materials (leaves, lawn)."
+        )
         row[import_bw_2024_collections._COL["sources_new"]] = (
             "https://example.com/a.pdf, not-a-url, https://example.com/b.pdf"
         )
         row[import_bw_2024_collections._COL["valid_from"]] = date(2024, 1, 1)
 
-        for col, year in zip(range(27, 37), range(2015, 2025), strict=True):
+        for col, year in zip(range(27, 34), range(2015, 2022), strict=True):
+            row[col] = float(year - 2000)
+        for col, year in zip(range(34, 38), range(2021, 2025), strict=True):
             row[col] = float(year - 2000)
 
         return row
@@ -42,12 +47,21 @@ class BW2024ImportMappingTests(SimpleTestCase):
             property_values,
             [
                 {
+                    "property_id": module._PROP_SPECIFIC,
+                    "unit_name": module._UNIT_KG,
+                    "year": year,
+                    "average": float(year - 2000),
+                }
+                for year in range(2015, 2022)
+            ]
+            + [
+                {
                     "property_id": module._PROP_TOTAL,
                     "unit_name": module._UNIT_MG,
                     "year": year,
                     "average": float(year - 2000),
                 }
-                for year in range(2015, 2025)
+                for year in range(2021, 2025)
             ],
         )
 
@@ -63,12 +77,15 @@ class BW2024ImportMappingTests(SimpleTestCase):
         self.assertEqual(record["description"], "Updated import description")
         self.assertEqual(record["valid_from"], date(2024, 1, 1))
         self.assertIsNone(record["valid_until"])
-        self.assertEqual(record["sources"], ["not-a-url"])
+        self.assertEqual(
+            record["sources"],
+            ["Collection of soft materials (leaves, lawn).", "not-a-url"],
+        )
         self.assertEqual(
             record["flyer_urls"],
             ["https://example.com/a.pdf", "https://example.com/b.pdf"],
         )
-        self.assertEqual(len(record["property_values"]), 10)
+        self.assertEqual(len(record["property_values"]), 11)
 
     def test_standalone_row_layout_matches_current_workbook(self):
         record = import_bw_2024_standalone._row_to_record(self._build_row())
@@ -76,9 +93,12 @@ class BW2024ImportMappingTests(SimpleTestCase):
         self.assertEqual(record["description"], "Updated import description")
         self.assertEqual(record["valid_from"], "2024-01-01")
         self.assertIsNone(record["valid_until"])
-        self.assertEqual(record["sources"], ["not-a-url"])
+        self.assertEqual(
+            record["sources"],
+            ["Collection of soft materials (leaves, lawn).", "not-a-url"],
+        )
         self.assertEqual(
             record["flyer_urls"],
             ["https://example.com/a.pdf", "https://example.com/b.pdf"],
         )
-        self.assertEqual(len(record["property_values"]), 10)
+        self.assertEqual(len(record["property_values"]), 11)
