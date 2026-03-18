@@ -372,7 +372,7 @@ class WasteFlyerModelForm(SimpleModelForm):
             }
             url = self.cleaned_data.get("url")
             if url:
-                instance, _ = WasteFlyer.objects.get_or_create(
+                instance, _ = WasteFlyer.objects.get_or_create_by_url(
                     url=self.cleaned_data["url"], defaults=defaults
                 )
                 return instance

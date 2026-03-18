@@ -9,15 +9,11 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
-from sources.waste_collection.importers import CollectionImporter
 from maps.db_functions import SimplifyPreserveTopology
 from maps.mixins import CachedGeoJSONMixin
 from maps.utils import build_collection_cache_key
-from utils.object_management.models import ReviewAction
-from utils.object_management.permissions import UserCreatedObjectPermission
-from utils.object_management.viewsets import UserCreatedObjectViewSet
-
 from sources.waste_collection.filters import CollectionFilterSet
+from sources.waste_collection.importers import CollectionImporter
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
     Collection,
@@ -26,8 +22,8 @@ from sources.waste_collection.models import (
     WasteFlyer,
 )
 from sources.waste_collection.serializers import (
-    AggregatedCollectionPropertyValueMutationSerializer,
     GEOMETRY_SIMPLIFY_TOLERANCE,
+    AggregatedCollectionPropertyValueMutationSerializer,
     CollectionFlatSerializer,
     CollectionImportRecordSerializer,
     CollectionModelSerializer,
@@ -37,6 +33,9 @@ from sources.waste_collection.serializers import (
     CollectorGeometrySerializer,
     WasteCollectionGeometrySerializer,
 )
+from utils.object_management.models import ReviewAction
+from utils.object_management.permissions import UserCreatedObjectPermission
+from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 
 class CollectionDjangoFilterBackend(rf_filters.DjangoFilterBackend):
@@ -268,7 +267,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             if len(url) > 2083:
                 continue
 
-            flyer, _ = WasteFlyer.objects.get_or_create(
+            flyer, _ = WasteFlyer.objects.get_or_create_by_url(
                 url=url,
                 defaults={
                     "owner": collection.owner,
@@ -287,7 +286,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             if len(url) > 2083:
                 continue
 
-            flyer, _ = WasteFlyer.objects.get_or_create(
+            flyer, _ = WasteFlyer.objects.get_or_create_by_url(
                 url=url,
                 defaults={
                     "owner": obj.owner,

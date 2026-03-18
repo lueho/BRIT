@@ -1003,6 +1003,41 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         WasteFlyer.objects.get(url="https://www.fest-flyers.org")
         self.assertEqual(len(initial_urls) + 1, self.collection.flyers.count())
 
+    def test_duplicate_existing_flyer_url_is_reused_without_error(self):
+        duplicate_url = "https://www.duplicate-flyers.org"
+        with mute_signals(signals.post_save):
+            first_duplicate = WasteFlyer.objects.create(url=duplicate_url)
+            WasteFlyer.objects.create(url=duplicate_url)
+
+        initial_urls = [{"url": flyer.url} for flyer in self.collection.flyers.all()]
+        data = {
+            "form-INITIAL_FORMS": 3,
+            "form-TOTAL_FORMS": 4,
+            "form-0-url": initial_urls[0]["url"],
+            "form-1-url": initial_urls[1]["url"],
+            "form-2-url": initial_urls[2]["url"],
+            "form-3-url": duplicate_url,
+        }
+        WasteFlyerModelFormSet = formset_factory(
+            WasteFlyerModelForm, formset=WasteFlyerFormSet
+        )
+        formset = WasteFlyerModelFormSet(
+            parent_object=self.collection, data=data, relation_field_name="flyers"
+        )
+
+        self.assertTrue(formset.is_valid())
+        with patch(
+            "sources.waste_collection.forms.cleanup_orphaned_waste_flyers.delay"
+        ) as mock_cleanup:
+            formset.save()
+
+        mock_cleanup.assert_called_once()
+        self.assertEqual(self.collection.flyers.filter(url=duplicate_url).count(), 1)
+        self.assertEqual(
+            self.collection.flyers.filter(url=duplicate_url).first().id,
+            first_duplicate.id,
+        )
+
     def test_flyers_removed_from_this_collection_but_connected_to_another_are_preserved(
         self,
     ):
