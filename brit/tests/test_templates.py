@@ -51,10 +51,8 @@ class CookieConsentTemplateHardeningTests(TestCase):
         response = self.client.get(reverse("cookie_consent_cookie_group_list"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'action="/cookies/accept/analytics/"', html=False)
-        self.assertContains(
-            response, 'action="/cookies/decline/analytics/"', html=False
-        )
+        self.assertContains(response, 'action="/cookies/accept/"', html=False)
+        self.assertContains(response, 'action="/cookies/decline/"', html=False)
         self.assertContains(
             response, 'name="cookie_groups" value="analytics"', html=False
         )
