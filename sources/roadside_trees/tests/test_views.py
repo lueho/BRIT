@@ -50,6 +50,10 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get("/maps/hamburg/roadside_trees/map/")
         self.assertEqual(response.status_code, 200)
 
+    def test_get_http_200_ok_via_sources_prefix(self):
+        response = self.client.get("/sources/roadside_trees/map/")
+        self.assertEqual(response.status_code, 200)
+
     def test_get_http_301_redirect_via_case_studies_hamburg_prefix(self):
         response = self.client.get(
             "/case_studies/hamburg/roadside_trees/map/",
@@ -57,6 +61,17 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 301)
         self.assertEqual(response["Location"], "/sources/roadside_trees/map/")
+
+    def test_case_studies_hamburg_redirect_preserves_query_string(self):
+        response = self.client.get(
+            "/case_studies/hamburg/roadside_trees/map/?stem_circumference_min=10",
+            follow=False,
+        )
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(
+            response["Location"],
+            "/sources/roadside_trees/map/?stem_circumference_min=10",
+        )
 
 
 class HamburgRoadsideTreeCatchmentAutocompleteViewTests(ViewWithPermissionsTestCase):
@@ -197,7 +212,7 @@ class HamburgRoadsideTreeCatchmentAutocompleteViewTests(ViewWithPermissionsTestC
         ]
         actual_results = response.json()["results"]
         # Compare only the essential fields as TomSelect may include additional fields
-        for expected, actual in zip(expected_results, actual_results):
+        for expected, actual in zip(expected_results, actual_results, strict=False):
             self.assertEqual(expected["id"], actual["id"])
             self.assertEqual(expected["name"], actual["name"])
             self.assertTrue(actual.get("can_view", False))
@@ -236,7 +251,7 @@ class HamburgRoadsideTreeCatchmentAutocompleteViewTests(ViewWithPermissionsTestC
         ]
         actual_results = response.json()["results"]
         # Compare only the essential fields as TomSelect may include additional fields
-        for expected, actual in zip(expected_results, actual_results):
+        for expected, actual in zip(expected_results, actual_results, strict=False):
             self.assertEqual(expected["id"], actual["id"])
             self.assertEqual(expected["name"], actual["name"])
             self.assertTrue(actual.get("can_view", False))
@@ -283,7 +298,7 @@ class HamburgRoadsideTreeCatchmentAutocompleteViewTests(ViewWithPermissionsTestC
         ]
         actual_results = response.json()["results"]
         # Compare only the essential fields as TomSelect may include additional fields
-        for expected, actual in zip(expected_results, actual_results):
+        for expected, actual in zip(expected_results, actual_results, strict=False):
             self.assertEqual(expected["id"], actual["id"])
             self.assertEqual(expected["name"], actual["name"])
             self.assertTrue(actual.get("can_view", False))
