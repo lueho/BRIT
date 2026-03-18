@@ -239,13 +239,20 @@ class SourceBibtexArticleImportView(PermissionRequiredMixin, FormView):
 
     def form_valid(self, form):
         try:
-            source = form.create_source(owner=self.request.user)
+            sources = form.create_sources(owner=self.request.user)
         except ValidationError as exc:
             form.add_error(None, exc)
             return self.form_invalid(form)
 
-        messages.success(self.request, "Source created successfully.")
-        return HttpResponseRedirect(source.get_absolute_url())
+        if len(sources) == 1:
+            messages.success(self.request, "Source created successfully.")
+            return HttpResponseRedirect(sources[0].get_absolute_url())
+
+        messages.success(
+            self.request,
+            f"{len(sources)} sources created successfully.",
+        )
+        return HttpResponseRedirect(reverse_lazy("source-list-owned"))
 
 
 class SourceDetailView(UserCreatedObjectDetailView):

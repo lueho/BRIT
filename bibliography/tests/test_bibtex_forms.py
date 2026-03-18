@@ -24,7 +24,7 @@ class SourceBibtexArticleImportFormTestCase(TestCase):
         form = SourceBibtexArticleImportForm(
             data={
                 "bibtex_entry": """
-                @article{Lovelace1843,
+                @article{ExternalReferenceTag,
                     author = {Lovelace, Ada and Hopper, Grace},
                     title = {Notes on the Analytical Engine},
                     journal = {Scientific Memoirs},
@@ -43,7 +43,7 @@ class SourceBibtexArticleImportFormTestCase(TestCase):
         source = form.create_source(owner=owner)
 
         self.assertEqual(source.type, "article")
-        self.assertEqual(source.abbreviation, "Lovelace1843")
+        self.assertEqual(source.abbreviation, "Lovelace 1843")
         self.assertEqual(source.title, "Notes on the Analytical Engine")
         self.assertEqual(source.journal, "Scientific Memoirs")
         self.assertEqual(source.volume, "3")
@@ -81,6 +81,7 @@ class SourceBibtexArticleImportFormTestCase(TestCase):
 
         source = form.create_source(owner=owner)
 
+        self.assertEqual(source.abbreviation, "Lovelace 1843")
         self.assertEqual(source.sourceauthors.count(), 1)
         created_author = source.sourceauthors.get().author
         self.assertEqual(created_author.first_names, "Ada")

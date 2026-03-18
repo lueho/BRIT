@@ -21,6 +21,9 @@ class SourceBibtexArticleImportViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse("source-create"))
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Source creation mode")
+        self.assertContains(response, "Manual")
+        self.assertContains(response, "BibTeX @article")
         self.assertContains(response, reverse("source-bibtex-article-import"))
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
@@ -37,6 +40,10 @@ class SourceBibtexArticleImportViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse("source-bibtex-article-import"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Create New Source from BibTeX @article")
+        self.assertContains(response, "Source creation mode")
+        self.assertContains(response, "Manual")
+        self.assertContains(response, "BibTeX @article")
+        self.assertContains(response, reverse("source-create"))
 
     def test_post_http_302_creates_source_from_bibtex_entry(self):
         self.client.force_login(self.member)
@@ -65,7 +72,7 @@ class SourceBibtexArticleImportViewTestCase(ViewWithPermissionsTestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        source = Source.objects.get(abbreviation="Lovelace1843")
+        source = Source.objects.get(abbreviation="Lovelace 1843")
         self.assertEqual(response.url, source.get_absolute_url())
         self.assertEqual(source.type, "article")
         self.assertEqual(source.title, "Notes on the Analytical Engine")

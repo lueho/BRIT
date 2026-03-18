@@ -9,6 +9,38 @@ _FIELD_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 
 def parse_bibtex_article_entry(raw_entry: str) -> dict:
+    entries = parse_bibtex_article_entries(raw_entry)
+    if len(entries) != 1:
+        raise BibtexArticleParseError("Expected exactly one BibTeX @article entry.")
+    return entries[0]
+
+
+def parse_bibtex_article_entries(raw_entries: str) -> list[dict]:
+    entry_text = (raw_entries or "").strip()
+    if not entry_text:
+        raise BibtexArticleParseError("BibTeX entry cannot be empty.")
+
+    entries = []
+    index = 0
+    while index < len(entry_text):
+        while index < len(entry_text) and entry_text[index].isspace():
+            index += 1
+        if index >= len(entry_text):
+            break
+        if entry_text[index] != "@":
+            raise BibtexArticleParseError(
+                "BibTeX input must contain only @article entries."
+            )
+
+        raw_entry, index = _extract_bibtex_entry(entry_text, index)
+        entries.append(_parse_single_bibtex_article_entry(raw_entry))
+
+    if not entries:
+        raise BibtexArticleParseError("BibTeX entry cannot be empty.")
+    return entries
+
+
+def _parse_single_bibtex_article_entry(raw_entry: str) -> dict:
     entry = (raw_entry or "").strip()
     if not entry:
         raise BibtexArticleParseError("BibTeX entry cannot be empty.")
@@ -59,6 +91,16 @@ def parse_bibtex_article_entry(raw_entry: str) -> dict:
         "abstract": _normalize_bibtex_text(fields.get("abstract")) or None,
         "authors": _parse_authors(fields.get("author")),
     }
+
+
+def _extract_bibtex_entry(text: str, start_index: int) -> tuple[str, int]:
+    match = re.match(r"@\s*([A-Za-z]+)\s*\{", text[start_index:])
+    if not match:
+        raise BibtexArticleParseError("Invalid BibTeX entry header.")
+
+    open_brace_index = start_index + match.end() - 1
+    close_brace_index = _find_matching_brace(text, open_brace_index)
+    return text[start_index : close_brace_index + 1], close_brace_index + 1
 
 
 def _find_matching_brace(text: str, open_index: int) -> int:

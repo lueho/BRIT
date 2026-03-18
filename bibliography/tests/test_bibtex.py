@@ -1,6 +1,9 @@
 from django.test import TestCase
 
-from ..bibtex import BibtexArticleParseError, parse_bibtex_article_entry
+from ..bibtex import (
+    BibtexArticleParseError,
+    parse_bibtex_article_entry,
+)
 
 
 class ParseBibtexArticleEntryTestCase(TestCase):

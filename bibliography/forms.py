@@ -10,7 +10,10 @@ from utils.forms import (
     SimpleModelForm,
 )
 
-from .bibtex import BibtexArticleParseError, parse_bibtex_article_entry
+from .bibtex import (
+    BibtexArticleParseError,
+    parse_bibtex_article_entries,
+)
 from .models import Author, Licence, Source, SourceAuthor
 
 
@@ -74,43 +77,62 @@ class SourceBibtexArticleImportForm(SimpleForm):
     def clean_bibtex_entry(self):
         bibtex_entry = self.cleaned_data["bibtex_entry"]
         try:
-            self.parsed_entry = parse_bibtex_article_entry(bibtex_entry)
+            self.parsed_entries = parse_bibtex_article_entries(bibtex_entry)
         except BibtexArticleParseError as exc:
             raise ValidationError(str(exc)) from exc
         return bibtex_entry
 
     def create_source(self, *, owner):
-        parsed_entry = getattr(self, "parsed_entry", None)
-        if parsed_entry is None:
+        sources = self.create_sources(owner=owner)
+        if len(sources) != 1:
+            raise ValueError("The BibTeX import form contains multiple entries.")
+        return sources[0]
+
+    def create_sources(self, *, owner):
+        parsed_entries = getattr(self, "parsed_entries", None)
+        if parsed_entries is None:
             raise ValueError("The BibTeX import form must be validated before saving.")
 
+        with transaction.atomic():
+            sources = []
+            for parsed_entry in parsed_entries:
+                sources.append(
+                    self._create_source_from_parsed_entry(
+                        owner=owner,
+                        parsed_entry=parsed_entry,
+                    )
+                )
+
+        return sources
+
+    def _create_source_from_parsed_entry(self, *, owner, parsed_entry):
         authors = self._resolve_authors(
-            owner=owner, parsed_authors=parsed_entry["authors"]
+            owner=owner,
+            parsed_authors=parsed_entry["authors"],
         )
 
-        with transaction.atomic():
-            source = Source.objects.create(
-                owner=owner,
-                type="article",
-                abbreviation=parsed_entry["citation_key"] or "",
-                publisher=parsed_entry["publisher"],
-                title=parsed_entry["title"],
-                journal=parsed_entry["journal"],
-                volume=parsed_entry["volume"],
-                issue=parsed_entry["number"],
-                pages=parsed_entry["pages"],
-                month=parsed_entry["month"],
-                year=parsed_entry["year"],
-                abstract=parsed_entry["abstract"],
-                url=parsed_entry["url"],
-                doi=parsed_entry["doi"],
+        source = Source.objects.create(
+            owner=owner,
+            type="article",
+            abbreviation="",
+            publisher=parsed_entry["publisher"],
+            title=parsed_entry["title"],
+            journal=parsed_entry["journal"],
+            volume=parsed_entry["volume"],
+            issue=parsed_entry["number"],
+            pages=parsed_entry["pages"],
+            month=parsed_entry["month"],
+            year=parsed_entry["year"],
+            abstract=parsed_entry["abstract"],
+            url=parsed_entry["url"],
+            doi=parsed_entry["doi"],
+        )
+        for position, author in enumerate(authors, start=1):
+            SourceAuthor.objects.create(
+                source=source,
+                author=author,
+                position=position,
             )
-            for position, author in enumerate(authors, start=1):
-                SourceAuthor.objects.create(
-                    source=source,
-                    author=author,
-                    position=position,
-                )
 
         return source
 

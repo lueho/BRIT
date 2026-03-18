@@ -1,6 +1,23 @@
 {% extends "simple_form_card.html" %}
 
-{% block card_footer %}
+{% block form_header_actions %}
   {% url "source-create" as source_create_url %}
-  <a href="{{ source_create_url }}">Create a source manually instead</a>
-{% endblock card_footer %}
+  <div class="btn-group btn-group-sm"
+       role="group"
+       aria-label="Source creation mode">
+    <a class="btn btn-outline-secondary"
+       role="button"
+       aria-pressed="false"
+       href="{{ source_create_url }}">Manual</a>
+    <a class="btn btn-outline-secondary active disabled"
+       role="button"
+       aria-current="page"
+       aria-pressed="true"
+       aria-disabled="true"
+       tabindex="-1"
+       href="{{ request.get_full_path }}">BibTeX @article</a>
+  </div>
+{% endblock form_header_actions %}
+
+{% block card_footer_container %}
+{% endblock card_footer_container %}
