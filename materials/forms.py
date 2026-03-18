@@ -167,6 +167,33 @@ class ComponentMeasurementModalModelForm(
 class MaterialPropertyValueModelForm(
     UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
 ):
+    property = TomSelectModelChoiceField(
+        queryset=MaterialProperty.objects.all(),
+        config=TomSelectConfig(
+            url="materialproperty-autocomplete",
+            label_field="name",
+        ),
+        label="Property",
+    )
+    unit = TomSelectModelChoiceField(
+        queryset=Unit.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="unit-autocomplete",
+            label_field="name",
+        ),
+        label="Unit",
+    )
+    analytical_method = TomSelectModelChoiceField(
+        queryset=AnalyticalMethod.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="analyticalmethod-autocomplete",
+            label_field="name",
+        ),
+        label="Analytical method",
+    )
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["unit"].required = False

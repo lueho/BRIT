@@ -5,6 +5,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.forms import inlineformset_factory
 from django.http import QueryDict
 from django.test import TestCase
+from django_tomselect.forms import TomSelectModelChoiceField
 
 from distributions.models import Timestep
 from utils.properties.models import Unit
@@ -115,6 +116,15 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
         cls.disallowed_unit = Unit.objects.create(name="g/L")
         cls.property = MaterialProperty.objects.create(name="Nitrogen", unit="g/L")
         cls.property.allowed_units.add(cls.allowed_unit)
+
+    def test_fk_fields_use_tomselect_autocomplete_fields(self):
+        form = MaterialPropertyValueModelForm()
+
+        self.assertIsInstance(form.fields["property"], TomSelectModelChoiceField)
+        self.assertIsInstance(form.fields["unit"], TomSelectModelChoiceField)
+        self.assertIsInstance(
+            form.fields["analytical_method"], TomSelectModelChoiceField
+        )
 
     def test_form_includes_unit_field(self):
         form = MaterialPropertyValueModelForm()
