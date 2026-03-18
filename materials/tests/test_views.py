@@ -838,6 +838,112 @@ class AnalyticalMethodCRUDViewsTestCase(
     update_object_data = {"name": "Updated Test Method"}
 
 
+class AnalyticalMethodDetailViewSamplesTestCase(ViewWithPermissionsTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.method = AnalyticalMethod.objects.create(
+            owner=cls.owner,
+            name="Combustion analysis",
+            publication_status="published",
+        )
+        cls.material = Material.objects.create(
+            owner=cls.owner,
+            name="Digestate",
+            publication_status="published",
+        )
+        cls.property = MaterialProperty.objects.create(
+            owner=cls.owner,
+            name="Dry matter",
+            unit="%",
+            publication_status="published",
+        )
+        cls.group = MaterialComponentGroup.objects.create(
+            owner=cls.owner,
+            name="Chemical elements",
+            publication_status="published",
+        )
+        cls.component = MaterialComponent.objects.create(
+            owner=cls.owner,
+            name="Carbon",
+            publication_status="published",
+        )
+        cls.unit = Unit.objects.filter(name="%").first()
+        if cls.unit is None:
+            cls.unit = Unit.objects.create(name="%", symbol="percent", owner=cls.owner)
+        elif not cls.unit.symbol:
+            cls.unit.symbol = "percent"
+            cls.unit.save(update_fields=["symbol"])
+
+        cls.visible_sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Published linked sample",
+            material=cls.material,
+            publication_status="published",
+        )
+        visible_property = MaterialPropertyValue.objects.create(
+            owner=cls.owner,
+            property=cls.property,
+            unit=cls.unit,
+            analytical_method=cls.method,
+            average=Decimal("42.0"),
+            standard_deviation=Decimal("0.0"),
+        )
+        cls.visible_sample.properties.add(visible_property)
+        ComponentMeasurement.objects.create(
+            owner=cls.owner,
+            sample=cls.visible_sample,
+            group=cls.group,
+            component=cls.component,
+            analytical_method=cls.method,
+            unit=cls.unit,
+            average=Decimal("1.0"),
+        )
+
+        cls.private_sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Private linked sample",
+            material=cls.material,
+            publication_status="private",
+        )
+        ComponentMeasurement.objects.create(
+            owner=cls.owner,
+            sample=cls.private_sample,
+            group=cls.group,
+            component=cls.component,
+            analytical_method=cls.method,
+            unit=cls.unit,
+            average=Decimal("2.0"),
+        )
+
+    def test_detail_view_lists_visible_related_samples_once_for_non_owner(self):
+        self.client.force_login(self.outsider)
+
+        response = self.client.get(
+            reverse("analyticalmethod-detail", kwargs={"pk": self.method.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Samples:")
+        self.assertContains(response, "Published linked sample", count=1)
+        self.assertContains(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.visible_sample.pk}),
+        )
+        self.assertNotContains(response, "Private linked sample")
+
+    def test_detail_view_includes_private_related_samples_for_owner(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse("analyticalmethod-detail", kwargs={"pk": self.method.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Published linked sample")
+        self.assertContains(response, "Private linked sample")
+
+
 # ----------- Sample Series CRUD ---------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 

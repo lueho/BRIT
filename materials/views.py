@@ -8,6 +8,7 @@ from django.contrib.auth.mixins import (
     PermissionRequiredMixin,
     UserPassesTestMixin,
 )
+from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import NoReverseMatch, reverse, reverse_lazy
@@ -18,7 +19,10 @@ from extra_views import UpdateWithInlinesView
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
 from utils.file_export.views import SingleObjectFileExportView
-from utils.object_management.permissions import get_object_policy
+from utils.object_management.permissions import (
+    filter_queryset_for_user,
+    get_object_policy,
+)
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -494,6 +498,22 @@ class AnalyticalMethodCreateView(UserCreatedObjectCreateView):
 
 class AnalyticalMethodDetailView(UserCreatedObjectDetailView):
     model = AnalyticalMethod
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        related_samples = (
+            Sample.objects.filter(
+                Q(properties__analytical_method=self.object)
+                | Q(component_measurements__analytical_method=self.object)
+            )
+            .select_related("material", "series")
+            .distinct()
+            .order_by("name", "pk")
+        )
+        context["related_samples"] = filter_queryset_for_user(
+            related_samples, self.request.user
+        )
+        return context
 
 
 class AnalyticalMethodModalDetailView(UserCreatedObjectModalDetailView):
