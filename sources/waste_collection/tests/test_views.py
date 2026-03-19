@@ -3557,17 +3557,29 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.staff = User.objects.create(username="reviewer", is_staff=True)
+        cls.predecessor_owner = User.objects.create(username="predecessor-owner")
 
         cls.catchment = CollectionCatchment.objects.create(name="RC")
         cls.system = CollectionSystem.objects.create(name="RS")
         cls.category = WasteCategory.objects.create(name="RCat")
+        cls.predecessor = Collection.objects.create(
+            owner=cls.predecessor_owner,
+            name="Published predecessor",
+            catchment=cls.catchment,
+            collection_system=cls.system,
+            waste_category=cls.category,
+            publication_status="published",
+            valid_from=date(2020, 1, 1),
+        )
         cls.collection = Collection.objects.create(
             name="ReviewCollection",
             catchment=cls.catchment,
             collection_system=cls.system,
             waste_category=cls.category,
             publication_status="review",
+            valid_from=date(2021, 1, 1),
         )
+        cls.collection.predecessors.add(cls.predecessor)
 
         cls.prop = Property.objects.create(
             name="PreviewProp", publication_status="published"
@@ -3699,6 +3711,24 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
         self.assertIn("Forbidden Materials", body)
         self.assertIn("Allowed Material", body)
         self.assertIn("Forbidden Material", body)
+
+    def test_review_detail_shows_published_predecessor_owned_by_another_user(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse(
+                "object_management:review_item_detail",
+                kwargs={"content_type_id": self.ct_id, "object_id": self.collection.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        visible_predecessors = response.context["visible_predecessors"]
+        self.assertEqual(
+            [collection.pk for collection in visible_predecessors],
+            [self.predecessor.pk],
+        )
+        self.assertContains(response, "Predecessors:")
+        self.assertContains(response, self.predecessor.get_absolute_url())
 
     def test_review_detail_renders_collection_property_values_rounded_to_one_decimal(
         self,

@@ -1603,6 +1603,26 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
             "forbidden_materials"
         )
         review_context["frequency_display"] = _frequency_display_context(obj.frequency)
+        user = self.request.user
+
+        try:
+            review_context["visible_successors"] = filter_queryset_for_user(
+                obj.successors.all(), user
+            )
+        except Exception:
+            review_context["visible_successors"] = obj.successors.none()
+
+        predecessors_qs = (
+            obj.predecessors.all()
+            .select_related("owner")
+            .order_by("-lastmodified_at", "-pk")
+        )
+        try:
+            review_context["visible_predecessors"] = filter_queryset_for_user(
+                predecessors_qs, user
+            )
+        except Exception:
+            review_context["visible_predecessors"] = obj.predecessors.none()
 
         # review_logs is set on the parent context before this method is called
         review_logs = context.get("review_logs") or []
