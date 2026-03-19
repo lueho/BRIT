@@ -528,8 +528,6 @@ class CollectionImporter:
             predecessor = self._find_predecessor(
                 catchment,
                 waste_category,
-                allowed_material_ids,
-                forbidden_material_ids,
                 collection_system,
                 valid_from,
             )
@@ -794,8 +792,6 @@ class CollectionImporter:
                     collector=collector,
                     collection_system=collection_system,
                     waste_category=waste_category,
-                    allowed_material_ids=allowed_material_ids or set(),
-                    forbidden_material_ids=forbidden_material_ids or set(),
                     valid_from=valid_from,
                 )
                 if catchment is not None:
@@ -831,8 +827,6 @@ class CollectionImporter:
         collector: Collector | None,
         collection_system: CollectionSystem | None,
         waste_category: WasteCategory | None,
-        allowed_material_ids: set[int],
-        forbidden_material_ids: set[int],
         valid_from,
     ) -> CollectionCatchment | None:
         if collector and collector.catchment_id:
@@ -841,8 +835,6 @@ class CollectionImporter:
         predecessor = self._find_predecessor_for_catchment_fallback(
             collector=collector,
             waste_category=waste_category,
-            allowed_material_ids=allowed_material_ids,
-            forbidden_material_ids=forbidden_material_ids,
             collection_system=collection_system,
             valid_from=valid_from,
         )
@@ -1288,8 +1280,6 @@ class CollectionImporter:
     def _find_predecessor(
         catchment: CollectionCatchment,
         waste_category: WasteCategory,
-        allowed_material_ids: set[int],
-        forbidden_material_ids: set[int],
         collection_system: CollectionSystem,
         valid_from,
     ) -> Collection | None:
@@ -1299,22 +1289,13 @@ class CollectionImporter:
         ).filter(waste_category=waste_category)
         if valid_from:
             qs = qs.filter(valid_from__lt=valid_from)
-        return (
-            qs.match_materials(
-                allowed_materials=allowed_material_ids,
-                forbidden_materials=forbidden_material_ids,
-            )
-            .order_by("-valid_from")
-            .first()
-        )
+        return qs.order_by("-valid_from").first()
 
     @staticmethod
     def _find_predecessor_for_catchment_fallback(
         *,
         collector: Collector | None,
         waste_category: WasteCategory | None,
-        allowed_material_ids: set[int],
-        forbidden_material_ids: set[int],
         collection_system: CollectionSystem | None,
         valid_from,
     ) -> Collection | None:
@@ -1327,11 +1308,4 @@ class CollectionImporter:
         )
         if valid_from:
             qs = qs.filter(valid_from__lt=valid_from)
-        return (
-            qs.match_materials(
-                allowed_materials=allowed_material_ids,
-                forbidden_materials=forbidden_material_ids,
-            )
-            .order_by("-valid_from")
-            .first()
-        )
+        return qs.order_by("-valid_from").first()

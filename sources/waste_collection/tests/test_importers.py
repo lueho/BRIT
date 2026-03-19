@@ -124,6 +124,48 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
         self.assertEqual(stats_second["created"], 1)
         self.assertEqual(Collection.objects.filter(owner=self.owner).count(), 2)
 
+    def test_new_version_links_predecessor_even_when_materials_change(self):
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+
+        predecessor_stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_2.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                    valid_from=date(2023, 1, 1),
+                )
+            ]
+        )
+        self.assertEqual(predecessor_stats["created"], 1)
+
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_3.name],
+                    forbidden_materials=[],
+                    valid_from=date(2024, 1, 1),
+                )
+            ]
+        )
+
+        predecessor = Collection.objects.get(
+            owner=self.owner, valid_from=date(2023, 1, 1)
+        )
+        successor = Collection.objects.get(
+            owner=self.owner, valid_from=date(2024, 1, 1)
+        )
+        predecessor.refresh_from_db()
+
+        self.assertEqual(stats["created"], 1)
+        self.assertEqual(stats["predecessor_links"], 1)
+        self.assertEqual(list(successor.predecessors.all()), [predecessor])
+        self.assertEqual(predecessor.valid_until, date(2023, 12, 31))
+        self.assertEqual(
+            set(successor.allowed_materials.values_list("name", flat=True)),
+            {self.allowed_1.name, self.allowed_3.name},
+        )
+        self.assertEqual(successor.forbidden_materials.count(), 0)
+
     def test_reimport_reuses_custom_source_notes(self):
         importer = CollectionImporter(owner=self.owner, publication_status="private")
 
@@ -339,6 +381,53 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
             valid_from=date(2023, 1, 1),
         )
         predecessor.allowed_materials.set([self.allowed_1])
+
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name],
+                    forbidden_materials=[],
+                )
+                | {
+                    "nuts_or_lau_id": "DEG0I, DEG0K",
+                    "catchment_name": "",
+                    "collector_name": collector.name,
+                }
+            ]
+        )
+
+        collection = Collection.objects.get(
+            owner=self.owner, valid_from=date(2024, 1, 1)
+        )
+        self.assertEqual(stats["created"], 1)
+        self.assertEqual(stats["predecessor_links"], 1)
+        self.assertEqual(collection.catchment, predecessor_catchment)
+        self.assertEqual(list(collection.predecessors.all()), [predecessor])
+        self.assertEqual(stats["warnings"], [])
+
+    def test_combined_lookup_fallback_uses_predecessor_catchment_when_materials_change(
+        self,
+    ):
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        predecessor_catchment = CollectionCatchment.objects.create(
+            name="Importer Predecessor Catch Changed Materials"
+        )
+        collector = Collector.objects.create(
+            name="Importer Changed Material Collector",
+            owner=self.owner,
+        )
+        predecessor = Collection.objects.create(
+            name="Importer predecessor changed materials",
+            owner=self.owner,
+            publication_status="private",
+            catchment=predecessor_catchment,
+            collector=collector,
+            collection_system=self.collection_system,
+            waste_category=self.waste_category,
+            valid_from=date(2023, 1, 1),
+        )
+        predecessor.allowed_materials.set([self.allowed_2])
+        predecessor.forbidden_materials.set([self.forbidden_1])
 
         stats = importer.run(
             [
