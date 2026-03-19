@@ -2169,6 +2169,42 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 302)
 
+    def test_post_preserves_bibliographic_sources_without_waste_flyers(self):
+        self.client.force_login(self.member)
+        source = Source.objects.create(
+            owner=self.member,
+            type="article",
+            title="Inline bibliographic source",
+            abbreviation="InlineBib",
+            publication_status="published",
+        )
+        data = {
+            "collection": self.collection.pk,
+            "property": self.prop.pk,
+            "unit": self.unit.pk,
+            "year": 2022,
+            "average": 123.5,
+            "standard_deviation": "",
+            "sources": [source.pk],
+            "form-TOTAL_FORMS": "0",
+            "form-INITIAL_FORMS": "0",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+        }
+
+        response = self.client.post(
+            reverse(self.url_name, kwargs={"pk": self.collection.pk}), data=data
+        )
+
+        self.assertEqual(response.status_code, 302)
+        cpv = CollectionPropertyValue.objects.get(
+            collection=self.collection,
+            property=self.prop,
+            unit=self.unit,
+            year=2022,
+        )
+        self.assertEqual(list(cpv.sources.values_list("pk", flat=True)), [source.pk])
+
 
 class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "add_aggregatedcollectionpropertyvalue"
