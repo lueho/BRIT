@@ -15,7 +15,7 @@ class ParseBibtexArticleEntryTestCase(TestCase):
             journal = {Scientific Memoirs},
             year = {1843},
             volume = {3},
-            number = {4},
+            issue = {4},
             pages = {666--699},
             month = {Dec},
             doi = {10.1000/test-doi},
@@ -33,7 +33,7 @@ class ParseBibtexArticleEntryTestCase(TestCase):
         self.assertEqual(parsed["year"], 1843)
         self.assertEqual(parsed["volume"], "3")
         self.assertEqual(parsed["number"], "4")
-        self.assertEqual(parsed["pages"], "666-699")
+        self.assertEqual(parsed["pages"], "666--699")
         self.assertEqual(parsed["month"], "dec")
         self.assertEqual(parsed["doi"], "10.1000/test-doi")
         self.assertEqual(parsed["url"], "https://example.com/article")
@@ -43,6 +43,41 @@ class ParseBibtexArticleEntryTestCase(TestCase):
             [
                 {"first_names": "Ada", "last_names": "Lovelace", "suffix": ""},
                 {"first_names": "Grace", "last_names": "Hopper", "suffix": ""},
+            ],
+        )
+
+    def test_parses_article_number_field(self):
+        entry = """
+        @Article{molecules25092165,
+        AUTHOR = {Hagel, Sebastian and Saake, Bodo},
+        TITLE = {Fractionation of Waste MDF by Steam Refining},
+        JOURNAL = {Molecules},
+        VOLUME = {25},
+        YEAR = {2020},
+        NUMBER = {9},
+        EID = {2165},
+        URL = {https://www.mdpi.com/1420-3049/25/9/2165},
+        PubMedID = {32380784},
+        ISSN = {1420-3049},
+        ABSTRACT = {In view ... in MDF fractionation.},
+        DOI = {10.3390/molecules25092165}
+        }
+        """
+
+        parsed = parse_bibtex_article_entry(entry)
+
+        self.assertEqual(parsed["citation_key"], "molecules25092165")
+        self.assertEqual(parsed["journal"], "Molecules")
+        self.assertEqual(parsed["volume"], "25")
+        self.assertEqual(parsed["number"], "9")
+        self.assertEqual(parsed["eid"], "2165")
+        self.assertIsNone(parsed["pages"])
+        self.assertEqual(parsed["doi"], "10.3390/molecules25092165")
+        self.assertEqual(
+            parsed["authors"],
+            [
+                {"first_names": "Sebastian", "last_names": "Hagel", "suffix": ""},
+                {"first_names": "Bodo", "last_names": "Saake", "suffix": ""},
             ],
         )
 

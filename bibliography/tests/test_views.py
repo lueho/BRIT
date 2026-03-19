@@ -227,13 +227,13 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
 
     create_object_data = {
         "title": "Test source",
-        "abbreviation": "TEST",
+        "citation_key": "TEST",
         "type": "website",
         "url": "https://example.com",
     }
     update_object_data = {
         "title": "Updated source",
-        "abbreviation": "UPD",
+        "citation_key": "UPD",
         "type": "website",
         "url": "https://example.org",
     }

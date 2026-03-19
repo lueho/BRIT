@@ -193,7 +193,7 @@ class LicenceAutocompleteView(UserCreatedObjectAutocompleteView):
 class SourcePublishedFilterView(PublishedObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
-        "abbreviation"
+        "citation_key"
     )
     filterset_class = SourceFilter
     dashboard_url = reverse_lazy("bibliography-explorer")
@@ -202,7 +202,7 @@ class SourcePublishedFilterView(PublishedObjectFilterView):
 class SourcePrivateFilterView(PrivateObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
-        "abbreviation"
+        "citation_key"
     )
     filterset_class = SourceFilter
     dashboard_url = reverse_lazy("bibliography-explorer")
@@ -542,7 +542,7 @@ class SourceListCheckUrlsView(PermissionRequiredMixin, View):
 class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Source
     search_lookups = [
-        "abbreviation__icontains",
+        "citation_key__icontains",
         "title__icontains",
         "authors__last_names__icontains",
         "authors__first_names__icontains",
@@ -553,7 +553,7 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
         "id",
         "type",
         "title",
-        "abbreviation",
+        "citation_key",
         "url",
     ]
 
@@ -607,11 +607,12 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
                     formatted_name = (
                         title
                         if title
-                        else result.get("abbreviation", f"Source #{result['id']}")
+                        else result.get("citation_key", f"Source #{result['id']}")
                     )
 
             result["text"] = formatted_name
             result["selected_text"] = formatted_name
+            result["citation_key"] = formatted_name
             result["abbreviation"] = formatted_name
             result["label"] = formatted_name
         return results

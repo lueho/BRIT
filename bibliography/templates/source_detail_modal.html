@@ -1,17 +1,17 @@
 {% load moderation_tags %}
 <div class="modal-header">
-    <h5 class="modal-title">{{ object.abbreviation }}</h5>
+    <h5 class="modal-title">{{ object.citation_key }}</h5>
     <button type="button"
             class="btn-close"
             data-bs-dismiss="modal"
             aria-label="Close"></button>
 </div>
 <div class="modal-body">
-    {% if 'abbreviation' in object_data and object_data.abbreviation %}
+    {% if 'citation_key' in object_data and object_data.citation_key %}
         <p>
-            <strong>Abbreviation:</strong>
+            <strong>Citation key:</strong>
             <br>
-            {{ object_data.abbreviation }}
+            {{ object_data.citation_key }}
         </p>
     {% endif %}
     {% if 'authors' in object_data and object_data.authors %}
@@ -52,18 +52,18 @@
             {{ object_data.journal }}
         </p>
     {% endif %}
-    {% if 'volume' in object_data and object_data.volume %}
+    {% if 'number' in object_data and object_data.number %}
         <p>
-            <strong>Volume:</strong>
+            <strong>Number:</strong>
             <br>
-            {{ object_data.volume }}
+            {{ object_data.number }}
         </p>
     {% endif %}
-    {% if 'issue' in object_data and object_data.issue %}
+    {% if 'eid' in object_data and object_data.eid %}
         <p>
-            <strong>Issue:</strong>
+            <strong>EID:</strong>
             <br>
-            {{ object_data.issue }}
+            {{ object_data.eid }}
         </p>
     {% endif %}
     {% if 'pages' in object_data and object_data.pages %}

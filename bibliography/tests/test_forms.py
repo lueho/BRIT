@@ -30,5 +30,7 @@ class SourceModelFormTestCase(TestCase):
         form = SourceModelForm()
 
         self.assertIn("volume", form.fields)
+        self.assertIn("eid", form.fields)
+        self.assertIn("number", form.fields)
         self.assertIn("pages", form.fields)
         self.assertIn("month", form.fields)

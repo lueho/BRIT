@@ -43,12 +43,12 @@ class SourceBibtexArticleImportFormTestCase(TestCase):
         source = form.create_source(owner=owner)
 
         self.assertEqual(source.type, "article")
-        self.assertEqual(source.abbreviation, "Lovelace 1843")
+        self.assertEqual(source.citation_key, "Lovelace & Hopper 1843")
         self.assertEqual(source.title, "Notes on the Analytical Engine")
         self.assertEqual(source.journal, "Scientific Memoirs")
         self.assertEqual(source.volume, "3")
-        self.assertEqual(source.issue, "4")
-        self.assertEqual(source.pages, "666-699")
+        self.assertEqual(source.number, "4")
+        self.assertEqual(source.pages, "666--699")
         self.assertEqual(source.month, "dec")
         self.assertEqual(source.year, 1843)
         self.assertEqual(
@@ -59,6 +59,56 @@ class SourceBibtexArticleImportFormTestCase(TestCase):
                 )
             ),
             [ada.pk, grace.pk],
+        )
+
+    def test_form_creates_article_source_with_article_number(self):
+        owner = User.objects.create(username="owner")
+        sebastian = Author.objects.create(
+            owner=owner,
+            first_names="Sebastian",
+            last_names="Hagel",
+        )
+        bodo = Author.objects.create(
+            owner=owner,
+            first_names="Bodo",
+            last_names="Saake",
+        )
+        form = SourceBibtexArticleImportForm(
+            data={
+                "bibtex_entry": """
+                @Article{molecules25092165,
+                    AUTHOR = {Hagel, Sebastian and Saake, Bodo},
+                    TITLE = {Fractionation of Waste MDF by Steam Refining},
+                    JOURNAL = {Molecules},
+                    VOLUME = {25},
+                    YEAR = {2020},
+                    NUMBER = {9},
+                    ARTICLE-NUMBER = {2165},
+                    URL = {https://www.mdpi.com/1420-3049/25/9/2165},
+                    ABSTRACT = {In view ... in MDF fractionation.},
+                    DOI = {10.3390/molecules25092165}
+                }
+                """,
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+        source = form.create_source(owner=owner)
+
+        self.assertEqual(source.citation_key, "Hagel & Saake 2020")
+        self.assertEqual(source.volume, "25")
+        self.assertEqual(source.number, "9")
+        self.assertEqual(source.eid, "2165")
+        self.assertIsNone(source.pages)
+        self.assertEqual(
+            list(
+                source.sourceauthors.order_by("position").values_list(
+                    "author_id",
+                    flat=True,
+                )
+            ),
+            [sebastian.pk, bodo.pk],
         )
 
     def test_form_creates_missing_authors_when_user_has_permission(self):
@@ -81,7 +131,7 @@ class SourceBibtexArticleImportFormTestCase(TestCase):
 
         source = form.create_source(owner=owner)
 
-        self.assertEqual(source.abbreviation, "Lovelace 1843")
+        self.assertEqual(source.citation_key, "Lovelace 1843")
         self.assertEqual(source.sourceauthors.count(), 1)
         created_author = source.sourceauthors.get().author
         self.assertEqual(created_author.first_names, "Ada")

@@ -124,11 +124,12 @@ class Source(UserCreatedObject):
     title = models.CharField(max_length=500)
     journal = models.CharField(max_length=500, blank=True, null=True)
     volume = models.CharField(max_length=255, blank=True, null=True)
-    issue = models.CharField(max_length=255, blank=True, null=True)
+    number = models.CharField(max_length=255, blank=True, null=True)
+    eid = models.CharField(max_length=255, blank=True, null=True)
     pages = models.CharField(max_length=255, blank=True, null=True)
     month = models.CharField(max_length=50, blank=True, null=True)
     year = models.IntegerField(blank=True, null=True)
-    abbreviation = models.CharField(max_length=50, blank=True)
+    citation_key = models.CharField(max_length=50, blank=True)
     abstract = models.TextField(blank=True, null=True)
     licence = models.ForeignKey(
         Licence, on_delete=models.PROTECT, blank=True, null=True
@@ -143,6 +144,15 @@ class Source(UserCreatedObject):
     class Meta:
         verbose_name = "Source"
 
+    def __init__(self, *args, **kwargs):
+        if "abbreviation" in kwargs and "citation_key" not in kwargs:
+            kwargs["citation_key"] = kwargs.pop("abbreviation")
+        if "issue" in kwargs and "number" not in kwargs:
+            kwargs["number"] = kwargs.pop("issue")
+        if "article_number" in kwargs and "eid" not in kwargs:
+            kwargs["eid"] = kwargs.pop("article_number")
+        super().__init__(*args, **kwargs)
+
     def ordered_authors(self):
         return self.sourceauthors.order_by("position").select_related("author")
 
@@ -151,23 +161,31 @@ class Source(UserCreatedObject):
         return [sa.author for sa in self.ordered_authors()]
 
     def __str__(self):
-        return self.abbreviation or self.title or f"Source #{self.pk}"
+        return self.citation_key or self.title or f"Source #{self.pk}"
 
     @property
-    def citation_key(self):
-        return self.abbreviation
+    def abbreviation(self):
+        return self.citation_key
 
-    @citation_key.setter
-    def citation_key(self, value):
-        self.abbreviation = value
+    @abbreviation.setter
+    def abbreviation(self, value):
+        self.citation_key = value
 
     @property
-    def number(self):
-        return self.issue
+    def issue(self):
+        return self.number
 
-    @number.setter
-    def number(self, value):
-        self.issue = value
+    @issue.setter
+    def issue(self, value):
+        self.number = value
+
+    @property
+    def article_number(self):
+        return self.eid
+
+    @article_number.setter
+    def article_number(self, value):
+        self.eid = value
 
     def generate_abbreviation(self):
         """Generate a citation key from authors and year.
@@ -209,8 +227,8 @@ class Source(UserCreatedObject):
             return base
 
         # Find existing sources with the same base abbreviation (excluding self)
-        qs = Source.objects.filter(abbreviation__startswith=base).exclude(pk=self.pk)
-        existing = set(qs.values_list("abbreviation", flat=True))
+        qs = Source.objects.filter(citation_key__startswith=base).exclude(pk=self.pk)
+        existing = set(qs.values_list("citation_key", flat=True))
 
         if base not in existing:
             return base
@@ -232,34 +250,34 @@ class Source(UserCreatedObject):
         return f"Source{year_part}".strip()
 
     def save(self, *args, **kwargs):
-        if not self.abbreviation:
+        if not self.citation_key:
             if self.pk:
                 # Existing object: can use full generation with authors
-                self.abbreviation = self._disambiguated_abbreviation()
+                self.citation_key = self._disambiguated_abbreviation()
             else:
                 # First save: generate from title/year, then disambiguate
                 base = self._base_abbreviation_without_authors()
                 existing = set(
-                    Source.objects.filter(abbreviation__startswith=base).values_list(
-                        "abbreviation", flat=True
+                    Source.objects.filter(citation_key__startswith=base).values_list(
+                        "citation_key", flat=True
                     )
                 )
                 if base not in existing:
-                    self.abbreviation = base
+                    self.citation_key = base
                 else:
                     for letter in string.ascii_lowercase:
                         candidate = f"{base}{letter}"
                         if candidate not in existing:
-                            self.abbreviation = candidate
+                            self.citation_key = candidate
                             break
                     else:
-                        self.abbreviation = base
+                        self.citation_key = base
         super().save(*args, **kwargs)
 
     def update_abbreviation(self):
         """Regenerate the abbreviation from current authors/year and save."""
-        self.abbreviation = self._disambiguated_abbreviation()
-        self.save(update_fields=["abbreviation"])
+        self.citation_key = self._disambiguated_abbreviation()
+        self.save(update_fields=["citation_key"])
 
 
 @receiver(post_save, sender=Source)
@@ -278,13 +296,13 @@ def update_source_abbreviation_on_author_change(sender, instance, **kwargs):
     source = instance.source
     # Only regenerate if the current abbreviation looks auto-generated
     # (title-based fallback from initial save) rather than manually set.
-    current = source.abbreviation or ""
+    current = source.citation_key or ""
     title_words = (source.title or "").split()
     title_based = title_words[0] if title_words else "Source"
     if not current or current.startswith(title_based):
         try:
-            source.abbreviation = source._disambiguated_abbreviation()
-            source.save(update_fields=["abbreviation"])
+            source.citation_key = source._disambiguated_abbreviation()
+            source.save(update_fields=["citation_key"])
         except Exception:
             pass
 

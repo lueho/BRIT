@@ -41,13 +41,14 @@ class SourceModelForm(SimpleModelForm):
     class Meta:
         model = Source
         fields = (
-            "abbreviation",
+            "citation_key",
             "publisher",
             "title",
             "type",
             "journal",
             "volume",
-            "issue",
+            "number",
+            "eid",
             "pages",
             "month",
             "year",
@@ -114,12 +115,13 @@ class SourceBibtexArticleImportForm(SimpleForm):
         source = Source.objects.create(
             owner=owner,
             type="article",
-            abbreviation="",
+            citation_key="",
             publisher=parsed_entry["publisher"],
             title=parsed_entry["title"],
             journal=parsed_entry["journal"],
             volume=parsed_entry["volume"],
-            issue=parsed_entry["number"],
+            number=parsed_entry["number"],
+            eid=parsed_entry["eid"],
             pages=parsed_entry["pages"],
             month=parsed_entry["month"],
             year=parsed_entry["year"],
@@ -133,6 +135,7 @@ class SourceBibtexArticleImportForm(SimpleForm):
                 author=author,
                 position=position,
             )
+        source.update_abbreviation()
 
         return source
 

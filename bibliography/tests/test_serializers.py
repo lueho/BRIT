@@ -29,7 +29,7 @@ class SourceSerializerTest(TestCase):
             {"first_names": "Jane", "last_names": "Doe"},
         ]
         self.source_data = {
-            "abbreviation": "TST",
+            "citation_key": "TST",
             "authors": self.author_data,
             "title": "Test Source",
             "type": "article",
@@ -37,7 +37,8 @@ class SourceSerializerTest(TestCase):
             "publisher": "Test Publisher",
             "journal": "Test Journal",
             "volume": "42",
-            "issue": "1",
+            "number": "1",
+            "eid": "2165",
             "pages": "10-25",
             "month": "mar",
             "year": "2020",
@@ -205,12 +206,13 @@ class HyperlinkedSourceSerializerTestCase(TestCase):
             source = Source.objects.create(
                 type="custom",
                 title="Test Source",
-                abbreviation="TS1",
+                citation_key="TS1",
                 licence=licence,
                 publisher="Test Publisher",
                 journal="Test Journal",
                 volume="42",
-                issue="Test Issue",
+                number="Test Issue",
+                eid="2165",
                 pages="10-25",
                 month="mar",
                 year=2022,
@@ -234,7 +236,7 @@ class HyperlinkedSourceSerializerTestCase(TestCase):
         )
 
         expected = {
-            "abbreviation": "TS1",
+            "citation_key": "TS1",
             "authors": [
                 OrderedDict(
                     [
@@ -277,7 +279,8 @@ class HyperlinkedSourceSerializerTestCase(TestCase):
             "publisher": self.source.publisher,
             "journal": self.source.journal,
             "volume": self.source.volume,
-            "issue": self.source.issue,
+            "number": self.source.number,
+            "eid": self.source.eid,
             "pages": self.source.pages,
             "month": self.source.month,
             "year": self.source.year,
@@ -307,7 +310,7 @@ class HyperlinkedSourceSerializerTestCase(TestCase):
             ordered_source = Source.objects.create(
                 type="custom",
                 title="Ordered Source",
-                abbreviation="OS1",
+                citation_key="OS1",
                 licence=licence,
             )
         SourceAuthor.objects.create(
@@ -335,7 +338,7 @@ class SourceAbbreviationSerializerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         with mute_signals(post_save):
-            Source.objects.create(title="Test Source", abbreviation="(TS, 1955)")
+            Source.objects.create(title="Test Source", citation_key="(TS, 1955)")
 
     def setUp(self):
         self.source = Source.objects.get(title="Test Source")
@@ -343,4 +346,4 @@ class SourceAbbreviationSerializerTestCase(TestCase):
     def test_source_link_serializer(self):
         data = SourceAbbreviationSerializer(self.source).data
         self.assertIn("pk", data)
-        self.assertIn("abbreviation", data)
+        self.assertIn("citation_key", data)

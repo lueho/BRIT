@@ -40,7 +40,7 @@ class SourceModelSerializer(ModelSerializer):
         model = Source
         fields = [
             "id",
-            "abbreviation",
+            "citation_key",
             "authors",
             "title",
             "type",
@@ -48,7 +48,8 @@ class SourceModelSerializer(ModelSerializer):
             "publisher",
             "journal",
             "volume",
-            "issue",
+            "number",
+            "eid",
             "pages",
             "month",
             "year",
@@ -122,7 +123,7 @@ class HyperlinkedSourceSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Source
         fields = (
-            "abbreviation",
+            "citation_key",
             "authors",
             "title",
             "type",
@@ -130,7 +131,8 @@ class HyperlinkedSourceSerializer(HyperlinkedModelSerializer):
             "publisher",
             "journal",
             "volume",
-            "issue",
+            "number",
+            "eid",
             "pages",
             "month",
             "year",
@@ -179,4 +181,4 @@ class HyperlinkedSourceSerializer(HyperlinkedModelSerializer):
 class SourceAbbreviationSerializer(ModelSerializer):
     class Meta:
         model = Source
-        fields = ("pk", "abbreviation")
+        fields = ("pk", "citation_key")

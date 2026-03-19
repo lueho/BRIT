@@ -6,11 +6,11 @@
     <link rel="stylesheet" href="{% static 'css/sources.min.css' %}">
 {% endblock style_sheets %}
 {% block detail_body %}
-    {% if object.abbreviation %}
+    {% if object.citation_key %}
         <p class="card-text">
-            <strong>Abbreviation:</strong>
+            <strong>Citation key:</strong>
             <br>
-            {{ object.abbreviation }}
+            {{ object.citation_key }}
         </p>
     {% endif %}
     {% if object.ordered_authors.exists %}
@@ -51,18 +51,18 @@
             {{ object.journal }}
         </p>
     {% endif %}
-    {% if object.volume %}
+    {% if object.number %}
         <p class="card-text">
-            <strong>Volume:</strong>
+            <strong>Number:</strong>
             <br>
-            {{ object.volume }}
+            {{ object.number }}
         </p>
     {% endif %}
-    {% if object.issue %}
+    {% if object.eid %}
         <p class="card-text">
-            <strong>Issue:</strong>
+            <strong>EID:</strong>
             <br>
-            {{ object.issue }}
+            {{ object.eid }}
         </p>
     {% endif %}
     {% if object.pages %}

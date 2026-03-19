@@ -259,20 +259,29 @@ class SourceUpdateAbbreviationTestCase(TestCase):
 
 
 class SourceArticleCompatibilityTestCase(TestCase):
-    def test_citation_key_alias_maps_to_abbreviation(self):
+    def test_abbreviation_alias_maps_to_citation_key(self):
         with mute_signals(post_save):
-            source = Source.objects.create(title="Article", abbreviation="Article2024")
+            source = Source.objects.create(title="Article", citation_key="Article2024")
 
-        self.assertEqual(source.citation_key, "Article2024")
+        self.assertEqual(source.abbreviation, "Article2024")
 
-        source.citation_key = "UpdatedKey"
-        self.assertEqual(source.abbreviation, "UpdatedKey")
+        source.abbreviation = "UpdatedKey"
+        self.assertEqual(source.citation_key, "UpdatedKey")
 
-    def test_number_alias_maps_to_issue(self):
+    def test_issue_alias_maps_to_number(self):
         with mute_signals(post_save):
-            source = Source.objects.create(title="Article", issue="4")
+            source = Source.objects.create(title="Article", number="4")
 
-        self.assertEqual(source.number, "4")
+        self.assertEqual(source.issue, "4")
 
-        source.number = "7"
-        self.assertEqual(source.issue, "7")
+        source.issue = "7"
+        self.assertEqual(source.number, "7")
+
+    def test_article_number_alias_maps_to_eid(self):
+        with mute_signals(post_save):
+            source = Source.objects.create(title="Article", eid="2165")
+
+        self.assertEqual(source.article_number, "2165")
+
+        source.article_number = "e42"
+        self.assertEqual(source.eid, "e42")

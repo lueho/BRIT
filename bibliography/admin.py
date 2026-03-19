@@ -32,14 +32,14 @@ class LicenceAdmin(admin.ModelAdmin):
 class SourceAdmin(admin.ModelAdmin):
     inlines = [SourceAuthorInline]
     list_display = (
-        "abbreviation",
+        "citation_key",
         "title",
         "year",
         "type",
         "owner",
         "publication_status",
     )
-    search_fields = ("abbreviation", "title", "doi")
+    search_fields = ("citation_key", "title", "doi")
     list_filter = ("publication_status", "type")
-    ordering = ("abbreviation",)
+    ordering = ("citation_key",)
     autocomplete_fields = ("licence",)

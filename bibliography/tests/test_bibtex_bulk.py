@@ -140,16 +140,16 @@ class SourceBibtexBulkImportViewTestCase(ViewWithPermissionsTestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("source-list-owned"))
-        self.assertTrue(Source.objects.filter(abbreviation="Lovelace 1843").exists())
-        self.assertTrue(Source.objects.filter(abbreviation="Hopper 1952").exists())
+        self.assertTrue(Source.objects.filter(citation_key="Lovelace 1843").exists())
+        self.assertTrue(Source.objects.filter(citation_key="Hopper 1952").exists())
         self.assertEqual(
-            Source.objects.get(abbreviation="Lovelace 1843")
+            Source.objects.get(citation_key="Lovelace 1843")
             .sourceauthors.get()
             .author_id,
             ada.pk,
         )
         self.assertEqual(
-            Source.objects.get(abbreviation="Hopper 1952")
+            Source.objects.get(citation_key="Hopper 1952")
             .sourceauthors.get()
             .author_id,
             grace.pk,
