@@ -119,7 +119,7 @@ class WasteFlyerTestCase(TestCase):
     def setUpTestData(cls):
         with mute_signals(signals.post_save):
             WasteFlyer.objects.create(
-                abbreviation="WasteFlyer007", url="https://www.super-test-flyer.org"
+                citation_key="WasteFlyer007", url="https://www.super-test-flyer.org"
             )
 
     def setUp(self):
@@ -127,12 +127,12 @@ class WasteFlyerTestCase(TestCase):
 
     def test_new_instance_is_saved_with_type_waste_flyer(self):
         with mute_signals(signals.post_save):
-            flyer = WasteFlyer.objects.create(abbreviation="WasteFlyer002")
+            flyer = WasteFlyer.objects.create(citation_key="WasteFlyer002")
         self.assertEqual(flyer.type, "waste_flyer")
 
     def test_str_returns_url(self):
         with mute_signals(signals.post_save):
-            flyer = WasteFlyer.objects.get(abbreviation="WasteFlyer007")
+            flyer = WasteFlyer.objects.get(citation_key="WasteFlyer007")
         self.assertEqual(flyer.__str__(), "https://www.super-test-flyer.org")
 
 

@@ -38,7 +38,7 @@ class WasteFlyerFilterTestCase(TestCase):
             for i in range(1, 5):
                 WasteFlyer.objects.create(
                     title=f"Waste flyer {i}",
-                    abbreviation=f"WF{i}",
+                    citation_key=f"WF{i}",
                     url=f"https://www.flyer{i}.com",
                     url_valid=i % 2 == 0,
                 )
@@ -46,13 +46,13 @@ class WasteFlyerFilterTestCase(TestCase):
         child_catchment = CollectionCatchment.objects.create(
             name="Child", parent=cls.catchment
         )
-        for flyer in WasteFlyer.objects.filter(abbreviation__in=("WF1", "WF2")):
+        for flyer in WasteFlyer.objects.filter(citation_key__in=("WF1", "WF2")):
             collection = Collection.objects.create(
                 catchment=child_catchment,
             )
             collection.flyers.add(flyer)
         collection = Collection.objects.create(catchment=cls.catchment)
-        collection.flyers.add(WasteFlyer.objects.get(abbreviation="WF3"))
+        collection.flyers.add(WasteFlyer.objects.get(citation_key="WF3"))
 
     def setUp(self):
         pass
@@ -74,7 +74,7 @@ class WasteFlyerFilterTestCase(TestCase):
         self.assertTrue(filter_.is_valid())
         self.assertQuerySetEqual(
             filter_.qs.order_by("id"),
-            WasteFlyer.objects.filter(abbreviation__in=("WF1", "WF2", "WF3")).order_by(
+            WasteFlyer.objects.filter(citation_key__in=("WF1", "WF2", "WF3")).order_by(
                 "id"
             ),
         )
