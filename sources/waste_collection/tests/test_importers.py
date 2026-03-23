@@ -210,6 +210,45 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
         self.assertEqual(stats_second["sources_created"], 0)
         self.assertEqual(collection.sources.count(), 1)
 
+    def test_reimport_syncs_collection_source_notes_exactly(self):
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+
+        importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_2.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {
+                    "sources": [
+                        "Private correspondence with district office",
+                        "Municipal waste guide",
+                    ]
+                }
+            ]
+        )
+
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_2.name, self.allowed_1.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {"sources": ["Municipal waste guide"]}
+            ]
+        )
+
+        collection = Collection.objects.get(
+            owner=self.owner, valid_from=date(2024, 1, 1)
+        )
+        self.assertEqual(stats["updated"], 1)
+        self.assertEqual(stats["unchanged"], 0)
+        self.assertIn("sources updated", stats["changes"][0])
+        self.assertEqual(
+            set(collection.sources.values_list("title", flat=True)),
+            {"Municipal waste guide"},
+        )
+
     def test_source_url_is_reclassified_as_waste_flyer(self):
         importer = CollectionImporter(owner=self.owner, publication_status="private")
         url = "https://example.org/flyer"
@@ -332,6 +371,42 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
             [first_flyer.id],
         )
 
+    def test_reimport_syncs_collection_flyers_exactly(self):
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        first_url = "https://example.org/flyer-a"
+        second_url = "https://example.org/flyer-b"
+
+        importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_2.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {"flyer_urls": [first_url, second_url]}
+            ]
+        )
+
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_2.name, self.allowed_1.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {"flyer_urls": [second_url]}
+            ]
+        )
+
+        collection = Collection.objects.get(
+            owner=self.owner, valid_from=date(2024, 1, 1)
+        )
+        self.assertEqual(stats["updated"], 1)
+        self.assertEqual(stats["unchanged"], 0)
+        self.assertIn("flyers updated", stats["changes"][0])
+        self.assertEqual(
+            set(collection.flyers.values_list("url", flat=True)),
+            {second_url},
+        )
+
     def test_combined_lookup_codes_fall_back_to_collector_catchment(self):
         importer = CollectionImporter(owner=self.owner, publication_status="private")
         collector = Collector.objects.create(
@@ -438,6 +513,99 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
                 | {
                     "nuts_or_lau_id": "DEG0I, DEG0K",
                     "catchment_name": "",
+                    "collector_name": collector.name,
+                }
+            ]
+        )
+
+        collection = Collection.objects.get(
+            owner=self.owner, valid_from=date(2024, 1, 1)
+        )
+        self.assertEqual(stats["created"], 1)
+        self.assertEqual(stats["predecessor_links"], 1)
+        self.assertEqual(collection.catchment, predecessor_catchment)
+        self.assertEqual(list(collection.predecessors.all()), [predecessor])
+        self.assertEqual(stats["warnings"], [])
+
+    def test_named_catchment_lookup_is_case_insensitive(self):
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name],
+                    forbidden_materials=[],
+                )
+                | {
+                    "catchment_name": self.catchment.name.upper(),
+                }
+            ]
+        )
+
+        collection = Collection.objects.get(
+            owner=self.owner, valid_from=date(2024, 1, 1)
+        )
+        self.assertEqual(stats["created"], 1)
+        self.assertEqual(collection.catchment, self.catchment)
+        self.assertEqual(stats["warnings"], [])
+
+    def test_missing_named_catchment_falls_back_to_collector_catchment(self):
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        collector = Collector.objects.create(
+            name="Importer Named Fallback Collector",
+            owner=self.owner,
+            catchment=self.catchment,
+        )
+
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name],
+                    forbidden_materials=[],
+                )
+                | {
+                    "catchment_name": "Unknown imported catchment name",
+                    "collector_name": collector.name,
+                }
+            ]
+        )
+
+        collection = Collection.objects.get(
+            owner=self.owner, valid_from=date(2024, 1, 1)
+        )
+        self.assertEqual(stats["created"], 1)
+        self.assertEqual(collection.catchment, self.catchment)
+        self.assertEqual(stats["warnings"], [])
+
+    def test_missing_named_catchment_falls_back_to_predecessor_catchment(self):
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        predecessor_catchment = CollectionCatchment.objects.create(
+            name="Importer Named Fallback Predecessor Catch"
+        )
+        collector = Collector.objects.create(
+            name="Importer Named Fallback Predecessor Collector",
+            owner=self.owner,
+        )
+        predecessor = Collection.objects.create(
+            name="Importer named fallback predecessor",
+            owner=self.owner,
+            publication_status="private",
+            catchment=predecessor_catchment,
+            collector=collector,
+            collection_system=self.collection_system,
+            waste_category=self.waste_category,
+            valid_from=date(2023, 1, 1),
+        )
+        predecessor.allowed_materials.set([self.allowed_1])
+
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name],
+                    forbidden_materials=[],
+                )
+                | {
+                    "catchment_name": "Unknown imported catchment name",
                     "collector_name": collector.name,
                 }
             ]

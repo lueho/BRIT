@@ -501,16 +501,34 @@ class CollectionImporter:
             if update_forbidden_materials:
                 changes.append("forbidden_materials updated")
 
-            if update_fields or update_allowed_materials or update_forbidden_materials:
-                if not self.dry_run:
-                    if update_fields:
-                        collection.save(
-                            update_fields=[*update_fields, "lastmodified_at"]
-                        )
-                    if update_allowed_materials:
-                        collection.allowed_materials.set(allowed_materials)
-                    if update_forbidden_materials:
-                        collection.forbidden_materials.set(forbidden_materials)
+            if not self.dry_run:
+                if update_fields:
+                    collection.save(update_fields=[*update_fields, "lastmodified_at"])
+                if update_allowed_materials:
+                    collection.allowed_materials.set(allowed_materials)
+                if update_forbidden_materials:
+                    collection.forbidden_materials.set(forbidden_materials)
+
+            source_urls, update_sources = self._attach_collection_sources(
+                collection, record.get("sources") or [], stats
+            )
+            update_flyers = self._attach_collection_flyers(
+                collection,
+                [*source_urls, *(record.get("flyer_urls") or [])],
+                stats,
+            )
+            if update_sources:
+                changes.append("sources updated")
+            if update_flyers:
+                changes.append("flyers updated")
+
+            if (
+                update_fields
+                or update_allowed_materials
+                or update_forbidden_materials
+                or update_sources
+                or update_flyers
+            ):
                 stats["updated"] = stats.get("updated", 0) + 1
                 stats["changes"] = stats.get("changes", [])
                 stats["changes"].append(f"{label}: {', '.join(changes)}")
@@ -575,11 +593,15 @@ class CollectionImporter:
 
             stats["created"] += 1
 
-        self._attach_collection_sources(collection, record.get("sources") or [], stats)
+            source_urls, _ = self._attach_collection_sources(
+                collection, record.get("sources") or [], stats
+            )
 
-        self._attach_collection_flyers(
-            collection, record.get("flyer_urls") or [], stats
-        )
+            self._attach_collection_flyers(
+                collection,
+                [*source_urls, *(record.get("flyer_urls") or [])],
+                stats,
+            )
 
         # Property values
         for pv in record.get("property_values") or []:
@@ -587,11 +609,12 @@ class CollectionImporter:
 
     def _attach_collection_flyers(
         self, collection: Collection, urls: list[str], stats: dict
-    ) -> None:
-        existing_urls = set(collection.flyers.values_list("url", flat=True))
+    ) -> bool:
+        desired_flyers = []
+        desired_urls = set()
         for url in urls:
             normalized_url = " ".join(str(url).split())
-            if not normalized_url or normalized_url in existing_urls:
+            if not normalized_url or normalized_url in desired_urls:
                 continue
             if len(normalized_url) > 2083:
                 stats["warnings"].append(
@@ -606,36 +629,45 @@ class CollectionImporter:
                     "publication_status": "private",
                 },
             )
-            collection.flyers.add(flyer)
-            existing_urls.add(normalized_url)
+            desired_flyers.append(flyer)
+            desired_urls.add(normalized_url)
             if created:
                 stats["flyers_created"] += 1
                 if self.publication_status == "review":
                     self._submit_for_review(flyer)
+        current_ids = set(collection.flyers.values_list("id", flat=True))
+        desired_ids = {flyer.id for flyer in desired_flyers}
+        if current_ids == desired_ids:
+            return False
+        collection.flyers.set(desired_flyers)
+        return True
 
     def _attach_collection_sources(
         self, collection: Collection, source_titles: list[str], stats: dict
-    ) -> None:
+    ) -> tuple[list[str], bool]:
         existing_titles = set(collection.sources.values_list("title", flat=True))
+        desired_sources = []
+        desired_titles = set()
         reclassified_urls = []
         for raw_title in source_titles:
             urls, notes = _split_imported_reference_entry(raw_title)
             reclassified_urls.extend(urls)
             for title in notes:
                 title = title[:500]
-                if not title or title in existing_titles:
+                if not title or title in desired_titles:
                     continue
                 source, created = Source.objects.get_or_create_custom_by_title(
                     owner=self.owner,
                     title=title,
                     defaults={"publication_status": "private"},
                 )
-                collection.sources.add(source)
-                existing_titles.add(title)
+                desired_sources.append(source)
+                desired_titles.add(title)
                 if created:
                     stats["sources_created"] += 1
                 if (
-                    self.publication_status == "review"
+                    title not in existing_titles
+                    and self.publication_status == "review"
                     and source.publication_status
                     in (
                         source.STATUS_PRIVATE,
@@ -644,8 +676,12 @@ class CollectionImporter:
                 ):
                     self._submit_for_review(source)
 
-        if reclassified_urls:
-            self._attach_collection_flyers(collection, reclassified_urls, stats)
+        current_ids = set(collection.sources.values_list("id", flat=True))
+        desired_ids = {source.id for source in desired_sources}
+        if current_ids == desired_ids:
+            return reclassified_urls, False
+        collection.sources.set(desired_sources)
+        return reclassified_urls, True
 
     def _attach_cpv_sources(
         self, cpv: CollectionPropertyValue, urls: list[str], stats: dict
@@ -775,8 +811,8 @@ class CollectionImporter:
         forbidden_material_ids: set[int] | None = None,
         valid_from=None,
     ) -> CollectionCatchment | None:
-        nuts_lau_id = record.get("nuts_or_lau_id") or ""
-        catchment_name = record.get("catchment_name") or ""
+        nuts_lau_id = (record.get("nuts_or_lau_id") or "").strip()
+        catchment_name = (record.get("catchment_name") or "").strip()
 
         if nuts_lau_id:
             catchment = self._nuts_catchments.get(nuts_lau_id)
@@ -802,16 +838,54 @@ class CollectionImporter:
             return None
 
         if catchment_name:
-            catchment = CollectionCatchment.objects.filter(name=catchment_name).first()
-            if catchment is None:
-                stats["warnings"].append(
-                    f"{label}: No catchment named '{catchment_name}'."
-                )
-            return catchment
+            catchment = self._resolve_named_catchment(catchment_name)
+            if catchment is not None:
+                return catchment
+
+            catchment = self._resolve_import_catchment_fallback(
+                collector=collector,
+                collection_system=collection_system,
+                waste_category=waste_category,
+                valid_from=valid_from,
+            )
+            if catchment is not None:
+                return catchment
+
+            stats["warnings"].append(f"{label}: No catchment named '{catchment_name}'.")
+            return None
 
         stats["warnings"].append(
             f"{label}: nuts_or_lau_id and catchment_name both empty."
         )
+        return None
+
+    @staticmethod
+    def _resolve_named_catchment(catchment_name: str) -> CollectionCatchment | None:
+        catchment = CollectionCatchment.objects.filter(name=catchment_name).first()
+        if catchment is not None:
+            return catchment
+        return CollectionCatchment.objects.filter(name__iexact=catchment_name).first()
+
+    @staticmethod
+    def _resolve_import_catchment_fallback(
+        *,
+        collector: Collector | None,
+        collection_system: CollectionSystem | None,
+        waste_category: WasteCategory | None,
+        valid_from,
+    ) -> CollectionCatchment | None:
+        if collector and collector.catchment_id:
+            return collector.catchment
+
+        predecessor = CollectionImporter._find_predecessor_for_catchment_fallback(
+            collector=collector,
+            waste_category=waste_category,
+            collection_system=collection_system,
+            valid_from=valid_from,
+        )
+        if predecessor and predecessor.catchment_id:
+            return predecessor.catchment
+
         return None
 
     @staticmethod
@@ -829,19 +903,12 @@ class CollectionImporter:
         waste_category: WasteCategory | None,
         valid_from,
     ) -> CollectionCatchment | None:
-        if collector and collector.catchment_id:
-            return collector.catchment
-
-        predecessor = self._find_predecessor_for_catchment_fallback(
+        return self._resolve_import_catchment_fallback(
             collector=collector,
-            waste_category=waste_category,
             collection_system=collection_system,
+            waste_category=waste_category,
             valid_from=valid_from,
         )
-        if predecessor and predecessor.catchment_id:
-            return predecessor.catchment
-
-        return None
 
     def _resolve_collection_system(
         self, record: dict, label: str, stats: dict

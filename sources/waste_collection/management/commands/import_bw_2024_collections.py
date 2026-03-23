@@ -308,6 +308,55 @@ def _records_to_json_serialisable(records: list[dict]) -> list[dict]:
     return out
 
 
+def _load_records(
+    file_path: Path,
+    *,
+    excel_rows: set[int] | None = None,
+) -> tuple[list[dict], list[str], int]:
+    """Load BW workbook rows into importer-compatible records.
+
+    Args:
+        file_path: Workbook path.
+        excel_rows: Optional set of 1-indexed Excel row numbers (including the
+            header row) to load. When omitted, all data rows are processed.
+
+    Returns:
+        Tuple of valid records, local preflight warnings, and total data-row count.
+    """
+    workbook = openpyxl.load_workbook(str(file_path), read_only=True, data_only=True)
+    rows = workbook.active.iter_rows(values_only=True)
+    next(rows, None)
+
+    all_records = []
+    warnings = []
+    row_count = 0
+
+    for row_number, row in enumerate(rows, start=2):
+        row_count += 1
+        if excel_rows is not None and row_number not in excel_rows:
+            continue
+
+        record = _row_to_record(row)
+        record = {
+            **record,
+            "_excel_row": row_number,
+        }
+        missing = []
+        if not record.get("collection_system"):
+            missing.append("collection_system")
+        if not record.get("valid_from"):
+            missing.append("valid_from")
+        if missing:
+            warnings.append(
+                f"Row {row_number} ({record.get('catchment_name') or record.get('nuts_or_lau_id')}): "
+                f"skipped — missing required field(s): {', '.join(missing)}"
+            )
+            continue
+        all_records.append(record)
+
+    return all_records, warnings, row_count
+
+
 class Command(BaseCommand):
     """Import BW 2024 waste collection data by calling the BRIT API."""
 
@@ -452,30 +501,9 @@ class Command(BaseCommand):
         if dry_run:
             self.stdout.write("DRY RUN — no records will be written.\n")
 
-        wb = openpyxl.load_workbook(str(file_path), read_only=True, data_only=True)
-        raw_rows = list(wb.active.iter_rows(values_only=True))[1:]
-        self.stdout.write(f"Read {len(raw_rows)} data rows from Excel.\n")
-
-        all_records = _records_to_json_serialisable(
-            [_row_to_record(r) for r in raw_rows]
-        )
-
-        # Pre-filter rows that violate hard-required fields to avoid noisy API skips.
-        records = []
-        pre_skip_warnings = []
-        for i, rec in enumerate(all_records, start=2):  # +2: 1-indexed + header row
-            missing = []
-            if not rec.get("collection_system"):
-                missing.append("collection_system")
-            if not rec.get("valid_from"):
-                missing.append("valid_from")
-            if missing:
-                pre_skip_warnings.append(
-                    f"Row {i} ({rec.get('catchment_name') or rec.get('nuts_or_lau_id')}): "
-                    f"skipped — missing required field(s): {', '.join(missing)}"
-                )
-            else:
-                records.append(rec)
+        records, pre_skip_warnings, row_count = _load_records(file_path)
+        self.stdout.write(f"Read {row_count} data rows from Excel.\n")
+        records = _records_to_json_serialisable(records)
 
         if pre_skip_warnings:
             self.stdout.write(
