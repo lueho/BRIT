@@ -28,6 +28,7 @@ from sources.waste_collection.serializers import (
     CollectionImportRecordSerializer,
     CollectionModelSerializer,
     CollectionMutationCreateSerializer,
+    CollectionMutationUpdateSerializer,
     CollectionMutationVersionSerializer,
     CollectionPropertyValueMutationSerializer,
     CollectorGeometrySerializer,
@@ -391,6 +392,118 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             ),
             "detail_url": reverse(detail_url_name, kwargs={"pk": obj.pk}),
         }
+
+    @staticmethod
+    def _collection_identity_mismatches(collection, data):
+        mismatches = {}
+
+        actual_waste_category = collection.effective_waste_category
+        expected_pairs = {
+            "catchment": (str(collection.catchment), data["expected_catchment"]),
+            "waste_category": (
+                str(actual_waste_category) if actual_waste_category else "",
+                data["expected_waste_category"],
+            ),
+            "collection_system": (
+                str(collection.collection_system),
+                data["expected_collection_system"],
+            ),
+            "publication_status": (
+                collection.publication_status,
+                data["expected_publication_status"],
+            ),
+            "valid_from": (
+                collection.valid_from.isoformat() if collection.valid_from else None,
+                data["expected_valid_from"].isoformat(),
+            ),
+        }
+
+        for field_name, (actual_value, expected_value) in expected_pairs.items():
+            if actual_value != expected_value:
+                mismatches[field_name] = {
+                    "actual": actual_value,
+                    "expected": expected_value,
+                }
+
+        return mismatches
+
+    @staticmethod
+    def _apply_collection_mutation_update(collection, data):
+        scalar_fields = (
+            "collector",
+            "frequency",
+            "fee_system",
+            "sorting_method",
+            "established",
+            "connection_type",
+            "min_bin_size",
+            "required_bin_capacity",
+            "required_bin_capacity_reference",
+            "description",
+        )
+        touched_scalar_fields = []
+        for field_name in scalar_fields:
+            if field_name not in data:
+                continue
+            setattr(collection, field_name, data[field_name])
+            touched_scalar_fields.append(field_name)
+
+        if touched_scalar_fields:
+            collection.save(update_fields=[*touched_scalar_fields, "lastmodified_at"])
+        else:
+            collection.save()
+
+        if "allowed_materials" in data:
+            collection.allowed_materials.set(list(data["allowed_materials"]))
+        if "forbidden_materials" in data:
+            collection.forbidden_materials.set(list(data["forbidden_materials"]))
+        if "sources" in data or "flyer_urls" in data:
+            CollectionViewSet._attach_sources_and_flyers(
+                collection,
+                data.get("sources", []),
+                data.get("flyer_urls", []),
+            )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+        url_path="update",
+        url_name="update",
+    )
+    def update_collection(self, request, pk=None):
+        actor = self._require_authenticated_actor(request)
+        collection = self.get_object()
+
+        if collection.owner_id != actor.id:
+            raise PermissionDenied(
+                "Only the collection owner may use the programmatic update endpoint."
+            )
+
+        serializer = CollectionMutationUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        mismatches = self._collection_identity_mismatches(collection, data)
+        if mismatches:
+            return Response(
+                {
+                    "detail": "Target collection no longer matches the expected identity.",
+                    "mismatches": mismatches,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        with transaction.atomic():
+            self._apply_collection_mutation_update(collection, data)
+
+        return Response(
+            {
+                **self._serialize_mutation_response(collection, False),
+                "updated": True,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @action(
         detail=False,

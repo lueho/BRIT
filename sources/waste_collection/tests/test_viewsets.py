@@ -806,6 +806,9 @@ class CollectionMutationApiTestCase(APITestCase):
         cls.allowed_material = Material.objects.create(
             name="Agent Allowed Material", owner=cls.owner
         )
+        cls.updated_allowed_material = Material.objects.create(
+            name="Agent Updated Allowed Material", owner=cls.owner
+        )
         cls.forbidden_material = Material.objects.create(
             name="Agent Forbidden Material", owner=cls.owner
         )
@@ -856,7 +859,6 @@ class CollectionMutationApiTestCase(APITestCase):
         cls.predecessor.flyers.add(cls.predecessor_flyer)
 
     def test_create_endpoint_requires_add_permission(self):
-        """Create endpoint denies users lacking add_collection permission."""
         user = User.objects.create_user(username="agent-no-perm")
         self.client.force_login(user)
 
@@ -874,7 +876,6 @@ class CollectionMutationApiTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_create_endpoint_private_draft_when_submit_disabled(self):
-        """Create endpoint can persist a private draft without review submission."""
         self.client.force_login(self.owner)
 
         response = self.client.post(
@@ -913,7 +914,6 @@ class CollectionMutationApiTestCase(APITestCase):
         )
 
     def test_create_endpoint_submits_for_review(self):
-        """Create endpoint submits to review and logs a submitted ReviewAction."""
         self.client.force_login(self.owner)
 
         response = self.client.post(
@@ -940,7 +940,6 @@ class CollectionMutationApiTestCase(APITestCase):
         )
 
     def test_create_endpoint_validates_dates(self):
-        """Create endpoint rejects invalid validity periods."""
         self.client.force_login(self.owner)
 
         response = self.client.post(
@@ -958,8 +957,108 @@ class CollectionMutationApiTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("valid_until", response.data)
 
+    def test_update_endpoint_denies_non_owner(self):
+        self.client.force_login(self.other_user)
+
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-update",
+                kwargs={"pk": self.private_predecessor.pk},
+            ),
+            {
+                "expected_catchment": str(self.private_predecessor.catchment),
+                "expected_waste_category": str(
+                    self.private_predecessor.effective_waste_category
+                ),
+                "expected_collection_system": str(
+                    self.private_predecessor.collection_system
+                ),
+                "expected_publication_status": self.private_predecessor.publication_status,
+                "expected_valid_from": self.private_predecessor.valid_from.isoformat(),
+                "description": "intruder update",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_update_endpoint_rejects_identity_mismatch(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-update",
+                kwargs={"pk": self.private_predecessor.pk},
+            ),
+            {
+                "expected_catchment": "Wrong Catchment",
+                "expected_waste_category": str(
+                    self.private_predecessor.effective_waste_category
+                ),
+                "expected_collection_system": str(
+                    self.private_predecessor.collection_system
+                ),
+                "expected_publication_status": self.private_predecessor.publication_status,
+                "expected_valid_from": self.private_predecessor.valid_from.isoformat(),
+                "description": "mismatch update",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn("mismatches", response.data)
+        self.private_predecessor.refresh_from_db()
+        self.assertEqual(self.private_predecessor.description, "private predecessor")
+
+    def test_update_endpoint_enriches_existing_collection(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-update",
+                kwargs={"pk": self.private_predecessor.pk},
+            ),
+            {
+                "expected_catchment": str(self.private_predecessor.catchment),
+                "expected_waste_category": str(
+                    self.private_predecessor.effective_waste_category
+                ),
+                "expected_collection_system": str(
+                    self.private_predecessor.collection_system
+                ),
+                "expected_publication_status": self.private_predecessor.publication_status,
+                "expected_valid_from": self.private_predecessor.valid_from.isoformat(),
+                "allowed_materials": [self.updated_allowed_material.pk],
+                "description": "updated in place",
+                "sources": [self.source.pk],
+                "flyer_urls": ["https://example.com/updated-flyer"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["updated"])
+
+        self.private_predecessor.refresh_from_db()
+        self.assertEqual(self.private_predecessor.description, "updated in place")
+        self.assertEqual(
+            list(
+                self.private_predecessor.allowed_materials.values_list(
+                    "name", flat=True
+                )
+            ),
+            [self.updated_allowed_material.name],
+        )
+        self.assertTrue(
+            self.private_predecessor.sources.filter(pk=self.source.pk).exists()
+        )
+        self.assertTrue(
+            self.private_predecessor.flyers.filter(
+                url="https://example.com/updated-flyer"
+            ).exists()
+        )
+
     def test_new_version_with_add_permission_succeeds(self):
-        """Users with add permission can still create a version from published predecessors."""
         self.client.force_login(self.other_user)
 
         response = self.client.post(
@@ -981,7 +1080,6 @@ class CollectionMutationApiTestCase(APITestCase):
     def test_new_version_without_add_permission_is_denied_for_published_predecessor(
         self,
     ):
-        """Users need add_collection permission even when predecessor is published."""
         user = User.objects.create_user(username="agent-no-add-version")
         self.client.force_login(user)
 
@@ -997,7 +1095,6 @@ class CollectionMutationApiTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_new_version_rejects_private_predecessor_of_other_user(self):
-        """Branching from another user's private predecessor is not allowed."""
         user = User.objects.create_user(username="agent-private-denied")
         user.user_permissions.add(self.add_collection_permission)
         self.client.force_login(user)
@@ -1014,7 +1111,6 @@ class CollectionMutationApiTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_new_version_allows_own_private_predecessor_with_add_permission(self):
-        """Users with add permission may branch from their own private predecessors."""
         user = User.objects.create_user(username="agent-own-private")
         user.user_permissions.add(self.add_collection_permission)
         own_predecessor = Collection.objects.create(
@@ -1047,7 +1143,6 @@ class CollectionMutationApiTestCase(APITestCase):
         self.assertTrue(successor.predecessors.filter(pk=own_predecessor.pk).exists())
 
     def test_new_version_creates_predecessor_link_and_submits(self):
-        """New-version endpoint creates linked successor and optional review submission."""
         self.client.force_login(self.owner)
 
         response = self.client.post(

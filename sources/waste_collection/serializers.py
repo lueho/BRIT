@@ -641,6 +641,11 @@ class CollectionImportRecordSerializer(serializers.Serializer):
         return attrs
 
 
+# ---------------------------------------------------------------------------
+# Collection mutation serializers
+# ---------------------------------------------------------------------------
+
+
 class CollectionMutationCreateSerializer(serializers.Serializer):
     """Validate payloads for programmatic collection creation."""
 
@@ -721,6 +726,102 @@ class CollectionMutationCreateSerializer(serializers.Serializer):
         if valid_from and valid_until and valid_from >= valid_until:
             raise serializers.ValidationError(
                 {"valid_until": ("Valid until date must be after the valid from date.")}
+            )
+        return attrs
+
+
+class CollectionMutationUpdateSerializer(serializers.Serializer):
+    """Validate guarded payloads for programmatic in-place collection updates."""
+
+    expected_catchment = serializers.CharField()
+    expected_waste_category = serializers.CharField()
+    expected_collection_system = serializers.CharField()
+    expected_publication_status = serializers.ChoiceField(
+        choices=[
+            models.Collection.STATUS_PRIVATE,
+            models.Collection.STATUS_REVIEW,
+            getattr(models.Collection, "STATUS_DECLINED", "declined"),
+        ]
+    )
+    expected_valid_from = serializers.DateField()
+
+    collector = serializers.PrimaryKeyRelatedField(
+        queryset=models.Collector.objects.all(), required=False, allow_null=True
+    )
+    frequency = serializers.PrimaryKeyRelatedField(
+        queryset=models.CollectionFrequency.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    fee_system = serializers.PrimaryKeyRelatedField(
+        queryset=models.FeeSystem.objects.all(), required=False, allow_null=True
+    )
+    sorting_method = serializers.PrimaryKeyRelatedField(
+        queryset=models.SortingMethod.objects.all(), required=False, allow_null=True
+    )
+    allowed_materials = serializers.PrimaryKeyRelatedField(
+        queryset=Material.objects.all(), many=True, required=False
+    )
+    forbidden_materials = serializers.PrimaryKeyRelatedField(
+        queryset=Material.objects.all(), many=True, required=False
+    )
+    sources = serializers.PrimaryKeyRelatedField(
+        queryset=Source.objects.all(), many=True, required=False
+    )
+    flyer_urls = serializers.ListField(child=serializers.URLField(), required=False)
+
+    established = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1800, max_value=2100
+    )
+    connection_type = serializers.ChoiceField(
+        choices=[choice[0] for choice in models.CONNECTION_TYPE_CHOICES],
+        required=False,
+        allow_null=True,
+    )
+    min_bin_size = serializers.DecimalField(
+        required=False,
+        allow_null=True,
+        max_digits=8,
+        decimal_places=1,
+    )
+    required_bin_capacity = serializers.DecimalField(
+        required=False,
+        allow_null=True,
+        max_digits=8,
+        decimal_places=1,
+    )
+    required_bin_capacity_reference = serializers.ChoiceField(
+        choices=[
+            choice[0] for choice in models.REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES
+        ],
+        required=False,
+        allow_null=True,
+    )
+    description = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_description(self, value):
+        return normalize_collection_description(value)
+
+    def validate(self, attrs):
+        mutable_fields = {
+            "collector",
+            "frequency",
+            "fee_system",
+            "sorting_method",
+            "allowed_materials",
+            "forbidden_materials",
+            "sources",
+            "flyer_urls",
+            "established",
+            "connection_type",
+            "min_bin_size",
+            "required_bin_capacity",
+            "required_bin_capacity_reference",
+            "description",
+        }
+        if not mutable_fields.intersection(attrs):
+            raise serializers.ValidationError(
+                "At least one mutable collection field must be provided."
             )
         return attrs
 
@@ -834,6 +935,7 @@ __all__ = [
     "CollectionImportRecordSerializer",
     "CollectionModelSerializer",
     "CollectionMutationCreateSerializer",
+    "CollectionMutationUpdateSerializer",
     "CollectionMutationVersionSerializer",
     "CollectionPropertyValueMutationSerializer",
     "CollectionSystemSerializer",
