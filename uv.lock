@@ -120,7 +120,6 @@ dependencies = [
     { name = "django-cookie-consent" },
     { name = "django-crispy-forms" },
     { name = "django-extra-views" },
-    { name = "django-geojson" },
     { name = "django-leaflet" },
     { name = "django-redis" },
     { name = "django-registration-redux" },
@@ -131,13 +130,11 @@ dependencies = [
     { name = "djangorestframework-csv" },
     { name = "djangorestframework-gis" },
     { name = "gunicorn" },
-    { name = "markdown" },
     { name = "openpyxl" },
     { name = "pillow" },
     { name = "pint" },
     { name = "psycopg2-binary" },
     { name = "requests" },
-    { name = "tblib" },
     { name = "whitenoise" },
     { name = "xlsxwriter" },
 ]
@@ -174,7 +171,6 @@ requires-dist = [
     { name = "django-cookie-consent", specifier = ">=1.0.0" },
     { name = "django-crispy-forms", specifier = ">=2.5" },
     { name = "django-extra-views", specifier = ">=0.16.0" },
-    { name = "django-geojson", specifier = ">=4.2.0" },
     { name = "django-leaflet", specifier = ">=0.33.0" },
     { name = "django-redis", specifier = ">=6.0.0" },
     { name = "django-registration-redux", specifier = ">=2.13" },
@@ -185,13 +181,11 @@ requires-dist = [
     { name = "djangorestframework-csv", specifier = ">=3.0.2" },
     { name = "djangorestframework-gis", specifier = ">=1.2.0" },
     { name = "gunicorn", specifier = ">=25.1.0" },
-    { name = "markdown", specifier = ">=3.7" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pillow", specifier = ">=12.1.1" },
     { name = "pint", specifier = ">=0.23" },
     { name = "psycopg2-binary", specifier = ">=2.9.0" },
     { name = "requests", specifier = ">=2.32.5" },
-    { name = "tblib", specifier = ">=3.2.2" },
     { name = "whitenoise", specifier = ">=6.9.0" },
     { name = "xlsxwriter", specifier = ">=3.2.9" },
 ]
@@ -670,18 +664,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/2c/e4/465d2699cd388c0005fb8d6ae6709f239917c6d8790ac35719676fffdcf3/django_filter-25.2.tar.gz", hash = "sha256:760e984a931f4468d096f5541787efb8998c61217b73006163bf2f9523fe8f23", size = 143818, upload-time = "2025-10-05T09:51:31.521Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c1/40/6a02495c5658beb1f31eb09952d8aa12ef3c2a66342331ce3a35f7132439/django_filter-25.2-py3-none-any.whl", hash = "sha256:9c0f8609057309bba611062fe1b720b4a873652541192d232dd28970383633e3", size = 94145, upload-time = "2025-10-05T09:51:29.728Z" },
-]
-
-[[package]]
-name = "django-geojson"
-version = "4.2.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "django" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c6/94/b7f83ffa37fbc4e8055243a298198858ead93d8d63c7e4c6aeae2b539765/django_geojson-4.2.0.tar.gz", hash = "sha256:1d35a22384c89165cfc5a47c3033b918b1035b86bd3862500a003e93cecb7816", size = 21107, upload-time = "2025-03-10T09:07:31.924Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/70/fc/f59aa9e7742cdada368582c9b16c3f007d046b9854f97fead8e7ee501e00/django_geojson-4.2.0-py3-none-any.whl", hash = "sha256:bdee93c1915147cbd37ee6299c1eaa588d86693f8402f48b0803825eee6bf23b", size = 22812, upload-time = "2025-03-10T09:07:29.779Z" },
 ]
 
 [[package]]
@@ -2262,15 +2244,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/90/76/437d71068094df0726366574cf3432a4ed754217b436eb7429415cf2d480/sqlparse-0.5.5.tar.gz", hash = "sha256:e20d4a9b0b8585fdf63b10d30066c7c94c5d7a7ec47c889a2d83a3caa93ff28e", size = 120815, upload-time = "2025-12-19T07:17:45.073Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/49/4b/359f28a903c13438ef59ebeee215fb25da53066db67b305c125f1c6d2a25/sqlparse-0.5.5-py3-none-any.whl", hash = "sha256:12a08b3bf3eec877c519589833aed092e2444e68240a3577e8e26148acc7b1ba", size = 46138, upload-time = "2025-12-19T07:17:46.573Z" },
-]
-
-[[package]]
-name = "tblib"
-version = "3.2.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f4/8a/14c15ae154895cc131174f858c707790d416c444fc69f93918adfd8c4c0b/tblib-3.2.2.tar.gz", hash = "sha256:e9a652692d91bf4f743d4a15bc174c0b76afc750fe8c7b6d195cc1c1d6d2ccec", size = 35046, upload-time = "2025-11-12T12:21:16.572Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/02/be/5d2d47b1fb58943194fb59dcf222f7c4e35122ec0ffe8c36e18b5d728f0b/tblib-3.2.2-py3-none-any.whl", hash = "sha256:26bdccf339bcce6a88b2b5432c988b266ebbe63a4e593f6b578b1d2e723d2b76", size = 12893, upload-time = "2025-11-12T12:21:14.407Z" },
 ]
 
 [[package]]
