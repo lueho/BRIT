@@ -101,6 +101,12 @@ class CollectionViewSetTestCase(APITestCase):
         self.factory = APIRequestFactory()
         self.viewset = CollectionViewSet()
 
+    @staticmethod
+    def _response_results(response):
+        if isinstance(response.data, dict):
+            return response.data.get("results", response.data.get("summaries", []))
+        return response.data
+
     def _get_collection_cache_key(self, params=None, user=None):
         """Build a CollectionViewSet cache key from request query params."""
         request = self.factory.get("/", params or {})
@@ -255,10 +261,97 @@ class CollectionViewSetTestCase(APITestCase):
         feature_ids = {f["properties"]["id"] for f in response.data["features"]}
         self.assertEqual(feature_ids, {predecessor.pk})
 
+    def test_list_endpoint_includes_research_metadata_fields(self):
+        predecessor = self._create_collection(
+            name="Research Predecessor",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PRIVATE,
+        )
+        successor = self._create_collection(
+            name="Research Successor",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PRIVATE,
+        )
+        successor.add_predecessor(predecessor)
+
+        self.client.force_login(self.regular_user)
+        response = self.client.get(
+            reverse("api-waste-collection-list"),
+            {"scope": "private", "id": [successor.pk]},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = self._response_results(response)
+        result = next(item for item in results if item["id"] == successor.pk)
+
+        self.assertEqual(result["publication_status"], UserCreatedObject.STATUS_PRIVATE)
+        self.assertEqual(result["collection_system_id"], self.collection_system.pk)
+        self.assertEqual(result["frequency_id"], self.frequency.pk)
+        self.assertEqual(result["predecessor_ids"], [predecessor.pk])
+        self.assertEqual(result["successor_ids"], [])
+
+    def test_summaries_endpoint_returns_own_private_collection_without_scope(self):
+        self.client.force_login(self.regular_user)
+
+        response = self.client.get(
+            reverse("api-waste-collection-summaries"),
+            {"id": [self.private_collection.pk]},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        summaries = self._response_results(response)
+        self.assertEqual(len(summaries), 1)
+        self.assertEqual(summaries[0]["id"], self.private_collection.pk)
+        self.assertEqual(
+            summaries[0]["Publication status"],
+            UserCreatedObject.STATUS_PRIVATE,
+        )
+
+    def test_summaries_endpoint_hides_other_users_private_collection(self):
+        self.client.force_login(self.regular_user)
+
+        response = self.client.get(
+            reverse("api-waste-collection-summaries"),
+            {"id": [self.other_user_private_collection.pk]},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self._response_results(response), [])
+
+    def test_frequencies_action_supports_exact_name_lookup(self):
+        CollectionFrequency.objects.create(
+            name="Agent Frequency Private",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PRIVATE,
+        )
+        published_frequency = CollectionFrequency.objects.create(
+            name="Weekly Research Frequency",
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
+        )
+
+        self.client.force_login(self.regular_user)
+        response = self.client.get(
+            reverse("api-waste-collection-frequencies"),
+            {"exact_name": "Weekly Research Frequency"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = self._response_results(response)
+        self.assertEqual(
+            results,
+            [
+                {
+                    "id": published_frequency.pk,
+                    "name": published_frequency.name,
+                    "type": published_frequency.type,
+                }
+            ],
+        )
+
     def test_create_permission_denied_without_model_permission(self):
         """User without add_collection permission cannot create collections."""
         data = {
-            "name": "New Collection",
+            "catchment": self.catchment.pk,
             "collector": self.collector.id,
             "fee_system": self.fee_system.id,
             "frequency": self.frequency.id,

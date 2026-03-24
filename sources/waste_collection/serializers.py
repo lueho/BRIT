@@ -21,6 +21,25 @@ from utils.serializers import FieldLabelModelSerializer
 GEOMETRY_SIMPLIFY_TOLERANCE = 0.001
 
 
+class CollectionReferenceFieldsMixin(serializers.Serializer):
+    catchment_id = serializers.IntegerField(read_only=True)
+    collector_id = serializers.IntegerField(read_only=True)
+    collection_system_id = serializers.IntegerField(read_only=True)
+    waste_category_id = serializers.IntegerField(read_only=True, allow_null=True)
+    frequency_id = serializers.IntegerField(read_only=True, allow_null=True)
+    fee_system_id = serializers.IntegerField(read_only=True, allow_null=True)
+    predecessor_ids = serializers.SerializerMethodField()
+    successor_ids = serializers.SerializerMethodField()
+
+    @staticmethod
+    def get_predecessor_ids(obj):
+        return list(obj.predecessors.order_by("pk").values_list("pk", flat=True))
+
+    @staticmethod
+    def get_successor_ids(obj):
+        return list(obj.successors.order_by("pk").values_list("pk", flat=True))
+
+
 GeoreferencedWasteCollection = models.Collection
 GeoreferencedCollector = models.Collector
 
@@ -155,7 +174,15 @@ class WasteFlyerSerializer(FieldLabelModelSerializer):
         fields = ("url",)
 
 
-class CollectionModelSerializer(FieldLabelModelSerializer):
+class CollectionFrequencyReferenceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.CollectionFrequency
+        fields = ("id", "name", "type")
+
+
+class CollectionModelSerializer(
+    CollectionReferenceFieldsMixin, FieldLabelModelSerializer
+):
     """
     Serializer for the Collection model, including all collection parameters and inline waste fields.
     """
@@ -200,17 +227,25 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
             "id",
             "owner_id",
             "publication_status",
+            "catchment_id",
             "catchment",
+            "collector_id",
             "collector",
+            "collection_system_id",
             "collection_system",
             "sorting_method",
             "established",
+            "waste_category_id",
             "waste_category",
             "connection_type",
             "allowed_materials",
             "forbidden_materials",
+            "frequency_id",
             "frequency",
+            "fee_system_id",
             "fee_system",
+            "predecessor_ids",
+            "successor_ids",
             "min_bin_size",
             "required_bin_capacity",
             "required_bin_capacity_reference",
@@ -462,6 +497,50 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
                     ordered_representation["aggregated"] = True
 
         return ordered_representation
+
+
+class CollectionResearchSerializer(
+    CollectionReferenceFieldsMixin, CollectionFlatSerializer
+):
+    id = serializers.IntegerField(read_only=True)
+    owner_id = serializers.IntegerField(source="owner.id", read_only=True)
+    publication_status = serializers.CharField(read_only=True)
+
+    class Meta(CollectionFlatSerializer.Meta):
+        fields = (
+            "id",
+            "owner_id",
+            "publication_status",
+            "catchment_id",
+            "catchment",
+            "nuts_or_lau_id",
+            "country",
+            "collector_id",
+            "collector",
+            "collection_system_id",
+            "collection_system",
+            "waste_category_id",
+            "waste_category",
+            "connection_type",
+            "allowed_materials",
+            "forbidden_materials",
+            "fee_system_id",
+            "fee_system",
+            "frequency_id",
+            "frequency",
+            "predecessor_ids",
+            "successor_ids",
+            "min_bin_size",
+            "required_bin_capacity",
+            "required_bin_capacity_reference",
+            "comments",
+            "flyer_urls",
+            "bibliography_sources",
+            "valid_from",
+            "valid_until",
+            "created_at",
+            "lastmodified_at",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -929,6 +1008,7 @@ class CollectionMutationVersionSerializer(serializers.Serializer):
 
 __all__ = [
     "AggregatedCollectionPropertyValueMutationSerializer",
+    "CollectionFrequencyReferenceSerializer",
     "GEOMETRY_SIMPLIFY_TOLERANCE",
     "CollectionFlatSerializer",
     "CollectionImportPropertyValueSerializer",
@@ -938,6 +1018,7 @@ __all__ = [
     "CollectionMutationUpdateSerializer",
     "CollectionMutationVersionSerializer",
     "CollectionPropertyValueMutationSerializer",
+    "CollectionResearchSerializer",
     "CollectionSystemSerializer",
     "CollectorGeometrySerializer",
     "CollectorSerializer",

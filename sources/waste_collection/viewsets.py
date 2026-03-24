@@ -17,6 +17,7 @@ from sources.waste_collection.importers import CollectionImporter
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
     Collection,
+    CollectionFrequency,
     CollectionPropertyValue,
     Collector,
     WasteFlyer,
@@ -25,17 +26,23 @@ from sources.waste_collection.serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
     AggregatedCollectionPropertyValueMutationSerializer,
     CollectionFlatSerializer,
+    CollectionFrequencyReferenceSerializer,
     CollectionImportRecordSerializer,
     CollectionModelSerializer,
     CollectionMutationCreateSerializer,
     CollectionMutationUpdateSerializer,
     CollectionMutationVersionSerializer,
     CollectionPropertyValueMutationSerializer,
+    CollectionResearchSerializer,
     CollectorGeometrySerializer,
     WasteCollectionGeometrySerializer,
 )
 from utils.object_management.models import ReviewAction
-from utils.object_management.permissions import UserCreatedObjectPermission
+from utils.object_management.permissions import (
+    UserCreatedObjectPermission,
+    apply_scope_filter,
+    filter_queryset_for_user,
+)
 from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 
@@ -144,10 +151,14 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         """Use detailed serializer for retrieve so the UI receives ownership and status fields.
 
         - retrieve -> CollectionModelSerializer (includes owner_id, publication_status, etc.)
+        - list     -> CollectionResearchSerializer (research workflow metadata)
         - default  -> self.serializer_class (CollectionFlatSerializer)
         """
-        if getattr(self, "action", None) == "retrieve":
+        action = getattr(self, "action", None)
+        if action == "retrieve":
             return CollectionModelSerializer
+        if action == "list":
+            return CollectionResearchSerializer
         return super().get_serializer_class()
 
     # Ensure CachedGeoJSONMixin uses the GeoJSON serializer class
@@ -463,6 +474,28 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 data.get("sources", []),
                 data.get("flyer_urls", []),
             )
+
+    @staticmethod
+    def _visible_summary_queryset(request):
+        queryset = Collection.objects.all()
+        scope = request.query_params.get("scope")
+        user = getattr(request, "user", None)
+
+        if scope in {"published", "private", "review", "declined", "archived"}:
+            return apply_scope_filter(queryset, scope, user=user)
+
+        return filter_queryset_for_user(queryset, user)
+
+    @staticmethod
+    def _visible_frequency_queryset(request):
+        queryset = CollectionFrequency.objects.all()
+        scope = request.query_params.get("scope", "published")
+        user = getattr(request, "user", None)
+
+        if scope in {"published", "private", "review", "declined", "archived"}:
+            return apply_scope_filter(queryset, scope, user=user)
+
+        return filter_queryset_for_user(queryset, user)
 
     @action(
         detail=True,
@@ -969,7 +1002,9 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
     def summaries(self, request, *args, **kwargs):
         self.check_permissions(request)
-        queryset = self.get_queryset().filter(id__in=request.query_params.getlist("id"))
+        queryset = self._visible_summary_queryset(request).filter(
+            id__in=request.query_params.getlist("id")
+        )
         serializer = CollectionModelSerializer(
             queryset,
             many=True,
@@ -977,6 +1012,30 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             context={"request": request},
         )
         return Response({"summaries": serializer.data})
+
+    @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
+    def frequencies(self, request, *args, **kwargs):
+        self.check_permissions(request)
+        queryset = self._visible_frequency_queryset(request)
+
+        exact_name = str(request.query_params.get("exact_name") or "").strip()
+        query = str(request.query_params.get("query") or "").strip()
+        if exact_name:
+            queryset = queryset.filter(name__iexact=exact_name)
+        elif query:
+            queryset = queryset.filter(name__icontains=query)
+
+        try:
+            limit = int(request.query_params.get("limit", 50))
+        except (TypeError, ValueError):
+            limit = 50
+        limit = max(1, min(limit, 200))
+
+        serializer = CollectionFrequencyReferenceSerializer(
+            queryset.order_by("name")[:limit],
+            many=True,
+        )
+        return Response({"results": serializer.data})
 
     @action(
         detail=False,
