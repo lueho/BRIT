@@ -6,17 +6,46 @@ _REQUEST_HEADERS = {
     "Referer": "https://www.wikipedia.org",
     "DNT": "1",
 }
+_REQUEST_TIMEOUT = 10
+
+
+def _is_success_status(status_code):
+    return 200 <= status_code < 300
 
 
 def check_url(url):
+    clean_url = str(url or "").strip()
+    if not clean_url:
+        return False
+
     try:
-        response = requests.head(url, headers=_REQUEST_HEADERS, allow_redirects=True)
+        response = requests.head(
+            clean_url,
+            headers=_REQUEST_HEADERS,
+            allow_redirects=True,
+            timeout=_REQUEST_TIMEOUT,
+        )
+    except requests.exceptions.RequestException:
+        response = None
+    else:
+        if _is_success_status(response.status_code):
+            return True
+
+    get_response = None
+    try:
+        get_response = requests.get(
+            clean_url,
+            headers=_REQUEST_HEADERS,
+            allow_redirects=True,
+            timeout=_REQUEST_TIMEOUT,
+            stream=True,
+        )
+        return _is_success_status(get_response.status_code)
     except requests.exceptions.RequestException:
         return False
-    else:
-        if response.status_code == 405:
-            response = requests.get(url, headers=_REQUEST_HEADERS, allow_redirects=True)
-        return response.status_code == 200
+    finally:
+        if get_response is not None:
+            get_response.close()
 
 
 def find_wayback_snapshot_for_year(url, year):

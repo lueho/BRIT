@@ -161,6 +161,8 @@ def _serialize_m2m_sources(obj: Any) -> list[dict[str, Any]]:
             "abbreviation": getattr(src, "abbreviation", ""),
             "url": getattr(src, "url", None),
             "url_valid": getattr(src, "url_valid", None),
+            "url_checked": _serialize_value(getattr(src, "url_checked", None)),
+            "url_valid_is_advisory": True,
             "doi": getattr(src, "doi", None),
             "abstract": getattr(src, "abstract", None),
             "year": getattr(src, "year", None),
@@ -247,6 +249,8 @@ def _serialize_collection_flyers(obj: Any) -> list[dict[str, Any]]:
             "id": flyer.pk,
             "url": getattr(flyer, "url", None),
             "url_valid": getattr(flyer, "url_valid", None),
+            "url_checked": _serialize_value(getattr(flyer, "url_checked", None)),
+            "url_valid_is_advisory": True,
             "title": getattr(flyer, "title", ""),
         }
         for flyer in obj.flyers.order_by("pk")

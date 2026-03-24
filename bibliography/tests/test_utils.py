@@ -1,8 +1,14 @@
 from unittest.mock import patch
 
+import requests
 from django.test import SimpleTestCase
 
-from ..utils import _REQUEST_HEADERS, check_url, find_wayback_snapshot_for_year
+from ..utils import (
+    _REQUEST_HEADERS,
+    _REQUEST_TIMEOUT,
+    check_url,
+    find_wayback_snapshot_for_year,
+)
 
 
 @patch("requests.get")
@@ -16,14 +22,29 @@ class SourceCheckUrlTestCase(SimpleTestCase):
         mock_head.return_value.status_code = 200
         self.assertTrue(check_url(self.url))
         self.assertFalse(mock_get.called)
+        mock_head.assert_called_once_with(
+            self.url,
+            headers=self.headers,
+            allow_redirects=True,
+            timeout=_REQUEST_TIMEOUT,
+        )
 
-    def test_request_with_http_status_404_returns_false(self, mock_head, mock_get):
+    def test_request_with_http_status_404_falls_back_to_get(self, mock_head, mock_get):
         mock_head.return_value.status_code = 404
-        self.assertFalse(check_url(self.url))
-        self.assertFalse(mock_get.called)
+        mock_get.return_value.status_code = 200
+
+        self.assertTrue(check_url(self.url))
+        mock_get.assert_called_once_with(
+            self.url,
+            headers=self.headers,
+            allow_redirects=True,
+            timeout=_REQUEST_TIMEOUT,
+            stream=True,
+        )
 
     def test_returns_false_if_no_url_exists(self, mock_head, mock_get):
         self.assertFalse(check_url(None))
+        self.assertFalse(mock_head.called)
         self.assertFalse(mock_get.called)
 
     def test_uses_get_method_if_head_returns_http_405(self, mock_head, mock_get):
@@ -31,8 +52,31 @@ class SourceCheckUrlTestCase(SimpleTestCase):
         mock_get.return_value.status_code = 200
         self.assertTrue(check_url(self.url))
         mock_get.assert_called_once_with(
-            self.url, headers=self.headers, allow_redirects=True
+            self.url,
+            headers=self.headers,
+            allow_redirects=True,
+            timeout=_REQUEST_TIMEOUT,
+            stream=True,
         )
+
+    def test_uses_get_method_if_head_request_fails(self, mock_head, mock_get):
+        mock_head.side_effect = requests.exceptions.RequestException("boom")
+        mock_get.return_value.status_code = 200
+
+        self.assertTrue(check_url(self.url))
+        mock_get.assert_called_once_with(
+            self.url,
+            headers=self.headers,
+            allow_redirects=True,
+            timeout=_REQUEST_TIMEOUT,
+            stream=True,
+        )
+
+    def test_returns_false_if_head_and_get_fail(self, mock_head, mock_get):
+        mock_head.return_value.status_code = 403
+        mock_get.side_effect = requests.exceptions.RequestException("boom")
+
+        self.assertFalse(check_url(self.url))
 
 
 @patch("requests.get")

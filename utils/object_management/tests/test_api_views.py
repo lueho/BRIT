@@ -1,5 +1,7 @@
 """Tests for review workflow API endpoints in object_management."""
 
+from datetime import date
+
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.db.models.signals import post_save, pre_save
@@ -8,7 +10,11 @@ from django.urls import reverse
 from factory.django import mute_signals
 
 from bibliography.models import Source
-from sources.waste_collection.models import Collection, CollectionPropertyValue
+from sources.waste_collection.models import (
+    Collection,
+    CollectionPropertyValue,
+    WasteFlyer,
+)
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.properties.models import Property, Unit
 
@@ -204,6 +210,8 @@ class ReviewAPIViewsTests(TestCase):
             title="Test Source",
             abbreviation="TS2024",
             url="https://example.com/report.pdf",
+            url_valid=False,
+            url_checked=date(2026, 3, 24),
             year=2024,
             type="article",
         )
@@ -226,6 +234,9 @@ class ReviewAPIViewsTests(TestCase):
         self.assertEqual(len(ctx["sources"]), 1)
         self.assertEqual(ctx["sources"][0]["title"], "Test Source")
         self.assertEqual(ctx["sources"][0]["url"], "https://example.com/report.pdf")
+        self.assertFalse(ctx["sources"][0]["url_valid"])
+        self.assertEqual(ctx["sources"][0]["url_checked"], "2026-03-24")
+        self.assertTrue(ctx["sources"][0]["url_valid_is_advisory"])
 
     def test_review_context_includes_related_display(self):
         """Context payload includes human-readable FK display strings."""
@@ -247,6 +258,14 @@ class ReviewAPIViewsTests(TestCase):
 
     def test_review_context_includes_flyers_for_collection(self):
         """Context payload includes flyers section for Collection items."""
+        flyer = WasteFlyer.objects.create(
+            owner=self.owner,
+            url="https://example.com/flyer.pdf",
+            url_valid=False,
+            url_checked=date(2026, 3, 24),
+        )
+        self.review_collection.flyers.add(flyer)
+
         url = reverse(
             "object_management:api_review_context",
             kwargs={
@@ -261,6 +280,11 @@ class ReviewAPIViewsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         ctx = response.json()["context"]
         self.assertIn("flyers", ctx)
+        self.assertEqual(len(ctx["flyers"]), 1)
+        self.assertEqual(ctx["flyers"][0]["url"], "https://example.com/flyer.pdf")
+        self.assertFalse(ctx["flyers"][0]["url_valid"])
+        self.assertEqual(ctx["flyers"][0]["url_checked"], "2026-03-24")
+        self.assertTrue(ctx["flyers"][0]["url_valid_is_advisory"])
 
     def test_review_context_does_not_include_review_guidance(self):
         """BRIT context payload contains only domain data; guidance is assembled by MCP."""
