@@ -236,8 +236,9 @@
     {% if frequency_display.is_year_round %}
       <p class="card-text">
         <strong>Collection frequency:</strong>
+        <br>
+        {{ frequency_display.summary }}
       </p>
-      {{ frequency_display.summary }}
       {% if frequency_display.options %}
         <p class="card-text text-muted small mt-0">Alternatively: {{ frequency_display.options|join:", " }}</p>
       {% endif %}
