@@ -415,6 +415,8 @@ class UserCreatedObjectFormMixin:
                 all_ids = submitted_ids | existing_ids
                 if all_ids:
                     field.queryset = model.objects.filter(pk__in=all_ids)
+                    if hasattr(field.widget, "get_queryset"):
+                        field.widget.get_queryset = lambda field=field: field.queryset
 
     def clean(self):
         """
