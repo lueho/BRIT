@@ -144,9 +144,12 @@ def _visible_collection_chain_for_user(collection, user):
 def _frequency_display_context(frequency):
     if not frequency:
         return None
+    frequency_rows = CollectionFrequencyScheduleService.rows_from_frequency(frequency)
     rows = CollectionFrequencyScheduleService.display_rows(frequency)
     is_year_round = len(rows) == 1 and rows[0]["segment"] == "All year"
     return {
+        "canonical_label": frequency.name,
+        "schedule_summary": CollectionFrequencyScheduleService.summary(frequency_rows),
         "rows": rows,
         "is_year_round": is_year_round,
         "summary": rows[0]["standard"] if is_year_round else None,

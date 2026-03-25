@@ -10,9 +10,13 @@ from django.urls import reverse
 from factory.django import mute_signals
 
 from bibliography.models import Source
+from distributions.models import TemporalDistribution, Timestep
 from sources.waste_collection.models import (
     Collection,
+    CollectionCountOptions,
+    CollectionFrequency,
     CollectionPropertyValue,
+    CollectionSeason,
     WasteFlyer,
 )
 from utils.object_management.models import ReviewAction, UserCreatedObject
@@ -27,6 +31,37 @@ class ReviewAPIViewsTests(TestCase):
         cls.owner = User.objects.create_user(username="owner")
         cls.moderator = User.objects.create_user(username="moderator")
         cls.regular_user = User.objects.create_user(username="regular")
+        distribution = TemporalDistribution.objects.get(name="Months of the year")
+        january = Timestep.objects.get(name="January")
+        june = Timestep.objects.get(name="June")
+        july = Timestep.objects.get(name="July")
+        december = Timestep.objects.get(name="December")
+        first_half_year, _ = CollectionSeason.objects.get_or_create(
+            distribution=distribution,
+            first_timestep=january,
+            last_timestep=june,
+        )
+        second_half_year, _ = CollectionSeason.objects.get_or_create(
+            distribution=distribution,
+            first_timestep=july,
+            last_timestep=december,
+        )
+        cls.frequency = CollectionFrequency.objects.create(
+            name="Seasonal flexibility",
+            type="Fixed-Seasonal",
+            publication_status="published",
+        )
+        CollectionCountOptions.objects.create(
+            frequency=cls.frequency,
+            season=first_half_year,
+            standard=26,
+            option_1=52,
+        )
+        CollectionCountOptions.objects.create(
+            frequency=cls.frequency,
+            season=second_half_year,
+            standard=13,
+        )
 
         content_type = ContentType.objects.get_for_model(Collection)
         permission, _ = Permission.objects.get_or_create(
@@ -40,6 +75,7 @@ class ReviewAPIViewsTests(TestCase):
             cls.review_collection = Collection.objects.create(
                 name="Review Collection",
                 owner=cls.owner,
+                frequency=cls.frequency,
                 publication_status=UserCreatedObject.STATUS_REVIEW,
             )
             cls.moderator_owned_review_collection = Collection.objects.create(
@@ -286,6 +322,34 @@ class ReviewAPIViewsTests(TestCase):
         self.assertEqual(ctx["flyers"][0]["url_checked"], "2026-03-24")
         self.assertTrue(ctx["flyers"][0]["url_valid_is_advisory"])
 
+    def test_review_context_includes_normalized_frequency_display(self):
+        url = reverse(
+            "object_management:api_review_context",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.review_collection.id,
+            },
+        )
+        self.client.force_login(self.moderator)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        ctx = response.json()["context"]
+        self.assertIn("frequency_display", ctx)
+        self.assertEqual(
+            ctx["frequency_display"]["canonical_label"], "Seasonal flexibility"
+        )
+        self.assertEqual(ctx["frequency_display"]["type"], "Fixed-Seasonal")
+        self.assertEqual(len(ctx["frequency_display"]["rows"]), 2)
+        self.assertEqual(
+            ctx["frequency_display"]["rows"][0]["segment"], "January to June"
+        )
+        self.assertEqual(ctx["frequency_display"]["rows"][0]["standard"], "Weekly")
+        self.assertEqual(
+            ctx["frequency_display"]["rows"][1]["standard"], "Every 2 weeks"
+        )
+
     def test_review_context_does_not_include_review_guidance(self):
         """BRIT context payload contains only domain data; guidance is assembled by MCP."""
         url = reverse(
@@ -333,7 +397,7 @@ class ReviewAPIViewsTests(TestCase):
             content_type_id=self.content_type_id,
             object_id=self.review_collection.id,
             action=ReviewAction.ACTION_COMMENT,
-            comment="Bot review",
+            comment="Review note",
             user=self.moderator,
         )
 

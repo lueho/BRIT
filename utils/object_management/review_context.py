@@ -1,11 +1,10 @@
-"""Helpers for external review-bot integrations.
+"""Helpers for review context serialization and draft validation.
 
 This module provides:
 - Serializers for reviewable objects (domain data only)
 - Validation of the structured draft response contract
 
-BRIT intentionally does not call external LLM providers directly.
-Context assembly for LLM consumption is the responsibility of the MCP layer.
+Context assembly beyond BRIT is the responsibility of the caller.
 """
 
 from __future__ import annotations
@@ -17,13 +16,15 @@ from typing import Any
 
 from django.contrib.contenttypes.models import ContentType
 
+from case_studies.soilcom.frequency_service import CollectionFrequencyScheduleService
+
 from .models import ReviewAction
 
 logger = logging.getLogger(__name__)
 
 
 class ReviewResponseError(Exception):
-    """Raised when the review-bot response cannot be parsed or validated."""
+    """Raised when a review response cannot be parsed or validated."""
 
 
 def build_review_context(
@@ -61,6 +62,7 @@ def build_review_context(
     # Collection-specific enrichments
     if _is_collection(obj):
         context["flyers"] = _serialize_collection_flyers(obj)
+        context["frequency_display"] = _serialize_collection_frequency(obj)
 
     if include_history:
         history = (
@@ -83,7 +85,7 @@ def build_review_context(
 
 
 def validate_draft_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Validate and normalize the LLM draft payload contract."""
+    """Validate and normalize the draft payload contract."""
     required_keys = {
         "summary",
         "decision_hint",
@@ -96,7 +98,7 @@ def validate_draft_payload(payload: dict[str, Any]) -> dict[str, Any]:
     if missing:
         missing_keys = ", ".join(sorted(missing))
         raise ReviewResponseError(
-            f"Review-bot response missing required keys: {missing_keys}."
+            f"Review response missing required keys: {missing_keys}."
         )
 
     decision_hint = str(payload["decision_hint"]).strip().lower()
@@ -188,7 +190,7 @@ def _serialize_related_display(obj: Any) -> dict[str, str | None]:
 def _serialize_cpv_timeline(obj: Any) -> list[dict[str, Any]]:
     """Return historical values for the same property on the same collection chain.
 
-    Helps agents assess plausibility by comparing a value against its trend
+    Helps assess plausibility by comparing a value against its trend
     across years. Only called for non-derived CollectionPropertyValues.
     """
     try:
@@ -255,6 +257,44 @@ def _serialize_collection_flyers(obj: Any) -> list[dict[str, Any]]:
         }
         for flyer in obj.flyers.order_by("pk")
     ]
+
+
+def _serialize_collection_frequency(obj: Any) -> dict[str, Any] | None:
+    frequency = getattr(obj, "frequency", None)
+    if frequency is None:
+        return None
+    try:
+        rows = CollectionFrequencyScheduleService.rows_from_frequency(frequency)
+        display_rows = CollectionFrequencyScheduleService.display_rows(frequency)
+        is_year_round = (
+            len(display_rows) == 1 and display_rows[0]["segment"] == "All year"
+        )
+        return {
+            "id": frequency.pk,
+            "canonical_label": frequency.name,
+            "type": getattr(frequency, "type", None),
+            "schedule_summary": CollectionFrequencyScheduleService.summary(rows),
+            "rows": display_rows,
+            "is_year_round": is_year_round,
+            "summary": display_rows[0]["standard"] if is_year_round else None,
+            "options": display_rows[0]["options"] if is_year_round else None,
+        }
+    except Exception:
+        logger.debug(
+            "Could not serialize collection frequency for %s",
+            obj.pk,
+            exc_info=True,
+        )
+        return {
+            "id": frequency.pk,
+            "canonical_label": frequency.name,
+            "type": getattr(frequency, "type", None),
+            "schedule_summary": None,
+            "rows": [],
+            "is_year_round": False,
+            "summary": None,
+            "options": [],
+        }
 
 
 def _serialize_model_fields(obj: Any) -> dict[str, Any]:

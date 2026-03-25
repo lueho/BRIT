@@ -235,16 +235,17 @@
   {% if object.frequency and frequency_display %}
     {% if frequency_display.is_year_round %}
       <p class="card-text">
-        <strong>Collection frequency:</strong>
+        <strong>Collection frequency (normalized schedule):</strong>
         <br>
         {{ frequency_display.summary }}
       </p>
       {% if frequency_display.options %}
         <p class="card-text text-muted small mt-0">Alternatively: {{ frequency_display.options|join:", " }}</p>
       {% endif %}
+      <p class="card-text text-muted small mt-0">Stored canonical label: {{ frequency_display.canonical_label }}</p>
     {% elif frequency_display.rows %}
       <p class="card-text mb-1">
-        <strong>Collection frequency:</strong>
+        <strong>Collection frequency (normalized schedule):</strong>
       </p>
       <ul class="mb-2">
         {% for frequency_row in frequency_display.rows %}
@@ -257,6 +258,7 @@
           </li>
         {% endfor %}
       </ul>
+      <p class="card-text text-muted small mt-0">Stored canonical label: {{ frequency_display.canonical_label }}</p>
     {% endif %}
   {% endif %}
   {% if object.fee_system %}

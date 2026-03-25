@@ -1,4 +1,4 @@
-"""API endpoints for review workflow actions and external bot context access."""
+"""API endpoints for review workflow actions and review context access."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 
 from .models import ReviewAction
 from .permissions import UserCreatedObjectPermission
-from .review_ai import build_review_context
+from .review_context import build_review_context
 from .views import ReviewDashboardView
 
 
@@ -119,12 +119,12 @@ class AddReviewCommentAPIView(APIView):
 
 
 class ReviewContextAPIView(APIView):
-    """Return review context for external bots to process outside BRIT."""
+    """Return review context for external consumers outside BRIT."""
 
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, content_type_id: int, object_id: int):
-        """Build context payload for external review automation."""
+        """Build a context payload for external review processing."""
         obj = _get_review_object(content_type_id=content_type_id, object_id=object_id)
         permission = UserCreatedObjectPermission()
         django_request = getattr(request, "_request", request)
