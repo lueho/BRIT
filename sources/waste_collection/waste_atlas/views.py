@@ -76,6 +76,19 @@ class EuropeDataCoverageMapIframeView(EuropeDataCoverageContextMixin, TemplateVi
     iframe_mode = True
 
 
+class EuropeBiowasteCollectionAmountMapView(WasteAtlasGroupMixin, TemplateView):
+    template_name = "waste_atlas/karte41_europe_biowaste_collection_amount.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["map_title"] = (
+            "Regional average amount of separately collected biowaste in Europe"
+        )
+        ctx["map_overview_label"] = "Map overview"
+        ctx["year"] = "2024"
+        return ctx
+
+
 class PopulationDensityMapView(AtlasMapView):
     """Karte 20 — Einwohnerdichte."""
 

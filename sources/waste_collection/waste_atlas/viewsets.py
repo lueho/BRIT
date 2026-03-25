@@ -17,6 +17,8 @@ from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from maps.db_functions import SimplifyPreserveTopology
+from maps.models import LauRegion, NutsRegion, RegionAttributeValue
 from sources.waste_collection.derived_values import (
     convert_total_to_specific,
     get_derived_property_config,
@@ -27,8 +29,6 @@ from sources.waste_collection.models import (
     CollectionCatchment,
     CollectionPropertyValue,
 )
-from maps.db_functions import SimplifyPreserveTopology
-from maps.models import LauRegion, NutsRegion, RegionAttributeValue
 
 from .serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
@@ -2022,6 +2022,7 @@ class CatchmentPopulationViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, population, population_density}."""
         country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
         population_attribute_id = _resolved_population_attribute_id()
 
         qs = (
@@ -2058,6 +2059,7 @@ class CatchmentPopulationViewSet(viewsets.ViewSet):
             )
             .values("id", "population", "population_density")
         )
+        qs = _apply_nuts_prefix_filter(qs, nuts_prefixes)
 
         data = [
             {

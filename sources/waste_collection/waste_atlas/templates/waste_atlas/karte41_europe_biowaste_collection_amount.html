@@ -1,0 +1,665 @@
+{% extends "base.html" %}
+
+{% block title %}
+  Waste Atlas — {{ map_title }}
+{% endblock title %}
+
+{% block style_sheets %}
+  {{ block.super }}
+  <style>
+    #map-container {
+      background: #fff;
+      border: 1px solid #dee2e6;
+      border-radius: .375rem;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 1rem;
+    }
+    .coverage-page {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    #europe-biowaste-svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #fff;
+    }
+    #loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      font-size: 1.1rem;
+      color: #555;
+    }
+    .atlas-legend text,
+    .biowaste-region-value,
+    .biowaste-region-name,
+    .biowaste-region-note {
+      font-family: 'Nunito', sans-serif;
+    }
+    .biowaste-region-list li + li {
+      margin-top: .5rem;
+    }
+    .biowaste-region-link {
+      color: inherit;
+      text-decoration: none;
+    }
+    .biowaste-region-link:hover .biowaste-region-name {
+      text-decoration: underline;
+    }
+    .biowaste-region-link.is-disabled {
+      pointer-events: none;
+      cursor: default;
+      color: inherit;
+      text-decoration: none;
+    }
+    .map-hint {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: .75rem;
+      padding: .5rem .75rem;
+      border: 1px solid #bfd7c1;
+      border-radius: .375rem;
+      background: #f2fbf3;
+      color: #244b2a;
+      font-weight: 600;
+      font-family: 'Nunito', sans-serif;
+    }
+  </style>
+{% endblock style_sheets %}
+
+{% block content %}
+  <div class="coverage-page">
+    <h1>Waste Atlas — {{ map_title }}</h1>
+    <p class="lead">
+      Regional average amount of separately collected biowaste for 2024. The full EU27 + UK outline is shown for orientation, and only highlighted regions open detailed biowaste amount maps.
+    </p>
+
+    <div class="mb-3">
+      <a href="{% url 'waste-atlas-overview' %}"
+         class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-th-list"></i> {{ map_overview_label }}
+      </a>
+    </div>
+
+    <div class="map-hint">
+      <i class="fas fa-hand-pointer"></i>
+      <span>Highlighted regions are clickable and open the detailed map.</span>
+    </div>
+
+    <div id="map-container">
+      <div id="loading-overlay">
+        <i class="fas fa-spinner fa-spin me-2"></i> Loading map data…
+      </div>
+      <svg id="europe-biowaste-svg">
+      </svg>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <strong>Regional averages for 2024</strong>
+      </div>
+      <div class="card-body">
+        <ul class="biowaste-region-list mb-0" id="region-average-list">
+        </ul>
+      </div>
+    </div>
+  </div>
+{% endblock content %}
+
+{% block javascript %}
+  {{ block.super }}
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var svgEl = document.getElementById('europe-biowaste-svg');
+      var mapContainer = document.getElementById('map-container');
+      var loadingEl = document.getElementById('loading-overlay');
+      var regionAverageList = document.getElementById('region-average-list');
+      var year = parseInt('{{ year }}', 10) || 2024;
+      var biowasteDataUrl = '/waste_collection/api/waste-atlas/biowaste-collection-amount/';
+      var populationDataUrl = '/waste_collection/api/waste-atlas/population/';
+      var detailMapBaseUrl = '{% url 'waste-atlas-biowaste-collection-amount-map' %}';
+      var backgroundFill = '#f5f7fa';
+      var backgroundStroke = '#98a2ad';
+      var noDataFill = '#eceff3';
+      var noDataStroke = '#7a8694';
+      var noCollectionFill = '#fff696';
+      var noCollectionStroke = '#9f8b00';
+      var categories = [
+        { min: 150.000001, label: '151+ kg/P/a', color: '#1a9850' },
+        { min: 100.000001, label: '101 – 150 kg/P/a', color: '#66bd63' },
+        { min: 50.000001, label: '51 – 100 kg/P/a', color: '#a6d96a' },
+        { min: 0, label: '0 – 50 kg/P/a', color: '#d9f0d3' }
+      ];
+      var continentalEuropeExtent = {
+        west: -10,
+        south: 34,
+        east: 32,
+        north: 72
+      };
+      var eu27PlusUkCountryCodes = new Set([
+        'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DE', 'DK', 'EE', 'EL', 'ES', 'FI',
+        'FR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO',
+        'SE', 'SI', 'SK', 'UK'
+      ]);
+      var regionConfigs = [
+        { key: 'DE', label: 'Germany', geometryType: 'country', geometryId: 'DE', country: 'DE', nutsPrefix: '', isClickable: true },
+        { key: 'DK', label: 'Denmark', geometryType: 'country', geometryId: 'DK', country: 'DK', nutsPrefix: '', isClickable: true },
+        { key: 'SE', label: 'Sweden', geometryType: 'country', geometryId: 'SE', country: 'SE', nutsPrefix: '', isClickable: true },
+        { key: 'NL', label: 'The Netherlands', geometryType: 'country', geometryId: 'NL', country: 'NL', nutsPrefix: '', isClickable: true },
+        { key: 'IT', label: 'Italy', geometryType: 'country', geometryId: 'IT', country: 'IT', nutsPrefix: '', isClickable: true },
+        { key: 'BE1,BE2', label: 'Flanders + Brussels', geometryType: 'custom', geometryId: 'BE1,BE2', country: 'BE', nutsPrefix: 'BE1,BE2', isClickable: true },
+        { key: 'ES51', label: 'Catalonia', geometryType: 'custom', geometryId: 'ES51', country: 'ES', nutsPrefix: 'ES51', isClickable: true }
+      ];
+
+      function fetchJson(url) {
+        return fetch(url, { credentials: 'same-origin' }).then(function (response) {
+          if (!response.ok) {
+            throw new Error(response.status + ' ' + response.statusText);
+          }
+          return response.json();
+        });
+      }
+
+      function sameCoordinate(a, b) {
+        return a[0] === b[0] && a[1] === b[1];
+      }
+
+      function closeRing(ring) {
+        if (!ring.length) {
+          return ring;
+        }
+        if (!sameCoordinate(ring[0], ring[ring.length - 1])) {
+          ring.push([ring[0][0], ring[0][1]]);
+        }
+        return ring;
+      }
+
+      function clipSegmentToVertical(pointA, pointB, x) {
+        var dx = pointB[0] - pointA[0];
+
+        if (dx === 0) {
+          return [x, pointA[1]];
+        }
+
+        return [
+          x,
+          pointA[1] + (pointB[1] - pointA[1]) * (x - pointA[0]) / dx
+        ];
+      }
+
+      function clipSegmentToHorizontal(pointA, pointB, y) {
+        var dy = pointB[1] - pointA[1];
+
+        if (dy === 0) {
+          return [pointA[0], y];
+        }
+
+        return [
+          pointA[0] + (pointB[0] - pointA[0]) * (y - pointA[1]) / dy,
+          y
+        ];
+      }
+
+      function clipRingAgainstEdge(ring, isInside, intersect) {
+        var output = [];
+
+        if (!ring.length) {
+          return output;
+        }
+
+        var previousPoint = ring[ring.length - 1];
+
+        ring.forEach(function (currentPoint) {
+          var currentInside = isInside(currentPoint);
+          var previousInside = isInside(previousPoint);
+
+          if (currentInside) {
+            if (!previousInside) {
+              output.push(intersect(previousPoint, currentPoint));
+            }
+            output.push(currentPoint);
+          } else if (previousInside) {
+            output.push(intersect(previousPoint, currentPoint));
+          }
+
+          previousPoint = currentPoint;
+        });
+
+        return output;
+      }
+
+      function clipLinearRingToExtent(ring) {
+        if (!ring || ring.length < 4) {
+          return null;
+        }
+
+        var openRing = ring.slice();
+
+        if (sameCoordinate(openRing[0], openRing[openRing.length - 1])) {
+          openRing.pop();
+        }
+
+        var clipped = clipRingAgainstEdge(
+          openRing,
+          function (point) { return point[0] >= continentalEuropeExtent.west; },
+          function (pointA, pointB) {
+            return clipSegmentToVertical(pointA, pointB, continentalEuropeExtent.west);
+          }
+        );
+        clipped = clipRingAgainstEdge(
+          clipped,
+          function (point) { return point[0] <= continentalEuropeExtent.east; },
+          function (pointA, pointB) {
+            return clipSegmentToVertical(pointA, pointB, continentalEuropeExtent.east);
+          }
+        );
+        clipped = clipRingAgainstEdge(
+          clipped,
+          function (point) { return point[1] >= continentalEuropeExtent.south; },
+          function (pointA, pointB) {
+            return clipSegmentToHorizontal(pointA, pointB, continentalEuropeExtent.south);
+          }
+        );
+        clipped = clipRingAgainstEdge(
+          clipped,
+          function (point) { return point[1] <= continentalEuropeExtent.north; },
+          function (pointA, pointB) {
+            return clipSegmentToHorizontal(pointA, pointB, continentalEuropeExtent.north);
+          }
+        );
+
+        if (clipped.length < 3) {
+          return null;
+        }
+
+        return closeRing(clipped);
+      }
+
+      function clipPolygonCoordinatesToExtent(polygonCoordinates) {
+        if (!polygonCoordinates || !polygonCoordinates.length) {
+          return null;
+        }
+
+        var clippedOuterRing = clipLinearRingToExtent(polygonCoordinates[0]);
+
+        if (!clippedOuterRing) {
+          return null;
+        }
+
+        var clippedPolygon = [clippedOuterRing];
+
+        polygonCoordinates.slice(1).forEach(function (ring) {
+          var clippedRing = clipLinearRingToExtent(ring);
+
+          if (clippedRing) {
+            clippedPolygon.push(clippedRing);
+          }
+        });
+
+        return clippedPolygon;
+      }
+
+      function clipFeatureToExtent(feature) {
+        if (!feature || !feature.geometry) {
+          return null;
+        }
+
+        if (feature.geometry.type === 'Polygon') {
+          var clippedPolygon = clipPolygonCoordinatesToExtent(feature.geometry.coordinates);
+
+          if (!clippedPolygon) {
+            return null;
+          }
+
+          return {
+            type: 'Feature',
+            id: feature.id,
+            properties: feature.properties,
+            geometry: {
+              type: 'Polygon',
+              coordinates: clippedPolygon
+            }
+          };
+        }
+
+        if (feature.geometry.type === 'MultiPolygon') {
+          var clippedMultiPolygon = feature.geometry.coordinates
+            .map(clipPolygonCoordinatesToExtent)
+            .filter(function (polygonCoordinates) {
+              return polygonCoordinates !== null;
+            });
+
+          if (!clippedMultiPolygon.length) {
+            return null;
+          }
+
+          return {
+            type: 'Feature',
+            id: feature.id,
+            properties: feature.properties,
+            geometry: {
+              type: clippedMultiPolygon.length === 1 ? 'Polygon' : 'MultiPolygon',
+              coordinates: clippedMultiPolygon.length === 1 ? clippedMultiPolygon[0] : clippedMultiPolygon
+            }
+          };
+        }
+
+        return null;
+      }
+
+      function trimFeatureCollectionToExtent(collection) {
+        return {
+          type: 'FeatureCollection',
+          features: (collection.features || []).map(clipFeatureToExtent).filter(function (feature) {
+            return feature !== null;
+          })
+        };
+      }
+
+      function featureCollectionFromFeatures(features) {
+        return {
+          type: 'FeatureCollection',
+          features: features.filter(function (feature) {
+            return !!feature;
+          })
+        };
+      }
+
+      function amountClass(value) {
+        for (var i = 0; i < categories.length; i += 1) {
+          if (value >= categories[i].min) {
+            return categories[i];
+          }
+        }
+        return categories[categories.length - 1];
+      }
+
+      function formatAmount(value) {
+        if (value === null || value === undefined || Number.isNaN(value)) {
+          return 'No 2024 data';
+        }
+        return value.toFixed(1) + ' kg/P/a';
+      }
+
+      function buildRegionDetailUrl(region) {
+        var params = new URLSearchParams();
+        params.set('country', region.country);
+        params.set('year', year);
+        if (region.nutsPrefix) {
+          params.set('nuts_prefix', region.nutsPrefix);
+        }
+        return detailMapBaseUrl + '?' + params.toString();
+      }
+
+      function computeRegionAverage(region, amountRows, populationRows) {
+        var populationByCatchment = {};
+        var weightedTotal = 0;
+        var weightedPopulation = 0;
+        var simpleTotal = 0;
+        var simpleCount = 0;
+        var hasOnlyNoCollection = amountRows.length > 0;
+
+        populationRows.forEach(function (row) {
+          populationByCatchment[row.catchment_id] = row.population;
+        });
+
+        amountRows.forEach(function (row) {
+          var numericAmount = row.amount;
+          if (row.no_collection) {
+            numericAmount = 0;
+          } else if (numericAmount === null || numericAmount === undefined) {
+            hasOnlyNoCollection = false;
+            return;
+          } else {
+            hasOnlyNoCollection = false;
+          }
+
+          simpleTotal += numericAmount;
+          simpleCount += 1;
+
+          if (populationByCatchment[row.catchment_id]) {
+            weightedTotal += numericAmount * populationByCatchment[row.catchment_id];
+            weightedPopulation += populationByCatchment[row.catchment_id];
+          }
+        });
+
+        if (weightedPopulation > 0) {
+          return {
+            value: weightedTotal / weightedPopulation,
+            noCollectionOnly: false,
+            detailUrl: buildRegionDetailUrl(region)
+          };
+        }
+
+        if (simpleCount > 0) {
+          return {
+            value: simpleTotal / simpleCount,
+            noCollectionOnly: hasOnlyNoCollection,
+            detailUrl: buildRegionDetailUrl(region)
+          };
+        }
+
+        return {
+          value: null,
+          noCollectionOnly: false,
+          detailUrl: buildRegionDetailUrl(region)
+        };
+      }
+
+      function renderRegionList(regionsWithData) {
+        regionAverageList.innerHTML = '';
+        regionsWithData.forEach(function (region) {
+          var listItem = document.createElement('li');
+          var link = document.createElement('a');
+          var nameSpan = document.createElement('span');
+          var valueSpan = document.createElement('span');
+          var noteDiv = document.createElement('div');
+
+          link.className = 'biowaste-region-link';
+          if (region.isClickable) {
+            link.href = region.detailUrl;
+          } else {
+            link.className += ' is-disabled';
+          }
+
+          nameSpan.className = 'biowaste-region-name fw-semibold d-block';
+          nameSpan.textContent = region.label;
+
+          valueSpan.className = 'biowaste-region-value d-block';
+          valueSpan.textContent = formatAmount(region.value);
+
+          noteDiv.className = 'biowaste-region-note text-muted small';
+          if (region.noCollectionOnly) {
+            noteDiv.textContent = 'No separate biowaste collection in the available 2024 catchments';
+          } else if (region.value === null) {
+            noteDiv.textContent = region.isClickable
+              ? 'No 2024 biowaste amount data available yet; click to open the detailed map'
+              : 'No 2024 biowaste amount data available';
+          } else if (region.isClickable) {
+            noteDiv.textContent = 'Click to open the detailed map';
+          } else {
+            noteDiv.textContent = 'No detailed sub-map available';
+          }
+
+          link.appendChild(nameSpan);
+          link.appendChild(valueSpan);
+          link.appendChild(noteDiv);
+          listItem.appendChild(link);
+          regionAverageList.appendChild(listItem);
+        });
+      }
+
+      function drawLegend(svg, width, height) {
+        return;
+      }
+
+      Promise.all([
+        fetchJson('/maps/api/nuts_region/geojson/?levl_code=0'),
+        fetchJson('/maps/api/nuts_region/geojson/?levl_code=1&cntr_code=BE'),
+        fetchJson('/maps/api/nuts_region/geojson/?levl_code=2&cntr_code=ES')
+      ]).then(function (results) {
+        var countries = trimFeatureCollectionToExtent(results[0]);
+        var belgiumRegions = trimFeatureCollectionToExtent(results[1]);
+        var spainRegions = trimFeatureCollectionToExtent(results[2]);
+        var europeBackgroundFeatures = (countries.features || []).filter(function (feature) {
+          var nutsId = feature.properties && feature.properties.nuts_id;
+          return eu27PlusUkCountryCodes.has(nutsId);
+        });
+        var countryFeatureById = {};
+        var customFeatureById = {};
+
+        europeBackgroundFeatures.forEach(function (feature) {
+          var nutsId = feature.properties && feature.properties.nuts_id;
+          countryFeatureById[nutsId] = feature;
+        });
+        (belgiumRegions.features || []).forEach(function (feature) {
+          var nutsId = feature.properties && feature.properties.nuts_id;
+          if (nutsId === 'BE1' || nutsId === 'BE2') {
+            customFeatureById[nutsId] = feature;
+          }
+        });
+        (spainRegions.features || []).forEach(function (feature) {
+          var nutsId = feature.properties && feature.properties.nuts_id;
+          if (nutsId === 'ES51') {
+            customFeatureById[nutsId] = feature;
+          }
+        });
+
+        return Promise.all(regionConfigs.map(function (region) {
+          var params = new URLSearchParams();
+          params.set('country', region.country);
+          params.set('year', year);
+          if (region.nutsPrefix) {
+            params.set('nuts_prefix', region.nutsPrefix);
+          }
+          return Promise.all([
+            fetchJson(biowasteDataUrl + '?' + params.toString()),
+            fetchJson(populationDataUrl + '?' + params.toString())
+          ]).then(function (dataResults) {
+            var computed = computeRegionAverage(region, dataResults[0], dataResults[1]);
+            var features = [];
+            if (region.geometryType === 'country') {
+              if (countryFeatureById[region.geometryId]) {
+                features.push(countryFeatureById[region.geometryId]);
+              }
+            } else {
+              region.geometryId.split(',').forEach(function (geometryId) {
+                if (customFeatureById[geometryId]) {
+                  features.push(customFeatureById[geometryId]);
+                }
+              });
+            }
+            return {
+              key: region.key,
+              label: region.label,
+              value: computed.value,
+              noCollectionOnly: computed.noCollectionOnly,
+              detailUrl: computed.detailUrl,
+              isClickable: region.isClickable,
+              featureCollection: featureCollectionFromFeatures(features)
+            };
+          });
+        })).then(function (regionsWithData) {
+          return {
+            backgroundCollection: featureCollectionFromFeatures(europeBackgroundFeatures),
+            regionsWithData: regionsWithData
+          };
+        });
+      }).then(function (result) {
+        var backgroundCollection = result.backgroundCollection;
+        var regionsWithData = result.regionsWithData;
+        var width = mapContainer.clientWidth || 1100;
+        var height = Math.round(width * 0.72);
+        var svg = d3.select(svgEl)
+          .attr('xmlns', 'http://www.w3.org/2000/svg')
+          .attr('width', width)
+          .attr('height', height);
+
+        svg.selectAll('*').remove();
+
+        var projection = d3.geoMercator().fitExtent(
+          [[35, 55], [width - 35, height - 80]],
+          backgroundCollection
+        );
+        var path = d3.geoPath().projection(projection);
+
+        svg.append('g')
+          .selectAll('path')
+          .data(backgroundCollection.features || [])
+          .enter()
+          .append('path')
+          .attr('d', path)
+          .attr('fill', backgroundFill)
+          .attr('stroke', backgroundStroke)
+          .attr('stroke-width', 0.9);
+
+        svg.append('text')
+          .attr('x', width / 2)
+          .attr('y', 30)
+          .attr('text-anchor', 'middle')
+          .attr('font-family', "'Nunito', sans-serif")
+          .attr('font-size', 20)
+          .attr('font-weight', 'bold')
+          .text('{{ map_title|escapejs }}');
+
+        svg.append('text')
+          .attr('x', width / 2)
+          .attr('y', 50)
+          .attr('text-anchor', 'middle')
+          .attr('font-family', "'Nunito', sans-serif")
+          .attr('font-size', 13)
+          .attr('fill', '#5c6670')
+          .text('2024 catchment averages, population-weighted where population data is available');
+
+        regionsWithData.forEach(function (region) {
+          var styleCategory = region.value === null ? null : amountClass(region.value);
+          var fill = noDataFill;
+          var stroke = noDataStroke;
+          var strokeWidth = 1.2;
+
+          if (region.noCollectionOnly) {
+            fill = noCollectionFill;
+            stroke = noCollectionStroke;
+          } else if (styleCategory) {
+            fill = styleCategory.color;
+            stroke = '#3e5f3f';
+            strokeWidth = 2.5;
+          }
+
+          var group = svg.append('g');
+          group.selectAll('path')
+            .data(region.featureCollection.features || [])
+            .enter()
+            .append('path')
+            .attr('d', path)
+            .attr('fill', fill)
+            .attr('stroke', stroke)
+            .attr('stroke-width', strokeWidth)
+            .style('cursor', region.isClickable ? 'pointer' : 'default')
+            .on('click', function () {
+              if (region.isClickable) {
+                window.location.href = region.detailUrl;
+              }
+            })
+            .append('title')
+            .text(region.label + ': ' + formatAmount(region.value));
+        });
+
+        drawLegend(svg, width, height);
+        renderRegionList(regionsWithData);
+        loadingEl.style.display = 'none';
+      }).catch(function (error) {
+        loadingEl.style.display = 'none';
+        mapContainer.innerHTML = '<div class="alert alert-danger m-3"><strong>Error loading map data:</strong> ' + error.message + '</div>';
+      });
+    });
+  </script>
+{% endblock javascript %}

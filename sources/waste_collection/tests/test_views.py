@@ -3908,11 +3908,48 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "No data")
         self.assertContains(response, "BE1,BE2")
 
+    def test_europe_biowaste_average_map_renders_2024_detail_links(self):
+        response = self.client.get(
+            reverse("waste-atlas-europe-biowaste-collection-amount-map")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Regional average amount of separately collected biowaste in Europe",
+        )
+        self.assertContains(
+            response,
+            "Regional average amount of separately collected biowaste for 2024",
+        )
+        self.assertContains(
+            response,
+            "/waste_collection/api/waste-atlas/biowaste-collection-amount/",
+        )
+        self.assertContains(
+            response,
+            "/waste_collection/api/waste-atlas/population/",
+        )
+        self.assertContains(
+            response,
+            reverse("waste-atlas-biowaste-collection-amount-map"),
+        )
+        self.assertContains(response, "Flanders + Brussels")
+        self.assertContains(response, "Catalonia")
+
     def test_waste_atlas_overview_includes_italy_orga_level_entry(self):
         """Overview page lists all country-specific organizational-level maps."""
         response = self.client.get(reverse("waste-atlas-overview"))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse("waste-atlas-europe-biowaste-collection-amount-map"),
+        )
+        self.assertContains(
+            response,
+            "Map 41 — Regional average amount of separately collected biowaste in Europe",
+        )
         self.assertContains(response, reverse("waste-atlas-orga-level-italy-map"))
         self.assertContains(
             response,
@@ -4028,6 +4065,102 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(
             response,
             "Belgium (Flanders + Brussels)",
+        )
+
+
+@override_settings(
+    SOILCOM_POPULATION_ATTRIBUTE_ID=None,
+    SOILCOM_POPULATION_ATTRIBUTE_NAME="Population [atlas population filter test]",
+)
+class WasteAtlasPopulationViewSetTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        Attribute.objects.create(name="Atlas population filler 1", unit="cap")
+        Attribute.objects.create(name="Atlas population filler 2", unit="cap")
+        cls.population_attribute = Attribute.objects.create(
+            name="Population [atlas population filter test]",
+            unit="cap",
+        )
+        cls.collection_system = CollectionSystem.objects.create(
+            name="Atlas population filter system"
+        )
+        cls.waste_category = WasteCategory.objects.create(
+            name="Atlas population filter waste"
+        )
+        cls.region_be1 = NutsRegion.objects.create(
+            name="Atlas BE1",
+            country="BE",
+            nuts_id="BE100",
+            cntr_code="BE",
+        )
+        cls.region_be3 = NutsRegion.objects.create(
+            name="Atlas BE3",
+            country="BE",
+            nuts_id="BE300",
+            cntr_code="BE",
+        )
+        cls.catchment_be1 = CollectionCatchment.objects.create(
+            name="Atlas Catchment BE1",
+            region=cls.region_be1.region_ptr,
+        )
+        cls.catchment_be3 = CollectionCatchment.objects.create(
+            name="Atlas Catchment BE3",
+            region=cls.region_be3.region_ptr,
+        )
+        Collection.objects.create(
+            catchment=cls.catchment_be1,
+            collection_system=cls.collection_system,
+            waste_category=cls.waste_category,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+        Collection.objects.create(
+            catchment=cls.catchment_be3,
+            collection_system=cls.collection_system,
+            waste_category=cls.waste_category,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+        RegionAttributeValue.objects.create(
+            name="Population BE1",
+            region=cls.region_be1.region_ptr,
+            attribute=cls.population_attribute,
+            date=date(2024, 1, 1),
+            value=111,
+        )
+        RegionAttributeValue.objects.create(
+            name="Population BE3",
+            region=cls.region_be3.region_ptr,
+            attribute=cls.population_attribute,
+            date=date(2024, 1, 1),
+            value=333,
+        )
+
+    def setUp(self):
+        clear_derived_value_config_cache()
+
+    def tearDown(self):
+        clear_derived_value_config_cache()
+
+    def test_population_endpoint_respects_nuts_prefix_filter(self):
+        with override_settings(
+            SOILCOM_POPULATION_ATTRIBUTE_ID=self.population_attribute.id
+        ):
+            clear_derived_value_config_cache()
+            response = self.client.get(
+                "/waste_collection/api/waste-atlas/population/",
+                {
+                    "country": "BE",
+                    "year": "2024",
+                    "nuts_prefix": "BE1",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(
+            response.json()[0]["catchment_id"],
+            self.catchment_be1.id,
         )
 
 
