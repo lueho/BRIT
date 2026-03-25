@@ -34,9 +34,11 @@ class MaterialPropertySerializerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         prop = MaterialProperty.objects.create(name="Test Property", unit="g/kg")
+        basis = MaterialComponent.objects.create(name="Dry Matter")
         unit = Unit.objects.create(name="mg/kg")
         MaterialPropertyValue.objects.create(
             property=prop,
+            basis_component=basis,
             unit=unit,
             average=Decimal("123.321"),
             standard_deviation=Decimal("0.1337"),
@@ -55,9 +57,11 @@ class MaterialPropertySerializerTestCase(TestCase):
         self.assertIn("id", data)
         self.assertIn("property_name", data)
         self.assertIn("property_url", data)
+        self.assertIn("basis_component", data)
         self.assertIn("average", data)
         self.assertIn("standard_deviation", data)
         self.assertIn("unit", data)
+        self.assertEqual(data["basis_component"], self.value.basis_component.name)
         self.assertEqual(data["unit"], self.value.unit.name)
         self.assertNotEqual(data["unit"], self.value.property.unit)
 

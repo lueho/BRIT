@@ -505,6 +505,14 @@ class MaterialPropertyGroup(NamedUserCreatedObject):
 
 class MaterialPropertyValue(UserCreatedObject):
     property = models.ForeignKey(MaterialProperty, on_delete=models.PROTECT)
+    basis_component = models.ForeignKey(
+        MaterialComponent,
+        related_name="basis_property_values",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        help_text="Basis component for the property value (e.g. Dry Matter).",
+    )
     unit = models.ForeignKey(
         Unit,
         on_delete=models.PROTECT,
@@ -530,6 +538,7 @@ class MaterialPropertyValue(UserCreatedObject):
         duplicate = MaterialPropertyValue.objects.create(
             owner=creator,
             property=self.property,
+            basis_component=self.basis_component,
             unit=self.unit,
             analytical_method=self.analytical_method,
             average=self.average,

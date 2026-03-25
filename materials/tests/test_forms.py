@@ -138,13 +138,17 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
     def setUpTestData(cls):
         cls.allowed_unit = Unit.objects.create(name="mg/L")
         cls.disallowed_unit = Unit.objects.create(name="g/L")
+        cls.default_basis = MaterialComponent.objects.create(name="Dry Matter")
         cls.property = MaterialProperty.objects.create(name="Nitrogen", unit="g/L")
         cls.property.allowed_units.add(cls.allowed_unit)
+        cls.property.default_basis_component = cls.default_basis
+        cls.property.save(update_fields=["default_basis_component"])
 
     def test_fk_fields_use_tomselect_autocomplete_fields(self):
         form = MaterialPropertyValueModelForm()
 
         self.assertIsInstance(form.fields["property"], TomSelectModelChoiceField)
+        self.assertIsInstance(form.fields["basis_component"], TomSelectModelChoiceField)
         self.assertIsInstance(form.fields["unit"], TomSelectModelChoiceField)
         self.assertIsInstance(
             form.fields["analytical_method"], TomSelectModelChoiceField
@@ -153,6 +157,10 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
     def test_form_includes_unit_field(self):
         form = MaterialPropertyValueModelForm()
         self.assertIn("unit", form.fields)
+
+    def test_form_includes_basis_component_field(self):
+        form = MaterialPropertyValueModelForm()
+        self.assertIn("basis_component", form.fields)
 
     def test_form_rejects_unit_not_in_allowed_units(self):
         data = QueryDict("", mutable=True)
@@ -167,6 +175,22 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
         form = MaterialPropertyValueModelForm(data=data)
         self.assertFalse(form.is_valid())
         self.assertIn("unit", form.errors)
+
+    def test_form_defaults_basis_component_from_property(self):
+        data = QueryDict("", mutable=True)
+        data.update(
+            {
+                "property": self.property.pk,
+                "unit": self.allowed_unit.pk,
+                "average": "12.3",
+                "standard_deviation": "0.5",
+            }
+        )
+        form = MaterialPropertyValueModelForm(data=data)
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(
+            form.cleaned_data["basis_component"], self.property.default_basis_component
+        )
 
 
 class CompositionUpdateFormTestCase(TestCase):

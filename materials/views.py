@@ -965,6 +965,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
             self.object.properties.select_related(
                 "property",
                 "property__comparable_property",
+                "basis_component",
                 "analytical_method",
                 "unit",
             )

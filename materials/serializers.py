@@ -129,6 +129,7 @@ class MaterialPropertyValueModelSerializer(ModelSerializer):
     property_url = HyperlinkedRelatedField(
         source="property", read_only=True, view_name="materialproperty-detail-modal"
     )
+    basis_component = ReadOnlyField(source="basis_component.name")
     unit = ReadOnlyField(source="unit.name")
     analytical_method = StringRelatedField()
     sources = SourceAbbreviationSerializer(many=True)
@@ -140,6 +141,7 @@ class MaterialPropertyValueModelSerializer(ModelSerializer):
             "property",
             "property_name",
             "property_url",
+            "basis_component",
             "analytical_method",
             "sources",
             "average",
@@ -236,11 +238,12 @@ class MaterialAPISerializer(ModelSerializer):
 
 class MaterialPropertyAPISerializer(ModelSerializer):
     name = StringRelatedField(source="property")
+    basis_component = ReadOnlyField(source="basis_component.name")
     unit = ReadOnlyField(source="unit.name")
 
     class Meta:
         model = MaterialPropertyValue
-        fields = ("name", "unit", "average", "standard_deviation")
+        fields = ("name", "basis_component", "unit", "average", "standard_deviation")
 
 
 class WeightShareAPISerializer(ModelSerializer):

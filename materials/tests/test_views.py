@@ -818,10 +818,21 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.unit = Unit.objects.create(name="mg/L", owner=cls.owner)
+        cls.default_basis = MaterialComponent.objects.create(
+            owner=cls.owner,
+            name="Dry Matter",
+            publication_status="published",
+        )
+        cls.alt_basis = MaterialComponent.objects.create(
+            owner=cls.owner,
+            name="Volatile Solids",
+            publication_status="published",
+        )
         cls.property = MaterialProperty.objects.create(
             owner=cls.owner,
             name="Dry Matter",
             unit="mg/L",
+            default_basis_component=cls.default_basis,
             publication_status="published",
         )
         cls.property.allowed_units.add(cls.unit)
@@ -839,6 +850,7 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         cls.value = MaterialPropertyValue.objects.create(
             owner=cls.owner,
             property=cls.property,
+            basis_component=cls.default_basis,
             unit=cls.unit,
             average=Decimal("12.5"),
             standard_deviation=Decimal("0.5"),
@@ -911,6 +923,15 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, "Volatile solids")
         self.assertContains(response, "Comparable as Organic matter")
 
+    def test_sample_detail_shows_value_level_basis_for_properties(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.value.basis_component.name)
+
     def test_update_view_redirects_back_to_sample_detail(self):
         self.client.force_login(self.owner)
 
@@ -918,6 +939,7 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
             reverse("materialpropertyvalue-update", kwargs={"pk": self.value.pk}),
             data={
                 "property": self.property.pk,
+                "basis_component": self.alt_basis.pk,
                 "unit": self.unit.pk,
                 "analytical_method": "",
                 "sources": [],
@@ -933,6 +955,7 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.value.refresh_from_db()
         self.assertEqual(self.value.average, Decimal("14.25"))
         self.assertEqual(self.value.standard_deviation, Decimal("0.75"))
+        self.assertEqual(self.value.basis_component, self.alt_basis)
 
 
 class ComponentMeasurementUpdateViewTestCase(ViewWithPermissionsTestCase):
@@ -1582,8 +1605,19 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         cls.sample = Sample.objects.create(
             owner=cls.owner, name="Test Sample", material=material, series=series
         )
+        cls.default_basis = MaterialComponent.objects.create(
+            owner=cls.owner,
+            name="Dry Matter",
+        )
+        cls.selected_basis = MaterialComponent.objects.create(
+            owner=cls.owner,
+            name="Volatile Solids",
+        )
         cls.property = MaterialProperty.objects.create(
-            name="Test Property", unit="Test Unit", owner=cls.owner
+            name="Test Property",
+            unit="Test Unit",
+            owner=cls.owner,
+            default_basis_component=cls.default_basis,
         )
         cls.unit = Unit.objects.create(name="mg/L", owner=cls.owner)
         cls.property.allowed_units.add(cls.unit)
@@ -1672,6 +1706,41 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(value.unit, self.unit)
 
+    def test_post_defaults_basis_component_from_property(self):
+        self.client.force_login(self.sample.owner)
+        data = {
+            "property": self.property.pk,
+            "unit": self.unit.pk,
+            "average": 123.321,
+            "standard_deviation": 0.1337,
+        }
+        self.client.post(
+            reverse("sample-add-property", kwargs={"pk": self.sample.pk}), data
+        )
+        value = MaterialPropertyValue.objects.get(
+            average=Decimal("123.321"),
+            standard_deviation=Decimal("0.1337"),
+        )
+        self.assertEqual(value.basis_component, self.default_basis)
+
+    def test_post_persists_selected_basis_component(self):
+        self.client.force_login(self.sample.owner)
+        data = {
+            "property": self.property.pk,
+            "basis_component": self.selected_basis.pk,
+            "unit": self.unit.pk,
+            "average": 123.321,
+            "standard_deviation": 0.1337,
+        }
+        self.client.post(
+            reverse("sample-add-property", kwargs={"pk": self.sample.pk}), data
+        )
+        value = MaterialPropertyValue.objects.get(
+            average=Decimal("123.321"),
+            standard_deviation=Decimal("0.1337"),
+        )
+        self.assertEqual(value.basis_component, self.selected_basis)
+
 
 class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "add_materialpropertyvalue"
@@ -1693,8 +1762,19 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         cls.sample = Sample.objects.create(
             owner=cls.owner, name="Test Sample", material=material, series=series
         )
+        cls.default_basis = MaterialComponent.objects.create(
+            owner=cls.owner,
+            name="Dry Matter",
+        )
+        cls.selected_basis = MaterialComponent.objects.create(
+            owner=cls.owner,
+            name="Volatile Solids",
+        )
         cls.property = MaterialProperty.objects.create(
-            name="Test Property", unit="Test Unit", owner=cls.owner
+            name="Test Property",
+            unit="Test Unit",
+            owner=cls.owner,
+            default_basis_component=cls.default_basis,
         )
         cls.unit = Unit.objects.create(name="g/L", owner=cls.owner)
         cls.property.allowed_units.add(cls.unit)
@@ -1782,6 +1862,41 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
             standard_deviation=Decimal("0.1337"),
         )
         self.assertEqual(value.unit, self.unit)
+
+    def test_post_defaults_basis_component_from_property(self):
+        self.client.force_login(self.sample.owner)
+        data = {
+            "property": self.property.pk,
+            "unit": self.unit.pk,
+            "average": 123.321,
+            "standard_deviation": 0.1337,
+        }
+        self.client.post(
+            reverse("sample-add-property-modal", kwargs={"pk": self.sample.pk}), data
+        )
+        value = MaterialPropertyValue.objects.get(
+            average=Decimal("123.321"),
+            standard_deviation=Decimal("0.1337"),
+        )
+        self.assertEqual(value.basis_component, self.default_basis)
+
+    def test_post_persists_selected_basis_component(self):
+        self.client.force_login(self.sample.owner)
+        data = {
+            "property": self.property.pk,
+            "basis_component": self.selected_basis.pk,
+            "unit": self.unit.pk,
+            "average": 123.321,
+            "standard_deviation": 0.1337,
+        }
+        self.client.post(
+            reverse("sample-add-property-modal", kwargs={"pk": self.sample.pk}), data
+        )
+        value = MaterialPropertyValue.objects.get(
+            average=Decimal("123.321"),
+            standard_deviation=Decimal("0.1337"),
+        )
+        self.assertEqual(value.basis_component, self.selected_basis)
 
 
 class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):

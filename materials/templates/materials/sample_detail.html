@@ -246,6 +246,7 @@
                     <tr>
                       <th>Property</th>
                       <th>Value</th>
+                      <th>Basis</th>
                       <th>Method</th>
                       <th>Sources</th>
                       {% if user.is_authenticated %}<th class="text-end">Edit</th>{% endif %}
@@ -263,8 +264,9 @@
                           {% endif %}
                         </td>
                         <td class="text-nowrap">
-                          {{ property.average|trim_decimal:6 }} ± {{ property.standard_deviation|trim_decimal:6 }} {{ property.property.unit }}
+                          {{ property.average|trim_decimal:6 }} ± {{ property.standard_deviation|trim_decimal:6 }} {{ property.unit }}
                         </td>
+                        <td>{{ property.basis_component.name|default:"-" }}</td>
                         <td>
                           {% if property.analytical_method %}
                             <a href="{% url 'analyticalmethod-detail-modal' property.analytical_method.pk %}"

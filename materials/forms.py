@@ -225,6 +225,15 @@ class MaterialPropertyValueModelForm(
         ),
         label="Property",
     )
+    basis_component = TomSelectModelChoiceField(
+        queryset=MaterialComponent.objects.filter(type="component"),
+        required=False,
+        config=TomSelectConfig(
+            url="materialcomponent-autocomplete",
+            label_field="name",
+        ),
+        label="Basis",
+    )
     unit = TomSelectModelChoiceField(
         queryset=Unit.objects.all(),
         required=False,
@@ -247,11 +256,19 @@ class MaterialPropertyValueModelForm(
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["unit"].required = False
+        self.fields["basis_component"].required = False
+        if not self.is_bound and not self.instance.pk:
+            property_obj = self.initial.get("property")
+            if property_obj and getattr(property_obj, "default_basis_component", None):
+                self.initial.setdefault(
+                    "basis_component", property_obj.default_basis_component
+                )
 
     class Meta:
         model = MaterialPropertyValue
         fields = (
             "property",
+            "basis_component",
             "unit",
             "analytical_method",
             "sources",
@@ -262,7 +279,11 @@ class MaterialPropertyValueModelForm(
     def clean(self):
         cleaned_data = super().clean()
         property_obj = cleaned_data.get("property")
+        basis_component = cleaned_data.get("basis_component")
         unit = cleaned_data.get("unit")
+        if property_obj and basis_component is None:
+            basis_component = property_obj.default_basis_component
+            cleaned_data["basis_component"] = basis_component
         if property_obj and not unit:
             unit = property_obj.allowed_units.first()
             if unit is None and property_obj.unit:
