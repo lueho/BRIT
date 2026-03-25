@@ -9,6 +9,7 @@ from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 
 from bibliography.models import Source
+from distributions.models import TemporalDistribution, Timestep
 from maps.models import Attribute, GeoPolygon, NutsRegion, Region, RegionAttributeValue
 from materials.models import Material
 from sources.waste_collection.derived_values import clear_derived_value_config_cache
@@ -18,6 +19,7 @@ from sources.waste_collection.models import (
     Catchment,
     Collection,
     CollectionCatchment,
+    CollectionCountOptions,
     CollectionFrequency,
     CollectionPropertyValue,
     CollectionSystem,
@@ -880,14 +882,41 @@ class CollectionMutationApiTestCase(APITestCase):
         cls.other_user = User.objects.create_user(username="agent-other")
         cls.staff = User.objects.create_user(username="agent-staff", is_staff=True)
 
-        content_type = ContentType.objects.get_for_model(Collection)
+        collection_content_type = ContentType.objects.get_for_model(Collection)
         cls.add_collection_permission, _ = Permission.objects.get_or_create(
-            content_type=content_type,
+            content_type=collection_content_type,
             codename="add_collection",
             defaults={"name": "Can add collection"},
         )
+        frequency_content_type = ContentType.objects.get_for_model(CollectionFrequency)
+        cls.add_collection_frequency_permission, _ = Permission.objects.get_or_create(
+            content_type=frequency_content_type,
+            codename="add_collectionfrequency",
+            defaults={"name": "Can add collection frequency"},
+        )
         cls.owner.user_permissions.add(cls.add_collection_permission)
+        cls.owner.user_permissions.add(cls.add_collection_frequency_permission)
         cls.other_user.user_permissions.add(cls.add_collection_permission)
+
+        cls.months_distribution = TemporalDistribution.objects.get(
+            name="Months of the year"
+        )
+        cls.march = Timestep.objects.get(
+            distribution=cls.months_distribution,
+            name="March",
+        )
+        cls.october = Timestep.objects.get(
+            distribution=cls.months_distribution,
+            name="October",
+        )
+        cls.november = Timestep.objects.get(
+            distribution=cls.months_distribution,
+            name="November",
+        )
+        cls.february = Timestep.objects.get(
+            distribution=cls.months_distribution,
+            name="February",
+        )
 
         cls.catchment = CollectionCatchment.objects.create(name="Agent Catchment")
         cls.collection_system = CollectionSystem.objects.create(name="Agent System")
@@ -950,6 +979,27 @@ class CollectionMutationApiTestCase(APITestCase):
             url="https://example.com/predecessor-flyer",
         )
         cls.predecessor.flyers.add(cls.predecessor_flyer)
+
+    def _seasonal_frequency_payload(self, *, name="", submit_for_review=True):
+        return {
+            "name": name,
+            "description": "Nordwestmecklenburg GER seasonal cadence.",
+            "submit_for_review": submit_for_review,
+            "rows": [
+                {
+                    "distribution": self.months_distribution.pk,
+                    "first_timestep": self.march.pk,
+                    "last_timestep": self.october.pk,
+                    "standard_cadence": "every_two_weeks",
+                },
+                {
+                    "distribution": self.months_distribution.pk,
+                    "first_timestep": self.november.pk,
+                    "last_timestep": self.february.pk,
+                    "standard_cadence": "every_four_weeks",
+                },
+            ],
+        }
 
     def test_create_endpoint_requires_add_permission(self):
         user = User.objects.create_user(username="agent-no-perm")
@@ -1049,6 +1099,94 @@ class CollectionMutationApiTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("valid_until", response.data)
+
+    def test_create_frequency_endpoint_requires_add_permission(self):
+        user = User.objects.create_user(username="agent-no-frequency-perm")
+        self.client.force_login(user)
+
+        response = self.client.post(
+            reverse("api-waste-collection-frequency-create"),
+            self._seasonal_frequency_payload(),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_frequency_endpoint_creates_exact_schedule_and_submits(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse("api-waste-collection-frequency-create"),
+            self._seasonal_frequency_payload(),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["created"])
+        self.assertTrue(response.data["submitted"])
+        self.assertEqual(
+            response.data["name"],
+            "Seasonal; March-October 17 per year; November-February 4 per year",
+        )
+
+        frequency = CollectionFrequency.objects.get(pk=response.data["id"])
+        self.assertEqual(frequency.owner, self.owner)
+        self.assertEqual(frequency.publication_status, "review")
+        self.assertEqual(frequency.type, "Seasonal")
+        self.assertEqual(
+            frequency.name,
+            "Seasonal; March-October 17 per year; November-February 4 per year",
+        )
+        self.assertTrue(
+            ReviewAction.for_object(frequency)
+            .filter(action=ReviewAction.ACTION_SUBMITTED)
+            .exists()
+        )
+
+        rows = list(
+            CollectionCountOptions.objects.filter(frequency=frequency)
+            .select_related("season__first_timestep", "season__last_timestep")
+            .order_by("season__first_timestep__order")
+        )
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(
+            [
+                (
+                    row.season.first_timestep.name,
+                    row.season.last_timestep.name,
+                    row.standard,
+                    row.publication_status,
+                )
+                for row in rows
+            ],
+            [
+                ("March", "October", 17, "review"),
+                ("November", "February", 4, "review"),
+            ],
+        )
+
+    def test_create_frequency_endpoint_reuses_existing_visible_frequency(self):
+        existing_frequency = CollectionFrequency.objects.create(
+            owner=self.owner,
+            publication_status="private",
+            name="Seasonal; March-October 17 per year; November-February 4 per year",
+            type="Seasonal",
+        )
+
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse("api-waste-collection-frequency-create"),
+            self._seasonal_frequency_payload(submit_for_review=False),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["created"])
+        self.assertEqual(response.data["id"], existing_frequency.pk)
+        self.assertEqual(
+            CollectionCountOptions.objects.filter(frequency=existing_frequency).count(),
+            0,
+        )
 
     def test_update_endpoint_denies_non_owner(self):
         self.client.force_login(self.other_user)

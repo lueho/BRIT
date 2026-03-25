@@ -90,6 +90,7 @@ class CollectionSeasonFormSetTestCase(TestCase):
         cls.february = Timestep.objects.get(name="February")
         cls.march = Timestep.objects.get(name="March")
         cls.april = Timestep.objects.get(name="April")
+        cls.november = Timestep.objects.get(name="November")
         cls.december = Timestep.objects.get(name="December")
         cls.whole_year, _ = CollectionSeason.objects.get_or_create(
             distribution=cls.distribution,
@@ -243,6 +244,19 @@ class CollectionSeasonFormSetTestCase(TestCase):
         self.assertEqual(150, options.option_1)
         self.assertEqual(200, options.option_2)
         self.assertEqual(250, options.option_3)
+
+    def test_cross_year_cadence_derives_standard_count(self):
+        data = {
+            "distribution": self.distribution.pk,
+            "first_timestep": self.november.pk,
+            "last_timestep": self.february.pk,
+            "standard_cadence": "every_four_weeks",
+        }
+
+        form = CollectionSeasonForm(data)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["standard"], 4)
 
 
 class CollectionModelFormTestCase(TestCase):

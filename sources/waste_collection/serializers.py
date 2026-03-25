@@ -6,6 +6,12 @@ from rest_framework_gis.fields import GeometrySerializerMethodField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from bibliography.models import Source
+from case_studies.soilcom.frequency_service import (
+    CADENCE_CHOICES,
+    CADENCE_CUSTOM,
+    CollectionFrequencyScheduleService,
+)
+from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material
 from sources.waste_collection import models
 from sources.waste_collection.description_formatting import (
@@ -725,6 +731,125 @@ class CollectionImportRecordSerializer(serializers.Serializer):
 # ---------------------------------------------------------------------------
 
 
+class CollectionFrequencyScheduleRowMutationSerializer(serializers.Serializer):
+    distribution = serializers.PrimaryKeyRelatedField(
+        queryset=TemporalDistribution.objects.all()
+    )
+    first_timestep = serializers.PrimaryKeyRelatedField(queryset=Timestep.objects.all())
+    last_timestep = serializers.PrimaryKeyRelatedField(queryset=Timestep.objects.all())
+    standard_cadence = serializers.ChoiceField(
+        choices=[choice[0] for choice in CADENCE_CHOICES],
+        required=False,
+        allow_blank=True,
+        default="",
+    )
+    standard = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    option_1_cadence = serializers.ChoiceField(
+        choices=[choice[0] for choice in CADENCE_CHOICES],
+        required=False,
+        allow_blank=True,
+        default="",
+    )
+    option_1 = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    option_2_cadence = serializers.ChoiceField(
+        choices=[choice[0] for choice in CADENCE_CHOICES],
+        required=False,
+        allow_blank=True,
+        default="",
+    )
+    option_2 = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    option_3_cadence = serializers.ChoiceField(
+        choices=[choice[0] for choice in CADENCE_CHOICES],
+        required=False,
+        allow_blank=True,
+        default="",
+    )
+    option_3 = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+
+    def validate(self, attrs):
+        distribution = attrs["distribution"]
+        if distribution.name != "Months of the year":
+            raise serializers.ValidationError(
+                {"distribution": "Only 'Months of the year' is currently supported."}
+            )
+
+        for field_name in ("first_timestep", "last_timestep"):
+            timestep = attrs[field_name]
+            if timestep.distribution_id != distribution.id:
+                raise serializers.ValidationError(
+                    {
+                        field_name: (
+                            "Selected timestep must belong to the supplied temporal distribution."
+                        )
+                    }
+                )
+
+        attrs = CollectionFrequencyScheduleService.populate_counts_from_cadences(attrs)
+        for field_name in ("standard", "option_1", "option_2", "option_3"):
+            cadence_field = f"{field_name}_cadence"
+            if attrs.get(cadence_field) == CADENCE_CUSTOM and attrs.get(field_name) in (
+                None,
+                "",
+            ):
+                raise serializers.ValidationError(
+                    {
+                        field_name: (
+                            "Enter a custom annual total or choose a cadence preset."
+                        )
+                    }
+                )
+
+        if attrs.get("standard") in (None, ""):
+            raise serializers.ValidationError(
+                {
+                    "standard": (
+                        "A standard service level is required for each schedule row."
+                    )
+                }
+            )
+        return attrs
+
+
+class CollectionFrequencyMutationSerializer(serializers.Serializer):
+    name = serializers.CharField(required=False, allow_blank=True, default="")
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    rows = CollectionFrequencyScheduleRowMutationSerializer(
+        many=True, allow_empty=False
+    )
+    submit_for_review = serializers.BooleanField(required=False, default=True)
+
+    def validate_description(self, value):
+        return normalize_collection_description(value)
+
+    def validate_rows(self, rows):
+        previous_first_timestep = None
+        previous_last_timestep = None
+        for row in rows:
+            first_timestep = row["first_timestep"]
+            last_timestep = row["last_timestep"]
+            if previous_first_timestep and previous_last_timestep:
+                if previous_first_timestep.order >= first_timestep.order:
+                    raise serializers.ValidationError(
+                        "The seasons must be given in ascending start-month order."
+                    )
+                if previous_last_timestep.order >= first_timestep.order:
+                    raise serializers.ValidationError(
+                        "The seasons must not overlap and must be given in order."
+                    )
+            previous_first_timestep = first_timestep
+            previous_last_timestep = last_timestep
+        return rows
+
+    def validate(self, attrs):
+        rows = attrs.get("rows", [])
+        frequency_type = CollectionFrequencyScheduleService.frequency_type(rows)
+        attrs["frequency_type"] = frequency_type
+        attrs["canonical_name"] = attrs.get(
+            "name"
+        ) or CollectionFrequencyScheduleService.canonical_name(rows, frequency_type)
+        return attrs
+
+
 class CollectionMutationCreateSerializer(serializers.Serializer):
     """Validate payloads for programmatic collection creation."""
 
@@ -1011,6 +1136,7 @@ __all__ = [
     "CollectionFrequencyReferenceSerializer",
     "GEOMETRY_SIMPLIFY_TOLERANCE",
     "CollectionFlatSerializer",
+    "CollectionFrequencyMutationSerializer",
     "CollectionImportPropertyValueSerializer",
     "CollectionImportRecordSerializer",
     "CollectionModelSerializer",

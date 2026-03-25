@@ -17,8 +17,10 @@ from sources.waste_collection.importers import CollectionImporter
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
     Collection,
+    CollectionCountOptions,
     CollectionFrequency,
     CollectionPropertyValue,
+    CollectionSeason,
     Collector,
     WasteFlyer,
 )
@@ -26,6 +28,7 @@ from sources.waste_collection.serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
     AggregatedCollectionPropertyValueMutationSerializer,
     CollectionFlatSerializer,
+    CollectionFrequencyMutationSerializer,
     CollectionFrequencyReferenceSerializer,
     CollectionImportRecordSerializer,
     CollectionModelSerializer,
@@ -496,6 +499,128 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             return apply_scope_filter(queryset, scope, user=user)
 
         return filter_queryset_for_user(queryset, user)
+
+    @staticmethod
+    def _existing_mutation_frequency(actor, canonical_name):
+        if actor is None or not actor.is_authenticated:
+            return CollectionFrequency.objects.none().first()
+
+        return (
+            CollectionFrequency.objects.filter(
+                Q(name__iexact=canonical_name)
+                & (
+                    Q(owner=actor)
+                    | Q(publication_status=CollectionFrequency.STATUS_PUBLISHED)
+                )
+            )
+            .order_by("pk")
+            .first()
+        )
+
+    @staticmethod
+    def _get_or_create_frequency_season(row):
+        season, _ = CollectionSeason.objects.get_or_create(
+            distribution=row["distribution"],
+            first_timestep=row["first_timestep"],
+            last_timestep=row["last_timestep"],
+        )
+        return season
+
+    def _create_collection_frequency(self, actor, data):
+        frequency = CollectionFrequency.objects.create(
+            owner=actor,
+            publication_status=CollectionFrequency.STATUS_PRIVATE,
+            name=data["canonical_name"],
+            type=data["frequency_type"],
+            description=data.get("description", ""),
+        )
+        count_options = []
+        for row in data.get("rows", []):
+            season = self._get_or_create_frequency_season(row)
+            count_options.append(
+                CollectionCountOptions.objects.create(
+                    frequency=frequency,
+                    season=season,
+                    standard=row.get("standard"),
+                    option_1=row.get("option_1"),
+                    option_2=row.get("option_2"),
+                    option_3=row.get("option_3"),
+                    owner=actor,
+                    publication_status=CollectionCountOptions.STATUS_PRIVATE,
+                )
+            )
+        return frequency, count_options
+
+    @staticmethod
+    def _submittable_frequency_rows(actor, frequency):
+        return list(
+            CollectionCountOptions.objects.filter(
+                frequency=frequency,
+                owner=actor,
+                publication_status__in=(
+                    CollectionCountOptions.STATUS_PRIVATE,
+                    getattr(CollectionCountOptions, "STATUS_DECLINED", "declined"),
+                ),
+            ).order_by("pk")
+        )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+        url_path="frequency/create",
+        url_name="frequency-create",
+    )
+    def create_collection_frequency(self, request, *args, **kwargs):
+        actor = self._require_authenticated_actor(request)
+        self._require_add_permission_for_model(actor, CollectionFrequency)
+
+        serializer = CollectionFrequencyMutationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        with transaction.atomic():
+            frequency = self._existing_mutation_frequency(actor, data["canonical_name"])
+            created = frequency is None
+            count_options = []
+            if created:
+                frequency, count_options = self._create_collection_frequency(
+                    actor, data
+                )
+            else:
+                count_options = self._submittable_frequency_rows(actor, frequency)
+
+            submitted = False
+            if data.get("submit_for_review", True):
+                for count_options_row in count_options:
+                    self._submit_object_for_review_if_requested(
+                        request,
+                        count_options_row,
+                        submit_for_review=True,
+                    )
+                submitted = self._submit_object_for_review_if_requested(
+                    request,
+                    frequency,
+                    submit_for_review=(
+                        created
+                        or frequency.publication_status
+                        in {frequency.STATUS_PRIVATE, frequency.STATUS_DECLINED}
+                    ),
+                )
+
+        return Response(
+            {
+                **self._serialize_user_created_object_response(
+                    frequency,
+                    submitted,
+                    detail_url_name="collectionfrequency-detail",
+                ),
+                "created": created,
+                "name": frequency.name,
+                "type": frequency.type,
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
 
     @action(
         detail=True,

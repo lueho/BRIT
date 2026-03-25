@@ -1,6 +1,8 @@
 import re
 from decimal import ROUND_HALF_UP, Decimal
 
+from django.db.models import Q
+
 CADENCE_WEEKLY = "weekly"
 CADENCE_EVERY_TWO_WEEKS = "every_two_weeks"
 CADENCE_EVERY_FOUR_WEEKS = "every_four_weeks"
@@ -88,9 +90,14 @@ class CollectionFrequencyScheduleService:
             or first_timestep.distribution_id != last_timestep.distribution_id
         ):
             return 0
-        return first_timestep.distribution.timestep_set.filter(
-            order__gte=first_timestep.order,
-            order__lte=last_timestep.order,
+        timesteps = first_timestep.distribution.timestep_set
+        if first_timestep.order <= last_timestep.order:
+            return timesteps.filter(
+                order__gte=first_timestep.order,
+                order__lte=last_timestep.order,
+            ).count()
+        return timesteps.filter(
+            Q(order__gte=first_timestep.order) | Q(order__lte=last_timestep.order)
         ).count()
 
     @classmethod
