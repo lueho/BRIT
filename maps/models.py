@@ -16,6 +16,7 @@ from utils.object_management.models import (
     NamedUserCreatedObject,
     UserCreatedObjectQuerySet,
 )
+from utils.properties.models import NumericMeasurementMixin
 
 TYPES = (
     ("administrative", "administrative"),
@@ -560,10 +561,13 @@ class Attribute(NamedUserCreatedObject):
         return f"{self.name} [{self.unit}]"
 
 
-class RegionAttributeValue(NamedUserCreatedObject):
+class RegionAttributeValue(NumericMeasurementMixin, NamedUserCreatedObject):
     """
     Attaches a value of an attribute class to a region
     """
+
+    measurement_property_field = "attribute"
+    measurement_value_field = "value"
 
     region = models.ForeignKey(Region, on_delete=models.PROTECT)
     attribute = models.ForeignKey(Attribute, on_delete=models.PROTECT)

@@ -1,10 +1,11 @@
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.test import TestCase
 
 from utils.object_management.models import get_default_owner
-from utils.properties.models import Unit
+from utils.properties.models import NumericMeasurementMixin, Unit
 from utils.properties.units import UnitConversionError
 
 
@@ -82,3 +83,53 @@ class UtilsInitialDataTestCase(TestCase):
         owner = get_default_owner()
         unit = Unit.objects.get(owner=owner, name="No unit")
         self.assertTrue(unit.dimensionless)
+
+
+class NumericMeasurementMixinTestCase(TestCase):
+    class DummyMeasurement(NumericMeasurementMixin):
+        def __init__(self, property_obj, average, standard_deviation, unit=None):
+            self.property = property_obj
+            self.average = average
+            self.standard_deviation = standard_deviation
+            self.unit = unit
+
+    class DummyAttributeMeasurement(NumericMeasurementMixin):
+        measurement_property_field = "attribute"
+        measurement_value_field = "value"
+
+        def __init__(self, attribute, value, standard_deviation):
+            self.attribute = attribute
+            self.value = value
+            self.standard_deviation = standard_deviation
+
+    def test_measurement_unit_label_falls_back_to_property_unit(self):
+        measurement = self.DummyMeasurement(
+            property_obj=SimpleNamespace(name="Dry matter", unit="g/kg"),
+            average=Decimal("12.34"),
+            standard_deviation=Decimal("0.56"),
+        )
+
+        self.assertEqual(measurement.measurement_name, "Dry matter")
+        self.assertEqual(measurement.measurement_unit_label, "g/kg")
+
+    def test_display_values_round_for_collection_style_properties(self):
+        measurement = self.DummyMeasurement(
+            property_obj=SimpleNamespace(name="specific waste collected"),
+            average=12.34,
+            standard_deviation=0.56,
+        )
+
+        self.assertEqual(measurement.display_average, 12.3)
+        self.assertEqual(measurement.display_standard_deviation, 0.6)
+
+    def test_custom_field_mapping_supports_attribute_value_patterns(self):
+        measurement = self.DummyAttributeMeasurement(
+            attribute=SimpleNamespace(name="Population density", unit="1/km²"),
+            value=123.321,
+            standard_deviation=1.25,
+        )
+
+        self.assertEqual(measurement.measurement_name, "Population density")
+        self.assertEqual(measurement.measurement_unit_label, "1/km²")
+        self.assertEqual(measurement.display_average, 123.321)
+        self.assertEqual(measurement.display_standard_deviation, 1.25)

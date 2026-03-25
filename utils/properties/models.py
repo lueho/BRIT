@@ -13,6 +13,73 @@ from utils.properties.units import (
 )
 
 
+class NumericMeasurementMixin:
+    measurement_property_field = "property"
+    measurement_value_field = "average"
+    measurement_standard_deviation_field = "standard_deviation"
+    measurement_unit_field = "unit"
+
+    @staticmethod
+    def _should_round_to_one_decimal(property_name):
+        normalized = (property_name or "").strip().lower()
+        return normalized.startswith(
+            (
+                "connection rate",
+                "specific waste collected",
+                "total waste collected",
+            )
+        )
+
+    def get_measurement_property(self):
+        return getattr(self, self.measurement_property_field, None)
+
+    def get_measurement_value(self):
+        return getattr(self, self.measurement_value_field, None)
+
+    def get_measurement_standard_deviation(self):
+        return getattr(self, self.measurement_standard_deviation_field, None)
+
+    def get_measurement_unit(self):
+        return getattr(self, self.measurement_unit_field, None)
+
+    @builtin_property
+    def measurement_name(self):
+        measurement_property = self.get_measurement_property()
+        if measurement_property is None:
+            return None
+        return getattr(measurement_property, "name", None) or str(measurement_property)
+
+    @builtin_property
+    def measurement_unit_label(self):
+        measurement_unit = self.get_measurement_unit()
+        if measurement_unit is not None:
+            return getattr(measurement_unit, "name", None) or str(measurement_unit)
+
+        measurement_property = self.get_measurement_property()
+        if measurement_property is None:
+            return None
+
+        return getattr(measurement_property, "unit", None)
+
+    @builtin_property
+    def display_average(self):
+        average = self.get_measurement_value()
+        if average is None:
+            return None
+        if self._should_round_to_one_decimal(self.measurement_name):
+            return round(average, 1)
+        return average
+
+    @builtin_property
+    def display_standard_deviation(self):
+        standard_deviation = self.get_measurement_standard_deviation()
+        if standard_deviation is None:
+            return None
+        if self._should_round_to_one_decimal(self.measurement_name):
+            return round(standard_deviation, 1)
+        return standard_deviation
+
+
 class PropertyBase(NamedUserCreatedObject):
     """
     Abstract base for module-specific property definitions.
@@ -118,7 +185,7 @@ class Property(PropertyBase):
     allowed_units = models.ManyToManyField(Unit)
 
 
-class PropertyValue(NamedUserCreatedObject):
+class PropertyValue(NumericMeasurementMixin, NamedUserCreatedObject):
     """
     Serves to link any abstract property definition (see "Property" class) to a concrete instance
     of any other model with a concrete value. Intended to be related to other models through many-to-many relations.
@@ -139,33 +206,6 @@ class PropertyValue(NamedUserCreatedObject):
     class Meta:
         abstract = True
         ordering = ["property__name"]
-
-    @staticmethod
-    def _should_round_to_one_decimal(property_name):
-        normalized = (property_name or "").strip().lower()
-        return normalized.startswith(
-            (
-                "connection rate",
-                "specific waste collected",
-                "total waste collected",
-            )
-        )
-
-    @builtin_property
-    def display_average(self):
-        if self.average is None:
-            return None
-        if self._should_round_to_one_decimal(getattr(self.property, "name", "")):
-            return round(self.average, 1)
-        return self.average
-
-    @builtin_property
-    def display_standard_deviation(self):
-        if self.standard_deviation is None:
-            return None
-        if self._should_round_to_one_decimal(getattr(self.property, "name", "")):
-            return round(self.standard_deviation, 1)
-        return self.standard_deviation
 
     def __str__(self):
         name = f"{self.property}: {self.average}"

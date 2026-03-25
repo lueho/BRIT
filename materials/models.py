@@ -16,7 +16,12 @@ from utils.object_management.models import (
     UserCreatedObjectManager,
     get_default_owner,
 )
-from utils.properties.models import PropertyBase, Unit, get_default_unit_pk
+from utils.properties.models import (
+    NumericMeasurementMixin,
+    PropertyBase,
+    Unit,
+    get_default_unit_pk,
+)
 
 
 class MaterialComponentKind(models.TextChoices):
@@ -503,7 +508,7 @@ class MaterialPropertyGroup(NamedUserCreatedObject):
         unique_together = [["name", "owner"]]
 
 
-class MaterialPropertyValue(UserCreatedObject):
+class MaterialPropertyValue(NumericMeasurementMixin, UserCreatedObject):
     property = models.ForeignKey(MaterialProperty, on_delete=models.PROTECT)
     basis_component = models.ForeignKey(
         MaterialComponent,

@@ -8,6 +8,7 @@ from rest_framework.serializers import (
 
 from bibliography.serializers import SourceAbbreviationSerializer
 from distributions.models import TemporalDistribution
+from utils.properties.serializers import NumericMeasurementSerializerMixin
 
 from .models import (
     Composition,
@@ -124,15 +125,15 @@ class CompositionDoughnutChartSerializer(ModelSerializer):
         return data
 
 
-class MaterialPropertyValueModelSerializer(ModelSerializer):
+class MaterialPropertyValueModelSerializer(
+    NumericMeasurementSerializerMixin, ModelSerializer
+):
     property_name = StringRelatedField(source="property")
     property_url = HyperlinkedRelatedField(
         source="property", read_only=True, view_name="materialproperty-detail-modal"
     )
     basis_component = ReadOnlyField(source="basis_component.name")
-    unit = ReadOnlyField(source="unit.name")
     analytical_method = StringRelatedField()
-    sources = SourceAbbreviationSerializer(many=True)
 
     class Meta:
         model = MaterialPropertyValue
@@ -236,14 +237,19 @@ class MaterialAPISerializer(ModelSerializer):
         fields = ("name", "categories")
 
 
-class MaterialPropertyAPISerializer(ModelSerializer):
+class BaseMaterialPropertyAPISerializer(ModelSerializer):
     name = StringRelatedField(source="property")
     basis_component = ReadOnlyField(source="basis_component.name")
-    unit = ReadOnlyField(source="unit.name")
 
     class Meta:
         model = MaterialPropertyValue
         fields = ("name", "basis_component", "unit", "average", "standard_deviation")
+
+
+class MaterialPropertyAPISerializer(
+    NumericMeasurementSerializerMixin, BaseMaterialPropertyAPISerializer
+):
+    pass
 
 
 class WeightShareAPISerializer(ModelSerializer):

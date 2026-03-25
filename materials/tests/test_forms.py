@@ -162,6 +162,14 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
         form = MaterialPropertyValueModelForm()
         self.assertIn("basis_component", form.fields)
 
+    def test_numeric_measurement_fields_use_any_step(self):
+        form = MaterialPropertyValueModelForm()
+
+        self.assertEqual(form.fields["average"].widget.attrs.get("step"), "any")
+        self.assertEqual(
+            form.fields["standard_deviation"].widget.attrs.get("step"), "any"
+        )
+
     def test_form_rejects_unit_not_in_allowed_units(self):
         data = QueryDict("", mutable=True)
         data.update(

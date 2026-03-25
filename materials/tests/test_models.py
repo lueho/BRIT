@@ -286,6 +286,21 @@ class MaterialPropertyValueTestCase(TestCase):
         self.assertEqual(duplicate.average, value.average)
         self.assertEqual(duplicate.standard_deviation, value.standard_deviation)
 
+    def test_shared_numeric_measurement_properties_are_available(self):
+        prop = MaterialProperty.objects.create(name="Nitrogen", unit="g/kg")
+        unit = Unit.objects.create(name="mg/kg")
+        value = MaterialPropertyValue.objects.create(
+            property=prop,
+            unit=unit,
+            average=Decimal("27.3"),
+            standard_deviation=Decimal("0.1337"),
+        )
+
+        self.assertEqual(value.measurement_name, prop.name)
+        self.assertEqual(value.measurement_unit_label, unit.name)
+        self.assertEqual(value.display_average, value.average)
+        self.assertEqual(value.display_standard_deviation, value.standard_deviation)
+
 
 class SampleTestCase(TestCase):
     @classmethod

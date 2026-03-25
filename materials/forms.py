@@ -28,6 +28,7 @@ from utils.forms import (
     SourcesFieldMixin,
     UserCreatedObjectFormMixin,
 )
+from utils.properties.forms import NumericMeasurementFieldsFormMixin
 from utils.properties.models import Unit, get_default_unit_pk
 
 from .models import (
@@ -147,7 +148,10 @@ class MaterialPropertyModalModelForm(ModalModelFormMixin, MaterialPropertyModelF
 
 
 class ComponentMeasurementModelForm(
-    UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
+    NumericMeasurementFieldsFormMixin,
+    UserCreatedObjectFormMixin,
+    SourcesFieldMixin,
+    SimpleModelForm,
 ):
     group = TomSelectModelChoiceField(
         queryset=MaterialComponentGroup.objects.all(),
@@ -215,7 +219,10 @@ class ComponentMeasurementModalModelForm(
 
 
 class MaterialPropertyValueModelForm(
-    UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
+    NumericMeasurementFieldsFormMixin,
+    UserCreatedObjectFormMixin,
+    SourcesFieldMixin,
+    SimpleModelForm,
 ):
     property = TomSelectModelChoiceField(
         queryset=MaterialProperty.objects.all(),

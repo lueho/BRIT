@@ -2,8 +2,13 @@ from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.forms import formset_factory
 from django.test import TestCase
 
-from ..forms import RegionMergeForm, RegionMergeFormSet, RegionModelForm
-from ..models import LauRegion, Region
+from ..forms import (
+    RegionAttributeValueModelForm,
+    RegionMergeForm,
+    RegionMergeFormSet,
+    RegionModelForm,
+)
+from ..models import Attribute, LauRegion, Region
 
 
 class RegionModelFormTestCase(TestCase):
@@ -156,3 +161,20 @@ class TestRegionMergeFormset(TestCase):
         formset = FormSet(data)
         self.assertFalse(formset.is_valid())
         self.assertIn("You must select at least one region.", formset.non_form_errors())
+
+
+class RegionAttributeValueModelFormTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region.objects.create(name="Test Region")
+        cls.attribute = Attribute.objects.create(
+            name="Population density", unit="1/km²"
+        )
+
+    def test_numeric_measurement_fields_use_any_step(self):
+        form = RegionAttributeValueModelForm()
+
+        self.assertEqual(form.fields["value"].widget.attrs.get("step"), "any")
+        self.assertEqual(
+            form.fields["standard_deviation"].widget.attrs.get("step"), "any"
+        )

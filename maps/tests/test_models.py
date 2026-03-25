@@ -4,7 +4,14 @@ from django.test import TestCase
 
 from maps.models import GeoPolygon, Location
 
-from ..models import Catchment, LauRegion, NutsRegion, Region
+from ..models import (
+    Attribute,
+    Catchment,
+    LauRegion,
+    NutsRegion,
+    Region,
+    RegionAttributeValue,
+)
 
 
 class TestLocationModel(TestCase):
@@ -159,6 +166,23 @@ class CatchmentPedigreeTestCase(TestCase):
     def test_downstream_pedigree_excludes_unrelated_catchment(self):
         pedigree = self.catchment.descendants(include_self=True)
         self.assertNotIn(self.unrelated_catchment, pedigree)
+
+
+class RegionAttributeValueMeasurementTestCase(TestCase):
+    def test_shared_numeric_measurement_properties_are_available(self):
+        region = Region.objects.create(name="Test Region")
+        attribute = Attribute.objects.create(name="Population density", unit="1/km²")
+        value = RegionAttributeValue.objects.create(
+            region=region,
+            attribute=attribute,
+            value=123.321,
+            standard_deviation=1.25,
+        )
+
+        self.assertEqual(value.measurement_name, attribute.name)
+        self.assertEqual(value.measurement_unit_label, attribute.unit)
+        self.assertEqual(value.display_average, value.value)
+        self.assertEqual(value.display_standard_deviation, value.standard_deviation)
 
 
 class LauCatchmentParentSignalTestCase(TestCase):

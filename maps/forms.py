@@ -26,6 +26,7 @@ from utils.forms import (
     SourcesFieldMixin,
     UserCreatedObjectFormMixin,
 )
+from utils.properties.forms import NumericMeasurementFieldsFormMixin
 
 from .models import (
     Attribute,
@@ -94,7 +95,9 @@ class AttributeModalModelForm(ModalModelFormMixin, AttributeModelForm):
     pass
 
 
-class RegionAttributeValueModelForm(SimpleModelForm):
+class RegionAttributeValueModelForm(NumericMeasurementFieldsFormMixin, SimpleModelForm):
+    measurement_field_names = ("value", "standard_deviation")
+
     region = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="region-autocomplete",

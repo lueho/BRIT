@@ -65,6 +65,7 @@ from utils.forms import (
     UserCreatedObjectFormMixin,
 )
 from utils.object_management.models import get_default_owner
+from utils.properties.forms import NumericMeasurementFieldsFormMixin
 
 
 class CollectorModelForm(SimpleModelForm):
@@ -438,7 +439,10 @@ class CollectionPropertyValueModelFormHelper(FormHelper):
 
 
 class CollectionPropertyValueModelForm(
-    UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
+    NumericMeasurementFieldsFormMixin,
+    UserCreatedObjectFormMixin,
+    SourcesFieldMixin,
+    SimpleModelForm,
 ):
     collection = TomSelectModelChoiceField(
         config=TomSelectConfig(
@@ -479,7 +483,10 @@ class AggregatedCollectionPropertyValueModelFormHelper(FormHelper):
 
 
 class AggregatedCollectionPropertyValueModelForm(
-    UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
+    NumericMeasurementFieldsFormMixin,
+    UserCreatedObjectFormMixin,
+    SourcesFieldMixin,
+    SimpleModelForm,
 ):
     collections = TomSelectModelMultipleChoiceField(
         config=TomSelectConfig(

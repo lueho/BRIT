@@ -17,6 +17,7 @@ from ..forms import (
     CollectionAddPredecessorForm,
     CollectionAddWasteSampleForm,
     CollectionModelForm,
+    CollectionPropertyValueModelForm,
     CollectionRemovePredecessorForm,
     CollectionRemoveWasteSampleForm,
     CollectionSeasonForm,
@@ -29,6 +30,7 @@ from ..models import (
     CollectionCatchment,
     CollectionCountOptions,
     CollectionFrequency,
+    CollectionPropertyValue,
     CollectionSeason,
     CollectionSystem,
     Collector,
@@ -257,6 +259,34 @@ class CollectionSeasonFormSetTestCase(TestCase):
 
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["standard"], 4)
+
+
+class CollectionPropertyValueModelFormTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.catchment = CollectionCatchment.objects.create(name="Test Catchment")
+        cls.collector = Collector.objects.create(name="Test Collector")
+        cls.collection_system = CollectionSystem.objects.create(name="Test System")
+        cls.collection = Collection.objects.create(
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.collection_system,
+            valid_from=date(2024, 1, 1),
+        )
+
+        from utils.properties.models import Property, Unit
+
+        cls.unit = Unit.objects.create(name="kg/a")
+        cls.property = Property.objects.create(name="Test property", unit="kg/a")
+        cls.property.allowed_units.add(cls.unit)
+
+    def test_numeric_measurement_fields_use_any_step(self):
+        form = CollectionPropertyValueModelForm()
+
+        self.assertEqual(form.fields["average"].widget.attrs.get("step"), "any")
+        self.assertEqual(
+            form.fields["standard_deviation"].widget.attrs.get("step"), "any"
+        )
 
 
 class CollectionModelFormTestCase(TestCase):
@@ -1142,8 +1172,6 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
     def test_flyer_referenced_by_property_value_is_not_deleted(self):
         """Test that a flyer referenced by a CollectionPropertyValue is not deleted."""
         from utils.properties.models import Property, Unit
-
-        from ..models import CollectionPropertyValue
 
         # Create a property value that references a flyer via sources
         unit = Unit.objects.create(name="Test Unit")
