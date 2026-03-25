@@ -71,6 +71,7 @@ class MaterialComponentAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "abbreviation",
+        "comparable_component",
         "component_kind",
         "owner",
         "publication_status",
@@ -94,6 +95,7 @@ class MaterialPropertyAdmin(admin.ModelAdmin):
         "name",
         "unit",
         "abbreviation",
+        "comparable_property",
         "group",
         "aggregation_kind",
         "owner",

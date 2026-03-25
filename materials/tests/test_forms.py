@@ -13,6 +13,8 @@ from utils.properties.models import Unit
 from ..forms import (
     AddComponentModalForm,
     AddCompositionModalForm,
+    ComponentModelForm,
+    MaterialPropertyModelForm,
     MaterialPropertyValueModelForm,
     WeightShareInlineFormset,
     WeightShareModelForm,
@@ -107,6 +109,28 @@ class AddComponentModalModelFormTestCase(TestCase):
         self.assertIn(self.component2, component_queryset)
         self.assertNotIn(self.component1, component_queryset)
         self.assertNotIn(MaterialComponent.objects.other(), component_queryset)
+
+
+class ComponentModelFormTestCase(TestCase):
+    def test_form_includes_comparable_component_field(self):
+        form = ComponentModelForm()
+
+        self.assertIn("comparable_component", form.fields)
+        self.assertIsInstance(
+            form.fields["comparable_component"],
+            TomSelectModelChoiceField,
+        )
+
+
+class MaterialPropertyModelFormTestCase(TestCase):
+    def test_form_includes_comparable_property_field(self):
+        form = MaterialPropertyModelForm()
+
+        self.assertIn("comparable_property", form.fields)
+        self.assertIsInstance(
+            form.fields["comparable_property"],
+            TomSelectModelChoiceField,
+        )
 
 
 class MaterialPropertyValueModelFormTestCase(TestCase):

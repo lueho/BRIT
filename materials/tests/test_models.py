@@ -53,6 +53,37 @@ class MaterialComponentTestCase(TestCase):
         self.assertIsInstance(default, MaterialComponent)
         self.assertEqual(default.name, "Other")
 
+    def test_canonical_component_defaults_to_self(self):
+        component = MaterialComponent.objects.create(name="Organic matter")
+
+        self.assertEqual(component.canonical_component, component)
+
+    def test_canonical_component_follows_comparable_component(self):
+        canonical = MaterialComponent.objects.create(name="Organic matter")
+        alias = MaterialComponent.objects.create(
+            name="Volatile solids",
+            comparable_component=canonical,
+        )
+
+        self.assertEqual(alias.canonical_component, canonical)
+
+
+class MaterialPropertyTestCase(TestCase):
+    def test_canonical_property_defaults_to_self(self):
+        property_obj = MaterialProperty.objects.create(name="Organic matter", unit="%")
+
+        self.assertEqual(property_obj.canonical_property, property_obj)
+
+    def test_canonical_property_follows_comparable_property(self):
+        canonical = MaterialProperty.objects.create(name="Organic matter", unit="%")
+        alias = MaterialProperty.objects.create(
+            name="Volatile solids",
+            unit="%",
+            comparable_property=canonical,
+        )
+
+        self.assertEqual(alias.canonical_property, canonical)
+
 
 class MaterialTestCase(TestCase):
     @classmethod

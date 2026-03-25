@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django_filters import (
     CharFilter,
     ChoiceFilter,
@@ -243,7 +244,7 @@ class SampleFilter(UserCreatedObjectScopedFilterSet):
     )
     parameter = ModelChoiceFilter(
         queryset=MaterialProperty.objects.none(),
-        field_name="properties__property",
+        method="filter_parameter",
         label="Parameter",
         empty_label="All",
         widget=TomSelectModelWidget(
@@ -253,7 +254,39 @@ class SampleFilter(UserCreatedObjectScopedFilterSet):
             )
         ),
     )
+    raw_parameter = ModelChoiceFilter(
+        queryset=MaterialComponent.objects.none(),
+        method="filter_raw_parameter",
+        label="Raw parameter",
+        empty_label="All",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="materialcomponent-autocomplete",
+                value_field="id",
+            )
+        ),
+    )
     created_at = DateFromToRangeFilter(field_name="created_at", label="Created")
+
+    def filter_parameter(self, queryset, name, value):
+        canonical_property = value.canonical_property
+        comparable_ids = MaterialProperty.objects.filter(
+            Q(pk=canonical_property.pk) | Q(comparable_property=canonical_property)
+        ).values_list("pk", flat=True)
+        return queryset.filter(properties__property_id__in=comparable_ids).distinct()
+
+    def filter_raw_parameter(self, queryset, name, value):
+        canonical_component = value.canonical_component
+        comparable_ids = MaterialComponent.objects.filter(
+            Q(type="component")
+            & (
+                Q(pk=canonical_component.pk)
+                | Q(comparable_component=canonical_component)
+            )
+        ).values_list("pk", flat=True)
+        return queryset.filter(
+            component_measurements__component_id__in=comparable_ids
+        ).distinct()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -277,10 +310,14 @@ class SampleFilter(UserCreatedObjectScopedFilterSet):
             categories=substrate_category,
         ).distinct()
         parameter_queryset = MaterialProperty.objects.all()
+        raw_parameter_queryset = MaterialComponent.objects.filter(type="component")
 
         if request and hasattr(request, "user"):
             parameter_queryset = filter_queryset_for_user(
                 parameter_queryset, request.user
+            )
+            raw_parameter_queryset = filter_queryset_for_user(
+                raw_parameter_queryset, request.user
             )
 
         if scope_value:
@@ -289,10 +326,16 @@ class SampleFilter(UserCreatedObjectScopedFilterSet):
                 scope_value,
                 user=getattr(request, "user", None),
             )
+            raw_parameter_queryset = apply_scope_filter(
+                raw_parameter_queryset,
+                scope_value,
+                user=getattr(request, "user", None),
+            )
 
         self.filters["name"].queryset = queryset
         self.filters["substrate_material"].queryset = substrate_queryset
         self.filters["parameter"].queryset = parameter_queryset
+        self.filters["raw_parameter"].queryset = raw_parameter_queryset
 
     class Meta:
         model = Sample
@@ -301,6 +344,7 @@ class SampleFilter(UserCreatedObjectScopedFilterSet):
             "name",
             "substrate_material",
             "parameter",
+            "raw_parameter",
             "created_at",
         )
 

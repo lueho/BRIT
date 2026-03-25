@@ -198,7 +198,7 @@
 {% block second_row %}
   {% object_policy object as policy %}
   {# --- Measurements Card (Properties + Component Measurements) --- #}
-  {% with properties=object.properties.all %}
+  {% with properties=property_values %}
     {% regroup component_measurements by group as measurements_by_group %}
     <div class="col col-12">
       <div class="card shadow h-100 tab-card">
@@ -258,6 +258,9 @@
                         <td>
                           <a href="{% url 'materialproperty-detail-modal' property.property.pk %}"
                              class="modal-link">{{ property.property.name }}</a>
+                          {% if property.canonical_property.pk != property.property.pk %}
+                            <div class="small text-muted">Comparable as {{ property.canonical_property.name }}</div>
+                          {% endif %}
                         </td>
                         <td class="text-nowrap">
                           {{ property.average|trim_decimal:6 }} ± {{ property.standard_deviation|trim_decimal:6 }} {{ property.property.unit }}
@@ -389,7 +392,12 @@
                             <tbody>
                               {% for measurement in group.list %}
                                 <tr>
-                                  <td class="ps-3">{{ measurement.component.name }}</td>
+                                  <td class="ps-3">
+                                    {{ measurement.component.name }}
+                                    {% if measurement.canonical_component.pk != measurement.component.pk %}
+                                      <div class="small text-muted">Comparable as {{ measurement.canonical_component.name }}</div>
+                                    {% endif %}
+                                  </td>
                                   <td>{{ measurement.component.abbreviation|default:"-" }}</td>
                                   <td>{{ measurement.basis_component.name|default:"-" }}</td>
                                   <td class="text-nowrap">

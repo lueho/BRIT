@@ -961,10 +961,21 @@ class SampleDetailView(UserCreatedObjectDetailView):
         data = SampleModelSerializer(
             self.object, context={"request": self.request}
         ).data
+        property_values = (
+            self.object.properties.select_related(
+                "property",
+                "property__comparable_property",
+                "analytical_method",
+                "unit",
+            )
+            .prefetch_related("sources")
+            .order_by("property__name", "id")
+        )
         component_measurements = (
             self.object.component_measurements.select_related(
                 "group",
                 "component",
+                "component__comparable_component",
                 "basis_component",
                 "analytical_method",
                 "unit",
@@ -991,6 +1002,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
             {
                 "data": data,
                 "charts": charts,
+                "property_values": property_values,
                 "component_measurements": component_measurements,
             }
         )

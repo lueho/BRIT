@@ -878,6 +878,39 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
             reverse("sample-detail", kwargs={"pk": self.sample.pk}),
         )
 
+    def test_sample_detail_shows_canonical_property_mapping_for_properties(self):
+        canonical_property = MaterialProperty.objects.create(
+            owner=self.owner,
+            name="Organic matter",
+            unit="%",
+            publication_status="published",
+        )
+        aliased_property = MaterialProperty.objects.create(
+            owner=self.owner,
+            name="Volatile solids",
+            unit="%",
+            comparable_property=canonical_property,
+            publication_status="published",
+        )
+        value = MaterialPropertyValue.objects.create(
+            owner=self.owner,
+            property=aliased_property,
+            unit=self.unit,
+            average=Decimal("61.0"),
+            standard_deviation=Decimal("0.5"),
+            publication_status="private",
+        )
+        self.sample.properties.add(value)
+
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Volatile solids")
+        self.assertContains(response, "Comparable as Organic matter")
+
     def test_update_view_redirects_back_to_sample_detail(self):
         self.client.force_login(self.owner)
 
@@ -2836,6 +2869,53 @@ class EmptyStateViewsTestCase(TestCase):
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Shares of:</strong> VS")
+
+    def test_sample_detail_shows_canonical_component_mapping_for_raw_measurements(self):
+        sample = Sample.objects.create(
+            name="Sample With Equivalent Raw Parameter",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        group = MaterialComponentGroup.objects.create(
+            name="Organic fraction",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        organic_matter = MaterialComponent.objects.create(
+            name="Organic matter",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        volatile_solids = MaterialComponent.objects.create(
+            name="Volatile solids",
+            owner=self.staff_user,
+            publication_status="published",
+            comparable_component=organic_matter,
+        )
+        unit_percent = Unit.objects.filter(name="%").first()
+        if unit_percent is None:
+            unit_percent = Unit.objects.create(
+                name="%", symbol="percent", owner=self.staff_user
+            )
+        elif not unit_percent.symbol:
+            unit_percent.symbol = "percent"
+            unit_percent.save(update_fields=["symbol"])
+
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=volatile_solids,
+            unit=unit_percent,
+            average=Decimal("62"),
+        )
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Volatile solids")
+        self.assertContains(response, "Comparable as Organic matter")
 
     def test_analytical_method_list_empty_anonymous(self):
         response = self.client.get(

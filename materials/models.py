@@ -1,3 +1,4 @@
+from builtins import property as builtin_property
 from decimal import Decimal
 
 from django.conf import settings
@@ -78,6 +79,17 @@ class BaseMaterial(NamedUserCreatedObject):
             "Basis component for this component (e.g. Dry Matter). Only used for components."
         ),
     )
+    comparable_component = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        related_name="comparable_variants",
+        null=True,
+        blank=True,
+        limit_choices_to={"type": "component"},
+        help_text=(
+            "Canonical component this raw term should be compared as. Only used for components."
+        ),
+    )
 
     class Meta:
         verbose_name = "Material"
@@ -123,6 +135,15 @@ class MaterialComponent(BaseMaterial):
         proxy = True
         verbose_name = "component"
         ordering = ["name"]
+
+    @property
+    def canonical_component(self):
+        component = self
+        visited_ids = set()
+        while component.comparable_component_id and component.pk not in visited_ids:
+            visited_ids.add(component.pk)
+            component = component.comparable_component
+        return component
 
 
 @receiver(post_save, sender=MaterialComponent)
@@ -421,6 +442,14 @@ class MaterialProperty(PropertyBase):
     """Materials-specific property definition."""
 
     abbreviation = models.CharField(max_length=50, blank=True)
+    comparable_property = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        related_name="comparable_variants",
+        null=True,
+        blank=True,
+        help_text="Canonical property this raw term should be compared as.",
+    )
     group = models.ForeignKey(
         "MaterialPropertyGroup",
         on_delete=models.PROTECT,
@@ -451,6 +480,17 @@ class MaterialProperty(PropertyBase):
         blank=True,
         help_text="Units that are acceptable for this property.",
     )
+
+    @property
+    def canonical_property(self):
+        property_obj = self
+        visited_ids = set()
+        while (
+            property_obj.comparable_property_id and property_obj.pk not in visited_ids
+        ):
+            visited_ids.add(property_obj.pk)
+            property_obj = property_obj.comparable_property
+        return property_obj
 
     def __str__(self):
         return f"{self.name} [{self.unit}]"
@@ -498,6 +538,10 @@ class MaterialPropertyValue(UserCreatedObject):
         duplicate.sources.set(self.sources.all())
 
         return duplicate
+
+    @builtin_property
+    def canonical_property(self):
+        return self.property.canonical_property
 
     def get_absolute_url(self):
         sample = self.sample_set.first()
@@ -892,6 +936,10 @@ class ComponentMeasurement(UserCreatedObject):
         )
         duplicate.sources.set(self.sources.all())
         return duplicate
+
+    @property
+    def canonical_component(self):
+        return self.component.canonical_component
 
     def get_absolute_url(self):
         return self.sample.get_absolute_url()

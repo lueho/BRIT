@@ -67,9 +67,34 @@ class MaterialModalModelForm(ModalModelFormMixin, MaterialModelForm):
 
 
 class ComponentModelForm(SimpleModelForm):
+    comparable_component = TomSelectModelChoiceField(
+        queryset=MaterialComponent.objects.filter(type="component"),
+        required=False,
+        config=TomSelectConfig(
+            url="materialcomponent-autocomplete",
+            label_field="name",
+        ),
+        label="Comparable as",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        queryset = MaterialComponent.objects.filter(type="component")
+        if self.instance.pk:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        self.fields["comparable_component"].queryset = queryset
+
+    def clean_comparable_component(self):
+        comparable_component = self.cleaned_data.get("comparable_component")
+        if comparable_component is None:
+            return None
+        if self.instance.pk and comparable_component.pk == self.instance.pk:
+            raise ValidationError("A component cannot be comparable to itself.")
+        return comparable_component.canonical_component
+
     class Meta:
         model = MaterialComponent
-        fields = ("name", "description")
+        fields = ("name", "description", "comparable_component")
 
 
 class ComponentModalModelForm(ModalModelFormMixin, ComponentModelForm):
@@ -87,9 +112,34 @@ class ComponentGroupModalModelForm(ModalModelFormMixin, ComponentGroupModelForm)
 
 
 class MaterialPropertyModelForm(SimpleModelForm):
+    comparable_property = TomSelectModelChoiceField(
+        queryset=MaterialProperty.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="materialproperty-autocomplete",
+            label_field="name",
+        ),
+        label="Comparable as",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        queryset = MaterialProperty.objects.all()
+        if self.instance.pk:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        self.fields["comparable_property"].queryset = queryset
+
+    def clean_comparable_property(self):
+        comparable_property = self.cleaned_data.get("comparable_property")
+        if comparable_property is None:
+            return None
+        if self.instance.pk and comparable_property.pk == self.instance.pk:
+            raise ValidationError("A property cannot be comparable to itself.")
+        return comparable_property.canonical_property
+
     class Meta:
         model = MaterialProperty
-        fields = ("name", "unit", "description")
+        fields = ("name", "unit", "description", "comparable_property")
 
 
 class MaterialPropertyModalModelForm(ModalModelFormMixin, MaterialPropertyModelForm):
