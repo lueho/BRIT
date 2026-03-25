@@ -3221,8 +3221,12 @@ class CollectionFrequencyDisplayTestCase(TestCase):
         cls.staff = User.objects.create(username="frequency-moderator", is_staff=True)
         distribution = TemporalDistribution.objects.get(name="Months of the year")
         january = Timestep.objects.get(name="January")
+        february = Timestep.objects.get(name="February")
+        march = Timestep.objects.get(name="March")
         june = Timestep.objects.get(name="June")
         july = Timestep.objects.get(name="July")
+        october = Timestep.objects.get(name="October")
+        november = Timestep.objects.get(name="November")
         december = Timestep.objects.get(name="December")
         full_year, _ = CollectionSeason.objects.get_or_create(
             distribution=distribution,
@@ -3238,6 +3242,16 @@ class CollectionFrequencyDisplayTestCase(TestCase):
             distribution=distribution,
             first_timestep=july,
             last_timestep=december,
+        )
+        march_to_october, _ = CollectionSeason.objects.get_or_create(
+            distribution=distribution,
+            first_timestep=march,
+            last_timestep=october,
+        )
+        november_to_february, _ = CollectionSeason.objects.get_or_create(
+            distribution=distribution,
+            first_timestep=november,
+            last_timestep=february,
         )
         cls.frequency = CollectionFrequency.objects.create(
             name="Seasonal flexibility",
@@ -3304,6 +3318,32 @@ class CollectionFrequencyDisplayTestCase(TestCase):
             frequency=cls.year_round_options_frequency,
             publication_status="published",
         )
+        cls.partial_year_preset_frequency = CollectionFrequency.objects.create(
+            name=(
+                "Seasonal; 1 per 2 weeks from March-October; "
+                "1 per 4 weeks from November-February"
+            ),
+            type="Seasonal",
+            publication_status="published",
+        )
+        CollectionCountOptions.objects.create(
+            frequency=cls.partial_year_preset_frequency,
+            season=march_to_october,
+            standard=17,
+        )
+        CollectionCountOptions.objects.create(
+            frequency=cls.partial_year_preset_frequency,
+            season=november_to_february,
+            standard=4,
+        )
+        cls.partial_year_preset_collection = Collection.objects.create(
+            name="Partial-year preset collection",
+            catchment=cls.catchment,
+            collection_system=cls.system,
+            waste_category=cls.category,
+            frequency=cls.partial_year_preset_frequency,
+            publication_status="published",
+        )
         cls.ct_id = ContentType.objects.get_for_model(Collection).pk
 
     def test_detail_shows_readable_seasonal_frequency(self):
@@ -3365,6 +3405,21 @@ class CollectionFrequencyDisplayTestCase(TestCase):
         self.assertIn("Every 2 weeks", body)
         self.assertIn("Weekly", body)
         self.assertIn("Stored canonical label: Year-round with options", body)
+
+    def test_detail_shows_partial_year_preset_frequency_without_custom_fallback(self):
+        response = self.client.get(
+            reverse(
+                "collection-detail",
+                kwargs={"pk": self.partial_year_preset_collection.pk},
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+        self.assertIn("March to October:", body)
+        self.assertIn("Every 2 weeks", body)
+        self.assertIn("November to February:", body)
+        self.assertIn("Every 4 weeks", body)
+        self.assertNotIn("4 collections during this period", body)
 
 
 class CollectionReviewDetailPropertiesTestCase(TestCase):

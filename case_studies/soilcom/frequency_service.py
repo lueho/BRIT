@@ -32,6 +32,13 @@ CADENCE_DISPLAY_LABELS = {
     CADENCE_MONTHLY: "Monthly",
 }
 
+CADENCE_NAME_LABELS = {
+    CADENCE_WEEKLY: "1 per week",
+    CADENCE_EVERY_TWO_WEEKS: "1 per 2 weeks",
+    CADENCE_EVERY_FOUR_WEEKS: "1 per 4 weeks",
+    CADENCE_MONTHLY: "1 per month",
+}
+
 COUNT_FIELDS = ("standard", "option_1", "option_2", "option_3")
 OPTION_FIELDS = COUNT_FIELDS[1:]
 TIMESTEP_NAME_ALIASES = {"mai": "may"}
@@ -232,6 +239,33 @@ class CollectionFrequencyScheduleService:
         return f"{first_timestep.name} to {last_timestep.name}"
 
     @classmethod
+    def is_year_round(cls, first_timestep, last_timestep):
+        return bool(
+            first_timestep
+            and last_timestep
+            and first_timestep.name == "January"
+            and last_timestep.name == "December"
+        )
+
+    @classmethod
+    def standard_name_fragment(cls, row):
+        first_timestep = row.get("first_timestep")
+        last_timestep = row.get("last_timestep")
+        cadence = row.get("standard_cadence")
+        cadence_name_label = CADENCE_NAME_LABELS.get(cadence)
+        if cadence_name_label and not cls.is_year_round(first_timestep, last_timestep):
+            return (
+                f"{cadence_name_label} from {first_timestep.name}-{last_timestep.name}"
+            )
+
+        segment_label = cls.segment_label(first_timestep, last_timestep)
+        standard = row.get("standard")
+        return (
+            f"{segment_label} {standard if standard is not None else 'unspecified'} "
+            f"per year"
+        )
+
+    @classmethod
     def count_display_label(cls, count, first_timestep, last_timestep):
         if count in (None, ""):
             return "Not specified"
@@ -321,19 +355,21 @@ class CollectionFrequencyScheduleService:
     def canonical_name(cls, rows, frequency_type):
         if not rows:
             return frequency_type
-        if len(rows) == 1 and not any(
-            rows[0].get(field_name) is not None for field_name in OPTION_FIELDS
+        if (
+            len(rows) == 1
+            and not any(
+                rows[0].get(field_name) is not None for field_name in OPTION_FIELDS
+            )
+            and cls.is_year_round(
+                rows[0].get("first_timestep"), rows[0].get("last_timestep")
+            )
         ):
             standard = rows[0].get("standard")
             if standard is not None:
                 return f"{frequency_type}; {standard} per year"
         parts = []
         for row in rows:
-            segment_label = cls.segment_label(
-                row.get("first_timestep"), row.get("last_timestep")
-            )
-            standard = row.get("standard")
-            segment = f"{segment_label} {standard if standard is not None else 'unspecified'} per year"
+            segment = cls.standard_name_fragment(row)
             option_values = [
                 str(row.get(field_name))
                 for field_name in OPTION_FIELDS

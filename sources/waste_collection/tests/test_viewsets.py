@@ -1126,7 +1126,7 @@ class CollectionMutationApiTestCase(APITestCase):
         self.assertTrue(response.data["submitted"])
         self.assertEqual(
             response.data["name"],
-            "Seasonal; March-October 17 per year; November-February 4 per year",
+            "Seasonal; 1 per 2 weeks from March-October; 1 per 4 weeks from November-February",
         )
 
         frequency = CollectionFrequency.objects.get(pk=response.data["id"])
@@ -1135,7 +1135,7 @@ class CollectionMutationApiTestCase(APITestCase):
         self.assertEqual(frequency.type, "Seasonal")
         self.assertEqual(
             frequency.name,
-            "Seasonal; March-October 17 per year; November-February 4 per year",
+            "Seasonal; 1 per 2 weeks from March-October; 1 per 4 weeks from November-February",
         )
         self.assertTrue(
             ReviewAction.for_object(frequency)
@@ -1169,7 +1169,7 @@ class CollectionMutationApiTestCase(APITestCase):
         existing_frequency = CollectionFrequency.objects.create(
             owner=self.owner,
             publication_status="private",
-            name="Seasonal; March-October 17 per year; November-February 4 per year",
+            name="Seasonal; 1 per 2 weeks from March-October; 1 per 4 weeks from November-February",
             type="Seasonal",
         )
 
