@@ -156,6 +156,9 @@ class ReviewContextAPIView(APIView):
             include_history=include_history,
             history_limit=max(1, min(history_limit, 50)),
         )
+        collection_update = _serialize_collection_update_context(request.user, obj)
+        if collection_update is not None:
+            context["collection_update"] = collection_update
 
         return Response(
             {
@@ -174,6 +177,56 @@ def _get_review_object(*, content_type_id: int, object_id: int):
     if model_class is None:
         raise Http404("No model is registered for this content type.")
     return get_object_or_404(model_class, pk=object_id)
+
+
+def _serialize_collection_update_context(user, obj):
+    """Return owner-gated update hints for collection review items."""
+    if not (
+        obj._meta.app_label in {"soilcom", "waste_collection"}
+        and obj._meta.model_name == "collection"
+    ):
+        return None
+
+    is_owner = bool(
+        user
+        and getattr(user, "is_authenticated", False)
+        and getattr(obj, "owner_id", None) == getattr(user, "id", None)
+    )
+    if not is_owner:
+        return {
+            "available": False,
+            "detail": "Only the collection owner may use the programmatic update endpoint.",
+        }
+
+    waste_category = getattr(obj, "effective_waste_category", None)
+    valid_from = getattr(obj, "valid_from", None)
+    return {
+        "available": True,
+        "update_url": reverse("api-waste-collection-update", kwargs={"pk": obj.pk}),
+        "expected_identity": {
+            "expected_catchment": str(obj.catchment),
+            "expected_waste_category": str(waste_category) if waste_category else "",
+            "expected_collection_system": str(obj.collection_system),
+            "expected_publication_status": getattr(obj, "publication_status", None),
+            "expected_valid_from": valid_from.isoformat() if valid_from else None,
+        },
+        "mutable_fields": [
+            "collector",
+            "frequency",
+            "fee_system",
+            "sorting_method",
+            "allowed_materials",
+            "forbidden_materials",
+            "sources",
+            "flyer_urls",
+            "established",
+            "connection_type",
+            "min_bin_size",
+            "required_bin_capacity",
+            "required_bin_capacity_reference",
+            "description",
+        ],
+    }
 
 
 def _to_bool(value):

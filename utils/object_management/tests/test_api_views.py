@@ -187,6 +187,86 @@ class ReviewAPIViewsTests(TestCase):
             payload["context"]["review_history"][0]["comment"], "Existing comment"
         )
 
+    def test_review_context_allows_owner_and_returns_feedback_summary(self):
+        """Owners of in-review collections can read structured review feedback."""
+        url = reverse(
+            "object_management:api_review_context",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.review_collection.id,
+            },
+        )
+        self.client.force_login(self.owner)
+
+        ReviewAction.objects.create(
+            content_type_id=self.content_type_id,
+            object_id=self.review_collection.id,
+            action=ReviewAction.ACTION_SUBMITTED,
+            comment="",
+            user=self.owner,
+        )
+        ReviewAction.objects.create(
+            content_type_id=self.content_type_id,
+            object_id=self.review_collection.id,
+            action=ReviewAction.ACTION_COMMENT,
+            comment="Please clarify the collection frequency.",
+            user=self.moderator,
+        )
+
+        response = self.client.get(url, data={"include_history": True})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["context"]
+        self.assertTrue(payload["review_feedback"]["has_feedback"])
+        self.assertEqual(
+            payload["review_feedback"]["latest_submission"]["action"],
+            ReviewAction.ACTION_SUBMITTED,
+        )
+        self.assertEqual(
+            payload["review_feedback"]["latest_feedback_action"]["comment"],
+            "Please clarify the collection frequency.",
+        )
+        self.assertEqual(
+            payload["review_feedback"]["feedback_actions_since_submission"][0][
+                "comment"
+            ],
+            "Please clarify the collection frequency.",
+        )
+
+    def test_review_context_exposes_collection_update_contract_for_owner_only(self):
+        """Only owners receive programmatic collection update hints in context."""
+        url = reverse(
+            "object_management:api_review_context",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.review_collection.id,
+            },
+        )
+
+        self.client.force_login(self.owner)
+        owner_response = self.client.get(url)
+        self.assertEqual(owner_response.status_code, 200)
+        owner_context = owner_response.json()["context"]["collection_update"]
+        self.assertTrue(owner_context["available"])
+        self.assertEqual(
+            owner_context["expected_identity"]["expected_publication_status"],
+            self.review_collection.publication_status,
+        )
+        self.assertIn("description", owner_context["mutable_fields"])
+        self.assertEqual(
+            owner_context["update_url"],
+            reverse(
+                "api-waste-collection-update",
+                kwargs={"pk": self.review_collection.pk},
+            ),
+        )
+
+        self.client.force_login(self.moderator)
+        moderator_response = self.client.get(url)
+        self.assertEqual(moderator_response.status_code, 200)
+        moderator_context = moderator_response.json()["context"]["collection_update"]
+        self.assertFalse(moderator_context["available"])
+
     def test_review_context_rejects_invalid_history_limit(self):
         """history_limit must be parseable as integer."""
         url = reverse(

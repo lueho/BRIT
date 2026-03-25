@@ -15,6 +15,7 @@ from decimal import Decimal
 from typing import Any
 
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
 
 from case_studies.soilcom.frequency_service import CollectionFrequencyScheduleService
 
@@ -51,6 +52,10 @@ def build_review_context(
         "fields": _serialize_model_fields(obj),
         "related_display": _serialize_related_display(obj),
         "sources": _serialize_m2m_sources(obj),
+        "review_feedback": _serialize_review_feedback(
+            obj,
+            history_limit=history_limit,
+        ),
     }
 
     # CPV-specific enrichments
@@ -71,17 +76,53 @@ def build_review_context(
             .order_by("-created_at", "-id")[:history_limit]
         )
         context["review_history"] = [
-            {
-                "action": action.action,
-                "comment": action.comment,
-                "user_id": action.user_id,
-                "username": action.user.username,
-                "created_at": _serialize_value(action.created_at),
-            }
-            for action in history
+            _serialize_review_action(action) for action in history
         ]
 
     return context
+
+
+def _serialize_review_feedback(obj: Any, *, history_limit: int) -> dict[str, Any]:
+    latest_submission = getattr(obj, "latest_submission_action", None)
+    latest_feedback = getattr(obj, "latest_review_feedback_action", None)
+
+    feedback_actions: list[dict[str, Any]] = []
+    if latest_submission is not None and getattr(obj, "owner_id", None):
+        actions = (
+            ReviewAction.for_object(obj)
+            .select_related("user")
+            .exclude(user_id=obj.owner_id)
+            .exclude(action=ReviewAction.ACTION_SUBMITTED)
+            .filter(
+                Q(created_at__gt=latest_submission.created_at)
+                | Q(
+                    created_at=latest_submission.created_at,
+                    id__gt=latest_submission.id,
+                )
+            )
+            .order_by("-created_at", "-id")[:history_limit]
+        )
+        feedback_actions = [_serialize_review_action(action) for action in actions]
+
+    return {
+        "has_feedback": latest_feedback is not None,
+        "latest_submission": _serialize_review_action(latest_submission),
+        "latest_feedback_action": _serialize_review_action(latest_feedback),
+        "feedback_actions_since_submission": feedback_actions,
+    }
+
+
+def _serialize_review_action(action: ReviewAction | None) -> dict[str, Any] | None:
+    if action is None:
+        return None
+
+    return {
+        "action": action.action,
+        "comment": action.comment,
+        "user_id": action.user_id,
+        "username": action.user.username,
+        "created_at": _serialize_value(action.created_at),
+    }
 
 
 def validate_draft_payload(payload: dict[str, Any]) -> dict[str, Any]:
