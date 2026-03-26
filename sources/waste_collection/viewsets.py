@@ -273,12 +273,28 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         return hostname[:255]
 
     @staticmethod
-    def _attach_sources_and_flyers(collection, sources, flyer_urls):
+    def _attach_sources_and_flyers(
+        collection,
+        sources=None,
+        flyer_urls=None,
+        *,
+        replace_sources=False,
+        replace_flyers=False,
+    ):
         """Attach bibliography sources and flyer URLs to ``collection``."""
-        if sources:
-            collection.sources.add(*sources)
+        if sources is not None:
+            sources = list(sources)
+        if flyer_urls is not None:
+            flyer_urls = list(flyer_urls)
 
-        for url in flyer_urls:
+        if sources is not None:
+            if replace_sources:
+                collection.sources.set(sources)
+            elif sources:
+                collection.sources.add(*sources)
+
+        flyers = []
+        for url in flyer_urls or []:
             if len(url) > 2083:
                 continue
 
@@ -290,7 +306,13 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                     "publication_status": "private",
                 },
             )
-            collection.flyers.add(flyer)
+            flyers.append(flyer)
+
+        if flyer_urls is not None:
+            if replace_flyers:
+                collection.flyers.set(flyers)
+            else:
+                collection.flyers.add(*flyers)
 
     @staticmethod
     def _attach_sources_and_flyers_to_property_value(obj, sources, flyer_urls):
@@ -505,8 +527,10 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         if "sources" in data or "flyer_urls" in data:
             CollectionViewSet._attach_sources_and_flyers(
                 collection,
-                data.get("sources", []),
-                data.get("flyer_urls", []),
+                sources=data.get("sources") if "sources" in data else None,
+                flyer_urls=data.get("flyer_urls") if "flyer_urls" in data else None,
+                replace_sources="sources" in data,
+                replace_flyers="flyer_urls" in data,
             )
 
     @staticmethod

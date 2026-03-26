@@ -1290,6 +1290,102 @@ class CollectionMutationApiTestCase(APITestCase):
             ).exists()
         )
 
+    def test_update_endpoint_replaces_sources_when_provided(self):
+        self.client.force_login(self.owner)
+        stale_source = Source.objects.create(
+            owner=self.owner,
+            title="Stale Agent Source",
+            abbreviation="StaleAgentSource",
+            url="https://example.com/stale-source",
+        )
+        stale_flyer = WasteFlyer.objects.create(
+            owner=self.owner,
+            title="Stale Agent Flyer",
+            publication_status="private",
+            url="https://example.com/stale-flyer",
+        )
+        self.private_predecessor.sources.add(stale_source)
+        self.private_predecessor.flyers.add(stale_flyer)
+
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-update",
+                kwargs={"pk": self.private_predecessor.pk},
+            ),
+            {
+                "expected_catchment": str(self.private_predecessor.catchment),
+                "expected_waste_category": str(
+                    self.private_predecessor.effective_waste_category
+                ),
+                "expected_collection_system": str(
+                    self.private_predecessor.collection_system
+                ),
+                "expected_publication_status": self.private_predecessor.publication_status,
+                "expected_valid_from": self.private_predecessor.valid_from.isoformat(),
+                "sources": [self.source.pk],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.private_predecessor.refresh_from_db()
+        self.assertEqual(
+            list(self.private_predecessor.sources.values_list("pk", flat=True)),
+            [self.source.pk],
+        )
+        self.assertEqual(
+            list(self.private_predecessor.flyers.values_list("pk", flat=True)),
+            [stale_flyer.pk],
+        )
+
+    def test_update_endpoint_replaces_flyers_when_provided(self):
+        self.client.force_login(self.owner)
+        stale_source = Source.objects.create(
+            owner=self.owner,
+            title="Stale Agent Source",
+            abbreviation="StaleAgentSource2",
+            url="https://example.com/stale-source-2",
+        )
+        stale_flyer = WasteFlyer.objects.create(
+            owner=self.owner,
+            title="Stale Agent Flyer",
+            publication_status="private",
+            url="https://example.com/stale-flyer-2",
+        )
+        self.private_predecessor.sources.add(stale_source)
+        self.private_predecessor.flyers.add(stale_flyer)
+
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-update",
+                kwargs={"pk": self.private_predecessor.pk},
+            ),
+            {
+                "expected_catchment": str(self.private_predecessor.catchment),
+                "expected_waste_category": str(
+                    self.private_predecessor.effective_waste_category
+                ),
+                "expected_collection_system": str(
+                    self.private_predecessor.collection_system
+                ),
+                "expected_publication_status": self.private_predecessor.publication_status,
+                "expected_valid_from": self.private_predecessor.valid_from.isoformat(),
+                "flyer_urls": ["https://example.com/replacement-flyer"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.private_predecessor.refresh_from_db()
+        self.assertEqual(
+            list(self.private_predecessor.sources.values_list("pk", flat=True)),
+            [stale_source.pk],
+        )
+        self.assertEqual(
+            list(self.private_predecessor.flyers.values_list("url", flat=True)),
+            ["https://example.com/replacement-flyer"],
+        )
+
     def test_update_endpoint_accepts_id_identity_comments_alias_and_string_flyers(self):
         self.client.force_login(self.owner)
 
