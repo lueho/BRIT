@@ -16,7 +16,7 @@ from utils.object_management.models import (
     NamedUserCreatedObject,
     UserCreatedObjectQuerySet,
 )
-from utils.properties.models import NumericMeasurementMixin
+from utils.properties.models import NumericMeasurementMixin, PropertyBase
 
 TYPES = (
     ("administrative", "administrative"),
@@ -550,7 +550,7 @@ class GeoDataset(NamedUserCreatedObject):
 
 
 # TODO: Check if this should be moved to utils app
-class Attribute(NamedUserCreatedObject):
+class Attribute(PropertyBase):
     """
     Defines an attribute class that can be attached to features of a map.
     """

@@ -3,6 +3,7 @@ from django.db.models import QuerySet
 from django.test import TestCase
 
 from maps.models import GeoPolygon, Location
+from utils.properties.models import PropertyBase
 
 from ..models import (
     Attribute,
@@ -185,6 +186,13 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         self.assertEqual(value.measurement_unit_label, attribute.unit)
         self.assertEqual(value.display_average, value.value)
         self.assertEqual(value.display_standard_deviation, value.standard_deviation)
+
+
+class AttributePropertyBaseContractTestCase(TestCase):
+    def test_attribute_uses_shared_property_base_contract(self):
+        attribute = Attribute.objects.create(name="Population density", unit="1/km²")
+
+        self.assertIsInstance(attribute, PropertyBase)
 
 
 class RegionAttributeTextValueCategoricalAttributeTestCase(TestCase):
