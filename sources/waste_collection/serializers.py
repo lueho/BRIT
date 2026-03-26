@@ -1180,7 +1180,6 @@ class CollectionMutationVersionSerializer(
 __all__ = [
     "AggregatedCollectionPropertyValueMutationSerializer",
     "CollectionFrequencyReferenceSerializer",
-    "GEOMETRY_SIMPLIFY_TOLERANCE",
     "CollectionFlatSerializer",
     "CollectionFrequencyMutationSerializer",
     "CollectionImportPropertyValueSerializer",

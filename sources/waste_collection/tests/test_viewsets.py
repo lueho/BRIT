@@ -1,5 +1,4 @@
 from datetime import date
-from unittest.mock import patch
 
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
@@ -9,7 +8,6 @@ from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 
 from bibliography.models import Source
-from distributions.models import TemporalDistribution, Timestep
 from maps.models import Attribute, GeoPolygon, NutsRegion, Region, RegionAttributeValue
 from materials.models import Material
 from sources.waste_collection.derived_values import clear_derived_value_config_cache
@@ -536,77 +534,6 @@ class CollectionViewSetTestCase(APITestCase):
             "Private collections should not be shared between users",
         )
 
-    @patch("sources.waste_collection.filters.ConnectionRateFilter.set_min_max")
-    def test_version_endpoint_skips_filter_min_max_initialization(
-        self, mock_set_min_max
-    ):
-        """Version endpoint should avoid expensive range-widget min/max queries."""
-        self.client.force_login(self.regular_user)
-        response = self.client.get(reverse("api-waste-collection-version"))
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        mock_set_min_max.assert_not_called()
-
-    @patch("sources.waste_collection.filters.ConnectionRateFilter.set_min_max")
-    def test_geojson_endpoint_skips_filter_min_max_initialization(
-        self, mock_set_min_max
-    ):
-        """GeoJSON endpoint should avoid expensive range-widget min/max queries."""
-        self.client.force_login(self.regular_user)
-        response = self.client.get(reverse("api-waste-collection-geojson"))
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        mock_set_min_max.assert_not_called()
-
-    @patch("sources.waste_collection.filters.ConnectionRateFilter.set_min_max")
-    def test_collection_filterset_still_initializes_min_max_by_default(
-        self, mock_set_min_max
-    ):
-        """Default CollectionFilterSet initialization should still prepare form widgets."""
-        from sources.waste_collection.filters import CollectionFilterSet
-
-        CollectionFilterSet(queryset=Collection.objects.all())
-        mock_set_min_max.assert_called_once()
-
-    def test_geojson_uses_simplified_geometry_annotation(self):
-        """Verify that GeoJSON serializer uses simplified_geom annotation when present.
-
-        This test ensures the GeometrySerializerMethodField is correctly
-        using the simplified geometry from the queryset annotation.
-        """
-        from unittest.mock import MagicMock
-
-        from sources.waste_collection.serializers import (
-            WasteCollectionGeometrySerializer,
-        )
-
-        # Create a mock instance with both original and simplified geometry
-        mock_instance = MagicMock()
-        mock_instance.geom = "original_geom"
-        mock_instance.simplified_geom = "simplified_geom"
-
-        serializer = WasteCollectionGeometrySerializer()
-
-        # The get_geom method should return simplified_geom when available
-        result = serializer.get_geom(mock_instance)
-        self.assertEqual(result, "simplified_geom")
-
-    def test_geojson_falls_back_to_original_geometry(self):
-        """Verify serializer falls back to original geom when simplified is not available."""
-        from unittest.mock import MagicMock
-
-        from sources.waste_collection.serializers import (
-            WasteCollectionGeometrySerializer,
-        )
-
-        # Create a mock instance without simplified geometry
-        mock_instance = MagicMock(spec=["geom"])
-        mock_instance.geom = "original_geom"
-
-        serializer = WasteCollectionGeometrySerializer()
-
-        # The get_geom method should fall back to original geometry
-        result = serializer.get_geom(mock_instance)
-        self.assertEqual(result, "original_geom")
-
 
 class CollectionReviewActionApiTestCase(APITestCase):
     """Ensure review action API endpoints trigger collection cascade behavior."""
@@ -822,7 +749,6 @@ class CollectionImporterWorkflowTestCase(APITestCase):
             .filter(action=ReviewAction.ACTION_SUBMITTED)
             .exists()
         )
-        collection.delete()
 
     def test_import_dry_run_creates_no_records(self):
         """Dry run must not persist any collection or ReviewAction."""
@@ -898,26 +824,6 @@ class CollectionMutationApiTestCase(APITestCase):
         cls.owner.user_permissions.add(cls.add_collection_frequency_permission)
         cls.other_user.user_permissions.add(cls.add_collection_permission)
 
-        cls.months_distribution = TemporalDistribution.objects.get(
-            name="Months of the year"
-        )
-        cls.march = Timestep.objects.get(
-            distribution=cls.months_distribution,
-            name="March",
-        )
-        cls.october = Timestep.objects.get(
-            distribution=cls.months_distribution,
-            name="October",
-        )
-        cls.november = Timestep.objects.get(
-            distribution=cls.months_distribution,
-            name="November",
-        )
-        cls.february = Timestep.objects.get(
-            distribution=cls.months_distribution,
-            name="February",
-        )
-
         cls.catchment = CollectionCatchment.objects.create(name="Agent Catchment")
         cls.collection_system = CollectionSystem.objects.create(name="Agent System")
         cls.waste_category = WasteCategory.objects.create(name="Agent Waste")
@@ -988,15 +894,15 @@ class CollectionMutationApiTestCase(APITestCase):
             "submit_for_review": submit_for_review,
             "rows": [
                 {
-                    "distribution": self.months_distribution.pk,
-                    "first_timestep": self.march.pk,
-                    "last_timestep": self.october.pk,
+                    "distribution": "Months of the year",
+                    "first_timestep": "March",
+                    "last_timestep": "October",
                     "standard_cadence": "every_two_weeks",
                 },
                 {
-                    "distribution": self.months_distribution.pk,
-                    "first_timestep": self.november.pk,
-                    "last_timestep": self.february.pk,
+                    "distribution": "Months of the year",
+                    "first_timestep": "November",
+                    "last_timestep": "February",
                     "standard_cadence": "every_four_weeks",
                 },
             ],

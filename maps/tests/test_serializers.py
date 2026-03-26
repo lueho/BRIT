@@ -4,6 +4,8 @@ from unittest.mock import patch
 from django.test import TestCase
 from django.urls import NoReverseMatch
 
+from utils.properties.models import Unit
+
 from ..models import (
     Attribute,
     CategoricalAttribute,
@@ -442,7 +444,19 @@ class NutsRegionSummarySerializerTestCase(TestCase):
     def test_population_density_method_field_returns_newest_value(self):
         data = NutsRegionSummarySerializer(self.region).data
         self.assertIn("population_density", data)
-        self.assertEqual(data["population_density"], "123.321 per km² (2019)")
+        self.assertEqual(data["population_density"], "123.321 1/km² (2019)")
+
+    def test_population_density_method_field_uses_value_level_unit_when_present(self):
+        explicit_unit = Unit.objects.create(name="people/km²", symbol="1/km²")
+        density_value = RegionAttributeValue.objects.filter(
+            attribute__name="Population density"
+        ).latest("date")
+        density_value.unit = explicit_unit
+        density_value.save(update_fields=["unit"])
+
+        data = NutsRegionSummarySerializer(self.region).data
+
+        self.assertEqual(data["population_density"], "123.321 people/km² (2019)")
 
     def test_urban_rural_remoteness_method_field_returns_non_if_for_non_existing(self):
         data = NutsRegionSummarySerializer(self.region).data

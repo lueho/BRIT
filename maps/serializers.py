@@ -333,7 +333,9 @@ class NutsRegionSummarySerializer(FieldLabelModelSerializer):
         ]
         if values:
             pd = max(values, key=lambda v: v.date if v.date else v.pk)
-            return f"{pd.value} per km² ({pd.date.year})"
+            unit = pd.measurement_unit_label
+            unit_suffix = f" {unit}" if unit else ""
+            return f"{pd.value}{unit_suffix} ({pd.date.year})"
         return None
 
     @staticmethod
