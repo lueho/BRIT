@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 from factory.django import mute_signals
 
+from distributions.models import TemporalDistribution, Timestep
 from maps.models import Attribute, LauRegion, NutsRegion, RegionAttributeValue
 from materials.models import MaterialCategory
 from utils.properties.models import Unit
@@ -24,6 +25,7 @@ from ..models import (
 )
 from ..serializers import (
     CollectionFlatSerializer,
+    CollectionFrequencyMutationSerializer,
     CollectionImportRecordSerializer,
     CollectionModelSerializer,
 )
@@ -440,3 +442,74 @@ class CollectionImportRecordSerializerTestCase(TestCase):
         serializer = CollectionImportRecordSerializer()
         self.assertIn("allowed_materials", serializer.fields)
         self.assertIn("forbidden_materials", serializer.fields)
+
+
+class CollectionFrequencyMutationSerializerTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.distribution, _ = TemporalDistribution.objects.get_or_create(
+            name="Months of the year"
+        )
+        cls.timesteps = {
+            name: Timestep.objects.get_or_create(
+                name=name,
+                distribution=cls.distribution,
+                defaults={"order": index},
+            )[0]
+            for index, name in enumerate(
+                (
+                    "January",
+                    "February",
+                    "March",
+                    "April",
+                    "May",
+                    "June",
+                    "July",
+                    "August",
+                    "September",
+                    "October",
+                    "November",
+                    "December",
+                ),
+                start=1,
+            )
+        }
+
+    def test_accepts_named_schedule_rows_and_derives_counts(self):
+        serializer = CollectionFrequencyMutationSerializer(
+            data={
+                "description": "Nordwestmecklenburg GER seasonal cadence.",
+                "rows": [
+                    {
+                        "distribution": "Months of the year",
+                        "first_timestep": "March",
+                        "last_timestep": "October",
+                        "standard_cadence": "every_two_weeks",
+                    },
+                    {
+                        "distribution": "Months of the year",
+                        "first_timestep": "November",
+                        "last_timestep": "February",
+                        "standard_cadence": "every_four_weeks",
+                    },
+                ],
+            }
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+        validated_data = serializer.validated_data
+        self.assertEqual(validated_data["frequency_type"], "Seasonal")
+        self.assertEqual(
+            validated_data["canonical_name"],
+            "Seasonal; 1 per 2 weeks from March-October; 1 per 4 weeks from November-February",
+        )
+        self.assertEqual(validated_data["rows"][0]["distribution"], self.distribution)
+        self.assertEqual(
+            validated_data["rows"][0]["first_timestep"], self.timesteps["March"]
+        )
+        self.assertEqual(
+            validated_data["rows"][1]["last_timestep"], self.timesteps["February"]
+        )
+        self.assertEqual(validated_data["rows"][0]["standard"], 17)
+        self.assertEqual(validated_data["rows"][1]["standard"], 4)

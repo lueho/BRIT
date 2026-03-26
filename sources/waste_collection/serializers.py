@@ -754,11 +754,18 @@ class CollectionImportRecordSerializer(serializers.Serializer):
 
 
 class CollectionFrequencyScheduleRowMutationSerializer(serializers.Serializer):
-    distribution = serializers.PrimaryKeyRelatedField(
-        queryset=TemporalDistribution.objects.all()
+    distribution = serializers.SlugRelatedField(
+        queryset=TemporalDistribution.objects.all(),
+        slug_field="name",
     )
-    first_timestep = serializers.PrimaryKeyRelatedField(queryset=Timestep.objects.all())
-    last_timestep = serializers.PrimaryKeyRelatedField(queryset=Timestep.objects.all())
+    first_timestep = serializers.SlugRelatedField(
+        queryset=Timestep.objects.all(),
+        slug_field="name",
+    )
+    last_timestep = serializers.SlugRelatedField(
+        queryset=Timestep.objects.all(),
+        slug_field="name",
+    )
     standard_cadence = serializers.ChoiceField(
         choices=[choice[0] for choice in CADENCE_CHOICES],
         required=False,
