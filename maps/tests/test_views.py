@@ -22,6 +22,7 @@ from rest_framework.viewsets import ModelViewSet
 from bibliography.models import Source
 from maps.mixins import GeoJSONMixin
 from maps.views import CatchmentCreateMergeLauView
+from utils.properties.models import Unit
 from utils.tests.testcases import (
     AbstractTestCases,
     ViewSetWithPermissionsTestCase,
@@ -455,6 +456,25 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
             "lau_region_3": lau_3.region_ptr,
             "parent_region": parent_region,
         }
+
+    def test_detail_view_renders_value_level_region_attribute_unit(self):
+        attribute = Attribute.objects.create(name="Population density", unit="1/km²")
+        unit = Unit.objects.create(name="people/km²", symbol="1/km²")
+        RegionAttributeValue.objects.create(
+            region=self.published_object.region,
+            attribute=attribute,
+            unit=unit,
+            value=123.321,
+            date=date(2024, 1, 1),
+            publication_status="published",
+        )
+
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Population density")
+        self.assertContains(response, "2024: 123.321 people/km²")
+        self.assertNotContains(response, "[1/km²]")
 
     # -----------------------
     # CreateView Test Cases

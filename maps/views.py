@@ -676,7 +676,7 @@ class CatchmentDetailView(MapMixin, UserCreatedObjectDetailView):
         if region is not None:
             context["region_attribute_values"] = (
                 RegionAttributeValue.objects.filter(region=region)
-                .select_related("attribute")
+                .select_related("attribute", "unit")
                 .order_by("attribute__name", "-date")
             )
         return context
