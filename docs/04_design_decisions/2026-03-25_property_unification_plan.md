@@ -1,16 +1,16 @@
-# Property Unification Plan After Phase 1
+# Property Unification Plan After Phase 3
 
-- **Status**: Proposed
+- **Status**: In progress
 - **Date**: 2026-03-25
-- **Context**: Phase 1 has been implemented as a low-risk convergence step. Shared numeric measurement behavior now lives in `utils.properties`, and the `materials`, `maps`, and waste-collection domains consume that shared behavior where their existing schemas permit it. The remaining work is to converge definition and value patterns further without forcing all domains into one concrete table design. In maps, that convergence should start by separating categorical data from quantitative measurements so only numeric definitions participate in the shared measurement architecture.
+- **Context**: Phase 1 has been implemented as a low-risk convergence step. Shared numeric measurement behavior now lives in `utils.properties`, and the `materials`, `maps`, and waste-collection domains consume that shared behavior where their existing schemas permit it. Since then, Phase 2 has separated categorical maps data from numeric maps data, and Phase 3 has aligned numeric maps definitions with `PropertyBase` without forcing a unit-field migration. The remaining work is to converge definition and value patterns further without forcing all domains into one concrete table design.
 
 ---
 
-## 1. Current Position After Phase 1
+## 1. Current Position After Phase 3
 
-### 1.1 Implemented in Phase 1
+### 1.1 Implemented in Phases 1-3
 
-Phase 1 established shared behavior rather than shared database tables.
+Phase 1-3 established shared behavior and shared definition contracts rather than shared concrete database tables.
 
 - **Shared model behavior**
   - `utils.properties.models.NumericMeasurementMixin`
@@ -21,20 +21,35 @@ Phase 1 established shared behavior rather than shared database tables.
 - **Shared serializer behavior**
   - `utils.properties.serializers.NumericMeasurementSerializerMixin`
   - adopted by the generic property serializer and material property serializers
+- **Maps semantic split**
+  - `RegionAttributeTextValue` now points to `CategoricalAttribute`
+  - `Attribute` is now numeric-only in practice
+- **Definition-layer convergence**
+  - `Attribute(PropertyBase)` now shares the same abstract definition contract as `MaterialProperty(PropertyBase)` and `Property(PropertyBase)`
 
-### 1.2 What Phase 1 deliberately did not do
+### 1.2 What remains deliberately unfinished
 
-Phase 1 did not attempt to unify storage shapes that still differ materially.
+Phase 1-3 did not attempt to unify storage shapes that still differ materially.
 
 - **Maps** still stores numeric values as `attribute` + `value`
-- **Maps** still uses `Attribute` as the definition concept for both quantitative indicators and categorical labels
 - **Materials** still stores numeric values as `property` + `average`
 - **Waste collection** still uses `PropertyValue`-style storage with year-specific specializations
-- **Maps** still stores unit metadata on `Attribute`, not on `RegionAttributeValue`
+- **Maps** still stores primary unit metadata on `Attribute`, not on `RegionAttributeValue`
 - **Maps** still keeps text values in `RegionAttributeTextValue`
 - **Materials** still carries basis and analytical-method metadata that do not apply to the other domains
 
 This is intentional. The next phases should continue to reduce duplication, but only where the domain model actually benefits.
+
+### 1.3 What we learned in Phases 2 and 3
+
+- **The semantic split in maps was viable without URL churn**
+  - the categorical definition path could be introduced while preserving the main maps behavior
+- **Definition-level convergence was lower-risk than value-level convergence**
+  - `Attribute` could move onto `PropertyBase` cleanly because the concrete maps model kept ownership of its existing field shape
+- **The next unit migration reaches beyond the maps app**
+  - some external consumers, such as waste-collection serializers, currently read unit metadata from `rav.attribute.unit`
+- **`Attribute.unit` should remain a transitional compatibility field during Phase 4**
+  - removing or de-emphasizing it should happen only after value-level units and downstream consumers are migrated
 
 ---
 
@@ -165,6 +180,8 @@ Key characteristics of the intended end-state:
 
 ## 3.1 Phase 2 — Separate categorical maps data from quantitative definitions
 
+- **Status**: Completed
+
 ### Goal
 
 Make maps categorical data a separate concept from numeric measurement data.
@@ -206,6 +223,8 @@ After this split, the numeric side of maps can be treated equivalently to the nu
 ---
 
 ## 3.2 Phase 3 — Align numeric definition model inheritance
+
+- **Status**: Completed
 
 ### Goal
 
@@ -252,23 +271,29 @@ It gives all three quantitative domains the same conceptual contract for:
 
 ---
 
-## 3.3 Phase 4 — Introduce value-level unit handling for maps
+## 3.3 Phase 4 — Inventory and introduce value-level unit handling for maps
 
 ### Goal
 
-Bring `RegionAttributeValue` closer to the common numeric value contract by storing unit at the value level.
+Bring `RegionAttributeValue` closer to the common numeric value contract by storing unit at the value level, but only after inventorying current unit strings and all consumers that still depend on `Attribute.unit`.
 
 ### Proposed change
 
-Add a `unit` foreign key to `RegionAttributeValue` and treat `Attribute.unit` as a transitional default or display fallback.
+Run this phase in two explicit sub-steps.
 
-Possible migration sequence:
+**Phase 4a — inventory and normalization preparation**
+
+1. Inventory all code paths that read `rav.attribute.unit` or otherwise assume unit metadata lives on `Attribute`
+2. Inspect current `maps_attribute.unit` strings and classify them into directly resolvable, deterministically normalizable, and unresolved values
+3. Identify downstream consumers outside the `maps` app that must be migrated together with maps itself
+
+**Phase 4b — value-level unit migration**
 
 1. Add nullable `unit` FK to `RegionAttributeValue`
-2. Resolve existing `Attribute.unit` strings to `Unit` objects
+2. Resolve existing `Attribute.unit` strings to `Unit` objects where possible
 3. Backfill `RegionAttributeValue.unit`
-4. Update maps forms, serializers, filters, and summary views to prefer `value.unit`
-5. Retain fallback to `attribute.unit` temporarily where data is incomplete
+4. Update maps forms, serializers, filters, summary views, and cross-app consumers to prefer `value.unit`
+5. Retain fallback to `attribute.unit` temporarily where data is incomplete or still in transition
 
 ### Why this phase matters
 
@@ -280,14 +305,16 @@ Once maps has value-level units, cross-domain numeric handling becomes much more
 
 - Medium
 - Existing maps values may rely on free-text unit strings that do not resolve cleanly to `Unit`
-- Summary serializers currently read `rav.attribute.unit`; those paths must be updated carefully
+- Some consumers outside the maps app currently read `rav.attribute.unit`; those paths must be updated carefully
+- Some summary and export paths still identify map measurements by attribute name strings, so unit migration may expose additional coupling that should be cleaned up at the same time
 
 ### Exit criteria
 
+- the inventory of unit strings and code consumers is complete
 - `RegionAttributeValue` has a `unit` FK
-- existing data is backfilled
-- serializers and views render `value.unit` consistently
-- `Attribute.unit` is no longer the only source of unit information
+- existing data is backfilled where units can be resolved safely
+- serializers, views, and cross-app exports render `value.unit` consistently
+- `Attribute.unit` is no longer the only source of unit information and remains only as a transitional compatibility field
 
 ---
 
@@ -427,9 +454,9 @@ The remaining plan should explicitly avoid the following.
 | Phase | Scope | Risk | Depends on |
 |---|---|---|---|
 | **1. Shared behavior** | Shared mixins for models/forms/serializers | Done | None |
-| **2. Maps semantic split** | Separate categorical maps data from quantitative definitions | Medium | 1 |
-| **3. Definition convergence** | Numeric maps definition onto `PropertyBase` | Low-Medium | 2 |
-| **4. Maps value-level units** | `RegionAttributeValue.unit` + backfill | Medium | 3 recommended |
+| **2. Maps semantic split** | Separate categorical maps data from quantitative definitions | Done | 1 |
+| **3. Definition convergence** | Numeric maps definition onto `PropertyBase` | Done | 2 |
+| **4. Maps unit migration** | Inventory unit strings and consumers, then add `RegionAttributeValue.unit` + backfill | Medium | 3 recommended |
 | **5. Optional abstract DB bases** | Shared concrete field base(s) where justified | Medium-High | 4 |
 | **6. Maps provenance decision** | Decide whether to add `sources` to map values | Low-Medium | 4 |
 | **7. Shared services** | Exports, queries, formatting, conversion helpers | Low | 3-6 as needed |
@@ -438,19 +465,19 @@ The remaining plan should explicitly avoid the following.
 
 ## 6. Recommended Next Implementation Step
 
-The next implementation step should be **Phase 2**.
+The next implementation step should be **Phase 4a**.
 
 Why:
 
-- It removes the main semantic ambiguity in maps before any deeper unification
-- It makes later numeric convergence conceptually honest instead of overloading one definition concept
-- It continues the same phase-1 strategy: clarify shared contracts first, then converge storage carefully
+- It prepares the highest-risk remaining schema change with a concrete inventory instead of assumptions
+- It reveals which unit strings can be backfilled automatically and which require explicit normalization
+- It identifies cross-app consumers that must be migrated together with maps
 
-Concretely, Phase 2 should answer these questions in code and tests:
+Concretely, Phase 4a should answer these questions in code and data:
 
-- Should `Attribute` remain the numeric name, with a new categorical definition model introduced beside it?
-- Which maps views, forms, serializers, and filters currently assume text and numeric records share the same definition source?
-- Can `RegionAttributeTextValue` move to a dedicated categorical definition path without breaking user-facing maps workflows?
+- Which code paths still depend on `Attribute.unit` or `rav.attribute.unit`?
+- Which current `maps_attribute.unit` values resolve directly to `Unit`, and which need normalization or manual mapping?
+- Which cross-app serializers, exports, or summaries need to move to value-level units together with the maps app?
 
 ---
 

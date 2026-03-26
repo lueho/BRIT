@@ -485,7 +485,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
                     year = rav.date.year if rav.date else None
                     col = f"{col_prefix}_{year}" if year else col_prefix
                     ordered_representation[col] = rav.value
-                    unit = rav.attribute.unit
+                    unit = rav.measurement_unit_label
                     ordered_representation[f"{col}_unit"] = unit if unit else ""
 
         additional_properties = ["specific waste collected", "Connection rate"]
