@@ -41,7 +41,7 @@ This is intentional. The next phases should continue to reduce duplication, but 
 
 The target architecture is:
 
-- **one shared abstraction family** in `utils.properties`
+- **shared abstract models and mixins** in `utils.properties`
 - **domain-specific concrete models** in each app
 
 The target architecture is not:
@@ -49,7 +49,22 @@ The target architecture is not:
 - one universal `Property` table for all definition records
 - one universal `PropertyValue` table for all numeric and text values
 
-### 2.1 Why not one concrete table
+### 2.1 Naming conventions
+
+Use the naming patterns that already exist in BRIT.
+
+- **Concrete domain models keep domain nouns**
+  - examples: `Property`, `MaterialProperty`, `Attribute`, `MaterialPropertyValue`, `RegionAttributeValue`
+- **Behavior-only reuse stays in `...Mixin` classes**
+  - examples: `NumericMeasurementMixin`, `NumericMeasurementFieldsFormMixin`, `NumericMeasurementSerializerMixin`
+- **`...Base` is reserved for shared abstract model contracts**
+  - examples: `PropertyBase`, `BaseMaterial`
+- **Concrete Django and DRF classes keep framework suffixes**
+  - examples: `RegionAttributeValueModelForm`, `MaterialPropertyValueModelSerializer`
+- **Avoid vague architecture labels**
+  - prefer real helper names or concise labels like "measurement helpers" over generic terms like "shared service layer"
+
+### 2.2 Why not one concrete table
 
 A single concrete property/value schema would immediately run into domain-specific mismatches.
 
@@ -59,11 +74,83 @@ A single concrete property/value schema would immediately run into domain-specif
 
 Trying to erase those differences too early would make the code less explicit and increase migration risk.
 
+### 2.3 Final architecture diagram
+
+```mermaid
+flowchart LR
+    subgraph shared["utils.properties abstract models and mixins"]
+        PB["PropertyBase\nshared abstract definition model"]
+        NM["NumericMeasurementMixin\nshared numeric behavior"]
+        UX["Numeric measurement helpers\nforms / serializers / queries"]
+    end
+
+    subgraph materials["materials"]
+        MP["MaterialProperty"]
+        MPV["MaterialPropertyValue"]
+    end
+
+    subgraph maps["maps"]
+        A["Attribute"]
+        RAV["RegionAttributeValue"]
+        RATV["RegionAttributeTextValue"]
+    end
+
+    subgraph waste["waste collection / shared property domain"]
+        P["Property"]
+        CPV["CollectionPropertyValue"]
+        ACPV["AggregatedCollectionPropertyValue"]
+    end
+
+    U["Unit"]
+    S["Source"]
+
+    PB --> MP
+    PB --> A
+    PB --> P
+
+    MP --> MPV
+    A --> RAV
+    A --> RATV
+    P --> CPV
+    P --> ACPV
+
+    NM -. shared numeric behavior .-> MPV
+    NM -. shared numeric behavior .-> RAV
+    NM -. shared numeric behavior .-> CPV
+    NM -. shared numeric behavior .-> ACPV
+
+    UX -. shared UI / API / query helpers .-> MPV
+    UX -. shared UI / API / query helpers .-> RAV
+    UX -. shared UI / API / query helpers .-> CPV
+    UX -. shared UI / API / query helpers .-> ACPV
+
+    MPV --> U
+    RAV --> U
+    CPV --> U
+    ACPV --> U
+
+    MPV --> S
+    CPV --> S
+    ACPV --> S
+    RAV -. provenance policy if adopted .-> S
+```
+
+Key characteristics of the intended end-state:
+
+- **Shared abstract models and mixins, app-owned concrete models**
+  - `utils.properties` provides shared contracts and behavior, while each domain keeps its own concrete tables
+- **Per-value unit ownership for numeric values**
+  - numeric value records point to `Unit`, rather than relying only on definition-level unit metadata
+- **Text values stay separate**
+  - `RegionAttributeTextValue` remains distinct from numeric value storage
+- **No universal concrete property/value table**
+  - unification happens through abstract contracts and named helpers, not through forced table consolidation
+
 ---
 
 ## 3. Remaining Plan
 
-## 3.1 Phase 2 — Converge definition-model semantics
+## 3.1 Phase 2 — Align definition model inheritance
 
 ### Goal
 
@@ -149,20 +236,20 @@ Once maps has value-level units, cross-domain numeric handling becomes much more
 
 ---
 
-## 3.3 Phase 4 — Introduce shared abstract DB bases only where fields truly converge
+## 3.3 Phase 4 — Evaluate a shared abstract numeric value base
 
 ### Goal
 
-After phase 3, evaluate whether the field-level convergence is now strong enough to introduce shared abstract database bases in `utils.properties`.
+After phase 3, evaluate whether the field-level convergence is now strong enough to introduce a shared abstract model for numeric value fields in `utils.properties`.
 
 ### Proposed change
 
-If the schemas are aligned enough, introduce a shared abstract base for numeric values that centralizes the truly shared fields.
+If the schemas are aligned enough, introduce a shared abstract base for numeric value fields that centralizes the truly shared fields.
 
 Candidate shape:
 
 ```python
-class NumericPropertyValueBase(NamedUserCreatedObject):
+class NumericMeasurementValueBase(NamedUserCreatedObject):
     unit = models.ForeignKey(Unit, on_delete=models.PROTECT)
     average = models.DecimalField(...)
     standard_deviation = models.DecimalField(..., null=True, blank=True)
@@ -176,7 +263,7 @@ Each domain would still define its own domain relation fields.
 
 Examples:
 
-- `MaterialPropertyValue(NumericPropertyValueBase)` keeps `property`, `basis_component`, `analytical_method`
+- `MaterialPropertyValue(NumericMeasurementValueBase)` keeps `property`, `basis_component`, `analytical_method`
 - `CollectionPropertyValue(PropertyValue)` may remain on the existing path if that remains clearer
 - `RegionAttributeValue` can only join this base if its field types and semantics are aligned enough
 
@@ -184,7 +271,7 @@ Examples:
 
 This phase is optional.
 
-If the result would require awkward renames or forced field shapes, keep the shared layer behavioral rather than schema-based.
+If the result would require awkward renames or forced field shapes, keep the shared layer in mixins and helpers rather than forcing a schema abstraction.
 
 ### Risks
 

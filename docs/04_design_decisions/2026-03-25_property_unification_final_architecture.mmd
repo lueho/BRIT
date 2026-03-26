@@ -1,0 +1,56 @@
+flowchart LR
+    subgraph shared["utils.properties abstract models and mixins"]
+        PB["PropertyBase\nshared abstract definition model"]
+        NM["NumericMeasurementMixin\nshared numeric behavior"]
+        UX["Numeric measurement helpers\nforms / serializers / queries"]
+    end
+
+    subgraph materials["materials"]
+        MP["MaterialProperty"]
+        MPV["MaterialPropertyValue"]
+    end
+
+    subgraph maps["maps"]
+        A["Attribute"]
+        RAV["RegionAttributeValue"]
+        RATV["RegionAttributeTextValue"]
+    end
+
+    subgraph waste["waste collection / shared property domain"]
+        P["Property"]
+        CPV["CollectionPropertyValue"]
+        ACPV["AggregatedCollectionPropertyValue"]
+    end
+
+    U["Unit"]
+    S["Source"]
+
+    PB --> MP
+    PB --> A
+    PB --> P
+
+    MP --> MPV
+    A --> RAV
+    A --> RATV
+    P --> CPV
+    P --> ACPV
+
+    NM -. shared numeric behavior .-> MPV
+    NM -. shared numeric behavior .-> RAV
+    NM -. shared numeric behavior .-> CPV
+    NM -. shared numeric behavior .-> ACPV
+
+    UX -. shared UI / API / query helpers .-> MPV
+    UX -. shared UI / API / query helpers .-> RAV
+    UX -. shared UI / API / query helpers .-> CPV
+    UX -. shared UI / API / query helpers .-> ACPV
+
+    MPV --> U
+    RAV --> U
+    CPV --> U
+    ACPV --> U
+
+    MPV --> S
+    CPV --> S
+    ACPV --> S
+    RAV -. provenance policy if adopted .-> S
