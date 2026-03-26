@@ -1,9 +1,14 @@
 from collections import OrderedDict
 
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import (
+    CharField,
+    ChoiceField,
     HyperlinkedModelSerializer,
+    IntegerField,
     ModelSerializer,
     SerializerMethodField,
+    ValidationError,
 )
 
 from .models import Author, Licence, Source, SourceAuthor
@@ -30,6 +35,111 @@ class LicenceModelSerializer(ModelSerializer):
         model = Licence
         fields = ["id", "name", "reference_url", "description", "bibtex_entry"]
         read_only_fields = ["bibtex_entry"]
+
+
+class SourceCreateAuthorSerializer(ModelSerializer):
+    id = IntegerField(required=False)
+    first_names = CharField(required=False, allow_blank=True)
+    last_names = CharField(required=False, allow_blank=True)
+
+    class Meta:
+        model = Author
+        fields = ["id", "first_names", "last_names"]
+
+    def validate(self, attrs):
+        if attrs.get("id") in (None, "") and not attrs.get("last_names", "").strip():
+            raise ValidationError(
+                {"last_names": "This field is required when id is not provided."}
+            )
+        return attrs
+
+
+class SourceCreateSerializer(ModelSerializer):
+    authors = SourceCreateAuthorSerializer(many=True, required=False)
+    type = ChoiceField(choices=Source._meta.get_field("type").choices, required=False)
+    citation_key = CharField(required=False, allow_blank=True)
+
+    class Meta:
+        model = Source
+        fields = [
+            "id",
+            "citation_key",
+            "authors",
+            "title",
+            "type",
+            "publisher",
+            "journal",
+            "volume",
+            "number",
+            "eid",
+            "pages",
+            "month",
+            "year",
+            "abstract",
+            "attributions",
+            "url",
+            "doi",
+            "last_accessed",
+            "publication_status",
+        ]
+        read_only_fields = ["id", "publication_status"]
+
+    def _resolve_authors(self, owner, authors_data):
+        authors = []
+        author_ids = set()
+
+        for author_data in authors_data:
+            raw_author_id = author_data.get("id")
+            author = None
+            if raw_author_id not in (None, ""):
+                try:
+                    author = Author.objects.get(pk=int(raw_author_id))
+                except (Author.DoesNotExist, TypeError, ValueError) as exc:
+                    raise ValidationError(
+                        {"authors": [f"Author id {raw_author_id} does not exist."]}
+                    ) from exc
+            else:
+                first_names = " ".join(
+                    str(author_data.get("first_names") or "").split()
+                )
+                last_names = " ".join(str(author_data.get("last_names") or "").split())
+                author = Author.objects.filter(
+                    first_names__iexact=first_names,
+                    last_names__iexact=last_names,
+                ).first()
+                if author is None:
+                    if not owner.has_perm("bibliography.add_author"):
+                        raise PermissionDenied(
+                            "You need permission to create authors for source creation."
+                        )
+                    author = Author.objects.create(
+                        owner=owner,
+                        first_names=first_names,
+                        last_names=last_names,
+                    )
+
+            if author.pk not in author_ids:
+                authors.append(author)
+                author_ids.add(author.pk)
+
+        return authors
+
+    def create(self, validated_data):
+        authors_data = validated_data.pop("authors", [])
+        owner = getattr(self.context.get("request"), "user", None)
+        authors = self._resolve_authors(owner, authors_data)
+        source = Source.objects.create(
+            owner=owner,
+            type=validated_data.pop("type", Source._meta.get_field("type").default),
+            **validated_data,
+        )
+        for position, author in enumerate(authors, start=1):
+            SourceAuthor.objects.create(
+                source=source,
+                author=author,
+                position=position,
+            )
+        return source
 
 
 class SourceModelSerializer(ModelSerializer):

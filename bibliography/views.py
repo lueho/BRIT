@@ -9,6 +9,9 @@ from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import FormView, TemplateView
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from utils.forms import TomSelectFormsetHelper
 from utils.object_management.permissions import get_object_policy
@@ -26,6 +29,7 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateView,
     UserCreatedObjectUpdateWithInlinesView,
 )
+from utils.permissions import HasModelPermission
 
 from .filters import AuthorFilterSet, LicenceListFilter, SourceFilter
 from .forms import (
@@ -39,7 +43,7 @@ from .forms import (
 )
 from .inlines import SourceAuthorInline
 from .models import SOURCE_TYPES, Author, Licence, Source
-from .serializers import HyperlinkedSourceSerializer
+from .serializers import HyperlinkedSourceSerializer, SourceCreateSerializer
 from .tasks import check_source_url, check_source_urls
 
 
@@ -492,6 +496,25 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
 
         source.delete()
         return JsonResponse({"deleted": True}, status=200)
+
+
+class SourceCreateAPIView(APIView):
+    queryset = Source.objects.all()
+    permission_classes = [HasModelPermission]
+    action = "create"
+    permission_required = {"create": "bibliography.add_source"}
+
+    def post(self, request, *args, **kwargs):
+        serializer = SourceCreateSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        source = serializer.save()
+        return Response(
+            SourceCreateSerializer(source, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class SourceCheckUrlView(LoginRequiredMixin, View):

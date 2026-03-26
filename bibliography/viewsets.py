@@ -31,6 +31,7 @@ class SourceViewSet(AutoPermModelViewSet):
     queryset = Source.objects.all()
     serializer_class = SourceModelSerializer
     filterset_class = SourceModelFilterSet
+    http_method_names = ["get", "head", "options"]
     custom_permission_required = {
         "list": None,
         "retrieve": None,

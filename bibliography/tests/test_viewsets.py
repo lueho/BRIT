@@ -1,9 +1,13 @@
+from django.contrib.auth.models import Permission
+from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
+from rest_framework.test import APIClient
 
+from utils.object_management.models import User
 from utils.tests.testcases import ViewSetWithPermissionsTestCase
 
-from ..models import Author
+from ..models import Author, Source
 
 
 class AuthorViewSetPermissionTestCase(ViewSetWithPermissionsTestCase):
@@ -118,3 +122,122 @@ class AuthorViewSetPermissionTestCase(ViewSetWithPermissionsTestCase):
             reverse("api-author-detail", args=[self.author.id])
         )
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+
+class SourceCreateAPIViewTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.member = User.objects.create(username="member")
+        self.outsider = User.objects.create(username="outsider")
+        self.member.user_permissions.add(
+            Permission.objects.get(
+                codename="add_source",
+                content_type__app_label="bibliography",
+            )
+        )
+
+    def test_create_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(
+            reverse("api-source-create"),
+            {"title": "Inline source"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_201_created_for_member_sets_owner_and_fields(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("api-source-create"),
+            {
+                "title": "Inline source",
+                "type": "book",
+                "publisher": "Test Publisher",
+                "year": 2024,
+                "attributions": "Stand: 16.11.2023",
+                "url": "https://example.com/source.pdf",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        payload = response.json()
+        source = Source.objects.get(pk=payload["id"])
+
+        self.assertEqual(source.owner, self.member)
+        self.assertEqual(source.title, "Inline source")
+        self.assertEqual(source.type, "book")
+        self.assertEqual(source.publisher, "Test Publisher")
+        self.assertEqual(source.year, 2024)
+        self.assertEqual(source.attributions, "Stand: 16.11.2023")
+        self.assertEqual(source.url, "https://example.com/source.pdf")
+        self.assertEqual(payload["publication_status"], Source.STATUS_PRIVATE)
+
+    def test_create_201_created_for_member_with_existing_author(self):
+        self.client.force_login(self.member)
+        author = Author.objects.create(
+            owner=self.member,
+            first_names="Ada",
+            last_names="Lovelace",
+        )
+
+        response = self.client.post(
+            reverse("api-source-create"),
+            {
+                "title": "Inline source",
+                "authors": [{"id": author.pk}],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        source = Source.objects.get(pk=response.json()["id"])
+        self.assertEqual(source.sourceauthors.count(), 1)
+        source_author = source.sourceauthors.get()
+        self.assertEqual(source_author.author_id, author.pk)
+        self.assertEqual(source_author.position, 1)
+
+    def test_create_403_when_new_author_payload_without_add_author_permission(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("api-source-create"),
+            {
+                "title": "Inline source",
+                "authors": [{"first_names": "Ada", "last_names": "Lovelace"}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_201_creates_source_and_new_author_when_permitted(self):
+        self.member.user_permissions.add(
+            Permission.objects.get(
+                codename="add_author",
+                content_type__app_label="bibliography",
+            )
+        )
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("api-source-create"),
+            {
+                "title": "Inline source",
+                "authors": [{"first_names": "Ada", "last_names": "Lovelace"}],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        source = Source.objects.get(pk=response.json()["id"])
+        self.assertEqual(source.owner, self.member)
+        self.assertEqual(source.sourceauthors.count(), 1)
+        self.assertEqual(source.sourceauthors.get().author.owner, self.member)
+
+    def test_generic_source_viewset_create_is_not_allowed(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("api-source-list"),
+            {"title": "Unsafe path"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)

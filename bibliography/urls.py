@@ -28,6 +28,7 @@ from .views import (
     SourceBibtexArticleImportView,
     SourceCheckUrlProgressView,
     SourceCheckUrlView,
+    SourceCreateAPIView,
     SourceCreateView,
     SourceDetailView,
     SourceListCheckUrlsView,
@@ -180,6 +181,11 @@ urlpatterns = [
         "sources/quick-create/",
         SourceQuickCreateView.as_view(),
         name="source-quick-create",
+    ),
+    path(
+        "api/sources/create/",
+        SourceCreateAPIView.as_view(),
+        name="api-source-create",
     ),
     path("api/", include(router.urls)),
 ]
