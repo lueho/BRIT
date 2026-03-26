@@ -928,6 +928,7 @@ class CollectionMutationApiTestCase(APITestCase):
         cls.allowed_material = Material.objects.create(
             name="Agent Allowed Material", owner=cls.owner
         )
+        cls.updated_collector = Collector.objects.create(name="Updated Agent Collector")
         cls.updated_allowed_material = Material.objects.create(
             name="Agent Updated Allowed Material", owner=cls.owner
         )
@@ -1289,6 +1290,76 @@ class CollectionMutationApiTestCase(APITestCase):
             ).exists()
         )
 
+    def test_update_endpoint_accepts_id_identity_comments_alias_and_string_flyers(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-update",
+                kwargs={"pk": self.private_predecessor.pk},
+            ),
+            {
+                "expected_catchment_id": self.private_predecessor.catchment_id,
+                "expected_waste_category_id": self.private_predecessor.waste_category_id,
+                "expected_collection_system_id": (
+                    self.private_predecessor.collection_system_id
+                ),
+                "expected_publication_status": self.private_predecessor.publication_status,
+                "expected_valid_from": self.private_predecessor.valid_from.isoformat(),
+                "collector": self.updated_collector.pk,
+                "comments": "updated via comments alias",
+                "flyer_urls": "https://example.com/alias-flyer-a, https://example.com/alias-flyer-b",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["updated"])
+
+        self.private_predecessor.refresh_from_db()
+        self.assertEqual(self.private_predecessor.collector, self.updated_collector)
+        self.assertEqual(
+            self.private_predecessor.description, "updated via comments alias"
+        )
+        self.assertTrue(
+            self.private_predecessor.flyers.filter(
+                url="https://example.com/alias-flyer-a"
+            ).exists()
+        )
+        self.assertTrue(
+            self.private_predecessor.flyers.filter(
+                url="https://example.com/alias-flyer-b"
+            ).exists()
+        )
+
+    def test_create_endpoint_accepts_comments_alias_and_string_flyers(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse("api-waste-collection-create"),
+            {
+                "catchment": self.catchment.pk,
+                "waste_category": self.waste_category.pk,
+                "collection_system": self.collection_system.pk,
+                "valid_from": "2025-05-01",
+                "comments": "created via comments alias",
+                "flyer_urls": "https://example.com/create-flyer-a, https://example.com/create-flyer-b",
+                "submit_for_review": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        collection = Collection.objects.get(pk=response.data["id"])
+        self.assertEqual(collection.description, "created via comments alias")
+        self.assertTrue(
+            collection.flyers.filter(url="https://example.com/create-flyer-a").exists()
+        )
+        self.assertTrue(
+            collection.flyers.filter(url="https://example.com/create-flyer-b").exists()
+        )
+
     def test_new_version_with_add_permission_succeeds(self):
         self.client.force_login(self.other_user)
 
@@ -1403,6 +1474,34 @@ class CollectionMutationApiTestCase(APITestCase):
             ReviewAction.for_object(successor)
             .filter(action=ReviewAction.ACTION_SUBMITTED)
             .exists()
+        )
+
+    def test_new_version_accepts_comments_alias_and_string_flyers(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-new-version",
+                kwargs={"pk": self.predecessor.pk},
+            ),
+            {
+                "valid_from": "2025-04-01",
+                "comments": "successor via comments alias",
+                "flyer_urls": "https://example.com/version-flyer-a, https://example.com/version-flyer-b",
+                "submit_for_review": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        successor = Collection.objects.get(pk=response.data["id"])
+        self.assertEqual(successor.description, "successor via comments alias")
+        self.assertTrue(
+            successor.flyers.filter(url="https://example.com/version-flyer-a").exists()
+        )
+        self.assertTrue(
+            successor.flyers.filter(url="https://example.com/version-flyer-b").exists()
         )
 
 

@@ -412,16 +412,47 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         mismatches = {}
 
         actual_waste_category = collection.effective_waste_category
+        identity_pairs = {
+            "catchment": {
+                "actual": str(collection.catchment),
+                "actual_id": getattr(collection.catchment, "pk", None),
+                "expected": data.get("expected_catchment"),
+                "expected_id": data.get("expected_catchment_id"),
+            },
+            "waste_category": {
+                "actual": str(actual_waste_category) if actual_waste_category else "",
+                "actual_id": getattr(actual_waste_category, "pk", None),
+                "expected": data.get("expected_waste_category"),
+                "expected_id": data.get("expected_waste_category_id"),
+            },
+            "collection_system": {
+                "actual": str(collection.collection_system),
+                "actual_id": getattr(collection.collection_system, "pk", None),
+                "expected": data.get("expected_collection_system"),
+                "expected_id": data.get("expected_collection_system_id"),
+            },
+        }
+
+        for field_name, values in identity_pairs.items():
+            expected_values = set()
+            if values["expected"] not in {None, ""}:
+                expected_values.add(str(values["expected"]))
+            if values["expected_id"] is not None:
+                expected_values.add(str(values["expected_id"]))
+
+            actual_values = {values["actual"]}
+            if values["actual_id"] is not None:
+                actual_values.add(str(values["actual_id"]))
+
+            if expected_values.isdisjoint(actual_values):
+                mismatches[field_name] = {
+                    "actual": values["actual"],
+                    "actual_id": values["actual_id"],
+                    "expected": values["expected"],
+                    "expected_id": values["expected_id"],
+                }
+
         expected_pairs = {
-            "catchment": (str(collection.catchment), data["expected_catchment"]),
-            "waste_category": (
-                str(actual_waste_category) if actual_waste_category else "",
-                data["expected_waste_category"],
-            ),
-            "collection_system": (
-                str(collection.collection_system),
-                data["expected_collection_system"],
-            ),
             "publication_status": (
                 collection.publication_status,
                 data["expected_publication_status"],

@@ -252,7 +252,12 @@ class ReviewAPIViewsTests(TestCase):
             owner_context["expected_identity"]["expected_publication_status"],
             self.review_collection.publication_status,
         )
+        self.assertEqual(
+            owner_context["expected_identity"]["expected_waste_category_id"],
+            None,
+        )
         self.assertIn("description", owner_context["mutable_fields"])
+        self.assertIn("comments", owner_context["mutable_fields"])
         self.assertEqual(
             owner_context["update_url"],
             reverse(

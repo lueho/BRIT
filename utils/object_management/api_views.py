@@ -205,8 +205,11 @@ def _serialize_collection_update_context(user, obj):
         "update_url": reverse("api-waste-collection-update", kwargs={"pk": obj.pk}),
         "expected_identity": {
             "expected_catchment": str(obj.catchment),
+            "expected_catchment_id": getattr(obj.catchment, "pk", None),
             "expected_waste_category": str(waste_category) if waste_category else "",
+            "expected_waste_category_id": getattr(waste_category, "pk", None),
             "expected_collection_system": str(obj.collection_system),
+            "expected_collection_system_id": getattr(obj.collection_system, "pk", None),
             "expected_publication_status": getattr(obj, "publication_status", None),
             "expected_valid_from": valid_from.isoformat() if valid_from else None,
         },
@@ -224,6 +227,7 @@ def _serialize_collection_update_context(user, obj):
             "min_bin_size",
             "required_bin_capacity",
             "required_bin_capacity_reference",
+            "comments",
             "description",
         ],
     }

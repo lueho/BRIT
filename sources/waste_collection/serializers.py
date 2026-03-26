@@ -27,6 +27,28 @@ from utils.serializers import FieldLabelModelSerializer
 GEOMETRY_SIMPLIFY_TOLERANCE = 0.001
 
 
+class FlexibleUrlListField(serializers.ListField):
+    def to_internal_value(self, data):
+        if data in (None, ""):
+            data = []
+        elif isinstance(data, str):
+            data = [item.strip() for item in data.split(",") if item.strip()]
+        return super().to_internal_value(data)
+
+
+class CommentsAliasSerializerMixin:
+    def to_internal_value(self, data):
+        if hasattr(data, "copy"):
+            data = data.copy()
+        else:
+            data = dict(data)
+
+        if "description" not in data and "comments" in data:
+            data["description"] = data["comments"]
+
+        return super().to_internal_value(data)
+
+
 class CollectionReferenceFieldsMixin(serializers.Serializer):
     catchment_id = serializers.IntegerField(read_only=True)
     collector_id = serializers.IntegerField(read_only=True)
@@ -570,7 +592,7 @@ class CollectionImportPropertyValueSerializer(serializers.Serializer):
     )
     average = serializers.FloatField(help_text="Measured / observed value.")
     standard_deviation = serializers.FloatField(required=False, allow_null=True)
-    flyer_urls = serializers.ListField(
+    flyer_urls = FlexibleUrlListField(
         child=serializers.URLField(),
         required=False,
         default=list,
@@ -590,7 +612,7 @@ class CollectionPropertyValueMutationSerializer(serializers.Serializer):
     sources = serializers.PrimaryKeyRelatedField(
         queryset=Source.objects.all(), many=True, required=False, default=list
     )
-    flyer_urls = serializers.ListField(
+    flyer_urls = FlexibleUrlListField(
         child=serializers.URLField(), required=False, default=list
     )
     submit_for_review = serializers.BooleanField(required=False, default=True)
@@ -608,7 +630,7 @@ class AggregatedCollectionPropertyValueMutationSerializer(serializers.Serializer
     sources = serializers.PrimaryKeyRelatedField(
         queryset=Source.objects.all(), many=True, required=False, default=list
     )
-    flyer_urls = serializers.ListField(
+    flyer_urls = FlexibleUrlListField(
         child=serializers.URLField(), required=False, default=list
     )
     submit_for_review = serializers.BooleanField(required=False, default=True)
@@ -708,7 +730,7 @@ class CollectionImportRecordSerializer(serializers.Serializer):
         required=False,
         default=list,
     )
-    flyer_urls = serializers.ListField(
+    flyer_urls = FlexibleUrlListField(
         child=serializers.URLField(), required=False, default=list
     )
     property_values = CollectionImportPropertyValueSerializer(
@@ -850,7 +872,9 @@ class CollectionFrequencyMutationSerializer(serializers.Serializer):
         return attrs
 
 
-class CollectionMutationCreateSerializer(serializers.Serializer):
+class CollectionMutationCreateSerializer(
+    CommentsAliasSerializerMixin, serializers.Serializer
+):
     """Validate payloads for programmatic collection creation."""
 
     catchment = serializers.PrimaryKeyRelatedField(
@@ -885,7 +909,7 @@ class CollectionMutationCreateSerializer(serializers.Serializer):
     sources = serializers.PrimaryKeyRelatedField(
         queryset=Source.objects.all(), many=True, required=False, default=list
     )
-    flyer_urls = serializers.ListField(
+    flyer_urls = FlexibleUrlListField(
         child=serializers.URLField(), required=False, default=list
     )
 
@@ -934,12 +958,17 @@ class CollectionMutationCreateSerializer(serializers.Serializer):
         return attrs
 
 
-class CollectionMutationUpdateSerializer(serializers.Serializer):
+class CollectionMutationUpdateSerializer(
+    CommentsAliasSerializerMixin, serializers.Serializer
+):
     """Validate guarded payloads for programmatic in-place collection updates."""
 
-    expected_catchment = serializers.CharField()
-    expected_waste_category = serializers.CharField()
-    expected_collection_system = serializers.CharField()
+    expected_catchment = serializers.CharField(required=False, allow_blank=True)
+    expected_catchment_id = serializers.IntegerField(required=False)
+    expected_waste_category = serializers.CharField(required=False, allow_blank=True)
+    expected_waste_category_id = serializers.IntegerField(required=False)
+    expected_collection_system = serializers.CharField(required=False, allow_blank=True)
+    expected_collection_system_id = serializers.IntegerField(required=False)
     expected_publication_status = serializers.ChoiceField(
         choices=[
             models.Collection.STATUS_PRIVATE,
@@ -972,7 +1001,7 @@ class CollectionMutationUpdateSerializer(serializers.Serializer):
     sources = serializers.PrimaryKeyRelatedField(
         queryset=Source.objects.all(), many=True, required=False
     )
-    flyer_urls = serializers.ListField(child=serializers.URLField(), required=False)
+    flyer_urls = FlexibleUrlListField(child=serializers.URLField(), required=False)
 
     established = serializers.IntegerField(
         required=False, allow_null=True, min_value=1800, max_value=2100
@@ -1007,6 +1036,21 @@ class CollectionMutationUpdateSerializer(serializers.Serializer):
         return normalize_collection_description(value)
 
     def validate(self, attrs):
+        identity_fields = (
+            ("expected_catchment", "expected_catchment_id"),
+            ("expected_waste_category", "expected_waste_category_id"),
+            ("expected_collection_system", "expected_collection_system_id"),
+        )
+        errors = {}
+        for display_field, id_field in identity_fields:
+            display_value = attrs.get(display_field)
+            if display_value == "":
+                display_value = None
+            if display_value is None and attrs.get(id_field) is None:
+                errors[display_field] = "Provide either the display value or the id."
+        if errors:
+            raise serializers.ValidationError(errors)
+
         mutable_fields = {
             "collector",
             "frequency",
@@ -1030,7 +1074,9 @@ class CollectionMutationUpdateSerializer(serializers.Serializer):
         return attrs
 
 
-class CollectionMutationVersionSerializer(serializers.Serializer):
+class CollectionMutationVersionSerializer(
+    CommentsAliasSerializerMixin, serializers.Serializer
+):
     """Validate payloads for creating a new collection version from a predecessor."""
 
     catchment = serializers.PrimaryKeyRelatedField(
@@ -1065,7 +1111,7 @@ class CollectionMutationVersionSerializer(serializers.Serializer):
     sources = serializers.PrimaryKeyRelatedField(
         queryset=Source.objects.all(), many=True, required=False
     )
-    flyer_urls = serializers.ListField(child=serializers.URLField(), required=False)
+    flyer_urls = FlexibleUrlListField(child=serializers.URLField(), required=False)
 
     valid_from = serializers.DateField()
     valid_until = serializers.DateField(required=False, allow_null=True)
