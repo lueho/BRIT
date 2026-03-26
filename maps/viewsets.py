@@ -131,7 +131,7 @@ class NutsRegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         NutsRegion.objects.select_related("borders", "parent")
         .prefetch_related(
             "regionattributevalue_set__attribute",
-            "regionattributetextvalue_set__attribute",
+            "regionattributetextvalue_set__categorical_attribute",
         )
         .all()
     )

@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     Attribute,
     Catchment,
+    CategoricalAttribute,
     GeoDataset,
     Location,
     MapConfiguration,
@@ -17,6 +18,11 @@ from .models import (
 
 @admin.register(Attribute)
 class AttributeModelAdmin(admin.ModelAdmin):
+    search_fields = ["name"]
+
+
+@admin.register(CategoricalAttribute)
+class CategoricalAttributeModelAdmin(admin.ModelAdmin):
     search_fields = ["name"]
 
 
@@ -72,4 +78,4 @@ class RegionAttributeValueModelAdmin(admin.ModelAdmin):
 
 @admin.register(RegionAttributeTextValue)
 class RegionAttributeTextValueModelAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["region", "attribute"]
+    autocomplete_fields = ["region", "categorical_attribute"]

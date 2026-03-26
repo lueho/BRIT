@@ -7,9 +7,11 @@ from maps.models import GeoPolygon, Location
 from ..models import (
     Attribute,
     Catchment,
+    CategoricalAttribute,
     LauRegion,
     NutsRegion,
     Region,
+    RegionAttributeTextValue,
     RegionAttributeValue,
 )
 
@@ -183,6 +185,21 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         self.assertEqual(value.measurement_unit_label, attribute.unit)
         self.assertEqual(value.display_average, value.value)
         self.assertEqual(value.display_standard_deviation, value.standard_deviation)
+
+
+class RegionAttributeTextValueCategoricalAttributeTestCase(TestCase):
+    def test_text_values_use_separate_categorical_attribute_definition(self):
+        region = Region.objects.create(name="Test Region")
+        categorical_attribute = CategoricalAttribute.objects.create(
+            name="Urban rural remoteness"
+        )
+        value = RegionAttributeTextValue.objects.create(
+            region=region,
+            categorical_attribute=categorical_attribute,
+            value="intermediate, close to a city",
+        )
+
+        self.assertEqual(value.categorical_attribute.name, "Urban rural remoteness")
 
 
 class LauCatchmentParentSignalTestCase(TestCase):

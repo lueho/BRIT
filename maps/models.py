@@ -561,6 +561,11 @@ class Attribute(NamedUserCreatedObject):
         return f"{self.name} [{self.unit}]"
 
 
+class CategoricalAttribute(NamedUserCreatedObject):
+    def __str__(self):
+        return self.name
+
+
 class RegionAttributeValue(NumericMeasurementMixin, NamedUserCreatedObject):
     """
     Attaches a value of an attribute class to a region
@@ -585,6 +590,8 @@ class RegionAttributeTextValue(NamedUserCreatedObject):
     """
 
     region = models.ForeignKey(Region, on_delete=models.PROTECT)
-    attribute = models.ForeignKey(Attribute, on_delete=models.PROTECT)
+    categorical_attribute = models.ForeignKey(
+        CategoricalAttribute, on_delete=models.PROTECT
+    )
     date = models.DateField(blank=True, null=True)
     value = models.CharField(max_length=511)

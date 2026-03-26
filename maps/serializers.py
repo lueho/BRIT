@@ -340,7 +340,7 @@ class NutsRegionSummarySerializer(FieldLabelModelSerializer):
     def get_urban_rural_remoteness(obj):
         # Use prefetched data to avoid N+1 queries
         for v in obj.regionattributetextvalue_set.all():
-            if v.attribute.name == "Urban rural remoteness":
+            if v.categorical_attribute.name == "Urban rural remoteness":
                 return v.value
         return None
 

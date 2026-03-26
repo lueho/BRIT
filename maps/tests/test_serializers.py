@@ -6,6 +6,7 @@ from django.urls import NoReverseMatch
 
 from ..models import (
     Attribute,
+    CategoricalAttribute,
     MapConfiguration,
     MapLayerConfiguration,
     MapLayerStyle,
@@ -408,12 +409,12 @@ class NutsRegionSummarySerializerTestCase(TestCase):
             value=123.321,
             date=datetime.date(2019, 1, 1),
         )
-        Attribute.objects.get_or_create(name="Urban rural remoteness", unit="")
+        CategoricalAttribute.objects.get_or_create(name="Urban rural remoteness")
         Attribute.objects.create(name="Population", unit="")
 
     def setUp(self):
         self.region = NutsRegion.objects.get(nuts_id="TE57")
-        self.urban_rural_remoteness = Attribute.objects.get(
+        self.urban_rural_remoteness = CategoricalAttribute.objects.get(
             name="Urban rural remoteness"
         )
 
@@ -450,7 +451,7 @@ class NutsRegionSummarySerializerTestCase(TestCase):
 
     def test_urban_rural_remoteness_method_field_returns_existing_values(self):
         RegionAttributeTextValue.objects.create(
-            attribute=self.urban_rural_remoteness,
+            categorical_attribute=self.urban_rural_remoteness,
             region=self.region,
             value="intermediate, close to a city",
             date=datetime.date.today(),
