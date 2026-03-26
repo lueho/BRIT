@@ -170,6 +170,26 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
             form.fields["standard_deviation"].widget.attrs.get("step"), "any"
         )
 
+    def test_form_defaults_unit_from_property_symbol_match(self):
+        property_obj = MaterialProperty.objects.create(name="Phosphorus", unit="kg/m³")
+        expected_unit = Unit.objects.create(
+            name="Kilogram per cubic metre",
+            symbol="kg/m³",
+        )
+
+        data = QueryDict("", mutable=True)
+        data.update(
+            {
+                "property": property_obj.pk,
+                "average": "12.3",
+                "standard_deviation": "0.5",
+            }
+        )
+        form = MaterialPropertyValueModelForm(data=data)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["unit"], expected_unit)
+
     def test_form_rejects_unit_not_in_allowed_units(self):
         data = QueryDict("", mutable=True)
         data.update(

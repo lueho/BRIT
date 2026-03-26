@@ -294,11 +294,9 @@ class MaterialPropertyValueModelForm(
         if property_obj and not unit:
             unit = property_obj.allowed_units.first()
             if unit is None and property_obj.unit:
-                unit = Unit.objects.filter(
-                    owner=property_obj.owner, name=property_obj.unit
-                ).first()
-            if unit is None and property_obj.unit:
-                unit = Unit.objects.filter(name=property_obj.unit).first()
+                unit = Unit.resolve_legacy_label(
+                    property_obj.unit, owner=property_obj.owner
+                )
             if unit is None:
                 unit = Unit.objects.filter(pk=get_default_unit_pk()).first()
             cleaned_data["unit"] = unit

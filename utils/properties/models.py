@@ -3,6 +3,7 @@ from functools import cached_property
 
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 
 from bibliography.models import Source
 from utils.object_management.models import NamedUserCreatedObject, get_default_owner
@@ -111,6 +112,20 @@ class Unit(NamedUserCreatedObject):
 
     class Meta:
         unique_together = ["owner", "name"]
+
+    @classmethod
+    def resolve_legacy_label(cls, label, owner=None):
+        normalized_label = (label or "").strip()
+        if not normalized_label:
+            return None
+
+        filters = Q(name=normalized_label) | Q(symbol=normalized_label)
+        if owner is not None:
+            unit = cls.objects.filter(owner=owner).filter(filters).first()
+            if unit is not None:
+                return unit
+
+        return cls.objects.filter(filters).first()
 
     @cached_property
     def pint_unit(self):

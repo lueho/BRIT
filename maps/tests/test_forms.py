@@ -198,6 +198,26 @@ class RegionAttributeValueModelFormTestCase(TestCase):
 
         self.assertEqual(cleaned_data["unit"], expected_unit)
 
+    def test_clean_assigns_symbol_match_when_name_differs(self):
+        expected_unit = Unit.objects.create(
+            name="People per square kilometre",
+            symbol="1/km²",
+        )
+
+        form = RegionAttributeValueModelForm()
+        form.cleaned_data = {
+            "region": self.region,
+            "attribute": self.attribute,
+            "unit": None,
+            "date": None,
+            "value": 123.321,
+            "standard_deviation": 1.25,
+        }
+
+        cleaned_data = form.clean()
+
+        self.assertEqual(cleaned_data["unit"], expected_unit)
+
     def test_clean_keeps_unit_empty_when_no_matching_unit_exists(self):
         unresolved_attribute = Attribute.objects.create(name="Area", unit="km²")
 

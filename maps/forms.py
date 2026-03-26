@@ -120,9 +120,7 @@ class RegionAttributeValueModelForm(NumericMeasurementFieldsFormMixin, SimpleMod
         if unit is not None or not attribute or not attribute.unit:
             return cleaned_data
 
-        unit = Unit.objects.filter(owner=attribute.owner, name=attribute.unit).first()
-        if unit is None:
-            unit = Unit.objects.filter(name=attribute.unit).first()
+        unit = Unit.resolve_legacy_label(attribute.unit, owner=attribute.owner)
 
         cleaned_data["unit"] = unit
         return cleaned_data

@@ -1,8 +1,8 @@
 # Property Unification Plan After Phase 3
 
 - **Status**: In progress
-- **Date**: 2026-03-25
-- **Context**: Phase 1 has been implemented as a low-risk convergence step. Shared numeric measurement behavior now lives in `utils.properties`, and the `materials`, `maps`, and waste-collection domains consume that shared behavior where their existing schemas permit it. Since then, Phase 2 has separated categorical maps data from numeric maps data, and Phase 3 has aligned numeric maps definitions with `PropertyBase` without forcing a unit-field migration. The remaining work is to converge definition and value patterns further without forcing all domains into one concrete table design.
+- **Date**: 2026-03-26
+- **Context**: Phase 1 has been implemented as a low-risk convergence step. Shared numeric measurement behavior now lives in `utils.properties`, and the `materials`, `maps`, and waste-collection domains consume that shared behavior where their existing schemas permit it. Since then, Phase 2 has separated categorical maps data from numeric maps data, and Phase 3 has aligned numeric maps definitions with `PropertyBase`. Phase 4 has now started: `RegionAttributeValue.unit` exists as a nullable FK with an initial backfill migration, but maps and cross-app consumers still rely on transitional fallback behavior from `Attribute.unit`. The remaining work is to finish that migration boundary cleanly without forcing all domains into one concrete table design.
 
 ---
 
@@ -26,6 +26,10 @@ Phase 1-3 established shared behavior and shared definition contracts rather tha
   - `Attribute` is now numeric-only in practice
 - **Definition-layer convergence**
   - `Attribute(PropertyBase)` now shares the same abstract definition contract as `MaterialProperty(PropertyBase)` and `Property(PropertyBase)`
+- **Phase 4 foundation already present**
+  - `RegionAttributeValue.unit` exists as a nullable FK to `Unit`
+  - migration `maps/migrations/0008_regionattributevalue_unit.py` already performs an initial backfill from `Attribute.unit`
+  - maps rendering and serializers already prefer value-level units through `measurement_unit_label`
 
 ### 1.2 What remains deliberately unfinished
 
@@ -34,7 +38,7 @@ Phase 1-3 did not attempt to unify storage shapes that still differ materially.
 - **Maps** still stores numeric values as `attribute` + `value`
 - **Materials** still stores numeric values as `property` + `average`
 - **Waste collection** still uses `PropertyValue`-style storage with year-specific specializations
-- **Maps** still stores primary unit metadata on `Attribute`, not on `RegionAttributeValue`
+- **Maps** still retains `Attribute.unit` as a transitional compatibility field
 - **Maps** still keeps text values in `RegionAttributeTextValue`
 - **Materials** still carries basis and analytical-method metadata that do not apply to the other domains
 
@@ -273,6 +277,8 @@ It gives all three quantitative domains the same conceptual contract for:
 
 ## 3.3 Phase 4 — Inventory and introduce value-level unit handling for maps
 
+- **Status**: In progress
+
 ### Goal
 
 Bring `RegionAttributeValue` closer to the common numeric value contract by storing unit at the value level, but only after inventorying current unit strings and all consumers that still depend on `Attribute.unit`.
@@ -294,6 +300,38 @@ Run this phase in two explicit sub-steps.
 3. Backfill `RegionAttributeValue.unit`
 4. Update maps forms, serializers, filters, summary views, and cross-app consumers to prefer `value.unit`
 5. Retain fallback to `attribute.unit` temporarily where data is incomplete or still in transition
+
+### Phase 4a findings completed on 2026-03-26
+
+**Schema and code state**
+
+- `RegionAttributeValue.unit` has already been added in `maps/migrations/0008_regionattributevalue_unit.py`
+- `NumericMeasurementMixin.measurement_unit_label` already prefers `value.unit` and only falls back to the definition-level unit when the FK is empty
+- maps detail rendering and maps summary serializers already consume `measurement_unit_label`, so those paths are structurally ready for value-level units
+
+**Current transitional consumers of `Attribute.unit` or equivalent fallback behavior**
+
+- `maps/forms.py`
+  - `RegionAttributeValueModelForm.clean()` still auto-populates a missing value-level unit from `attribute.unit`
+- `utils/properties/models.py`
+  - `NumericMeasurementMixin.measurement_unit_label` still falls back to the definition-level `unit` field when no value-level unit is set
+- `maps/migrations/0008_regionattributevalue_unit.py`
+  - the backfill still derives units from `attribute.unit`
+- `sources/waste_collection/serializers.py`
+  - map exports consume `rav.measurement_unit_label`, so they still depend on the fallback path until all `RegionAttributeValue.unit` rows are populated
+
+**Current dev data inventory**
+
+- observed `maps_attribute.unit` values: `<blank>`, `1/km²`, `km²`
+- observed value counts are small in the current dev database
+- none of the non-blank current dev `maps_attribute.unit` values matched an existing `Unit` by `name` or `symbol`
+
+**Implications for Phase 4b**
+
+- Phase 4b should not assume the existing `Unit` table is already aligned with maps unit strings
+- deterministic unit resolution should match both `Unit.name` and `Unit.symbol`
+- where no matching `Unit` exists, the migration path must explicitly decide between creating new `Unit` rows, seeding canonical units first, or leaving specific values unresolved for manual cleanup
+- the most important remaining migration boundary is not the presence of the FK itself, but completing backfill and reducing dependence on fallback rendering
 
 ### Why this phase matters
 
@@ -456,7 +494,7 @@ The remaining plan should explicitly avoid the following.
 | **1. Shared behavior** | Shared mixins for models/forms/serializers | Done | None |
 | **2. Maps semantic split** | Separate categorical maps data from quantitative definitions | Done | 1 |
 | **3. Definition convergence** | Numeric maps definition onto `PropertyBase` | Done | 2 |
-| **4. Maps unit migration** | Inventory unit strings and consumers, then add `RegionAttributeValue.unit` + backfill | Medium | 3 recommended |
+| **4. Maps unit migration** | Inventory unit strings and consumers, complete `RegionAttributeValue.unit` backfill, and reduce fallback dependence | Medium | 3 recommended |
 | **5. Optional abstract DB bases** | Shared concrete field base(s) where justified | Medium-High | 4 |
 | **6. Maps provenance decision** | Decide whether to add `sources` to map values | Low-Medium | 4 |
 | **7. Shared services** | Exports, queries, formatting, conversion helpers | Low | 3-6 as needed |
@@ -465,19 +503,19 @@ The remaining plan should explicitly avoid the following.
 
 ## 6. Recommended Next Implementation Step
 
-The next implementation step should be **Phase 4a**.
+The next implementation step should be **Phase 4b**.
 
 Why:
 
-- It prepares the highest-risk remaining schema change with a concrete inventory instead of assumptions
-- It reveals which unit strings can be backfilled automatically and which require explicit normalization
-- It identifies cross-app consumers that must be migrated together with maps
+- the inventory work is now concrete enough to stop planning and finish the migration boundary
+- the FK and initial backfill already exist, so the remaining risk is incomplete data alignment and fallback dependence rather than missing schema
+- the current dev inventory shows that maps unit strings are not yet aligned with existing `Unit` rows, so Phase 4b must make that decision explicit instead of relying on accidental matches
 
-Concretely, Phase 4a should answer these questions in code and data:
+Concretely, the next Phase 4b step should answer these questions in code and data:
 
-- Which code paths still depend on `Attribute.unit` or `rav.attribute.unit`?
-- Which current `maps_attribute.unit` values resolve directly to `Unit`, and which need normalization or manual mapping?
-- Which cross-app serializers, exports, or summaries need to move to value-level units together with the maps app?
+- Should unresolved maps units create canonical `Unit` rows automatically, or should canonical units be seeded first and unresolved values left visible for manual cleanup?
+- Which remaining maps values still have `unit_id IS NULL`, and can they be backfilled deterministically from the current `Attribute.unit` labels?
+- Which fallback consumers should remain temporarily, and which should switch to strict value-level-unit behavior once backfill coverage is acceptable?
 
 ---
 

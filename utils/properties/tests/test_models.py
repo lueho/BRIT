@@ -2,6 +2,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from utils.object_management.models import get_default_owner
@@ -47,6 +48,28 @@ class UnitModelConversionTestCase(TestCase):
     def test_pint_unit_is_none_when_symbol_is_blank(self):
         unit = Unit.objects.create(name="No symbol", symbol="")
         self.assertIsNone(unit.pint_unit)
+
+    def test_resolve_legacy_label_matches_symbol(self):
+        expected_unit = Unit.objects.create(
+            name="People per square kilometre", symbol="1/km²"
+        )
+
+        resolved_unit = Unit.resolve_legacy_label("1/km²")
+
+        self.assertEqual(resolved_unit, expected_unit)
+
+    def test_resolve_legacy_label_prefers_owner_scoped_match(self):
+        owner = get_user_model().objects.create_user(username="unit-owner")
+        Unit.objects.create(name="Global unit", symbol="kg")
+        expected_unit = Unit.objects.create(
+            owner=owner,
+            name="Owner kilogram",
+            symbol="kg",
+        )
+
+        resolved_unit = Unit.resolve_legacy_label("kg", owner=owner)
+
+        self.assertEqual(resolved_unit, expected_unit)
 
     def test_convert_raises_when_pint_registry_is_unavailable(self):
         source = Unit.objects.create(name="Kilogram", symbol="kg")
