@@ -2,7 +2,7 @@
 
 - **Status**: Proposed
 - **Date**: 2026-03-25
-- **Context**: Phase 1 has been implemented as a low-risk convergence step. Shared numeric measurement behavior now lives in `utils.properties`, and the `materials`, `maps`, and waste-collection domains consume that shared behavior where their existing schemas permit it. The remaining work is to converge definition and value patterns further without forcing all domains into one concrete table design.
+- **Context**: Phase 1 has been implemented as a low-risk convergence step. Shared numeric measurement behavior now lives in `utils.properties`, and the `materials`, `maps`, and waste-collection domains consume that shared behavior where their existing schemas permit it. The remaining work is to converge definition and value patterns further without forcing all domains into one concrete table design. In maps, that convergence should start by separating categorical data from quantitative measurements so only numeric definitions participate in the shared measurement architecture.
 
 ---
 
@@ -27,6 +27,7 @@ Phase 1 established shared behavior rather than shared database tables.
 Phase 1 did not attempt to unify storage shapes that still differ materially.
 
 - **Maps** still stores numeric values as `attribute` + `value`
+- **Maps** still uses `Attribute` as the definition concept for both quantitative indicators and categorical labels
 - **Materials** still stores numeric values as `property` + `average`
 - **Waste collection** still uses `PropertyValue`-style storage with year-specific specializations
 - **Maps** still stores unit metadata on `Attribute`, not on `RegionAttributeValue`
@@ -43,11 +44,13 @@ The target architecture is:
 
 - **shared abstract models and mixins** in `utils.properties`
 - **domain-specific concrete models** in each app
+- **a separate categorical maps path** outside the shared numeric measurement architecture
 
 The target architecture is not:
 
 - one universal `Property` table for all definition records
 - one universal `PropertyValue` table for all numeric and text values
+- one shared maps definition concept for both quantitative measurements and categorical labels
 
 ### 2.1 Naming conventions
 
@@ -70,7 +73,7 @@ A single concrete property/value schema would immediately run into domain-specif
 
 - **Materials** needs `basis_component` and `analytical_method`
 - **Waste collection** needs `year`, `is_derived`, and aggregated variants
-- **Maps** has both numeric and text values and currently uses `date` instead of `year`
+- **Maps** currently mixes quantitative indicators with categorical labels and uses `date` instead of `year`; the categorical side should be separated before deeper numeric convergence
 
 Trying to erase those differences too early would make the code less explicit and increase migration risk.
 
@@ -90,9 +93,15 @@ flowchart LR
     end
 
     subgraph maps["maps"]
-        A["Attribute"]
-        RAV["RegionAttributeValue"]
-        RATV["RegionAttributeTextValue"]
+        subgraph maps_numeric["numeric maps measurements"]
+            A["Attribute\nnumeric-only definition"]
+            RAV["RegionAttributeValue"]
+        end
+
+        subgraph maps_categorical["categorical maps data"]
+            MCD["Categorical maps definition\nseparate concept"]
+            RATV["RegionAttributeTextValue"]
+        end
     end
 
     subgraph waste["waste collection / shared property domain"]
@@ -110,7 +119,7 @@ flowchart LR
 
     MP --> MPV
     A --> RAV
-    A --> RATV
+    MCD --> RATV
     P --> CPV
     P --> ACPV
 
@@ -137,8 +146,12 @@ flowchart LR
 
 Key characteristics of the intended end-state:
 
+- **Categorical maps data is separate from numeric measurement architecture**
+  - text or label-style regional data should not share the same definition concept as quantitative map measurements
 - **Shared abstract models and mixins, app-owned concrete models**
   - `utils.properties` provides shared contracts and behavior, while each domain keeps its own concrete tables
+- **Numeric maps data can then converge honestly with other numeric domains**
+  - once maps definitions are quantitative-only, they can share the same abstract contracts as materials and waste collection without dragging categorical semantics along
 - **Per-value unit ownership for numeric values**
   - numeric value records point to `Unit`, rather than relying only on definition-level unit metadata
 - **Text values stay separate**
@@ -150,7 +163,49 @@ Key characteristics of the intended end-state:
 
 ## 3. Remaining Plan
 
-## 3.1 Phase 2 — Align definition model inheritance
+## 3.1 Phase 2 — Separate categorical maps data from quantitative definitions
+
+### Goal
+
+Make maps categorical data a separate concept from numeric measurement data.
+
+### Proposed change
+
+Introduce a distinct categorical definition/value path in maps so numeric map measurements no longer share the same definition concept with text labels.
+
+Desired end state:
+
+- `Attribute` becomes explicitly numeric-only, or is replaced by a clearly quantitative maps definition model
+- `RegionAttributeValue` remains the numeric value record for regional measurements
+- `RegionAttributeTextValue` points to a separate categorical definition model rather than a numeric measurement definition
+
+### Scope
+
+- Identify all maps views, forms, serializers, and filters that currently treat `Attribute` as both numeric and categorical
+- Introduce or migrate to a dedicated categorical definition model for text values
+- Preserve current maps behavior and URLs where possible while making the semantic split explicit
+
+### Why this phase matters
+
+This removes the main conceptual conflation in maps.
+
+After this split, the numeric side of maps can be treated equivalently to the numeric measurement models in other apps without dragging categorical semantics into the shared abstraction layer.
+
+### Risks
+
+- Medium
+- Maps CRUD paths may assume one shared definition queryset or foreign key
+- Existing filters or summaries may combine numeric and text attributes implicitly
+
+### Exit criteria
+
+- Categorical maps data no longer depends on the same definition concept as numeric map measurements
+- Numeric maps definitions are clearly quantitative-only
+- maps tests continue to pass
+
+---
+
+## 3.2 Phase 3 — Align numeric definition model inheritance
 
 ### Goal
 
@@ -158,25 +213,25 @@ Make `PropertyBase` the clear shared contract for domain-owned quantitative defi
 
 ### Proposed change
 
-Keep `utils.properties.models.PropertyBase` as the canonical abstract base for domain-specific quantitative definitions and move `maps.Attribute` onto that contract.
+After the categorical split, keep `utils.properties.models.PropertyBase` as the canonical abstract base for domain-specific quantitative definitions and move the numeric maps definition model onto that contract.
 
 Desired end state:
 
 - `MaterialProperty(PropertyBase)`
-- `Attribute(PropertyBase)`
+- the numeric maps definition model, currently `Attribute`, inherits `PropertyBase`
 - `Property(PropertyBase)` remains the generic concrete definition used directly by waste collection
 
 ### Scope
 
-- Update `maps.models.Attribute` to inherit from `PropertyBase`
+- Update the numeric maps definition model to inherit from `PropertyBase`
 - Preserve current behavior and URLs in the maps app
-- Keep `Attribute` as a maps-owned concrete model rather than replacing it with `Property`
+- Keep the maps-owned concrete model rather than replacing it with `Property`
 
 ### Why this phase matters
 
-This aligns the definition layer first without forcing cross-app table reuse.
+Once categorical semantics are no longer mixed in, definition-layer convergence becomes semantically clean instead of overloaded.
 
-It gives all three domains the same conceptual contract for:
+It gives all three quantitative domains the same conceptual contract for:
 
 - `name`
 - `description`
@@ -191,13 +246,13 @@ It gives all three domains the same conceptual contract for:
 
 ### Exit criteria
 
-- `Attribute` inherits `PropertyBase`
+- the numeric maps definition model inherits `PropertyBase`
 - maps tests continue to pass
 - no schema-level unit migration is bundled into this phase
 
 ---
 
-## 3.2 Phase 3 — Introduce value-level unit handling for maps
+## 3.3 Phase 4 — Introduce value-level unit handling for maps
 
 ### Goal
 
@@ -236,11 +291,11 @@ Once maps has value-level units, cross-domain numeric handling becomes much more
 
 ---
 
-## 3.3 Phase 4 — Evaluate a shared abstract numeric value base
+## 3.4 Phase 5 — Evaluate a shared abstract numeric value base
 
 ### Goal
 
-After phase 3, evaluate whether the field-level convergence is now strong enough to introduce a shared abstract model for numeric value fields in `utils.properties`.
+After phase 4, evaluate whether the field-level convergence is now strong enough to introduce a shared abstract model for numeric value fields in `utils.properties`.
 
 ### Proposed change
 
@@ -285,7 +340,7 @@ If the result would require awkward renames or forced field shapes, keep the sha
 
 ---
 
-## 3.4 Phase 5 — Clarify provenance expectations for maps values
+## 3.5 Phase 6 — Clarify provenance expectations for maps values
 
 ### Goal
 
@@ -319,7 +374,7 @@ If not added:
 
 ---
 
-## 3.5 Phase 6 — Cross-domain services and queries
+## 3.6 Phase 7 — Cross-domain services and queries
 
 ### Goal
 
@@ -354,6 +409,8 @@ Once the data contracts are aligned enough, introduce shared services for cross-
 
 The remaining plan should explicitly avoid the following.
 
+- **Do not force categorical map data into the numeric measurement architecture**
+  - text or label-style regional data should not be modeled as if it were just another numeric property/value variant
 - **Do not merge numeric and text values into one table**
   - `RegionAttributeTextValue` should remain separate unless there is a compelling domain reason to change it
 - **Do not remove materials-specific semantics**
@@ -370,11 +427,12 @@ The remaining plan should explicitly avoid the following.
 | Phase | Scope | Risk | Depends on |
 |---|---|---|---|
 | **1. Shared behavior** | Shared mixins for models/forms/serializers | Done | None |
-| **2. Definition convergence** | `Attribute` onto `PropertyBase` | Low-Medium | 1 |
-| **3. Maps value-level units** | `RegionAttributeValue.unit` + backfill | Medium | 2 recommended |
-| **4. Optional abstract DB bases** | Shared concrete field base(s) where justified | Medium-High | 3 |
-| **5. Maps provenance decision** | Decide whether to add `sources` to map values | Low-Medium | 3 |
-| **6. Shared services** | Exports, queries, formatting, conversion helpers | Low | 2-5 as needed |
+| **2. Maps semantic split** | Separate categorical maps data from quantitative definitions | Medium | 1 |
+| **3. Definition convergence** | Numeric maps definition onto `PropertyBase` | Low-Medium | 2 |
+| **4. Maps value-level units** | `RegionAttributeValue.unit` + backfill | Medium | 3 recommended |
+| **5. Optional abstract DB bases** | Shared concrete field base(s) where justified | Medium-High | 4 |
+| **6. Maps provenance decision** | Decide whether to add `sources` to map values | Low-Medium | 4 |
+| **7. Shared services** | Exports, queries, formatting, conversion helpers | Low | 3-6 as needed |
 
 ---
 
@@ -384,15 +442,15 @@ The next implementation step should be **Phase 2**.
 
 Why:
 
-- It is smaller and safer than a maps unit migration
-- It aligns the definition layer before changing value storage
-- It continues the same phase-1 strategy: strengthen shared contracts first, then converge storage carefully
+- It removes the main semantic ambiguity in maps before any deeper unification
+- It makes later numeric convergence conceptually honest instead of overloading one definition concept
+- It continues the same phase-1 strategy: clarify shared contracts first, then converge storage carefully
 
 Concretely, Phase 2 should answer these questions in code and tests:
 
-- Can `Attribute` cleanly inherit from `PropertyBase` without breaking maps semantics?
-- Which maps tests encode assumptions about `Attribute` today?
-- Should `Attribute.unit` remain a simple inherited field for one more phase while value-level units are still pending?
+- Should `Attribute` remain the numeric name, with a new categorical definition model introduced beside it?
+- Which maps views, forms, serializers, and filters currently assume text and numeric records share the same definition source?
+- Can `RegionAttributeTextValue` move to a dedicated categorical definition path without breaking user-facing maps workflows?
 
 ---
 

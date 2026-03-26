@@ -11,9 +11,15 @@ flowchart LR
     end
 
     subgraph maps["maps"]
-        A["Attribute"]
-        RAV["RegionAttributeValue"]
-        RATV["RegionAttributeTextValue"]
+        subgraph maps_numeric["numeric maps measurements"]
+            A["Attribute\nnumeric-only definition"]
+            RAV["RegionAttributeValue"]
+        end
+
+        subgraph maps_categorical["categorical maps data"]
+            MCD["Categorical maps definition\nseparate concept"]
+            RATV["RegionAttributeTextValue"]
+        end
     end
 
     subgraph waste["waste collection / shared property domain"]
@@ -31,7 +37,7 @@ flowchart LR
 
     MP --> MPV
     A --> RAV
-    A --> RATV
+    MCD --> RATV
     P --> CPV
     P --> ACPV
 
