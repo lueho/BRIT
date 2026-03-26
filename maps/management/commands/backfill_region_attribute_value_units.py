@@ -1,6 +1,6 @@
 from collections import Counter
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 from maps.models import RegionAttributeValue
 from utils.properties.models import Unit
@@ -20,10 +20,16 @@ class Command(BaseCommand):
             action="store_true",
             help="Create owner-scoped Unit rows when no matching unit can be resolved.",
         )
+        parser.add_argument(
+            "--fail-on-unresolved",
+            action="store_true",
+            help="Raise a command error when unresolved labels remain after processing.",
+        )
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
         create_missing_units = options["create_missing_units"]
+        fail_on_unresolved = options["fail_on_unresolved"]
         stats = {
             "values_examined": 0,
             "values_backfilled": 0,
@@ -101,3 +107,8 @@ class Command(BaseCommand):
             self.stdout.write("Unresolved labels:")
             for label, count in unresolved_labels.items():
                 self.stdout.write(f"- {label}: {count}")
+
+        if fail_on_unresolved and stats["values_unresolved"]:
+            raise CommandError(
+                f"{stats['values_unresolved']} RegionAttributeValue rows remain unresolved."
+            )

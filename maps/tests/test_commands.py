@@ -1,6 +1,7 @@
 import io
 
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase
 
 from utils.properties.models import Unit
@@ -72,3 +73,20 @@ class RegionAttributeValueUnitBackfillCommandTests(TestCase):
         self.assertEqual(value.unit.owner, attribute.owner)
         self.assertIn("values_backfilled: 1", out.getvalue())
         self.assertIn("units_created: 1", out.getvalue())
+
+    def test_command_can_fail_when_unresolved_values_remain(self):
+        region = Region.objects.create(name="Unresolved Region")
+        attribute = Attribute.objects.create(name="Area", unit="km²")
+        RegionAttributeValue.objects.create(
+            region=region,
+            attribute=attribute,
+            value=123.321,
+        )
+
+        with self.assertRaisesMessage(
+            CommandError,
+            "1 RegionAttributeValue rows remain unresolved.",
+        ):
+            call_command(
+                "backfill_region_attribute_value_units", fail_on_unresolved=True
+            )
