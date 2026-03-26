@@ -27,6 +27,7 @@ from utils.forms import (
     UserCreatedObjectFormMixin,
 )
 from utils.properties.forms import NumericMeasurementFieldsFormMixin
+from utils.properties.models import Unit
 
 from .models import (
     Attribute,
@@ -109,12 +110,28 @@ class RegionAttributeValueModelForm(NumericMeasurementFieldsFormMixin, SimpleMod
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["region"].queryset = Region.objects.all()
+        self.fields["unit"].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        attribute = cleaned_data.get("attribute")
+        unit = cleaned_data.get("unit")
+
+        if unit is not None or not attribute or not attribute.unit:
+            return cleaned_data
+
+        unit = Unit.objects.filter(owner=attribute.owner, name=attribute.unit).first()
+        if unit is None:
+            unit = Unit.objects.filter(name=attribute.unit).first()
+
+        cleaned_data["unit"] = unit
+        return cleaned_data
 
     date = DateField(widget=DateInput(attrs={"type": "date"}))
 
     class Meta:
         model = RegionAttributeValue
-        fields = ("region", "attribute", "date", "value", "standard_deviation")
+        fields = ("region", "attribute", "unit", "date", "value", "standard_deviation")
 
 
 class RegionAttributeValueModalModelForm(

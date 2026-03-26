@@ -3,7 +3,7 @@ from django.db.models import QuerySet
 from django.test import TestCase
 
 from maps.models import GeoPolygon, Location
-from utils.properties.models import PropertyBase
+from utils.properties.models import PropertyBase, Unit
 
 from ..models import (
     Attribute,
@@ -186,6 +186,19 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         self.assertEqual(value.measurement_unit_label, attribute.unit)
         self.assertEqual(value.display_average, value.value)
         self.assertEqual(value.display_standard_deviation, value.standard_deviation)
+
+    def test_value_level_unit_takes_precedence_over_attribute_unit(self):
+        region = Region.objects.create(name="Test Region")
+        attribute = Attribute.objects.create(name="Population density", unit="1/km²")
+        unit = Unit.objects.create(name="1/km²", symbol="1/km²")
+        value = RegionAttributeValue.objects.create(
+            region=region,
+            attribute=attribute,
+            unit=unit,
+            value=123.321,
+        )
+
+        self.assertEqual(value.measurement_unit_label, unit.name)
 
 
 class AttributePropertyBaseContractTestCase(TestCase):

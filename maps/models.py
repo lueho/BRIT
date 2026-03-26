@@ -16,7 +16,7 @@ from utils.object_management.models import (
     NamedUserCreatedObject,
     UserCreatedObjectQuerySet,
 )
-from utils.properties.models import NumericMeasurementMixin, PropertyBase
+from utils.properties.models import NumericMeasurementMixin, PropertyBase, Unit
 
 TYPES = (
     ("administrative", "administrative"),
@@ -576,6 +576,7 @@ class RegionAttributeValue(NumericMeasurementMixin, NamedUserCreatedObject):
 
     region = models.ForeignKey(Region, on_delete=models.PROTECT)
     attribute = models.ForeignKey(Attribute, on_delete=models.PROTECT)
+    unit = models.ForeignKey(Unit, on_delete=models.PROTECT, blank=True, null=True)
     date = models.DateField(blank=True, null=True)
     value = models.FloatField(default=0.0)
     standard_deviation = models.FloatField(default=0.0, blank=True, null=True)

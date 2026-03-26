@@ -2,6 +2,8 @@ from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.forms import formset_factory
 from django.test import TestCase
 
+from utils.properties.models import Unit
+
 from ..forms import (
     RegionAttributeValueModelForm,
     RegionMergeForm,
@@ -178,3 +180,37 @@ class RegionAttributeValueModelFormTestCase(TestCase):
         self.assertEqual(
             form.fields["standard_deviation"].widget.attrs.get("step"), "any"
         )
+
+    def test_clean_assigns_matching_unit_from_attribute_when_available(self):
+        expected_unit = Unit.objects.create(name="1/km²", symbol="1/km²")
+
+        form = RegionAttributeValueModelForm()
+        form.cleaned_data = {
+            "region": self.region,
+            "attribute": self.attribute,
+            "unit": None,
+            "date": None,
+            "value": 123.321,
+            "standard_deviation": 1.25,
+        }
+
+        cleaned_data = form.clean()
+
+        self.assertEqual(cleaned_data["unit"], expected_unit)
+
+    def test_clean_keeps_unit_empty_when_no_matching_unit_exists(self):
+        unresolved_attribute = Attribute.objects.create(name="Area", unit="km²")
+
+        form = RegionAttributeValueModelForm()
+        form.cleaned_data = {
+            "region": self.region,
+            "attribute": unresolved_attribute,
+            "unit": None,
+            "date": None,
+            "value": 123.321,
+            "standard_deviation": 1.25,
+        }
+
+        cleaned_data = form.clean()
+
+        self.assertIsNone(cleaned_data["unit"])

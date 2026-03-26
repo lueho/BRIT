@@ -73,7 +73,7 @@ class RegionModelAdmin(admin.ModelAdmin):
 
 @admin.register(RegionAttributeValue)
 class RegionAttributeValueModelAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["region", "attribute"]
+    autocomplete_fields = ["region", "attribute", "unit"]
 
 
 @admin.register(RegionAttributeTextValue)

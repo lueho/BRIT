@@ -8,6 +8,7 @@ from factory.django import mute_signals
 
 from maps.models import Attribute, LauRegion, NutsRegion, RegionAttributeValue
 from materials.models import MaterialCategory
+from utils.properties.models import Unit
 
 from ..models import (
     REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
@@ -376,10 +377,26 @@ class CollectionFlatSerializerTestCase(TestCase):
         self.assertIn("population_2020", data)
         self.assertEqual(data["population_2020"], 123321)
         self.assertIn("population_2020_unit", data)
+        self.assertEqual(data["population_2020_unit"], "")
         self.assertIn("population_density_2020", data)
         self.assertEqual(data["population_density_2020"], 123.5)
         self.assertIn("population_density_2020_unit", data)
         self.assertEqual(data["population_density_2020_unit"], "1/km")
+
+    def test_region_attribute_values_export_explicit_value_level_unit_when_present(
+        self,
+    ):
+        explicit_unit = Unit.objects.create(name="1/km²", symbol="1/km²")
+        density_value = RegionAttributeValue.objects.get(
+            attribute__name="Population density"
+        )
+        density_value.unit = explicit_unit
+        density_value.save(update_fields=["unit"])
+
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        data = serializer.data
+
+        self.assertEqual(data["population_density_2020_unit"], "1/km²")
 
     def test_newline_characters_are_replaced_with_semicolons_in_comments(self):
         self.collection_nuts.description = (
