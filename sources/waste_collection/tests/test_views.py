@@ -32,6 +32,7 @@ from maps.models import (
     NutsRegion,
     Region,
     RegionAttributeValue,
+    RegionProperty,
 )
 from materials.models import (
     Material,
@@ -4189,9 +4190,9 @@ class WasteAtlasMapViewsTestCase(TestCase):
 class WasteAtlasPopulationViewSetTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        Property.objects.create(name="Atlas population filler 1", unit="cap")
-        Property.objects.create(name="Atlas population filler 2", unit="cap")
-        cls.population_attribute = Property.objects.create(
+        RegionProperty.objects.create(name="Atlas population filler 1", unit="cap")
+        RegionProperty.objects.create(name="Atlas population filler 2", unit="cap")
+        cls.population_attribute = RegionProperty.objects.create(
             name="Population [atlas population filter test]",
             unit="cap",
         )
@@ -5367,7 +5368,7 @@ class DerivedValuesTestCase(TestCase):
         )
         cls.unit_specific = Unit.objects.create(name="kg/(cap.*a) [test]")
         cls.unit_total = Unit.objects.create(name="Mg/a [test]")
-        cls.population_attribute = Property.objects.create(
+        cls.population_attribute = RegionProperty.objects.create(
             name="Population [test]",
             unit="cap",
         )

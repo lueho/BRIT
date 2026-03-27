@@ -477,8 +477,8 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
             for attr_name in region_attributes:
                 col_prefix = attr_name.lower().replace(" ", "_")
                 rav_qs = (
-                    region.regionattributevalue_set.filter(attribute__name=attr_name)
-                    .select_related("attribute")
+                    region.regionattributevalue_set.filter(property__name=attr_name)
+                    .select_related("property", "unit")
                     .order_by("date")
                 )
                 for rav in rav_qs:

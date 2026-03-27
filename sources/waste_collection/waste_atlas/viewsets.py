@@ -1,5 +1,6 @@
 import json
 
+from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import (
     Case,
@@ -18,7 +19,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from maps.db_functions import SimplifyPreserveTopology
-from maps.models import LauRegion, NutsRegion, RegionAttributeValue
+from maps.models import LauRegion, NutsRegion, RegionAttributeValue, RegionProperty
 from sources.waste_collection.derived_values import (
     convert_total_to_specific,
     get_derived_property_config,
@@ -84,12 +85,49 @@ POPULATION_ATTRIBUTE_ID = 3
 POPULATION_DENSITY_ATTRIBUTE_ID = 2
 
 
+def _resolve_property_id_by_name(name_setting, default_name):
+    target_name = getattr(settings, name_setting, default_name)
+    matches = RegionProperty.objects.filter(name=target_name)
+    if matches.count() == 1:
+        return matches.values_list("pk", flat=True).first()
+
+    raise ImproperlyConfigured(
+        f"Could not unambiguously resolve property named '{target_name}'."
+    )
+
+
+def _resolve_property_id_from_settings(id_setting, name_setting, default_name):
+    configured_id = getattr(settings, id_setting, None)
+    if configured_id is not None:
+        if RegionProperty.objects.filter(pk=configured_id).exists():
+            return configured_id
+        raise ImproperlyConfigured(
+            f"{id_setting}={configured_id} does not exist for property '{default_name}'."
+        )
+
+    return _resolve_property_id_by_name(name_setting, default_name)
+
+
 def _resolved_population_attribute_id():
     """Return the configured population attribute ID with a legacy fallback."""
     try:
         return get_derived_property_config().population_attribute_id
     except ImproperlyConfigured:
-        return POPULATION_ATTRIBUTE_ID
+        return _resolve_property_id_by_name(
+            "SOILCOM_POPULATION_ATTRIBUTE_NAME",
+            "Population",
+        )
+
+
+def _resolved_population_density_attribute_id():
+    try:
+        return _resolve_property_id_from_settings(
+            "SOILCOM_POPULATION_DENSITY_ATTRIBUTE_ID",
+            "SOILCOM_POPULATION_DENSITY_ATTRIBUTE_NAME",
+            "Population density",
+        )
+    except ImproperlyConfigured:
+        return None
 
 
 def _parse_country_year(request):
@@ -146,6 +184,10 @@ def _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path=""):
             }
         )
     return qs.filter(prefix_q)
+
+
+def _build_feature_collection(features):
+    return {"type": "FeatureCollection", "features": features}
 
 
 def _filter_by_waste_categories(queryset, categories):
@@ -1089,7 +1131,7 @@ def _amounts_for_2024(
     pop_qs = (
         RegionAttributeValue.objects.filter(
             region__catchment__id__in=list(total_by_catchment.keys()),
-            attribute_id=_resolved_population_attribute_id(),
+            property_id=_resolved_population_attribute_id(),
         )
         .order_by("region_id", "-date")
         .distinct("region_id")
@@ -1113,10 +1155,6 @@ def _amounts_for_2024(
     if include_metadata:
         return result, value_sources, {}
     return result
-
-
-def _build_feature_collection(features):
-    return {"type": "FeatureCollection", "features": features}
 
 
 def _get_biowaste_acpv_outline_geojson(country, year, nuts_prefixes=()):
@@ -1328,7 +1366,7 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=()):
             pop_qs = (
                 RegionAttributeValue.objects.filter(
                     region__catchment__id__in=list(total_by_catchment.keys()),
-                    attribute_id=_resolved_population_attribute_id(),
+                    property_id=_resolved_population_attribute_id(),
                 )
                 .order_by("region_id", "-date")
                 .distinct("region_id")
@@ -2037,13 +2075,13 @@ class CatchmentPopulationViewSet(viewsets.ViewSet):
         # Subqueries for population and population density
         pop_sq = RegionAttributeValue.objects.filter(
             region_id=OuterRef("region_id"),
-            attribute_id=population_attribute_id,
+            property_id=population_attribute_id,
             date__year=year,
         ).values("value")[:1]
 
         density_sq = RegionAttributeValue.objects.filter(
             region_id=OuterRef("region_id"),
-            attribute_id=POPULATION_DENSITY_ATTRIBUTE_ID,
+            property_id=_resolved_population_density_attribute_id(),
             date__year=year,
         ).values("value")[:1]
 

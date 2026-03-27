@@ -19,7 +19,7 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 
-from maps.models import Attribute, RegionAttributeValue
+from maps.models import RegionAttributeValue, RegionProperty
 from utils.object_management.models import get_default_owner
 from utils.properties.models import Property, Unit
 
@@ -152,7 +152,7 @@ def get_derived_property_config():
         label="total waste property",
     )
     population_attribute_id = _resolve_named_record_id(
-        model=Attribute,
+        model=RegionProperty,
         id_setting="SOILCOM_POPULATION_ATTRIBUTE_ID",
         name_setting="SOILCOM_POPULATION_ATTRIBUTE_NAME",
         default_name=_DEFAULT_POPULATION_ATTRIBUTE_NAME,
@@ -210,6 +210,15 @@ def clear_derived_value_config_cache():
     _counterpart_mapping.cache_clear()
 
 
+@lru_cache(maxsize=1)
+def _counterpart_mapping():
+    cfg = get_derived_value_config()
+    return {
+        cfg.specific_property_id: (cfg.total_property_id, cfg.total_unit_id),
+        cfg.total_property_id: (cfg.specific_property_id, cfg.specific_unit_id),
+    }
+
+
 def get_convertible_property_ids():
     """Return property IDs for CPVs that can be converted to counterparts."""
     cfg = get_derived_property_config()
@@ -219,15 +228,6 @@ def get_convertible_property_ids():
 def is_convertible_property(property_id):
     """Return whether the given property ID has a derived counterpart mapping."""
     return property_id in get_convertible_property_ids()
-
-
-@lru_cache(maxsize=1)
-def _counterpart_mapping():
-    cfg = get_derived_value_config()
-    return {
-        cfg.specific_property_id: (cfg.total_property_id, cfg.total_unit_id),
-        cfg.total_property_id: (cfg.specific_property_id, cfg.specific_unit_id),
-    }
 
 
 def get_population_for_collection(collection, year=None):
@@ -244,16 +244,18 @@ def get_population_for_collection(collection, year=None):
 
     qs = RegionAttributeValue.objects.filter(
         region_id=region_id,
-        attribute_id=cfg.population_attribute_id,
+        property_id=cfg.population_attribute_id,
     )
-    if not qs.exists():
-        return None
 
     if year:
-        # Prefer value for the exact year, fall back to most recent
-        exact = qs.filter(date__year=year).first()
-        if exact:
-            return exact.value
+        exact = (
+            qs.filter(date__year=year)
+            .order_by("-date")
+            .values_list("value", flat=True)
+            .first()
+        )
+        if exact is not None:
+            return exact
 
     return qs.order_by("-date").values_list("value", flat=True).first()
 

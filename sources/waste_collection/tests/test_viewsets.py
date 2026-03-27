@@ -8,7 +8,13 @@ from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 
 from bibliography.models import Source
-from maps.models import Attribute, GeoPolygon, NutsRegion, Region, RegionAttributeValue
+from maps.models import (
+    GeoPolygon,
+    NutsRegion,
+    Region,
+    RegionAttributeValue,
+    RegionProperty,
+)
 from materials.models import Material
 from sources.waste_collection.derived_values import clear_derived_value_config_cache
 from sources.waste_collection.importers import CollectionImporter
@@ -1824,7 +1830,7 @@ class GreenWasteCollectionAmountViewSetTests(APITestCase):
         )
         cls.specific_unit = Unit.objects.create(name="kg/(cap.*a) [green-atlas-test]")
         cls.total_unit = Unit.objects.create(name="Mg/a [green-atlas-test]")
-        cls.population_attribute = Attribute.objects.create(
+        cls.population_attribute = RegionProperty.objects.create(
             name="Population [green-atlas-test]",
             unit="cap",
         )
@@ -1950,7 +1956,7 @@ class GreenWasteCollectionAmountViewSetTests(APITestCase):
         RegionAttributeValue.objects.create(
             name="Population GW Amount",
             region=cls.region,
-            attribute=cls.population_attribute,
+            property=cls.population_attribute,
             date=date(2024, 1, 1),
             value=1000,
         )
@@ -2188,7 +2194,7 @@ class OrganicAmountViewSetTests(APITestCase):
         )
         cls.specific_unit = Unit.objects.create(name="kg/(cap.*a) [organic-atlas-test]")
         cls.total_unit = Unit.objects.create(name="Mg/a [organic-atlas-test]")
-        cls.population_attribute = Attribute.objects.create(
+        cls.population_attribute = RegionProperty.objects.create(
             name="Population [organic-atlas-test]",
             unit="cap",
         )

@@ -5,6 +5,7 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from maps.models import GeoPolygon, Region, RegionProperty
 from sources.waste_collection.derived_values import clear_derived_value_config_cache
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
@@ -14,7 +15,6 @@ from sources.waste_collection.models import (
     CollectionSystem,
     WasteCategory,
 )
-from maps.models import Attribute, GeoPolygon, Region
 from utils.properties.models import Property, Unit
 
 
@@ -50,7 +50,7 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
         )
         cls.specific_unit = Unit.objects.create(name="kg/(cap.*a) [bio-atlas-test]")
         cls.total_unit = Unit.objects.create(name="Mg/a [bio-atlas-test]")
-        cls.population_attribute = Attribute.objects.create(
+        cls.population_attribute = RegionProperty.objects.create(
             name="Population [bio-atlas-test]",
             unit="cap",
         )

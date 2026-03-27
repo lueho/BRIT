@@ -7,7 +7,7 @@ from django.urls import reverse
 from factory.django import mute_signals
 
 from distributions.models import TemporalDistribution, Timestep
-from maps.models import Attribute, LauRegion, NutsRegion, RegionAttributeValue
+from maps.models import LauRegion, NutsRegion, RegionAttributeValue, RegionProperty
 from materials.models import MaterialCategory
 from utils.properties.models import Unit
 
@@ -237,19 +237,19 @@ class CollectionFlatSerializerTestCase(TestCase):
         nutsregion = NutsRegion.objects.create(
             name="Hamburg", country="DE", nuts_id="DE600"
         )
-        population = Attribute.objects.create(name="Population", unit="")
-        population_density = Attribute.objects.create(
+        population = RegionProperty.objects.create(name="Population", unit="")
+        population_density = RegionProperty.objects.create(
             name="Population density", unit="1/km"
         )
         RegionAttributeValue.objects.create(
             region=nutsregion.region_ptr,
-            attribute=population,
+            property=population,
             date=date(2020, 1, 1),
             value=123321,
         )
         RegionAttributeValue.objects.create(
             region=nutsregion.region_ptr,
-            attribute=population_density,
+            property=population_density,
             date=date(2020, 1, 1),
             value=123.5,
         )
@@ -390,7 +390,7 @@ class CollectionFlatSerializerTestCase(TestCase):
     ):
         explicit_unit = Unit.objects.create(name="1/km²", symbol="1/km²")
         density_value = RegionAttributeValue.objects.get(
-            attribute__name="Population density"
+            property__name="Population density"
         )
         density_value.unit = explicit_unit
         density_value.save(update_fields=["unit"])
