@@ -1,7 +1,10 @@
 """Tests for sources.waste_collection.importers."""
 
 from datetime import date
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 
+import openpyxl
 from django.contrib.auth import get_user_model
 from django.db.models import signals
 from django.test import TestCase
@@ -11,6 +14,7 @@ from bibliography.models import Source
 from materials.models import Material
 
 from ..importers import CollectionImporter
+from ..management.commands.import_de_2024_improved_standalone import _load_records
 from ..models import (
     Collection,
     CollectionCatchment,
@@ -30,6 +34,9 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
     def setUpTestData(cls):
         user_model = get_user_model()
         cls.owner = user_model.objects.create_user(username="importer-material-owner")
+        cls.other_owner = user_model.objects.create_user(
+            username="existing-collection-owner"
+        )
         cls.catchment = CollectionCatchment.objects.create(
             name="Importer Material Catch"
         )
@@ -100,6 +107,37 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
         self.assertEqual(stats_second["unchanged"], 1)
         self.assertEqual(stats_second["skipped"], 0)
         self.assertEqual(Collection.objects.filter(owner=self.owner).count(), 1)
+
+    def test_reimport_preserves_existing_collection_owner(self):
+        collection = Collection.objects.create(
+            name="Existing importer collection",
+            owner=self.other_owner,
+            publication_status="private",
+            catchment=self.catchment,
+            collection_system=self.collection_system,
+            waste_category=self.waste_category,
+            valid_from=date(2024, 1, 1),
+        )
+        collection.allowed_materials.set([self.allowed_1, self.allowed_2])
+        collection.forbidden_materials.set([self.forbidden_1])
+
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_2.name, self.allowed_1.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {"description": "Updated by import"}
+            ]
+        )
+
+        collection.refresh_from_db()
+        self.assertEqual(stats["created"], 0)
+        self.assertEqual(stats["updated"], 1)
+        self.assertEqual(collection.owner, self.other_owner)
+        self.assertEqual(collection.description, "Updated by import")
+        self.assertEqual(Collection.objects.filter(owner=self.owner).count(), 0)
 
     def test_different_material_set_creates_new_collection(self):
         importer = CollectionImporter(owner=self.owner, publication_status="private")
@@ -776,3 +814,51 @@ class CollectionImporterFrequencyResolutionTestCase(TestCase):
                 "record[3]: CollectionFrequency 'Fixed-Seasonal; 39 per year (1 per 2 weeks from March - November)' not found — normalized to 'Seasonal; 19 per year (1 per 2 weeks from March - November, 0 from December - February)'."
             ],
         )
+
+
+class ImprovedWorkbookLoadRecordsTestCase(TestCase):
+    def _create_workbook(self, rows: list[list]) -> Path:
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.append(
+            [
+                "Catchment",
+                "NUTS/LAU Id",
+                "Collector",
+                "Collection System",
+                "Waste Category",
+                "Valid from",
+                "Valid until",
+            ]
+        )
+        for row in rows:
+            sheet.append(row)
+
+        handle = NamedTemporaryFile(suffix=".xlsx", delete=False)
+        handle.close()
+        workbook.save(handle.name)
+        return Path(handle.name)
+
+    def test_load_records_accepts_iso_string_dates(self):
+        workbook_path = self._create_workbook(
+            [
+                [
+                    "Koblenz, Kreisfreie Stadt (DEB11)",
+                    "DEB11",
+                    "Kommunaler Servicebetrieb Koblenz",
+                    "Door to door",
+                    "Biowaste",
+                    "2024-01-01",
+                    "2024-12-31",
+                ]
+            ]
+        )
+        self.addCleanup(workbook_path.unlink)
+
+        records, warnings, row_count = _load_records(workbook_path)
+
+        self.assertEqual(row_count, 1)
+        self.assertEqual(warnings, [])
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["valid_from"], "2024-01-01")
+        self.assertEqual(records[0]["valid_until"], "2024-12-31")

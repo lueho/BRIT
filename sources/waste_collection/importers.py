@@ -78,6 +78,11 @@ _FREQUENCY_COUNT_FRAGMENT_RE = re.compile(
 _IMPORTED_REFERENCE_URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 
 
+def _normalize_collector_lookup_key(value: str) -> str:
+    text = (value or "").replace("\xa0", " ")
+    return " ".join(text.split()).casefold()
+
+
 def _should_warn_on_frequency_normalization(
     raw_name: str,
     resolved_name: str,
@@ -264,6 +269,12 @@ class CollectionImporter:
         self._collectors: dict[str, Collector] = {
             o.name: o for o in Collector.objects.all()
         }
+        self._normalized_collectors: dict[str, Collector] = {}
+        for collector in self._collectors.values():
+            self._normalized_collectors.setdefault(
+                _normalize_collector_lookup_key(collector.name),
+                collector,
+            )
         self._materials: dict[str, Material] = {
             o.name: o for o in Material.objects.all()
         }
@@ -955,6 +966,12 @@ class CollectionImporter:
             if collector is not None:
                 return collector
 
+            collector = self._normalized_collectors.get(
+                _normalize_collector_lookup_key(name)
+            )
+            if collector is not None:
+                return collector
+
         if website:
             return next(
                 (
@@ -995,6 +1012,9 @@ class CollectionImporter:
                 stats.setdefault("collectors_created", 0)
                 stats["collectors_created"] += 1
             self._collectors[collector.name] = collector
+            self._normalized_collectors[
+                _normalize_collector_lookup_key(collector.name)
+            ] = collector
             return collector
 
         stats["warnings"].append(
