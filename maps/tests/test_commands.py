@@ -4,6 +4,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase
 
+from utils.object_management.models import get_default_owner
 from utils.properties.models import Unit
 
 from ..models import Region, RegionAttributeValue, RegionProperty
@@ -83,6 +84,63 @@ class RegionAttributeValueUnitBackfillCommandTests(TestCase):
         self.assertEqual(value.unit.owner, region_property.owner)
         self.assertIn("values_backfilled: 1", out.getvalue())
         self.assertIn("units_created: 1", out.getvalue())
+
+    def test_command_reports_blank_property_unit_names(self):
+        region = Region.objects.create(name="Population Region")
+        region_property = RegionProperty.objects.create(name="Population", unit="")
+        RegionAttributeValue.objects.create(
+            region=region,
+            property=region_property,
+            value=123.321,
+        )
+
+        out = io.StringIO()
+        call_command("backfill_region_attribute_value_units", stdout=out)
+
+        self.assertIn("blank_property_unit: 1", out.getvalue())
+        self.assertIn("blank_property_unit_backfilled: 0", out.getvalue())
+        self.assertIn("Blank property units:", out.getvalue())
+        self.assertIn("- Population: 1", out.getvalue())
+
+    def test_command_can_treat_selected_blank_property_as_no_unit(self):
+        region = Region.objects.create(name="Population Region")
+        region_property = RegionProperty.objects.create(name="Population", unit="")
+        value = RegionAttributeValue.objects.create(
+            region=region,
+            property=region_property,
+            value=123.321,
+        )
+        expected_unit = Unit.objects.get(owner=get_default_owner(), name="No unit")
+
+        out = io.StringIO()
+        call_command(
+            "backfill_region_attribute_value_units",
+            treat_blank_property_unit_as_no_unit=["Population"],
+            stdout=out,
+        )
+
+        value.refresh_from_db()
+        self.assertEqual(value.unit, expected_unit)
+        self.assertIn("values_backfilled: 1", out.getvalue())
+        self.assertIn("blank_property_unit: 1", out.getvalue())
+        self.assertIn("blank_property_unit_backfilled: 1", out.getvalue())
+
+    def test_command_can_fail_when_blank_property_unit_remains(self):
+        region = Region.objects.create(name="Population Region")
+        region_property = RegionProperty.objects.create(name="Population", unit="")
+        RegionAttributeValue.objects.create(
+            region=region,
+            property=region_property,
+            value=123.321,
+        )
+
+        with self.assertRaisesMessage(
+            CommandError,
+            "1 RegionAttributeValue rows remain unresolved.",
+        ):
+            call_command(
+                "backfill_region_attribute_value_units", fail_on_unresolved=True
+            )
 
     def test_command_can_fail_when_unresolved_values_remain(self):
         region = Region.objects.create(name="Unresolved Region")
