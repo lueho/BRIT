@@ -54,6 +54,12 @@ class NumericMeasurementMixin:
     def measurement_unit_label(self):
         measurement_unit = self.get_measurement_unit()
         if measurement_unit is not None:
+            unit_symbol = getattr(measurement_unit, "symbol", "") or ""
+            if (
+                getattr(measurement_unit, "dimensionless", False)
+                and not unit_symbol.strip()
+            ):
+                return None
             return getattr(measurement_unit, "name", None) or str(measurement_unit)
 
         measurement_property = self.get_measurement_property()
@@ -83,10 +89,11 @@ class NumericMeasurementMixin:
 
 class PropertyBase(NamedUserCreatedObject):
     """
-    Abstract base for module-specific property definitions.
+    Abstract base for domain-owned quantitative property definitions.
 
-    This keeps shared behavior (review workflow, ownership, naming) centralized
-    while allowing each module to store its own property records.
+    Each domain is expected to provide its own concrete ``PropertyBase``
+    subclass while ``utils.properties`` keeps the shared review workflow,
+    ownership model, naming contract, and measurement helpers centralized.
     """
 
     unit = models.CharField(max_length=63)
@@ -193,8 +200,10 @@ def get_default_unit_pk():
 
 class Property(PropertyBase):
     """
-    Defines properties that can be shared among other models. Allows to compare instances of different models that share
-    the same properties while enforcing the use of matching units.
+    Generic concrete property table for the ``utils.properties`` domain.
+
+    This model remains useful for shared or transitional workflows, but it is
+    not the intended permanent concrete property table for every domain.
     """
 
     allowed_units = models.ManyToManyField(Unit)
@@ -202,8 +211,11 @@ class Property(PropertyBase):
 
 class PropertyValue(NumericMeasurementMixin, NamedUserCreatedObject):
     """
-    Serves to link any abstract property definition (see "Property" class) to a concrete instance
-    of any other model with a concrete value. Intended to be related to other models through many-to-many relations.
+    Abstract numeric value base for code paths that still use ``Property``.
+
+    Domains that own their own concrete property tables should reuse the
+    shared numeric helpers while keeping their concrete value models in the
+    domain app.
     """
 
     property = models.ForeignKey(Property, on_delete=models.PROTECT)

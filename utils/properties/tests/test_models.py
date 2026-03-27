@@ -8,6 +8,7 @@ from django.test import TestCase
 from utils.object_management.models import get_default_owner
 from utils.properties.models import NumericMeasurementMixin, Unit
 from utils.properties.units import UnitConversionError
+from utils.properties.utils import format_measurement_display
 
 
 class _FakeConvertedQuantity:
@@ -108,6 +109,18 @@ class UtilsInitialDataTestCase(TestCase):
         self.assertTrue(unit.dimensionless)
 
 
+class MeasurementFormattingUtilsTestCase(TestCase):
+    def test_format_measurement_display_includes_unit_and_year(self):
+        self.assertEqual(
+            format_measurement_display(123.321, unit_label="1/km²", year=2019),
+            "123.321 1/km² (2019)",
+        )
+
+    def test_format_measurement_display_omits_empty_parts(self):
+        self.assertEqual(format_measurement_display(123321, year=2021), "123321 (2021)")
+        self.assertEqual(format_measurement_display(12.3, unit_label="kg"), "12.3 kg")
+
+
 class NumericMeasurementMixinTestCase(TestCase):
     class DummyMeasurement(NumericMeasurementMixin):
         def __init__(self, property_obj, average, standard_deviation, unit=None):
@@ -134,6 +147,16 @@ class NumericMeasurementMixinTestCase(TestCase):
 
         self.assertEqual(measurement.measurement_name, "Dry matter")
         self.assertEqual(measurement.measurement_unit_label, "g/kg")
+
+    def test_measurement_unit_label_hides_canonical_no_unit(self):
+        measurement = self.DummyMeasurement(
+            property_obj=SimpleNamespace(name="Population", unit=""),
+            average=Decimal("12.34"),
+            standard_deviation=Decimal("0.56"),
+            unit=Unit.objects.get(owner=get_default_owner(), name="No unit"),
+        )
+
+        self.assertIsNone(measurement.measurement_unit_label)
 
     def test_display_values_round_for_collection_style_properties(self):
         measurement = self.DummyMeasurement(

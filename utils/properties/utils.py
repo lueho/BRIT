@@ -3,6 +3,15 @@ from utils.object_management.models import get_default_owner
 INITIALIZATION_DEPENDENCIES = ["users", "utils.object_management"]
 
 
+def format_measurement_display(value, unit_label=None, year=None):
+    formatted_value = f"{value}"
+    if unit_label:
+        formatted_value = f"{formatted_value} {unit_label}"
+    if year is not None:
+        formatted_value = f"{formatted_value} ({year})"
+    return formatted_value
+
+
 def ensure_initial_data(stdout=None):
     """
     Ensures all required initial data for the utils.properties app exists.
