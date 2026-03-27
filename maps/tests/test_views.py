@@ -361,6 +361,31 @@ class RegionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         "geom": "MULTIPOLYGON(((0 0, 0 100, 100 100, 100 0, 0 0)))",
     }
 
+    def test_detail_view_renders_region_attribute_values(self):
+        region_property = RegionProperty.objects.create(
+            name="Population density",
+            unit="1/km²",
+        )
+        unit = Unit.objects.create(name="people/km²", symbol="1/km²")
+        RegionAttributeValue.objects.create(
+            region=self.published_object,
+            property=region_property,
+            unit=unit,
+            value=123.321,
+            date=date(2024, 1, 1),
+            publication_status="published",
+        )
+
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Region attributes:")
+        self.assertContains(response, "Population density")
+        self.assertContains(response, "2024")
+        self.assertContains(response, "123.321")
+        self.assertContains(response, "people/km²")
+        self.assertNotContains(response, "[1/km²]")
+
 
 # ----------- Region Utils ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------

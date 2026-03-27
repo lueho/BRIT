@@ -623,6 +623,11 @@ class RegionDetailView(MapMixin, UserCreatedObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context["region_attribute_values"] = (
+            RegionAttributeValue.objects.filter(region=self.object)
+            .select_related("property", "unit")
+            .order_by("property__name", "-date")
+        )
         context["show_composed_of"] = self.request.GET.get("show_composed_of") in {
             "1",
             "true",

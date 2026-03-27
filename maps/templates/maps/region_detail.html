@@ -25,6 +25,25 @@
             {{ object.description|markdown_to_html }}
         </p>
     {% endif %}
+    {% if region_attribute_values %}
+        <p class="card-text">
+            <strong>Region attributes:</strong>
+        </p>
+        {% regroup region_attribute_values by property as attr_groups %}
+        {% for group in attr_groups %}
+            <p class="card-text mb-1">
+                <strong>{{ group.grouper.name }}</strong>
+            </p>
+            <ul class="list-unstyled ms-3 mb-2">
+                {% for rav in group.list %}
+                    <li>
+                        {{ rav.date|date:"Y"|default:"—" }}: {{ rav.value }}
+                        {% if rav.measurement_unit_label %}{{ rav.measurement_unit_label }}{% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endfor %}
+    {% endif %}
     {% block additional_details %}{% endblock %}
 {% endblock %}
 
