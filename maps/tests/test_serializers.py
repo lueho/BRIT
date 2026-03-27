@@ -7,7 +7,6 @@ from django.urls import NoReverseMatch
 from utils.properties.models import Unit
 
 from ..models import (
-    Attribute,
     CategoricalAttribute,
     MapConfiguration,
     MapLayerConfiguration,
@@ -15,6 +14,7 @@ from ..models import (
     NutsRegion,
     RegionAttributeTextValue,
     RegionAttributeValue,
+    RegionProperty,
 )
 from ..serializers import MapConfigurationSerializer, NutsRegionSummarySerializer
 
@@ -397,22 +397,25 @@ class MapConfigurationSerializerTestCase(TestCase):
 class NutsRegionSummarySerializerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        attribute = Attribute.objects.create(name="Population density", unit="1/km²")
+        density_property = RegionProperty.objects.create(
+            name="Population density",
+            unit="1/km²",
+        )
         region = NutsRegion.objects.create(nuts_id="TE57", name_latn="Test NUTS")
         RegionAttributeValue.objects.create(
-            attribute=attribute,
+            property=density_property,
             region=region,
             value=123.321,
             date=datetime.date(2018, 1, 1),
         )
         RegionAttributeValue.objects.create(
-            attribute=attribute,
+            property=density_property,
             region=region,
             value=123.321,
             date=datetime.date(2019, 1, 1),
         )
         CategoricalAttribute.objects.get_or_create(name="Urban rural remoteness")
-        Attribute.objects.create(name="Population", unit="")
+        RegionProperty.objects.create(name="Population", unit="")
 
     def setUp(self):
         self.region = NutsRegion.objects.get(nuts_id="TE57")
@@ -427,7 +430,7 @@ class NutsRegionSummarySerializerTestCase(TestCase):
 
     def test_population_method_field_returns_value_as_integer(self):
         RegionAttributeValue.objects.create(
-            attribute=Attribute.objects.get(name="Population"),
+            property=RegionProperty.objects.get(name="Population"),
             region=self.region,
             value=123321,
             date=datetime.date(2021, 12, 31),
@@ -449,7 +452,7 @@ class NutsRegionSummarySerializerTestCase(TestCase):
     def test_population_density_method_field_uses_value_level_unit_when_present(self):
         explicit_unit = Unit.objects.create(name="people/km²", symbol="1/km²")
         density_value = RegionAttributeValue.objects.filter(
-            attribute__name="Population density"
+            property__name="Population density"
         ).latest("date")
         density_value.unit = explicit_unit
         density_value.save(update_fields=["unit"])

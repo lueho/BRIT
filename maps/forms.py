@@ -39,6 +39,7 @@ from .models import (
     NutsRegion,
     Region,
     RegionAttributeValue,
+    RegionProperty,
 )
 
 
@@ -106,6 +107,14 @@ class RegionAttributeValueModelForm(NumericMeasurementFieldsFormMixin, SimpleMod
         ),
         label="Region",
     )
+    property = TomSelectModelChoiceField(
+        queryset=RegionProperty.objects.all(),
+        config=TomSelectConfig(
+            url="regionproperty-autocomplete",
+            label_field="name",
+        ),
+        label="Property",
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -114,13 +123,13 @@ class RegionAttributeValueModelForm(NumericMeasurementFieldsFormMixin, SimpleMod
 
     def clean(self):
         cleaned_data = super().clean()
-        attribute = cleaned_data.get("attribute")
+        property_obj = cleaned_data.get("property")
         unit = cleaned_data.get("unit")
 
-        if unit is not None or not attribute or not attribute.unit:
+        if unit is not None or not property_obj or not property_obj.unit:
             return cleaned_data
 
-        unit = Unit.resolve_legacy_label(attribute.unit, owner=attribute.owner)
+        unit = Unit.resolve_legacy_label(property_obj.unit, owner=property_obj.owner)
 
         cleaned_data["unit"] = unit
         return cleaned_data
@@ -129,7 +138,7 @@ class RegionAttributeValueModelForm(NumericMeasurementFieldsFormMixin, SimpleMod
 
     class Meta:
         model = RegionAttributeValue
-        fields = ("region", "attribute", "unit", "date", "value", "standard_deviation")
+        fields = ("region", "property", "unit", "date", "value", "standard_deviation")
 
 
 class RegionAttributeValueModalModelForm(

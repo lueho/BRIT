@@ -6,17 +6,20 @@ from django.test import TestCase
 
 from utils.properties.models import Unit
 
-from ..models import Attribute, Region, RegionAttributeValue
+from ..models import Region, RegionAttributeValue, RegionProperty
 
 
 class RegionAttributeValueUnitBackfillCommandTests(TestCase):
     def test_dry_run_reports_backfill_without_persisting(self):
         region = Region.objects.create(name="Dry Run Region")
-        attribute = Attribute.objects.create(name="Population density", unit="1/km²")
+        region_property = RegionProperty.objects.create(
+            name="Population density",
+            unit="1/km²",
+        )
         unit = Unit.objects.create(name="People per square kilometre", symbol="1/km²")
         value = RegionAttributeValue.objects.create(
             region=region,
-            attribute=attribute,
+            property=region_property,
             value=123.321,
         )
 
@@ -33,11 +36,14 @@ class RegionAttributeValueUnitBackfillCommandTests(TestCase):
 
     def test_command_backfills_existing_matching_unit(self):
         region = Region.objects.create(name="Matched Region")
-        attribute = Attribute.objects.create(name="Population density", unit="1/km²")
+        region_property = RegionProperty.objects.create(
+            name="Population density",
+            unit="1/km²",
+        )
         unit = Unit.objects.create(name="People per square kilometre", symbol="1/km²")
         value = RegionAttributeValue.objects.create(
             region=region,
-            attribute=attribute,
+            property=region_property,
             value=123.321,
         )
 
@@ -52,10 +58,10 @@ class RegionAttributeValueUnitBackfillCommandTests(TestCase):
 
     def test_command_can_create_missing_units(self):
         region = Region.objects.create(name="Created Unit Region")
-        attribute = Attribute.objects.create(name="Area", unit="km²")
+        region_property = RegionProperty.objects.create(name="Area", unit="km²")
         value = RegionAttributeValue.objects.create(
             region=region,
-            attribute=attribute,
+            property=region_property,
             value=123.321,
         )
 
@@ -70,16 +76,16 @@ class RegionAttributeValueUnitBackfillCommandTests(TestCase):
         self.assertIsNotNone(value.unit)
         self.assertEqual(value.unit.name, "km²")
         self.assertEqual(value.unit.symbol, "km²")
-        self.assertEqual(value.unit.owner, attribute.owner)
+        self.assertEqual(value.unit.owner, region_property.owner)
         self.assertIn("values_backfilled: 1", out.getvalue())
         self.assertIn("units_created: 1", out.getvalue())
 
     def test_command_can_fail_when_unresolved_values_remain(self):
         region = Region.objects.create(name="Unresolved Region")
-        attribute = Attribute.objects.create(name="Area", unit="km²")
+        region_property = RegionProperty.objects.create(name="Area", unit="km²")
         RegionAttributeValue.objects.create(
             region=region,
-            attribute=attribute,
+            property=region_property,
             value=123.321,
         )
 

@@ -16,7 +16,11 @@ from utils.object_management.models import (
     NamedUserCreatedObject,
     UserCreatedObjectQuerySet,
 )
-from utils.properties.models import NumericMeasurementMixin, PropertyBase, Unit
+from utils.properties.models import (
+    NumericMeasurementMixin,
+    PropertyBase,
+    Unit,
+)
 
 TYPES = (
     ("administrative", "administrative"),
@@ -549,10 +553,20 @@ class GeoDataset(NamedUserCreatedObject):
         return reverse(f"{self.model_name}")
 
 
-# TODO: Check if this should be moved to utils app
 class Attribute(PropertyBase):
     """
-    Defines an attribute class that can be attached to features of a map.
+    Legacy maps quantitative definition kept during the ``RegionProperty`` rollout.
+    """
+
+    unit = models.CharField(max_length=127)
+
+    def __str__(self):
+        return f"{self.name} [{self.unit}]"
+
+
+class RegionProperty(PropertyBase):
+    """
+    Maps-owned quantitative property definition that will replace ``Attribute``.
     """
 
     unit = models.CharField(max_length=127)
@@ -568,14 +582,18 @@ class CategoricalAttribute(NamedUserCreatedObject):
 
 class RegionAttributeValue(NumericMeasurementMixin, NamedUserCreatedObject):
     """
-    Attaches a value of an attribute class to a region
+    Numeric regional measurement for the maps domain.
+
+    During the ``RegionProperty`` rollout this model now points at the
+    maps-owned ``RegionProperty`` table, while legacy ``Attribute`` rows are
+    retained temporarily for compatibility and data migration safety.
     """
 
-    measurement_property_field = "attribute"
+    measurement_property_field = "property"
     measurement_value_field = "value"
 
     region = models.ForeignKey(Region, on_delete=models.PROTECT)
-    attribute = models.ForeignKey(Attribute, on_delete=models.PROTECT)
+    property = models.ForeignKey(RegionProperty, on_delete=models.PROTECT)
     unit = models.ForeignKey(Unit, on_delete=models.PROTECT, blank=True, null=True)
     date = models.DateField(blank=True, null=True)
     value = models.FloatField(default=0.0)
@@ -587,7 +605,7 @@ class RegionAttributeValue(NumericMeasurementMixin, NamedUserCreatedObject):
 
 class RegionAttributeTextValue(NamedUserCreatedObject):
     """
-    Attaches a category value of an attribute class to a region
+    Categorical regional value kept separate from numeric measurement storage.
     """
 
     region = models.ForeignKey(Region, on_delete=models.PROTECT)

@@ -13,11 +13,17 @@ from .models import (
     Region,
     RegionAttributeTextValue,
     RegionAttributeValue,
+    RegionProperty,
 )
 
 
 @admin.register(Attribute)
 class AttributeModelAdmin(admin.ModelAdmin):
+    search_fields = ["name"]
+
+
+@admin.register(RegionProperty)
+class RegionPropertyModelAdmin(admin.ModelAdmin):
     search_fields = ["name"]
 
 
@@ -73,7 +79,7 @@ class RegionModelAdmin(admin.ModelAdmin):
 
 @admin.register(RegionAttributeValue)
 class RegionAttributeValueModelAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["region", "attribute", "unit"]
+    autocomplete_fields = ["region", "property", "unit"]
 
 
 @admin.register(RegionAttributeTextValue)

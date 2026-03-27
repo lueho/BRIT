@@ -243,7 +243,7 @@ class NutsRegionModelSerializer(ModelSerializer):
 
     @staticmethod
     def get_population(obj):
-        qs = obj.regionattributevalue_set.filter(attribute__name="Population").order_by(
+        qs = obj.regionattributevalue_set.filter(property__name="Population").order_by(
             "-date"
         )
         if qs.exists():
@@ -312,39 +312,37 @@ class NutsRegionSummarySerializer(FieldLabelModelSerializer):
 
     @staticmethod
     def get_population(obj):
-        # Use prefetched data to avoid N+1 queries
-        values = [
-            v
-            for v in obj.regionattributevalue_set.all()
-            if v.attribute.name == "Population"
-        ]
-        if values:
-            pop = max(values, key=lambda v: v.date if v.date else v.pk)
+        qs = obj.regionattributevalue_set.filter(property__name="Population").order_by(
+            "-date"
+        )
+        if qs.exists():
+            pop = qs[0]
             return f"{int(pop.value)} ({pop.date.year})"
-        return None
+        else:
+            return None
 
     @staticmethod
     def get_population_density(obj):
-        # Use prefetched data to avoid N+1 queries
-        values = [
-            v
-            for v in obj.regionattributevalue_set.all()
-            if v.attribute.name == "Population density"
-        ]
-        if values:
-            pd = max(values, key=lambda v: v.date if v.date else v.pk)
+        qs = obj.regionattributevalue_set.filter(
+            property__name="Population density"
+        ).order_by("-date")
+        if qs.exists():
+            pd = qs[0]
             unit = pd.measurement_unit_label
             unit_suffix = f" {unit}" if unit else ""
             return f"{pd.value}{unit_suffix} ({pd.date.year})"
-        return None
+        else:
+            return None
 
     @staticmethod
     def get_urban_rural_remoteness(obj):
-        # Use prefetched data to avoid N+1 queries
-        for v in obj.regionattributetextvalue_set.all():
-            if v.categorical_attribute.name == "Urban rural remoteness":
-                return v.value
-        return None
+        qs = obj.regionattributetextvalue_set.filter(
+            categorical_attribute__name="Urban rural remoteness"
+        )
+        if qs.exists():
+            return qs[0].value
+        else:
+            return None
 
 
 class LauRegionSummarySerializer(FieldLabelModelSerializer):

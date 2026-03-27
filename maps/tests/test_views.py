@@ -43,6 +43,7 @@ from ..models import (
     NutsRegion,
     Region,
     RegionAttributeValue,
+    RegionProperty,
 )
 from ..utils import get_region_cache_key
 from ..views import MapMixin
@@ -458,11 +459,14 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         }
 
     def test_detail_view_renders_value_level_region_attribute_unit(self):
-        attribute = Attribute.objects.create(name="Population density", unit="1/km²")
+        region_property = RegionProperty.objects.create(
+            name="Population density",
+            unit="1/km²",
+        )
         unit = Unit.objects.create(name="people/km²", symbol="1/km²")
         RegionAttributeValue.objects.create(
             region=self.published_object.region,
-            attribute=attribute,
+            property=region_property,
             unit=unit,
             value=123.321,
             date=date(2024, 1, 1),
@@ -1144,8 +1148,8 @@ class RegionAttributeValueCRUDViewsTestCase(
             "region": Region.objects.create(
                 owner=cls.owner_user, name="Test Region", publication_status="published"
             ),
-            "attribute": Attribute.objects.create(
-                name="Test Attribute", unit="Test Unit", publication_status="published"
+            "property": RegionProperty.objects.create(
+                name="Test Property", unit="Test Unit", publication_status="published"
             ),
         }
 

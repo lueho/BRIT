@@ -7,7 +7,7 @@ from utils.properties.models import Unit
 
 
 class Command(BaseCommand):
-    help = "Backfill RegionAttributeValue.unit from Attribute.unit labels."
+    help = "Backfill RegionAttributeValue.unit from RegionProperty.unit labels."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -34,13 +34,13 @@ class Command(BaseCommand):
             "values_examined": 0,
             "values_backfilled": 0,
             "values_unresolved": 0,
-            "blank_attribute_unit": 0,
+            "blank_property_unit": 0,
             "units_created": 0,
         }
         unresolved_labels = Counter()
         resolved_units = {}
         values = (
-            RegionAttributeValue.objects.select_related("attribute")
+            RegionAttributeValue.objects.select_related("property")
             .filter(unit__isnull=True)
             .order_by("pk")
         )
@@ -50,32 +50,34 @@ class Command(BaseCommand):
 
         for value in values.iterator():
             stats["values_examined"] += 1
-            attribute = value.attribute
-            unit_label = (attribute.unit or "").strip()
+            property_obj = value.property
+            unit_label = (property_obj.unit or "").strip()
             if not unit_label:
-                stats["blank_attribute_unit"] += 1
+                stats["blank_property_unit"] += 1
                 continue
 
-            cache_key = (attribute.owner_id, unit_label)
+            cache_key = (property_obj.owner_id, unit_label)
             cache_entry = resolved_units.get(cache_key)
             if cache_entry is None:
-                unit = Unit.resolve_legacy_label(unit_label, owner=attribute.owner_id)
+                unit = Unit.resolve_legacy_label(
+                    unit_label, owner=property_obj.owner_id
+                )
                 created = False
                 if unit is None and create_missing_units:
                     if dry_run:
                         unit = Unit(
-                            owner_id=attribute.owner_id,
+                            owner_id=property_obj.owner_id,
                             name=unit_label,
                             symbol=unit_label if len(unit_label) <= 63 else "",
                         )
                         created = True
                     else:
                         unit, created = Unit.objects.get_or_create(
-                            owner_id=attribute.owner_id,
+                            owner_id=property_obj.owner_id,
                             name=unit_label,
                             defaults={
                                 "symbol": unit_label if len(unit_label) <= 63 else "",
-                                "publication_status": attribute.publication_status,
+                                "publication_status": property_obj.publication_status,
                             },
                         )
                 cache_entry = (unit, created)
@@ -98,7 +100,7 @@ class Command(BaseCommand):
             "values_examined",
             "values_backfilled",
             "values_unresolved",
-            "blank_attribute_unit",
+            "blank_property_unit",
             "units_created",
         ):
             self.stdout.write(f"{key}: {stats[key]}")

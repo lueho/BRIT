@@ -75,6 +75,7 @@ from .models import (
     NutsRegion,
     Region,
     RegionAttributeValue,
+    RegionProperty,
 )
 from .signals import clear_geojson_cache_pattern
 
@@ -676,8 +677,8 @@ class CatchmentDetailView(MapMixin, UserCreatedObjectDetailView):
         if region is not None:
             context["region_attribute_values"] = (
                 RegionAttributeValue.objects.filter(region=region)
-                .select_related("attribute", "unit")
-                .order_by("attribute__name", "-date")
+                .select_related("property", "unit")
+                .order_by("property__name", "-date")
             )
         return context
 
@@ -878,6 +879,10 @@ class RegionOfLauAutocompleteView(UserCreatedObjectAutocompleteView):
             lau_name = item.get("lauregion__lau_name")
             item["text"] = f"{lau_name} ({lau_id})"
         return results
+
+
+class RegionPropertyAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = RegionProperty
 
 
 class CatchmentOptionGeometryAPI(APIView):

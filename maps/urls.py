@@ -64,6 +64,7 @@ from .views import (
     RegionModalDeleteView,
     RegionOfLauAutocompleteView,
     RegionPrivateFilterView,
+    RegionPropertyAutocompleteView,
     RegionPublishedFilterView,
     RegionUpdateView,
 )
@@ -146,6 +147,11 @@ urlpatterns = [
         "attributes/autocomplete/",
         AttributeAutocompleteView.as_view(),
         name="attribute-autocomplete",
+    ),
+    path(
+        "region-properties/autocomplete/",
+        RegionPropertyAutocompleteView.as_view(),
+        name="regionproperty-autocomplete",
     ),
     path(
         "attribute_values/create/",

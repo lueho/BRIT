@@ -44,7 +44,7 @@
         <p class="card-text">
             <strong>Region attributes:</strong>
         </p>
-        {% regroup region_attribute_values by attribute as attr_groups %}
+        {% regroup region_attribute_values by property as attr_groups %}
         {% for group in attr_groups %}
             <p class="card-text mb-1">
                 <strong>{{ group.grouper.name }}</strong>
@@ -53,7 +53,7 @@
                 {% for rav in group.list %}
                     <li>
                         <!-- djlint:off -->
-                                                {{ rav.date|date:"Y"|default:"—" }}: {{ rav.value }} {% if rav.measurement_unit_label %}{{ rav.measurement_unit_label }}{% endif %}
+                                                                        {{ rav.date|date:"Y"|default:"—" }}: {{ rav.value }} {% if rav.measurement_unit_label %}{{ rav.measurement_unit_label }}{% endif %}
                         <!-- djlint:on -->
                     </li>
                 {% endfor %}
