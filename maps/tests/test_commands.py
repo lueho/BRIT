@@ -14,7 +14,7 @@ class RegionAttributeValueUnitBackfillCommandTests(TestCase):
         region = Region.objects.create(name="Dry Run Region")
         region_property = RegionProperty.objects.create(
             name="Population density",
-            unit="1/km²",
+            unit="",
         )
         unit = Unit.objects.create(name="People per square kilometre", symbol="1/km²")
         value = RegionAttributeValue.objects.create(
@@ -22,6 +22,8 @@ class RegionAttributeValueUnitBackfillCommandTests(TestCase):
             property=region_property,
             value=123.321,
         )
+        region_property.unit = "1/km²"
+        region_property.save(update_fields=["unit"])
 
         out = io.StringIO()
         call_command("backfill_region_attribute_value_units", dry_run=True, stdout=out)
@@ -38,7 +40,7 @@ class RegionAttributeValueUnitBackfillCommandTests(TestCase):
         region = Region.objects.create(name="Matched Region")
         region_property = RegionProperty.objects.create(
             name="Population density",
-            unit="1/km²",
+            unit="",
         )
         unit = Unit.objects.create(name="People per square kilometre", symbol="1/km²")
         value = RegionAttributeValue.objects.create(
@@ -46,6 +48,8 @@ class RegionAttributeValueUnitBackfillCommandTests(TestCase):
             property=region_property,
             value=123.321,
         )
+        region_property.unit = "1/km²"
+        region_property.save(update_fields=["unit"])
 
         out = io.StringIO()
         call_command("backfill_region_attribute_value_units", stdout=out)

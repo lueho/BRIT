@@ -191,6 +191,35 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         self.assertEqual(value.display_average, value.value)
         self.assertEqual(value.display_standard_deviation, value.standard_deviation)
 
+    def test_save_assigns_matching_unit_from_property(self):
+        region = Region.objects.create(name="Test Region")
+        region_property = RegionProperty.objects.create(
+            name="Population density",
+            unit="1/km²",
+        )
+        unit = Unit.objects.create(
+            name="People per square kilometre",
+            symbol="1/km²",
+        )
+
+        value = RegionAttributeValue.objects.create(
+            region=region,
+            property=region_property,
+            value=123.321,
+        )
+
+        self.assertEqual(value.unit, unit)
+        self.assertEqual(value.measurement_unit_label, unit.name)
+
+    def test_save_leaves_unit_empty_when_property_unit_cannot_be_resolved(self):
+        value = RegionAttributeValue.objects.create(
+            region=Region.objects.create(name="Test Region"),
+            property=RegionProperty.objects.create(name="Area", unit="km²"),
+            value=123.321,
+        )
+
+        self.assertIsNone(value.unit)
+
     def test_value_level_unit_takes_precedence_over_property_unit(self):
         region = Region.objects.create(name="Test Region")
         region_property = RegionProperty.objects.create(

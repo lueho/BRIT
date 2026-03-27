@@ -599,6 +599,23 @@ class RegionAttributeValue(NumericMeasurementMixin, NamedUserCreatedObject):
     value = models.FloatField(default=0.0)
     standard_deviation = models.FloatField(default=0.0, blank=True, null=True)
 
+    def assign_default_unit(self):
+        if self.unit_id is not None:
+            return self.unit
+
+        property_obj = getattr(self, "property", None)
+        if property_obj is None:
+            return None
+
+        unit = Unit.resolve_legacy_label(property_obj.unit, owner=property_obj.owner)
+        if unit is not None:
+            self.unit = unit
+        return self.unit
+
+    def save(self, *args, **kwargs):
+        self.assign_default_unit()
+        super().save(*args, **kwargs)
+
     def get_absolute_url(self):
         return reverse("region-detail", args=[self.region.pk])
 
