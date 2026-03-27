@@ -212,6 +212,19 @@ class CollectorPrivateListView(PrivateObjectFilterView):
     dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
+class CollectorReviewFilterView(ReviewObjectFilterView):
+    model = Collector
+    filterset_class = CollectorFilter
+    dashboard_url = reverse_lazy("wastecollection-explorer")
+
+    def get_filterset_kwargs(self, filterset_class=None):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        data = kwargs.get("data").copy() if kwargs.get("data") else {}
+        data["scope"] = "review"
+        kwargs["data"] = data
+        return kwargs
+
+
 class CollectorCreateView(UserCreatedObjectCreateView):
     form_class = CollectorModelForm
     permission_required = "waste_collection.add_collector"

@@ -63,6 +63,11 @@ urlpatterns = [
         name="collector-list-owned",
     ),
     path(
+        "collectors/review/",
+        views.CollectorReviewFilterView.as_view(),
+        name="collector-list-review",
+    ),
+    path(
         "collectors/create/",
         views.CollectorCreateView.as_view(),
         name="collector-create",

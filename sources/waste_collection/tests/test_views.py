@@ -25,7 +25,6 @@ from openpyxl import load_workbook
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import (
-    Attribute,
     GeoDataset,
     MapConfiguration,
     MapLayerConfiguration,
@@ -84,7 +83,6 @@ from sources.waste_collection.views import (
     CollectionWithdrawFromReviewView,
 )
 from sources.waste_collection.waste_atlas.viewsets import (
-    POPULATION_ATTRIBUTE_ID,
     _amounts_for_2024,
     _resolved_population_attribute_id,
 )
@@ -143,6 +141,67 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 
     create_object_data = {"name": "Test Collector"}
     update_object_data = {"name": "Updated Test Collector"}
+
+
+class CollectorListScopeRegressionTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="collector_owner")
+        cls.moderator = User.objects.create_user(username="collector_moderator")
+
+        content_type = ContentType.objects.get_for_model(Collector)
+        permission, _ = Permission.objects.get_or_create(
+            codename="can_moderate_collector",
+            content_type=content_type,
+            defaults={"name": "Can moderate collectors"},
+        )
+        cls.moderator.user_permissions.add(permission)
+
+        cls.owner_private = Collector.objects.create(
+            owner=cls.owner,
+            name="Owner Private Collector",
+            publication_status="private",
+        )
+        cls.owner_review = Collector.objects.create(
+            owner=cls.owner,
+            name="Owner Review Collector",
+            publication_status="review",
+        )
+        cls.owner_published = Collector.objects.create(
+            owner=cls.owner,
+            name="Owner Published Collector",
+            publication_status="published",
+        )
+
+    def test_private_list_uses_dedicated_review_route_for_scope_toggle(self):
+        self.client.force_login(self.moderator)
+
+        response = self.client.get(
+            reverse("collector-list-owned"), {"scope": "private"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context["review_representation_url"],
+            reverse("collector-list-review"),
+        )
+        self.assertContains(
+            response,
+            f'href="{reverse("collector-list-review")}?scope=review"',
+            html=False,
+        )
+
+    def test_private_list_shows_owner_published_collectors(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse("collector-list-owned"), {"scope": "private"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.owner_private.name)
+        self.assertContains(response, self.owner_review.name)
+        self.assertContains(response, self.owner_published.name)
 
 
 class CollectorDetailPermissionRegressionTest(ViewWithPermissionsTestCase):
@@ -4130,9 +4189,9 @@ class WasteAtlasMapViewsTestCase(TestCase):
 class WasteAtlasPopulationViewSetTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        Attribute.objects.create(name="Atlas population filler 1", unit="cap")
-        Attribute.objects.create(name="Atlas population filler 2", unit="cap")
-        cls.population_attribute = Attribute.objects.create(
+        Property.objects.create(name="Atlas population filler 1", unit="cap")
+        Property.objects.create(name="Atlas population filler 2", unit="cap")
+        cls.population_attribute = Property.objects.create(
             name="Population [atlas population filter test]",
             unit="cap",
         )
@@ -4179,14 +4238,14 @@ class WasteAtlasPopulationViewSetTests(TestCase):
         RegionAttributeValue.objects.create(
             name="Population BE1",
             region=cls.region_be1.region_ptr,
-            attribute=cls.population_attribute,
+            property=cls.population_attribute,
             date=date(2024, 1, 1),
             value=111,
         )
         RegionAttributeValue.objects.create(
             name="Population BE3",
             region=cls.region_be3.region_ptr,
-            attribute=cls.population_attribute,
+            property=cls.population_attribute,
             date=date(2024, 1, 1),
             value=333,
         )
@@ -5308,7 +5367,7 @@ class DerivedValuesTestCase(TestCase):
         )
         cls.unit_specific = Unit.objects.create(name="kg/(cap.*a) [test]")
         cls.unit_total = Unit.objects.create(name="Mg/a [test]")
-        cls.population_attribute = Attribute.objects.create(
+        cls.population_attribute = Property.objects.create(
             name="Population [test]",
             unit="cap",
         )
@@ -5341,7 +5400,7 @@ class DerivedValuesTestCase(TestCase):
             RegionAttributeValue.objects.create(
                 name=f"Population {suffix}",
                 region=region,
-                attribute=self.population_attribute,
+                property=self.population_attribute,
                 date=date(2024, 1, 1),
                 value=population,
             )
@@ -5586,7 +5645,7 @@ class DerivedValuesTestCase(TestCase):
         with override_settings(SOILCOM_POPULATION_ATTRIBUTE_ID=999999):
             clear_derived_value_config_cache()
             self.assertEqual(
-                _resolved_population_attribute_id(), POPULATION_ATTRIBUTE_ID
+                _resolved_population_attribute_id(), self.population_attribute.id
             )
 
     def test_convert_specific_to_total_mg_happy_path(self):
@@ -5853,14 +5912,14 @@ class DerivedValuesTestCase(TestCase):
         RegionAttributeValue.objects.create(
             name="Pop 2023",
             region=region,
-            attribute=self.population_attribute,
+            property=self.population_attribute,
             date=date(2023, 1, 1),
             value=3000,
         )
         RegionAttributeValue.objects.create(
             name="Pop 2024",
             region=region,
-            attribute=self.population_attribute,
+            property=self.population_attribute,
             date=date(2024, 6, 15),
             value=3500,
         )
@@ -5873,14 +5932,14 @@ class DerivedValuesTestCase(TestCase):
         RegionAttributeValue.objects.create(
             name="Pop old",
             region=region,
-            attribute=self.population_attribute,
+            property=self.population_attribute,
             date=date(2020, 1, 1),
             value=1000,
         )
         RegionAttributeValue.objects.create(
             name="Pop newer",
             region=region,
-            attribute=self.population_attribute,
+            property=self.population_attribute,
             date=date(2022, 1, 1),
             value=2000,
         )
