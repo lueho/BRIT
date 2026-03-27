@@ -1,8 +1,8 @@
 # Property Unification Plan After Phase 3
 
 - **Status**: In progress
-- **Date**: 2026-03-26
-- **Context**: Phase 1 has been implemented as a low-risk convergence step. Shared numeric measurement behavior now lives in `utils.properties`, and the `materials`, `maps`, and waste-collection domains consume that shared behavior where their existing schemas permit it. Since then, Phase 2 has separated categorical maps data from numeric maps data, and Phase 3 has aligned numeric maps definitions with `PropertyBase`. Phase 4 has now started: `RegionAttributeValue.unit` exists as a nullable FK with an initial backfill migration, but maps and cross-app consumers still rely on transitional fallback behavior from `Attribute.unit`. The remaining work is to finish that migration boundary cleanly without forcing all domains into one concrete table design.
+- **Date**: 2026-03-27
+- **Context**: Phase 1 established shared numeric measurement behavior in `utils.properties`. Phase 2 separated categorical maps data from numeric maps data. Phase 3 aligned numeric maps definitions with `PropertyBase`. On 2026-03-27 the architectural decision was clarified further: the final pattern should be one concrete `PropertyBase`-backed property table per domain, with `utils.properties` providing shared review workflow, forms, serializers, and measurement helpers. This means the current direct use of the generic `Property` table outside its own domain is transitional rather than the desired end-state.
 
 ---
 
@@ -26,6 +26,9 @@ Phase 1-3 established shared behavior and shared definition contracts rather tha
   - `Attribute` is now numeric-only in practice
 - **Definition-layer convergence**
   - `Attribute(PropertyBase)` now shares the same abstract definition contract as `MaterialProperty(PropertyBase)` and `Property(PropertyBase)`
+- **Architecture decision clarified on 2026-03-27**
+  - the final target is now one concrete `PropertyBase`-backed property table per domain
+  - direct reuse of the generic `Property` table by other domains should be treated as transitional rather than canonical
 - **Phase 4 foundation already present**
   - `RegionAttributeValue.unit` exists as a nullable FK to `Unit`
   - migration `maps/migrations/0008_regionattributevalue_unit.py` already performs an initial backfill from `Attribute.unit`
@@ -37,7 +40,7 @@ Phase 1-3 did not attempt to unify storage shapes that still differ materially.
 
 - **Maps** still stores numeric values as `attribute` + `value`
 - **Materials** still stores numeric values as `property` + `average`
-- **Waste collection** still uses `PropertyValue`-style storage with year-specific specializations
+- **Waste collection** still uses the generic `Property` / `PropertyValue` pattern with year-specific specializations instead of its own concrete property table
 - **Maps** still retains `Attribute.unit` as a transitional compatibility field
 - **Maps** still keeps text values in `RegionAttributeTextValue`
 - **Materials** still carries basis and analytical-method metadata that do not apply to the other domains
@@ -62,12 +65,14 @@ This is intentional. The next phases should continue to reduce duplication, but 
 The target architecture is:
 
 - **shared abstract models and mixins** in `utils.properties`
-- **domain-specific concrete models** in each app
+- **one concrete `PropertyBase`-backed property model per domain**
+- **domain-specific concrete value models** in each app that point to their domain property table
 - **a separate categorical maps path** outside the shared numeric measurement architecture
 
 The target architecture is not:
 
 - one universal `Property` table for all definition records
+- direct reuse of the generic `Property` table as the permanent concrete property model for every domain
 - one universal `PropertyValue` table for all numeric and text values
 - one shared maps definition concept for both quantitative measurements and categorical labels
 
@@ -76,7 +81,7 @@ The target architecture is not:
 Use the naming patterns that already exist in BRIT.
 
 - **Concrete domain models keep domain nouns**
-  - examples: `Property`, `MaterialProperty`, `Attribute`, `MaterialPropertyValue`, `RegionAttributeValue`
+  - examples: `MaterialProperty`, a future `RegionProperty`, and a future waste-collection property model
 - **Behavior-only reuse stays in `...Mixin` classes**
   - examples: `NumericMeasurementMixin`, `NumericMeasurementFieldsFormMixin`, `NumericMeasurementSerializerMixin`
 - **`...Base` is reserved for shared abstract model contracts**
@@ -88,7 +93,7 @@ Use the naming patterns that already exist in BRIT.
 
 ### 2.2 Why not one concrete table
 
-A single concrete property/value schema would immediately run into domain-specific mismatches.
+A single concrete property/value schema would immediately run into domain-specific mismatches, and keeping the generic `Property` table as the final resting place for every domain would hide those differences instead of modeling them explicitly.
 
 - **Materials** needs `basis_component` and `analytical_method`
 - **Waste collection** needs `year`, `is_derived`, and aggregated variants
@@ -113,7 +118,7 @@ flowchart LR
 
     subgraph maps["maps"]
         subgraph maps_numeric["numeric maps measurements"]
-            A["Attribute\nnumeric-only definition"]
+            RP["RegionProperty\nplanned maps-owned definition"]
             RAV["RegionAttributeValue"]
         end
 
@@ -123,8 +128,8 @@ flowchart LR
         end
     end
 
-    subgraph waste["waste collection / shared property domain"]
-        P["Property"]
+    subgraph waste["waste collection"]
+        WCP["planned waste-collection\nproperty model"]
         CPV["CollectionPropertyValue"]
         ACPV["AggregatedCollectionPropertyValue"]
     end
@@ -133,14 +138,14 @@ flowchart LR
     S["Source"]
 
     PB --> MP
-    PB --> A
-    PB --> P
+    PB --> RP
+    PB --> WCP
 
     MP --> MPV
-    A --> RAV
+    RP --> RAV
     MCD --> RATV
-    P --> CPV
-    P --> ACPV
+    WCP --> CPV
+    WCP --> ACPV
 
     NM -. shared numeric behavior .-> MPV
     NM -. shared numeric behavior .-> RAV
@@ -167,10 +172,12 @@ Key characteristics of the intended end-state:
 
 - **Categorical maps data is separate from numeric measurement architecture**
   - text or label-style regional data should not share the same definition concept as quantitative map measurements
-- **Shared abstract models and mixins, app-owned concrete models**
-  - `utils.properties` provides shared contracts and behavior, while each domain keeps its own concrete tables
-- **Numeric maps data can then converge honestly with other numeric domains**
-  - once maps definitions are quantitative-only, they can share the same abstract contracts as materials and waste collection without dragging categorical semantics along
+- **Shared abstract models and mixins, domain-owned concrete property tables**
+  - `utils.properties` provides shared contracts and behavior, while each domain keeps its own concrete property table
+- **The generic `Property` table is transitional, not universal**
+  - direct use of `Property` should be treated as an interim implementation until all domains follow the same concrete-table pattern
+- **Numeric maps data should converge by adopting the same table pattern, not by moving into the generic `Property` table**
+  - maps should end up with a concrete `RegionProperty(PropertyBase)` model while reusing the same shared helpers as other domains
 - **Per-value unit ownership for numeric values**
   - numeric value records point to `Unit`, rather than relying only on definition-level unit metadata
 - **Text values stay separate**
@@ -241,8 +248,8 @@ After the categorical split, keep `utils.properties.models.PropertyBase` as the 
 Desired end state:
 
 - `MaterialProperty(PropertyBase)`
-- the numeric maps definition model, currently `Attribute`, inherits `PropertyBase`
-- `Property(PropertyBase)` remains the generic concrete definition used directly by waste collection
+- the numeric maps definition model, currently `Attribute`, inherits `PropertyBase` as a bridge toward a maps-owned `RegionProperty`
+- direct use of the generic `Property(PropertyBase)` model remains a transitional pattern rather than the final concrete-table design for all domains
 
 ### Scope
 
@@ -275,33 +282,38 @@ It gives all three quantitative domains the same conceptual contract for:
 
 ---
 
-## 3.3 Phase 4 — Inventory and introduce value-level unit handling for maps
+## 3.3 Phase 4 — Introduce `RegionProperty` and finish maps numeric measurement alignment
 
 - **Status**: In progress
 
 ### Goal
 
-Bring `RegionAttributeValue` closer to the common numeric value contract by storing unit at the value level, but only after inventorying current unit strings and all consumers that still depend on `Attribute.unit`.
+Establish the domain-owned maps property table pattern by replacing `Attribute` with a maps-owned quantitative property model and complete the remaining value-level unit migration on top of that model.
 
 ### Proposed change
 
-Run this phase in two explicit sub-steps.
+Run this phase in three explicit sub-steps.
 
-**Phase 4a — inventory and normalization preparation**
+**Phase 4a — introduce `RegionProperty(PropertyBase)`**
 
-1. Inventory all code paths that read `rav.attribute.unit` or otherwise assume unit metadata lives on `Attribute`
-2. Inspect current `maps_attribute.unit` strings and classify them into directly resolvable, deterministically normalizable, and unresolved values
-3. Identify downstream consumers outside the `maps` app that must be migrated together with maps itself
+1. Introduce a concrete maps-owned quantitative definition model, likely `RegionProperty(PropertyBase)`
+2. Migrate numeric definition data from `Attribute` into `RegionProperty`
+3. Preserve the separate categorical `CategoricalAttribute` path
 
-**Phase 4b — value-level unit migration**
+**Phase 4b — repoint `RegionAttributeValue` and consumers**
 
-1. Add nullable `unit` FK to `RegionAttributeValue`
-2. Resolve existing `Attribute.unit` strings to `Unit` objects where possible
+1. Point `RegionAttributeValue.property` at `RegionProperty`
+2. Update maps forms, serializers, filters, summary views, and cross-app consumers to stop depending on `Attribute`
+3. Remove or retire `Attribute` once the rollout boundary is complete
+
+**Phase 4c — finish value-level unit migration**
+
+1. Keep `RegionAttributeValue.unit` as the value-level FK to `Unit`
+2. Resolve legacy definition-level unit strings where possible
 3. Backfill `RegionAttributeValue.unit`
-4. Update maps forms, serializers, filters, summary views, and cross-app consumers to prefer `value.unit`
-5. Retain fallback to `attribute.unit` temporarily where data is incomplete or still in transition
+4. Remove fallback dependence on legacy definition-level unit strings once coverage is acceptable
 
-### Phase 4a findings completed on 2026-03-26
+### Legacy unit inventory findings completed on 2026-03-26 and still relevant for Phase 4c
 
 **Schema and code state**
 
@@ -326,33 +338,43 @@ Run this phase in two explicit sub-steps.
 - observed value counts are small in the current dev database
 - none of the non-blank current dev `maps_attribute.unit` values matched an existing `Unit` by `name` or `symbol`
 
-**Implications for Phase 4b**
+**Runtime backfill result on the current working database**
 
-- Phase 4b should not assume the existing `Unit` table is already aligned with maps unit strings
+- running `python manage.py backfill_region_attribute_value_units` examined `139403` `RegionAttributeValue` rows with `unit_id IS NULL`
+- `0` rows were backfilled and `0` non-blank labels were unresolved
+- all `139403` examined rows had blank `Attribute.unit`
+- in the current working database, the immediate Phase 4c blocker is therefore missing legacy unit metadata rather than label normalization
+
+**Implications for Phase 4c**
+
+- Phase 4c should not assume the existing `Unit` table is already aligned with maps unit strings
 - deterministic unit resolution should match both `Unit.name` and `Unit.symbol`
 - where no matching `Unit` exists, the migration path must explicitly decide between creating new `Unit` rows, seeding canonical units first, or leaving specific values unresolved for manual cleanup
 - the most important remaining migration boundary is not the presence of the FK itself, but completing backfill and reducing dependence on fallback rendering
+- for the current working database, Phase 4c must distinguish between values that are intentionally unitless and values whose units are missing data that needs remediation
 
 ### Why this phase matters
 
-This is the single biggest structural difference between maps and the other numeric-property domains.
+This is the phase that makes maps follow the same concrete-table pattern as materials and the intended end-state for the other numeric domains.
 
-Once maps has value-level units, cross-domain numeric handling becomes much more coherent.
+Once maps owns both its quantitative definition table and its value-level units, cross-domain behavior can stay shared without hiding domain ownership in the schema.
 
 ### Risks
 
 - Medium
+- Introducing `RegionProperty` touches both schema and runtime assumptions at once
 - Existing maps values may rely on free-text unit strings that do not resolve cleanly to `Unit`
-- Some consumers outside the maps app currently read `rav.attribute.unit`; those paths must be updated carefully
-- Some summary and export paths still identify map measurements by attribute name strings, so unit migration may expose additional coupling that should be cleaned up at the same time
+- Some consumers outside the maps app currently read maps definitions and units via `Attribute`; those paths must be updated carefully
+- Some summary and export paths still identify map measurements by attribute name strings, so the property-table migration may expose additional coupling that should be cleaned up at the same time
 
 ### Exit criteria
 
-- the inventory of unit strings and code consumers is complete
-- `RegionAttributeValue` has a `unit` FK
+- maps has a concrete quantitative definition model owned by the maps domain
+- `RegionAttributeValue` points at the maps-owned quantitative definition model
+- `RegionAttributeValue` keeps a value-level `unit` FK
 - existing data is backfilled where units can be resolved safely
 - serializers, views, and cross-app exports render `value.unit` consistently
-- `Attribute.unit` is no longer the only source of unit information and remains only as a transitional compatibility field
+- `Attribute` is retired or reduced to short-lived migration compatibility only during rollout
 
 ---
 
@@ -494,8 +516,8 @@ The remaining plan should explicitly avoid the following.
 | **1. Shared behavior** | Shared mixins for models/forms/serializers | Done | None |
 | **2. Maps semantic split** | Separate categorical maps data from quantitative definitions | Done | 1 |
 | **3. Definition convergence** | Numeric maps definition onto `PropertyBase` | Done | 2 |
-| **4. Maps unit migration** | Inventory unit strings and consumers, complete `RegionAttributeValue.unit` backfill, and reduce fallback dependence | Medium | 3 recommended |
-| **5. Optional abstract DB bases** | Shared concrete field base(s) where justified | Medium-High | 4 |
+| **4. Maps concrete property-table pivot** | Introduce `RegionProperty`, migrate `RegionAttributeValue`, and keep categorical maps data separate | Medium | 3 recommended |
+| **5. Maps unit migration** | Complete `RegionAttributeValue.unit` backfill and reduce fallback dependence on legacy definition-level units | Medium | 4 |
 | **6. Maps provenance decision** | Decide whether to add `sources` to map values | Low-Medium | 4 |
 | **7. Shared services** | Exports, queries, formatting, conversion helpers | Low | 3-6 as needed |
 
@@ -503,19 +525,19 @@ The remaining plan should explicitly avoid the following.
 
 ## 6. Recommended Next Implementation Step
 
-The next implementation step should be **Phase 4b**.
+The next implementation step should be **Phase 4a**.
 
 Why:
 
-- the inventory work is now concrete enough to stop planning and finish the migration boundary
-- the FK and initial backfill already exist, so the remaining risk is incomplete data alignment and fallback dependence rather than missing schema
-- the current dev inventory shows that maps unit strings are not yet aligned with existing `Unit` rows, so Phase 4b must make that decision explicit instead of relying on accidental matches
+- the architecture decision is now explicit: maps should have its own concrete quantitative property table instead of collapsing into the generic `Property` table
+- the work already completed in phases 2 and 3 makes this pivot lower-risk than it would have been earlier
+- the existing unit inventory remains useful, but it should now be applied on top of the correct concrete-table pattern instead of extending `Attribute`
 
-Concretely, the next Phase 4b step should answer these questions in code and data:
+Concretely, the next Phase 4a step should answer these questions in code and data:
 
-- Should unresolved maps units create canonical `Unit` rows automatically, or should canonical units be seeded first and unresolved values left visible for manual cleanup?
-- Which remaining maps values still have `unit_id IS NULL`, and can they be backfilled deterministically from the current `Attribute.unit` labels?
-- Which fallback consumers should remain temporarily, and which should switch to strict value-level-unit behavior once backfill coverage is acceptable?
+- What should the concrete maps-owned quantitative definition model be called, and should it replace `Attribute` directly or through a staged migration?
+- Which maps and cross-app consumers should be migrated in the same batch when `RegionAttributeValue` stops depending on `Attribute`?
+- How should legacy definition-level `Attribute.unit` data be carried forward into the new maps property table and the existing value-level `RegionAttributeValue.unit` field?
 
 ---
 

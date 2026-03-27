@@ -444,7 +444,13 @@ def add_default_temporal_distribution(sender, instance, created, **kwargs):
 
 
 class MaterialProperty(PropertyBase):
-    """Materials-specific property definition."""
+    """
+    Materials-owned quantitative property definition.
+
+    This model is the canonical example of the intended BRIT pattern:
+    each domain owns its concrete ``PropertyBase`` table while reusing the
+    shared review workflow and measurement helpers from ``utils.properties``.
+    """
 
     abbreviation = models.CharField(max_length=50, blank=True)
     comparable_property = models.ForeignKey(
@@ -509,6 +515,8 @@ class MaterialPropertyGroup(NamedUserCreatedObject):
 
 
 class MaterialPropertyValue(NumericMeasurementMixin, UserCreatedObject):
+    """Concrete numeric measurement record linked to ``MaterialProperty``."""
+
     property = models.ForeignKey(MaterialProperty, on_delete=models.PROTECT)
     basis_component = models.ForeignKey(
         MaterialComponent,

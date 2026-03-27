@@ -9,6 +9,8 @@ from utils.properties.models import (
 
 
 class NumericMeasurementSerializerMixin(Serializer):
+    """Shared presentation fields for numeric measurements across domains."""
+
     average = ReadOnlyField(source="display_average")
     standard_deviation = ReadOnlyField(source="display_standard_deviation")
     unit = ReadOnlyField(source="measurement_unit_label")
@@ -29,6 +31,8 @@ class UnitModelSerializer(ModelSerializer):
 
 
 class PropertyModelSerializer(ModelSerializer):
+    """Serializer for the generic ``utils.properties.Property`` table."""
+
     allowed_units = UnitModelSerializer(many=True)
 
     class Meta:
@@ -37,6 +41,8 @@ class PropertyModelSerializer(ModelSerializer):
 
 
 class PropertyValueModelSerializer(NumericMeasurementSerializerMixin, ModelSerializer):
+    """Serializer for ``PropertyValue``-style records that still use generic ``Property``."""
+
     class Meta:
         model = PropertyValue
         fields = (
