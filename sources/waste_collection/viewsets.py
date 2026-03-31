@@ -45,6 +45,7 @@ from utils.object_management.permissions import (
     UserCreatedObjectPermission,
     apply_scope_filter,
     filter_queryset_for_user,
+    get_object_policy,
 )
 from utils.object_management.viewsets import UserCreatedObjectViewSet
 
@@ -239,22 +240,10 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
 
     @staticmethod
     def _require_can_add_property(request, collection):
-        actor = getattr(request, "user", None)
-        if actor is None or not actor.is_authenticated:
-            raise PermissionDenied("Authentication is required for this action.")
-
-        if collection.publication_status == Collection.STATUS_ARCHIVED:
-            raise PermissionDenied(
-                "You do not have permission to add statistics to this collection."
-            )
-
-        if actor.is_staff:
-            return
-
-        if collection.owner_id == actor.id:
-            return
-
-        if collection.publication_status == Collection.STATUS_PUBLISHED:
+        policy = get_object_policy(
+            getattr(request, "user", None), collection, request=request
+        )
+        if policy.get("can_add_property"):
             return
 
         raise PermissionDenied(

@@ -820,6 +820,14 @@ class CollectionMutationApiTestCase(APITestCase):
             codename="add_collection",
             defaults={"name": "Can add collection"},
         )
+        cpv_content_type = ContentType.objects.get_for_model(CollectionPropertyValue)
+        cls.add_collection_property_value_permission, _ = (
+            Permission.objects.get_or_create(
+                content_type=cpv_content_type,
+                codename="add_collectionpropertyvalue",
+                defaults={"name": "Can add collection property value"},
+            )
+        )
         frequency_content_type = ContentType.objects.get_for_model(CollectionFrequency)
         cls.add_collection_frequency_permission, _ = Permission.objects.get_or_create(
             content_type=frequency_content_type,
@@ -827,8 +835,12 @@ class CollectionMutationApiTestCase(APITestCase):
             defaults={"name": "Can add collection frequency"},
         )
         cls.owner.user_permissions.add(cls.add_collection_permission)
+        cls.owner.user_permissions.add(cls.add_collection_property_value_permission)
         cls.owner.user_permissions.add(cls.add_collection_frequency_permission)
         cls.other_user.user_permissions.add(cls.add_collection_permission)
+        cls.other_user.user_permissions.add(
+            cls.add_collection_property_value_permission
+        )
 
         cls.catchment = CollectionCatchment.objects.create(name="Agent Catchment")
         cls.collection_system = CollectionSystem.objects.create(name="Agent System")
@@ -853,6 +865,13 @@ class CollectionMutationApiTestCase(APITestCase):
             abbreviation="AgentSource",
             url="https://example.com/source",
         )
+        cls.property = Property.objects.create(
+            name="Agent Property", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(
+            name="Agent Unit", publication_status="published"
+        )
+        cls.property.allowed_units.add(cls.unit)
 
         cls.predecessor = Collection.objects.create(
             owner=cls.owner,
@@ -1012,6 +1031,45 @@ class CollectionMutationApiTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("valid_until", response.data)
+
+    def test_property_value_create_allows_non_owner_on_published_collection(self):
+        self.client.force_login(self.other_user)
+
+        response = self.client.post(
+            reverse("api-waste-collection-property-value-create"),
+            {
+                "collection": self.predecessor.pk,
+                "property_id": self.property.pk,
+                "unit_name": self.unit.name,
+                "year": 2025,
+                "average": 42.0,
+                "submit_for_review": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        cpv = CollectionPropertyValue.objects.get(pk=response.data["id"])
+        self.assertEqual(cpv.collection, self.predecessor)
+        self.assertEqual(cpv.owner, self.other_user)
+
+    def test_property_value_create_denies_non_owner_on_private_collection(self):
+        self.client.force_login(self.other_user)
+
+        response = self.client.post(
+            reverse("api-waste-collection-property-value-create"),
+            {
+                "collection": self.private_predecessor.pk,
+                "property_id": self.property.pk,
+                "unit_name": self.unit.name,
+                "year": 2025,
+                "average": 42.0,
+                "submit_for_review": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_create_frequency_endpoint_requires_add_permission(self):
         user = User.objects.create_user(username="agent-no-frequency-perm")

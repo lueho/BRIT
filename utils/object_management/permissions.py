@@ -9,6 +9,22 @@ from rest_framework import permissions
 logger = logging.getLogger(__name__)
 
 
+def _get_property_add_permission_codename(obj):
+    try:
+        key = (obj._meta.app_label, obj._meta.model_name)
+    except Exception:
+        return None
+
+    permission_by_object = {
+        ("materials", "sample"): "materials.add_materialpropertyvalue",
+        (
+            "waste_collection",
+            "collection",
+        ): "waste_collection.add_collectionpropertyvalue",
+    }
+    return permission_by_object.get(key)
+
+
 class GlobalObjectPermission(permissions.BasePermission):
     """Allow global-object reads for everyone and writes for staff only."""
 
@@ -452,7 +468,26 @@ def get_object_policy(user, obj, request=None, review_mode=False):
     # Object-specific management helpers
     # If published objects shouldn't mutate, gate with not is_published
     can_manage_samples = (is_owner or is_staff) and not is_archived and not is_published
-    can_add_property = (is_owner or is_staff) and not is_archived
+    property_add_permission = _get_property_add_permission_codename(obj)
+    if property_add_permission is None:
+        can_add_property = (is_owner or is_staff) and not is_archived
+    else:
+        has_property_add_permission = bool(
+            is_authenticated and user.has_perm(property_add_permission)
+        )
+        can_add_property = (
+            has_property_add_permission
+            and not is_archived
+            and (
+                is_staff
+                or is_owner
+                or (
+                    property_add_permission
+                    == "waste_collection.add_collectionpropertyvalue"
+                    and is_published
+                )
+            )
+        )
 
     # Duplicate/new version require model-level add permission.
     can_duplicate = False

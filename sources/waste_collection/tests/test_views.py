@@ -2145,7 +2145,7 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.collection = Collection.objects.create(
-            name="Test Collection", publication_status="published", owner=cls.member
+            name="Test Collection", publication_status="published", owner=cls.owner
         )
         cls.unit = Unit.objects.create(name="Test Unit", publication_status="published")
         cls.prop = Property.objects.create(
@@ -2172,6 +2172,18 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
             reverse(self.url_name, kwargs={"pk": self.collection.pk})
         )
         self.assertEqual(response.status_code, 200)
+
+    def test_detail_shows_add_property_button_for_non_owner_with_permission(self):
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("collection-detail", kwargs={"pk": self.collection.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse(self.url_name, kwargs={"pk": self.collection.pk}),
+        )
 
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)

@@ -8,12 +8,13 @@ from factory.django import mute_signals
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from sources.waste_collection.models import Collection
+from sources.waste_collection.models import Collection, CollectionPropertyValue
 from utils.object_management.models import UserCreatedObject
 
 from ..permissions import (
     GlobalObjectPermission,
     UserCreatedObjectPermission,
+    get_object_policy,
 )
 
 
@@ -184,6 +185,46 @@ class ReviewWorkflowPermissionTests(TestCase):
                 request, self.private_collection
             )
         )
+
+    def test_central_policy_allows_non_owner_with_add_permission_on_published_collection(
+        self,
+    ):
+        cpv_content_type = ContentType.objects.get_for_model(CollectionPropertyValue)
+        permission, _ = Permission.objects.get_or_create(
+            codename="add_collectionpropertyvalue",
+            content_type=cpv_content_type,
+            defaults={"name": "Can add collection property value"},
+        )
+        self.regular_user.user_permissions.add(permission)
+
+        request = self.factory.get("/")
+        request.user = self.regular_user
+
+        policy = get_object_policy(
+            self.regular_user, self.published_collection, request=request
+        )
+
+        self.assertTrue(policy["can_add_property"])
+
+    def test_central_policy_denies_non_owner_with_add_permission_on_private_collection(
+        self,
+    ):
+        cpv_content_type = ContentType.objects.get_for_model(CollectionPropertyValue)
+        permission, _ = Permission.objects.get_or_create(
+            codename="add_collectionpropertyvalue",
+            content_type=cpv_content_type,
+            defaults={"name": "Can add collection property value"},
+        )
+        self.regular_user.user_permissions.add(permission)
+
+        request = self.factory.get("/")
+        request.user = self.regular_user
+
+        policy = get_object_policy(
+            self.regular_user, self.private_collection, request=request
+        )
+
+        self.assertFalse(policy["can_add_property"])
 
 
 class GlobalObjectPermissionTestCase(TestCase):
