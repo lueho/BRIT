@@ -16,18 +16,21 @@ from ..forms import (
     ComponentModelForm,
     MaterialPropertyModelForm,
     MaterialPropertyValueModelForm,
+    SampleModelForm,
     WeightShareInlineFormset,
     WeightShareModelForm,
 )
 from ..models import (
     Composition,
     Material,
+    MaterialCategory,
     MaterialComponent,
     MaterialComponentGroup,
     MaterialProperty,
     Sample,
     SampleSeries,
     WeightShare,
+    get_sample_substrate_category_name,
 )
 
 
@@ -219,6 +222,48 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
         self.assertEqual(
             form.cleaned_data["basis_component"], self.property.default_basis_component
         )
+
+
+class SampleModelFormTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        substrate_category_name = get_sample_substrate_category_name()
+        cls.substrate_category, _ = MaterialCategory.objects.get_or_create(
+            name=substrate_category_name,
+        )
+        cls.other_category, _ = MaterialCategory.objects.get_or_create(
+            name="Simple component"
+        )
+
+        cls.substrate_material = Material.objects.create(name="Food waste mix")
+        cls.substrate_material.categories.add(cls.substrate_category)
+
+        cls.non_substrate_material = Material.objects.create(name="Amino Acids")
+        cls.non_substrate_material.categories.add(cls.other_category)
+
+    def test_material_field_uses_substrate_autocomplete(self):
+        form = SampleModelForm()
+
+        self.assertEqual(
+            form.fields["material"].widget.url,
+            "sample-substrate-material-autocomplete",
+        )
+
+    def test_material_queryset_only_contains_substrate_materials(self):
+        form = SampleModelForm()
+        material_queryset = form.fields["material"].queryset
+
+        self.assertIn(self.substrate_material, material_queryset)
+        self.assertNotIn(self.non_substrate_material, material_queryset)
+
+    def test_material_queryset_preserves_existing_material_on_edit(self):
+        sample = Sample.objects.create(material=self.non_substrate_material)
+
+        form = SampleModelForm(instance=sample)
+        material_queryset = form.fields["material"].queryset
+
+        self.assertIn(self.substrate_material, material_queryset)
+        self.assertIn(self.non_substrate_material, material_queryset)
 
 
 class CompositionUpdateFormTestCase(TestCase):

@@ -44,6 +44,7 @@ from .models import (
     Sample,
     SampleSeries,
     WeightShare,
+    get_or_create_sample_substrate_category,
 )
 
 
@@ -369,7 +370,7 @@ class SampleSeriesAddTemporalDistributionModalModelForm(ModalModelForm):
 class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm):
     material = TomSelectModelChoiceField(
         config=TomSelectConfig(
-            url="material-autocomplete",
+            url="sample-substrate-material-autocomplete",
             label_field="name",
             value_field="id",
         ),
@@ -385,6 +386,19 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
         required=False,
         label="Series",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        substrate_category, _ = get_or_create_sample_substrate_category()
+        material_queryset = Material.objects.filter(
+            type="material",
+            categories=substrate_category,
+        )
+        if self.instance.pk and self.instance.material_id:
+            material_queryset = material_queryset | Material.objects.filter(
+                pk=self.instance.material_id
+            )
+        self.fields["material"].queryset = material_queryset.distinct()
 
     class Meta:
         model = Sample
