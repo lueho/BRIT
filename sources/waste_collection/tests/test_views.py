@@ -3431,7 +3431,7 @@ class CollectionFrequencyDisplayTestCase(TestCase):
         self.assertIn("Every 2 weeks", body)
         self.assertIn("Alternatively:", body)
         self.assertIn("52 collections during this period", body)
-        self.assertIn("Stored canonical label: Seasonal flexibility", body)
+        self.assertNotIn("Stored canonical label:", body)
 
     def test_review_detail_shows_readable_seasonal_frequency(self):
         self.client.force_login(self.staff)
@@ -3448,7 +3448,7 @@ class CollectionFrequencyDisplayTestCase(TestCase):
         self.assertIn("Weekly", body)
         self.assertIn("July to December:", body)
         self.assertIn("Every 2 weeks", body)
-        self.assertIn("Stored canonical label: Seasonal flexibility", body)
+        self.assertNotIn("Stored canonical label:", body)
 
     def test_detail_shows_simple_frequency_inline(self):
         response = self.client.get(
@@ -3459,7 +3459,7 @@ class CollectionFrequencyDisplayTestCase(TestCase):
         self.assertIn("Collection frequency (normalized schedule):", body)
         self.assertIn("5 collections per year", body)
         self.assertNotIn("All year", body)
-        self.assertIn("Stored canonical label: Custom annual collection", body)
+        self.assertNotIn("Stored canonical label:", body)
 
     def test_detail_shows_year_round_with_options_inline(self):
         response = self.client.get(
@@ -3476,7 +3476,7 @@ class CollectionFrequencyDisplayTestCase(TestCase):
         self.assertIn("Alternatively:", body)
         self.assertIn("Every 2 weeks", body)
         self.assertIn("Weekly", body)
-        self.assertIn("Stored canonical label: Year-round with options", body)
+        self.assertNotIn("Stored canonical label:", body)
 
     def test_detail_shows_partial_year_preset_frequency_without_custom_fallback(self):
         response = self.client.get(
