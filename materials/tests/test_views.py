@@ -1684,6 +1684,22 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         unpublished_sample.properties.add(property_value)
         return unpublished_sample
 
+    def test_update_view_prefills_material_autocomplete_with_material_name(self):
+        material = Material.objects.create(
+            owner=self.owner_user,
+            name="Prefill Material Without Abbreviation",
+            abbreviation="",
+            publication_status="private",
+        )
+        self.unpublished_object.material = material
+        self.unpublished_object.save(update_fields=["material"])
+
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_update_url(self.unpublished_object.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, material.name)
+
     def test_list_view_published_as_authenticated_owner(self):
         if not self.public_list_view:
             self.skipTest("List view is not enabled for this test case.")

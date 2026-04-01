@@ -370,7 +370,7 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
     material = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="material-autocomplete",
-            label_field="abbreviation",
+            label_field="name",
             value_field="id",
         ),
         required=False,
@@ -379,7 +379,7 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
     series = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="sampleseries-autocomplete",
-            label_field="abbreviation",
+            label_field="name",
             value_field="id",
         ),
         required=False,
