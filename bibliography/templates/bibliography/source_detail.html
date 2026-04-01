@@ -51,6 +51,13 @@
             {{ object.journal }}
         </p>
     {% endif %}
+    {% if object.volume %}
+        <p class="card-text">
+            <strong>Volume:</strong>
+            <br>
+            {{ object.volume }}
+        </p>
+    {% endif %}
     {% if object.number %}
         <p class="card-text">
             <strong>Number:</strong>
