@@ -466,6 +466,13 @@
             {% else %}
               <div class="p-3 text-muted">No component measurements.</div>
             {% endif %}
+            {% if policy.can_manage_samples and perms.materials.add_componentmeasurement %}
+              <div class="p-3 border-top">
+                <a href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
+                  <i class="fas fa-fw fa-plus"></i> Add measurement
+                </a>
+              </div>
+            {% endif %}
           </div>
         </div>
       </div>

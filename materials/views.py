@@ -9,7 +9,7 @@ from django.contrib.auth.mixins import (
     UserPassesTestMixin,
 )
 from django.db.models import Q
-from django.http import HttpResponseRedirect
+from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.views.generic import ListView, RedirectView, TemplateView
@@ -36,6 +36,7 @@ from utils.object_management.views import (
     UserCreatedObjectModalDeleteView,
     UserCreatedObjectModalDetailView,
     UserCreatedObjectModalUpdateView,
+    UserCreatedObjectReadAccessMixin,
     UserCreatedObjectUpdateView,
     UserCreatedObjectUpdateWithInlinesView,
     UserOwnsObjectMixin,
@@ -464,6 +465,63 @@ class MaterialPropertyAutocompleteView(UserCreatedObjectAutocompleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class SampleBoundCreateMixin(UserPassesTestMixin):
+    sample = None
+    sample_query_param = "sample"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.sample = self.get_sample()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_sample(self):
+        if self.sample is not None:
+            return self.sample
+
+        sample_pk = self.request.GET.get(
+            self.sample_query_param
+        ) or self.request.POST.get(self.sample_query_param)
+        if not sample_pk:
+            raise Http404("Sample query parameter is required.")
+
+        self.sample = get_object_or_404(Sample, pk=sample_pk)
+        return self.sample
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["related_sample"] = self.sample
+        return context
+
+    def get_success_url(self):
+        return self.sample.get_absolute_url()
+
+
+class MaterialPropertyValueCreateView(
+    SampleBoundCreateMixin, UserCreatedObjectCreateView
+):
+    model = MaterialPropertyValue
+    form_class = MaterialPropertyValueModelForm
+    permission_required = "materials.add_materialpropertyvalue"
+
+    def test_func(self):
+        policy = get_object_policy(self.request.user, self.sample, request=self.request)
+        return policy["can_add_property"]
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        self.sample.properties.add(self.object)
+        return response
+
+
+class MaterialPropertyValueDetailView(
+    UserCreatedObjectReadAccessMixin, SingleObjectMixin, RedirectView
+):
+    model = MaterialPropertyValue
+    query_string = True
+
+    def get_redirect_url(self, *args, **kwargs):
+        return self.get_object().get_absolute_url()
+
+
 class MaterialPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
     model = MaterialPropertyValue
 
@@ -479,6 +537,35 @@ class MaterialPropertyValueUpdateView(UserCreatedObjectUpdateView):
 
     def get_success_url(self):
         return self.object.get_absolute_url()
+
+
+class ComponentMeasurementCreateView(
+    SampleBoundCreateMixin, UserCreatedObjectCreateView
+):
+    model = ComponentMeasurement
+    form_class = ComponentMeasurementModelForm
+    permission_required = "materials.add_componentmeasurement"
+
+    def test_func(self):
+        policy = get_object_policy(self.request.user, self.sample, request=self.request)
+        return (
+            self.request.user.has_perm("materials.add_componentmeasurement")
+            and policy["can_manage_samples"]
+        )
+
+    def form_valid(self, form):
+        form.instance.sample = self.sample
+        return super().form_valid(form)
+
+
+class ComponentMeasurementDetailView(
+    UserCreatedObjectReadAccessMixin, SingleObjectMixin, RedirectView
+):
+    model = ComponentMeasurement
+    query_string = True
+
+    def get_redirect_url(self, *args, **kwargs):
+        return self.get_object().get_absolute_url()
 
 
 class ComponentMeasurementUpdateView(UserCreatedObjectUpdateView):

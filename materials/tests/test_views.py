@@ -958,6 +958,85 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(self.value.basis_component, self.alt_basis)
 
 
+class MaterialPropertyValueCreateAndDetailViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = "add_materialpropertyvalue"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.unit = Unit.objects.create(name="g/L", owner=cls.member)
+        cls.default_basis = MaterialComponent.objects.create(
+            owner=cls.member,
+            name="Dry Matter",
+            publication_status="published",
+        )
+        cls.property = MaterialProperty.objects.create(
+            owner=cls.member,
+            name="Dry Matter",
+            unit="g/L",
+            default_basis_component=cls.default_basis,
+            publication_status="published",
+        )
+        cls.property.allowed_units.add(cls.unit)
+        cls.material = Material.objects.create(
+            owner=cls.member,
+            name="Digestate",
+            publication_status="published",
+        )
+        cls.sample = Sample.objects.create(
+            owner=cls.member,
+            name="Sample for property creation",
+            material=cls.material,
+            publication_status="private",
+        )
+        cls.value = MaterialPropertyValue.objects.create(
+            owner=cls.member,
+            property=cls.property,
+            basis_component=cls.default_basis,
+            unit=cls.unit,
+            average=Decimal("12.5"),
+            standard_deviation=Decimal("0.5"),
+            publication_status="private",
+        )
+        cls.sample.properties.add(cls.value)
+
+    def test_create_view_creates_value_for_related_sample_and_redirects(self):
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            f"{reverse('materialpropertyvalue-create')}?sample={self.sample.pk}",
+            data={
+                "property": self.property.pk,
+                "basis_component": self.default_basis.pk,
+                "unit": self.unit.pk,
+                "analytical_method": "",
+                "sources": [],
+                "average": "18.25",
+                "standard_deviation": "0.75",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+        )
+        value = MaterialPropertyValue.objects.get(average=Decimal("18.25"))
+        self.assertEqual(value.owner, self.member)
+        self.assertIn(value, self.sample.properties.all())
+
+    def test_detail_view_redirects_to_related_sample_detail(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse("materialpropertyvalue-detail", kwargs={"pk": self.value.pk})
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+        )
+
+
 class ComponentMeasurementUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
@@ -1066,6 +1145,107 @@ class ComponentMeasurementUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(self.measurement.average, Decimal("14.25"))
         self.assertEqual(self.measurement.sample_size, 3)
         self.assertEqual(self.measurement.comment, "Updated from sample detail")
+
+
+class ComponentMeasurementCreateAndDetailViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = "add_componentmeasurement"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.unit = Unit.objects.filter(name="%").first()
+        if cls.unit is None:
+            cls.unit = Unit.objects.create(name="%", symbol="percent", owner=cls.member)
+        elif not cls.unit.symbol:
+            cls.unit.symbol = "percent"
+            cls.unit.save(update_fields=["symbol"])
+
+        cls.group = MaterialComponentGroup.objects.create(
+            owner=cls.member,
+            name="Composition group",
+            publication_status="published",
+        )
+        cls.component = MaterialComponent.objects.create(
+            owner=cls.member,
+            name="Carbon",
+            publication_status="published",
+        )
+        cls.material = Material.objects.create(
+            owner=cls.member,
+            name="Digestate",
+            publication_status="published",
+        )
+        cls.sample = Sample.objects.create(
+            owner=cls.member,
+            name="Sample for measurement creation",
+            material=cls.material,
+            publication_status="private",
+        )
+        cls.measurement = ComponentMeasurement.objects.create(
+            owner=cls.member,
+            sample=cls.sample,
+            group=cls.group,
+            component=cls.component,
+            unit=cls.unit,
+            average=Decimal("12.5"),
+            standard_deviation=Decimal("0.5"),
+            publication_status="private",
+        )
+
+    def test_sample_detail_shows_measurement_create_link_for_sample_owner(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f"{reverse('componentmeasurement-create')}?sample={self.sample.pk}",
+        )
+
+    def test_create_view_creates_measurement_for_related_sample_and_redirects(self):
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            f"{reverse('componentmeasurement-create')}?sample={self.sample.pk}",
+            data={
+                "group": self.group.pk,
+                "component": self.component.pk,
+                "basis_component": "",
+                "analytical_method": "",
+                "sources": [],
+                "unit": self.unit.pk,
+                "average": "18.25",
+                "standard_deviation": "0.75",
+                "sample_size": "3",
+                "comment": "Created from dedicated route",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+        )
+        measurement = ComponentMeasurement.objects.get(
+            average=Decimal("18.25"),
+            comment="Created from dedicated route",
+        )
+        self.assertEqual(measurement.owner, self.member)
+        self.assertEqual(measurement.sample, self.sample)
+
+    def test_detail_view_redirects_to_related_sample_detail(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse("componentmeasurement-detail", kwargs={"pk": self.measurement.pk})
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+        )
 
 
 # ----------- Analytical Method CRUD -----------------------------------------------------------------------------------

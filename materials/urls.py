@@ -493,6 +493,16 @@ urlpatterns = [
         name="materialproperty-autocomplete",
     ),
     path(
+        "property_values/create/",
+        views.MaterialPropertyValueCreateView.as_view(),
+        name="materialpropertyvalue-create",
+    ),
+    path(
+        "property_values/<int:pk>/",
+        views.MaterialPropertyValueDetailView.as_view(),
+        name="materialpropertyvalue-detail",
+    ),
+    path(
         "property_values/<int:pk>/delete/modal/",
         views.MaterialPropertyValueModalDeleteView.as_view(),
         name="materialpropertyvalue-delete-modal",
@@ -501,6 +511,16 @@ urlpatterns = [
         "property_values/<int:pk>/update/",
         views.MaterialPropertyValueUpdateView.as_view(),
         name="materialpropertyvalue-update",
+    ),
+    path(
+        "component_measurements/create/",
+        views.ComponentMeasurementCreateView.as_view(),
+        name="componentmeasurement-create",
+    ),
+    path(
+        "component_measurements/<int:pk>/",
+        views.ComponentMeasurementDetailView.as_view(),
+        name="componentmeasurement-detail",
     ),
     path(
         "component_measurements/<int:pk>/update/",
