@@ -19,6 +19,7 @@ from django.http import JsonResponse
 from django.http.request import MultiValueDict, QueryDict
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from factory.django import mute_signals
 from openpyxl import load_workbook
 
@@ -5756,6 +5757,26 @@ class DerivedValuesTestCase(TestCase):
         self.assertEqual(derived.property_id, self.property_specific.pk)
         self.assertEqual(derived.unit_id, self.unit_specific.pk)
         self.assertTrue(derived.is_derived)
+
+    def test_create_derived_review_value_copies_submitted_at(self):
+        collection, _ = self._create_collection("review-meta", population=2000)
+        submitted_at = timezone.now() - timedelta(days=1)
+        cpv = self._bulk_create_cpv(
+            name="source-review",
+            collection=collection,
+            property=self.property_specific,
+            unit=self.unit_specific,
+            year=2024,
+            average=10.0,
+            publication_status="review",
+            submitted_at=submitted_at,
+            is_derived=False,
+        )
+        derived, action = create_or_update_derived_cpv(cpv)
+        self.assertEqual(action, "created")
+        self.assertIsNotNone(derived)
+        self.assertEqual(derived.publication_status, "review")
+        self.assertEqual(derived.submitted_at, submitted_at)
 
     def test_create_or_update_updates_existing_derived_value(self):
         collection, _ = self._create_collection("update-val", population=1000)

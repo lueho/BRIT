@@ -362,6 +362,25 @@ def create_or_update_derived_cpv(cpv, *, owner=None, publication_status=None):
     if derived_qs.count() > 1:
         _prune_duplicate_derived_rows(cpv, target_property_id)
 
+    effective_publication_status = (
+        publication_status if publication_status is not None else cpv.publication_status
+    )
+    submitted_at = cpv.submitted_at
+    approved_at = None
+    approved_by = None
+    if effective_publication_status in (
+        CollectionPropertyValue.STATUS_PUBLISHED,
+        CollectionPropertyValue.STATUS_ARCHIVED,
+    ):
+        approved_at = cpv.approved_at
+        approved_by = cpv.approved_by
+    elif effective_publication_status not in (
+        CollectionPropertyValue.STATUS_REVIEW,
+        CollectionPropertyValue.STATUS_PUBLISHED,
+        CollectionPropertyValue.STATUS_ARCHIVED,
+    ):
+        submitted_at = None
+
     # Create or update the derived record
     derived, created = CollectionPropertyValue.objects.update_or_create(
         collection=cpv.collection,
@@ -373,11 +392,10 @@ def create_or_update_derived_cpv(cpv, *, owner=None, publication_status=None):
             "average": computed_avg,
             "unit_id": target_unit_id,
             "owner": owner if owner is not None else cpv.owner,
-            "publication_status": (
-                publication_status
-                if publication_status is not None
-                else cpv.publication_status
-            ),
+            "publication_status": effective_publication_status,
+            "submitted_at": submitted_at,
+            "approved_at": approved_at,
+            "approved_by": approved_by,
         },
     )
     action = "Created" if created else "Updated"
