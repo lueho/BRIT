@@ -38,6 +38,7 @@ from .views import (
     SourcePrivateFilterView,
     SourcePublishedFilterView,
     SourceQuickCreateView,
+    SourceReviewFilterView,
     SourceUpdateView,
 )
 
@@ -129,6 +130,11 @@ urlpatterns = [
         "sources/user/",
         SourcePrivateFilterView.as_view(),
         name="source-list-owned",
+    ),
+    path(
+        "sources/review/",
+        SourceReviewFilterView.as_view(),
+        name="source-list-review",
     ),
     path("sources/create/", SourceCreateView.as_view(), name="source-create"),
     path(

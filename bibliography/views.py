@@ -18,6 +18,7 @@ from utils.object_management.permissions import get_object_policy
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
+    ReviewObjectFilterView,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectCreateWithInlinesView,
@@ -204,6 +205,15 @@ class SourcePublishedFilterView(PublishedObjectFilterView):
 
 
 class SourcePrivateFilterView(PrivateObjectFilterView):
+    model = Source
+    queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
+        "citation_key"
+    )
+    filterset_class = SourceFilter
+    dashboard_url = reverse_lazy("bibliography-explorer")
+
+
+class SourceReviewFilterView(ReviewObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
         "citation_key"

@@ -217,6 +217,7 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     view_modal_create_name = "source-create-modal"
     view_published_list_name = "source-list"
     view_private_list_name = "source-list-owned"
+    view_review_list_name = "source-list-review"
     view_detail_name = "source-detail"
     view_modal_detail_name = "source-detail-modal"
     view_update_name = "source-update"
@@ -392,6 +393,47 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         author_ids = set(source.sourceauthors.values_list("author_id", flat=True))
         self.assertSetEqual(
             author_ids, {self.source_author_1.author.pk, self.source_author_2.author.pk}
+        )
+
+
+class SourceReviewListRegressionTest(ViewWithPermissionsTestCase):
+    member_permissions = ["can_moderate_source"]
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.review_source = Source.objects.create(
+            owner=cls.outsider,
+            title="Review Source",
+            publication_status="review",
+        )
+
+    def test_review_list_is_reachable_for_moderator(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(reverse("source-list-review"), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.redirect_chain,
+            [(f"{reverse('source-list-review')}?scope=review", 302)],
+        )
+        self.assertContains(response, self.review_source.title)
+
+    def test_private_list_uses_dedicated_review_route_for_scope_toggle(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(reverse("source-list-owned"), {"scope": "private"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context["review_representation_url"],
+            reverse("source-list-review"),
+        )
+        self.assertContains(
+            response,
+            f'href="{reverse("source-list-review")}?scope=review"',
+            html=False,
         )
 
 
