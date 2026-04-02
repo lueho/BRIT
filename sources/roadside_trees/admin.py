@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.gis.admin import GISModelAdmin
 
-from sources.roadside_trees.models import HamburgGreenAreas, HamburgRoadsideTrees
+from sources.roadside_trees.models import HamburgRoadsideTrees
 
 
 @admin.register(HamburgRoadsideTrees)
@@ -20,18 +20,4 @@ class HamburgRoadsideTreesAdmin(GISModelAdmin):
     ordering = ("baumid",)
 
 
-@admin.register(HamburgGreenAreas)
-class HamburgGreenAreasAdmin(GISModelAdmin):
-    list_display = (
-        "anlagenname",
-        "belegenheit",
-        "gruenart",
-        "flaeche_ha",
-        "bezirksnummer",
-    )
-    search_fields = ("anlagenname", "belegenheit", "identnummer")
-    list_filter = ("gruenart", "bezirksnummer")
-    ordering = ("anlagenname",)
-
-
-__all__ = ["HamburgGreenAreasAdmin", "HamburgRoadsideTreesAdmin"]
+__all__ = ["HamburgRoadsideTreesAdmin"]

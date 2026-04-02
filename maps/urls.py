@@ -302,6 +302,7 @@ urlpatterns = [
     ),
     path("nantes/", include("sources.greenhouses.urls")),
     path("hamburg/", include("sources.roadside_trees.urls")),
+    path("hamburg/", include("sources.urban_green_spaces.urls")),
     path("locations/", LocationPublishedListView.as_view(), name="location-list"),
     path(
         "locations/user/", LocationPrivateListView.as_view(), name="location-list-owned"

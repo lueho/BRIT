@@ -14,7 +14,8 @@ from sources.greenhouses.models import (
     NantesGreenhouses,
 )
 from sources.registry import get_source_domain_plugin, get_source_domain_plugins
-from sources.roadside_trees.models import HamburgGreenAreas, HamburgRoadsideTrees
+from sources.roadside_trees.models import HamburgRoadsideTrees
+from sources.urban_green_spaces.models import HamburgGreenAreas
 from sources.waste_collection.models import (
     Collection,
     CollectionPropertyValue,
@@ -27,13 +28,22 @@ class SourceDomainPluginContractTestCase(SimpleTestCase):
     def test_registered_source_domain_plugins_expose_stable_slugs(self):
         self.assertEqual(
             tuple(plugin.slug for plugin in get_source_domain_plugins()),
-            ("roadside_trees", "greenhouses", "waste_collection"),
+            (
+                "roadside_trees",
+                "urban_green_spaces",
+                "greenhouses",
+                "waste_collection",
+            ),
         )
 
     def test_registered_source_domain_plugins_declare_app_configs(self):
         self.assertEqual(
             get_source_domain_plugin("roadside_trees").app_config,
             "sources.roadside_trees.apps.RoadsideTreesConfig",
+        )
+        self.assertEqual(
+            get_source_domain_plugin("urban_green_spaces").app_config,
+            "sources.urban_green_spaces.apps.UrbanGreenSpacesConfig",
         )
         self.assertEqual(
             get_source_domain_plugin("greenhouses").app_config,
@@ -45,13 +55,22 @@ class SourceDomainPluginContractTestCase(SimpleTestCase):
         )
 
     def test_registered_source_domain_plugins_expose_urlconfs(self):
-        for slug in ("roadside_trees", "greenhouses", "waste_collection"):
+        for slug in (
+            "roadside_trees",
+            "urban_green_spaces",
+            "greenhouses",
+            "waste_collection",
+        ):
             self.assertTrue(get_source_domain_plugin(slug).get_urlpatterns())
 
     def test_registered_source_domain_plugins_declare_capabilities(self):
         self.assertIn(
             "legacy_redirects",
             get_source_domain_plugin("roadside_trees").capabilities,
+        )
+        self.assertIn(
+            "legacy_redirects",
+            get_source_domain_plugin("urban_green_spaces").capabilities,
         )
         self.assertIn("forms", get_source_domain_plugin("greenhouses").capabilities)
         self.assertIn(
@@ -66,15 +85,21 @@ class SourcesModelAdapterTestCase(SimpleTestCase):
             apps.get_app_config("roadside_trees").name,
             "sources.roadside_trees",
         )
-        self.assertEqual(HamburgGreenAreas._meta.app_label, "roadside_trees")
-        self.assertEqual(
-            HamburgGreenAreas._meta.db_table,
-            "flexibi_hamburg_hamburggreenareas",
-        )
         self.assertEqual(HamburgRoadsideTrees._meta.app_label, "roadside_trees")
         self.assertEqual(
             HamburgRoadsideTrees._meta.db_table,
             "flexibi_hamburg_hamburgroadsidetrees",
+        )
+
+    def test_urban_green_spaces_model_uses_new_app_label_and_preserves_db_table(self):
+        self.assertEqual(
+            apps.get_app_config("urban_green_spaces").name,
+            "sources.urban_green_spaces",
+        )
+        self.assertEqual(HamburgGreenAreas._meta.app_label, "urban_green_spaces")
+        self.assertEqual(
+            HamburgGreenAreas._meta.db_table,
+            "flexibi_hamburg_hamburggreenareas",
         )
 
     def test_flexibi_hamburg_app_label_is_provided_by_migration_shim(self):

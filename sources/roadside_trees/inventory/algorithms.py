@@ -2,8 +2,8 @@ from distributions.plots import Distribution
 from inventories.algorithms import InventoryAlgorithmsBase
 from inventories.models import Scenario
 from materials.models import SampleSeries
-
-from sources.roadside_trees.models import HamburgGreenAreas, HamburgRoadsideTrees
+from sources.roadside_trees.models import HamburgRoadsideTrees
+from sources.urban_green_spaces.models import HamburgGreenAreas
 
 
 class InventoryAlgorithms(InventoryAlgorithmsBase):
@@ -60,9 +60,7 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
                 if amount_share is None:
                     continue
                 value = (
-                    float(share.average)
-                    * float(amount_share)
-                    * float(total_production)
+                    float(share.average) * float(amount_share) * float(total_production)
                 )
                 distribution.add_share(share.timestep, share.component, value)
         else:

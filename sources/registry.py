@@ -1,10 +1,12 @@
 from sources.contracts import SourceDomainPlugin
 from sources.greenhouses.plugin import plugin as greenhouses_plugin
 from sources.roadside_trees.plugin import plugin as roadside_trees_plugin
+from sources.urban_green_spaces.plugin import plugin as urban_green_spaces_plugin
 from sources.waste_collection.plugin import plugin as waste_collection_plugin
 
 _SOURCE_DOMAIN_PLUGINS: tuple[SourceDomainPlugin, ...] = (
     roadside_trees_plugin,
+    urban_green_spaces_plugin,
     greenhouses_plugin,
     waste_collection_plugin,
 )

@@ -1,5 +1,4 @@
 from django.urls import include, path
-from django.views.generic import RedirectView
 
 from sources.roadside_trees.router import router
 from sources.roadside_trees.views import (
@@ -29,11 +28,6 @@ urlpatterns = [
         "roadside_trees/catchment_autocomplete/",
         HamburgRoadsideTreeCatchmentAutocompleteView.as_view(),
         name="hamburgroadsidetrees-catchment-autocomplete",
-    ),
-    path(
-        "green_areas/map/",
-        RedirectView.as_view(url="/maps/", permanent=True),
-        name="HamburgGreenAreas",
     ),
     path("api/", include(router.urls)),
 ]

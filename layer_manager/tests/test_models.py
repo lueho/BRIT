@@ -15,11 +15,10 @@ from layer_manager.models import (
 )
 from maps.models import Catchment, GeoDataset, Region
 from materials.models import Material, MaterialComponent, SampleSeries
-from sources.roadside_trees.models import HamburgGreenAreas
+from sources.urban_green_spaces.models import HamburgGreenAreas
 
 
 class LayerTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         Point(12, 34)
@@ -94,7 +93,6 @@ class LayerTestCase(TestCase):
         layer.create_feature_table()
 
     def test_create_or_replace(self):
-
         results = {
             "avg_area_yield": {
                 "aggregated_values": [
@@ -151,7 +149,6 @@ class LayerTestCase(TestCase):
         del apps.all_models["layer_manager"][table_name]
 
     def test_get_feature_collection(self):
-
         results = {
             "avg_area_yield": {
                 "aggregated_values": [
@@ -241,7 +238,6 @@ class LayerTestCase(TestCase):
 
 
 class LayerAggregatedDistributionTestCase(TestCase):
-
     def setUp(self):
         self.component = MaterialComponent.objects.default()
         self.timestep = Timestep.objects.default()

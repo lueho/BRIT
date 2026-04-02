@@ -126,6 +126,16 @@ class RoadsideTreesPluginIntegrationTestCase(SimpleTestCase):
         )
 
 
+class UrbanGreenSpacesPluginIntegrationTestCase(SimpleTestCase):
+    def test_urban_green_spaces_plugin_keeps_current_public_entry_point(self):
+        self.assertEqual(reverse("HamburgGreenAreas"), "/maps/hamburg/green_areas/map/")
+
+    def test_urban_green_spaces_plugin_stays_outside_sources_hub_for_now(self):
+        plugin = get_source_domain_plugin("urban_green_spaces")
+
+        self.assertFalse(plugin.mount_in_hub)
+
+
 class GreenhousesPluginIntegrationTestCase(SimpleTestCase):
     def test_greenhouses_plugin_exposes_explorer_counter_metadata(self):
         plugin = get_source_domain_plugin("greenhouses")

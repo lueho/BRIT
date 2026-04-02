@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "inventories.apps.InventoriesConfig",
     "sources.apps.SourcesConfig",
     "sources.roadside_trees.apps.RoadsideTreesConfig",
+    "sources.urban_green_spaces.apps.UrbanGreenSpacesConfig",
     "sources.greenhouses.apps.GreenhousesConfig",
     "sources.waste_collection.apps.WasteCollectionConfig",
     "sources.legacy_flexibi_hamburg.apps.LegacyFlexibiHamburgMigrationsConfig",

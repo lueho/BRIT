@@ -31,17 +31,22 @@ from sources.greenhouses.models import (
     GrowthTimeStepSet,
     NantesGreenhouses,
 )
-from sources.roadside_trees.models import HamburgGreenAreas, HamburgRoadsideTrees
+from sources.roadside_trees.models import HamburgRoadsideTrees
+from sources.urban_green_spaces.models import HamburgGreenAreas
 
 
-@override_settings(DEFAULT_OBJECT_OWNER_USERNAME="standard_user", ADMIN_USERNAME="admin")
+@override_settings(
+    DEFAULT_OBJECT_OWNER_USERNAME="standard_user", ADMIN_USERNAME="admin"
+)
 class InventoryExecutionIntegrationTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.default_owner = User.objects.create(username="standard_user")
 
     def setUp(self):
-        average_distribution = TemporalDistribution.objects.filter(name="Average").first()
+        average_distribution = TemporalDistribution.objects.filter(
+            name="Average"
+        ).first()
         if average_distribution is None:
             average_distribution = TemporalDistribution.objects.create(
                 owner=self.default_owner,
@@ -233,7 +238,9 @@ class InventoryExecutionIntegrationTests(TestCase):
 
         return algorithm, custom_values
 
-    def configure_and_run_single_inventory(self, scenario, feedstock, algorithm, values):
+    def configure_and_run_single_inventory(
+        self, scenario, feedstock, algorithm, values
+    ):
         scenario.add_inventory_algorithm(feedstock, algorithm, values)
         execution_plan = scenario.inventory_execution_plan()
         self.assertEqual(len(execution_plan), 1)
@@ -244,7 +251,9 @@ class InventoryExecutionIntegrationTests(TestCase):
             run_inventory_algorithm.run(algorithm.id, **execution_plan[0]["kwargs"])
         )
 
-        return Layer.objects.get(scenario=scenario, feedstock=feedstock, algorithm=algorithm)
+        return Layer.objects.get(
+            scenario=scenario, feedstock=feedstock, algorithm=algorithm
+        )
 
     def build_hamburg_feedstock_profile(self, feedstock, scenario):
         seasonal_distribution = TemporalDistribution.objects.create(
@@ -275,7 +284,9 @@ class InventoryExecutionIntegrationTests(TestCase):
 
         feedstock.add_temporal_distribution(seasonal_distribution)
         summer_values = {summer.id: 0.6, winter.id: 0.4}
-        for sample in feedstock.samples.filter(timestep__distribution=seasonal_distribution):
+        for sample in feedstock.samples.filter(
+            timestep__distribution=seasonal_distribution
+        ):
             composition = Composition.objects.create(
                 owner=self.default_owner,
                 group=macro_components,
@@ -409,13 +420,17 @@ class InventoryExecutionIntegrationTests(TestCase):
         HamburgRoadsideTrees.objects.create(geom=Point(1, 1, srid=4326), baumid=1)
         HamburgRoadsideTrees.objects.create(geom=Point(2, 2, srid=4326), baumid=2)
 
-        layer = self.configure_and_run_single_inventory(scenario, feedstock, algorithm, values)
+        layer = self.configure_and_run_single_inventory(
+            scenario, feedstock, algorithm, values
+        )
         feature_collection = layer.get_feature_collection()
         charts = ScenarioResult(scenario).get_charts()
 
         self.assertEqual(feature_collection.objects.count(), 2)
         self.assertTrue(
-            layer.layeraggregatedvalue_set.filter(name="Total production", unit="Mg/a").exists()
+            layer.layeraggregatedvalue_set.filter(
+                name="Total production", unit="Mg/a"
+            ).exists()
         )
         self.assertTrue(
             layer.layeraggregateddistribution_set.filter(
@@ -426,7 +441,9 @@ class InventoryExecutionIntegrationTests(TestCase):
         self.assertIn("seasonalFeedstockBarChart", charts)
         self.assertTrue(charts["seasonalFeedstockBarChart"]["data"])
 
-    def test_hamburg_roadside_tree_inventory_uses_average_macro_components_for_seasonal_chart(self):
+    def test_hamburg_roadside_tree_inventory_uses_average_macro_components_for_seasonal_chart(
+        self,
+    ):
         region, _catchment, scenario = self.create_region_and_catchment(
             "Hamburg Trees Average Composition",
             offset=5,
@@ -459,7 +476,9 @@ class InventoryExecutionIntegrationTests(TestCase):
         HamburgRoadsideTrees.objects.create(geom=Point(6, 6, srid=4326), baumid=6)
         HamburgRoadsideTrees.objects.create(geom=Point(7, 7, srid=4326), baumid=7)
 
-        layer = self.configure_and_run_single_inventory(scenario, feedstock, algorithm, values)
+        layer = self.configure_and_run_single_inventory(
+            scenario, feedstock, algorithm, values
+        )
         seasonal_distribution = layer.layeraggregateddistribution_set.get(
             name="Seasonal production per component"
         )
@@ -469,7 +488,9 @@ class InventoryExecutionIntegrationTests(TestCase):
         self.assertIn("seasonalFeedstockBarChart", charts)
         self.assertTrue(charts["seasonalFeedstockBarChart"]["data"])
 
-    def test_hamburg_roadside_tree_inventory_tolerates_duplicate_group_and_distribution_names(self):
+    def test_hamburg_roadside_tree_inventory_tolerates_duplicate_group_and_distribution_names(
+        self,
+    ):
         region, _catchment, scenario = self.create_region_and_catchment(
             "Hamburg Trees Duplicate Defaults",
             offset=10,
@@ -524,7 +545,9 @@ class InventoryExecutionIntegrationTests(TestCase):
         HamburgRoadsideTrees.objects.create(geom=Point(11, 11, srid=4326), baumid=11)
         HamburgRoadsideTrees.objects.create(geom=Point(12, 12, srid=4326), baumid=12)
 
-        layer = self.configure_and_run_single_inventory(scenario, feedstock, algorithm, values)
+        layer = self.configure_and_run_single_inventory(
+            scenario, feedstock, algorithm, values
+        )
         charts = ScenarioResult(scenario).get_charts()
 
         self.assertTrue(
@@ -578,12 +601,16 @@ class InventoryExecutionIntegrationTests(TestCase):
             nutzcode=1,
         )
 
-        layer = self.configure_and_run_single_inventory(scenario, feedstock, algorithm, values)
+        layer = self.configure_and_run_single_inventory(
+            scenario, feedstock, algorithm, values
+        )
         feature_collection = layer.get_feature_collection()
         charts = ScenarioResult(scenario).get_charts()
 
         self.assertEqual(feature_collection.objects.count(), 1)
-        self.assertTrue(layer.layeraggregatedvalue_set.filter(name="Total area").exists())
+        self.assertTrue(
+            layer.layeraggregatedvalue_set.filter(name="Total area").exists()
+        )
         self.assertIn("productionPerFeedstockBarChart", charts)
         self.assertIn("seasonalFeedstockBarChart", charts)
 
@@ -697,7 +724,9 @@ class InventoryExecutionIntegrationTests(TestCase):
             ],
         )
 
-        layer = self.configure_and_run_single_inventory(scenario, feedstock, algorithm, values)
+        layer = self.configure_and_run_single_inventory(
+            scenario, feedstock, algorithm, values
+        )
         feature_collection = layer.get_feature_collection()
         charts = ScenarioResult(scenario).get_charts()
 
