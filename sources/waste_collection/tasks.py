@@ -1,5 +1,4 @@
 from types import SimpleNamespace
-import sys
 
 from celery import chord
 from django.contrib.auth import get_user_model
@@ -7,16 +6,8 @@ from django.utils import timezone
 
 from bibliography.utils import check_url, find_wayback_snapshot_for_year
 from brit.celery import app
-
 from sources.waste_collection.filters import WasteFlyerFilter
 from sources.waste_collection.models import WasteFlyer
-
-
-def _compat_symbol(name, default):
-    legacy_module = sys.modules.get("case_studies.soilcom.tasks")
-    if legacy_module is not None and hasattr(legacy_module, name):
-        return getattr(legacy_module, name)
-    return default
 
 
 @app.task(name="check_wasteflyer_url", trail=True)
@@ -25,13 +16,7 @@ def check_wasteflyer_url(pk):
     if flyer is None:
         return False
 
-    compat_check_url = _compat_symbol("check_url", check_url)
-    compat_find_wayback_snapshot_for_year = _compat_symbol(
-        "find_wayback_snapshot_for_year",
-        find_wayback_snapshot_for_year,
-    )
-
-    url_valid = compat_check_url(flyer.url)
+    url_valid = check_url(flyer.url)
 
     if flyer.url and "web.archive.org" in flyer.url:
         flyer.url_valid = url_valid
@@ -46,7 +31,7 @@ def check_wasteflyer_url(pk):
         .first()
     )
     if collection_year:
-        wayback_url = compat_find_wayback_snapshot_for_year(flyer.url, collection_year)
+        wayback_url = find_wayback_snapshot_for_year(flyer.url, collection_year)
         if wayback_url:
             flyer.url = wayback_url
             url_valid = True
@@ -75,8 +60,7 @@ def check_wasteflyer_urls(self, params, user_id=None):
     for flyer in qs:
         signatures.append(check_wasteflyer_url.s(flyer.pk))
     callback = check_wasteflyer_urls_callback.s()
-    compat_chord = _compat_symbol("chord", chord)
-    task_chord = compat_chord(signatures)(callback)
+    task_chord = chord(signatures)(callback)
     return task_chord.task_id
 
 

@@ -31,8 +31,6 @@ from utils.properties.models import Property, Unit
     SOILCOM_POPULATION_ATTRIBUTE_NAME="Population [bio-atlas-test]",
 )
 class BiowasteCollectionAmountViewSetTests(APITestCase):
-    """Regression tests for Karte 18 biowaste amount provenance output."""
-
     endpoint = "/waste_collection/api/waste-atlas/biowaste-collection-amount/"
     outline_endpoint = (
         "/waste_collection/api/waste-atlas/biowaste-collection-amount/"
@@ -41,7 +39,6 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
-        """Create CPV and ACPV-backed test data for the atlas endpoint."""
         cls.specific_property = Property.objects.create(
             name="specific waste collected [bio-atlas-test]"
         )
@@ -169,11 +166,9 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
         )
 
     def setUp(self):
-        """Clear derived-value config cache before each test."""
         clear_derived_value_config_cache()
 
     def tearDown(self):
-        """Clear derived-value config cache after each test."""
         clear_derived_value_config_cache()
 
     @classmethod
@@ -188,7 +183,6 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
 
     @classmethod
     def _create_collection(cls, *, catchment, collection_system, year):
-        """Create a collection row for the biowaste amount endpoint."""
         return Collection.objects.create(
             name=f"{catchment.name}-{collection_system.name}-{year}",
             catchment=catchment,
@@ -199,7 +193,6 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
 
     @classmethod
     def _create_cpv(cls, *, collection, property_obj, unit_obj, year, average):
-        """Create one collection property value for a collection and year."""
         return CollectionPropertyValue.objects.create(
             name=f"CPV {collection.id} {property_obj.id} {year}",
             collection=collection,
@@ -213,7 +206,6 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
 
     @classmethod
     def _create_agg_value(cls, *, collections, property_obj, unit_obj, year, average):
-        """Create one aggregated collection property value linked to collections."""
         agg = AggregatedCollectionPropertyValue.objects.create(
             name=f"ACPV {property_obj.id} {year} {average}",
             property=property_obj,
@@ -226,7 +218,6 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
         return agg
 
     def test_returns_value_sources_for_cpv_and_acpv_rows(self):
-        """Expose ACPV and CPV provenance on the biowaste amount endpoint."""
         response = self.client.get(self.endpoint, {"country": "DE", "year": 2022})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)

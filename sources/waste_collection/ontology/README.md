@@ -49,17 +49,17 @@ docker compose exec -T web python manage.py export_soilcom_vocabulary --fail-on-
 
 Default output:
 
-- `/app/case_studies/soilcom/ontology/export/controlled_vocabulary.json`
+- `/app/sources/waste_collection/ontology/export/controlled_vocabulary.json`
 
 ## Governance rules (URI contract)
 
 1. Every concept gets a stable URI and MUST NOT be renamed in place.
 2. Labels may evolve, IDs/URIs are immutable once released.
 3. New country imports must add:
-   - language mapping in `case_studies/soilcom/vocabulary.py`
+   - language mapping in `sources/waste_collection/vocabulary.py`
    - source crosswalk files under `ontology/mappings/`
    - explicit `target_label` values in crosswalk CSV rows
-4. Vocabulary version increases in `case_studies/soilcom/vocabulary.py`.
+4. Vocabulary version increases in `sources/waste_collection/vocabulary.py`.
 
 The exported vocabulary snapshot includes a machine-readable `semantic_contract`
 object with:

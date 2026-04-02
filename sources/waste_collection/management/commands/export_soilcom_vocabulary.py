@@ -4,7 +4,7 @@ Usage::
 
     docker compose exec web python manage.py export_soilcom_vocabulary
     docker compose exec web python manage.py export_soilcom_vocabulary \
-        --output /app/case_studies/soilcom/ontology/export/controlled_vocabulary.json
+        --output /app/sources/waste_collection/ontology/export/controlled_vocabulary.json
     docker compose exec web python manage.py export_soilcom_vocabulary --fail-on-unmapped
 """
 
@@ -15,7 +15,9 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
-from sources.waste_collection.vocabulary import get_waste_collection_controlled_vocabulary
+from sources.waste_collection.vocabulary import (
+    get_waste_collection_controlled_vocabulary,
+)
 
 
 class Command(BaseCommand):

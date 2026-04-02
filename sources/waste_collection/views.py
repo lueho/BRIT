@@ -24,7 +24,6 @@ from bibliography.views import (
     SourceModalDeleteView,
     SourceModalDetailView,
 )
-from case_studies.soilcom.frequency_service import CollectionFrequencyScheduleService
 from maps.filters import CatchmentFilterSet
 from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.views import (
@@ -73,6 +72,9 @@ from sources.waste_collection.forms import (
     WasteFlyerFormSetHelper,
     WasteFlyerModalModelForm,
     WasteFlyerModelForm,
+)
+from sources.waste_collection.frequency_service import (
+    CollectionFrequencyScheduleService,
 )
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
