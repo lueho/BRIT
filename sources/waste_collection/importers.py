@@ -592,9 +592,6 @@ class CollectionImporter:
             collection.allowed_materials.set(allowed_materials)
             collection.forbidden_materials.set(forbidden_materials)
 
-            if self.publication_status == "review":
-                self._submit_for_review(collection)
-
             if predecessor:
                 collection.predecessors.add(predecessor)
                 if not predecessor.valid_until:
@@ -613,6 +610,9 @@ class CollectionImporter:
                 [*source_urls, *(record.get("flyer_urls") or [])],
                 stats,
             )
+
+            if self.publication_status == "review":
+                self._submit_for_review(collection)
 
         # Property values
         for pv in record.get("property_values") or []:

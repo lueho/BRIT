@@ -13,6 +13,7 @@ from django_filters import CharFilter, FilterSet
 from django_filters.views import FilterView
 from factory.django import mute_signals
 
+from bibliography.models import Source
 from distributions.models import TemporalDistribution
 from maps.models import Catchment, Region
 from sources.waste_collection.models import (
@@ -61,6 +62,13 @@ class ReviewWorkflowViewTests(TestCase):
                 owner=cls.owner,
                 publication_status=UserCreatedObject.STATUS_REVIEW,
             )
+
+        cls.review_source = Source.objects.create(
+            owner=cls.owner,
+            title="Review Workflow Source",
+        )
+        cls.private_collection.sources.add(cls.review_source)
+        cls.review_collection.sources.add(cls.review_source)
 
     def setUp(self):
         # Get content type for URLs
@@ -565,6 +573,13 @@ class ReviewWorkflowModalViewTests(TestCase):
                 owner=cls.owner,
                 publication_status=UserCreatedObject.STATUS_REVIEW,
             )
+
+        cls.review_source = Source.objects.create(
+            owner=cls.owner,
+            title="Review Workflow Modal Source",
+        )
+        cls.private_collection.sources.add(cls.review_source)
+        cls.review_collection.sources.add(cls.review_source)
 
         cls.ct_id = ContentType.objects.get_for_model(Collection).id
 

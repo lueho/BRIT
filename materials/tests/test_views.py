@@ -1652,9 +1652,13 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
 
     @classmethod
     def create_related_objects(cls):
+        substrate_category, _ = MaterialCategory.objects.get_or_create(
+            name=get_sample_substrate_category_name()
+        )
         material = Material.objects.create(
             name="Test Material", publication_status="published"
         )
+        material.categories.add(substrate_category)
         prop = MaterialProperty.objects.create(
             name="Test Property", unit="Test Unit", publication_status="published"
         )
@@ -1685,12 +1689,16 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         return unpublished_sample
 
     def test_update_view_prefills_material_autocomplete_with_material_name(self):
+        substrate_category, _ = MaterialCategory.objects.get_or_create(
+            name=get_sample_substrate_category_name()
+        )
         material = Material.objects.create(
             owner=self.owner_user,
             name="Prefill Material Without Abbreviation",
             abbreviation="",
             publication_status="private",
         )
+        material.categories.add(substrate_category)
         self.unpublished_object.material = material
         self.unpublished_object.save(update_fields=["material"])
 
@@ -2101,7 +2109,11 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        substrate_category, _ = MaterialCategory.objects.get_or_create(
+            name=get_sample_substrate_category_name()
+        )
         cls.material = Material.objects.create(name="Test Material")
+        cls.material.categories.add(substrate_category)
         cls.series = SampleSeries.objects.create(
             name="Test Series", material=cls.material
         )

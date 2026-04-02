@@ -762,6 +762,7 @@ class CollectionModelFormTestCase(TestCase):
                     "frequency": self.frequency.id,
                     "valid_from": date(2024, 1, 1),
                     "connection_type": "VOLUNTARY",
+                    "reviewed_predecessor_evidence": True,
                 }
             ),
             initial=initial_waste_data,
@@ -807,6 +808,7 @@ class CollectionModelFormTestCase(TestCase):
                     "frequency": self.frequency.id,
                     "valid_from": date(2024, 1, 1),
                     "connection_type": "VOLUNTARY",
+                    "reviewed_predecessor_evidence": True,
                 }
             ),
         )
@@ -838,6 +840,7 @@ class CollectionModelFormTestCase(TestCase):
                     "frequency": self.frequency.id,
                     "valid_from": date(2024, 1, 1),
                     "connection_type": "VOLUNTARY",
+                    "reviewed_predecessor_evidence": True,
                 }
             ),
         )
@@ -874,6 +877,7 @@ class CollectionModelFormTestCase(TestCase):
                     "frequency": self.frequency.id,
                     "valid_from": date(2024, 1, 1),
                     "connection_type": "VOLUNTARY",
+                    "reviewed_predecessor_evidence": True,
                 }
             ),
         )
@@ -916,6 +920,7 @@ class CollectionModelFormTestCase(TestCase):
                     "frequency": self.frequency.id,
                     "valid_from": date(2024, 1, 1),
                     "connection_type": "VOLUNTARY",
+                    "reviewed_predecessor_evidence": True,
                 }
             ),
         )

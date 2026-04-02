@@ -5,6 +5,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.utils import timezone
 
+from bibliography.models import Source
 from sources.waste_collection.models import Collection, WasteCategory
 
 from ..models import ReviewAction, UserCreatedObject
@@ -39,6 +40,11 @@ class ReviewWorkflowModelTests(TestCase):
             owner=self.owner,
             publication_status=UserCreatedObject.STATUS_PRIVATE,
         )
+        self.source = Source.objects.create(
+            owner=self.owner,
+            title="Review Workflow Model Source",
+        )
+        self.collection.sources.add(self.source)
 
     def test_submit_for_review(self):
         """Test submitting an object for review."""

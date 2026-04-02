@@ -497,6 +497,26 @@ class Collection(NamedUserCreatedObject):
 
     objects = CollectionQuerySet.as_manager()
 
+    VERSION_REVIEW_FIELD_NAMES = (
+        "catchment",
+        "collector",
+        "collection_system",
+        "waste_category",
+        "frequency",
+        "fee_system",
+        "sorting_method",
+        "allowed_materials",
+        "forbidden_materials",
+        "sources",
+        "flyer_urls",
+        "established",
+        "connection_type",
+        "min_bin_size",
+        "required_bin_capacity",
+        "required_bin_capacity_reference",
+        "description",
+    )
+
     class Meta(NamedUserCreatedObject.Meta):
         db_table = "soilcom_collection"
 
@@ -687,6 +707,78 @@ class Collection(NamedUserCreatedObject):
                 )
         super().clean()
 
+    def review_readiness_errors(self):
+        errors = {}
+
+        attached_sources = list(self.sources.all()) if self.pk else []
+        attached_flyers = list(self.flyers.all()) if self.pk else []
+
+        if not attached_sources and not attached_flyers:
+            errors["sources"] = (
+                "Attach at least one bibliography source or waste flyer before submitting this collection for review."
+            )
+
+        invalid_source_urls = sorted(
+            {
+                source.url
+                for source in attached_sources
+                if source.url and source.url_checked and not source.url_valid
+            }
+        )
+        invalid_flyer_urls = sorted(
+            {
+                flyer.url
+                for flyer in attached_flyers
+                if flyer.url and flyer.url_checked and not flyer.url_valid
+            }
+        )
+        invalid_urls = invalid_source_urls + invalid_flyer_urls
+        if invalid_urls:
+            errors["sources"] = (
+                "Resolve checked-invalid source URLs before review submission: "
+                + "; ".join(invalid_urls)
+            )
+
+        return errors
+
+    def validate_review_readiness(self):
+        errors = self.review_readiness_errors()
+        if errors:
+            raise ValidationError(errors)
+
+    def carried_over_version_review_fields(self):
+        fields = []
+
+        field_values = {
+            "catchment": self.catchment_id,
+            "collector": self.collector_id,
+            "collection_system": self.collection_system_id,
+            "waste_category": self.waste_category_id,
+            "frequency": self.frequency_id,
+            "fee_system": self.fee_system_id,
+            "sorting_method": self.sorting_method_id,
+            "established": self.established,
+            "connection_type": self.connection_type,
+            "min_bin_size": self.min_bin_size,
+            "required_bin_capacity": self.required_bin_capacity,
+            "required_bin_capacity_reference": self.required_bin_capacity_reference,
+            "description": (self.description or "").strip(),
+        }
+        for field_name, value in field_values.items():
+            if value not in (None, ""):
+                fields.append(field_name)
+
+        if self.allowed_materials.exists():
+            fields.append("allowed_materials")
+        if self.forbidden_materials.exists():
+            fields.append("forbidden_materials")
+        if self.sources.exists():
+            fields.append("sources")
+        if self.flyers.exclude(url__isnull=True).exclude(url="").exists():
+            fields.append("flyer_urls")
+
+        return fields
+
     def add_predecessor(self, predecessor):
         """
         Link *predecessor* to the current collection.
@@ -757,6 +849,10 @@ class Collection(NamedUserCreatedObject):
                     action_method()
             except Exception:
                 continue
+
+    def submit_for_review(self):
+        self.validate_review_readiness()
+        return super().submit_for_review()
 
     def approve(self, user=None):
         """

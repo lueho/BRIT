@@ -313,7 +313,7 @@
               <div class="p-3 text-muted">
                 {% if not user.is_authenticated %}
                   No properties recorded. Log in to add properties.
-                {% elif policy.can_add_property %}
+                {% elif policy.is_owner or policy.can_add_property %}
                   No properties recorded. Add your first property.
                 {% else %}
                   No properties recorded.

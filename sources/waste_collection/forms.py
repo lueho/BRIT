@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Case, Value, When
 from django.db.models import IntegerField as DBIntegerField
 from django.forms import (
+    BooleanField,
     CheckboxSelectMultiple,
     ChoiceField,
     DateInput,
@@ -24,15 +25,15 @@ from django_tomselect.forms import (
     TomSelectModelMultipleChoiceField,
 )
 
-from case_studies.soilcom.frequency_service import (
-    CADENCE_CHOICES,
-    CADENCE_CUSTOM,
-    CollectionFrequencyScheduleService,
-)
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import Sample
 from sources.waste_collection.description_formatting import (
     normalize_collection_description,
+)
+from sources.waste_collection.frequency_service import (
+    CADENCE_CHOICES,
+    CADENCE_CUSTOM,
+    CollectionFrequencyScheduleService,
 )
 from sources.waste_collection.models import (
     CONNECTION_TYPE_CHOICES,
@@ -512,30 +513,39 @@ class AggregatedCollectionPropertyValueModelForm(
 
 class CollectionModelFormHelper(FormHelper):
     form_tag = False
-    layout = Layout(
-        Field("catchment"),
-        ForeignkeyField("collector"),
-        ForeignkeyField("collection_system"),
-        Field("sorting_method"),
-        ForeignkeyField("waste_category"),
-        Field("connection_type"),
-        Field("allowed_materials"),
-        Field("forbidden_materials"),
-        Field("samples"),
-        ForeignkeyField("fee_system"),
-        Field("frequency"),
-        Field("min_bin_size"),
-        Field("required_bin_capacity"),
-        Field("required_bin_capacity_reference"),
-        Field("established"),
-        Field("valid_from"),
-        Field("valid_until"),
-        Field("description"),
-        Div(
-            Field("sources", template="bootstrap5/field_no_label.html"),
-            css_class="mt-4",
-        ),
-    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        layout_fields = [
+            Field("catchment"),
+            ForeignkeyField("collector"),
+            ForeignkeyField("collection_system"),
+            Field("sorting_method"),
+            ForeignkeyField("waste_category"),
+            Field("connection_type"),
+            Field("allowed_materials"),
+            Field("forbidden_materials"),
+            Field("samples"),
+            ForeignkeyField("fee_system"),
+            Field("frequency"),
+            Field("min_bin_size"),
+            Field("required_bin_capacity"),
+            Field("required_bin_capacity_reference"),
+            Field("established"),
+            Field("valid_from"),
+            Field("valid_until"),
+            Field("description"),
+        ]
+        form = getattr(self, "form", None)
+        if form is not None and "reviewed_predecessor_evidence" in form.fields:
+            layout_fields.append(Field("reviewed_predecessor_evidence"))
+        layout_fields.append(
+            Div(
+                Field("sources", template="bootstrap5/field_no_label.html"),
+                css_class="mt-4",
+            )
+        )
+        self.layout = Layout(*layout_fields)
 
 
 class CollectionModelForm(
@@ -562,6 +572,18 @@ class CollectionModelForm(
         qs = self._ordered_waste_component_qs()
         self.fields["allowed_materials"].queryset = qs
         self.fields["forbidden_materials"].queryset = qs
+        if self.predecessor is not None:
+            carry_over_fields = self.predecessor.carried_over_version_review_fields()
+            self.fields["reviewed_predecessor_evidence"] = BooleanField(
+                required=bool(carry_over_fields),
+                label=_("I reviewed the carried-over evidence for this new version"),
+                help_text=(
+                    "Review the predecessor evidence before saving this version. "
+                    f"Fields with carried-over evidence: {', '.join(carry_over_fields)}."
+                    if carry_over_fields
+                    else "No evidence-backed predecessor fields need confirmation."
+                ),
+            )
         if not self.is_bound:
             description = self.initial.get("description")
             if description is None and getattr(self.instance, "description", None):
@@ -570,9 +592,25 @@ class CollectionModelForm(
                 normalized_description = normalize_collection_description(description)
                 self.initial["description"] = normalized_description
                 self.fields["description"].initial = normalized_description
+        self.helper = self.Meta.form_helper_class(self)
 
     def clean_description(self):
         return normalize_collection_description(self.cleaned_data.get("description"))
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.predecessor is None:
+            return cleaned_data
+
+        carry_over_fields = self.predecessor.carried_over_version_review_fields()
+        if carry_over_fields and not cleaned_data.get("reviewed_predecessor_evidence"):
+            self.add_error(
+                "reviewed_predecessor_evidence",
+                _(
+                    "Confirm that you reviewed all carried-over predecessor evidence before creating a new version."
+                ),
+            )
+        return cleaned_data
 
     @classmethod
     def _ordered_waste_component_qs(cls):
