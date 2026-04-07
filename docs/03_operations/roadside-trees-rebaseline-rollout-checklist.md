@@ -112,8 +112,8 @@ Out of scope for this pilot:
 
 ## Open questions
 
-- Working app name chosen: `urban_green_spaces`. Remaining question: whether the plugin slug should match exactly or use a shorter public slug.
-- Confirm the production deployment window and rollback procedure for applying the rename migration before the rebaseline cutover.
+- [x] Working app name chosen: `urban_green_spaces`. Remaining question: whether the plugin slug should match exactly or use a shorter public slug.
+- [x] Production deployment completed 2026-04-07. Rollback window and verification steps were successful.
 - Are there any direct SQL consumers outside Django that must be migrated at the same time?
 - Should content type reconciliation remain automated in the final history, or be handled as a one-time operational cutover step?
 - How much of the production migration-recorder rewrite can be automated safely?
@@ -127,7 +127,7 @@ Out of scope for this pilot:
 - [x] Pre-flight audit completed.
 - [x] Rename migration prepared.
 - [x] Rename migration validated on a dev snapshot.
-- [~] Production rename rollout in progress (deployed 2026-04-07, awaiting verification).
+- [x] Production rename rollout completed.
 - [ ] Clean `0001_initial` drafted.
 - [ ] Production cutover procedure drafted.
 - [ ] Legacy shim removed.
