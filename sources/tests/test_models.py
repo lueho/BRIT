@@ -88,7 +88,7 @@ class SourcesModelAdapterTestCase(SimpleTestCase):
         self.assertEqual(HamburgRoadsideTrees._meta.app_label, "roadside_trees")
         self.assertEqual(
             HamburgRoadsideTrees._meta.db_table,
-            "flexibi_hamburg_hamburgroadsidetrees",
+            "roadside_trees_hamburgroadsidetrees",
         )
 
     def test_urban_green_spaces_model_uses_new_app_label_and_preserves_db_table(self):

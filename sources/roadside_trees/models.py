@@ -26,7 +26,7 @@ class HamburgRoadsideTrees(models.Model):
     bezirk = models.CharField(max_length=63, blank=True, null=True)
 
     class Meta:
-        db_table = "flexibi_hamburg_hamburgroadsidetrees"
+        db_table = "roadside_trees_hamburgroadsidetrees"
         verbose_name = "Hamburg Roadside Tree"
         verbose_name_plural = "Hamburg Roadside Trees"
         ordering = ["baumid"]

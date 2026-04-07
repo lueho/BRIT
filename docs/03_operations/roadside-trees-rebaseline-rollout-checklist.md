@@ -18,9 +18,10 @@ Chosen sequence:
 1. Create a dedicated Hamburg green areas domain app and move `HamburgGreenAreas` ownership there while the current migration graph is still active.
 2. Validate that extraction on dev and staging, including inventory and admin flows.
 3. Rename the remaining `flexibi_hamburg_*` roadside-tree tables to `roadside_trees_*`.
-4. Recreate a clean `0001_initial` in the new Hamburg domain apps that matches the extracted and renamed schema.
-5. Update the production `django_migrations` table as part of the migration-history cutover.
-6. Remove the `flexibi_hamburg` legacy shim only after the new baselines are proven.
+4. Deploy and apply that rename on production under the current migration graph.
+5. Recreate a clean `0001_initial` in the new Hamburg domain apps that matches the extracted and renamed schema.
+6. Update the production `django_migrations` table as part of the migration-history cutover.
+7. Remove the `flexibi_hamburg` legacy shim only after the new baselines are proven.
 
 ## Scope
 
@@ -46,6 +47,7 @@ Out of scope for this pilot:
 - `roadside_trees` models point at stable `roadside_trees_*` table names.
 - No runtime code depends on `flexibi_hamburg_*` physical table names.
 - Existing environments can apply the table rename without data loss.
+- Production can apply the current-graph rename before any migration-history rewrite begins.
 - Fresh environments can bootstrap from clean migration baselines in the new Hamburg domain apps.
 - Production migration history can be updated in a controlled and reversible way.
 - The `flexibi_hamburg` shim is no longer required after cutover.
@@ -81,21 +83,27 @@ Out of scope for this pilot:
 - [ ] Verify the renamed tables and indexes in the database.
 - [ ] Validate on a staging-like database before planning production cutover.
 
-### 5. Recreate the clean migration baseline
+### 5. Production rename rollout on the existing graph
+
+- [ ] Deploy the current rename migration to production without changing the historical baseline yet.
+- [ ] Confirm production now uses `roadside_trees_hamburgroadsidetrees` and no longer exposes `flexibi_hamburg_hamburgroadsidetrees`.
+- [ ] Verify ORM reads and critical admin/runtime flows against the renamed production table.
+
+### 6. Recreate the clean migration baseline
 
 - [ ] Replace the transitional migration histories with clean `0001_initial` files that describe the extracted and renamed schema directly.
 - [ ] Ensure the new baselines have no dependency on `flexibi_hamburg`.
 - [ ] Decide whether a small follow-up content-type migration is still needed for existing environments.
 - [ ] Validate that a fresh database can migrate cleanly using only the new app migration histories.
 
-### 6. Production migration-history cutover
+### 7. Production migration-history cutover
 
 - [ ] Write the exact production procedure for updating `django_migrations`.
 - [ ] Rehearse the recorder update on a restored or staging copy of production.
 - [ ] Define rollback steps before touching production.
-- [ ] Apply the production recorder fix only after the schema and new baseline are verified.
+- [ ] Apply the production recorder fix only after the production rename, schema, and new baseline are verified.
 
-### 7. Legacy shim removal
+### 8. Legacy shim removal
 
 - [ ] Remove the `flexibi_hamburg` entries from `INSTALLED_APPS` and `MIGRATION_MODULES`.
 - [ ] Delete `sources/legacy_flexibi_hamburg`.
@@ -105,7 +113,7 @@ Out of scope for this pilot:
 ## Open questions
 
 - Working app name chosen: `urban_green_spaces`. Remaining question: whether the plugin slug should match exactly or use a shorter public slug.
-- What exact `roadside_trees_*` naming convention should be used for the remaining roadside tree tables?
+- Confirm the production deployment window and rollback procedure for applying the rename migration before the rebaseline cutover.
 - Are there any direct SQL consumers outside Django that must be migrated at the same time?
 - Should content type reconciliation remain automated in the final history, or be handled as a one-time operational cutover step?
 - How much of the production migration-recorder rewrite can be automated safely?
@@ -116,9 +124,10 @@ Out of scope for this pilot:
 - [x] Agreed that `HamburgGreenAreas` should move out of `sources.roadside_trees` first.
 - [x] Working app name chosen: `urban_green_spaces`.
 - [x] Extraction work started.
-- [ ] Pre-flight audit started.
-- [ ] Rename migration prepared.
-- [ ] Rename migration validated in Docker.
+- [x] Pre-flight audit completed.
+- [x] Rename migration prepared.
+- [x] Rename migration validated on a dev snapshot.
+- [ ] Production rename rollout completed.
 - [ ] Clean `0001_initial` drafted.
 - [ ] Production cutover procedure drafted.
 - [ ] Legacy shim removed.
