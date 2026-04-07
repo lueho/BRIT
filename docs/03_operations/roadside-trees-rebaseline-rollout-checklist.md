@@ -150,5 +150,124 @@ Out of scope for this pilot:
 
 ### Follow-up tasks
 
-- [ ] Greenhouses (flexibi_nantes) migration re-baseline - similar process pending
+- [ ] Greenhouses (flexibi_nantes) migration re-baseline - see procedure below
 - [ ] Waste collection (soilcom) migration re-baseline - similar process pending
+
+---
+
+## Appendix A: Greenhouses (flexibi_nantes) Re-baseline Procedure
+
+Based on the successful roadside_trees pattern. The greenhouses app has multiple models with legacy `flexibi_nantes_*` table names.
+
+### Current State
+
+**Models with legacy table names:**
+- `NantesGreenhouses` → `flexibi_nantes_nantesgreenhouses`
+- `Greenhouse` → `flexibi_nantes_greenhouse`
+- `Culture` → `flexibi_nantes_culture`
+- `GreenhouseGrowthCycle` → `flexibi_nantes_greenhousegrowthcycle`
+- `GrowthTimeStepSet` → `flexibi_nantes_growthtimestepset`
+- `GrowthShare` → `flexibi_nantes_growthshare`
+- `CaseStudyBaseObjects` → `flexibi_nantes_casestudybaseobjects`
+
+**Current migrations:**
+- `0001_move_legacy_models.py` - Creates model state, depends on `flexibi_nantes`
+- `0002_update_content_types.py` - Updates content types from legacy app
+
+### Procedure Steps
+
+#### Phase 1: Table Renames (Current Migration Graph)
+
+1. **Update model `Meta.db_table` attributes** in `sources/greenhouses/models.py`:
+   ```python
+   # Pattern: greenhouses_<modelname>
+   db_table = "greenhouses_nantesgreenhouses"
+   db_table = "greenhouses_greenhouse"
+   # ... etc for all 7 models
+   ```
+
+2. **Create rename migration** `0003_rename_greenhouses_tables.py`:
+   ```python
+   dependencies = [("greenhouses", "0002_update_content_types")]
+   
+   operations = [
+       migrations.AlterModelTable(name="nantesgreenhouses", table="greenhouses_nantesgreenhouses"),
+       migrations.AlterModelTable(name="greenhouse", table="greenhouses_greenhouse"),
+       # ... etc for all 7 models
+   ]
+   ```
+
+3. **Update tests** that assert `db_table` names
+
+4. **Validate on dev**:
+   ```bash
+   docker compose exec web python manage.py migrate greenhouses
+   docker compose exec web python manage.py test greenhouses --settings=brit.settings.testrunner
+   ```
+
+5. **Deploy to production** - Apply rename under current graph
+
+#### Phase 2: Clean Baseline (Post-Rename)
+
+6. **Remove old migrations**:
+   ```bash
+   rm sources/greenhouses/migrations/0001_move_legacy_models.py
+   rm sources/greenhouses/migrations/0002_update_content_types.py
+   rm sources/greenhouses/migrations/0003_rename_greenhouses_tables.py
+   ```
+
+7. **Generate clean baseline**:
+   ```bash
+   docker compose exec web python manage.py makemigrations greenhouses
+   ```
+   Creates `0001_initial.py` with all 7 models and new table names, no `flexibi_nantes` dependency.
+
+8. **Remove legacy shim** from settings:
+   - Remove `sources.legacy_flexibi_nantes.apps.LegacyFlexibiNantesConfig` from `INSTALLED_APPS`
+   - Remove `"flexibi_nantes": "sources.legacy_flexibi_nantes.migrations"` from `MIGRATION_MODULES`
+   - Delete `sources/legacy_flexibi_nantes/` directory
+
+#### Phase 3: Production Cutover
+
+9. **Execute SQL on production**:
+   ```sql
+   BEGIN;
+   
+   -- Remove old greenhouses migration records
+   DELETE FROM django_migrations 
+   WHERE app = 'greenhouses' 
+   AND name IN ('0001_move_legacy_models', '0002_update_content_types', '0003_rename_greenhouses_tables');
+   
+   -- Remove legacy flexibi_nantes migration records (if any)
+   DELETE FROM django_migrations WHERE app = 'flexibi_nantes';
+   
+   -- Insert new baseline
+   INSERT INTO django_migrations (app, name, applied) 
+   VALUES ('greenhouses', '0001_initial', NOW());
+   
+   COMMIT;
+   ```
+
+10. **Deploy code** with clean baseline
+
+11. **Smoke test**:
+    ```bash
+    docker compose exec web python manage.py showmigrations greenhouses
+    docker compose exec web python manage.py shell -c "from sources.greenhouses.models import Greenhouse; print(Greenhouse.objects.count())"
+    ```
+
+### Key Differences from Roadside Trees
+
+| Aspect | Roadside Trees | Greenhouses |
+|--------|---------------|-------------|
+| Models | 1 (`HamburgRoadsideTrees`) | 7 models |
+| Table renames | 1 | 7 (batch in single migration) |
+| Dependencies | `flexibi_hamburg` | `flexibi_nantes` |
+| Content types | Updated via migration | Same pattern |
+
+### Risk Considerations
+
+- **More models** = more tables to rename in production
+- **Foreign key relationships** between models must remain intact after renames
+- **Test coverage** verify all 7 models work post-rename
+- **Staging validation** recommended before production cutover
