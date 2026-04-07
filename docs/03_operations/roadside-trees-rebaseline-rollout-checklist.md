@@ -283,30 +283,23 @@ Based on the successful roadside_trees pattern. The greenhouses app has multiple
 
 ## Appendix B: Urban Green Spaces Re-baseline Procedure
 
-**Status:** Table rename deployed 2026-04-07. Re-baseline pending.
+**Status:** Clean baseline created 2026-04-07. Production SQL cutover pending next deploy.
 
-Simpler than greenhouses - only 1 model (`HamburgGreenAreas`).
+### Re-baseline Steps
 
-### Current State
-
-- Table: `urban_green_spaces_hamburggreenareas` (already renamed from `flexibi_hamburg_*`)
-- Migrations: `0001_initial.py`, `0002_rename_hamburggreenareas_table.py`
-- Depends on: Nothing (after roadside_trees cleanup)
-
-### Re-baseline Steps (Post-Rename Deploy)
-
-1. **Remove old migrations**:
+- [x] 1. **Remove old migrations**:
    ```bash
    rm sources/urban_green_spaces/migrations/0001_initial.py
    rm sources/urban_green_spaces/migrations/0002_rename_hamburggreenareas_table.py
    ```
 
-2. **Generate clean baseline**:
+- [x] 2. **Generate clean baseline**:
    ```bash
    docker compose exec web python manage.py makemigrations urban_green_spaces
    ```
+   Creates `0001_initial.py` with `db_table = 'urban_green_spaces_hamburggreenareas'`
 
-3. **Production SQL cutover**:
+- [ ] 3. **Production SQL cutover** (run BEFORE deploying this commit):
    ```sql
    BEGIN;
    
@@ -320,4 +313,4 @@ Simpler than greenhouses - only 1 model (`HamburgGreenAreas`).
    COMMIT;
    ```
 
-4. **Deploy** and verify
+- [ ] 4. **Deploy** this commit and verify
