@@ -20,7 +20,7 @@ class HamburgGreenAreas(models.Model):
     stand = models.CharField(max_length=63, blank=True, null=True)
 
     class Meta:
-        db_table = "flexibi_hamburg_hamburggreenareas"
+        db_table = "urban_green_spaces_hamburggreenareas"
 
     @staticmethod
     def get_absolute_url():

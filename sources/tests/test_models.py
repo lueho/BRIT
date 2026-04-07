@@ -99,16 +99,7 @@ class SourcesModelAdapterTestCase(SimpleTestCase):
         self.assertEqual(HamburgGreenAreas._meta.app_label, "urban_green_spaces")
         self.assertEqual(
             HamburgGreenAreas._meta.db_table,
-            "flexibi_hamburg_hamburggreenareas",
-        )
-
-    def test_flexibi_hamburg_app_label_is_provided_by_migration_shim(self):
-        app_config = apps.get_app_config("flexibi_hamburg")
-
-        self.assertEqual(app_config.name, "sources.legacy_flexibi_hamburg")
-        self.assertEqual(
-            settings.MIGRATION_MODULES["flexibi_hamburg"],
-            "sources.legacy_flexibi_hamburg.migrations",
+            "urban_green_spaces_hamburggreenareas",
         )
 
     def test_greenhouse_models_use_sources_app_label_and_preserve_db_tables(self):
