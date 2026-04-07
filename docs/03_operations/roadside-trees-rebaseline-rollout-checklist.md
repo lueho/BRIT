@@ -139,8 +139,15 @@ Out of scope for this pilot:
 
 ### Stale files identified for removal
 
-- [ ] `sources/legacy_flexibi_hamburg/` - Empty directory (migrations deleted, apps.py still present)
-- [ ] Remove `flexibi_hamburg` from `MIGRATION_MODULES` in settings if still present
+- [x] `sources/legacy_flexibi_hamburg/` - Deleted
+- [x] Remove `flexibi_hamburg` from `MIGRATION_MODULES` in settings - Done
+
+### In Progress
+
+- [x] **Urban Green Spaces table rename deployed** 2026-04-07
+  - `flexibi_hamburg_hamburggreenareas` → `urban_green_spaces_hamburggreenareas`
+  - Migration `0002_rename_hamburggreenareas_table.py` applied on production
+  - Next: Re-baseline to clean `0001_initial` (see Appendix B)
 
 ### Stale documentation to update
 
@@ -150,7 +157,7 @@ Out of scope for this pilot:
 
 ### Follow-up tasks
 
-- [ ] Greenhouses (flexibi_nantes) migration re-baseline - see procedure below
+- [ ] Greenhouses (flexibi_nantes) migration re-baseline - see Appendix A
 - [ ] Waste collection (soilcom) migration re-baseline - similar process pending
 
 ---
@@ -271,3 +278,46 @@ Based on the successful roadside_trees pattern. The greenhouses app has multiple
 - **Foreign key relationships** between models must remain intact after renames
 - **Test coverage** verify all 7 models work post-rename
 - **Staging validation** recommended before production cutover
+
+---
+
+## Appendix B: Urban Green Spaces Re-baseline Procedure
+
+**Status:** Table rename deployed 2026-04-07. Re-baseline pending.
+
+Simpler than greenhouses - only 1 model (`HamburgGreenAreas`).
+
+### Current State
+
+- Table: `urban_green_spaces_hamburggreenareas` (already renamed from `flexibi_hamburg_*`)
+- Migrations: `0001_initial.py`, `0002_rename_hamburggreenareas_table.py`
+- Depends on: Nothing (after roadside_trees cleanup)
+
+### Re-baseline Steps (Post-Rename Deploy)
+
+1. **Remove old migrations**:
+   ```bash
+   rm sources/urban_green_spaces/migrations/0001_initial.py
+   rm sources/urban_green_spaces/migrations/0002_rename_hamburggreenareas_table.py
+   ```
+
+2. **Generate clean baseline**:
+   ```bash
+   docker compose exec web python manage.py makemigrations urban_green_spaces
+   ```
+
+3. **Production SQL cutover**:
+   ```sql
+   BEGIN;
+   
+   DELETE FROM django_migrations 
+   WHERE app = 'urban_green_spaces' 
+   AND name IN ('0001_initial', '0002_rename_hamburggreenareas_table');
+   
+   INSERT INTO django_migrations (app, name, applied) 
+   VALUES ('urban_green_spaces', '0001_initial', NOW());
+   
+   COMMIT;
+   ```
+
+4. **Deploy** and verify
