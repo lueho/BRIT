@@ -1,5 +1,8 @@
-from django.test import TestCase
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
+from uuid import uuid4
+
+from django.test import TestCase
 
 from maps.models import Region
 from materials.models import SampleSeries
@@ -20,8 +23,6 @@ from ..models import (
     ScenarioInventoryConfiguration,
     ScenarioStatus,
 )
-from uuid import uuid4
-from unittest.mock import Mock, patch
 
 
 class ScenarioTestCase(TestCase):
@@ -115,7 +116,9 @@ class ScenarioTestCase(TestCase):
             algorithm,
         )
 
-    def test_inventory_algorithm_from_task_reference_supports_legacy_case_studies_paths(self):
+    def test_inventory_algorithm_from_task_reference_supports_legacy_case_studies_paths(
+        self,
+    ):
         algorithm = InventoryAlgorithm.objects.create(
             name="Resolver Algorithm",
             source_module="flexibi_hamburg",
@@ -137,7 +140,9 @@ class ScenarioTestCase(TestCase):
             algorithm,
         )
 
-    def test_inventory_algorithm_task_reference_supports_fully_qualified_module_path(self):
+    def test_inventory_algorithm_task_reference_supports_fully_qualified_module_path(
+        self,
+    ):
         algorithm = InventoryAlgorithm.objects.create(
             name="Resolver Algorithm",
             source_module="sources.roadside_trees.inventory.algorithms",
@@ -221,7 +226,9 @@ class ScenarioTestCase(TestCase):
         self.assertEqual(result, {"result": "ok"})
         execute.assert_called_once_with(example="value")
 
-    def test_serialize_inventory_execution_plan_builds_sources_task_reference_shape(self):
+    def test_serialize_inventory_execution_plan_builds_sources_task_reference_shape(
+        self,
+    ):
         algorithm = InventoryAlgorithm.objects.create(
             name="Resolver Algorithm",
             source_module="flexibi_hamburg",
@@ -255,9 +262,13 @@ class ScenarioTestCase(TestCase):
                 }
             },
         )
-        self.assertIsNot(config[7][algorithm.task_reference], execution_plan[0]["kwargs"])
+        self.assertIsNot(
+            config[7][algorithm.task_reference], execution_plan[0]["kwargs"]
+        )
 
-    def test_is_valid_configuration_scopes_required_parameters_to_current_scenario(self):
+    def test_is_valid_configuration_scopes_required_parameters_to_current_scenario(
+        self,
+    ):
         material = Material.objects.get(name="Feedstock 1")
         feedstock = SampleSeries.objects.create(
             material=material,
@@ -306,7 +317,9 @@ class ScenarioTestCase(TestCase):
         with self.assertRaises(ScenarioConfigurationError):
             self.scenario.is_valid_configuration()
 
-    def test_inventory_algorithm_config_is_scoped_to_feedstock_and_uses_short_names(self):
+    def test_inventory_algorithm_config_is_scoped_to_feedstock_and_uses_short_names(
+        self,
+    ):
         material = Material.objects.get(name="Feedstock 1")
         other_material = Material.objects.get(name="Feedstock 2")
         feedstock = SampleSeries.objects.create(

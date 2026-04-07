@@ -568,7 +568,7 @@ class CollectionReviewActionApiTestCase(APITestCase):
         cls.property.allowed_units.add(cls.unit)
 
     def _create_collection(self, name, owner, publication_status):
-        return Collection.objects.create(
+        collection = Collection.objects.create(
             name=name,
             owner=owner,
             catchment=self.catchment,
@@ -579,6 +579,14 @@ class CollectionReviewActionApiTestCase(APITestCase):
             fee_system=self.fee_system,
             frequency=self.frequency,
         )
+        source = Source.objects.create(
+            owner=owner,
+            title=f"{name} Source",
+            abbreviation=f"{name}-source",
+            url=f"https://example.com/{name.lower().replace(' ', '-')}",
+        )
+        collection.sources.add(source)
+        return collection
 
     def _create_cpv(self, collection, owner, status, year=2020):
         return CollectionPropertyValue.objects.create(
@@ -713,6 +721,7 @@ class CollectionImporterWorkflowTestCase(APITestCase):
             "allowed_materials": "",
             "forbidden_materials": "",
             "description": "",
+            "sources": ["Importer review source"],
             "property_values": [],
             "flyer_urls": [],
         }
@@ -997,6 +1006,7 @@ class CollectionMutationApiTestCase(APITestCase):
                 "catchment": self.catchment.pk,
                 "waste_category": self.waste_category.pk,
                 "collection_system": self.collection_system.pk,
+                "sources": [self.source.pk],
                 "valid_from": "2025-02-01",
             },
             format="json",
@@ -1013,6 +1023,49 @@ class CollectionMutationApiTestCase(APITestCase):
             .filter(action=ReviewAction.ACTION_SUBMITTED)
             .exists()
         )
+
+    def test_create_endpoint_rejects_submit_without_any_evidence(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse("api-waste-collection-create"),
+            {
+                "catchment": self.catchment.pk,
+                "waste_category": self.waste_category.pk,
+                "collection_system": self.collection_system.pk,
+                "valid_from": "2025-02-15",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("sources", response.data)
+
+    def test_create_endpoint_rejects_submit_with_checked_invalid_source(self):
+        self.client.force_login(self.owner)
+        invalid_source = Source.objects.create(
+            owner=self.owner,
+            title="Invalid review source",
+            abbreviation="InvalidReviewSource",
+            url="https://example.com/invalid-source",
+            url_valid=False,
+            url_checked=date(2025, 2, 1),
+        )
+
+        response = self.client.post(
+            reverse("api-waste-collection-create"),
+            {
+                "catchment": self.catchment.pk,
+                "waste_category": self.waste_category.pk,
+                "collection_system": self.collection_system.pk,
+                "sources": [invalid_source.pk],
+                "valid_from": "2025-02-16",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("sources", response.data)
 
     def test_create_endpoint_validates_dates(self):
         self.client.force_login(self.owner)
@@ -1436,6 +1489,7 @@ class CollectionMutationApiTestCase(APITestCase):
             ),
             {
                 "valid_from": "2025-03-01",
+                "reviewed_predecessor_evidence": True,
             },
             format="json",
         )
@@ -1501,7 +1555,11 @@ class CollectionMutationApiTestCase(APITestCase):
                 "api-waste-collection-new-version",
                 kwargs={"pk": own_predecessor.pk},
             ),
-            {"valid_from": "2025-04-02"},
+            {
+                "valid_from": "2025-04-02",
+                "reviewed_predecessor_evidence": True,
+                "submit_for_review": False,
+            },
             format="json",
         )
 
@@ -1521,6 +1579,7 @@ class CollectionMutationApiTestCase(APITestCase):
             {
                 "valid_from": "2025-03-01",
                 "description": "agent successor",
+                "reviewed_predecessor_evidence": True,
                 "submit_for_review": True,
             },
             format="json",
@@ -1553,6 +1612,7 @@ class CollectionMutationApiTestCase(APITestCase):
             {
                 "valid_from": "2025-04-01",
                 "comments": "successor via comments alias",
+                "reviewed_predecessor_evidence": True,
                 "flyer_urls": "https://example.com/version-flyer-a, https://example.com/version-flyer-b",
                 "submit_for_review": False,
             },
@@ -1569,6 +1629,24 @@ class CollectionMutationApiTestCase(APITestCase):
         self.assertTrue(
             successor.flyers.filter(url="https://example.com/version-flyer-b").exists()
         )
+
+    def test_new_version_requires_explicit_predecessor_evidence_review(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-new-version",
+                kwargs={"pk": self.predecessor.pk},
+            ),
+            {
+                "valid_from": "2025-04-15",
+                "submit_for_review": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("reviewed_predecessor_evidence", response.data)
 
 
 class GreenWasteCollectionSystemCountViewSetTests(APITestCase):

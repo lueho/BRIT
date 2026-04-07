@@ -1,5 +1,6 @@
-from .settings import *
 from urllib.parse import urlparse, urlunparse
+
+from .settings import *
 
 SITE_ID = 1
 

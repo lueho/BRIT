@@ -1,6 +1,5 @@
 from django.db import migrations
 
-
 WASTE_COLLECTION_MODEL_NAMES = [
     "aggregatedcollectionpropertyvalue",
     "collection",
@@ -40,4 +39,6 @@ class Migration(migrations.Migration):
         ("soilcom", "0013_move_models_to_sources"),
     ]
 
-    operations = [migrations.RunPython(update_content_types, reverse_update_content_types)]
+    operations = [
+        migrations.RunPython(update_content_types, reverse_update_content_types)
+    ]

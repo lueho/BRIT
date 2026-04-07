@@ -1,6 +1,5 @@
 """Form tests for the processes module."""
 
-from decimal import Decimal
 import unittest
 
 from django.contrib.auth import get_user_model
@@ -90,7 +89,9 @@ class ProcessFormTestCase(TestCase):
         self.assertTrue(form.is_valid())
 
 
-@unittest.skip("ProcessMaterialFormSet not exported - uses InlineFormSetFactory pattern")
+@unittest.skip(
+    "ProcessMaterialFormSet not exported - uses InlineFormSetFactory pattern"
+)
 class ProcessMaterialFormSetTestCase(TestCase):
     """Test ProcessMaterial inline formset."""
 
@@ -102,32 +103,16 @@ class ProcessMaterialFormSetTestCase(TestCase):
 
     def test_valid_formset(self):
         """Valid formset data should be valid."""
-        data = {
-            "process_materials-TOTAL_FORMS": "1",
-            "process_materials-INITIAL_FORMS": "0",
-            "process_materials-0-material": self.material.pk,
-            "process_materials-0-role": ProcessMaterial.Role.INPUT,
-            "process_materials-0-order": "1",
-        }
-        formset = ProcessMaterialFormSet(data, instance=self.process, prefix="process_materials")
-        self.assertTrue(formset.is_valid())
+        pass  # ProcessMaterialFormSet not exported; test skipped
 
     def test_quantity_requires_unit(self):
         """Quantity value should require a unit."""
-        data = {
-            "process_materials-TOTAL_FORMS": "1",
-            "process_materials-INITIAL_FORMS": "0",
-            "process_materials-0-material": self.material.pk,
-            "process_materials-0-role": ProcessMaterial.Role.INPUT,
-            "process_materials-0-quantity_value": "10.5",
-            "process_materials-0-order": "1",
-        }
-        formset = ProcessMaterialFormSet(data, instance=self.process, prefix="process_materials")
-        # The validation happens at model level, not form level
-        self.assertTrue(formset.is_valid())
+        pass  # ProcessMaterialFormSet not exported; test skipped
 
 
-@unittest.skip("ProcessOperatingParameterFormSet not exported - uses InlineFormSetFactory pattern")
+@unittest.skip(
+    "ProcessOperatingParameterFormSet not exported - uses InlineFormSetFactory pattern"
+)
 class ProcessOperatingParameterFormSetTestCase(TestCase):
     """Test ProcessOperatingParameter inline formset."""
 
@@ -138,33 +123,11 @@ class ProcessOperatingParameterFormSetTestCase(TestCase):
 
     def test_valid_formset(self):
         """Valid formset data should be valid."""
-        data = {
-            "operating_parameters-TOTAL_FORMS": "1",
-            "operating_parameters-INITIAL_FORMS": "0",
-            "operating_parameters-0-parameter": ProcessOperatingParameter.Parameter.TEMPERATURE,
-            "operating_parameters-0-nominal_value": "150",
-            "operating_parameters-0-unit": self.unit.pk,
-            "operating_parameters-0-order": "1",
-        }
-        formset = ProcessOperatingParameterFormSet(
-            data, instance=self.process, prefix="operating_parameters"
-        )
-        self.assertTrue(formset.is_valid())
+        pass  # ProcessOperatingParameterFormSet not exported; test skipped
 
     def test_custom_parameter_with_name(self):
         """Custom parameters should allow custom names."""
-        data = {
-            "operating_parameters-TOTAL_FORMS": "1",
-            "operating_parameters-INITIAL_FORMS": "0",
-            "operating_parameters-0-parameter": ProcessOperatingParameter.Parameter.CUSTOM,
-            "operating_parameters-0-name": "Custom Parameter",
-            "operating_parameters-0-nominal_value": "100",
-            "operating_parameters-0-order": "1",
-        }
-        formset = ProcessOperatingParameterFormSet(
-            data, instance=self.process, prefix="operating_parameters"
-        )
-        self.assertTrue(formset.is_valid())
+        pass  # ProcessOperatingParameterFormSet not exported; test skipped
 
 
 class ProcessAddMaterialFormTestCase(TestCase):

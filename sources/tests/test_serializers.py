@@ -3,6 +3,11 @@ from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
+from sources.greenhouses.filters import (
+    CultureListFilter,
+    GreenhouseTypeFilter,
+    NantesGreenhousesFilterSet,
+)
 from sources.greenhouses.forms import (
     CultureModalModelForm,
     CultureModelForm,
@@ -14,11 +19,6 @@ from sources.greenhouses.forms import (
     GrowthTimestepInline,
     InlineGrowthShare,
     UpdateGreenhouseGrowthCycleValuesForm,
-)
-from sources.greenhouses.filters import (
-    CultureListFilter,
-    GreenhouseTypeFilter,
-    NantesGreenhousesFilterSet,
 )
 from sources.greenhouses.renderers import (
     NantesGreenhousesCSVRenderer,
@@ -50,13 +50,14 @@ from sources.waste_collection.filters import (
     WasteFlyerFilter,
 )
 from sources.waste_collection.forms import (
+    CONNECTION_TYPE_CHOICES,
+    REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
     AggregatedCollectionPropertyValueModelForm,
     CollectionAddPredecessorForm,
     CollectionAddWasteSampleForm,
     CollectionFrequencyModalModelForm,
     CollectionFrequencyModelForm,
     CollectionModelForm,
-    CONNECTION_TYPE_CHOICES,
     CollectionPropertyValueModelForm,
     CollectionRemovePredecessorForm,
     CollectionRemoveWasteSampleForm,
@@ -69,7 +70,6 @@ from sources.waste_collection.forms import (
     CollectorModelForm,
     FeeSystemModalModelForm,
     FeeSystemModelForm,
-    REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
     SortingMethodModalModelForm,
     SortingMethodModelForm,
     WasteCategoryModalModelForm,
@@ -96,7 +96,9 @@ from sources.waste_collection.tasks import check_wasteflyer_url, check_wasteflye
 class SourcesSerializerAdapterTestCase(SimpleTestCase):
     def test_waste_collection_serializers_are_owned_by_sources(self):
         self.assertGreater(GEOMETRY_SIMPLIFY_TOLERANCE, 0)
-        self.assertEqual(CollectionFlatSerializer.__module__, "sources.waste_collection.serializers")
+        self.assertEqual(
+            CollectionFlatSerializer.__module__, "sources.waste_collection.serializers"
+        )
         self.assertEqual(
             WasteCollectionGeometrySerializer.__module__,
             "sources.waste_collection.serializers",
@@ -131,35 +133,61 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
         )
 
     def test_waste_collection_filters_and_renderers_are_owned_by_sources(self):
-        self.assertEqual(CollectionFrequencyListFilter.__module__, "sources.waste_collection.filters")
-        self.assertEqual(CollectionFilterSet.__module__, "sources.waste_collection.filters")
-        self.assertEqual(CollectionSystemListFilter.__module__, "sources.waste_collection.filters")
+        self.assertEqual(
+            CollectionFrequencyListFilter.__module__, "sources.waste_collection.filters"
+        )
+        self.assertEqual(
+            CollectionFilterSet.__module__, "sources.waste_collection.filters"
+        )
+        self.assertEqual(
+            CollectionSystemListFilter.__module__, "sources.waste_collection.filters"
+        )
         self.assertEqual(CollectorFilter.__module__, "sources.waste_collection.filters")
-        self.assertEqual(FeeSystemListFilter.__module__, "sources.waste_collection.filters")
-        self.assertEqual(WasteCategoryListFilter.__module__, "sources.waste_collection.filters")
-        self.assertEqual(WasteComponentListFilter.__module__, "sources.waste_collection.filters")
-        self.assertEqual(WasteFlyerFilter.__module__, "sources.waste_collection.filters")
-        self.assertEqual(CollectionCSVRenderer.__module__, "sources.waste_collection.renderers")
-        self.assertEqual(CollectionXLSXRenderer.__module__, "sources.waste_collection.renderers")
+        self.assertEqual(
+            FeeSystemListFilter.__module__, "sources.waste_collection.filters"
+        )
+        self.assertEqual(
+            WasteCategoryListFilter.__module__, "sources.waste_collection.filters"
+        )
+        self.assertEqual(
+            WasteComponentListFilter.__module__, "sources.waste_collection.filters"
+        )
+        self.assertEqual(
+            WasteFlyerFilter.__module__, "sources.waste_collection.filters"
+        )
+        self.assertEqual(
+            CollectionCSVRenderer.__module__, "sources.waste_collection.renderers"
+        )
+        self.assertEqual(
+            CollectionXLSXRenderer.__module__, "sources.waste_collection.renderers"
+        )
 
     def test_waste_collection_filters_are_owned_by_sources(self):
-        self.assertEqual(CollectionFilterSet.__module__, "sources.waste_collection.filters")
+        self.assertEqual(
+            CollectionFilterSet.__module__, "sources.waste_collection.filters"
+        )
         self.assertEqual(
             CollectionSystemListFilter.__module__,
             "sources.waste_collection.filters",
         )
         self.assertEqual(CollectorFilter.__module__, "sources.waste_collection.filters")
-        self.assertEqual(WasteFlyerFilter.__module__, "sources.waste_collection.filters")
+        self.assertEqual(
+            WasteFlyerFilter.__module__, "sources.waste_collection.filters"
+        )
 
     def test_waste_collection_renderers_are_owned_by_sources(self):
-        self.assertEqual(CollectionCSVRenderer.__module__, "sources.waste_collection.renderers")
+        self.assertEqual(
+            CollectionCSVRenderer.__module__, "sources.waste_collection.renderers"
+        )
         self.assertEqual(
             CollectionXLSXRenderer.__module__,
             "sources.waste_collection.renderers",
         )
 
     def test_roadside_tree_filters_and_serializers_are_owned_by_sources(self):
-        self.assertEqual(HamburgRoadsideTreesFilterSet.__module__, "sources.roadside_trees.filters")
+        self.assertEqual(
+            HamburgRoadsideTreesFilterSet.__module__, "sources.roadside_trees.filters"
+        )
         self.assertEqual(
             HamburgRoadsideTreeFlatSerializer.__module__,
             "sources.roadside_trees.serializers",
@@ -256,7 +284,9 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
             CollectionFrequencyModelForm.__module__,
             "sources.waste_collection.forms",
         )
-        self.assertEqual(CollectionModelForm.__module__, "sources.waste_collection.forms")
+        self.assertEqual(
+            CollectionModelForm.__module__, "sources.waste_collection.forms"
+        )
         self.assertEqual(
             CollectionPropertyValueModelForm.__module__,
             "sources.waste_collection.forms",
@@ -269,7 +299,9 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
             CollectionRemoveWasteSampleForm.__module__,
             "sources.waste_collection.forms",
         )
-        self.assertEqual(CollectionSeasonForm.__module__, "sources.waste_collection.forms")
+        self.assertEqual(
+            CollectionSeasonForm.__module__, "sources.waste_collection.forms"
+        )
         self.assertEqual(
             CollectionSeasonFormHelper.__module__,
             "sources.waste_collection.forms",
@@ -290,12 +322,16 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
             CollectorModalModelForm.__module__,
             "sources.waste_collection.forms",
         )
-        self.assertEqual(CollectorModelForm.__module__, "sources.waste_collection.forms")
+        self.assertEqual(
+            CollectorModelForm.__module__, "sources.waste_collection.forms"
+        )
         self.assertEqual(
             FeeSystemModalModelForm.__module__,
             "sources.waste_collection.forms",
         )
-        self.assertEqual(FeeSystemModelForm.__module__, "sources.waste_collection.forms")
+        self.assertEqual(
+            FeeSystemModelForm.__module__, "sources.waste_collection.forms"
+        )
         self.assertEqual(
             SortingMethodModalModelForm.__module__,
             "sources.waste_collection.forms",
@@ -309,17 +345,23 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
             WasteFlyerModalModelForm.__module__,
             "sources.waste_collection.forms",
         )
-        self.assertEqual(WasteFlyerModelForm.__module__, "sources.waste_collection.forms")
+        self.assertEqual(
+            WasteFlyerModelForm.__module__, "sources.waste_collection.forms"
+        )
         self.assertEqual(
             WasteCategoryModalModelForm.__module__,
             "sources.waste_collection.forms",
         )
-        self.assertEqual(WasteCategoryModelForm.__module__, "sources.waste_collection.forms")
+        self.assertEqual(
+            WasteCategoryModelForm.__module__, "sources.waste_collection.forms"
+        )
         self.assertEqual(
             WasteComponentModalModelForm.__module__,
             "sources.waste_collection.forms",
         )
-        self.assertEqual(WasteComponentModelForm.__module__, "sources.waste_collection.forms")
+        self.assertEqual(
+            WasteComponentModelForm.__module__, "sources.waste_collection.forms"
+        )
         self.assertEqual(
             SortingMethodModelForm.__module__,
             "sources.waste_collection.forms",
@@ -354,7 +396,9 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
             importlib.reload(geojson)
 
         try:
-            self.assertIs(geojson.WasteCollectionGeometrySerializer, geometry_serializer)
+            self.assertIs(
+                geojson.WasteCollectionGeometrySerializer, geometry_serializer
+            )
             self.assertEqual(geojson.GEOMETRY_SIMPLIFY_TOLERANCE, tolerance)
         finally:
             importlib.reload(geojson)
@@ -371,7 +415,9 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
             importlib.reload(geojson)
 
         try:
-            self.assertIs(geojson.HamburgRoadsideTreeGeometrySerializer, geometry_serializer)
+            self.assertIs(
+                geojson.HamburgRoadsideTreeGeometrySerializer, geometry_serializer
+            )
         finally:
             importlib.reload(geojson)
 

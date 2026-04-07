@@ -33,12 +33,12 @@ def warm_collection_geojson_cache(self):
     """
     from django.db.models import F
 
+    from maps.db_functions import SimplifyPreserveTopology
     from sources.waste_collection.geojson import (
-        Collection,
         GEOMETRY_SIMPLIFY_TOLERANCE,
+        Collection,
         WasteCollectionGeometrySerializer,
     )
-    from maps.db_functions import SimplifyPreserveTopology
 
     logger.info("Starting Collection GeoJSON cache warm-up")
 

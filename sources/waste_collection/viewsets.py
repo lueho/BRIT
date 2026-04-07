@@ -1,11 +1,12 @@
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Exists, F, OuterRef, Q
 from django.urls import reverse
 from django_filters import rest_framework as rf_filters
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
@@ -346,7 +347,10 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 "You do not have permission to submit this collection for review."
             )
 
-        collection.submit_for_review()
+        try:
+            collection.submit_for_review()
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.message_dict or exc.messages) from exc
         ReviewAction.objects.create(
             content_type=ContentType.objects.get_for_model(collection.__class__),
             object_id=collection.pk,
@@ -1009,7 +1013,12 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 "fee_system",
                 "sorting_method",
             )
-            .prefetch_related("allowed_materials", "forbidden_materials")
+            .prefetch_related(
+                "allowed_materials",
+                "forbidden_materials",
+                "sources",
+                "flyers",
+            )
             .first()
         )
         if predecessor is None:

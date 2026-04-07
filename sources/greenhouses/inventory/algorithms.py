@@ -5,7 +5,6 @@ from distributions.plots import Distribution
 from inventories.algorithms import InventoryAlgorithmsBase
 from inventories.models import Scenario
 from materials.models import SampleSeries
-
 from sources.greenhouses.models import Greenhouse, NantesGreenhouses
 
 

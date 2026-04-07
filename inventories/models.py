@@ -1,8 +1,8 @@
 import importlib
 import pkgutil
+
 from celery.result import AsyncResult
 from celery.states import READY_STATES
-
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
 from django.db import models
@@ -69,7 +69,9 @@ class InventoryAlgorithm(models.Model):
         source_module = InventoryAlgorithm.normalize_source_module(source_module)
         if "." in source_module:
             return source_module
-        return InventoryAlgorithm.SOURCE_MODULE_PATH_ALIASES.get(source_module, source_module)
+        return InventoryAlgorithm.SOURCE_MODULE_PATH_ALIASES.get(
+            source_module, source_module
+        )
 
     @staticmethod
     def task_reference_lookup_candidates(source_module):
@@ -107,7 +109,9 @@ class InventoryAlgorithm(models.Model):
 
     @staticmethod
     def available_functions(module_name):
-        module = importlib.import_module(InventoryAlgorithm.get_module_path(module_name))
+        module = importlib.import_module(
+            InventoryAlgorithm.get_module_path(module_name)
+        )
         return [
             alg
             for alg in module.InventoryAlgorithms.__dict__
@@ -247,7 +251,7 @@ def auto_default(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=InventoryAlgorithmParameterValue)
-def manage_scenario_status(sender, instance, created, **kwargs):
+def manage_parameter_value_defaults(sender, instance, created, **kwargs):
     """
     Makes sure that defaults are always set correctly, even if the user provides incoherent input.
     """
@@ -266,13 +270,17 @@ class ScenarioConfigurationError(Exception):
 
 class WrongParameterForInventoryAlgorithm(Exception):
     def __init__(self, value):
-        f"""The provided value: {value} does not belong to a parameter of the chosen algorithm."""
+        super().__init__(
+            f"The provided value: {value} does not belong to a parameter of the chosen algorithm."
+        )
 
 
 class FeedstockNotImplemented(Exception):
     def __init__(self, feedstock):
-        f"""The feedstock: {feedstock} cannot be included because there is not dataset and or 
-        algorithm for it in this region"""
+        super().__init__(
+            f"The feedstock: {feedstock} cannot be included because there is not dataset and or "
+            "algorithm for it in this region"
+        )
 
 
 SCENARIO_STATUS = (
@@ -388,7 +396,6 @@ class Scenario(NamedUserCreatedObject):
         geodataset: GeoDataset = None,
         geodatasets: QuerySet = None,
     ):
-
         if feedstocks is None and feedstock is None:
             feedstocks = Material.objects.filter(type="material")
         elif feedstocks is None and feedstock is not None:
@@ -413,7 +420,6 @@ class Scenario(NamedUserCreatedObject):
         )
 
     def remaining_inventory_algorithm_options(self, feedstock, geodataset):
-
         if ScenarioInventoryConfiguration.objects.filter(
             scenario=self, feedstock=feedstock, geodataset=geodataset
         ):
@@ -531,8 +537,7 @@ class Scenario(NamedUserCreatedObject):
 
         # Get all inventory algorithms that are used in this scenario
         algorithms = [
-            c.inventory_algorithm
-            for c in configuration.distinct("inventory_algorithm")
+            c.inventory_algorithm for c in configuration.distinct("inventory_algorithm")
         ]
 
         # Are all required parameters included in the configuration?
@@ -598,7 +603,10 @@ class Scenario(NamedUserCreatedObject):
                         "feedstock_id": feedstock,
                     },
                 }
-            if parameter and parameter not in inventory_config[feedstock][algorithm.id]["kwargs"]:
+            if (
+                parameter
+                and parameter not in inventory_config[feedstock][algorithm.id]["kwargs"]
+            ):
                 inventory_config[feedstock][algorithm.id]["kwargs"][parameter] = {
                     "value": value,
                     "standard_deviation": standard_deviation,
@@ -622,7 +630,6 @@ class Scenario(NamedUserCreatedObject):
         return inventory_config
 
     def configuration_for_template(self):
-
         config = {}
         for entry in self.configuration().select_related(
             "feedstock", "inventory_algorithm", "inventory_parameter", "inventory_value"

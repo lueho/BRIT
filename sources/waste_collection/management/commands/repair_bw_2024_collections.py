@@ -155,7 +155,7 @@ class Command(BaseCommand):
             )
         records = list(serializer.validated_data)
 
-        totals = {key: 0 for key in _IMPORT_STAT_KEYS}
+        totals = dict.fromkeys(_IMPORT_STAT_KEYS, 0)
         totals["warnings"] = []
         totals["skipped"] += len(local_warnings)
 

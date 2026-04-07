@@ -216,14 +216,16 @@ class ProcessDetailSerializer(serializers.ModelSerializer):
     categories = ProcessCategorySerializer(many=True, read_only=True)
     owner_name = serializers.CharField(source="owner.username", read_only=True)
     parent_name = serializers.CharField(source="parent.name", read_only=True)
-    
+
     # Related objects
     process_materials = ProcessMaterialAPISerializer(many=True, read_only=True)
-    operating_parameters = ProcessOperatingParameterSerializer(many=True, read_only=True)
+    operating_parameters = ProcessOperatingParameterSerializer(
+        many=True, read_only=True
+    )
     links = ProcessLinkSerializer(many=True, read_only=True)
     info_resources = ProcessInfoResourceSerializer(many=True, read_only=True)
     references = ProcessReferenceSerializer(many=True, read_only=True)
-    
+
     # Convenience properties
     input_materials = serializers.SerializerMethodField()
     output_materials = serializers.SerializerMethodField()
@@ -261,17 +263,11 @@ class ProcessDetailSerializer(serializers.ModelSerializer):
 
     def get_input_materials(self, obj):
         """Get list of input materials."""
-        return [
-            {"id": m.id, "name": m.name}
-            for m in obj.input_materials
-        ]
+        return [{"id": m.id, "name": m.name} for m in obj.input_materials]
 
     def get_output_materials(self, obj):
         """Get list of output materials."""
-        return [
-            {"id": m.id, "name": m.name}
-            for m in obj.output_materials
-        ]
+        return [{"id": m.id, "name": m.name} for m in obj.output_materials]
 
     def get_sources(self, obj):
         """Get distinct literature sources."""

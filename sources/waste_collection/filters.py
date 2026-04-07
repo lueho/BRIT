@@ -17,17 +17,6 @@ from django_filters import (
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
 
-from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
-from utils.filters import (
-    NullableRangeFilter,
-    UserCreatedObjectScopedFilterSet,
-)
-from utils.object_management.permissions import (
-    apply_scope_filter,
-    filter_queryset_for_user,
-)
-from utils.widgets import NullableRangeSliderWidget
-
 from sources.waste_collection.models import (
     CONNECTION_TYPE_CHOICES,
     REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
@@ -43,6 +32,16 @@ from sources.waste_collection.models import (
     WasteComponent,
     WasteFlyer,
 )
+from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
+from utils.filters import (
+    NullableRangeFilter,
+    UserCreatedObjectScopedFilterSet,
+)
+from utils.object_management.permissions import (
+    apply_scope_filter,
+    filter_queryset_for_user,
+)
+from utils.widgets import NullableRangeSliderWidget
 
 
 class CollectorFilter(UserCreatedObjectScopedFilterSet):

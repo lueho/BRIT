@@ -2,9 +2,8 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
 
 from maps.views import CatchmentAutocompleteView, GeoDataSetPublishedFilteredMapView
-from utils.file_export.views import GenericUserCreatedObjectExportView
-
 from sources.roadside_trees.filters import HamburgRoadsideTreesFilterSet
+from utils.file_export.views import GenericUserCreatedObjectExportView
 
 
 class RoadsideTreesPublishedMapView(GeoDataSetPublishedFilteredMapView):

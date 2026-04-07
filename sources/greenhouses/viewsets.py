@@ -3,14 +3,13 @@ from django.http import JsonResponse
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from utils.viewsets import AutoPermModelViewSet
-
 from sources.greenhouses.filters import NantesGreenhousesFilterSet
 from sources.greenhouses.models import NantesGreenhouses
 from sources.greenhouses.serializers import (
     NantesGreenhousesGeometrySerializer,
     NantesGreenhousesModelSerializer,
 )
+from utils.viewsets import AutoPermModelViewSet
 
 
 class NantesGreenhousesViewSet(AutoPermModelViewSet):

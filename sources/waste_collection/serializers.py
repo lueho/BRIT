@@ -6,17 +6,17 @@ from rest_framework_gis.fields import GeometrySerializerMethodField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from bibliography.models import Source
-from case_studies.soilcom.frequency_service import (
-    CADENCE_CHOICES,
-    CADENCE_CUSTOM,
-    CollectionFrequencyScheduleService,
-)
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material
 from sources.waste_collection import models
 from sources.waste_collection.description_formatting import (
     flatten_collection_description,
     normalize_collection_description,
+)
+from sources.waste_collection.frequency_service import (
+    CADENCE_CHOICES,
+    CADENCE_CUSTOM,
+    CollectionFrequencyScheduleService,
 )
 from utils.object_management.permissions import get_object_policy
 from utils.properties.models import Property
@@ -1150,6 +1150,10 @@ class CollectionMutationVersionSerializer(
         allow_null=True,
     )
     description = serializers.CharField(required=False, allow_blank=True)
+    reviewed_predecessor_evidence = serializers.BooleanField(
+        required=False,
+        default=False,
+    )
     submit_for_review = serializers.BooleanField(required=False, default=True)
 
     def validate_description(self, value):
@@ -1159,6 +1163,16 @@ class CollectionMutationVersionSerializer(
         predecessor = self.context.get("predecessor")
         if predecessor is None:
             raise serializers.ValidationError("A predecessor collection is required.")
+
+        carry_over_fields = predecessor.carried_over_version_review_fields()
+        if carry_over_fields and not attrs.get("reviewed_predecessor_evidence"):
+            raise serializers.ValidationError(
+                {
+                    "reviewed_predecessor_evidence": (
+                        "Confirm that you reviewed all carried-over predecessor evidence before creating a new version."
+                    )
+                }
+            )
 
         valid_from = attrs.get("valid_from")
         valid_until = attrs.get("valid_until")

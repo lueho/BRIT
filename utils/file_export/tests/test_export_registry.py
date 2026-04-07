@@ -1,5 +1,5 @@
-from collections import OrderedDict, namedtuple
 import importlib
+from collections import OrderedDict, namedtuple
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 

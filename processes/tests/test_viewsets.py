@@ -60,7 +60,7 @@ class ProcessCategoryViewSetTestCase(APITestCase):
             publication_status="published",
         )
         process.categories.add(self.category1)
-        
+
         response = self.client.get(
             f"/processes/api/categories/{self.category1.pk}/processes/"
         )
@@ -78,7 +78,7 @@ class ProcessViewSetTestCase(APITestCase):
             owner=self.owner,
             publication_status="published",
         )
-        
+
         self.process1 = Process.objects.create(
             name="Pyrolysis",
             short_description="Thermal decomposition",
@@ -87,14 +87,14 @@ class ProcessViewSetTestCase(APITestCase):
             publication_status="published",
         )
         self.process1.categories.add(self.category)
-        
+
         self.process2 = Process.objects.create(
             name="Gasification",
             mechanism="Partial Oxidation",
             owner=self.owner,
             publication_status="published",
         )
-        
+
         # Add materials
         self.material_in = Material.objects.create(
             name="Wood Chips",
@@ -106,7 +106,7 @@ class ProcessViewSetTestCase(APITestCase):
             owner=self.owner,
             publication_status="published",
         )
-        
+
         ProcessMaterial.objects.create(
             process=self.process1,
             material=self.material_in,
@@ -117,14 +117,14 @@ class ProcessViewSetTestCase(APITestCase):
             material=self.material_out,
             role=ProcessMaterial.Role.OUTPUT,
         )
-        
+
         # Add operating parameters
         self.unit = Unit.objects.create(
             name="°C",
             owner=self.owner,
             publication_status="published",
         )
-        
+
         ProcessOperatingParameter.objects.create(
             process=self.process1,
             parameter=ProcessOperatingParameter.Parameter.TEMPERATURE,
@@ -195,13 +195,13 @@ class ProcessViewSetTestCase(APITestCase):
 
     def test_variants_action(self):
         """API should return process variants."""
-        variant = Process.objects.create(
+        Process.objects.create(
             name="Fast Pyrolysis",
             parent=self.process1,
             owner=self.owner,
             publication_status="published",
         )
-        
+
         response = self.client.get(
             f"/processes/api/processes/{self.process1.pk}/variants/"
         )

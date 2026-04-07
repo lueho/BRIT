@@ -39,7 +39,7 @@ class ProcessCategorySerializerTestCase(TestCase):
         """Serializer should serialize category correctly."""
         serializer = ProcessCategorySerializer(self.category)
         data = serializer.data
-        
+
         self.assertEqual(data["name"], "Thermochemical")
         self.assertEqual(data["description"], "Test description")
         self.assertEqual(data["publication_status"], "published")
@@ -48,7 +48,7 @@ class ProcessCategorySerializerTestCase(TestCase):
         """Serializer should deserialize valid data."""
         data = {"name": "New Category", "description": "New description"}
         serializer = ProcessCategorySerializer(data=data)
-        
+
         # Note: owner field is read-only and set in the view
         self.assertTrue(serializer.is_valid())
 
@@ -63,7 +63,7 @@ class ProcessMaterialSerializerTestCase(TestCase):
             name="Wood Chips", owner=self.owner, publication_status="published"
         )
         self.unit = Unit.objects.create(name="kg", owner=self.owner)
-        
+
         self.process_material = ProcessMaterial.objects.create(
             process=self.process,
             material=self.material,
@@ -76,7 +76,7 @@ class ProcessMaterialSerializerTestCase(TestCase):
         """Serializer should serialize process material correctly."""
         serializer = ProcessMaterialAPISerializer(self.process_material)
         data = serializer.data
-        
+
         self.assertEqual(data["role"], ProcessMaterial.Role.INPUT)
         self.assertEqual(data["role_display"], "Input")
         self.assertEqual(float(data["quantity_value"]), 10.5)
@@ -89,7 +89,7 @@ class ProcessOperatingParameterSerializerTestCase(TestCase):
         self.owner = get_user_model().objects.create(username="test_user")
         self.process = Process.objects.create(name="Test Process", owner=self.owner)
         self.unit = Unit.objects.create(name="°C", owner=self.owner)
-        
+
         self.parameter = ProcessOperatingParameter.objects.create(
             process=self.process,
             parameter=ProcessOperatingParameter.Parameter.TEMPERATURE,
@@ -102,8 +102,10 @@ class ProcessOperatingParameterSerializerTestCase(TestCase):
         """Serializer should serialize parameter correctly."""
         serializer = ProcessOperatingParameterSerializer(self.parameter)
         data = serializer.data
-        
-        self.assertEqual(data["parameter"], ProcessOperatingParameter.Parameter.TEMPERATURE)
+
+        self.assertEqual(
+            data["parameter"], ProcessOperatingParameter.Parameter.TEMPERATURE
+        )
         self.assertEqual(data["parameter_display"], "Temperature")
         self.assertEqual(float(data["value_min"]), 100)
         self.assertEqual(float(data["value_max"]), 200)
@@ -117,7 +119,7 @@ class ProcessListSerializerTestCase(TestCase):
         self.category = ProcessCategory.objects.create(
             name="Thermochemical", owner=self.owner
         )
-        
+
         self.process = Process.objects.create(
             name="Pyrolysis",
             short_description="Test description",
@@ -131,7 +133,7 @@ class ProcessListSerializerTestCase(TestCase):
         """List serializer should include basic process info."""
         serializer = ProcessListSerializer(self.process)
         data = serializer.data
-        
+
         self.assertEqual(data["name"], "Pyrolysis")
         self.assertEqual(data["short_description"], "Test description")
         self.assertEqual(data["mechanism"], "Thermal Decomposition")
@@ -147,7 +149,7 @@ class ProcessDetailSerializerTestCase(TestCase):
         self.category = ProcessCategory.objects.create(
             name="Thermochemical", owner=self.owner
         )
-        
+
         self.process = Process.objects.create(
             name="Pyrolysis",
             short_description="Test description",
@@ -157,11 +159,11 @@ class ProcessDetailSerializerTestCase(TestCase):
             publication_status="published",
         )
         self.process.categories.add(self.category)
-        
+
         # Add materials
         self.material_in = Material.objects.create(name="Wood Chips", owner=self.owner)
         self.material_out = Material.objects.create(name="Bio-oil", owner=self.owner)
-        
+
         ProcessMaterial.objects.create(
             process=self.process,
             material=self.material_in,
@@ -177,7 +179,7 @@ class ProcessDetailSerializerTestCase(TestCase):
         """Detail serializer should include all process information."""
         serializer = ProcessDetailSerializer(self.process)
         data = serializer.data
-        
+
         self.assertEqual(data["name"], "Pyrolysis")
         self.assertEqual(data["description"], "Detailed description")
         self.assertEqual(len(data["input_materials"]), 1)

@@ -42,7 +42,9 @@ class ProcessCategoryFilterTestCase(TestCase):
 
     def test_no_filter_returns_all(self):
         """Empty filter should return all categories."""
-        filterset = ProcessCategoryFilter(data={}, queryset=ProcessCategory.objects.all())
+        filterset = ProcessCategoryFilter(
+            data={}, queryset=ProcessCategory.objects.all()
+        )
         self.assertEqual(filterset.qs.count(), 3)
 
 
@@ -51,14 +53,14 @@ class ProcessFilterTestCase(TestCase):
 
     def setUp(self):
         self.owner = get_user_model().objects.create(username="test_user")
-        
+
         self.category1 = ProcessCategory.objects.create(
             name="Thermochemical", owner=self.owner, publication_status="published"
         )
         self.category2 = ProcessCategory.objects.create(
             name="Biochemical", owner=self.owner, publication_status="published"
         )
-        
+
         self.process1 = Process.objects.create(
             name="Pyrolysis",
             mechanism="Thermal Decomposition",
@@ -66,7 +68,7 @@ class ProcessFilterTestCase(TestCase):
             publication_status="published",
         )
         self.process1.categories.add(self.category1)
-        
+
         self.process2 = Process.objects.create(
             name="Gasification",
             mechanism="Partial Oxidation",
@@ -74,7 +76,7 @@ class ProcessFilterTestCase(TestCase):
             publication_status="published",
         )
         self.process2.categories.add(self.category1)
-        
+
         self.process3 = Process.objects.create(
             name="Anaerobic Digestion",
             mechanism="Fermentation",
@@ -82,13 +84,13 @@ class ProcessFilterTestCase(TestCase):
             publication_status="published",
         )
         self.process3.categories.add(self.category2)
-        
+
         self.parent_process = Process.objects.create(
             name="Parent Process",
             owner=self.owner,
             publication_status="published",
         )
-        
+
         self.child_process = Process.objects.create(
             name="Child Process",
             parent=self.parent_process,
@@ -132,7 +134,7 @@ class ProcessFilterTestCase(TestCase):
             owner=self.owner,
             publication_status="draft",
         )
-        
+
         filterset = ProcessFilter(
             data={"publication_status": "published"}, queryset=Process.objects.all()
         )
@@ -148,7 +150,7 @@ class ProcessFilterTestCase(TestCase):
             material=material,
             role=ProcessMaterial.Role.INPUT,
         )
-        
+
         filterset = ProcessFilter(
             data={"input_material": "Wood"}, queryset=Process.objects.all()
         )
@@ -165,7 +167,7 @@ class ProcessFilterTestCase(TestCase):
             material=material,
             role=ProcessMaterial.Role.OUTPUT,
         )
-        
+
         filterset = ProcessFilter(
             data={"output_material": "Bio-oil"}, queryset=Process.objects.all()
         )

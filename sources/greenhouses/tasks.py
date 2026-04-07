@@ -2,7 +2,6 @@ from django.http.request import MultiValueDict, QueryDict
 
 import utils.file_export.storages
 from brit.celery import app
-
 from sources.greenhouses.filters import NantesGreenhousesFilterSet
 from sources.greenhouses.models import NantesGreenhouses
 from sources.greenhouses.renderers import (

@@ -1,18 +1,21 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout, Row
 from django.forms import CheckboxSelectMultiple, RadioSelect
-from django_filters.filters import BooleanFilter, ModelChoiceFilter, MultipleChoiceFilter
+from django_filters.filters import (
+    BooleanFilter,
+    ModelChoiceFilter,
+    MultipleChoiceFilter,
+)
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
 
 from maps.models import Catchment
+from sources.greenhouses.models import Culture, Greenhouse, NantesGreenhouses
 from utils.filters import BaseCrispyFilterSet, UserCreatedObjectScopedFilterSet
 from utils.object_management.permissions import (
     apply_scope_filter,
     filter_queryset_for_user,
 )
-
-from sources.greenhouses.models import Culture, Greenhouse, NantesGreenhouses
 
 HEATING_CHOICES = (
     ("", "All"),

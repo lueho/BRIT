@@ -32,6 +32,8 @@ from urllib.request import Request, urlopen
 import openpyxl
 from django.core.management.base import BaseCommand, CommandError
 
+from ...sweden_2024_map_data import load_map_details
+
 # ---------------------------------------------------------------------------
 # Default file paths (local, relative to cwd)
 # ---------------------------------------------------------------------------
@@ -40,7 +42,7 @@ _PDF_2022 = Path("husha-llsavfall-i-siffror-2022.pdf")
 _PDF_2023 = Path("husha-llsavfall-i-siffror-2023.pdf")
 _PDF_2024 = Path("husha-llsavfall-i-siffror-2024.pdf")
 _MUNICIPALITIES_CSV = Path("sweden_municipalities.csv")
-
+_MAP_DATA_2024 = Path("sweden_2024_map_data.json")
 _BATCH_SIZE = 50
 _VALID_STATUSES = ("private", "review")
 
@@ -401,7 +403,6 @@ _LAU_IDS = {
     "Ystad": "1286",
     "Älmhult": "0765",
     "Älvdalen": "2039",
-    "Älvkarleby": "0319",
     "Älvsbyn": "2560",
     "Ängelholm": "1292",
     "Åmål": "1492",
@@ -757,6 +758,38 @@ def _parse_excel_2021(path: Path) -> list[dict]:
             )
 
     return records
+
+
+def _apply_2024_map_details(
+    records: list[dict], map_details_by_lau: dict[str, dict[str, object]]
+) -> list[dict]:
+    if not map_details_by_lau:
+        return records
+
+    updated_records = []
+    for record in records:
+        if record.get("waste_category") != _WASTE_CATEGORY_FOOD:
+            updated_records.append(record)
+            continue
+
+        lau_id = (record.get("nuts_or_lau_id") or "").strip().zfill(4)
+        details = map_details_by_lau.get(lau_id)
+        if not lau_id or not details:
+            updated_records.append(record)
+            continue
+
+        updated_record = dict(record)
+        if details.get("no_collection"):
+            updated_record["collection_system"] = _COLLECTION_SYSTEM_NONE
+            updated_record["sorting_method"] = ""
+            updated_record["allowed_materials"] = ""
+            updated_record["property_values"] = []
+        else:
+            updated_record["sorting_method"] = details.get("sorting_method") or ""
+            updated_record["allowed_materials"] = details.get("bag_material") or ""
+        updated_records.append(updated_record)
+
+    return updated_records
 
 
 def _parse_pdf(path: Path, data_year: int) -> list[dict]:
@@ -1231,6 +1264,16 @@ class Command(BaseCommand):
                 f"(default: {_MUNICIPALITIES_CSV})."
             ),
         )
+        parser.add_argument(
+            "--map-data-2024",
+            type=str,
+            default="",
+            help=(
+                "Optional raw JSON artifact from prepare_sweden_2024_map_data. "
+                "Legacy prepared CSV files are also accepted. Rows flagged for "
+                "manual review are ignored."
+            ),
+        )
 
     # ------------------------------------------------------------------
     # Auth helpers
@@ -1321,6 +1364,17 @@ class Command(BaseCommand):
                 f"Warning: No collector website mappings loaded (CSV not found or empty: {csv_path}).\n"
             )
 
+        prepared_map_details: dict[str, dict[str, object]] = {}
+        map_data_2024 = (options.get("map_data_2024") or "").strip()
+        if map_data_2024:
+            map_data_path = Path(map_data_2024)
+            if not map_data_path.exists():
+                raise CommandError(f"2024 map-data file not found: {map_data_path}")
+            prepared_map_details = load_map_details(map_data_path)
+            self.stdout.write(
+                f"Loaded 2024 map details for {len(prepared_map_details)} municipalities.\n"
+            )
+
         # Resolve auth token
         token = options.get("token")
         if not token:
@@ -1358,6 +1412,8 @@ class Command(BaseCommand):
                     records = _parse_excel_2021(path)
                 else:
                     records = _parse_pdf(path, year)
+                    if year == 2024 and prepared_map_details:
+                        records = _apply_2024_map_details(records, prepared_map_details)
             except CommandError:
                 raise
             except Exception as exc:

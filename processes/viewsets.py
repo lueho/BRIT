@@ -4,7 +4,7 @@ Provides RESTful API endpoints for all process-related models.
 """
 
 from django.db.models import Count, Prefetch
-from rest_framework import filters, permissions, status, viewsets
+from rest_framework import filters, permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -18,7 +18,6 @@ from .serializers import (
     ProcessCategorySerializer,
     ProcessDetailSerializer,
     ProcessListSerializer,
-    ProcessMaterialAPISerializer,
     ProcessOperatingParameterSerializer,
 )
 
@@ -60,7 +59,7 @@ class ProcessViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Optimize queries with select/prefetch related."""
         queryset = Process.objects.filter(publication_status="published")
-        
+
         if self.action == "list":
             queryset = queryset.select_related("owner", "parent").prefetch_related(
                 "categories"
@@ -83,7 +82,7 @@ class ProcessViewSet(viewsets.ModelViewSet):
                 "info_resources",
                 "references__source",
             )
-        
+
         return queryset
 
     def get_serializer_class(self):
@@ -96,16 +95,16 @@ class ProcessViewSet(viewsets.ModelViewSet):
     def materials(self, request, pk=None):
         """Get all materials (inputs and outputs) for this process."""
         process = self.get_object()
-        return Response({
-            "inputs": [
-                {"id": m.id, "name": m.name}
-                for m in process.input_materials
-            ],
-            "outputs": [
-                {"id": m.id, "name": m.name}
-                for m in process.output_materials
-            ],
-        })
+        return Response(
+            {
+                "inputs": [
+                    {"id": m.id, "name": m.name} for m in process.input_materials
+                ],
+                "outputs": [
+                    {"id": m.id, "name": m.name} for m in process.output_materials
+                ],
+            }
+        )
 
     @action(detail=True, methods=["get"])
     def parameters(self, request, pk=None):
@@ -119,23 +118,25 @@ class ProcessViewSet(viewsets.ModelViewSet):
     def parameters_by_type(self, request, pk=None):
         """Get operating parameters grouped by type."""
         process = self.get_object()
-        
+
         params_by_type = {}
         for param in process.operating_parameters.all():
             param_type = param.get_parameter_display()
             if param_type not in params_by_type:
                 params_by_type[param_type] = []
-            
-            params_by_type[param_type].append({
-                "id": param.id,
-                "name": param.name if param.name else param_type,
-                "value_min": param.value_min,
-                "value_max": param.value_max,
-                "nominal_value": param.nominal_value,
-                "unit": param.unit.name if param.unit else None,
-                "basis": param.basis,
-            })
-        
+
+            params_by_type[param_type].append(
+                {
+                    "id": param.id,
+                    "name": param.name if param.name else param_type,
+                    "value_min": param.value_min,
+                    "value_max": param.value_max,
+                    "nominal_value": param.nominal_value,
+                    "unit": param.unit.name if param.unit else None,
+                    "basis": param.basis,
+                }
+            )
+
         return Response(params_by_type)
 
     @action(detail=True, methods=["get"])
@@ -167,28 +168,30 @@ class ProcessViewSet(viewsets.ModelViewSet):
         categories = ProcessCategory.objects.filter(
             publication_status="published"
         ).prefetch_related("processes")
-        
+
         result = []
         for category in categories:
             processes = category.processes.filter(publication_status="published")
             if processes.exists():
-                result.append({
-                    "category": ProcessCategorySerializer(category).data,
-                    "processes": ProcessListSerializer(processes, many=True).data,
-                })
-        
+                result.append(
+                    {
+                        "category": ProcessCategorySerializer(category).data,
+                        "processes": ProcessListSerializer(processes, many=True).data,
+                    }
+                )
+
         return Response(result)
 
     @action(detail=False, methods=["get"])
     def by_mechanism(self, request):
         """Get processes grouped by mechanism."""
         processes = self.get_queryset()
-        
+
         mechanisms = {}
         for process in processes:
             mechanism = process.mechanism or "Other"
             if mechanism not in mechanisms:
                 mechanisms[mechanism] = []
             mechanisms[mechanism].append(ProcessListSerializer(process).data)
-        
+
         return Response(mechanisms)

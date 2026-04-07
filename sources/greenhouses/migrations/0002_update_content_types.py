@@ -1,6 +1,5 @@
 from django.db import migrations
 
-
 GREENHOUSE_MODEL_NAMES = [
     "casestudybaseobjects",
     "culture",
@@ -33,4 +32,6 @@ class Migration(migrations.Migration):
         ("flexibi_nantes", "0005_move_models_to_sources"),
     ]
 
-    operations = [migrations.RunPython(update_content_types, reverse_update_content_types)]
+    operations = [
+        migrations.RunPython(update_content_types, reverse_update_content_types)
+    ]

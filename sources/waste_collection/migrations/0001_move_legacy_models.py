@@ -1,24 +1,25 @@
 import datetime
+
 import django.core.validators
 import django.db.models.deletion
 import django.utils.timezone
-import utils.object_management.models
-import utils.properties.models
 from django.conf import settings
 from django.db import migrations, models
 
+import utils.object_management.models
+import utils.properties.models
+
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('soilcom', '0012_remove_wastestream_model'),
-        ('bibliography', '0006_alter_source_url'),
-        ('distributions', '0004_alter_period_publication_status_and_more'),
-        ('maps', '0005_alter_attribute_publication_status_and_more'),
-        ('materials', '0007_merge_20260217_0951'),
-        ('properties', '0006_merge_20260217_0951'),
+        ("soilcom", "0012_remove_wastestream_model"),
+        ("bibliography", "0006_alter_source_url"),
+        ("distributions", "0004_alter_period_publication_status_and_more"),
+        ("maps", "0005_alter_attribute_publication_status_and_more"),
+        ("materials", "0007_merge_20260217_0951"),
+        ("properties", "0006_merge_20260217_0951"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -26,359 +27,1373 @@ class Migration(migrations.Migration):
         migrations.SeparateDatabaseAndState(
             database_operations=[],
             state_operations=[
-                        migrations.CreateModel(
-                            name='CollectionCatchment',
-                            fields=[
-                            ],
-                            options={
-                                'proxy': True,
-                                'indexes': [],
-                                'constraints': [],
-                            },
-                            bases=('maps.catchment',),
+                migrations.CreateModel(
+                    name="CollectionCatchment",
+                    fields=[],
+                    options={
+                        "proxy": True,
+                        "indexes": [],
+                        "constraints": [],
+                    },
+                    bases=("maps.catchment",),
+                ),
+                migrations.CreateModel(
+                    name="CollectionSeason",
+                    fields=[],
+                    options={
+                        "proxy": True,
+                        "indexes": [],
+                        "constraints": [],
+                    },
+                    bases=("distributions.period",),
+                ),
+                migrations.CreateModel(
+                    name="WasteFlyer",
+                    fields=[],
+                    options={
+                        "verbose_name": "Waste Flyer",
+                        "proxy": True,
+                        "indexes": [],
+                        "constraints": [],
+                    },
+                    bases=("bibliography.source",),
+                ),
+                migrations.CreateModel(
+                    name="WasteComponent",
+                    fields=[],
+                    options={
+                        "proxy": True,
+                        "indexes": [],
+                        "constraints": [],
+                    },
+                    bases=("materials.material",),
+                ),
+                migrations.CreateModel(
+                    name="Collection",
+                    fields=[
+                        (
+                            "id",
+                            models.BigAutoField(
+                                auto_created=True,
+                                primary_key=True,
+                                serialize=False,
+                                verbose_name="ID",
+                            ),
                         ),
-                        migrations.CreateModel(
-                            name='CollectionSeason',
-                            fields=[
-                            ],
-                            options={
-                                'proxy': True,
-                                'indexes': [],
-                                'constraints': [],
-                            },
-                            bases=('distributions.period',),
+                        (
+                            "created_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Created at",
+                            ),
                         ),
-                        migrations.CreateModel(
-                            name='WasteFlyer',
-                            fields=[
-                            ],
-                            options={
-                                'verbose_name': 'Waste Flyer',
-                                'proxy': True,
-                                'indexes': [],
-                                'constraints': [],
-                            },
-                            bases=('bibliography.source',),
+                        (
+                            "lastmodified_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Last modified at",
+                            ),
                         ),
-                        migrations.CreateModel(
-                            name='WasteComponent',
-                            fields=[
-                            ],
-                            options={
-                                'proxy': True,
-                                'indexes': [],
-                                'constraints': [],
-                            },
-                            bases=('materials.material',),
+                        (
+                            "publication_status",
+                            models.CharField(
+                                choices=[
+                                    ("private", "Private"),
+                                    ("review", "Review"),
+                                    ("published", "Published"),
+                                    ("declined", "Declined"),
+                                    ("archived", "Archived"),
+                                ],
+                                default="private",
+                                max_length=10,
+                            ),
                         ),
-                        migrations.CreateModel(
-                            name='Collection',
-                            fields=[
-                                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Review'), ('published', 'Published'), ('declined', 'Declined'), ('archived', 'Archived')], default='private', max_length=10)),
-                                ('submitted_at', models.DateTimeField(blank=True, null=True)),
-                                ('approved_at', models.DateTimeField(blank=True, null=True)),
-                                ('name', models.CharField(max_length=255)),
-                                ('description', models.TextField(blank=True, null=True)),
-                                ('valid_from', models.DateField(default=datetime.date.today)),
-                                ('valid_until', models.DateField(blank=True, null=True)),
-                                ('established', models.PositiveSmallIntegerField(blank=True, help_text='Year when this collection scheme was first introduced.', null=True, verbose_name='Year established')),
-                                ('connection_type', models.CharField(blank=True, choices=[('MANDATORY', 'mandatory'), ('MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION', 'mandatory with exception for home composters'), ('VOLUNTARY', 'voluntary'), ('not_specified', 'not specified')], default=None, help_text="Indicates whether connection to the collection system is mandatory, voluntary, or not specified. Leave blank for never set; select 'not specified' for explicit user choice.", max_length=40, null=True, verbose_name='Connection type')),
-                                ('min_bin_size', models.DecimalField(blank=True, decimal_places=1, help_text='Smallest physical bin size that the collector provides for this collection. Exceprions may apply (e.g. for home composters)', max_digits=8, null=True, validators=[django.core.validators.MinValueValidator(0)], verbose_name='Smallest available bin size (L)')),
-                                ('required_bin_capacity', models.DecimalField(blank=True, decimal_places=1, help_text='Minimum total bin capacity that must be supplied per reference unit (see field below).', max_digits=8, null=True, validators=[django.core.validators.MinValueValidator(0)], verbose_name='Minimum required specific bin capacity (L/reference unit)')),
-                                ('required_bin_capacity_reference', models.CharField(blank=True, choices=[('person', 'per person'), ('household', 'per household'), ('property', 'per property'), ('not_specified', 'not specified')], default=None, help_text='Defines the unit (person, household, property) for which the required bin capacity applies. Leave blank if not specified.', max_length=16, null=True, verbose_name='Reference unit for minimum required specific bin capacity')),
-                                ('allowed_materials', models.ManyToManyField(blank=True, db_table='soilcom_collection_allowed_materials', related_name='allowed_in_collections', to='materials.material')),
-                                ('approved_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='+', to=settings.AUTH_USER_MODEL)),
-                                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                                ('forbidden_materials', models.ManyToManyField(blank=True, db_table='soilcom_collection_forbidden_materials', related_name='forbidden_in_collections', to='materials.material')),
-                                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                                ('owner', models.ForeignKey(default=utils.object_management.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                                ('predecessors', models.ManyToManyField(blank=True, db_table='soilcom_collection_predecessors', related_name='successors', to='waste_collection.collection')),
-                                ('samples', models.ManyToManyField(db_table='soilcom_collection_samples', related_name='collections', to='materials.sample')),
-                                ('sources', models.ManyToManyField(db_table='soilcom_collection_sources', to='bibliography.source')),
-                            ],
-                            options={
-                                'db_table': 'soilcom_collection',
-                                'ordering': ['name', 'id'],
-                                'abstract': False,
-                            },
+                        ("submitted_at", models.DateTimeField(blank=True, null=True)),
+                        ("approved_at", models.DateTimeField(blank=True, null=True)),
+                        ("name", models.CharField(max_length=255)),
+                        ("description", models.TextField(blank=True, null=True)),
+                        ("valid_from", models.DateField(default=datetime.date.today)),
+                        ("valid_until", models.DateField(blank=True, null=True)),
+                        (
+                            "established",
+                            models.PositiveSmallIntegerField(
+                                blank=True,
+                                help_text="Year when this collection scheme was first introduced.",
+                                null=True,
+                                verbose_name="Year established",
+                            ),
                         ),
-                        migrations.CreateModel(
-                            name='AggregatedCollectionPropertyValue',
-                            fields=[
-                                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Review'), ('published', 'Published'), ('declined', 'Declined'), ('archived', 'Archived')], default='private', max_length=10)),
-                                ('submitted_at', models.DateTimeField(blank=True, null=True)),
-                                ('approved_at', models.DateTimeField(blank=True, null=True)),
-                                ('name', models.CharField(max_length=255)),
-                                ('description', models.TextField(blank=True, null=True)),
-                                ('average', models.FloatField()),
-                                ('standard_deviation', models.FloatField(blank=True, null=True)),
-                                ('year', models.PositiveSmallIntegerField(null=True, validators=[django.core.validators.RegexValidator('^([0-9]{4})$', code='invalid year', message='Year needs to be in YYYY format.')])),
-                                ('approved_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='+', to=settings.AUTH_USER_MODEL)),
-                                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                                ('owner', models.ForeignKey(default=utils.object_management.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                                ('property', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='properties.property')),
-                                ('sources', models.ManyToManyField(blank=True, db_table='soilcom_aggregatedcollectionpropertyvalue_sources', help_text='Sources or references for this property value.', to='bibliography.source')),
-                                ('unit', models.ForeignKey(default=utils.properties.models.get_default_unit_pk, on_delete=django.db.models.deletion.PROTECT, to='properties.unit')),
-                                ('collections', models.ManyToManyField(db_table='soilcom_aggregatedcollectionpropertyvalue_collections', to='waste_collection.collection')),
-                            ],
-                            options={
-                                'db_table': 'soilcom_aggregatedcollectionpropertyvalue',
-                                'ordering': ['property__name'],
-                                'abstract': False,
-                            },
+                        (
+                            "connection_type",
+                            models.CharField(
+                                blank=True,
+                                choices=[
+                                    ("MANDATORY", "mandatory"),
+                                    (
+                                        "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION",
+                                        "mandatory with exception for home composters",
+                                    ),
+                                    ("VOLUNTARY", "voluntary"),
+                                    ("not_specified", "not specified"),
+                                ],
+                                default=None,
+                                help_text="Indicates whether connection to the collection system is mandatory, voluntary, or not specified. Leave blank for never set; select 'not specified' for explicit user choice.",
+                                max_length=40,
+                                null=True,
+                                verbose_name="Connection type",
+                            ),
                         ),
-                        migrations.CreateModel(
-                            name='CollectionFrequency',
-                            fields=[
-                                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Review'), ('published', 'Published'), ('declined', 'Declined'), ('archived', 'Archived')], default='private', max_length=10)),
-                                ('submitted_at', models.DateTimeField(blank=True, null=True)),
-                                ('approved_at', models.DateTimeField(blank=True, null=True)),
-                                ('name', models.CharField(max_length=255)),
-                                ('description', models.TextField(blank=True, null=True)),
-                                ('type', models.CharField(choices=[('Fixed', 'Fixed'), ('Fixed-Flexible', 'Fixed-Flexible'), ('Fixed-Seasonal', 'Fixed-Seasonal'), ('Seasonal', 'Seasonal')], default='Fixed', max_length=16)),
-                                ('approved_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='+', to=settings.AUTH_USER_MODEL)),
-                                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                                ('owner', models.ForeignKey(default=utils.object_management.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                            ],
-                            options={
-                                'verbose_name_plural': 'collection frequencies',
-                                'db_table': 'soilcom_collectionfrequency',
-                                'ordering': ['name', 'id'],
-                                'abstract': False,
-                            },
+                        (
+                            "min_bin_size",
+                            models.DecimalField(
+                                blank=True,
+                                decimal_places=1,
+                                help_text="Smallest physical bin size that the collector provides for this collection. Exceprions may apply (e.g. for home composters)",
+                                max_digits=8,
+                                null=True,
+                                validators=[
+                                    django.core.validators.MinValueValidator(0)
+                                ],
+                                verbose_name="Smallest available bin size (L)",
+                            ),
                         ),
-                        migrations.CreateModel(
-                            name='CollectionCountOptions',
-                            fields=[
-                                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Review'), ('published', 'Published'), ('declined', 'Declined'), ('archived', 'Archived')], default='private', max_length=10)),
-                                ('submitted_at', models.DateTimeField(blank=True, null=True)),
-                                ('approved_at', models.DateTimeField(blank=True, null=True)),
-                                ('standard', models.PositiveSmallIntegerField(blank=True, null=True)),
-                                ('option_1', models.PositiveSmallIntegerField(blank=True, null=True)),
-                                ('option_2', models.PositiveSmallIntegerField(blank=True, null=True)),
-                                ('option_3', models.PositiveSmallIntegerField(blank=True, null=True)),
-                                ('approved_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='+', to=settings.AUTH_USER_MODEL)),
-                                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                                ('owner', models.ForeignKey(default=utils.object_management.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                                ('frequency', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='waste_collection.collectionfrequency')),
-                                ('season', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='waste_collection.collectionseason')),
-                            ],
-                            options={
-                                'db_table': 'soilcom_collectioncountoptions',
-                                'abstract': False,
-                            },
+                        (
+                            "required_bin_capacity",
+                            models.DecimalField(
+                                blank=True,
+                                decimal_places=1,
+                                help_text="Minimum total bin capacity that must be supplied per reference unit (see field below).",
+                                max_digits=8,
+                                null=True,
+                                validators=[
+                                    django.core.validators.MinValueValidator(0)
+                                ],
+                                verbose_name="Minimum required specific bin capacity (L/reference unit)",
+                            ),
                         ),
-                        migrations.AddField(
-                            model_name='collection',
-                            name='frequency',
-                            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='collections', to='waste_collection.collectionfrequency'),
+                        (
+                            "required_bin_capacity_reference",
+                            models.CharField(
+                                blank=True,
+                                choices=[
+                                    ("person", "per person"),
+                                    ("household", "per household"),
+                                    ("property", "per property"),
+                                    ("not_specified", "not specified"),
+                                ],
+                                default=None,
+                                help_text="Defines the unit (person, household, property) for which the required bin capacity applies. Leave blank if not specified.",
+                                max_length=16,
+                                null=True,
+                                verbose_name="Reference unit for minimum required specific bin capacity",
+                            ),
                         ),
-                        migrations.CreateModel(
-                            name='CollectionSystem',
-                            fields=[
-                                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Review'), ('published', 'Published'), ('declined', 'Declined'), ('archived', 'Archived')], default='private', max_length=10)),
-                                ('submitted_at', models.DateTimeField(blank=True, null=True)),
-                                ('approved_at', models.DateTimeField(blank=True, null=True)),
-                                ('name', models.CharField(max_length=255)),
-                                ('description', models.TextField(blank=True, null=True)),
-                                ('approved_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='+', to=settings.AUTH_USER_MODEL)),
-                                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                                ('owner', models.ForeignKey(default=utils.object_management.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                            ],
-                            options={
-                                'verbose_name': 'waste collection system',
-                                'db_table': 'soilcom_collectionsystem',
-                                'ordering': ['name', 'id'],
-                                'abstract': False,
-                            },
+                        (
+                            "allowed_materials",
+                            models.ManyToManyField(
+                                blank=True,
+                                db_table="soilcom_collection_allowed_materials",
+                                related_name="allowed_in_collections",
+                                to="materials.material",
+                            ),
                         ),
-                        migrations.AddField(
-                            model_name='collection',
-                            name='collection_system',
-                            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='collections', to='waste_collection.collectionsystem'),
+                        (
+                            "approved_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                related_name="+",
+                                to=settings.AUTH_USER_MODEL,
+                            ),
                         ),
-                        migrations.CreateModel(
-                            name='Collector',
-                            fields=[
-                                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Review'), ('published', 'Published'), ('declined', 'Declined'), ('archived', 'Archived')], default='private', max_length=10)),
-                                ('submitted_at', models.DateTimeField(blank=True, null=True)),
-                                ('approved_at', models.DateTimeField(blank=True, null=True)),
-                                ('name', models.CharField(max_length=255)),
-                                ('description', models.TextField(blank=True, null=True)),
-                                ('website', models.URLField(blank=True, max_length=511, null=True)),
-                                ('approved_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='+', to=settings.AUTH_USER_MODEL)),
-                                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                                ('owner', models.ForeignKey(default=utils.object_management.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                                ('catchment', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='waste_collection.collectioncatchment')),
-                            ],
-                            options={
-                                'verbose_name': 'waste collector',
-                                'db_table': 'soilcom_collector',
-                                'ordering': ['name', 'id'],
-                                'abstract': False,
-                            },
+                        (
+                            "created_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_created",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Created by",
+                            ),
                         ),
-                        migrations.AddField(
-                            model_name='collection',
-                            name='collector',
-                            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='waste_collection.collector'),
+                        (
+                            "forbidden_materials",
+                            models.ManyToManyField(
+                                blank=True,
+                                db_table="soilcom_collection_forbidden_materials",
+                                related_name="forbidden_in_collections",
+                                to="materials.material",
+                            ),
                         ),
-                        migrations.CreateModel(
-                            name='FeeSystem',
-                            fields=[
-                                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Review'), ('published', 'Published'), ('declined', 'Declined'), ('archived', 'Archived')], default='private', max_length=10)),
-                                ('submitted_at', models.DateTimeField(blank=True, null=True)),
-                                ('approved_at', models.DateTimeField(blank=True, null=True)),
-                                ('name', models.CharField(max_length=255)),
-                                ('description', models.TextField(blank=True, null=True)),
-                                ('approved_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='+', to=settings.AUTH_USER_MODEL)),
-                                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                                ('owner', models.ForeignKey(default=utils.object_management.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                            ],
-                            options={
-                                'db_table': 'soilcom_feesystem',
-                                'ordering': ['name', 'id'],
-                                'abstract': False,
-                            },
+                        (
+                            "lastmodified_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_lastmodified",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Last modified by",
+                            ),
                         ),
-                        migrations.AddField(
-                            model_name='collection',
-                            name='fee_system',
-                            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='waste_collection.feesystem'),
+                        (
+                            "owner",
+                            models.ForeignKey(
+                                default=utils.object_management.models.get_default_owner_pk,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                to=settings.AUTH_USER_MODEL,
+                            ),
                         ),
-                        migrations.CreateModel(
-                            name='SortingMethod',
-                            fields=[
-                                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Review'), ('published', 'Published'), ('declined', 'Declined'), ('archived', 'Archived')], default='private', max_length=10)),
-                                ('submitted_at', models.DateTimeField(blank=True, null=True)),
-                                ('approved_at', models.DateTimeField(blank=True, null=True)),
-                                ('name', models.CharField(max_length=255)),
-                                ('description', models.TextField(blank=True, null=True)),
-                                ('approved_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='+', to=settings.AUTH_USER_MODEL)),
-                                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                                ('owner', models.ForeignKey(default=utils.object_management.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                            ],
-                            options={
-                                'verbose_name': 'sorting method',
-                                'db_table': 'soilcom_sortingmethod',
-                                'ordering': ['name', 'id'],
-                                'abstract': False,
-                            },
+                        (
+                            "predecessors",
+                            models.ManyToManyField(
+                                blank=True,
+                                db_table="soilcom_collection_predecessors",
+                                related_name="successors",
+                                to="waste_collection.collection",
+                            ),
                         ),
-                        migrations.AddField(
-                            model_name='collection',
-                            name='sorting_method',
-                            field=models.ForeignKey(blank=True, help_text='How waste fractions are separated at the household level.', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='collections', to='waste_collection.sortingmethod', verbose_name='Sorting method'),
+                        (
+                            "samples",
+                            models.ManyToManyField(
+                                db_table="soilcom_collection_samples",
+                                related_name="collections",
+                                to="materials.sample",
+                            ),
                         ),
-                        migrations.CreateModel(
-                            name='WasteCategory',
-                            fields=[
-                                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Review'), ('published', 'Published'), ('declined', 'Declined'), ('archived', 'Archived')], default='private', max_length=10)),
-                                ('submitted_at', models.DateTimeField(blank=True, null=True)),
-                                ('approved_at', models.DateTimeField(blank=True, null=True)),
-                                ('name', models.CharField(max_length=255)),
-                                ('description', models.TextField(blank=True, null=True)),
-                                ('approved_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='+', to=settings.AUTH_USER_MODEL)),
-                                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                                ('owner', models.ForeignKey(default=utils.object_management.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                            ],
-                            options={
-                                'verbose_name_plural': 'waste categories',
-                                'db_table': 'soilcom_wastecategory',
-                                'ordering': ['name', 'id'],
-                                'abstract': False,
-                            },
+                        (
+                            "sources",
+                            models.ManyToManyField(
+                                db_table="soilcom_collection_sources",
+                                to="bibliography.source",
+                            ),
                         ),
-                        migrations.AddField(
-                            model_name='collection',
-                            name='waste_category',
-                            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='collections', to='waste_collection.wastecategory'),
+                    ],
+                    options={
+                        "db_table": "soilcom_collection",
+                        "ordering": ["name", "id"],
+                        "abstract": False,
+                    },
+                ),
+                migrations.CreateModel(
+                    name="AggregatedCollectionPropertyValue",
+                    fields=[
+                        (
+                            "id",
+                            models.BigAutoField(
+                                auto_created=True,
+                                primary_key=True,
+                                serialize=False,
+                                verbose_name="ID",
+                            ),
                         ),
-                        migrations.AddField(
-                            model_name='collection',
-                            name='catchment',
-                            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='collections', to='waste_collection.collectioncatchment'),
+                        (
+                            "created_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Created at",
+                            ),
                         ),
-                        migrations.AddField(
-                            model_name='collectionfrequency',
-                            name='seasons',
-                            field=models.ManyToManyField(through='waste_collection.CollectionCountOptions', to='waste_collection.collectionseason'),
+                        (
+                            "lastmodified_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Last modified at",
+                            ),
                         ),
-                        migrations.AddField(
-                            model_name='collection',
-                            name='flyers',
-                            field=models.ManyToManyField(db_table='soilcom_collection_flyers', related_name='collections', to='waste_collection.wasteflyer'),
+                        (
+                            "publication_status",
+                            models.CharField(
+                                choices=[
+                                    ("private", "Private"),
+                                    ("review", "Review"),
+                                    ("published", "Published"),
+                                    ("declined", "Declined"),
+                                    ("archived", "Archived"),
+                                ],
+                                default="private",
+                                max_length=10,
+                            ),
                         ),
-                        migrations.CreateModel(
-                            name='CollectionPropertyValue',
-                            fields=[
-                                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Review'), ('published', 'Published'), ('declined', 'Declined'), ('archived', 'Archived')], default='private', max_length=10)),
-                                ('submitted_at', models.DateTimeField(blank=True, null=True)),
-                                ('approved_at', models.DateTimeField(blank=True, null=True)),
-                                ('name', models.CharField(max_length=255)),
-                                ('description', models.TextField(blank=True, null=True)),
-                                ('average', models.FloatField()),
-                                ('standard_deviation', models.FloatField(blank=True, null=True)),
-                                ('year', models.PositiveSmallIntegerField(null=True, validators=[django.core.validators.RegexValidator('^([0-9]{4})$', code='invalid year', message='Year needs to be in YYYY format.')])),
-                                ('is_derived', models.BooleanField(default=False, help_text='True when this value was computed from another property (e.g. total ↔ specific via population).')),
-                                ('approved_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='+', to=settings.AUTH_USER_MODEL)),
-                                ('collection', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='waste_collection.collection')),
-                                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                                ('owner', models.ForeignKey(default=utils.object_management.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                                ('property', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='properties.property')),
-                                ('sources', models.ManyToManyField(blank=True, db_table='soilcom_collectionpropertyvalue_sources', help_text='Sources or references for this property value.', to='bibliography.source')),
-                                ('unit', models.ForeignKey(default=utils.properties.models.get_default_unit_pk, on_delete=django.db.models.deletion.PROTECT, to='properties.unit')),
-                            ],
-                            options={
-                                'db_table': 'soilcom_collectionpropertyvalue',
-                                'ordering': ['property__name'],
-                                'abstract': False,
-                                'constraints': [models.UniqueConstraint(condition=models.Q(('is_derived', True)), fields=('collection', 'property', 'year'), name='soilcom_unique_derived_cpv_per_key'), models.UniqueConstraint(condition=models.Q(('is_derived', True), ('year__isnull', True)), fields=('collection', 'property'), name='soilcom_unique_derived_cpv_per_key_null_year')],
-                            },
+                        ("submitted_at", models.DateTimeField(blank=True, null=True)),
+                        ("approved_at", models.DateTimeField(blank=True, null=True)),
+                        ("name", models.CharField(max_length=255)),
+                        ("description", models.TextField(blank=True, null=True)),
+                        ("average", models.FloatField()),
+                        (
+                            "standard_deviation",
+                            models.FloatField(blank=True, null=True),
                         ),
-                        migrations.AddIndex(
-                            model_name='collectioncountoptions',
-                            index=models.Index(fields=['publication_status'], name='soilcom_col_publica_c5f9a3_idx'),
+                        (
+                            "year",
+                            models.PositiveSmallIntegerField(
+                                null=True,
+                                validators=[
+                                    django.core.validators.RegexValidator(
+                                        "^([0-9]{4})$",
+                                        code="invalid year",
+                                        message="Year needs to be in YYYY format.",
+                                    )
+                                ],
+                            ),
                         ),
+                        (
+                            "approved_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                related_name="+",
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                        (
+                            "created_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_created",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Created by",
+                            ),
+                        ),
+                        (
+                            "lastmodified_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_lastmodified",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Last modified by",
+                            ),
+                        ),
+                        (
+                            "owner",
+                            models.ForeignKey(
+                                default=utils.object_management.models.get_default_owner_pk,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                        (
+                            "property",
+                            models.ForeignKey(
+                                on_delete=django.db.models.deletion.PROTECT,
+                                to="properties.property",
+                            ),
+                        ),
+                        (
+                            "sources",
+                            models.ManyToManyField(
+                                blank=True,
+                                db_table="soilcom_aggregatedcollectionpropertyvalue_sources",
+                                help_text="Sources or references for this property value.",
+                                to="bibliography.source",
+                            ),
+                        ),
+                        (
+                            "unit",
+                            models.ForeignKey(
+                                default=utils.properties.models.get_default_unit_pk,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                to="properties.unit",
+                            ),
+                        ),
+                        (
+                            "collections",
+                            models.ManyToManyField(
+                                db_table="soilcom_aggregatedcollectionpropertyvalue_collections",
+                                to="waste_collection.collection",
+                            ),
+                        ),
+                    ],
+                    options={
+                        "db_table": "soilcom_aggregatedcollectionpropertyvalue",
+                        "ordering": ["property__name"],
+                        "abstract": False,
+                    },
+                ),
+                migrations.CreateModel(
+                    name="CollectionFrequency",
+                    fields=[
+                        (
+                            "id",
+                            models.BigAutoField(
+                                auto_created=True,
+                                primary_key=True,
+                                serialize=False,
+                                verbose_name="ID",
+                            ),
+                        ),
+                        (
+                            "created_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Created at",
+                            ),
+                        ),
+                        (
+                            "lastmodified_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Last modified at",
+                            ),
+                        ),
+                        (
+                            "publication_status",
+                            models.CharField(
+                                choices=[
+                                    ("private", "Private"),
+                                    ("review", "Review"),
+                                    ("published", "Published"),
+                                    ("declined", "Declined"),
+                                    ("archived", "Archived"),
+                                ],
+                                default="private",
+                                max_length=10,
+                            ),
+                        ),
+                        ("submitted_at", models.DateTimeField(blank=True, null=True)),
+                        ("approved_at", models.DateTimeField(blank=True, null=True)),
+                        ("name", models.CharField(max_length=255)),
+                        ("description", models.TextField(blank=True, null=True)),
+                        (
+                            "type",
+                            models.CharField(
+                                choices=[
+                                    ("Fixed", "Fixed"),
+                                    ("Fixed-Flexible", "Fixed-Flexible"),
+                                    ("Fixed-Seasonal", "Fixed-Seasonal"),
+                                    ("Seasonal", "Seasonal"),
+                                ],
+                                default="Fixed",
+                                max_length=16,
+                            ),
+                        ),
+                        (
+                            "approved_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                related_name="+",
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                        (
+                            "created_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_created",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Created by",
+                            ),
+                        ),
+                        (
+                            "lastmodified_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_lastmodified",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Last modified by",
+                            ),
+                        ),
+                        (
+                            "owner",
+                            models.ForeignKey(
+                                default=utils.object_management.models.get_default_owner_pk,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                    ],
+                    options={
+                        "verbose_name_plural": "collection frequencies",
+                        "db_table": "soilcom_collectionfrequency",
+                        "ordering": ["name", "id"],
+                        "abstract": False,
+                    },
+                ),
+                migrations.CreateModel(
+                    name="CollectionCountOptions",
+                    fields=[
+                        (
+                            "id",
+                            models.BigAutoField(
+                                auto_created=True,
+                                primary_key=True,
+                                serialize=False,
+                                verbose_name="ID",
+                            ),
+                        ),
+                        (
+                            "created_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Created at",
+                            ),
+                        ),
+                        (
+                            "lastmodified_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Last modified at",
+                            ),
+                        ),
+                        (
+                            "publication_status",
+                            models.CharField(
+                                choices=[
+                                    ("private", "Private"),
+                                    ("review", "Review"),
+                                    ("published", "Published"),
+                                    ("declined", "Declined"),
+                                    ("archived", "Archived"),
+                                ],
+                                default="private",
+                                max_length=10,
+                            ),
+                        ),
+                        ("submitted_at", models.DateTimeField(blank=True, null=True)),
+                        ("approved_at", models.DateTimeField(blank=True, null=True)),
+                        (
+                            "standard",
+                            models.PositiveSmallIntegerField(blank=True, null=True),
+                        ),
+                        (
+                            "option_1",
+                            models.PositiveSmallIntegerField(blank=True, null=True),
+                        ),
+                        (
+                            "option_2",
+                            models.PositiveSmallIntegerField(blank=True, null=True),
+                        ),
+                        (
+                            "option_3",
+                            models.PositiveSmallIntegerField(blank=True, null=True),
+                        ),
+                        (
+                            "approved_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                related_name="+",
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                        (
+                            "created_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_created",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Created by",
+                            ),
+                        ),
+                        (
+                            "lastmodified_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_lastmodified",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Last modified by",
+                            ),
+                        ),
+                        (
+                            "owner",
+                            models.ForeignKey(
+                                default=utils.object_management.models.get_default_owner_pk,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                        (
+                            "frequency",
+                            models.ForeignKey(
+                                on_delete=django.db.models.deletion.CASCADE,
+                                to="waste_collection.collectionfrequency",
+                            ),
+                        ),
+                        (
+                            "season",
+                            models.ForeignKey(
+                                on_delete=django.db.models.deletion.CASCADE,
+                                to="waste_collection.collectionseason",
+                            ),
+                        ),
+                    ],
+                    options={
+                        "db_table": "soilcom_collectioncountoptions",
+                        "abstract": False,
+                    },
+                ),
+                migrations.AddField(
+                    model_name="collection",
+                    name="frequency",
+                    field=models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="collections",
+                        to="waste_collection.collectionfrequency",
+                    ),
+                ),
+                migrations.CreateModel(
+                    name="CollectionSystem",
+                    fields=[
+                        (
+                            "id",
+                            models.BigAutoField(
+                                auto_created=True,
+                                primary_key=True,
+                                serialize=False,
+                                verbose_name="ID",
+                            ),
+                        ),
+                        (
+                            "created_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Created at",
+                            ),
+                        ),
+                        (
+                            "lastmodified_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Last modified at",
+                            ),
+                        ),
+                        (
+                            "publication_status",
+                            models.CharField(
+                                choices=[
+                                    ("private", "Private"),
+                                    ("review", "Review"),
+                                    ("published", "Published"),
+                                    ("declined", "Declined"),
+                                    ("archived", "Archived"),
+                                ],
+                                default="private",
+                                max_length=10,
+                            ),
+                        ),
+                        ("submitted_at", models.DateTimeField(blank=True, null=True)),
+                        ("approved_at", models.DateTimeField(blank=True, null=True)),
+                        ("name", models.CharField(max_length=255)),
+                        ("description", models.TextField(blank=True, null=True)),
+                        (
+                            "approved_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                related_name="+",
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                        (
+                            "created_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_created",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Created by",
+                            ),
+                        ),
+                        (
+                            "lastmodified_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_lastmodified",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Last modified by",
+                            ),
+                        ),
+                        (
+                            "owner",
+                            models.ForeignKey(
+                                default=utils.object_management.models.get_default_owner_pk,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                    ],
+                    options={
+                        "verbose_name": "waste collection system",
+                        "db_table": "soilcom_collectionsystem",
+                        "ordering": ["name", "id"],
+                        "abstract": False,
+                    },
+                ),
+                migrations.AddField(
+                    model_name="collection",
+                    name="collection_system",
+                    field=models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="collections",
+                        to="waste_collection.collectionsystem",
+                    ),
+                ),
+                migrations.CreateModel(
+                    name="Collector",
+                    fields=[
+                        (
+                            "id",
+                            models.BigAutoField(
+                                auto_created=True,
+                                primary_key=True,
+                                serialize=False,
+                                verbose_name="ID",
+                            ),
+                        ),
+                        (
+                            "created_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Created at",
+                            ),
+                        ),
+                        (
+                            "lastmodified_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Last modified at",
+                            ),
+                        ),
+                        (
+                            "publication_status",
+                            models.CharField(
+                                choices=[
+                                    ("private", "Private"),
+                                    ("review", "Review"),
+                                    ("published", "Published"),
+                                    ("declined", "Declined"),
+                                    ("archived", "Archived"),
+                                ],
+                                default="private",
+                                max_length=10,
+                            ),
+                        ),
+                        ("submitted_at", models.DateTimeField(blank=True, null=True)),
+                        ("approved_at", models.DateTimeField(blank=True, null=True)),
+                        ("name", models.CharField(max_length=255)),
+                        ("description", models.TextField(blank=True, null=True)),
+                        (
+                            "website",
+                            models.URLField(blank=True, max_length=511, null=True),
+                        ),
+                        (
+                            "approved_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                related_name="+",
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                        (
+                            "created_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_created",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Created by",
+                            ),
+                        ),
+                        (
+                            "lastmodified_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_lastmodified",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Last modified by",
+                            ),
+                        ),
+                        (
+                            "owner",
+                            models.ForeignKey(
+                                default=utils.object_management.models.get_default_owner_pk,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                        (
+                            "catchment",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.CASCADE,
+                                to="waste_collection.collectioncatchment",
+                            ),
+                        ),
+                    ],
+                    options={
+                        "verbose_name": "waste collector",
+                        "db_table": "soilcom_collector",
+                        "ordering": ["name", "id"],
+                        "abstract": False,
+                    },
+                ),
+                migrations.AddField(
+                    model_name="collection",
+                    name="collector",
+                    field=models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="waste_collection.collector",
+                    ),
+                ),
+                migrations.CreateModel(
+                    name="FeeSystem",
+                    fields=[
+                        (
+                            "id",
+                            models.BigAutoField(
+                                auto_created=True,
+                                primary_key=True,
+                                serialize=False,
+                                verbose_name="ID",
+                            ),
+                        ),
+                        (
+                            "created_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Created at",
+                            ),
+                        ),
+                        (
+                            "lastmodified_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Last modified at",
+                            ),
+                        ),
+                        (
+                            "publication_status",
+                            models.CharField(
+                                choices=[
+                                    ("private", "Private"),
+                                    ("review", "Review"),
+                                    ("published", "Published"),
+                                    ("declined", "Declined"),
+                                    ("archived", "Archived"),
+                                ],
+                                default="private",
+                                max_length=10,
+                            ),
+                        ),
+                        ("submitted_at", models.DateTimeField(blank=True, null=True)),
+                        ("approved_at", models.DateTimeField(blank=True, null=True)),
+                        ("name", models.CharField(max_length=255)),
+                        ("description", models.TextField(blank=True, null=True)),
+                        (
+                            "approved_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                related_name="+",
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                        (
+                            "created_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_created",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Created by",
+                            ),
+                        ),
+                        (
+                            "lastmodified_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_lastmodified",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Last modified by",
+                            ),
+                        ),
+                        (
+                            "owner",
+                            models.ForeignKey(
+                                default=utils.object_management.models.get_default_owner_pk,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                    ],
+                    options={
+                        "db_table": "soilcom_feesystem",
+                        "ordering": ["name", "id"],
+                        "abstract": False,
+                    },
+                ),
+                migrations.AddField(
+                    model_name="collection",
+                    name="fee_system",
+                    field=models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to="waste_collection.feesystem",
+                    ),
+                ),
+                migrations.CreateModel(
+                    name="SortingMethod",
+                    fields=[
+                        (
+                            "id",
+                            models.BigAutoField(
+                                auto_created=True,
+                                primary_key=True,
+                                serialize=False,
+                                verbose_name="ID",
+                            ),
+                        ),
+                        (
+                            "created_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Created at",
+                            ),
+                        ),
+                        (
+                            "lastmodified_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Last modified at",
+                            ),
+                        ),
+                        (
+                            "publication_status",
+                            models.CharField(
+                                choices=[
+                                    ("private", "Private"),
+                                    ("review", "Review"),
+                                    ("published", "Published"),
+                                    ("declined", "Declined"),
+                                    ("archived", "Archived"),
+                                ],
+                                default="private",
+                                max_length=10,
+                            ),
+                        ),
+                        ("submitted_at", models.DateTimeField(blank=True, null=True)),
+                        ("approved_at", models.DateTimeField(blank=True, null=True)),
+                        ("name", models.CharField(max_length=255)),
+                        ("description", models.TextField(blank=True, null=True)),
+                        (
+                            "approved_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                related_name="+",
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                        (
+                            "created_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_created",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Created by",
+                            ),
+                        ),
+                        (
+                            "lastmodified_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_lastmodified",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Last modified by",
+                            ),
+                        ),
+                        (
+                            "owner",
+                            models.ForeignKey(
+                                default=utils.object_management.models.get_default_owner_pk,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                    ],
+                    options={
+                        "verbose_name": "sorting method",
+                        "db_table": "soilcom_sortingmethod",
+                        "ordering": ["name", "id"],
+                        "abstract": False,
+                    },
+                ),
+                migrations.AddField(
+                    model_name="collection",
+                    name="sorting_method",
+                    field=models.ForeignKey(
+                        blank=True,
+                        help_text="How waste fractions are separated at the household level.",
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="collections",
+                        to="waste_collection.sortingmethod",
+                        verbose_name="Sorting method",
+                    ),
+                ),
+                migrations.CreateModel(
+                    name="WasteCategory",
+                    fields=[
+                        (
+                            "id",
+                            models.BigAutoField(
+                                auto_created=True,
+                                primary_key=True,
+                                serialize=False,
+                                verbose_name="ID",
+                            ),
+                        ),
+                        (
+                            "created_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Created at",
+                            ),
+                        ),
+                        (
+                            "lastmodified_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Last modified at",
+                            ),
+                        ),
+                        (
+                            "publication_status",
+                            models.CharField(
+                                choices=[
+                                    ("private", "Private"),
+                                    ("review", "Review"),
+                                    ("published", "Published"),
+                                    ("declined", "Declined"),
+                                    ("archived", "Archived"),
+                                ],
+                                default="private",
+                                max_length=10,
+                            ),
+                        ),
+                        ("submitted_at", models.DateTimeField(blank=True, null=True)),
+                        ("approved_at", models.DateTimeField(blank=True, null=True)),
+                        ("name", models.CharField(max_length=255)),
+                        ("description", models.TextField(blank=True, null=True)),
+                        (
+                            "approved_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                related_name="+",
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                        (
+                            "created_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_created",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Created by",
+                            ),
+                        ),
+                        (
+                            "lastmodified_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_lastmodified",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Last modified by",
+                            ),
+                        ),
+                        (
+                            "owner",
+                            models.ForeignKey(
+                                default=utils.object_management.models.get_default_owner_pk,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                    ],
+                    options={
+                        "verbose_name_plural": "waste categories",
+                        "db_table": "soilcom_wastecategory",
+                        "ordering": ["name", "id"],
+                        "abstract": False,
+                    },
+                ),
+                migrations.AddField(
+                    model_name="collection",
+                    name="waste_category",
+                    field=models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="collections",
+                        to="waste_collection.wastecategory",
+                    ),
+                ),
+                migrations.AddField(
+                    model_name="collection",
+                    name="catchment",
+                    field=models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="collections",
+                        to="waste_collection.collectioncatchment",
+                    ),
+                ),
+                migrations.AddField(
+                    model_name="collectionfrequency",
+                    name="seasons",
+                    field=models.ManyToManyField(
+                        through="waste_collection.CollectionCountOptions",
+                        to="waste_collection.collectionseason",
+                    ),
+                ),
+                migrations.AddField(
+                    model_name="collection",
+                    name="flyers",
+                    field=models.ManyToManyField(
+                        db_table="soilcom_collection_flyers",
+                        related_name="collections",
+                        to="waste_collection.wasteflyer",
+                    ),
+                ),
+                migrations.CreateModel(
+                    name="CollectionPropertyValue",
+                    fields=[
+                        (
+                            "id",
+                            models.BigAutoField(
+                                auto_created=True,
+                                primary_key=True,
+                                serialize=False,
+                                verbose_name="ID",
+                            ),
+                        ),
+                        (
+                            "created_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Created at",
+                            ),
+                        ),
+                        (
+                            "lastmodified_at",
+                            models.DateTimeField(
+                                db_index=True,
+                                default=django.utils.timezone.now,
+                                verbose_name="Last modified at",
+                            ),
+                        ),
+                        (
+                            "publication_status",
+                            models.CharField(
+                                choices=[
+                                    ("private", "Private"),
+                                    ("review", "Review"),
+                                    ("published", "Published"),
+                                    ("declined", "Declined"),
+                                    ("archived", "Archived"),
+                                ],
+                                default="private",
+                                max_length=10,
+                            ),
+                        ),
+                        ("submitted_at", models.DateTimeField(blank=True, null=True)),
+                        ("approved_at", models.DateTimeField(blank=True, null=True)),
+                        ("name", models.CharField(max_length=255)),
+                        ("description", models.TextField(blank=True, null=True)),
+                        ("average", models.FloatField()),
+                        (
+                            "standard_deviation",
+                            models.FloatField(blank=True, null=True),
+                        ),
+                        (
+                            "year",
+                            models.PositiveSmallIntegerField(
+                                null=True,
+                                validators=[
+                                    django.core.validators.RegexValidator(
+                                        "^([0-9]{4})$",
+                                        code="invalid year",
+                                        message="Year needs to be in YYYY format.",
+                                    )
+                                ],
+                            ),
+                        ),
+                        (
+                            "is_derived",
+                            models.BooleanField(
+                                default=False,
+                                help_text="True when this value was computed from another property (e.g. total ↔ specific via population).",
+                            ),
+                        ),
+                        (
+                            "approved_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                related_name="+",
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                        (
+                            "collection",
+                            models.ForeignKey(
+                                on_delete=django.db.models.deletion.CASCADE,
+                                to="waste_collection.collection",
+                            ),
+                        ),
+                        (
+                            "created_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_created",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Created by",
+                            ),
+                        ),
+                        (
+                            "lastmodified_by",
+                            models.ForeignKey(
+                                blank=True,
+                                null=True,
+                                on_delete=django.db.models.deletion.SET_NULL,
+                                related_name="%(app_label)s_%(class)s_lastmodified",
+                                to=settings.AUTH_USER_MODEL,
+                                verbose_name="Last modified by",
+                            ),
+                        ),
+                        (
+                            "owner",
+                            models.ForeignKey(
+                                default=utils.object_management.models.get_default_owner_pk,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                to=settings.AUTH_USER_MODEL,
+                            ),
+                        ),
+                        (
+                            "property",
+                            models.ForeignKey(
+                                on_delete=django.db.models.deletion.PROTECT,
+                                to="properties.property",
+                            ),
+                        ),
+                        (
+                            "sources",
+                            models.ManyToManyField(
+                                blank=True,
+                                db_table="soilcom_collectionpropertyvalue_sources",
+                                help_text="Sources or references for this property value.",
+                                to="bibliography.source",
+                            ),
+                        ),
+                        (
+                            "unit",
+                            models.ForeignKey(
+                                default=utils.properties.models.get_default_unit_pk,
+                                on_delete=django.db.models.deletion.PROTECT,
+                                to="properties.unit",
+                            ),
+                        ),
+                    ],
+                    options={
+                        "db_table": "soilcom_collectionpropertyvalue",
+                        "ordering": ["property__name"],
+                        "abstract": False,
+                        "constraints": [
+                            models.UniqueConstraint(
+                                condition=models.Q(("is_derived", True)),
+                                fields=("collection", "property", "year"),
+                                name="soilcom_unique_derived_cpv_per_key",
+                            ),
+                            models.UniqueConstraint(
+                                condition=models.Q(
+                                    ("is_derived", True), ("year__isnull", True)
+                                ),
+                                fields=("collection", "property"),
+                                name="soilcom_unique_derived_cpv_per_key_null_year",
+                            ),
+                        ],
+                    },
+                ),
+                migrations.AddIndex(
+                    model_name="collectioncountoptions",
+                    index=models.Index(
+                        fields=["publication_status"],
+                        name="soilcom_col_publica_c5f9a3_idx",
+                    ),
+                ),
             ],
         )
     ]

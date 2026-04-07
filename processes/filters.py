@@ -17,7 +17,9 @@ class ProcessCategoryFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
         lookup_expr="icontains",
         label="Category Name",
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Search by name..."}),
+        widget=forms.TextInput(
+            attrs={"class": "form-control", "placeholder": "Search by name..."}
+        ),
     )
     publication_status = django_filters.ChoiceFilter(
         choices=[("", "All")] + list(STATUS_CHOICES),
@@ -36,23 +38,28 @@ class ProcessFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
         lookup_expr="icontains",
         label="Process Name",
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Search by name..."}),
+        widget=forms.TextInput(
+            attrs={"class": "form-control", "placeholder": "Search by name..."}
+        ),
     )
-    
+
     categories = django_filters.ModelMultipleChoiceFilter(
         queryset=ProcessCategory.objects.filter(publication_status="published"),
         label="Categories",
         widget=forms.CheckboxSelectMultiple(),
     )
-    
+
     mechanism = django_filters.CharFilter(
         lookup_expr="icontains",
         label="Mechanism",
         widget=forms.TextInput(
-            attrs={"class": "form-control", "placeholder": "e.g., pyrolysis, fermentation..."}
+            attrs={
+                "class": "form-control",
+                "placeholder": "e.g., pyrolysis, fermentation...",
+            }
         ),
     )
-    
+
     has_parent = django_filters.BooleanFilter(
         field_name="parent",
         lookup_expr="isnull",
@@ -60,33 +67,41 @@ class ProcessFilter(django_filters.FilterSet):
         label="Has Parent Process",
         widget=forms.NullBooleanSelect(attrs={"class": "form-select"}),
     )
-    
+
     parent = django_filters.ModelChoiceFilter(
-        queryset=Process.objects.filter(publication_status="published", parent__isnull=True),
+        queryset=Process.objects.filter(
+            publication_status="published", parent__isnull=True
+        ),
         label="Parent Process",
         widget=forms.Select(attrs={"class": "form-select"}),
     )
-    
+
     publication_status = django_filters.ChoiceFilter(
         choices=[("", "All")] + list(STATUS_CHOICES),
         label="Publication Status",
         widget=forms.Select(attrs={"class": "form-select"}),
     )
-    
+
     # Material-based filtering
     input_material = django_filters.CharFilter(
         method="filter_by_input_material",
         label="Input Material",
         widget=forms.TextInput(
-            attrs={"class": "form-control", "placeholder": "Search by input material..."}
+            attrs={
+                "class": "form-control",
+                "placeholder": "Search by input material...",
+            }
         ),
     )
-    
+
     output_material = django_filters.CharFilter(
         method="filter_by_output_material",
         label="Output Material",
         widget=forms.TextInput(
-            attrs={"class": "form-control", "placeholder": "Search by output material..."}
+            attrs={
+                "class": "form-control",
+                "placeholder": "Search by output material...",
+            }
         ),
     )
 

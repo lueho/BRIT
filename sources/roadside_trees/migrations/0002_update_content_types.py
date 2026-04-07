@@ -1,6 +1,5 @@
 from django.db import migrations
 
-
 HAMBURG_MODEL_NAMES = ["hamburgroadsidetrees", "hamburggreenareas"]
 
 
@@ -25,4 +24,6 @@ class Migration(migrations.Migration):
         ("flexibi_hamburg", "0003_move_models_to_sources"),
     ]
 
-    operations = [migrations.RunPython(update_content_types, reverse_update_content_types)]
+    operations = [
+        migrations.RunPython(update_content_types, reverse_update_content_types)
+    ]

@@ -7,11 +7,10 @@ from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
 
 from maps.models import Catchment
+from sources.roadside_trees.models import HamburgRoadsideTrees
 from utils.crispy_fields import RangeSliderField
 from utils.filters import BaseCrispyFilterSet, NullableRangeFilter
 from utils.widgets import NullableRangeSliderWidget
-
-from sources.roadside_trees.models import HamburgRoadsideTrees
 
 GATTUNG_CHOICES = (
     ("Linde", "Linden"),

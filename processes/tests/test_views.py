@@ -3,8 +3,6 @@
 Comprehensive tests for all CRUD views following BRIT testing patterns.
 """
 
-from django.contrib.auth.models import Permission
-from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
@@ -127,7 +125,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
     def related_objects_post_data(self):
         """Override to handle many-to-many fields and inline formsets.
-        
+
         Formset prefixes are based on the related_name attribute of ForeignKey fields:
         - ProcessMaterial: process_materials
         - ProcessOperatingParameter: operating_parameters
@@ -187,13 +185,13 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         """Process detail view should display related materials, parameters, etc."""
         if not self.detail_view:
             self.skipTest("Detail view is not enabled for this test case.")
-        
+
         process = self.published_object
         self.client.force_login(self.owner_user)
         response = self.client.get(
             reverse(self.view_detail_name, kwargs={"pk": process.pk})
         )
-        
+
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, process.name)
 
