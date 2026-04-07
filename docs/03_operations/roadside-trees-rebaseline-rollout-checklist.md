@@ -127,7 +127,7 @@ Out of scope for this pilot:
 - [x] Pre-flight audit completed.
 - [x] Rename migration prepared.
 - [x] Rename migration validated on a dev snapshot.
-- [ ] Production rename rollout completed.
+- [~] Production rename rollout in progress (deployed 2026-04-07, awaiting verification).
 - [ ] Clean `0001_initial` drafted.
 - [ ] Production cutover procedure drafted.
 - [ ] Legacy shim removed.
