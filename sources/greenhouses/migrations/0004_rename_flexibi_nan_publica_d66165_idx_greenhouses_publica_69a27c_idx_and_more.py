@@ -9,15 +9,20 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RenameIndex(
-            model_name="greenhousegrowthcycle",
-            new_name="greenhouses_publica_69a27c_idx",
-            old_name="flexibi_nan_publica_d66165_idx",
-        ),
-        migrations.RenameIndex(
-            model_name="growthshare",
-            new_name="greenhouses_publica_459799_idx",
-            old_name="flexibi_nan_publica_3516d7_idx",
+        migrations.SeparateDatabaseAndState(
+            database_operations=[],
+            state_operations=[
+                migrations.RenameIndex(
+                    model_name="greenhousegrowthcycle",
+                    new_name="greenhouses_publica_69a27c_idx",
+                    old_name="flexibi_nan_publica_d66165_idx",
+                ),
+                migrations.RenameIndex(
+                    model_name="growthshare",
+                    new_name="greenhouses_publica_459799_idx",
+                    old_name="flexibi_nan_publica_3516d7_idx",
+                ),
+            ],
         ),
         migrations.AlterModelTable(
             name="casestudybaseobjects",
