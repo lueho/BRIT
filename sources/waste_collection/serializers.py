@@ -1150,10 +1150,6 @@ class CollectionMutationVersionSerializer(
         allow_null=True,
     )
     description = serializers.CharField(required=False, allow_blank=True)
-    reviewed_predecessor_evidence = serializers.BooleanField(
-        required=False,
-        default=False,
-    )
     submit_for_review = serializers.BooleanField(required=False, default=True)
 
     def validate_description(self, value):
@@ -1163,16 +1159,6 @@ class CollectionMutationVersionSerializer(
         predecessor = self.context.get("predecessor")
         if predecessor is None:
             raise serializers.ValidationError("A predecessor collection is required.")
-
-        carry_over_fields = predecessor.carried_over_version_review_fields()
-        if carry_over_fields and not attrs.get("reviewed_predecessor_evidence"):
-            raise serializers.ValidationError(
-                {
-                    "reviewed_predecessor_evidence": (
-                        "Confirm that you reviewed all carried-over predecessor evidence before creating a new version."
-                    )
-                }
-            )
 
         valid_from = attrs.get("valid_from")
         valid_until = attrs.get("valid_until")

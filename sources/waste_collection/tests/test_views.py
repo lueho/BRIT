@@ -1748,7 +1748,6 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             "frequency": self.frequency.id,
             "valid_from": date(2022, 1, 1),
             "description": "This is a test case that should pass!",
-            "reviewed_predecessor_evidence": "on",
             "form-INITIAL_FORMS": "0",
             "form-TOTAL_FORMS": "0",
         }
@@ -2099,7 +2098,6 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
             "frequency": self.frequency.id,
             "valid_from": date(2022, 1, 1),
             "description": "This is a test case that should pass!",
-            "reviewed_predecessor_evidence": "on",
             "form-INITIAL_FORMS": "0",
             "form-TOTAL_FORMS": "0",
         }
@@ -2748,7 +2746,6 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
             "connection_type": "VOLUNTARY",
             "allowed_materials": [self.waste_component.pk],
             "valid_from": date.today(),
-            "reviewed_predecessor_evidence": "on",
             "form-TOTAL_FORMS": 1,
             "form-INITIAL_FORMS": 0,
             "form-0-url": "https://www.test-flyer.org",

@@ -1487,10 +1487,7 @@ class CollectionMutationApiTestCase(APITestCase):
                 "api-waste-collection-new-version",
                 kwargs={"pk": self.predecessor.pk},
             ),
-            {
-                "valid_from": "2025-03-01",
-                "reviewed_predecessor_evidence": True,
-            },
+            {"valid_from": "2025-03-01"},
             format="json",
         )
 
@@ -1557,7 +1554,6 @@ class CollectionMutationApiTestCase(APITestCase):
             ),
             {
                 "valid_from": "2025-04-02",
-                "reviewed_predecessor_evidence": True,
                 "submit_for_review": False,
             },
             format="json",
@@ -1579,7 +1575,6 @@ class CollectionMutationApiTestCase(APITestCase):
             {
                 "valid_from": "2025-03-01",
                 "description": "agent successor",
-                "reviewed_predecessor_evidence": True,
                 "submit_for_review": True,
             },
             format="json",
@@ -1612,7 +1607,6 @@ class CollectionMutationApiTestCase(APITestCase):
             {
                 "valid_from": "2025-04-01",
                 "comments": "successor via comments alias",
-                "reviewed_predecessor_evidence": True,
                 "flyer_urls": "https://example.com/version-flyer-a, https://example.com/version-flyer-b",
                 "submit_for_review": False,
             },
@@ -1629,24 +1623,6 @@ class CollectionMutationApiTestCase(APITestCase):
         self.assertTrue(
             successor.flyers.filter(url="https://example.com/version-flyer-b").exists()
         )
-
-    def test_new_version_requires_explicit_predecessor_evidence_review(self):
-        self.client.force_login(self.owner)
-
-        response = self.client.post(
-            reverse(
-                "api-waste-collection-new-version",
-                kwargs={"pk": self.predecessor.pk},
-            ),
-            {
-                "valid_from": "2025-04-15",
-                "submit_for_review": False,
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("reviewed_predecessor_evidence", response.data)
 
 
 class GreenWasteCollectionSystemCountViewSetTests(APITestCase):

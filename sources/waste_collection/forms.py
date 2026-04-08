@@ -6,7 +6,6 @@ from django.core.exceptions import ValidationError
 from django.db.models import Case, Value, When
 from django.db.models import IntegerField as DBIntegerField
 from django.forms import (
-    BooleanField,
     CheckboxSelectMultiple,
     ChoiceField,
     DateInput,
@@ -536,9 +535,6 @@ class CollectionModelFormHelper(FormHelper):
             Field("valid_until"),
             Field("description"),
         ]
-        form = getattr(self, "form", None)
-        if form is not None and "reviewed_predecessor_evidence" in form.fields:
-            layout_fields.append(Field("reviewed_predecessor_evidence"))
         layout_fields.append(
             Div(
                 Field("sources", template="bootstrap5/field_no_label.html"),
@@ -572,18 +568,6 @@ class CollectionModelForm(
         qs = self._ordered_waste_component_qs()
         self.fields["allowed_materials"].queryset = qs
         self.fields["forbidden_materials"].queryset = qs
-        if self.predecessor is not None:
-            carry_over_fields = self.predecessor.carried_over_version_review_fields()
-            self.fields["reviewed_predecessor_evidence"] = BooleanField(
-                required=bool(carry_over_fields),
-                label=_("I reviewed the carried-over evidence for this new version"),
-                help_text=(
-                    "Review the predecessor evidence before saving this version. "
-                    f"Fields with carried-over evidence: {', '.join(carry_over_fields)}."
-                    if carry_over_fields
-                    else "No evidence-backed predecessor fields need confirmation."
-                ),
-            )
         if not self.is_bound:
             description = self.initial.get("description")
             if description is None and getattr(self.instance, "description", None):
@@ -598,19 +582,7 @@ class CollectionModelForm(
         return normalize_collection_description(self.cleaned_data.get("description"))
 
     def clean(self):
-        cleaned_data = super().clean()
-        if self.predecessor is None:
-            return cleaned_data
-
-        carry_over_fields = self.predecessor.carried_over_version_review_fields()
-        if carry_over_fields and not cleaned_data.get("reviewed_predecessor_evidence"):
-            self.add_error(
-                "reviewed_predecessor_evidence",
-                _(
-                    "Confirm that you reviewed all carried-over predecessor evidence before creating a new version."
-                ),
-            )
-        return cleaned_data
+        return super().clean()
 
     @classmethod
     def _ordered_waste_component_qs(cls):
