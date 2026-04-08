@@ -142,12 +142,13 @@ Out of scope for this pilot:
 - [x] `sources/legacy_flexibi_hamburg/` - Deleted
 - [x] Remove `flexibi_hamburg` from `MIGRATION_MODULES` in settings - Done
 
-### In Progress
+### Completed 2026-04-08
 
-- [x] **Urban Green Spaces table rename deployed** 2026-04-07
-  - `flexibi_hamburg_hamburggreenareas` → `urban_green_spaces_hamburggreenareas`
-  - Migration `0002_rename_hamburggreenareas_table.py` applied on production
-  - Next: Re-baseline to clean `0001_initial` (see Appendix B)
+- [x] **Urban Green Spaces full re-baseline** - Production deployment and verification complete
+  - Table: `flexibi_hamburg_hamburggreenareas` → `urban_green_spaces_hamburggreenareas` ✅
+  - Migration SQL cutover executed ✅
+  - Clean `0001_initial` baseline active ✅
+  - 4,722 green areas verified ✅
 
 ### Stale documentation to update
 
@@ -283,7 +284,7 @@ Based on the successful roadside_trees pattern. The greenhouses app has multiple
 
 ## Appendix B: Urban Green Spaces Re-baseline Procedure
 
-**Status:** Clean baseline created 2026-04-07. Production SQL cutover pending next deploy.
+**Status:** ✅ COMPLETE - Deployed and verified 2026-04-08
 
 ### Re-baseline Steps
 
@@ -299,7 +300,7 @@ Based on the successful roadside_trees pattern. The greenhouses app has multiple
    ```
    Creates `0001_initial.py` with `db_table = 'urban_green_spaces_hamburggreenareas'`
 
-- [ ] 3. **Production SQL cutover** (run BEFORE deploying this commit):
+- [x] 3. **Production SQL cutover**:
    ```sql
    BEGIN;
    
@@ -313,4 +314,6 @@ Based on the successful roadside_trees pattern. The greenhouses app has multiple
    COMMIT;
    ```
 
-- [ ] 4. **Deploy** this commit and verify
+- [x] 4. **Deploy and verify** ✅
+   - Smoke test passed: 4,722 green areas intact
+   - Migration history clean: single `0001_initial` record
