@@ -39,7 +39,7 @@ class NantesGreenhouses(models.Model):
     above_ground = models.BooleanField(blank=True, null=True)
 
     class Meta:
-        db_table = "flexibi_nantes_nantesgreenhouses"
+        db_table = "greenhouses_nantesgreenhouses"
 
 
 class GreenhouseManager(UserCreatedObjectManager):
@@ -66,7 +66,7 @@ class Greenhouse(NamedUserCreatedObject):
     objects = GreenhouseManager()
 
     class Meta(NamedUserCreatedObject.Meta):
-        db_table = "flexibi_nantes_greenhouse"
+        db_table = "greenhouses_greenhouse"
 
     def components(self):
         return list({share.component for share in self.shares})
@@ -152,7 +152,7 @@ class Culture(NamedUserCreatedObject):
     residue = models.ForeignKey(SampleSeries, on_delete=models.PROTECT, null=True)
 
     class Meta(NamedUserCreatedObject.Meta):
-        db_table = "flexibi_nantes_culture"
+        db_table = "greenhouses_culture"
 
 
 class GreenhouseGrowthCycle(UserCreatedObject):
@@ -162,7 +162,7 @@ class GreenhouseGrowthCycle(UserCreatedObject):
     group_settings = models.ForeignKey(Composition, on_delete=models.CASCADE, null=True)
 
     class Meta(UserCreatedObject.Meta):
-        db_table = "flexibi_nantes_greenhousegrowthcycle"
+        db_table = "greenhouses_greenhousegrowthcycle"
 
     def add_timestep(self, timestep):
         ts_set = GrowthTimeStepSet.objects.create(
@@ -235,7 +235,7 @@ class GrowthTimeStepSet(models.Model):
     )
 
     class Meta:
-        db_table = "flexibi_nantes_growthtimestepset"
+        db_table = "greenhouses_growthtimestepset"
 
     def add_component(self, component, **kwargs):
         share = GrowthShare.objects.create(
@@ -262,7 +262,7 @@ class GrowthShare(UserCreatedObject):
     standard_deviation = models.FloatField(default=0.0)
 
     class Meta(UserCreatedObject.Meta):
-        db_table = "flexibi_nantes_growthshare"
+        db_table = "greenhouses_growthshare"
 
     @property
     def timestep(self):
@@ -314,7 +314,7 @@ class CaseStudyBaseObjects(models.Model):
     objects = BaseObjectManager()
 
     class Meta:
-        db_table = "flexibi_nantes_casestudybaseobjects"
+        db_table = "greenhouses_casestudybaseobjects"
 
 
 __all__ = [

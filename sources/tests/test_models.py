@@ -105,38 +105,25 @@ class SourcesModelAdapterTestCase(SimpleTestCase):
     def test_greenhouse_models_use_sources_app_label_and_preserve_db_tables(self):
         self.assertEqual(apps.get_app_config("greenhouses").name, "sources.greenhouses")
         self.assertEqual(Culture._meta.app_label, "greenhouses")
-        self.assertEqual(Culture._meta.db_table, "flexibi_nantes_culture")
+        self.assertEqual(Culture._meta.db_table, "greenhouses_culture")
         self.assertEqual(Greenhouse._meta.app_label, "greenhouses")
-        self.assertEqual(Greenhouse._meta.db_table, "flexibi_nantes_greenhouse")
+        self.assertEqual(Greenhouse._meta.db_table, "greenhouses_greenhouse")
         self.assertEqual(GreenhouseGrowthCycle._meta.app_label, "greenhouses")
         self.assertEqual(
             GreenhouseGrowthCycle._meta.db_table,
-            "flexibi_nantes_greenhousegrowthcycle",
+            "greenhouses_greenhousegrowthcycle",
         )
         self.assertEqual(GrowthTimeStepSet._meta.app_label, "greenhouses")
         self.assertEqual(
             GrowthTimeStepSet._meta.db_table,
-            "flexibi_nantes_growthtimestepset",
+            "greenhouses_growthtimestepset",
         )
         self.assertEqual(GrowthShare._meta.app_label, "greenhouses")
-        self.assertEqual(GrowthShare._meta.db_table, "flexibi_nantes_growthshare")
+        self.assertEqual(GrowthShare._meta.db_table, "greenhouses_growthshare")
         self.assertEqual(NantesGreenhouses._meta.app_label, "greenhouses")
         self.assertEqual(
             NantesGreenhouses._meta.db_table,
-            "flexibi_nantes_nantesgreenhouses",
-        )
-
-    def test_flexibi_nantes_app_label_is_provided_by_migration_shim(self):
-        app_config = apps.get_app_config("flexibi_nantes")
-
-        self.assertEqual(
-            app_config.__class__.__module__,
-            "sources.legacy_flexibi_nantes.apps",
-        )
-        self.assertEqual(app_config.name, "sources.legacy_flexibi_nantes")
-        self.assertEqual(
-            settings.MIGRATION_MODULES["flexibi_nantes"],
-            "sources.legacy_flexibi_nantes.migrations",
+            "greenhouses_nantesgreenhouses",
         )
 
     def test_waste_collection_models_use_sources_app_label_and_preserve_db_tables(self):
