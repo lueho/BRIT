@@ -60,6 +60,8 @@ from django.core.cache import cache
 from django.db.models.signals import post_delete, post_migrate, post_save
 from django.dispatch import receiver
 
+_moderation_permissions_loaded = set()
+
 
 def _iter_user_created_models():
     """Yield all concrete, non-proxy models that inherit from UserCreatedObject."""
@@ -91,6 +93,10 @@ def ensure_moderation_permissions(sender, **kwargs):
     Runs in all environments (including tests) to ensure permissions exist
     consistently. Uses get_or_create for idempotency.
     """
+    using = kwargs.get("using") or "default"
+    if using in _moderation_permissions_loaded:
+        return
+
     group_name = getattr(settings, "REVIEW_MODERATORS_GROUP_NAME", "moderators")
 
     try:
@@ -99,6 +105,7 @@ def ensure_moderation_permissions(sender, **kwargs):
         # If group creation fails, don't break migrations
         return
 
+    completed = True
     for model in _iter_user_created_models():
         try:
             model_name = model._meta.model_name
@@ -117,8 +124,12 @@ def ensure_moderation_permissions(sender, **kwargs):
             # Ensure the group holds the permission
             moderators_group.permissions.add(permission)
         except Exception:
+            completed = False
             # Be robust; a single failure should not break overall signal execution
             continue
+
+    if completed:
+        _moderation_permissions_loaded.add(using)
 
 
 @receiver(post_save)
