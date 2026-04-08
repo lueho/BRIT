@@ -74,7 +74,7 @@
 |---|---|---|---|
 | `LayerAggregatedValue` | `unit` | `CharField(15)` | Free-text string |
 
-### 1.8 `flexibi_nantes` — Growth distributions
+### 1.8 `greenhouses` — Growth distributions
 
 - `GrowthShare` has `average`/`standard_deviation` (FloatField) but **no unit field**.
 - The serializer hardcodes `"unit": "Mg/a"`.
@@ -88,7 +88,7 @@
 | **A. `FK → Unit` on value** | `PropertyValue`, `CollectionPropertyValue`, `AggregatedCollectionPropertyValue`, `ComponentMeasurement` | 4 models |
 | **B. `CharField` on definition** | `PropertyBase`→`MaterialProperty`, `Attribute`, `InventoryAlgorithmParameter`, `LayerAggregatedValue` | 4+ models |
 | **C. No unit field** | `MaterialPropertyValue` (inherits from definition), `RegionAttributeValue`, `InventoryAlgorithmParameterValue`, `WeightShare`, `InventoryAmountShare`, `GrowthShare` | 6+ models |
-| **D. Hardcoded string** | `CompositionDoughnutChartSerializer` (`"%"`), flexibi_nantes serializer (`"Mg/a"`) | 2 serializers |
+| **D. Hardcoded string** | `CompositionDoughnutChartSerializer` (`"%"`), greenhouse serializer (`"Mg/a"`) | 2 serializers |
 | **E. Python string matching** | `BaseChart.add_dataset()`, `UnitMismatchError` | 1 module |
 
 ---

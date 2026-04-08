@@ -667,7 +667,7 @@ Sources is structurally different from other explorers (Materials, Processes, et
 |---|---|---|
 | Materials Explorer | Entity types within `materials` app | 1 app |
 | Processes Explorer | Entity types within `processes` app | 1 app |
-| **Sources Explorer** | Source types across multiple apps | `soilcom`, `flexibi_nantes`, `flexibi_hamburg` |
+| **Sources Explorer** | Source types across multiple apps | `soilcom`, `greenhouses`, `flexibi_hamburg` |
 
 Despite this structural difference, the visual pattern is identical: explorer cards with icon, title, description, count, and browse link, using the shared `explorer-cards.css` styles.
 

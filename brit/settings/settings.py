@@ -55,7 +55,6 @@ INSTALLED_APPS = [
     "sources.urban_green_spaces.apps.UrbanGreenSpacesConfig",
     "sources.greenhouses.apps.GreenhousesConfig",
     "sources.waste_collection.apps.WasteCollectionConfig",
-    "sources.legacy_flexibi_nantes.apps.LegacyFlexibiNantesConfig",
     "sources.legacy_soilcom.apps.LegacySoilcomConfig",
     "layer_manager.apps.LayerManagerConfig",
     "sources.waste_collection.waste_atlas.apps.WasteAtlasConfig",
@@ -111,7 +110,6 @@ DATABASES = {}  # Specified in local.py for development and heroku.py for produc
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 MIGRATION_MODULES = {
-    "flexibi_nantes": "sources.legacy_flexibi_nantes.migrations",
     "soilcom": "sources.legacy_soilcom.migrations",
 }
 

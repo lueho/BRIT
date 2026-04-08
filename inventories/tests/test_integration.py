@@ -692,7 +692,7 @@ class InventoryExecutionIntegrationTests(TestCase):
         )
         algorithm, values = self.create_algorithm_with_values(
             name="Nantes greenhouse production",
-            source_module="flexibi_nantes",
+            source_module="sources.greenhouses.inventory.algorithms",
             function_name="nantes_greenhouse_production",
             geodataset=geodataset,
             feedstock=feedstock,

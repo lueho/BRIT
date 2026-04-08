@@ -30,11 +30,9 @@ class InventoryAlgorithm(models.Model):
 
     SOURCE_MODULE_PATH_ALIASES = {
         "flexibi_hamburg": "sources.roadside_trees.inventory.algorithms",
-        "flexibi_nantes": "sources.greenhouses.inventory.algorithms",
     }
     SOURCE_MODULE_PATH_ALIASES_REVERSED = {
         "sources.roadside_trees.inventory.algorithms": "flexibi_hamburg",
-        "sources.greenhouses.inventory.algorithms": "flexibi_nantes",
     }
 
     name = models.CharField(max_length=56)

@@ -127,8 +127,7 @@ class ScenarioTestCase(TestCase):
         )
 
         legacy_task_reference = (
-            "case_studies.flexibi_hamburg.algorithms:"
-            "hamburg_roadside_tree_production"
+            "case_studies.flexibi_hamburg.algorithms:hamburg_roadside_tree_production"
         )
 
         self.assertEqual(
@@ -194,7 +193,6 @@ class ScenarioTestCase(TestCase):
             InventoryAlgorithm.available_modules(),
             [
                 "flexibi_hamburg",
-                "flexibi_nantes",
                 "sources.greenhouses.inventory.algorithms",
             ],
         )
