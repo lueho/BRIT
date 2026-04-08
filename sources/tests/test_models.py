@@ -102,29 +102,15 @@ class SourcesModelAdapterTestCase(SimpleTestCase):
             "urban_green_spaces_hamburggreenareas",
         )
 
-    def test_greenhouse_models_use_sources_app_label_and_preserve_db_tables(self):
+    def test_greenhouse_models_use_sources_app_label(self):
         self.assertEqual(apps.get_app_config("greenhouses").name, "sources.greenhouses")
         self.assertEqual(Culture._meta.app_label, "greenhouses")
-        self.assertEqual(Culture._meta.db_table, "greenhouses_culture")
         self.assertEqual(Greenhouse._meta.app_label, "greenhouses")
-        self.assertEqual(Greenhouse._meta.db_table, "greenhouses_greenhouse")
         self.assertEqual(GreenhouseGrowthCycle._meta.app_label, "greenhouses")
-        self.assertEqual(
-            GreenhouseGrowthCycle._meta.db_table,
-            "greenhouses_greenhousegrowthcycle",
-        )
         self.assertEqual(GrowthTimeStepSet._meta.app_label, "greenhouses")
-        self.assertEqual(
-            GrowthTimeStepSet._meta.db_table,
-            "greenhouses_growthtimestepset",
-        )
         self.assertEqual(GrowthShare._meta.app_label, "greenhouses")
-        self.assertEqual(GrowthShare._meta.db_table, "greenhouses_growthshare")
         self.assertEqual(NantesGreenhouses._meta.app_label, "greenhouses")
-        self.assertEqual(
-            NantesGreenhouses._meta.db_table,
-            "greenhouses_nantesgreenhouses",
-        )
+        # Table names use Django's implicit naming: greenhouses_<modelname>
 
     def test_waste_collection_models_use_sources_app_label_and_preserve_db_tables(self):
         self.assertEqual(

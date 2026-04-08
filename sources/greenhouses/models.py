@@ -38,9 +38,6 @@ class NantesGreenhouses(models.Model):
     high_wire = models.BooleanField(blank=True, null=True)
     above_ground = models.BooleanField(blank=True, null=True)
 
-    class Meta:
-        db_table = "greenhouses_nantesgreenhouses"
-
 
 class GreenhouseManager(UserCreatedObjectManager):
     def types(self):
@@ -66,7 +63,7 @@ class Greenhouse(NamedUserCreatedObject):
     objects = GreenhouseManager()
 
     class Meta(NamedUserCreatedObject.Meta):
-        db_table = "greenhouses_greenhouse"
+        pass
 
     def components(self):
         return list({share.component for share in self.shares})
@@ -152,7 +149,7 @@ class Culture(NamedUserCreatedObject):
     residue = models.ForeignKey(SampleSeries, on_delete=models.PROTECT, null=True)
 
     class Meta(NamedUserCreatedObject.Meta):
-        db_table = "greenhouses_culture"
+        pass
 
 
 class GreenhouseGrowthCycle(UserCreatedObject):
@@ -162,7 +159,7 @@ class GreenhouseGrowthCycle(UserCreatedObject):
     group_settings = models.ForeignKey(Composition, on_delete=models.CASCADE, null=True)
 
     class Meta(UserCreatedObject.Meta):
-        db_table = "greenhouses_greenhousegrowthcycle"
+        pass
 
     def add_timestep(self, timestep):
         ts_set = GrowthTimeStepSet.objects.create(
@@ -235,7 +232,7 @@ class GrowthTimeStepSet(models.Model):
     )
 
     class Meta:
-        db_table = "greenhouses_growthtimestepset"
+        pass
 
     def add_component(self, component, **kwargs):
         share = GrowthShare.objects.create(
@@ -262,7 +259,7 @@ class GrowthShare(UserCreatedObject):
     standard_deviation = models.FloatField(default=0.0)
 
     class Meta(UserCreatedObject.Meta):
-        db_table = "greenhouses_growthshare"
+        pass
 
     @property
     def timestep(self):
@@ -314,7 +311,7 @@ class CaseStudyBaseObjects(models.Model):
     objects = BaseObjectManager()
 
     class Meta:
-        db_table = "greenhouses_casestudybaseobjects"
+        pass
 
 
 __all__ = [
