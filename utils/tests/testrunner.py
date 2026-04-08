@@ -190,12 +190,7 @@ class SerialAwareTestRunner(DiscoverRunner):
         return StopwatchTestResult
 
     def setup_databases(self, **kwargs):
-        old_config = super().setup_databases(**kwargs)
-
-        if getattr(settings, "TESTING", False):
-            call_command("ensure_initial_data")
-
-        return old_config
+        return super().setup_databases(**kwargs)
 
     def run_tests(self, test_labels, extra_tests=None, **kwargs):
         # Check if we have any serial tests to handle

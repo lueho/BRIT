@@ -134,12 +134,15 @@ class RegionAttributeValueUnitBackfillCommandTests(TestCase):
             value=123.321,
         )
 
+        out = io.StringIO()
         with self.assertRaisesMessage(
             CommandError,
             "1 RegionAttributeValue rows remain unresolved.",
         ):
             call_command(
-                "backfill_region_attribute_value_units", fail_on_unresolved=True
+                "backfill_region_attribute_value_units",
+                fail_on_unresolved=True,
+                stdout=out,
             )
 
     def test_command_can_fail_when_unresolved_values_remain(self):
@@ -151,10 +154,13 @@ class RegionAttributeValueUnitBackfillCommandTests(TestCase):
             value=123.321,
         )
 
+        out = io.StringIO()
         with self.assertRaisesMessage(
             CommandError,
             "1 RegionAttributeValue rows remain unresolved.",
         ):
             call_command(
-                "backfill_region_attribute_value_units", fail_on_unresolved=True
+                "backfill_region_attribute_value_units",
+                fail_on_unresolved=True,
+                stdout=out,
             )
