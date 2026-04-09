@@ -55,7 +55,6 @@ INSTALLED_APPS = [
     "sources.urban_green_spaces.apps.UrbanGreenSpacesConfig",
     "sources.greenhouses.apps.GreenhousesConfig",
     "sources.waste_collection.apps.WasteCollectionConfig",
-    "sources.legacy_soilcom.apps.LegacySoilcomConfig",
     "layer_manager.apps.LayerManagerConfig",
     "sources.waste_collection.waste_atlas.apps.WasteAtlasConfig",
     "case_studies.closecycle.apps.ClosecycleConfig",
@@ -108,10 +107,6 @@ WSGI_APPLICATION = "brit.wsgi.application"
 # Database settings
 DATABASES = {}  # Specified in local.py for development and heroku.py for production
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
-
-MIGRATION_MODULES = {
-    "soilcom": "sources.legacy_soilcom.migrations",
-}
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
