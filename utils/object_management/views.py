@@ -402,11 +402,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
 
         if (
             model_class._meta.model_name == "collection"
-            and model_class._meta.app_label
-            in {
-                "soilcom",
-                "waste_collection",
-            }
+            and model_class._meta.app_label == "waste_collection"
         ):
             search_filters.extend(
                 [
@@ -1762,12 +1758,12 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         ReviewItemDetailView._model_view_registry[model_class] = cls
 
     def test_func(self):
-        """Allow access for staff and moderators; owners when in review or declined.
+        """Allow access for staff, moderators, and owners.
 
         This overrides the default read-access mixin so that non-staff moderators who
         hold the dynamic per-model permission (can_moderate_<model>) may access the
-        review detail view. Owners are permitted to access the review view while their
-        item is in review (to read and add comments) and when declined (to read feedback).
+        review detail view. Owners are permitted to access the review view for any
+        of their objects to see review history and activity.
         """
         user = getattr(self, "request", None) and self.request.user
         if not user or not getattr(user, "is_authenticated", False):
@@ -1777,13 +1773,13 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         policy = get_object_policy(user, obj, request=self.request)
 
         if policy["is_owner"]:
-            return policy["is_in_review"] or policy["is_declined"]
+            return True
 
         return user_is_moderator_for_model(user, obj.__class__)
 
     def dispatch(self, request, *args, **kwargs):
         """
-        Authorize review details for moderators/staff and for owners in review/declined.
+        Authorize review details for moderators/staff and for owners.
 
         Delegation order:
         1. Resolve object from content type/object id.
@@ -1792,8 +1788,8 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
            return its response.
         4. Otherwise execute base authorization and rendering.
 
-        Owners can access while the item is in review (for commenting) and when
-        declined (to read feedback).
+        Owners can access the review page for any of their objects to see review
+        history and activity, regardless of publication status.
         """
         obj = self.get_object()
         model_class = obj.__class__
@@ -1809,11 +1805,7 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         policy = get_object_policy(request.user, obj, request=request)
 
         if policy["is_owner"]:
-            if policy["is_in_review"] or policy["is_declined"]:
-                return super().dispatch(request, *args, **kwargs)
-            raise PermissionDenied(
-                "Owners can only access review details while the item is in review or declined."
-            )
+            return super().dispatch(request, *args, **kwargs)
 
         if not user_is_moderator_for_model(request.user, obj.__class__):
             raise PermissionDenied(

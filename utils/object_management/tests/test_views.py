@@ -368,16 +368,25 @@ class ReviewDetailAccessTests(TestCase):
         cls.ct_id = ct.id
 
         with mute_signals(post_save, pre_save):
+            cls.obj_private = Collection.objects.create(
+                name="Private",
+                owner=cls.owner,
+                publication_status=UserCreatedObject.STATUS_PRIVATE,
+            )
             cls.obj_review = Collection.objects.create(
                 name="In Review",
                 owner=cls.owner,
                 publication_status=UserCreatedObject.STATUS_REVIEW,
             )
-        with mute_signals(post_save, pre_save):
             cls.obj_declined = Collection.objects.create(
                 name="Declined",
                 owner=cls.owner,
                 publication_status=UserCreatedObject.STATUS_DECLINED,
+            )
+            cls.obj_published = Collection.objects.create(
+                name="Published",
+                owner=cls.owner,
+                publication_status=UserCreatedObject.STATUS_PUBLISHED,
             )
 
     def test_owner_can_access_review_detail_in_review(self):
@@ -393,6 +402,24 @@ class ReviewDetailAccessTests(TestCase):
         url = reverse(
             "object_management:review_item_detail",
             kwargs={"content_type_id": self.ct_id, "object_id": self.obj_declined.id},
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_owner_can_access_review_detail_private(self):
+        url = reverse(
+            "object_management:review_item_detail",
+            kwargs={"content_type_id": self.ct_id, "object_id": self.obj_private.id},
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_owner_can_access_review_detail_published(self):
+        url = reverse(
+            "object_management:review_item_detail",
+            kwargs={"content_type_id": self.ct_id, "object_id": self.obj_published.id},
         )
         self.client.force_login(self.owner)
         response = self.client.get(url)
