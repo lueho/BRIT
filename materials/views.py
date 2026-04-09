@@ -1009,8 +1009,8 @@ class SampleDetailView(UserCreatedObjectDetailView):
                         "component": component_data["component"].pk,
                         "component_name": component_data["component"].name,
                         "average": float(component_percent / Decimal("100")),
-                        "standard_deviation": 0.0,
-                        "as_percentage": f"{round(component_percent, 1)} ± 0.0{display_unit}",
+                        "standard_deviation": None,
+                        "as_percentage": f"{round(component_percent, 1)}{display_unit}",
                     }
                 )
 
@@ -1038,7 +1038,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
                     updated_percent = existing_percent + other_gap
                     other_share["average"] = float(updated_percent / Decimal("100"))
                     other_share["as_percentage"] = (
-                        f"{round(updated_percent, 1)} ± 0.0{display_unit}"
+                        f"{round(updated_percent, 1)}{display_unit}"
                     )
                 else:
                     shares.append(
@@ -1046,8 +1046,8 @@ class SampleDetailView(UserCreatedObjectDetailView):
                             "component": other_component.pk,
                             "component_name": other_component.name,
                             "average": float(other_gap / Decimal("100")),
-                            "standard_deviation": 0.0,
-                            "as_percentage": f"{round(other_gap, 1)} ± 0.0{display_unit}",
+                            "standard_deviation": None,
+                            "as_percentage": f"{round(other_gap, 1)}{display_unit}",
                         }
                     )
 

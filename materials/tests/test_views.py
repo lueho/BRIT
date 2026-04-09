@@ -3095,8 +3095,9 @@ class EmptyStateViewsTestCase(TestCase):
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Chemical Elements")
-        self.assertContains(response, "30.0 ± 0.0%")
-        self.assertContains(response, "70.0 ± 0.0%")
+        self.assertContains(response, "30.0%")
+        self.assertContains(response, "70.0%")
+        self.assertNotContains(response, "30.0 ± 0.0%")
         self.assertNotContains(response, "No compositions available")
 
     def test_sample_detail_prefers_persisted_composition_over_measurement_fallback(
@@ -3177,6 +3178,7 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "20.0 ± 0.0%")
         self.assertContains(response, "80.0 ± 0.0%")
         self.assertNotContains(response, "70.0 ± 0.0%")
+        self.assertNotContains(response, "70.0%")
 
     def test_sample_detail_keeps_dm_percent_values_for_dm_measurements(self):
         sample = Sample.objects.create(
@@ -3238,9 +3240,10 @@ class EmptyStateViewsTestCase(TestCase):
 
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "35.0 ± 0.0% of DM")
-        self.assertContains(response, "25.0 ± 0.0% of DM")
-        self.assertContains(response, "40.0 ± 0.0% of DM")
+        self.assertContains(response, "35.0% of DM")
+        self.assertContains(response, "25.0% of DM")
+        self.assertContains(response, "40.0% of DM")
+        self.assertNotContains(response, "35.0 ± 0.0% of DM")
 
     def test_sample_detail_fills_other_for_incomplete_weight_percent_measurements(self):
         sample = Sample.objects.create(
@@ -3295,9 +3298,10 @@ class EmptyStateViewsTestCase(TestCase):
 
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "15.0 ± 0.0%")
-        self.assertContains(response, "25.0 ± 0.0%")
-        self.assertContains(response, "60.0 ± 0.0%")
+        self.assertContains(response, "15.0%")
+        self.assertContains(response, "25.0%")
+        self.assertContains(response, "60.0%")
+        self.assertNotContains(response, "60.0 ± 0.0%")
 
     def test_sample_detail_uses_basis_component_as_reference_for_derived_composition(
         self,
