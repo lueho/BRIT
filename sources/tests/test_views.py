@@ -63,6 +63,13 @@ class SourceDomainHubRoutingTestCase(SimpleTestCase):
             ("roadside_trees",),
         )
 
+    def test_registry_keeps_plugins_discoverable_by_slug(self):
+        self.assertEqual(get_source_domain_plugin("greenhouses").slug, "greenhouses")
+        self.assertEqual(
+            get_source_domain_plugin("waste_collection").slug,
+            "waste_collection",
+        )
+
     def test_roadside_trees_public_route_remains_mounted_under_sources(self):
         self.assertEqual(
             reverse("HamburgRoadsideTrees"), "/sources/roadside_trees/map/"

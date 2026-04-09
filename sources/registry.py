@@ -1,14 +1,38 @@
+from importlib import import_module
+
+from django.apps import apps
+
 from sources.contracts import SourceDomainPlugin
-from sources.greenhouses.plugin import plugin as greenhouses_plugin
-from sources.roadside_trees.plugin import plugin as roadside_trees_plugin
-from sources.urban_green_spaces.plugin import plugin as urban_green_spaces_plugin
-from sources.waste_collection.plugin import plugin as waste_collection_plugin
+
+
+def _discover_source_domain_plugins() -> tuple[SourceDomainPlugin, ...]:
+    plugins: list[SourceDomainPlugin] = []
+
+    for app_config in apps.get_app_configs():
+        if app_config.name == "sources":
+            continue
+
+        try:
+            plugin_module = import_module(f"{app_config.name}.plugin")
+        except ModuleNotFoundError as exc:
+            if exc.name == f"{app_config.name}.plugin":
+                continue
+            raise
+
+        plugin = getattr(plugin_module, "plugin", None)
+        if plugin is None:
+            continue
+        if not isinstance(plugin, SourceDomainPlugin):
+            raise TypeError(
+                f"{app_config.name}.plugin.plugin must be a SourceDomainPlugin instance"
+            )
+        plugins.append(plugin)
+
+    return tuple(sorted(plugins, key=lambda plugin: plugin.slug))
+
 
 _SOURCE_DOMAIN_PLUGINS: tuple[SourceDomainPlugin, ...] = (
-    roadside_trees_plugin,
-    urban_green_spaces_plugin,
-    greenhouses_plugin,
-    waste_collection_plugin,
+    _discover_source_domain_plugins()
 )
 
 

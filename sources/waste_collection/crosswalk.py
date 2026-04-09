@@ -384,9 +384,22 @@ def validate_crosswalk_mappings(
     vocabulary_snapshot: dict | None = None,
     mappings_dir: Path | None = None,
     vocabulary_ttl_path: Path | None = None,
+) -> list[str]:
+    """Return URI integrity errors for waste_collection crosswalk mappings."""
+    return get_crosswalk_uri_validation_errors(
+        vocabulary_snapshot=vocabulary_snapshot,
+        mappings_dir=mappings_dir,
+        vocabulary_ttl_path=vocabulary_ttl_path,
+    )
+
+
+def ensure_crosswalk_mappings_valid(
+    vocabulary_snapshot: dict | None = None,
+    mappings_dir: Path | None = None,
+    vocabulary_ttl_path: Path | None = None,
 ) -> None:
     """Raise when waste_collection crosswalk mappings violate URI integrity rules."""
-    errors = get_crosswalk_uri_validation_errors(
+    errors = validate_crosswalk_mappings(
         vocabulary_snapshot=vocabulary_snapshot,
         mappings_dir=mappings_dir,
         vocabulary_ttl_path=vocabulary_ttl_path,

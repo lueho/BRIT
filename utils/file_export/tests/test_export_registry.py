@@ -7,6 +7,8 @@ from django.contrib.auth.models import AnonymousUser, User
 from django.test import RequestFactory, SimpleTestCase, TestCase
 from openpyxl import load_workbook
 
+from sources.contracts import SourceDomainExport, SourceDomainPlugin
+
 from ..export_registry import (
     EXPORT_REGISTRY,
     ExportSpec,
@@ -61,100 +63,68 @@ class ExportRegistryTestCase(SimpleTestCase):
         """Registry init should import export classes through the sources adapters."""
         from utils.file_export import registry_init
 
-        collection_filterset = object()
-        collection_serializer = object()
-        collection_csv = object()
-        collection_xlsx = object()
-        roadside_filterset = object()
-        roadside_serializer = object()
-        roadside_csv = object()
-        roadside_xlsx = object()
-        greenhouse_filterset = object()
-        greenhouse_serializer = object()
-        greenhouse_csv = object()
-        greenhouse_xlsx = object()
+        greenhouse_export = SourceDomainExport(
+            model_label="greenhouses.NantesGreenhouses",
+            filterset=object(),
+            serializer=object(),
+            renderers={"xlsx": object(), "csv": object()},
+        )
+        waste_collection_export = SourceDomainExport(
+            model_label="waste_collection.Collection",
+            filterset=object(),
+            serializer=object(),
+            renderers={"xlsx": object(), "csv": object()},
+        )
+        plugin = SourceDomainPlugin(
+            slug="greenhouses",
+            verbose_name="Greenhouses",
+            app_config="sources.greenhouses.apps.GreenhousesConfig",
+            urlconf="sources.greenhouses.urls",
+            capabilities=("exports",),
+        )
+        waste_collection_plugin = SourceDomainPlugin(
+            slug="waste_collection",
+            verbose_name="Waste Collection",
+            app_config="sources.waste_collection.apps.WasteCollectionConfig",
+            urlconf="sources.waste_collection.urls",
+            capabilities=("exports",),
+        )
 
         with (
             patch(
                 "utils.file_export.export_registry.register_export"
             ) as mock_register_export,
             patch(
-                "sources.waste_collection.exports.CollectionFilterSet",
-                collection_filterset,
+                "sources.registry.get_source_domain_plugins",
+                return_value=(plugin, waste_collection_plugin),
             ),
             patch(
-                "sources.waste_collection.exports.CollectionFlatSerializer",
-                collection_serializer,
-            ),
-            patch(
-                "sources.waste_collection.exports.CollectionCSVRenderer",
-                collection_csv,
-            ),
-            patch(
-                "sources.waste_collection.exports.CollectionXLSXRenderer",
-                collection_xlsx,
-            ),
-            patch(
-                "sources.roadside_trees.exports.HamburgRoadsideTreesFilterSet",
-                roadside_filterset,
-            ),
-            patch(
-                "sources.roadside_trees.exports.HamburgRoadsideTreeFlatSerializer",
-                roadside_serializer,
-            ),
-            patch(
-                "sources.roadside_trees.exports.HamburgRoadsideTreesCSVRenderer",
-                roadside_csv,
-            ),
-            patch(
-                "sources.roadside_trees.exports.HamburgRoadsideTreesXLSXRenderer",
-                roadside_xlsx,
-            ),
-            patch(
-                "sources.greenhouses.exports.NantesGreenhousesFilterSet",
-                greenhouse_filterset,
-            ),
-            patch(
-                "sources.greenhouses.exports.NantesGreenhousesFlatSerializer",
-                greenhouse_serializer,
-            ),
-            patch(
-                "sources.greenhouses.exports.NantesGreenhousesCSVRenderer",
-                greenhouse_csv,
-            ),
-            patch(
-                "sources.greenhouses.exports.NantesGreenhousesXLSXRenderer",
-                greenhouse_xlsx,
+                "importlib.import_module",
+                side_effect=[
+                    MagicMock(EXPORTS=(greenhouse_export,)),
+                    MagicMock(EXPORTS=(waste_collection_export,)),
+                ],
             ),
         ):
             importlib.reload(registry_init)
 
-        self.assertEqual(mock_register_export.call_count, 3)
+        self.assertEqual(mock_register_export.call_count, 2)
         self.assertEqual(
             mock_register_export.call_args_list[0].args,
             (
-                "waste_collection.Collection",
-                collection_filterset,
-                collection_serializer,
-                {"xlsx": collection_xlsx, "csv": collection_csv},
+                greenhouse_export.model_label,
+                greenhouse_export.filterset,
+                greenhouse_export.serializer,
+                greenhouse_export.renderers,
             ),
         )
         self.assertEqual(
             mock_register_export.call_args_list[1].args,
             (
-                "roadside_trees.HamburgRoadsideTrees",
-                roadside_filterset,
-                roadside_serializer,
-                {"xlsx": roadside_xlsx, "csv": roadside_csv},
-            ),
-        )
-        self.assertEqual(
-            mock_register_export.call_args_list[2].args,
-            (
-                "greenhouses.NantesGreenhouses",
-                greenhouse_filterset,
-                greenhouse_serializer,
-                {"xlsx": greenhouse_xlsx, "csv": greenhouse_csv},
+                waste_collection_export.model_label,
+                waste_collection_export.filterset,
+                waste_collection_export.serializer,
+                waste_collection_export.renderers,
             ),
         )
 

@@ -3,6 +3,14 @@ from importlib import import_module
 
 
 @dataclass(frozen=True)
+class SourceDomainExport:
+    model_label: str
+    filterset: object
+    serializer: object
+    renderers: dict[str, object]
+
+
+@dataclass(frozen=True)
 class SourceDomainPlugin:
     slug: str
     verbose_name: str
@@ -21,6 +29,9 @@ class SourceDomainPlugin:
         module_path, attr_name = self.published_count_getter.rsplit(".", 1)
         getter = getattr(import_module(module_path), attr_name)
         return getter()
+
+    def get_app_module(self) -> str:
+        return self.app_config.rsplit(".", 2)[0]
 
     def get_urlpatterns(self):
         return import_module(self.urlconf).urlpatterns

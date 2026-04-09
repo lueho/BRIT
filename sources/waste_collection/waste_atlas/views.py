@@ -43,6 +43,14 @@ class WasteAtlasOverviewView(WasteAtlasGroupMixin, TemplateView):
 
     template_name = "waste_atlas/overview.html"
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["selected_required_bin_capacity_reference"] = self.request.GET.get(
+            "required_bin_capacity_reference",
+            "person",
+        )
+        return ctx
+
 
 class EuropeDataCoverageContextMixin:
     """Provide shared context for the Europe coverage map page variants."""

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 from django.apps import apps
 from django.test import SimpleTestCase
 
+from sources.contracts import SourceDomainExport
 from sources.greenhouses.models import (
     Culture,
     Greenhouse,
@@ -28,11 +29,21 @@ class SourceDomainPluginContractTestCase(SimpleTestCase):
         self.assertEqual(
             tuple(plugin.slug for plugin in get_source_domain_plugins()),
             (
+                "greenhouses",
                 "roadside_trees",
                 "urban_green_spaces",
-                "greenhouses",
                 "waste_collection",
             ),
+        )
+
+    def test_registered_source_domain_plugins_can_resolve_app_modules(self):
+        self.assertEqual(
+            get_source_domain_plugin("greenhouses").get_app_module(),
+            "sources.greenhouses",
+        )
+        self.assertEqual(
+            get_source_domain_plugin("waste_collection").get_app_module(),
+            "sources.waste_collection",
         )
 
     def test_registered_source_domain_plugins_declare_app_configs(self):
@@ -76,6 +87,23 @@ class SourceDomainPluginContractTestCase(SimpleTestCase):
             "signals",
             get_source_domain_plugin("waste_collection").capabilities,
         )
+
+    def test_builtin_source_plugins_publish_export_metadata_through_exports_module(
+        self,
+    ):
+        from sources.greenhouses.exports import EXPORTS as greenhouse_exports
+        from sources.roadside_trees.exports import EXPORTS as roadside_exports
+        from sources.waste_collection.exports import EXPORTS as waste_collection_exports
+
+        for exports in (
+            greenhouse_exports,
+            roadside_exports,
+            waste_collection_exports,
+        ):
+            self.assertTrue(exports)
+            self.assertTrue(
+                all(isinstance(export, SourceDomainExport) for export in exports)
+            )
 
 
 class SourcesModelAdapterTestCase(SimpleTestCase):
