@@ -12,7 +12,7 @@ The BRIT framework uses a standardized permission pattern for object moderation:
 - Location: `/utils/object_management/permissions.py` (lines 157-168)
 
 ### 2. **Other Modules Reviewed**
-- **soilcom**: Templates use `perms.soilcom.can_moderate_collection` for Collection model
+- **waste_collection**: Templates use `perms.waste_collection.can_moderate_collection` for Collection model
 - **bibliography**: Source model doesn't define custom moderation permissions (relies on staff-only)
 - **materials**: Material model doesn't define custom moderation permissions (relies on staff-only)
 - **maps**: Catchment model doesn't define custom moderation permissions (relies on staff-only)

@@ -53,4 +53,4 @@ def ensure_initial_data(stdout=None):
     ):
         SortingMethod.objects.get_or_create(name=method_name)
     if stdout:
-        print("Soilcom initial data ensured.", file=stdout)
+        print("Waste collection initial data ensured.", file=stdout)

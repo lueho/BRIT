@@ -466,23 +466,25 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
         )
 
 
-class ValidateSoilcomCrosswalksCommandTestCase(SimpleTestCase):
-    """Verify the Soilcom crosswalk validation management command wrapper."""
+class ValidateWasteCollectionCrosswalksCommandTestCase(SimpleTestCase):
+    """Verify the waste_collection crosswalk validation management command."""
 
     @patch(
-        "sources.waste_collection.management.commands.validate_soilcom_crosswalks.validate_crosswalk_mappings"
+        "sources.waste_collection.management.commands.validate_waste_collection_crosswalks.validate_crosswalk_mappings"
     )
     def test_command_succeeds_when_crosswalk_assets_are_valid(self, mock_validate):
         """Command should emit success output when no crosswalk errors are found."""
         mock_validate.return_value = []
         stdout = StringIO()
 
-        call_command("validate_soilcom_crosswalks", stdout=stdout)
+        call_command("validate_waste_collection_crosswalks", stdout=stdout)
 
-        self.assertIn("Soilcom crosswalk validation passed.", stdout.getvalue())
+        self.assertIn(
+            "Waste collection crosswalk validation passed.", stdout.getvalue()
+        )
 
     @patch(
-        "sources.waste_collection.management.commands.validate_soilcom_crosswalks.validate_crosswalk_mappings"
+        "sources.waste_collection.management.commands.validate_waste_collection_crosswalks.validate_crosswalk_mappings"
     )
     def test_command_raises_command_error_when_crosswalk_assets_are_invalid(
         self,
@@ -497,4 +499,4 @@ class ValidateSoilcomCrosswalksCommandTestCase(SimpleTestCase):
             CommandError,
             "fixture.csv:2: Unknown target_concept_uri 'https://example.org/bad'.",
         ):
-            call_command("validate_soilcom_crosswalks")
+            call_command("validate_waste_collection_crosswalks")

@@ -1,4 +1,4 @@
-"""Controlled vocabulary helpers for Soilcom waste collection models."""
+"""Controlled vocabulary helpers for waste_collection models."""
 
 from __future__ import annotations
 
@@ -184,7 +184,7 @@ def get_collection_unit_names_for_collection_data() -> list[str]:
 def get_concepts_by_uri(
     vocabulary_ttl_path: Path | None = None,
 ) -> dict[str, dict[str, str | None]]:
-    """Return authoritative Soilcom concepts keyed by canonical URI.
+    """Return authoritative waste_collection concepts keyed by canonical URI.
 
     Args:
         vocabulary_ttl_path: Optional alternate Turtle vocabulary path.
@@ -192,7 +192,7 @@ def get_concepts_by_uri(
     Returns:
         Dict keyed by canonical concept URI. Each value contains the concept's
         scheme URI plus canonical label metadata parsed from the authoritative
-        Soilcom SKOS vocabulary.
+        waste_collection SKOS vocabulary.
     """
     return get_ttl_concept_registry(
         vocabulary_ttl_path=vocabulary_ttl_path,

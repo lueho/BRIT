@@ -8,7 +8,7 @@ This guide describes how to use, extend, and test the generic export workflow fo
 
 - **Export Views:**
   - Each exportable model has a dedicated export view, subclassing `GenericUserCreatedObjectExportView`.
-  - The view sets `model_label` (e.g., `'soilcom.Collection'`).
+  - The view sets `model_label` (e.g., `'waste_collection.Collection'`).
   - The view automatically determines which objects the user can export (published or owned) and passes filter parameters and context (such as `user_id` and `list_type`) to the export task. No long lists of IDs are passed.
 
 - **Export Task:**

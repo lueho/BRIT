@@ -96,16 +96,41 @@ def _resolve_property_id_by_name(name_setting, default_name):
     )
 
 
+def _get_first_configured_setting(*setting_names):
+    if not setting_names:
+        return None, None
+    for setting_name in setting_names:
+        if hasattr(settings, setting_name):
+            return setting_name, getattr(settings, setting_name)
+    return setting_names[0], None
+
+
 def _resolve_property_id_from_settings(id_setting, name_setting, default_name):
-    configured_id = getattr(settings, id_setting, None)
-    if configured_id is not None:
+    if isinstance(id_setting, str):
+        id_settings = (id_setting,)
+    else:
+        id_settings = tuple(id_setting)
+
+    if isinstance(name_setting, str):
+        name_settings = (name_setting,)
+    else:
+        name_settings = tuple(name_setting)
+
+    configured_id_setting, configured_id = _get_first_configured_setting(*id_settings)
+    if configured_id_setting is not None and configured_id is not None:
         if RegionProperty.objects.filter(pk=configured_id).exists():
             return configured_id
         raise ImproperlyConfigured(
-            f"{id_setting}={configured_id} does not exist for property '{default_name}'."
+            f"{configured_id_setting}={configured_id} does not exist for property '{default_name}'."
         )
 
-    return _resolve_property_id_by_name(name_setting, default_name)
+    configured_name_setting, configured_name = _get_first_configured_setting(
+        *name_settings
+    )
+    if configured_name is not None:
+        return _resolve_property_id_by_name(configured_name_setting, default_name)
+
+    return _resolve_property_id_by_name(name_settings[0], default_name)
 
 
 def _resolved_population_attribute_id():
@@ -113,8 +138,12 @@ def _resolved_population_attribute_id():
     try:
         return get_derived_property_config().population_attribute_id
     except ImproperlyConfigured:
-        return _resolve_property_id_by_name(
-            "SOILCOM_POPULATION_ATTRIBUTE_NAME",
+        return _resolve_property_id_from_settings(
+            (),
+            (
+                "WASTE_COLLECTION_POPULATION_ATTRIBUTE_NAME",
+                "SOILCOM_POPULATION_ATTRIBUTE_NAME",
+            ),
             "Population",
         )
 
@@ -122,8 +151,14 @@ def _resolved_population_attribute_id():
 def _resolved_population_density_attribute_id():
     try:
         return _resolve_property_id_from_settings(
-            "SOILCOM_POPULATION_DENSITY_ATTRIBUTE_ID",
-            "SOILCOM_POPULATION_DENSITY_ATTRIBUTE_NAME",
+            (
+                "WASTE_COLLECTION_POPULATION_DENSITY_ATTRIBUTE_ID",
+                "SOILCOM_POPULATION_DENSITY_ATTRIBUTE_ID",
+            ),
+            (
+                "WASTE_COLLECTION_POPULATION_DENSITY_ATTRIBUTE_NAME",
+                "SOILCOM_POPULATION_DENSITY_ATTRIBUTE_NAME",
+            ),
             "Population density",
         )
     except ImproperlyConfigured:

@@ -152,9 +152,9 @@ Out of scope for this pilot:
 
 ### Stale documentation to update
 
-- [ ] `docs/04_design_decisions/2026-02-10_sources_consolidation_plan.md` - Still references `flexibi_hamburg` extensively; should be updated to reflect completed state
-- [ ] `docs/04_design_decisions/2026-02-09_module_ux_harmonization_guideline.md` - References `case_studies/flexibi_hamburg`
-- [ ] `brit/settings/settings.py` - Verify `flexibi_hamburg` removed from `INSTALLED_APPS` and `MIGRATION_MODULES`
+- [x] `docs/04_design_decisions/2026-02-10_sources_consolidation_plan.md` - Updated to frame legacy labels and migration strategy as historical state
+- [x] `docs/04_design_decisions/2026-02-09_module_ux_harmonization_guideline.md` - Updated current module/app references away from legacy labels
+- [x] `brit/settings/settings.py` - Verified `flexibi_hamburg` was removed from active settings/runtime
 
 ### Follow-up tasks
 

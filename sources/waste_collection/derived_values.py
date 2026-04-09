@@ -4,8 +4,8 @@ When a CPV for *specific waste collected* exists
 but *total waste collected* does not (or vice-versa),
 the missing value can be derived via population data:
 
-    specific = total_Mg × 1000 / population
-    total_Mg = specific × population / 1000
+    specific = total_Mg x 1000 / population
+    total_Mg = specific x population / 1000
 
 Derived records are stored with ``is_derived=True`` so they can be
 distinguished from manually entered data and regenerated at will.
@@ -27,13 +27,16 @@ from .models import CollectionPropertyValue
 
 logger = logging.getLogger(__name__)
 
+_SETTING_NOT_SET = object()
+
 # Names of the canonical records used for derivation.
 # Optional settings can override these when projects use different naming:
-# - SOILCOM_SPECIFIC_WASTE_PROPERTY_NAME
-# - SOILCOM_TOTAL_WASTE_PROPERTY_NAME
-# - SOILCOM_SPECIFIC_WASTE_UNIT_NAME
-# - SOILCOM_TOTAL_WASTE_UNIT_NAME
-# - SOILCOM_POPULATION_ATTRIBUTE_NAME
+# - WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_NAME
+# - WASTE_COLLECTION_TOTAL_WASTE_PROPERTY_NAME
+# - WASTE_COLLECTION_SPECIFIC_WASTE_UNIT_NAME
+# - WASTE_COLLECTION_TOTAL_WASTE_UNIT_NAME
+# - WASTE_COLLECTION_POPULATION_ATTRIBUTE_NAME
+# Legacy SOILCOM_* aliases remain supported for backward compatibility.
 
 _DEFAULT_SPECIFIC_WASTE_PROPERTY_NAME = "specific waste collected"
 _DEFAULT_TOTAL_WASTE_PROPERTY_NAME = "total waste collected"
@@ -42,11 +45,12 @@ _DEFAULT_TOTAL_WASTE_UNIT_NAME = "Mg/a"
 _DEFAULT_POPULATION_ATTRIBUTE_NAME = "Population"
 
 # Optional settings can pin explicit IDs when desired:
-# - SOILCOM_SPECIFIC_WASTE_PROPERTY_ID
-# - SOILCOM_TOTAL_WASTE_PROPERTY_ID
-# - SOILCOM_SPECIFIC_WASTE_UNIT_ID
-# - SOILCOM_TOTAL_WASTE_UNIT_ID
-# - SOILCOM_POPULATION_ATTRIBUTE_ID
+# - WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_ID
+# - WASTE_COLLECTION_TOTAL_WASTE_PROPERTY_ID
+# - WASTE_COLLECTION_SPECIFIC_WASTE_UNIT_ID
+# - WASTE_COLLECTION_TOTAL_WASTE_UNIT_ID
+# - WASTE_COLLECTION_POPULATION_ATTRIBUTE_ID
+# Legacy SOILCOM_* aliases remain supported for backward compatibility.
 
 # Conversion factor: 1 Mg = 1000 kg
 _MG_TO_KG = 1000
@@ -85,23 +89,34 @@ class DerivedValueConfig(DerivedPropertyConfig):
     total_unit_id: int
 
 
+def _get_configured_setting(*setting_names: str):
+    """Return the first explicitly configured setting value and its name."""
+    for setting_name in setting_names:
+        value = getattr(settings, setting_name, _SETTING_NOT_SET)
+        if value is not _SETTING_NOT_SET:
+            return setting_name, value
+    return setting_names[0], None
+
+
 def _resolve_named_record_id(
     *,
     model,
-    id_setting: str,
-    name_setting: str,
+    id_settings: tuple[str, ...],
+    name_settings: tuple[str, ...],
     default_name: str,
     label: str,
 ):
-    configured_id = getattr(settings, id_setting, None)
+    configured_id_setting, configured_id = _get_configured_setting(*id_settings)
     if configured_id is not None:
         if not model.objects.filter(pk=configured_id).exists():
             raise ImproperlyConfigured(
-                f"{id_setting}={configured_id} does not exist for {label}."
+                f"{configured_id_setting}={configured_id} does not exist for {label}."
             )
         return configured_id
 
-    target_name = getattr(settings, name_setting, default_name)
+    _, target_name = _get_configured_setting(*name_settings)
+    if target_name is None:
+        target_name = default_name
     qs = model.objects.filter(name=target_name)
     if qs.count() == 1:
         return qs.values_list("pk", flat=True).first()
@@ -130,7 +145,7 @@ def _resolve_named_record_id(
 
     raise ImproperlyConfigured(
         f"Could not unambiguously resolve {label} named '{target_name}'. "
-        f"Configure {id_setting} to disambiguate."
+        f"Configure {id_settings[0]} to disambiguate."
     )
 
 
@@ -139,22 +154,40 @@ def get_derived_property_config():
     """Resolve and cache property/attribute IDs required for derivation."""
     specific_property_id = _resolve_named_record_id(
         model=Property,
-        id_setting="SOILCOM_SPECIFIC_WASTE_PROPERTY_ID",
-        name_setting="SOILCOM_SPECIFIC_WASTE_PROPERTY_NAME",
+        id_settings=(
+            "WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_ID",
+            "SOILCOM_SPECIFIC_WASTE_PROPERTY_ID",
+        ),
+        name_settings=(
+            "WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_NAME",
+            "SOILCOM_SPECIFIC_WASTE_PROPERTY_NAME",
+        ),
         default_name=_DEFAULT_SPECIFIC_WASTE_PROPERTY_NAME,
         label="specific waste property",
     )
     total_property_id = _resolve_named_record_id(
         model=Property,
-        id_setting="SOILCOM_TOTAL_WASTE_PROPERTY_ID",
-        name_setting="SOILCOM_TOTAL_WASTE_PROPERTY_NAME",
+        id_settings=(
+            "WASTE_COLLECTION_TOTAL_WASTE_PROPERTY_ID",
+            "SOILCOM_TOTAL_WASTE_PROPERTY_ID",
+        ),
+        name_settings=(
+            "WASTE_COLLECTION_TOTAL_WASTE_PROPERTY_NAME",
+            "SOILCOM_TOTAL_WASTE_PROPERTY_NAME",
+        ),
         default_name=_DEFAULT_TOTAL_WASTE_PROPERTY_NAME,
         label="total waste property",
     )
     population_attribute_id = _resolve_named_record_id(
         model=RegionProperty,
-        id_setting="SOILCOM_POPULATION_ATTRIBUTE_ID",
-        name_setting="SOILCOM_POPULATION_ATTRIBUTE_NAME",
+        id_settings=(
+            "WASTE_COLLECTION_POPULATION_ATTRIBUTE_ID",
+            "SOILCOM_POPULATION_ATTRIBUTE_ID",
+        ),
+        name_settings=(
+            "WASTE_COLLECTION_POPULATION_ATTRIBUTE_NAME",
+            "SOILCOM_POPULATION_ATTRIBUTE_NAME",
+        ),
         default_name=_DEFAULT_POPULATION_ATTRIBUTE_NAME,
         label="population attribute",
     )
@@ -177,15 +210,27 @@ def get_derived_value_config():
     prop_cfg = get_derived_property_config()
     specific_unit_id = _resolve_named_record_id(
         model=Unit,
-        id_setting="SOILCOM_SPECIFIC_WASTE_UNIT_ID",
-        name_setting="SOILCOM_SPECIFIC_WASTE_UNIT_NAME",
+        id_settings=(
+            "WASTE_COLLECTION_SPECIFIC_WASTE_UNIT_ID",
+            "SOILCOM_SPECIFIC_WASTE_UNIT_ID",
+        ),
+        name_settings=(
+            "WASTE_COLLECTION_SPECIFIC_WASTE_UNIT_NAME",
+            "SOILCOM_SPECIFIC_WASTE_UNIT_NAME",
+        ),
         default_name=_DEFAULT_SPECIFIC_WASTE_UNIT_NAME,
         label="specific waste unit",
     )
     total_unit_id = _resolve_named_record_id(
         model=Unit,
-        id_setting="SOILCOM_TOTAL_WASTE_UNIT_ID",
-        name_setting="SOILCOM_TOTAL_WASTE_UNIT_NAME",
+        id_settings=(
+            "WASTE_COLLECTION_TOTAL_WASTE_UNIT_ID",
+            "SOILCOM_TOTAL_WASTE_UNIT_ID",
+        ),
+        name_settings=(
+            "WASTE_COLLECTION_TOTAL_WASTE_UNIT_NAME",
+            "SOILCOM_TOTAL_WASTE_UNIT_NAME",
+        ),
         default_name=_DEFAULT_TOTAL_WASTE_UNIT_NAME,
         label="total waste unit",
     )
@@ -234,7 +279,7 @@ def get_population_for_collection(collection, year=None):
     """Return the population for a collection's catchment region.
 
     Uses the most recent ``RegionAttributeValue`` with
-    ``attribute_id=SOILCOM_POPULATION_ATTRIBUTE_*`` for the catchment's region.
+    ``attribute_id=WASTE_COLLECTION_POPULATION_ATTRIBUTE_*`` for the catchment's region.
     If *year* is given, prefers the value closest to that year.
     """
     cfg = get_derived_property_config()

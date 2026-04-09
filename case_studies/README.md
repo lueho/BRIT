@@ -13,9 +13,9 @@ The remaining case study is implemented as a separate Django application within 
 - `closecycle/` - Implementation of the CloseCycle case study
 
 Former case-study apps have been migrated into `sources/`:
-- `sources/roadside_trees/` - FLEXIBI Hamburg
-- `sources/greenhouses/` - FLEXIBI Nantes
-- `sources/waste_collection/` - SOILCOM waste collection
+- `sources/roadside_trees/` - roadside tree datasets and views
+- `sources/greenhouses/` - greenhouse datasets and views
+- `sources/waste_collection/` - household waste collection datasets and views
 
 ## Integration
 The remaining case-study app integrates with other BRIT modules, particularly:

@@ -38,13 +38,13 @@ systems, connection types, and required bin-capacity reference terms.
 Run inside Docker:
 
 ```bash
-docker compose exec -T web python manage.py export_soilcom_vocabulary
+docker compose exec -T web python manage.py export_waste_collection_vocabulary
 ```
 
 Optional strict mode (fails if country codes have no language mapping):
 
 ```bash
-docker compose exec -T web python manage.py export_soilcom_vocabulary --fail-on-unmapped
+docker compose exec -T web python manage.py export_waste_collection_vocabulary --fail-on-unmapped
 ```
 
 Default output:

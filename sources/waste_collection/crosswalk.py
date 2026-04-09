@@ -126,19 +126,19 @@ def _normalize_connection_type_candidates(value: str) -> set[str]:
 
 
 class CrosswalkValidationError(ValueError):
-    """Raised when Soilcom crosswalk assets violate URI integrity rules."""
+    """Raised when waste_collection crosswalk assets violate URI integrity rules."""
 
     def __init__(self, errors: Sequence[str] | str):
         if isinstance(errors, str):
-            normalized_errors = [errors]
+            normalized_errors = [errors] if errors else []
         else:
-            normalized_errors = list(errors)
-
-        self.errors = normalized_errors
+            normalized_errors = [str(error) for error in errors if str(error)]
+        if not normalized_errors:
+            normalized_errors = ["Unknown crosswalk validation error."]
         detail = "; ".join(normalized_errors[:3])
         if len(normalized_errors) > 3:
             detail = f"{detail}; ..."
-        super().__init__(f"Soilcom crosswalk validation failed: {detail}")
+        super().__init__(f"Waste collection crosswalk validation failed: {detail}")
 
 
 def _normalize_term(value: str) -> str:
@@ -179,7 +179,7 @@ def _load_ttl_concept_registry(
     vocabulary_ttl_path: str,
     uri_base: str,
 ) -> dict[str, dict[str, str | None]]:
-    """Parse the Soilcom SKOS Turtle file into a concept registry."""
+    """Parse the waste_collection SKOS Turtle file into a concept registry."""
     registry: dict[str, dict[str, str | None]] = {}
     current_uri: str | None = None
     current_scheme_uri: str | None = None
@@ -249,7 +249,7 @@ def get_ttl_concept_registry(
     vocabulary_ttl_path: Path | None = None,
     uri_base: str = "https://brit.bioresource-tools.net/vocab/soilcom",
 ) -> dict[str, dict[str, str | None]]:
-    """Return canonical concept metadata parsed from Soilcom Turtle vocabulary."""
+    """Return canonical concept metadata parsed from the waste_collection Turtle vocabulary."""
     ttl_path = (vocabulary_ttl_path or VOCABULARY_TTL_PATH).resolve()
     return _load_ttl_concept_registry(str(ttl_path), uri_base)
 
@@ -264,12 +264,12 @@ def _expected_target_label_for_domain(
     return concept_entry.get("label")
 
 
-def validate_crosswalk_mappings(
+def get_crosswalk_uri_validation_errors(
     vocabulary_snapshot: dict | None = None,
     mappings_dir: Path | None = None,
     vocabulary_ttl_path: Path | None = None,
 ) -> list[str]:
-    """Return URI integrity errors for Soilcom crosswalk CSV files."""
+    """Return URI integrity errors for waste_collection crosswalk CSV files."""
     if vocabulary_snapshot is None:
         from sources.waste_collection.vocabulary import (
             get_waste_collection_controlled_vocabulary,
@@ -380,13 +380,13 @@ def validate_crosswalk_mappings(
     return errors
 
 
-def ensure_crosswalk_mappings_valid(
+def validate_crosswalk_mappings(
     vocabulary_snapshot: dict | None = None,
     mappings_dir: Path | None = None,
     vocabulary_ttl_path: Path | None = None,
 ) -> None:
-    """Raise when Soilcom crosswalk mappings violate URI integrity rules."""
-    errors = validate_crosswalk_mappings(
+    """Raise when waste_collection crosswalk mappings violate URI integrity rules."""
+    errors = get_crosswalk_uri_validation_errors(
         vocabulary_snapshot=vocabulary_snapshot,
         mappings_dir=mappings_dir,
         vocabulary_ttl_path=vocabulary_ttl_path,

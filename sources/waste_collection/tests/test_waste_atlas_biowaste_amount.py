@@ -19,16 +19,16 @@ from utils.properties.models import Property, Unit
 
 
 @override_settings(
-    SOILCOM_SPECIFIC_WASTE_PROPERTY_ID=None,
-    SOILCOM_TOTAL_WASTE_PROPERTY_ID=None,
-    SOILCOM_SPECIFIC_WASTE_UNIT_ID=None,
-    SOILCOM_TOTAL_WASTE_UNIT_ID=None,
-    SOILCOM_POPULATION_ATTRIBUTE_ID=None,
-    SOILCOM_SPECIFIC_WASTE_PROPERTY_NAME="specific waste collected [bio-atlas-test]",
-    SOILCOM_TOTAL_WASTE_PROPERTY_NAME="total waste collected [bio-atlas-test]",
-    SOILCOM_SPECIFIC_WASTE_UNIT_NAME="kg/(cap.*a) [bio-atlas-test]",
-    SOILCOM_TOTAL_WASTE_UNIT_NAME="Mg/a [bio-atlas-test]",
-    SOILCOM_POPULATION_ATTRIBUTE_NAME="Population [bio-atlas-test]",
+    WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_ID=None,
+    WASTE_COLLECTION_TOTAL_WASTE_PROPERTY_ID=None,
+    WASTE_COLLECTION_SPECIFIC_WASTE_UNIT_ID=None,
+    WASTE_COLLECTION_TOTAL_WASTE_UNIT_ID=None,
+    WASTE_COLLECTION_POPULATION_ATTRIBUTE_ID=None,
+    WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_NAME="specific waste collected [bio-atlas-test]",
+    WASTE_COLLECTION_TOTAL_WASTE_PROPERTY_NAME="total waste collected [bio-atlas-test]",
+    WASTE_COLLECTION_SPECIFIC_WASTE_UNIT_NAME="kg/(cap.*a) [bio-atlas-test]",
+    WASTE_COLLECTION_TOTAL_WASTE_UNIT_NAME="Mg/a [bio-atlas-test]",
+    WASTE_COLLECTION_POPULATION_ATTRIBUTE_NAME="Population [bio-atlas-test]",
 )
 class BiowasteCollectionAmountViewSetTests(APITestCase):
     endpoint = "/waste_collection/api/waste-atlas/biowaste-collection-amount/"

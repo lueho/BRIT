@@ -101,7 +101,7 @@ def capture_previous_collection_publication_status(sender, instance, **kwargs):
 @receiver(post_delete, sender=Collection)
 def invalidate_collection_geojson_cache(sender, instance, **kwargs):
     """
-    Proactively clear Soilcom Collection GeoJSON cache whenever a Collection changes.
+    Proactively clear waste-collection GeoJSON cache whenever a Collection changes.
 
     This prevents accumulation of outdated dv-based cache entries when data changes frequently.
     Uses Redis delete_pattern via maps.signals.clear_geojson_cache_pattern.

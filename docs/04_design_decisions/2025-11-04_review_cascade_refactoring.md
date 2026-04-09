@@ -10,7 +10,7 @@ The `ReviewActionCascadeMixin` in `utils/object_management/views.py` had several
 
 ## Problems Identified
 
-### 1. Hard-coded Soilcom Dependency in Generic Module ❌
+### 1. Hard-coded legacy Soilcom dependency in Generic Module ❌
 
 **Location:** `utils/object_management/views.py`
 
@@ -24,7 +24,7 @@ from case_studies.soilcom.models import (
 **Issues:**
 - Generic `object_management` module depended on specific `soilcom` models
 - Violated dependency inversion principle
-- Made object_management non-reusable without soilcom
+- Made object_management non-reusable without the waste_collection domain
 - Created potential circular dependency risks
 
 ### 2. Inconsistent Mixin Usage ❌
@@ -94,9 +94,9 @@ def post_action_hook(self, request, previous_status=None):
 
 This provides a clean extension point without hard-coding model-specific logic.
 
-### Phase 2: Move Cascade to Soilcom Module ✅
+### Phase 2: Move Cascade to the waste_collection module ✅
 
-**Created `CollectionReviewActionCascadeMixin` in `case_studies/soilcom/views.py`:**
+**Created `CollectionReviewActionCascadeMixin` in `sources/waste_collection/views.py` (originally extracted from the legacy `case_studies.soilcom` path):**
 
 ```python
 class CollectionReviewActionCascadeMixin:
@@ -179,8 +179,8 @@ OK ✅
 
 All tests in:
 - `utils.object_management.tests`
-- `case_studies.soilcom.tests.test_versioning_views`
-- `case_studies.soilcom.tests.test_review_cascade_mixin`
+- `sources.waste_collection.tests.test_versioning_views`
+- `sources.waste_collection.tests.test_views`
 
 ## Benefits Achieved
 
@@ -225,7 +225,7 @@ class AuthorSubmitForReviewView(
 
 The Collection-specific views exist but aren't automatically used. Collections currently use generic views (no cascade). To enable cascade, either:
 
-1. Register specific URLs in `soilcom/urls.py`
+1. Register specific URLs in `sources/waste_collection/urls.py`
 2. Implement view resolver that auto-selects model-specific views
 3. Use views programmatically where needed
 

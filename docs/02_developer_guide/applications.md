@@ -31,7 +31,7 @@ This document is a high-level map of BRIT apps and their responsibilities. App-s
 - Inventory and scenario tooling.
 
 ### `case_studies`
-- Project-specific or domain-specific extensions such as Soilcom and Flexibi.
+- Remaining project-specific extensions such as CloseCycle. Former project-labeled source apps now live under `sources/` as domain modules like `waste_collection`, `greenhouses`, and `roadside_trees`.
 
 ## Documentation Boundaries
 

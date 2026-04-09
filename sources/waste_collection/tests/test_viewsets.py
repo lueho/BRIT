@@ -1916,16 +1916,16 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
 
 
 @override_settings(
-    SOILCOM_SPECIFIC_WASTE_PROPERTY_ID=None,
-    SOILCOM_TOTAL_WASTE_PROPERTY_ID=None,
-    SOILCOM_SPECIFIC_WASTE_UNIT_ID=None,
-    SOILCOM_TOTAL_WASTE_UNIT_ID=None,
-    SOILCOM_POPULATION_ATTRIBUTE_ID=None,
-    SOILCOM_SPECIFIC_WASTE_PROPERTY_NAME="specific waste collected [green-atlas-test]",
-    SOILCOM_TOTAL_WASTE_PROPERTY_NAME="total waste collected [green-atlas-test]",
-    SOILCOM_SPECIFIC_WASTE_UNIT_NAME="kg/(cap.*a) [green-atlas-test]",
-    SOILCOM_TOTAL_WASTE_UNIT_NAME="Mg/a [green-atlas-test]",
-    SOILCOM_POPULATION_ATTRIBUTE_NAME="Population [green-atlas-test]",
+    WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_ID=None,
+    WASTE_COLLECTION_TOTAL_WASTE_PROPERTY_ID=None,
+    WASTE_COLLECTION_SPECIFIC_WASTE_UNIT_ID=None,
+    WASTE_COLLECTION_TOTAL_WASTE_UNIT_ID=None,
+    WASTE_COLLECTION_POPULATION_ATTRIBUTE_ID=None,
+    WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_NAME="specific waste collected [green-atlas-test]",
+    WASTE_COLLECTION_TOTAL_WASTE_PROPERTY_NAME="total waste collected [green-atlas-test]",
+    WASTE_COLLECTION_SPECIFIC_WASTE_UNIT_NAME="kg/(cap.*a) [green-atlas-test]",
+    WASTE_COLLECTION_TOTAL_WASTE_UNIT_NAME="Mg/a [green-atlas-test]",
+    WASTE_COLLECTION_POPULATION_ATTRIBUTE_NAME="Population [green-atlas-test]",
 )
 class GreenWasteCollectionAmountViewSetTests(APITestCase):
     """Tests for Green Waste collection amount atlas endpoint."""
@@ -2280,16 +2280,16 @@ class BinSizeViewSetTests(APITestCase):
 
 
 @override_settings(
-    SOILCOM_SPECIFIC_WASTE_PROPERTY_ID=None,
-    SOILCOM_TOTAL_WASTE_PROPERTY_ID=None,
-    SOILCOM_SPECIFIC_WASTE_UNIT_ID=None,
-    SOILCOM_TOTAL_WASTE_UNIT_ID=None,
-    SOILCOM_POPULATION_ATTRIBUTE_ID=None,
-    SOILCOM_SPECIFIC_WASTE_PROPERTY_NAME="specific waste collected [organic-atlas-test]",
-    SOILCOM_TOTAL_WASTE_PROPERTY_NAME="total waste collected [organic-atlas-test]",
-    SOILCOM_SPECIFIC_WASTE_UNIT_NAME="kg/(cap.*a) [organic-atlas-test]",
-    SOILCOM_TOTAL_WASTE_UNIT_NAME="Mg/a [organic-atlas-test]",
-    SOILCOM_POPULATION_ATTRIBUTE_NAME="Population [organic-atlas-test]",
+    WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_ID=None,
+    WASTE_COLLECTION_TOTAL_WASTE_PROPERTY_ID=None,
+    WASTE_COLLECTION_SPECIFIC_WASTE_UNIT_ID=None,
+    WASTE_COLLECTION_TOTAL_WASTE_UNIT_ID=None,
+    WASTE_COLLECTION_POPULATION_ATTRIBUTE_ID=None,
+    WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_NAME="specific waste collected [organic-atlas-test]",
+    WASTE_COLLECTION_TOTAL_WASTE_PROPERTY_NAME="total waste collected [organic-atlas-test]",
+    WASTE_COLLECTION_SPECIFIC_WASTE_UNIT_NAME="kg/(cap.*a) [organic-atlas-test]",
+    WASTE_COLLECTION_TOTAL_WASTE_UNIT_NAME="Mg/a [organic-atlas-test]",
+    WASTE_COLLECTION_POPULATION_ATTRIBUTE_NAME="Population [organic-atlas-test]",
 )
 class OrganicAmountViewSetTests(APITestCase):
     """Regression tests for Karte 27 (organic amount) and Karte 28 (organic ratio)."""

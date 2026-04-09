@@ -58,7 +58,7 @@ from sources.waste_collection.models import (
     CollectionPropertyValue,
     CollectionSystem,
     Collector,
-    MaterialCategory,  # soilcom.MaterialCategory
+    MaterialCategory,
     WasteCategory,
     WasteComponent,
     WasteFlyer,
@@ -2664,24 +2664,24 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
             name="Test Catchment", owner=cls.user
         )
 
-        # Create WasteCategory (soilcom.models)
+        # Create WasteCategory for the waste_collection domain
         cls.waste_category = WasteCategory.objects.create(
             name="Test Waste Category", owner=cls.user
         )
 
-        # Create MaterialCategory (soilcom.models) for "Biowaste component"
+        # Create MaterialCategory for "Biowaste component"
         # This is distinct from the MaterialCategory above.
-        cls.soilcom_biowaste_material_category, _ = (
+        cls.biowaste_component_material_category, _ = (
             MaterialCategory.objects.get_or_create(
                 name="Biowaste component", defaults={"owner": cls.user}
             )
         )
 
-        # Create WasteComponent and associate with the soilcom.MaterialCategory
+        # Create WasteComponent and associate with the biowaste component category
         cls.waste_component = WasteComponent.objects.create(
             name="Test Component", owner=cls.user, type="material"
         )
-        cls.waste_component.categories.add(cls.soilcom_biowaste_material_category)
+        cls.waste_component.categories.add(cls.biowaste_component_material_category)
 
         # Create MaterialCategory and Material (materials.models)
         cls.material_category = MaterialCategory.objects.create(
@@ -4194,11 +4194,15 @@ class WasteAtlasMapViewsTestCase(TestCase):
             response,
             "Belgium (Flanders + Brussels)",
         )
+        self.assertEqual(
+            response.context["selected_required_bin_capacity_reference"],
+            "person",
+        )
 
 
 @override_settings(
-    SOILCOM_POPULATION_ATTRIBUTE_ID=None,
-    SOILCOM_POPULATION_ATTRIBUTE_NAME="Population [atlas population filter test]",
+    WASTE_COLLECTION_POPULATION_ATTRIBUTE_ID=None,
+    WASTE_COLLECTION_POPULATION_ATTRIBUTE_NAME="Population [atlas population filter test]",
 )
 class WasteAtlasPopulationViewSetTests(TestCase):
     @classmethod
@@ -4272,7 +4276,7 @@ class WasteAtlasPopulationViewSetTests(TestCase):
 
     def test_population_endpoint_respects_nuts_prefix_filter(self):
         with override_settings(
-            SOILCOM_POPULATION_ATTRIBUTE_ID=self.population_attribute.id
+            WASTE_COLLECTION_POPULATION_ATTRIBUTE_ID=self.population_attribute.id
         ):
             clear_derived_value_config_cache()
             response = self.client.get(
@@ -5366,16 +5370,16 @@ class CollectionXLSXRendererTestCase(TestCase):
 
 
 @override_settings(
-    SOILCOM_SPECIFIC_WASTE_PROPERTY_ID=None,
-    SOILCOM_TOTAL_WASTE_PROPERTY_ID=None,
-    SOILCOM_SPECIFIC_WASTE_UNIT_ID=None,
-    SOILCOM_TOTAL_WASTE_UNIT_ID=None,
-    SOILCOM_POPULATION_ATTRIBUTE_ID=None,
-    SOILCOM_SPECIFIC_WASTE_PROPERTY_NAME="specific waste collected [test]",
-    SOILCOM_TOTAL_WASTE_PROPERTY_NAME="total waste collected [test]",
-    SOILCOM_SPECIFIC_WASTE_UNIT_NAME="kg/(cap.*a) [test]",
-    SOILCOM_TOTAL_WASTE_UNIT_NAME="Mg/a [test]",
-    SOILCOM_POPULATION_ATTRIBUTE_NAME="Population [test]",
+    WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_ID=None,
+    WASTE_COLLECTION_TOTAL_WASTE_PROPERTY_ID=None,
+    WASTE_COLLECTION_SPECIFIC_WASTE_UNIT_ID=None,
+    WASTE_COLLECTION_TOTAL_WASTE_UNIT_ID=None,
+    WASTE_COLLECTION_POPULATION_ATTRIBUTE_ID=None,
+    WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_NAME="specific waste collected [test]",
+    WASTE_COLLECTION_TOTAL_WASTE_PROPERTY_NAME="total waste collected [test]",
+    WASTE_COLLECTION_SPECIFIC_WASTE_UNIT_NAME="kg/(cap.*a) [test]",
+    WASTE_COLLECTION_TOTAL_WASTE_UNIT_NAME="Mg/a [test]",
+    WASTE_COLLECTION_POPULATION_ATTRIBUTE_NAME="Population [test]",
 )
 class DerivedValuesTestCase(TestCase):
     @classmethod
@@ -5631,14 +5635,14 @@ class DerivedValuesTestCase(TestCase):
         self.assertIsNone(convert_total_to_specific(10, -5))
 
     def test_get_derived_property_config_raises_for_invalid_configured_id(self):
-        with override_settings(SOILCOM_SPECIFIC_WASTE_PROPERTY_ID=999999):
+        with override_settings(WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_ID=999999):
             clear_derived_value_config_cache()
             with self.assertRaises(ImproperlyConfigured):
                 get_derived_property_config()
 
     def test_get_derived_property_config_raises_for_ambiguous_names(self):
         Property.objects.create(name="specific waste collected [test]")
-        with override_settings(SOILCOM_SPECIFIC_WASTE_PROPERTY_ID=None):
+        with override_settings(WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_ID=None):
             clear_derived_value_config_cache()
             with self.assertRaises(ImproperlyConfigured):
                 get_derived_property_config()
@@ -5656,14 +5660,14 @@ class DerivedValuesTestCase(TestCase):
             is_derived=False,
         )
 
-        with override_settings(SOILCOM_SPECIFIC_WASTE_PROPERTY_ID=999999):
+        with override_settings(WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_ID=999999):
             clear_derived_value_config_cache()
             # Should not raise; handler catches ImproperlyConfigured.
             sync_derived_cpv_on_save(sender=CollectionPropertyValue, instance=cpv)
             sync_derived_cpv_on_delete(sender=CollectionPropertyValue, instance=cpv)
 
     def test_population_attribute_resolution_uses_fallback_when_misconfigured(self):
-        with override_settings(SOILCOM_POPULATION_ATTRIBUTE_ID=999999):
+        with override_settings(WASTE_COLLECTION_POPULATION_ATTRIBUTE_ID=999999):
             clear_derived_value_config_cache()
             self.assertEqual(
                 _resolved_population_attribute_id(), self.population_attribute.id

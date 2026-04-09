@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary
 
-BRIT has grown organically across multiple research projects (FLEXIBI, SOILCOM, CLOSECYCLE). Each module was built at different times, by different contributors, and to serve different domain needs. While a solid shared infrastructure exists (`utils/object_management`, base templates like `detail_with_options.html`, `filtered_list.html`, `simple_list_card.html`), the *user-facing guidance*—how a user discovers, navigates, and operates within a module—varies significantly. This document catalogs the inconsistencies and proposes a harmonized guideline.
+BRIT has grown organically across multiple research projects and domain modules, including `roadside_trees`, `greenhouses`, `waste_collection`, and `closecycle`. Each module was built at different times, by different contributors, and to serve different domain needs. While a solid shared infrastructure exists (`utils/object_management`, base templates like `detail_with_options.html`, `filtered_list.html`, `simple_list_card.html`), the *user-facing guidance*—how a user discovers, navigates, and operates within a module—varies significantly. This document catalogs the inconsistencies and proposes a harmonized guideline.
 
 ### 1.1 Key Conceptual Distinction: Explorer vs. Dashboard
 
@@ -273,7 +273,7 @@ Case studies are currently mounted in confusing ways:
 
 **Proposed consolidation:**
 1. Pick ONE canonical URL prefix per case study and redirect the other
-2. Recommendation: mount under `case_studies/` and remove from `maps/`
+2. Recommendation: keep canonical domain routes under `sources/` or dedicated top-level prefixes and leave legacy `case_studies/` routes as redirects only
 3. Or: give each case study its own top-level prefix but remove the duplicate mounting
 
 ---
