@@ -4,10 +4,13 @@ This section contains BRIT runtime and deployment documentation.
 
 ## Recommended Reading Order
 - [Operations & Deployment](operations.md)
-- [Collection waste semantics simplification rollout checklist](wastestream-removal-rollout-checklist.md)
 
 - **Canonical operations runbook**
   Use [Operations & Deployment](operations.md).
+
+## Completed rollout records
+
+- [Collection waste semantics simplification rollout record](wastestream-removal-rollout-record.md)
 
 ## Documentation Ownership
 
@@ -20,4 +23,4 @@ This section contains BRIT runtime and deployment documentation.
 - **Architecture context**
   Keep in [Deployment Overview](../02_developer_guide/architecture/deployment.md).
 
-_Last updated: 2026-03-06_
+_Last updated: 2026-04-09_

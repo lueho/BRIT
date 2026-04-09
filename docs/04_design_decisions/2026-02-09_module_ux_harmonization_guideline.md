@@ -273,46 +273,14 @@ Case studies are currently mounted in confusing ways:
 
 ---
 
-## 5. Remaining Action Items
+## 5. Execution tracking
 
-### 5.1 High-value navigation cleanup
-
-- [ ] Change the Processes sidebar and home entry point from `processes-dashboard` to `processtype-list` once the explorer remains easily reachable as a secondary action.
-- [ ] Make Bibliography consistent between sidebar and home by choosing either `bibliography-explorer` or `source-list` as the canonical entry point.
-- [ ] Decide whether Waste Collection should gain a first-class sidebar/home entry or remain discoverable through Sources only.
-
-### 5.2 Explorer naming and presentation cleanup
-
-- [ ] Decide whether `maps-dashboard` and `processes-dashboard` should be renamed to canonical `*-explorer` names, with compatibility aliases left in place as needed.
-- [ ] Modernize the Maps explorer so it matches the current shared explorer-card pattern and better reflects the module surface.
-
-### 5.3 Route-surface cleanup
-
-- [ ] Continue shrinking legacy public prefixes for source-domain modules by converting compatibility routes into pure redirects where possible.
-- [ ] Continue the broader URL naming cleanup for underscore-based names, inconsistent trailing slashes, and PascalCase map route names once the `GeoDataset` coupling can be decoupled safely.
-
-### 5.4 Sidebar behavior cleanup
-
-- [ ] Replace path-substring active-state detection with a more robust namespace- or route-aware mechanism.
+Active implementation follow-up for this guideline is now tracked in GitHub issue #89.
+This document remains the architectural and UX guidance record rather than a live backlog.
 
 ---
 
-## 6. Implementation Priority
-
-| Priority | Item | Effort |
-|---|---|---|
-| **P1** | Change Processes entry point from explorer to primary list | Small |
-| **P1** | Make Bibliography sidebar/home entry consistent | Small |
-| **P1** | Decide on Waste Collection top-level navigation placement | Small |
-| **P2** | Rename remaining `*-dashboard` explorer names where still misleading | Small |
-| **P2** | Modernize Maps explorer and broaden its module coverage | Medium |
-| **P3** | Continue consolidating legacy public prefixes for source-domain modules | Medium |
-| **P3** | Continue broader route naming cleanup once map URL coupling is addressed | Medium |
-| **P4** | Improve sidebar active-state detection | Small |
-
----
-
-## 7. Summary of the Harmonized User Journey
+## 6. Summary of the Harmonized User Journey
 
 ```
 User arrives at Home
@@ -333,9 +301,9 @@ This flow is **predictable**, **consistent**, and **task-oriented**. A user who 
 
 ---
 
-## 8. Primary List View Context Pattern
+## 7. Primary List View Context Pattern
 
-### 8.1 Current state
+### 7.1 Current state
 
 `filtered_list.html` already supports two important contextual extension points:
 
@@ -344,14 +312,14 @@ This flow is **predictable**, **consistent**, and **task-oriented**. A user who 
 
 This pattern is already implemented for several primary list views, including Samples, Sources, Inventories, Collections, GeoDatasets, and CLOSECYCLE showcases.
 
-### 8.2 Remaining inconsistency
+### 7.2 Remaining inconsistency
 
 Not every primary list uses the pattern yet.
 
 - `processes` still presents its primary list without the same contextual intro/learning treatment
 - some source-domain and supporting-model lists still intentionally remain plain filtered lists
 
-### 8.3 Guidance
+### 7.3 Guidance
 
 The preferred pattern for a module's primary list remains:
 
@@ -361,17 +329,15 @@ The preferred pattern for a module's primary list remains:
 
 Secondary/supporting-model lists do not need the full contextual treatment unless they are intended as user-facing entry points.
 
-### 8.4 Remaining follow-up
+### 7.4 Execution note
 
-- [ ] Add contextual intro/learning content to the Processes primary list if it is kept as a primary entry point.
-- [ ] Decide whether any additional primary lists still need the intro/learning treatment, especially where explorer-first navigation is being replaced.
-- [ ] Consider whether `dashboard_url` should eventually be renamed to `explorer_url` in shared list templates for terminology consistency.
+Any remaining primary-list context follow-up is tracked in GitHub issue #89.
 
 ---
 
-## 9. Hub Pages
+## 8. Hub Pages
 
-### 9.1 Current role of Sources
+### 8.1 Current role of Sources
 
 The Sources page is now an explorer/hub rather than a static placeholder page.
 It remains a valid exception to the “sidebar should land on a primary list” guideline because it aggregates multiple source-domain apps behind a single conceptual entry point.
@@ -382,7 +348,7 @@ Current behavior:
 - the home page Sources card links to `sources-explorer`
 - the page acts as a cross-app entry point for source-domain modules rather than a data list itself
 
-### 9.2 Guidance for hub pages
+### 8.2 Guidance for hub pages
 
 Hub pages are appropriate when they:
 
@@ -392,12 +358,11 @@ Hub pages are appropriate when they:
 
 They are not a substitute for a module's primary working surface.
 
-### 9.3 Learning page
+### 8.3 Learning page
 
 The Learning page should remain a site-wide catalog of educational resources.
 It complements, rather than replaces, module-level learning content embedded in primary list views.
 
-### 9.4 Remaining follow-up
+### 8.4 Execution note
 
-- [ ] Keep evaluating whether Sources should remain a top-level hub or whether more direct home/sidebar links to subdomains would serve users better.
-- [ ] Continue to distinguish clearly between explorers, hubs, and primary working lists in naming and navigation.
+Any remaining hub/navigation follow-up is tracked in GitHub issue #89.

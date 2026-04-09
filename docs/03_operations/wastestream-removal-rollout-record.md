@@ -25,13 +25,10 @@ The completed rollout covered the following checks:
 - waste-atlas behavior checks
 - importer behavior checks without legacy `WasteStream` logic
 
-## Remaining follow-up
+## Execution tracking
 
-The remaining work is post-cutover cleanup, not rollout execution:
-
-1. Remove obsolete legacy `soilcom` content types and dependent permissions for retired waste-stream-related models in a dedicated follow-up.
-2. Remove any remaining documentation/examples that still describe `WasteStream` as an active runtime concept.
-3. Keep database cleanup separate from the completed rollout so recovery scope stays small and auditable.
+The remaining post-cutover cleanup is tracked in GitHub issue #87.
+This file remains a completed rollout record rather than a live follow-up checklist.
 
 ## Usage note
 

@@ -221,15 +221,8 @@ class AuthorSubmitForReviewView(
 
 ## Known Limitations
 
-⚠️ **URL Registration Needed**
-
-The Collection-specific views exist but aren't automatically used. Collections currently use generic views (no cascade). To enable cascade, either:
-
-1. Register specific URLs in `sources/waste_collection/urls.py`
-2. Implement view resolver that auto-selects model-specific views
-3. Use views programmatically where needed
-
-This will be addressed in a future commit.
+The remaining URL-wiring follow-up for collection-specific cascade views is tracked in GitHub issue #92.
+This document remains historical refactoring context rather than a live follow-up tracker.
 
 ## Related Commits
 

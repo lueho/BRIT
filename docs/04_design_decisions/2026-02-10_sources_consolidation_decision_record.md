@@ -62,16 +62,10 @@ The canonical implementation lives under `sources.*`, but some public compatibil
 
 This means the consolidation is complete in terms of module ownership, while some legacy public prefixes remain intentionally for compatibility.
 
-## 3. Remaining Follow-up Cleanup
+## 3. Execution tracking
 
-The remaining work is cleanup, not architectural migration:
-
-1. Convert remaining legacy public prefixes into pure redirects or retire them once it is safe to do so.
-2. Remove remaining compatibility re-exports and legacy package seams after confirming fresh database setup and the relevant Dockerized test coverage stay green.
-3. Remove leftover legacy `soilcom` database artifacts in a dedicated follow-up:
-   - empty tables `soilcom_georeferencedcollector` and `soilcom_georeferencedwastecollection`
-   - obsolete `soilcom` content types and dependent permissions for retired models
-4. Continue trimming documentation and examples that still describe the transition-era architecture as if it were current.
+The remaining cleanup follow-up is tracked in GitHub issue #87.
+This document remains a completed decision record rather than a live cleanup checklist.
 
 ## 4. Scope of This Record
 

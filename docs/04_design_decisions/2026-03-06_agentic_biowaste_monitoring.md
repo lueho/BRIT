@@ -263,35 +263,10 @@ A French municipal source states that biowaste is collected weekly door-to-door 
 - enables partner integrations and machine-to-machine interoperability
 - provides a governed foundation for LLM-assisted workflows
 
-## Recommended Implementation Phases
+## Execution tracking
 
-### Phase 1: Semantic Foundation in BRIT
-
-- formalize canonical URIs for controlled concepts
-- complete scheme-aware vocabulary coverage for the monitoring scope
-- add lifecycle states, aliases, and deprecation policy where missing
-- enforce strict validation for crosswalk targets and imported concept references
-
-### Phase 2: Reviewable Crosswalk and Fact Ingestion
-
-- extend BRIT to store proposed and approved mappings
-- retain provenance for extracted facts
-- support review queues for ambiguous mappings and changed facts
-- produce machine-readable validation outputs
-
-### Phase 3: Agentic Discovery and Extraction
-
-- integrate external agents for source discovery and extraction
-- support multilingual candidate generation
-- rank uncertainty and novelty for human review
-- generate structured facts rather than directly mutating canonical BRIT data
-
-### Phase 4: Europe-Wide Monitoring Products
-
-- publish biowaste collection coverage dashboards
-- publish change alerts and quality indicators
-- expose semantically validated APIs and exports for downstream consumers
-- expand from biowaste to other waste collection domains
+Active implementation follow-up for this proposal is now tracked in GitHub issue #91.
+This document remains the proposal and architectural context rather than a live phased implementation checklist.
 
 ## Risks and Mitigations
 

@@ -200,43 +200,10 @@ The existing per-dataset models (`HamburgRoadsideTrees`, `NantesGreenhouses`) wi
 be migrated into canonical target models per source type. This is a one-time
 migration with backwards-compatible redirects for existing map URLs.
 
-## 6. Implementation Phases
+## 6. Execution tracking
 
-### Phase 1: Foundation (prerequisite for all other phases)
-
-- [ ] Define canonical target models per source type (roadside trees, greenhouses)
-- [ ] Create `DataSourceConfig` model with JSON schema mapping field
-- [ ] Migrate existing data from per-dataset models into canonical models
-- [ ] Update `GeoDataset` to reference `DataSourceConfig` instead of `model_name`
-- [ ] Update Sources Explorer "Map" button to link to filtered geodataset list
-
-### Phase 2: Pipeline Framework
-
-- [ ] Implement base `Connector` interface and `FileConnector`
-- [ ] Implement schema mapping engine (column rename + simple transforms)
-- [ ] Implement validation framework (geometry, bounds, attributes)
-- [ ] Implement pipeline orchestrator (management command)
-- [ ] Schema drift detection and status reporting
-
-### Phase 3: Scheduling and Monitoring
-
-- [ ] Add Celery beat schedule (or cron-based management command)
-- [ ] Dashboard or admin view for pipeline status and last-pull timestamps
-- [ ] Email/notification on schema drift or pipeline failures
-- [ ] Dataset version comparison (record count trends, quality metrics)
-
-### Phase 4: Additional Connectors
-
-- [ ] `WFSConnector` for OGC Web Feature Services
-- [ ] `CKANConnector` for open data portals
-- [ ] `ArcGISConnector` for ArcGIS REST/Hub sources
-
-### Phase 5: Enrichment (future)
-
-- [ ] Cross-source deduplication (same tree in overlapping datasets)
-- [ ] Automated quality scoring per dataset
-- [ ] User-contributed schema mappings (community-maintained)
-- [ ] LLM-assisted initial schema mapping suggestions
+Active implementation follow-up for this proposal is now tracked in GitHub issue #85.
+This document remains the architectural proposal and design reference rather than a live implementation checklist.
 
 ## 7. Effort Estimate
 
