@@ -181,6 +181,14 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
 
         self.assertFalse(form.fields["standard_deviation"].required)
 
+    def test_standard_deviation_input_is_not_rendered_as_required(self):
+        form = MaterialPropertyValueModelForm()
+
+        self.assertNotIn(
+            "required",
+            str(form["standard_deviation"]),
+        )
+
     def test_form_defaults_unit_from_property_symbol_match(self):
         property_obj = MaterialProperty.objects.create(name="Phosphorus", unit="kg/m³")
         expected_unit = Unit.objects.create(
@@ -237,6 +245,14 @@ class ComponentMeasurementModelFormTestCase(TestCase):
         form = ComponentMeasurementModelForm()
 
         self.assertFalse(form.fields["standard_deviation"].required)
+
+    def test_standard_deviation_input_is_not_rendered_as_required(self):
+        form = ComponentMeasurementModelForm()
+
+        self.assertNotIn(
+            "required",
+            str(form["standard_deviation"]),
+        )
 
 
 class SampleModelFormTestCase(TestCase):

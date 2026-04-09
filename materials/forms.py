@@ -215,6 +215,12 @@ class ComponentMeasurementModelForm(
             "comment",
         )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["standard_deviation"].required = False
+        self.fields["standard_deviation"].widget.is_required = False
+        self.fields["standard_deviation"].widget.attrs.pop("required", None)
+
 
 class ComponentMeasurementModalModelForm(
     ModalModelFormMixin, ComponentMeasurementModelForm
@@ -268,6 +274,9 @@ class MaterialPropertyValueModelForm(
         super().__init__(*args, **kwargs)
         self.fields["unit"].required = False
         self.fields["basis_component"].required = False
+        self.fields["standard_deviation"].required = False
+        self.fields["standard_deviation"].widget.is_required = False
+        self.fields["standard_deviation"].widget.attrs.pop("required", None)
         if not self.is_bound and not self.instance.pk:
             property_obj = self.initial.get("property")
             if property_obj and getattr(property_obj, "default_basis_component", None):
