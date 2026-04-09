@@ -117,14 +117,14 @@ class SourcesModelAdapterTestCase(SimpleTestCase):
             "sources.waste_collection",
         )
         self.assertEqual(Collection._meta.app_label, "waste_collection")
-        self.assertEqual(Collection._meta.db_table, "soilcom_collection")
+        self.assertEqual(Collection._meta.db_table, "waste_collection_collection")
         self.assertEqual(CollectionPropertyValue._meta.app_label, "waste_collection")
         self.assertEqual(
             CollectionPropertyValue._meta.db_table,
-            "soilcom_collectionpropertyvalue",
+            "waste_collection_collectionpropertyvalue",
         )
         self.assertEqual(Collector._meta.app_label, "waste_collection")
-        self.assertEqual(Collector._meta.db_table, "soilcom_collector")
+        self.assertEqual(Collector._meta.db_table, "waste_collection_collector")
         self.assertEqual(WasteFlyer._meta.app_label, "waste_collection")
         self.assertTrue(WasteFlyer._meta.proxy)
 

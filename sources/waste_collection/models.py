@@ -64,7 +64,6 @@ class Collector(NamedUserCreatedObject):
 
     class Meta(NamedUserCreatedObject.Meta):
         verbose_name = "waste collector"
-        db_table = "soilcom_collector"
 
     @property
     def geom(self):
@@ -77,7 +76,6 @@ class Collector(NamedUserCreatedObject):
 class CollectionSystem(NamedUserCreatedObject):
     class Meta(NamedUserCreatedObject.Meta):
         verbose_name = "waste collection system"
-        db_table = "soilcom_collectionsystem"
 
     def __str__(self):
         return self.name
@@ -88,7 +86,6 @@ class SortingMethod(NamedUserCreatedObject):
 
     class Meta(NamedUserCreatedObject.Meta):
         verbose_name = "sorting method"
-        db_table = "soilcom_sortingmethod"
 
     def __str__(self):
         return self.name
@@ -97,7 +94,6 @@ class SortingMethod(NamedUserCreatedObject):
 class WasteCategory(NamedUserCreatedObject):
     class Meta(NamedUserCreatedObject.Meta):
         verbose_name_plural = "waste categories"
-        db_table = "soilcom_wastecategory"
 
 
 class WasteComponentManager(UserCreatedObjectManager):
@@ -190,7 +186,6 @@ class CollectionFrequency(NamedUserCreatedObject):
 
     class Meta(NamedUserCreatedObject.Meta):
         verbose_name_plural = "collection frequencies"
-        db_table = "soilcom_collectionfrequency"
 
     @property
     def has_options(self):
@@ -230,9 +225,6 @@ class CollectionCountOptions(UserCreatedObject):
     option_2 = models.PositiveSmallIntegerField(blank=True, null=True)
     option_3 = models.PositiveSmallIntegerField(blank=True, null=True)
 
-    class Meta(UserCreatedObject.Meta):
-        db_table = "soilcom_collectioncountoptions"
-
     @property
     def non_standard_options(self):
         return [
@@ -240,14 +232,13 @@ class CollectionCountOptions(UserCreatedObject):
         ]
 
 
+class FeeSystem(NamedUserCreatedObject):
+    pass
+
+
 YEAR_VALIDATOR = RegexValidator(
     r"^([0-9]{4})$", message="Year needs to be in YYYY format.", code="invalid year"
 )
-
-
-class FeeSystem(NamedUserCreatedObject):
-    class Meta(NamedUserCreatedObject.Meta):
-        db_table = "soilcom_feesystem"
 
 
 class CollectionQuerySet(UserCreatedObjectQuerySet):
@@ -405,13 +396,11 @@ class Collection(NamedUserCreatedObject):
         Material,
         related_name="allowed_in_collections",
         blank=True,
-        db_table="soilcom_collection_allowed_materials",
     )
     forbidden_materials = models.ManyToManyField(
         Material,
         related_name="forbidden_in_collections",
         blank=True,
-        db_table="soilcom_collection_forbidden_materials",
     )
     frequency = models.ForeignKey(
         CollectionFrequency,
@@ -423,15 +412,12 @@ class Collection(NamedUserCreatedObject):
     fee_system = models.ForeignKey(
         FeeSystem, on_delete=models.PROTECT, blank=True, null=True
     )
-    samples = models.ManyToManyField(
-        Sample, related_name="collections", db_table="soilcom_collection_samples"
-    )
+    samples = models.ManyToManyField(Sample, related_name="collections")
     flyers = models.ManyToManyField(
         WasteFlyer,
         related_name="collections",
-        db_table="soilcom_collection_flyers",
     )
-    sources = models.ManyToManyField(Source, db_table="soilcom_collection_sources")
+    sources = models.ManyToManyField(Source)
 
     valid_from = models.DateField(default=date.today)
     valid_until = models.DateField(blank=True, null=True)
@@ -440,7 +426,6 @@ class Collection(NamedUserCreatedObject):
         blank=True,
         symmetrical=False,
         related_name="successors",
-        db_table="soilcom_collection_predecessors",
     )
     sorting_method = models.ForeignKey(
         SortingMethod,
@@ -516,9 +501,6 @@ class Collection(NamedUserCreatedObject):
         "required_bin_capacity_reference",
         "description",
     )
-
-    class Meta(NamedUserCreatedObject.Meta):
-        db_table = "soilcom_collection"
 
     @property
     def geom(self):
@@ -958,7 +940,6 @@ class CollectionPropertyValue(PropertyValue):
         Source,
         blank=True,
         help_text="Sources or references for this property value.",
-        db_table="soilcom_collectionpropertyvalue_sources",
     )
     collection = models.ForeignKey(Collection, on_delete=models.CASCADE)
     year = models.PositiveSmallIntegerField(null=True, validators=[YEAR_VALIDATOR])
@@ -980,24 +961,18 @@ class CollectionPropertyValue(PropertyValue):
                 name="soilcom_unique_derived_cpv_per_key_null_year",
             ),
         ]
-        db_table = "soilcom_collectionpropertyvalue"
 
 
 class AggregatedCollectionPropertyValue(PropertyValue):
     collections = models.ManyToManyField(
         Collection,
-        db_table="soilcom_aggregatedcollectionpropertyvalue_collections",
     )
     sources = models.ManyToManyField(
         Source,
         blank=True,
         help_text="Sources or references for this property value.",
-        db_table="soilcom_aggregatedcollectionpropertyvalue_sources",
     )
     year = models.PositiveSmallIntegerField(null=True, validators=[YEAR_VALIDATOR])
-
-    class Meta(PropertyValue.Meta):
-        db_table = "soilcom_aggregatedcollectionpropertyvalue"
 
 
 def _schedule_wasteflyer_url_check(flyer_ids):
