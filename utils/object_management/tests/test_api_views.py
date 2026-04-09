@@ -1,6 +1,7 @@
 """Tests for review workflow API endpoints in object_management."""
 
 from datetime import date
+from types import SimpleNamespace
 
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
@@ -19,7 +20,12 @@ from sources.waste_collection.models import (
     CollectionSeason,
     WasteFlyer,
 )
+from utils.object_management.api_views import _serialize_collection_update_context
 from utils.object_management.models import ReviewAction, UserCreatedObject
+from utils.object_management.review_context import (
+    _is_collection,
+    _is_collection_property_value,
+)
 from utils.properties.models import Property, Unit
 
 
@@ -271,6 +277,40 @@ class ReviewAPIViewsTests(TestCase):
         self.assertEqual(moderator_response.status_code, 200)
         moderator_context = moderator_response.json()["context"]["collection_update"]
         self.assertFalse(moderator_context["available"])
+
+    def test_collection_update_context_ignores_legacy_soilcom_label(self):
+        soilcom_collection = SimpleNamespace(
+            _meta=SimpleNamespace(app_label="soilcom", model_name="collection")
+        )
+
+        self.assertIsNone(
+            _serialize_collection_update_context(self.owner, soilcom_collection)
+        )
+
+    def test_review_context_collection_helpers_require_waste_collection_label(self):
+        soilcom_collection = SimpleNamespace(
+            _meta=SimpleNamespace(app_label="soilcom", model_name="collection")
+        )
+        soilcom_cpv = SimpleNamespace(
+            _meta=SimpleNamespace(
+                app_label="soilcom",
+                model_name="collectionpropertyvalue",
+            )
+        )
+        waste_collection = SimpleNamespace(
+            _meta=SimpleNamespace(app_label="waste_collection", model_name="collection")
+        )
+        waste_collection_cpv = SimpleNamespace(
+            _meta=SimpleNamespace(
+                app_label="waste_collection",
+                model_name="collectionpropertyvalue",
+            )
+        )
+
+        self.assertFalse(_is_collection(soilcom_collection))
+        self.assertFalse(_is_collection_property_value(soilcom_cpv))
+        self.assertTrue(_is_collection(waste_collection))
+        self.assertTrue(_is_collection_property_value(waste_collection_cpv))
 
     def test_review_context_rejects_invalid_history_limit(self):
         """history_limit must be parseable as integer."""

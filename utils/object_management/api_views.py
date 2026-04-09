@@ -182,7 +182,7 @@ def _get_review_object(*, content_type_id: int, object_id: int):
 def _serialize_collection_update_context(user, obj):
     """Return owner-gated update hints for collection review items."""
     if not (
-        obj._meta.app_label in {"soilcom", "waste_collection"}
+        obj._meta.app_label == "waste_collection"
         and obj._meta.model_name == "collection"
     ):
         return None

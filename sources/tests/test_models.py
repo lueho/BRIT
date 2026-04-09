@@ -2,7 +2,6 @@ import importlib
 from unittest.mock import MagicMock, patch
 
 from django.apps import apps
-from django.conf import settings
 from django.test import SimpleTestCase
 
 from sources.greenhouses.models import (
@@ -129,14 +128,10 @@ class SourcesModelAdapterTestCase(SimpleTestCase):
         self.assertEqual(WasteFlyer._meta.app_label, "waste_collection")
         self.assertTrue(WasteFlyer._meta.proxy)
 
-    def test_soilcom_app_label_is_provided_by_migration_shim(self):
-        app_config = apps.get_app_config("soilcom")
-
-        self.assertEqual(app_config.__class__.__module__, "sources.legacy_soilcom.apps")
-        self.assertEqual(app_config.name, "sources.legacy_soilcom")
+    def test_waste_collection_app_config_is_owned_by_sources(self):
         self.assertEqual(
-            settings.MIGRATION_MODULES["soilcom"],
-            "sources.legacy_soilcom.migrations",
+            apps.get_app_config("waste_collection").name,
+            "sources.waste_collection",
         )
 
     def test_greenhouse_selectors_import_greenhouse_from_sources_model_adapter(self):
