@@ -15,6 +15,7 @@ from utils.properties.models import Unit
 from ..forms import (
     AddComponentModalForm,
     AddCompositionModalForm,
+    ComponentMeasurementModelForm,
     ComponentModelForm,
     MaterialPropertyModelForm,
     MaterialPropertyValueModelForm,
@@ -175,6 +176,11 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
             form.fields["standard_deviation"].widget.attrs.get("step"), "any"
         )
 
+    def test_standard_deviation_is_optional(self):
+        form = MaterialPropertyValueModelForm()
+
+        self.assertFalse(form.fields["standard_deviation"].required)
+
     def test_form_defaults_unit_from_property_symbol_match(self):
         property_obj = MaterialProperty.objects.create(name="Phosphorus", unit="kg/m³")
         expected_unit = Unit.objects.create(
@@ -224,6 +230,13 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
         self.assertEqual(
             form.cleaned_data["basis_component"], self.property.default_basis_component
         )
+
+
+class ComponentMeasurementModelFormTestCase(TestCase):
+    def test_standard_deviation_is_optional(self):
+        form = ComponentMeasurementModelForm()
+
+        self.assertFalse(form.fields["standard_deviation"].required)
 
 
 class SampleModelFormTestCase(TestCase):

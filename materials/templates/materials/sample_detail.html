@@ -264,7 +264,11 @@
                           {% endif %}
                         </td>
                         <td class="text-nowrap">
-                          {{ property.average|trim_decimal:6 }} ± {{ property.standard_deviation|trim_decimal:6 }} {{ property.unit }}
+                          {{ property.average|trim_decimal:6 }}
+                          {% if property.display_standard_deviation != None %}
+                            ± {{ property.display_standard_deviation|trim_decimal:6 }}
+                          {% endif %}
+                          {{ property.unit }}
                         </td>
                         <td>{{ property.basis_component.name|default:"-" }}</td>
                         <td>
@@ -404,8 +408,8 @@
                                   <td>{{ measurement.basis_component.name|default:"-" }}</td>
                                   <td class="text-nowrap">
                                     <strong>{{ measurement.average|trim_decimal:4 }}</strong>
-                                    {% if measurement.standard_deviation %}
-                                      <small class="text-muted">± {{ measurement.standard_deviation|trim_decimal:2 }}</small>
+                                    {% if measurement.display_standard_deviation != None %}
+                                      <small class="text-muted">± {{ measurement.display_standard_deviation|trim_decimal:2 }}</small>
                                     {% endif %}
                                     <small>{{ measurement.unit }}</small>
                                   </td>

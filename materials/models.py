@@ -545,7 +545,12 @@ class MaterialPropertyValue(NumericMeasurementMixin, UserCreatedObject):
         help_text="Sources or references for this measurement.",
     )
     average = models.DecimalField(max_digits=20, decimal_places=10)
-    standard_deviation = models.DecimalField(max_digits=20, decimal_places=10)
+    standard_deviation = models.DecimalField(
+        max_digits=20,
+        decimal_places=10,
+        null=True,
+        blank=True,
+    )
 
     def duplicate(self, creator):
         duplicate = MaterialPropertyValue.objects.create(
@@ -877,8 +882,10 @@ class Composition(NamedUserCreatedObject):
         return f"Composition of {self.group.name} of sample {self.sample.name}"
 
 
-class ComponentMeasurement(UserCreatedObject):
+class ComponentMeasurement(NumericMeasurementMixin, UserCreatedObject):
     """Raw (unnormalized) component measurements for a sample."""
+
+    measurement_property_field = "component"
 
     sample = models.ForeignKey(
         Sample,
@@ -927,7 +934,10 @@ class ComponentMeasurement(UserCreatedObject):
         max_digits=20, decimal_places=10, default=Decimal("0.0"), null=False
     )
     standard_deviation = models.DecimalField(
-        max_digits=20, decimal_places=10, default=Decimal("0.0"), null=False
+        max_digits=20,
+        decimal_places=10,
+        null=True,
+        blank=True,
     )
     sample_size = models.PositiveIntegerField(
         null=True,

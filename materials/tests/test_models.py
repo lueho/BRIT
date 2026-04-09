@@ -8,6 +8,7 @@ from factory.django import mute_signals
 
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import (
+    ComponentMeasurement,
     Composition,
     Material,
     MaterialComponent,
@@ -286,6 +287,18 @@ class MaterialPropertyValueTestCase(TestCase):
         self.assertEqual(duplicate.average, value.average)
         self.assertEqual(duplicate.standard_deviation, value.standard_deviation)
 
+    def test_display_standard_deviation_is_none_when_missing(self):
+        prop = MaterialProperty.objects.create(name="Nitrogen", unit="g/kg")
+        unit = Unit.objects.create(name="mg/kg")
+        value = MaterialPropertyValue.objects.create(
+            property=prop,
+            unit=unit,
+            average=Decimal("27.3"),
+            standard_deviation=None,
+        )
+
+        self.assertIsNone(value.display_standard_deviation)
+
     def test_shared_numeric_measurement_properties_are_available(self):
         prop = MaterialProperty.objects.create(name="Nitrogen", unit="g/kg")
         unit = Unit.objects.create(name="mg/kg")
@@ -300,6 +313,25 @@ class MaterialPropertyValueTestCase(TestCase):
         self.assertEqual(value.measurement_unit_label, unit.name)
         self.assertEqual(value.display_average, value.average)
         self.assertEqual(value.display_standard_deviation, value.standard_deviation)
+
+
+class ComponentMeasurementTestCase(TestCase):
+    def test_display_standard_deviation_is_none_when_missing(self):
+        material = Material.objects.create(name="Digestate")
+        sample = Sample.objects.create(name="Sample", material=material)
+        group = MaterialComponentGroup.objects.create(name="Chemical elements")
+        component = MaterialComponent.objects.create(name="Carbon")
+        unit = Unit.objects.create(name="%")
+        measurement = ComponentMeasurement.objects.create(
+            sample=sample,
+            group=group,
+            component=component,
+            unit=unit,
+            average=Decimal("42.0"),
+            standard_deviation=None,
+        )
+
+        self.assertIsNone(measurement.display_standard_deviation)
 
 
 class SampleTestCase(TestCase):

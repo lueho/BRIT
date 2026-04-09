@@ -1007,6 +1007,27 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.value.basis_component.name)
 
+    def test_sample_detail_hides_missing_property_standard_deviation(self):
+        value = MaterialPropertyValue.objects.create(
+            owner=self.owner,
+            property=self.property,
+            basis_component=self.default_basis,
+            unit=self.unit,
+            average=Decimal("61.25"),
+            standard_deviation=None,
+            publication_status="private",
+        )
+        self.sample.properties.add(value)
+
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "61.25")
+        self.assertNotContains(response, "61.25 ±")
+
     def test_update_view_redirects_back_to_sample_detail(self):
         self.client.force_login(self.owner)
 
@@ -1098,6 +1119,29 @@ class MaterialPropertyValueCreateAndDetailViewTestCase(ViewWithPermissionsTestCa
         value = MaterialPropertyValue.objects.get(average=Decimal("18.25"))
         self.assertEqual(value.owner, self.member)
         self.assertIn(value, self.sample.properties.all())
+
+    def test_create_view_allows_missing_standard_deviation(self):
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            f"{reverse('materialpropertyvalue-create')}?sample={self.sample.pk}",
+            data={
+                "property": self.property.pk,
+                "basis_component": self.default_basis.pk,
+                "unit": self.unit.pk,
+                "analytical_method": "",
+                "sources": [],
+                "average": "19.5",
+                "standard_deviation": "",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+        )
+        value = MaterialPropertyValue.objects.get(average=Decimal("19.5"))
+        self.assertIsNone(value.standard_deviation)
 
     def test_detail_view_redirects_to_related_sample_detail(self):
         self.client.force_login(self.member)
@@ -1192,6 +1236,28 @@ class ComponentMeasurementUpdateViewTestCase(ViewWithPermissionsTestCase):
             self.measurement.get_absolute_url(),
             reverse("sample-detail", kwargs={"pk": self.sample.pk}),
         )
+
+    def test_sample_detail_hides_missing_measurement_standard_deviation(self):
+        measurement = ComponentMeasurement.objects.create(
+            owner=self.owner,
+            sample=self.sample,
+            group=self.group,
+            component=self.component,
+            unit=self.unit,
+            average=Decimal("7.25"),
+            standard_deviation=None,
+            publication_status="private",
+        )
+
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "7.25")
+        self.assertNotContains(response, "7.25 ±")
+        self.assertEqual(measurement.standard_deviation, None)
 
     def test_update_view_redirects_back_to_sample_detail(self):
         self.client.force_login(self.owner)
@@ -1309,6 +1375,35 @@ class ComponentMeasurementCreateAndDetailViewTestCase(ViewWithPermissionsTestCas
         )
         self.assertEqual(measurement.owner, self.member)
         self.assertEqual(measurement.sample, self.sample)
+
+    def test_create_view_allows_missing_standard_deviation(self):
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            f"{reverse('componentmeasurement-create')}?sample={self.sample.pk}",
+            data={
+                "group": self.group.pk,
+                "component": self.component.pk,
+                "basis_component": "",
+                "analytical_method": "",
+                "sources": [],
+                "unit": self.unit.pk,
+                "average": "21.0",
+                "standard_deviation": "",
+                "sample_size": "",
+                "comment": "Without spread",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+        )
+        measurement = ComponentMeasurement.objects.get(
+            average=Decimal("21.0"),
+            comment="Without spread",
+        )
+        self.assertIsNone(measurement.standard_deviation)
 
     def test_detail_view_redirects_to_related_sample_detail(self):
         self.client.force_login(self.member)
