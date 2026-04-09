@@ -1,75 +1,39 @@
-# Collection Waste Semantics Simplification Rollout & Rollback Checklist
+# Collection Waste Semantics Simplification Rollout Record
 
-**Scope:** Issue #80 hardening for epic #71 (removal of `WasteStream` and direct `Collection` waste semantics in soilcom)
-**Date:** 2026-02-28
-**Owners:** Maintainer + reviewer on duty
+**Scope:** Issue #80 hardening for epic #71 (removal of `WasteStream` and direct `Collection` waste semantics in waste collection)  
+**Date:** 2026-02-28  
+**Status:** Completed 2026-04-09
 
-## 1) Pre-rollout checks
+## Outcome
 
-- [ ] Confirm code includes direct `Collection` waste fields (`waste_category`, `allowed_materials`, `forbidden_materials`).
-- [ ] Confirm cleanup migration exists and is reviewed (`0012_remove_wastestream_model`).
-- [ ] Confirm stale runtime imports/references to `WasteStream` are removed.
-- [ ] Confirm backups/snapshots are available for target database.
-- [ ] Confirm deployment window and rollback owner are assigned.
+The rollout to direct `Collection` waste semantics is complete.
 
-## 2) Validation before deploy
+- `Collection` now carries the relevant waste fields directly
+- the legacy `WasteStream` runtime path has been removed from the active implementation
+- production cutover and smoke checks completed successfully on 2026-04-09
 
-Run in Docker:
+This file is retained as a short operations record rather than an active rollout checklist.
 
-```bash
-docker compose exec web python manage.py test --keepdb --noinput --settings=brit.settings.testrunner --parallel 4
-```
+## Completed verification themes
 
-- [ ] Full suite is green.
-- [ ] Focused soilcom suites pass (forms/views/filters/serializers/viewsets/importers).
-- [ ] No migration conflicts in target branch.
+The completed rollout covered the following checks:
 
-## 3) Deploy steps
+- test coverage for the waste-collection runtime after the semantics simplification
+- migration and deployment verification
+- collection create/update/copy/versioning smoke checks
+- review/detail/API behavior checks
+- waste-atlas behavior checks
+- importer behavior checks without legacy `WasteStream` logic
 
-- [ ] Deploy application image/revision.
-- [ ] Run DB migrations:
+## Remaining follow-up
 
-```bash
-docker compose exec web python manage.py migrate
-```
+The remaining work is post-cutover cleanup, not rollout execution:
 
-- [ ] Verify app startup and worker startup.
-- [ ] Verify no migration/runtime errors in logs.
+1. Remove obsolete legacy `soilcom` content types and dependent permissions for retired waste-stream-related models in a dedicated follow-up.
+2. Remove any remaining documentation/examples that still describe `WasteStream` as an active runtime concept.
+3. Keep database cleanup separate from the completed rollout so recovery scope stays small and auditable.
 
-## 4) Post-deploy smoke tests
+## Usage note
 
-- [ ] Collection create/update/copy/versioning works.
-- [ ] Collection detail/review pages render with inline material data.
-- [ ] API payloads include expected waste fields.
-- [ ] Waste-atlas endpoints return expected classification semantics.
-- [ ] Import workflow succeeds using direct `Collection` waste fields without legacy `WasteStream` logic.
-
-## 5) Monitoring window (first 24h)
-
-- [ ] Monitor web logs for template/query errors.
-- [ ] Monitor Celery logs for importer/cache tasks.
-- [ ] Watch for elevated error rate or slow queries in atlas/filter endpoints.
-
-## 6) Rollback plan
-
-Use rollback only for severe production regressions that cannot be patched quickly.
-
-### A. Preferred: roll forward with hotfix
-
-- [ ] Triage regression and patch quickly.
-- [ ] Re-run focused tests.
-- [ ] Deploy hotfix.
-
-### B. Full rollback path
-
-- [ ] Put app into maintenance mode (or halt writes).
-- [ ] Redeploy previous known-good application revision.
-- [ ] Restore database from pre-rollout backup/snapshot if schema/data requires reversal.
-- [ ] Run smoke tests for core user paths.
-- [ ] Communicate incident + recovery status.
-
-## 7) Closeout
-
-- [ ] Add deployment notes to issue #80.
-- [ ] Record final sign-off in issue #71 child issues.
-- [ ] Archive this checklist reference in operations notes for future major schema removals.
+Do not treat this file as a live deploy checklist.
+If a future schema-removal rollout needs an operational checklist, create a new document specific to that change rather than reusing this completed record.

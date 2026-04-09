@@ -1,14 +1,15 @@
 # Module UX Harmonization Guideline
 
 **Date:** 2026-02-09  
-**Status:** Proposal  
+**Status:** Living guideline; partially implemented  
+**Last updated:** 2026-04-09  
 **Scope:** All user-facing modules in BRIT
 
 ---
 
 ## 1. Executive Summary
 
-BRIT has grown organically across multiple research projects and domain modules, including `roadside_trees`, `greenhouses`, `waste_collection`, and `closecycle`. Each module was built at different times, by different contributors, and to serve different domain needs. While a solid shared infrastructure exists (`utils/object_management`, base templates like `detail_with_options.html`, `filtered_list.html`, `simple_list_card.html`), the *user-facing guidance*—how a user discovers, navigates, and operates within a module—varies significantly. This document catalogs the inconsistencies and proposes a harmonized guideline.
+BRIT has grown organically across multiple research projects and domain modules, including `roadside_trees`, `greenhouses`, `waste_collection`, and `closecycle`. Each module was built at different times, by different contributors, and to serve different domain needs. While a solid shared infrastructure exists (`utils/object_management`, base templates like `detail_with_options.html`, `filtered_list.html`, `simple_list_card.html`), the *user-facing guidance*—how a user discovers, navigates, and operates within a module—still varies significantly. This document records the remaining inconsistencies and the harmonized direction.
 
 ### 1.1 Key Conceptual Distinction: Explorer vs. Dashboard
 
@@ -28,7 +29,7 @@ Every module has one (sometimes two) **primary models** that represent the core 
 | **Maps** | GeoDataSet, Catchment | Attribute, AttributeValue, Region, Location, NutsRegion |
 | **Waste Collection** | Collection | Collector, CollectionSystem, WasteCategory, WasteComponent, FeeSystem, Frequency, WasteFlyer, CollectionCatchment |
 | **Bibliography** | Source | Author, Licence |
-| **Processes** | ProcessType | ProcessGroup, MechanismCategory |
+| **Processes** | Process | ProcessCategory |
 | **Inventories** | Scenario | InventoryAlgorithm |
 | **CLOSECYCLE** | Showcase | — |
 | **Nantes** | Greenhouse, Culture | GrowthCycle |
@@ -36,18 +37,18 @@ Every module has one (sometimes two) **primary models** that represent the core 
 
 ---
 
-## 2. Current Module Inventory & Entry-Point Analysis
+## 2. Current Module Inventory & Entry-Point Analysis (2026-04-09)
 
 ### 2.1 How Users Reach Each Module
 
 | Module | Sidebar link target | Home card target | Entry experience |
 |---|---|---|---|
 | **Maps** | `maps_list` (geodataset filter list) | `maps_list` | Lands directly on a filtered data list |
-| **Materials** | `sample-list-featured` (featured samples) | `sample-list-featured` | Lands on a curated "featured" view — a special list |
-| **Sources** | `sources-list` (static template page) | `sources-list` | Lands on a hand-crafted overview page with cards |
+| **Materials** | `sample-list` | `sample-list` | Lands directly on the primary filtered list |
+| **Sources** | `sources-explorer` | `sources-explorer` | Lands on a cross-app explorer/hub |
 | **Processes** | `processes-dashboard` (explorer dashboard) | `processes-dashboard` | Lands on a structured explorer dashboard |
 | **Inventories** | `scenario-list` (scenario filter list) | `scenario-list` | Lands directly on a filtered data list |
-| **Bibliography** | `source-list` (source filter list) | `source-list` | Lands directly on a filtered data list |
+| **Bibliography** | `bibliography-explorer` | `source-list` | Sidebar and home currently use different entry points |
 | **Waste Collection** | *(not in sidebar)* | *(not on home)* | Reachable from Sources page or direct URL |
 | **CLOSECYCLE** | *(not in sidebar)* | *(not on home)* | Reachable from home News card or direct URL |
 | **Hamburg** | *(not in sidebar)* | *(not on home)* | Only via Maps sub-routes or direct URL |
@@ -57,18 +58,18 @@ Every module has one (sometimes two) **primary models** that represent the core 
 
 | Module | Has explorer? | Style | Sidebar entry point |
 |---|---|---|---|
-| Materials | ✅ `materials-dashboard` | **Modern**: icon cards with counts, grouped sections, hover effects | `sample-list-featured` (primary model list) |
-| Processes | ✅ `processes-dashboard` | **Modern**: same card style as Materials | `processes-dashboard` (explorer!) |
-| Waste Collection | ✅ `wastecollection-dashboard` | **Modern**: same card style as Materials | *(not in sidebar)* |
-| Bibliography | ✅ `bibliography-dashboard` | **Legacy**: plain cards with text, `card-footer` buttons | `source-list` (primary model list) |
+| Materials | ✅ `materials-explorer` | Modern explorer cards using shared styles | `sample-list` (primary model list) |
+| Processes | ✅ `processes-dashboard` / `processes-explorer` | Modern explorer cards using shared styles | `processes-dashboard` (explorer) |
+| Waste Collection | ✅ `wastecollection-explorer` | Modern explorer cards using shared styles | *(not in sidebar)* |
+| Bibliography | ✅ `bibliography-explorer` | Explorer entry point exists; sidebar uses explorer while home uses primary list | `bibliography-explorer` |
 | Maps | ✅ `maps-dashboard` | **Legacy**: plain cards with text, `card-footer` buttons, only 2 of ~6 entities | `maps_list` (primary model list) |
 | Inventories | ❌ | — | `scenario-list` (primary model list) |
-| Sources | ❌ (static page serves as overview) | Hand-coded overview | `sources-list` (static page) |
+| Sources | ✅ `sources-explorer` | Cross-app explorer/hub | `sources-explorer` |
 
 **Key findings:**
-1. Three modules use the modern explorer card pattern, two use a legacy card pattern, and three have no explorer at all.
-2. The term "dashboard" is used in the codebase but these pages are really **model explorers** (entity catalogs), not dashboards in the activity/metrics sense.
-3. Most sidebar links already point to the **primary model list** — Materials (→ Samples), Maps (→ GeoDataSets), Inventories (→ Scenarios), Bibliography (→ Sources). The exception is Processes, which enters on the explorer. This inconsistency is notable: *Materials already does it right by linking to Samples, not to the explorer.*
+1. The shared explorer-card styling has already been extracted into `explorer-cards.css`, but naming and entry-point conventions still vary across modules.
+2. Explorer naming is only partially harmonized: Materials, Waste Collection, Bibliography, and Sources already use `*-explorer`, while Processes and Maps still expose `*-dashboard` names.
+3. Sidebar and home entry points are still inconsistent: Processes still enters on the explorer, Bibliography uses different sidebar vs. home targets, and Waste Collection remains absent from the top-level navigation.
 
 ---
 
@@ -78,17 +79,16 @@ Every module has one (sometimes two) **primary models** that represent the core 
 
 | Issue | Details |
 |---|---|
-| **Inconsistent entry points** | Some modules enter on a dashboard (Processes), some on a featured list (Materials), some on a raw filter list (Maps, Inventories, Bibliography), and one on a static page (Sources). A user switching between modules has no predictable mental model of "what happens when I click a module." |
-| **Missing sidebar entries** | Waste Collection (one of the largest modules) is not in the sidebar. Case studies (CLOSECYCLE, Hamburg, Nantes) are not in the sidebar. Users must know specific URLs or find them through Sources/Maps. |
-| **Dual URL mounting** | Case studies are mounted twice: under `maps/` *and* under `case_studies/` (Hamburg, Nantes). This creates duplicate routes to the same content. |
+| **Inconsistent entry points** | Some modules enter on a primary list (`sample-list`, `maps_list`, `scenario-list`), some on explorers (`processes-dashboard`, `sources-explorer`, `bibliography-explorer`), and some are only reachable through secondary navigation. Users still lack a predictable mental model for module entry. |
+| **Missing top-level navigation entries** | Waste Collection remains absent from the main sidebar and home module cards. CLOSECYCLE remains reachable via the News card rather than the main module navigation. |
+| **Compatibility prefixes remain public** | Several source-domain modules still expose legacy public prefixes for compatibility (`/waste_collection/`, `/case_studies/nantes/`, `/case_studies/hamburg/`, `/maps/hamburg/`, `/maps/nantes/`). This is intentional for now, but it keeps the public route surface broader than the desired end state. |
 
 ### 3.2 Explorer Design
 
 | Issue | Details |
 |---|---|
-| **Conceptual mislabeling** | All explorer pages are called "dashboards" in URL names and templates (`materials-dashboard`, `processes-dashboard`, `wastecollection-dashboard`). They are model catalogs, not dashboards. This creates a misleading mental model — users might expect activity or status information. |
-| **Two explorer generations** | Materials, Processes, and Waste Collection use the modern explorer card style with inline CSS for `.explorer-card`, `.explorer-icon`, `.explorer-section-heading`. Bibliography and Maps use a legacy card style with `card-footer` buttons. |
-| **Duplicated CSS** | The modern explorer card styles are copy-pasted identically in `materials_dashboard.html`, `processes_dashboard.html`, and `wastecollection_dashboard.html` rather than extracted into a shared stylesheet or partial. |
+| **Conceptual mislabeling remains partially unresolved** | Some explorer pages now use `*-explorer`, but Processes and Maps still use `dashboard` names for pages that behave as explorers rather than activity dashboards. |
+| **Two explorer generations** | Materials, Processes, Waste Collection, and Sources use the newer explorer-card pattern. Maps still uses a legacy card layout and remains the clearest candidate for visual harmonization. |
 | **Incomplete Maps explorer** | The Maps explorer only shows 2 entity types (Datasets, Catchments) but the module manages 6+ entity types (GeoDataSets, Attributes, Regions, Catchments, Locations, NutsRegions). |
 | **Explorer as entry point is overwhelming** | Processes enters on the explorer, showing all entity types. A new user doesn't know which one to click. The Materials module handles this better — the sidebar links directly to the primary model (Samples), and the explorer is reachable as a secondary navigation option. |
 
@@ -229,16 +229,11 @@ All modules MUST follow these URL patterns:
 
 ### 4.4 Sidebar Navigation Updates
 
-1. **Add missing modules** to the sidebar:
-   - Waste Collection (under a "Case Studies" section heading)
-   - CLOSECYCLE Showcases (under "Case Studies")
-2. **All sidebar links should target the primary model list:**
-   - Maps → `geodataset-list` (currently → `maps_list` — already correct, just rename)
-   - Materials → `sample-list-featured` (currently → `sample-list-featured` — ✅ already correct)
-   - Processes → primary model list (currently → `processes-dashboard` — change to `processtype-list`)
-   - Inventories → `scenario-list` (currently → `scenario-list` — ✅ already correct)
-   - Bibliography → `source-list` (currently → `source-list` — ✅ already correct)
-   - Waste Collection → `collection-list`
+1. **Decide whether all sidebar links should target primary lists or whether selected explorer/hub exceptions are intentional.**
+   - Processes is the clearest remaining candidate to switch from `processes-dashboard` to `processtype-list`.
+   - Bibliography currently differs between sidebar (`bibliography-explorer`) and home (`source-list`) and should be made consistent.
+   - Sources is a deliberate exception today because it functions as a cross-app hub rather than a primary-model list.
+2. **Decide whether Waste Collection and CLOSECYCLE need top-level sidebar/home placement** or should remain discoverable through Sources and the home News card.
 3. **Improve active state detection** by using URL namespace prefixes or a context variable instead of string-contains matching.
 
 ### 4.5 List View Standardization
@@ -278,61 +273,27 @@ Case studies are currently mounted in confusing ways:
 
 ---
 
-## 5. Module-Specific Action Items
+## 5. Remaining Action Items
 
-### 5.1 Maps
-- [ ] Upgrade explorer to modern explorer card style
-- [ ] Add cards for all entity types: GeoDataSets, Attributes, Attribute Values, Regions, Catchments, Locations
-- [ ] Rename `maps-dashboard` → `maps-explorer`
-- [ ] Sidebar already links to primary model list (GeoDataSets) — ✅
-- [ ] Add `explorer_url` to all list views
-- [ ] Remove duplicate case study URL mounting
+### 5.1 High-value navigation cleanup
 
-### 5.2 Materials
-- [ ] Sidebar and home already link to primary model (Samples) — ✅ best practice reference
-- [ ] Rename `materials-dashboard` → `materials-explorer`
-- [ ] Extract explorer card CSS to shared file
-- [ ] Add `explorer_url` to all list views
+- [ ] Change the Processes sidebar and home entry point from `processes-dashboard` to `processtype-list` once the explorer remains easily reachable as a secondary action.
+- [ ] Make Bibliography consistent between sidebar and home by choosing either `bibliography-explorer` or `source-list` as the canonical entry point.
+- [ ] Decide whether Waste Collection should gain a first-class sidebar/home entry or remain discoverable through Sources only.
 
-### 5.3 Bibliography
-- [ ] Upgrade explorer to modern explorer card style with counts
-- [ ] Rename `bibliography-dashboard` → `bibliography-explorer`
-- [ ] Sidebar already links to primary model list (Sources) — ✅
-- [ ] Close `</div>` tag missing in `bibliography_dashboard.html` (row not closed)
-- [ ] Add `explorer_url` to all list views
+### 5.2 Explorer naming and presentation cleanup
 
-### 5.4 Inventories
-- [ ] Create a new `inventories-explorer` page
-- [ ] Add cards for: Scenarios, Inventory Algorithms
-- [ ] Sidebar already links to primary model list (Scenarios) — ✅
-- [ ] Add `explorer_url` to scenario list view
+- [ ] Decide whether `maps-dashboard` and `processes-dashboard` should be renamed to canonical `*-explorer` names, with compatibility aliases left in place as needed.
+- [ ] Modernize the Maps explorer so it matches the current shared explorer-card pattern and better reflects the module surface.
 
-### 5.5 Sources
-- [ ] Evaluate whether static page should become a proper explorer with data-driven cards and counts
-- [ ] Or: merge Sources into the home page as a concept rather than a module
+### 5.3 Route-surface cleanup
 
-### 5.6 Processes
-- [ ] Change sidebar link from `processes-dashboard` → primary model list (`processtype-list`)
-- [ ] Rename `processes-dashboard` → `processes-explorer`
-- [ ] Extract explorer card CSS to shared file
-- [ ] Add `explorer_url` to all list views
+- [ ] Continue shrinking legacy public prefixes for source-domain modules by converting compatibility routes into pure redirects where possible.
+- [ ] Continue the broader URL naming cleanup for underscore-based names, inconsistent trailing slashes, and PascalCase map route names once the `GeoDataset` coupling can be decoupled safely.
 
-### 5.7 Waste Collection
-- [ ] Add to sidebar navigation, linking to primary model list (Collections)
-- [ ] Rename `wastecollection-dashboard` → `wastecollection-explorer`
-- [ ] Extract explorer card CSS to shared file
-- [ ] Add `explorer_url` to all list views
+### 5.4 Sidebar behavior cleanup
 
-### 5.8 CLOSECYCLE
-- [ ] Add to sidebar navigation, linking to Showcase list
-- [ ] Consider creating a small explorer if more entity types are added
-
-### 5.9 URL Cleanup
-- [ ] Rename `*-dashboard` URL names to `*-explorer`
-- [ ] Rename underscore-based URL names to kebab-case
-- [ ] Add missing trailing slashes to modal URLs
-- [ ] Rename PascalCase map URL names to kebab-case
-- [ ] Remove or redirect duplicate case study URL mounts
+- [ ] Replace path-substring active-state detection with a more robust namespace- or route-aware mechanism.
 
 ---
 
@@ -340,17 +301,14 @@ Case studies are currently mounted in confusing ways:
 
 | Priority | Item | Effort |
 |---|---|---|
-| **P1** | Extract shared explorer card CSS + partial templates | Small |
-| **P1** | Rename `*-dashboard` → `*-explorer` in URLs and templates | Small |
-| **P1** | Change Processes sidebar link from explorer → primary model list | Small |
-| **P2** | Upgrade Maps and Bibliography explorers to modern style | Medium |
-| **P2** | Create Inventories explorer | Medium |
-| **P2** | Add `explorer_url` back-links to all list views | Small |
-| **P3** | URL naming cleanup (kebab-case, trailing slashes) | Medium (many files, needs redirect mapping) |
-| **P3** | Consolidate case study URL mounting | Medium |
-| **P3** | Add missing modules to sidebar | Small |
+| **P1** | Change Processes entry point from explorer to primary list | Small |
+| **P1** | Make Bibliography sidebar/home entry consistent | Small |
+| **P1** | Decide on Waste Collection top-level navigation placement | Small |
+| **P2** | Rename remaining `*-dashboard` explorer names where still misleading | Small |
+| **P2** | Modernize Maps explorer and broaden its module coverage | Medium |
+| **P3** | Continue consolidating legacy public prefixes for source-domain modules | Medium |
+| **P3** | Continue broader route naming cleanup once map URL coupling is addressed | Medium |
 | **P4** | Improve sidebar active-state detection | Small |
-| **P4** | Redesign Sources module entry point | Medium |
 
 ---
 
@@ -375,346 +333,71 @@ This flow is **predictable**, **consistent**, and **task-oriented**. A user who 
 
 ---
 
-## 8. Primary List View: Description & Learning Content
+## 8. Primary List View Context Pattern
 
-### 8.1 Problem Statement
+### 8.1 Current state
 
-When a user first arrives at a module via the sidebar, they land on the primary model list. In some modules this list includes contextual information (a brief description of the module and links to learning materials); in others it is a bare data table. The modules that do provide context use two incompatible patterns, leading to an inconsistent first impression.
+`filtered_list.html` already supports two important contextual extension points:
 
-### 8.2 Existing Patterns (Status Quo)
+- `{% block list_intro %}` for a short module introduction above the list
+- `{% block learning_pane_body %}` for module-specific learning content in the sidebar
 
-Three patterns currently coexist in the codebase:
+This pattern is already implemented for several primary list views, including Samples, Sources, Inventories, Collections, GeoDatasets, and CLOSECYCLE showcases.
 
-#### Pattern A: Standalone Landing Page
+### 8.2 Remaining inconsistency
 
-**Used by:** Materials (`featured_sample_list.html`, `featured_materials_list.html`), Sources (`sources_list.html`)
+Not every primary list uses the pattern yet.
 
-The sidebar links to a **separate** page that extends `base.html` directly. This page shows:
-- A description card (left column) explaining the module
-- A learning material card (right column) linking to external lectures
-- Below: a grid of featured/curated items (not the full filterable list)
+- `processes` still presents its primary list without the same contextual intro/learning treatment
+- some source-domain and supporting-model lists still intentionally remain plain filtered lists
 
-The actual filterable list (`sample_filter.html`, `sampleseries_filter.html`) is reached via a secondary "see as list" link in the card footer.
+### 8.3 Guidance
 
-**Problems:**
-1. Adds an **extra click** between sidebar and the real, filterable data
-2. Description and learning content are **not available** when the user navigates directly to the filtered list (e.g. via a bookmark or back-link)
-3. Featured items are displayed as a **card grid** without filters, pagination, or scope toggles — a different interaction model than every other list in the application
-4. Learning content is **duplicated** (identical HOOU links appear in both `featured_sample_list.html` and `sources_list.html`)
+The preferred pattern for a module's primary list remains:
 
-#### Pattern B: Learning Sidebar Tab in Filtered List
+1. a compact intro banner via `list_intro`
+2. a reusable module-specific learning partial in `learning_pane_body`
+3. an Explorer action in the options area via the existing `dashboard_url` hook until naming is generalized
 
-**Used by:** Waste Collection (`collection_filter.html`), Greenhouses (`greenhouse_filter.html`)
+Secondary/supporting-model lists do not need the full contextual treatment unless they are intended as user-facing entry points.
 
-The primary list view extends `filtered_list.html` and overrides `{% block learning_pane_body %}` to populate the Learning tab in the sidebar. The `filtered_list.html` base template auto-hides the Learning tab via JavaScript when no content is provided.
+### 8.4 Remaining follow-up
 
-**Advantages:**
-1. **No extra click** — contextual content is alongside the data
-2. Uses existing `filtered_list.html` sidebar tab infrastructure
-3. Learning tab **auto-hides** via JS when empty (graceful degradation)
-4. Content is available regardless of how the user reached the list
-
-**Limitations:**
-1. No module **description** visible on first load — only learning resources in a sidebar tab
-2. Learning resources in a tab that is not active by default — easy to miss
-
-#### Pattern C: Plain Filtered List (No Context)
-
-**Used by:** Processes (`processtype_filter.html`), Inventories (`scenario_filter.html`), Bibliography (`source_filter.html`), CLOSECYCLE (`showcase_filter.html`), Maps
-
-The primary list view extends `filtered_list.html` but explicitly empties the Learning tab:
-```django
-{% block learning_tab_button %}{% endblock learning_tab_button %}
-{% block learning_tab_pane %}{% endblock learning_tab_pane %}
-```
-
-No description, no learning resources. The user sees only a data table with filters.
-
-### 8.3 Current State Per Module
-
-| Module | Sidebar target | Pattern | Description? | Learning? |
-|---|---|---|---|---|
-| **Materials** | `sample-list-featured` | A (standalone) | ✅ in landing page | ✅ in landing page |
-| **Sources** | `sources-list` | A (standalone) | ✅ in landing page | ✅ in landing page |
-| **Waste Collection** | `collection-list` | B (sidebar tab) | ❌ | ✅ in sidebar tab |
-| **Greenhouses** (Nantes) | `greenhouse-list` | B (sidebar tab) | ❌ | ✅ in sidebar tab |
-| **Processes** | `processtype-list` | C (bare) | ❌ | ❌ |
-| **Inventories** | `scenario-list` | C (bare) | ❌ | ❌ |
-| **Bibliography** | `source-list` | C (bare) | ❌ | ❌ |
-| **CLOSECYCLE** | `showcase-list` | C (bare) | ❌ | ❌ |
-| **Maps** | `maps_list` | C (bare) | ❌ | ❌ |
-
-### 8.4 Optimized Design Pattern
-
-Combine the best aspects of all three patterns into a single, consistent approach that works within the existing `filtered_list.html` infrastructure.
-
-#### 8.4.1 Concept: Intro Banner + Learning Sidebar Tab
-
-```
-filtered_list.html
-├── {% block list_intro %}              ← NEW optional block
-│   ├── Module description (1–2 sentences)
-│   └── Quick-access links (Explorer, Map view, etc.)
-├── List card (existing)
-│   ├── Header with scope/view/explorer toggles
-│   ├── Filterable data table
-│   └── Pagination
-└── Sidebar (existing)
-    ├── Filters tab (active by default)
-    ├── Options tab (Create, Explorer, Export)
-    └── Learning tab (auto-hidden when empty)
-        └── External resources, lectures, courses
-```
-
-#### 8.4.2 The `list_intro` Block
-
-Add a new `{% block list_intro %}{% endblock list_intro %}` to `filtered_list.html`, placed **above** the list card (before the `<div class="row">`). When overridden, it renders a compact, dismissible intro banner:
-
-```html
-{% block list_intro %}
-<div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start" role="region" aria-label="Module introduction">
-  <div class="flex-grow-1">
-    <strong><i class="fas fa-leaf me-1"></i> Materials</strong>
-    <p class="mb-0 small text-muted">
-      Define and analyze heterogeneous materials from biogeneous residues.
-      Explore compositions with respect to different separation methods.
-    </p>
-  </div>
-  <button type="button" class="btn-close ms-3" data-bs-dismiss="alert" aria-label="Dismiss"></button>
-</div>
-{% endblock list_intro %}
-```
-
-**Design decisions:**
-- **Compact**: 2–3 lines max, does not push the data table off-screen
-- **Dismissible**: uses Bootstrap alert dismiss so returning users can hide it
-- **Non-intrusive**: uses `alert-light` styling, blending with the page rather than demanding attention
-- **Optional**: the base block is empty, so modules without a description are unaffected
-
-#### 8.4.3 The Learning Sidebar Tab
-
-The `filtered_list.html` Learning tab infrastructure already exists and auto-hides when empty. Each module's primary list template should override `{% block learning_pane_body %}` with:
-
-1. A **featured resource** card (the most relevant external learning material)
-2. A **resource list** with links to additional lectures/courses
-
-Use the component pattern already established in `waste_collection/includes/learning_materials.html`:
-
-```html
-{% block learning_pane_body %}
-  {% include "<module>/includes/learning_materials.html" %}
-{% endblock learning_pane_body %}
-```
-
-Each module that has learning resources creates a `<module>/includes/learning_materials.html` partial. This keeps the content reusable across list views, detail views, and map views within the same module.
-
-#### 8.4.4 Deprecation of Standalone Landing Pages (Pattern A)
-
-Once the intro banner and learning tab are in place for Materials and Sources:
-
-1. Move the description text from `featured_sample_list.html` into `sample_filter.html`'s `{% block list_intro %}`
-2. Move the learning links from `featured_sample_list.html` into `sample_filter.html`'s `{% block learning_pane_body %}`
-3. Redirect `sample-list-featured` → `sample-list` (or keep as alias for backwards compatibility)
-4. Same for `sampleseries-list-featured` and `sources-list`
-
-The Sources module (`sources_list.html`) is a special case — it functions as a hub page linking to sub-modules (Waste Collection, Greenhouses) rather than a data list. This page may remain as a static overview or evolve into a proper explorer page. Evaluate separately.
-
-### 8.5 Improvement Plan
-
-#### Phase 1: Infrastructure (filtered_list.html changes)
-
-| Step | Description | Effort |
-|---|---|---|
-| 1.1 | Add `{% block list_intro %}{% endblock %}` to `filtered_list.html` above the list card | Tiny |
-| 1.2 | Verify the Learning tab auto-hide JS works correctly for all modules | Tiny |
-
-#### Phase 2: Populate Learning Content
-
-For each module's primary list template, override `{% block learning_pane_body %}` and remove the explicit learning tab emptying (`{% block learning_tab_button %}{% endblock %}`).
-
-| Step | Module | Primary list template | Learning content source | Effort |
-|---|---|---|---|---|
-| 2.1 | Waste Collection | `collection_filter.html` | Already done ✅ | — |
-| 2.2 | Greenhouses | `greenhouse_filter.html` | Already done ✅ | — |
-| 2.3 | Materials (Samples) | `sample_filter.html` | Move from `featured_sample_list.html` | Small |
-| 2.4 | Processes | `processtype_filter.html` | Write new content (link to HOOU bioresource lectures) | Small |
-| 2.5 | Bibliography | `source_filter.html` | Write new content (citation guidelines, data licensing) | Small |
-| 2.6 | Inventories | `scenario_filter.html` | Write new content (inventory methodology, scenario workflow) | Small |
-| 2.7 | CLOSECYCLE | `showcase_filter.html` | Write new content (CLOSECYCLE project overview) | Small |
-| 2.8 | Maps | `maps/geodataset_filter.html` or equivalent | Write new content (GIS data sources, NUTS regions) | Small |
-
-#### Phase 3: Add Intro Banners
-
-For each module's primary list template, override `{% block list_intro %}` with a concise module description.
-
-| Step | Module | Template | Description text source | Effort |
-|---|---|---|---|---|
-| 3.1 | Materials (Samples) | `sample_filter.html` | Adapt from `featured_sample_list.html` | Tiny |
-| 3.2 | Processes | `processtype_filter.html` | Write new (1–2 sentences about process types) | Tiny |
-| 3.3 | Bibliography | `source_filter.html` | Write new (1–2 sentences about sources/citations) | Tiny |
-| 3.4 | Inventories | `scenario_filter.html` | Write new (1–2 sentences about scenarios) | Tiny |
-| 3.5 | Waste Collection | `collection_filter.html` | Write new (1–2 sentences about biowaste collection data) | Tiny |
-| 3.6 | CLOSECYCLE | `showcase_filter.html` | Write new (1–2 sentences about circular economy showcases) | Tiny |
-| 3.7 | Maps | primary list template | Write new (1–2 sentences about geodatasets) | Tiny |
-
-#### Phase 4: Deprecate Standalone Landing Pages
-
-| Step | Description | Effort |
-|---|---|---|
-| 4.1 | Update Materials sidebar link from `sample-list-featured` → `sample-list` | Tiny |
-| 4.2 | Keep `sample-list-featured` URL as redirect to `sample-list` for backwards compatibility | Tiny |
-| 4.3 | Keep `sampleseries-list-featured` URL as redirect to `sampleseries-list` | Tiny |
-| 4.4 | Evaluate Sources module: convert `sources_list.html` to a proper explorer, or merge hub links into Home | Medium |
-
-### 8.6 Summary
-
-The optimized pattern is: **every primary list view provides its own context**. A brief intro banner above the table orients first-time visitors, the Learning sidebar tab offers deeper educational resources, and the Options tab provides the Explorer back-link. No intermediate landing pages, no duplicated content, no inconsistent interaction models. A user arriving at any module via the sidebar sees the same layout: intro → data → sidebar with filters, options, and learning.
+- [ ] Add contextual intro/learning content to the Processes primary list if it is kept as a primary entry point.
+- [ ] Decide whether any additional primary lists still need the intro/learning treatment, especially where explorer-first navigation is being replaced.
+- [ ] Consider whether `dashboard_url` should eventually be renamed to `explorer_url` in shared list templates for terminology consistency.
 
 ---
 
-## 9. Hub Pages: Concept and Recommendations
+## 9. Hub Pages
 
-### 9.1 Problem Statement
+### 9.1 Current role of Sources
 
-Some pages in the application act as **hubs** — they don't show data themselves but instead group and link to related sub-modules. The Sources page (`sources_list.html`) is the primary example. With the completion of Phases 1–4 (intro banners, learning tabs, sidebar entries for all modules), the role of hub pages needs to be re-evaluated: do they still serve a purpose, and if so, what should the standardized pattern be?
+The Sources page is now an explorer/hub rather than a static placeholder page.
+It remains a valid exception to the “sidebar should land on a primary list” guideline because it aggregates multiple source-domain apps behind a single conceptual entry point.
 
-### 9.2 Inventory of Page Types
+Current behavior:
 
-The application currently has five distinct page types:
+- the sidebar links to `sources-explorer`
+- the home page Sources card links to `sources-explorer`
+- the page acts as a cross-app entry point for source-domain modules rather than a data list itself
 
-| Type | Purpose | Template pattern | Examples |
-|---|---|---|---|
-| **Home page** | Global hub: links to all top-level modules with cover images and descriptions | `home.html` extends `base.html` | Home |
-| **Explorer** | Module-internal catalog: enumerates entity types within a single Django app with counts and browse links | `*_dashboard.html` extends `base.html` | Materials Explorer, Processes Explorer, Waste Collection Explorer, Bibliography Explorer, Inventories Explorer, Maps Explorer |
-| **Hub page** | Cross-module aggregator: groups related modules/apps under a conceptual theme with descriptions and cover images | `sources_list.html` extends `base.html` | Sources |
-| **Primary list view** | Filterable data table with intro banner, learning sidebar, and scope toggles | `*_filter.html` extends `filtered_list.html` | Sample list, Process type list, Collection list, etc. |
-| **Learning page** | Centralized learning resource catalog: HOOU courses and lectures with cover images | `learning.html` extends `base.html` | Learning |
+### 9.2 Guidance for hub pages
 
-### 9.3 Analysis of the Sources Hub Page
+Hub pages are appropriate when they:
 
-The Sources page currently serves three functions:
+- aggregate multiple subdomains or apps
+- provide meaningful conceptual grouping
+- help users choose between multiple adjacent workflows
 
-1. **Domain description** — Explains the concept of bioresource sources (two paragraphs)
-2. **Learning resources** — Links to HOOU lectures (identical to those now in learning sidebar tabs)
-3. **Sub-module navigation** — Cards with cover images linking to Waste Collection and Greenhouses
+They are not a substitute for a module's primary working surface.
 
-**Redundancies after Phase 1–4:**
-- Function 1 is now handled by **intro banners** on each sub-module's primary list view
-- Function 2 is now handled by **learning sidebar tabs** on each sub-module's primary list view
-- Function 3 is partially redundant because:
-  - Waste Collection has its own **sidebar entry** under Case Studies
-  - CLOSECYCLE has its own **sidebar entry** under Case Studies
-  - Greenhouses is accessible from the Waste Collection explorer or sidebar
-  - The **Home page** already links to Sources (and could link to sub-modules directly)
+### 9.3 Learning page
 
-**What Sources still provides:**
-- A conceptual grouping: "these are all models describing how bioresources are generated"
-- An intermediate navigation layer between Home and the sub-module lists
+The Learning page should remain a site-wide catalog of educational resources.
+It complements, rather than replaces, module-level learning content embedded in primary list views.
 
-**What Sources doesn't provide:**
-- Any data — it's a pure `TemplateView` with no model, no queryset, no filters
-- Entity enumeration — unlike explorers, it doesn't list entity types within a single app
+### 9.4 Remaining follow-up
 
-### 9.4 Sources Domain Ontology
-
-The Sources module encompasses a family of **source types** — categories of real-world systems that generate bioresources. Each source type has two orthogonal facets:
-
-#### 9.4.1 Terminology
-
-| Term | Definition |
-|---|---|
-| **Source type** | A category of bioresource-generating system (e.g., roadside trees, greenhouses, household waste collection) |
-| **Generation model** | A parametric description of *how* a source type produces bioresources — growth models, maintenance schedules, collection parameters, residue yields |
-| **Source distribution** | A spatial dataset describing *where and how many* instances of a source type exist in a geographic catchment |
-
-#### 9.4.2 Two Facets per Source Type
-
-Every source type has (or will have) both facets:
-
-| Source type | Generation model (how) | Source distribution (where/how many) |
-|---|---|---|
-| **Roadside trees** | Growth model, pruning/maintenance schedule → green residue yield | GIS point dataset of tree locations (Hamburg) |
-| **Greenhouses** | Growth cycles, cultures → organic residue output | GIS dataset of greenhouse locations (Nantes) |
-| **Household waste collection** | Collection system parameters, waste categories, material constraints, and frequencies → biowaste volume | Catchment polygons (future) |
-
-Current implementation status:
-
-| Source type | Generation model | Source distribution (map) |
-|---|---|---|
-| Household waste collection | `collection-list` ✅ | — not yet |
-| Greenhouses | `greenhouse-list` ✅ | `NantesGreenhouses` ✅ |
-| Roadside trees | — not yet | `HamburgRoadsideTrees` ✅ |
-
-Each source type currently has one facet implemented. The explorer should expose both facets per source type, marking missing ones as not yet available.
-
-#### 9.4.3 How Both Facets Combine in Inventories
-
-In the **Inventories** module, both facets come together:
-
-1. The user selects a **generation model** — how much bioresource does one unit of this source type produce?
-2. The user selects a **source distribution** (catchment + geodataset) — how many units of this source type exist in this area?
-3. The inventory algorithm combines them to produce a **bioresource potential estimate**.
-
-This means Sources is not just a navigation hub but describes a core domain concept that feeds directly into the inventory workflow.
-
-### 9.5 Sources Explorer Design (Implemented)
-
-#### 9.5.1 Decision: Sources as a Cross-App Explorer
-
-Sources is structurally different from other explorers (Materials, Processes, etc.) because it enumerates **separate Django apps** rather than entity types within a single app:
-
-| Explorer | What it enumerates | Apps involved |
-|---|---|---|
-| Materials Explorer | Entity types within `materials` app | 1 app |
-| Processes Explorer | Entity types within `processes` app | 1 app |
-| **Sources Explorer** | Source types across multiple apps | `waste_collection`, `greenhouses`, `roadside_trees` |
-
-Despite this structural difference, the visual pattern is identical: explorer cards with icon, title, description, count, and browse link, using the shared `explorer-cards.css` styles.
-
-#### 9.5.2 Two-Action Card Pattern
-
-Because each source type has two facets, each explorer card provides **two entry points**:
-
-```
-┌──────────────────────────────────────────────┐
-│ [icon] Source Type Name                      │
-│                                              │
-│ Description of this source type and the      │
-│ bioresources it generates.                   │
-│                                              │
-│ [N published]   [Browse models] [View map]   │
-└──────────────────────────────────────────────┘
-```
-
-- **Browse models** → links to the generation model list view (e.g., `collection-list`)
-- **View map** → links to the source distribution map view (e.g., `NantesGreenhouses`)
-- If a facet is not yet implemented, its button is disabled or absent
-
-This keeps the source type as the primary organizing concept (matching the user's mental model: "I want to work with greenhouses") while making both dimensions directly accessible.
-
-#### 9.5.3 Navigation
-
-- **Sidebar** → "Sources" links to `sources-explorer`
-- **Home page** → Sources card links to `sources-explorer`
-- **Old URL** → `sources-list` redirects 301 to `sources-explorer`
-
-### 9.6 Recommendations for the Learning Page
-
-The Learning page (`learning.html`) is structurally similar to a hub page — it groups external resources with cover images and descriptions. However, it serves a different purpose:
-
-- It's a **catalog** of all learning resources in one place
-- Individual modules now have module-specific learning content in their sidebar tabs
-- The Learning page provides the **complete collection** and additional context about the HOOU partnership
-
-**Recommendation:** Keep the Learning page as-is. It serves as a centralized reference that complements the per-module learning tabs. The sidebar entry under "Sites" is appropriate — it's a site-wide resource, not a module.
-
-### 9.7 Summary
-
-| Page | Current state | Recommendation |
-|---|---|---|
-| **Sources** | Explorer with two-action cards per source type | Keep; add map buttons as source distributions become available |
-| **Learning** | Sidebar entry → centralized learning catalog | Keep as-is |
-| **Home** | Global hub with module cards | Keep as-is |
-| **Explorers** | Module-internal entity catalog | Keep as-is; no changes needed |
-
-The guiding principle: **the sidebar links to places where users can work with data**. The Sources Explorer qualifies because it provides direct access to generation models and source distributions — the two facets that combine in the inventory workflow.
+- [ ] Keep evaluating whether Sources should remain a top-level hub or whether more direct home/sidebar links to subdomains would serve users better.
+- [ ] Continue to distinguish clearly between explorers, hubs, and primary working lists in naming and navigation.
