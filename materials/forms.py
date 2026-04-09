@@ -11,6 +11,7 @@ from django.forms import (
     Widget,
 )
 from django.forms.models import BaseInlineFormSet
+from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django_tomselect.forms import (
     TomSelectConfig,
@@ -21,12 +22,14 @@ from extra_views import InlineFormSetFactory
 from bibliography.models import Source
 from distributions.models import TemporalDistribution
 from utils.forms import (
+    CreateEnabledTomSelectModelChoiceField,
     ModalForm,
     ModalModelForm,
     ModalModelFormMixin,
     SimpleModelForm,
     SourcesFieldMixin,
     UserCreatedObjectFormMixin,
+    configure_tomselect_inline_create,
 )
 from utils.properties.forms import NumericMeasurementFieldsFormMixin
 from utils.properties.models import Unit, get_default_unit_pk
@@ -368,14 +371,16 @@ class SampleSeriesAddTemporalDistributionModalModelForm(ModalModelForm):
 
 
 class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm):
-    material = TomSelectModelChoiceField(
+    material = CreateEnabledTomSelectModelChoiceField(
         config=TomSelectConfig(
             url="sample-substrate-material-autocomplete",
             label_field="name",
             value_field="id",
+            placeholder="Select or create a substrate",
+            create=True,
         ),
         required=False,
-        label="Material",
+        label="Substrate",
     )
     series = TomSelectModelChoiceField(
         config=TomSelectConfig(
@@ -398,7 +403,20 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             material_queryset = material_queryset | Material.objects.filter(
                 pk=self.instance.material_id
             )
-        self.fields["material"].queryset = material_queryset.distinct()
+        substrate_field = self.fields["material"]
+        substrate_field.queryset = material_queryset.distinct()
+        substrate_field.help_text = (
+            "Select an existing substrate. If it is not listed, type a new name "
+            "and press Enter to create it automatically."
+        )
+
+        request = getattr(self, "request", None)
+        if request and request.user.has_perm("materials.add_material"):
+            configure_tomselect_inline_create(
+                substrate_field,
+                create_url=reverse("sample-substrate-material-quick-create"),
+                error_message="Could not create substrate.",
+            )
 
     class Meta:
         model = Sample

@@ -1,3 +1,5 @@
+import json
+
 from bootstrap_modal_forms.mixins import CreateUpdateAjaxMixin, PopRequestMixin
 from crispy_forms.helper import FormHelper
 from django.core.exceptions import ImproperlyConfigured, ValidationError
@@ -9,8 +11,45 @@ from django.forms import (
     formset_factory,
     modelformset_factory,
 )
+from django_tomselect.forms import (
+    TomSelectModelChoiceField,
+    TomSelectModelMultipleChoiceField,
+)
+
+from .widgets import (
+    CreateEnabledTomSelectModelMultipleWidget,
+    CreateEnabledTomSelectModelWidget,
+)
 
 MARKDOWN_HELP_TEXT = "Supports **bold** text and lists (- item). No headings."
+
+
+class CreateEnabledTomSelectModelChoiceField(TomSelectModelChoiceField):
+    widget_class = CreateEnabledTomSelectModelWidget
+
+
+class CreateEnabledTomSelectModelMultipleChoiceField(TomSelectModelMultipleChoiceField):
+    widget_class = CreateEnabledTomSelectModelMultipleWidget
+
+
+def configure_tomselect_inline_create(
+    field,
+    *,
+    create_url,
+    payload_key="name",
+    extra_payload=None,
+    error_message=None,
+):
+    field.widget.attrs["data-tomselect-create-url"] = create_url
+    field.widget.attrs["data-tomselect-create-payload-key"] = payload_key
+
+    if extra_payload:
+        field.widget.attrs["data-tomselect-create-extra-payload"] = json.dumps(
+            extra_payload
+        )
+
+    if error_message:
+        field.widget.attrs["data-tomselect-create-error-message"] = error_message
 
 
 class FormHelperMixin:

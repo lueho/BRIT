@@ -1,5 +1,16 @@
 from django.forms.widgets import HiddenInput, SelectMultiple
 from django_filters.widgets import SuffixedMultiWidget
+from django_tomselect.widgets import TomSelectModelMultipleWidget, TomSelectModelWidget
+
+
+class CreateEnabledTomSelectModelWidget(TomSelectModelWidget):
+    class Media:
+        js = ("js/tomselect_inline_create.min.js",)
+
+
+class CreateEnabledTomSelectModelMultipleWidget(TomSelectModelMultipleWidget):
+    class Media:
+        js = ("js/tomselect_inline_create.min.js",)
 
 
 class RangeSliderWidget(SuffixedMultiWidget):

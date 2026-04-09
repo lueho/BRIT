@@ -1,3 +1,4 @@
+import json
 from collections import Counter, defaultdict
 from decimal import Decimal
 
@@ -9,10 +10,10 @@ from django.contrib.auth.mixins import (
     UserPassesTestMixin,
 )
 from django.db.models import Q
-from django.http import Http404, HttpResponseRedirect
+from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import NoReverseMatch, reverse, reverse_lazy
-from django.views.generic import ListView, RedirectView, TemplateView
+from django.views.generic import ListView, RedirectView, TemplateView, View
 from django.views.generic.detail import SingleObjectMixin
 from extra_views import UpdateWithInlinesView
 
@@ -284,6 +285,50 @@ class SampleSubstrateMaterialAutocompleteView(UserCreatedObjectAutocompleteView)
             type="material",
             categories=substrate_category,
         ).distinct()
+
+
+class SampleSubstrateMaterialQuickCreateView(
+    LoginRequiredMixin, PermissionRequiredMixin, View
+):
+    """Create a substrate material directly from the sample form autocomplete."""
+
+    permission_required = "materials.add_material"
+
+    def post(self, request, *args, **kwargs):
+        try:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            payload = {}
+
+        name = " ".join(str(payload.get("name", "")).split())
+        if not name:
+            return JsonResponse(
+                {"error": "A non-empty substrate name is required."},
+                status=400,
+            )
+
+        substrate_category, _ = get_or_create_sample_substrate_category()
+        material = Material.objects.filter(
+            owner=request.user,
+            name__iexact=name,
+            type="material",
+        ).first()
+        created = False
+        if material is None:
+            material = Material.objects.create(owner=request.user, name=name)
+            created = True
+
+        material.categories.add(substrate_category)
+
+        return JsonResponse(
+            {
+                "id": material.pk,
+                "name": material.name,
+                "label": material.name,
+                "text": material.name,
+            },
+            status=201 if created else 200,
+        )
 
 
 # ----------- Material Component CRUD ----------------------------------------------------------------------------------

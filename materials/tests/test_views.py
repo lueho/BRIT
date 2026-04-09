@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 from urllib.parse import quote
 from uuid import uuid4
@@ -95,6 +96,80 @@ class SampleSubstrateMaterialAutocompleteViewTestCase(TestCase):
         self.assertIn(self.substrate_name, names)
         self.assertNotIn(self.non_substrate_name, names)
         self.assertNotIn(self.component_name, names)
+
+
+class SampleSubstrateMaterialQuickCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ["add_material"]
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.substrate_category, _ = MaterialCategory.objects.get_or_create(
+            name=get_sample_substrate_category_name()
+        )
+
+    def test_post_redirects_anonymous_user_to_login(self):
+        response = self.client.post(
+            reverse("sample-substrate-material-quick-create"),
+            data=json.dumps({"name": "Wood"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_returns_403_without_add_material_permission(self):
+        self.client.force_login(self.outsider)
+
+        response = self.client.post(
+            reverse("sample-substrate-material-quick-create"),
+            data=json.dumps({"name": "Wood"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_returns_400_when_name_is_blank(self):
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("sample-substrate-material-quick-create"),
+            data=json.dumps({"name": "   "}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_post_creates_material_and_attaches_substrate_category(self):
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("sample-substrate-material-quick-create"),
+            data=json.dumps({"name": "Wood"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        material = Material.objects.get(pk=payload["id"])
+
+        self.assertEqual(material.owner, self.member)
+        self.assertEqual(material.name, "Wood")
+        self.assertEqual(material.type, "material")
+        self.assertIn(self.substrate_category, material.categories.all())
+
+    def test_post_reuses_existing_owner_material_and_attaches_substrate_category(self):
+        existing = Material.objects.create(owner=self.member, name="Wood")
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("sample-substrate-material-quick-create"),
+            data=json.dumps({"name": " wood  "}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        existing.refresh_from_db()
+        self.assertIn(self.substrate_category, existing.categories.all())
 
 
 class AnalyticalMethodReviewCascadeTest(TestCase):
