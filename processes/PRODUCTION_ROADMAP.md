@@ -25,7 +25,7 @@
 
 ## Transformation Plan
 
-Based on analysis of the **soilcom** module (most developed) and **materials** module patterns, here's the step-by-step roadmap:
+Based on analysis of the **waste_collection** module and **materials** module patterns, here's the step-by-step roadmap:
 
 ---
 
@@ -85,9 +85,9 @@ class ProcessOperatingParameterInlineFormSet(forms.ModelForm):
 ```
 
 **Files to create:**
-- `processes/forms.py` (~400-500 lines based on soilcom pattern)
+- `processes/forms.py` (~400-500 lines based on waste_collection pattern)
 
-**Pattern reference:** `case_studies/soilcom/forms.py`, `materials/forms.py`
+**Pattern reference:** `sources/waste_collection/forms.py`, `materials/forms.py`
 
 ---
 
@@ -123,7 +123,7 @@ class ProcessFilter(django_filters.FilterSet):
 **Files to create:**
 - `processes/filters.py` (~200-300 lines)
 
-**Pattern reference:** `case_studies/soilcom/filters.py`, `materials/filters.py`
+**Pattern reference:** `sources/waste_collection/filters.py`, `materials/filters.py`
 
 ---
 
@@ -237,10 +237,10 @@ class ProcessAddParameterView(LoginRequiredMixin, UpdateView):
 ```
 
 **Files to update:**
-- `processes/views.py` (~800-1200 lines based on soilcom/materials pattern)
+- `processes/views.py` (~800-1200 lines based on waste_collection/materials pattern)
 
 **Pattern reference:** 
-- `case_studies/soilcom/views.py` (1204 lines, complex example)
+- `sources/waste_collection/views.py` (complex example)
 - `materials/views.py` (909 lines, simpler example)
 
 ---
@@ -344,7 +344,7 @@ processes/templates/processes/
 - Include charts/visualizations where appropriate
 
 **Pattern reference:**
-- `case_studies/soilcom/templates/` (24 templates)
+- `sources/waste_collection/templates/waste_collection/`
 - `materials/templates/` 
 - `utils/object_management/templates/` (base templates)
 
@@ -401,7 +401,7 @@ class ProcessSerializer(serializers.ModelSerializer):
 **Files to create:**
 - `processes/serializers.py` (~300-400 lines)
 
-**Pattern reference:** `case_studies/soilcom/serializers.py`
+**Pattern reference:** `sources/waste_collection/serializers.py`
 
 ---
 
@@ -450,7 +450,7 @@ class ProcessViewSet(viewsets.ModelViewSet):
 **Files to create:**
 - `processes/viewsets.py` (~200-300 lines)
 
-**Pattern reference:** `case_studies/soilcom/viewsets.py`
+**Pattern reference:** `sources/waste_collection/viewsets.py`
 
 ---
 
@@ -543,7 +543,7 @@ class ProcessFormWithInlinesTestCase(TestCase):
 **Files to create:**
 - `processes/tests/test_forms.py` (~200-300 lines)
 
-**Pattern reference:** `case_studies/soilcom/tests/test_forms.py`
+**Pattern reference:** `sources/waste_collection/tests/test_forms.py`
 
 ---
 
@@ -599,7 +599,7 @@ def process_post_save(sender, instance, created, **kwargs):
 **Files to create:**
 - `processes/signals.py` (~100 lines)
 
-**Pattern reference:** `case_studies/soilcom/signals.py`
+**Pattern reference:** `sources/waste_collection/signals.py`
 
 ---
 
@@ -621,7 +621,7 @@ def generate_process_report(process_id):
 **Files to create:**
 - `processes/tasks.py` (~100-200 lines)
 
-**Pattern reference:** `case_studies/soilcom/tasks.py`
+**Pattern reference:** `sources/waste_collection/tasks.py`
 
 ---
 
@@ -684,7 +684,7 @@ def calculate_process_efficiency(process):
 
 ## Estimated Effort
 
-Based on soilcom complexity and materials simplicity:
+Based on waste_collection complexity and materials simplicity:
 
 | Phase | Component | Lines of Code | Effort (hours) |
 |-------|-----------|---------------|----------------|
@@ -808,7 +808,7 @@ class {ModelName}CRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 ## References
 
 ### Code Examples
-- **Full featured:** `/case_studies/soilcom/`
+- **Full featured:** `/sources/waste_collection/`
 - **Mid complexity:** `/materials/`
 - **Base classes:** `/utils/object_management/`
 - **Testing patterns:** `/utils/tests/testcases.py`

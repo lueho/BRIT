@@ -159,7 +159,7 @@ Out of scope for this pilot:
 ### Follow-up tasks
 
 - [x] Greenhouses migration re-baseline - Complete 2026-04-08
-- [ ] Waste collection (soilcom) migration re-baseline - see Appendix C
+- [x] Waste collection (soilcom) migration re-baseline - Complete 2026-04-09 (see Appendix C)
 
 ---
 
@@ -232,55 +232,63 @@ Out of scope for this pilot:
 
 ## Appendix C: Waste Collection (soilcom) Re-baseline Procedure
 
-**Status:** Planned
+**Status:** COMPLETE - Deployed, cut over, and verified 2026-04-09
 
-Based on the successful roadside_trees and greenhouses pattern, but with extra complexity:
+Based on the successful roadside_trees and greenhouses pattern, this module required extra coordination because it started from:
 
-- `waste_collection` still uses explicit `soilcom_*` concrete table names
-- several explicit `soilcom_*` many-to-many tables also need coordinated renames
-- proxy models (`CollectionCatchment`, `CollectionSeason`, `WasteFlyer`, `WasteComponent`) should stay proxy-only and do not get table renames
-- the legacy `sources.legacy_soilcom` shim is still active in settings and tests
-- a few remaining runtime references still assume the legacy `soilcom` app label
+- explicit `soilcom_*` concrete table names
+- several explicit `soilcom_*` many-to-many tables that needed coordinated renames
+- proxy models (`CollectionCatchment`, `CollectionSeason`, `WasteFlyer`, `WasteComponent`) that needed to stay proxy-only
+- a legacy `sources.legacy_soilcom` shim in settings and migrations
+- runtime seams that previously recognized the `soilcom` app label
 
 ### Current State
 
-**Current `waste_collection` migrations:**
+**Current repository migration state:**
 
-- `0001_move_legacy_models.py` - ownership-transfer migration, depends on `soilcom`
-- `0002_update_content_types.py` - rewrites content types from `soilcom` to `waste_collection`
-- `0003_alter_collection_required_bin_capacity_reference.py` - post-transfer schema change under the current graph
+- `sources/waste_collection/migrations/0001_initial.py` is the only `waste_collection` migration
+- the clean baseline has no `soilcom` dependency
+- `sources.legacy_soilcom` has been removed from the repo and from Django settings
 
-**Current concrete model tables still using `soilcom_*`:**
+**Current canonical concrete tables:**
 
-- `Collector` → `soilcom_collector`
-- `CollectionSystem` → `soilcom_collectionsystem`
-- `SortingMethod` → `soilcom_sortingmethod`
-- `WasteCategory` → `soilcom_wastecategory`
-- `CollectionFrequency` → `soilcom_collectionfrequency`
-- `CollectionCountOptions` → `soilcom_collectioncountoptions`
-- `FeeSystem` → `soilcom_feesystem`
-- `Collection` → `soilcom_collection`
-- `CollectionPropertyValue` → `soilcom_collectionpropertyvalue`
-- `AggregatedCollectionPropertyValue` → `soilcom_aggregatedcollectionpropertyvalue`
+- `Collector` → `waste_collection_collector`
+- `CollectionSystem` → `waste_collection_collectionsystem`
+- `SortingMethod` → `waste_collection_sortingmethod`
+- `WasteCategory` → `waste_collection_wastecategory`
+- `CollectionFrequency` → `waste_collection_collectionfrequency`
+- `CollectionCountOptions` → `waste_collection_collectioncountoptions`
+- `FeeSystem` → `waste_collection_feesystem`
+- `Collection` → `waste_collection_collection`
+- `CollectionPropertyValue` → `waste_collection_collectionpropertyvalue`
+- `AggregatedCollectionPropertyValue` → `waste_collection_aggregatedcollectionpropertyvalue`
 
-**Current explicit many-to-many tables still using `soilcom_*`:**
+**Current explicit many-to-many tables:**
 
-- `soilcom_collection_allowed_materials`
-- `soilcom_collection_forbidden_materials`
-- `soilcom_collection_samples`
-- `soilcom_collection_flyers`
-- `soilcom_collection_sources`
-- `soilcom_collection_predecessors`
-- `soilcom_collectionpropertyvalue_sources`
-- `soilcom_aggregatedcollectionpropertyvalue_collections`
-- `soilcom_aggregatedcollectionpropertyvalue_sources`
+- `waste_collection_collection_allowed_materials`
+- `waste_collection_collection_forbidden_materials`
+- `waste_collection_collection_samples`
+- `waste_collection_collection_flyers`
+- `waste_collection_collection_sources`
+- `waste_collection_collection_predecessors`
+- `waste_collection_collectionpropertyvalue_sources`
+- `waste_collection_aggregatedcollectionpropertyvalue_collections`
+- `waste_collection_aggregatedcollectionpropertyvalue_sources`
 
-**Proxy models that should not be table-renamed:**
+**Proxy models that remain proxy-only:**
 
 - `CollectionCatchment`
 - `CollectionSeason`
 - `WasteFlyer`
 - `WasteComponent`
+
+**Deployment status:**
+
+- Phase 1 rename rollout already ran on production through `waste_collection.0005_alter_aggregatedcollectionpropertyvalue_collections_and_more`
+- Phase 2 clean baseline was committed as `10f71a44` and pushed to `main` and `deploy`
+- Phase 3 cutover SQL was rehearsed successfully on a restored production snapshot in dev; smoke checks passed
+- production cutover and deploy completed 2026-04-09; Postgres smoke checks passed
+- known leftover tables `soilcom_georeferencedcollector` and `soilcom_georeferencedwastecollection` remain outside the active `waste_collection` baseline
 
 ### Procedure Steps
 
@@ -371,7 +379,14 @@ Based on the successful roadside_trees and greenhouses pattern, but with extra c
 
 #### Phase 3: Production Cutover
 
-11. **Execute SQL on production** after the rename migration is already applied:
+11. **Execute the `django_migrations` cutover SQL on production before deploying the clean-baseline code**.
+
+    Preconditions:
+
+    - production has already applied the Phase 1 rename rollout through `waste_collection.0005_alter_aggregatedcollectionpropertyvalue_collections_and_more`
+    - the deploy that removes `sources.legacy_soilcom` and replaces the migration graph with `waste_collection.0001_initial` has not been released yet
+
+    Run this recorder update in the release window immediately before the new deploy:
     ```sql
     BEGIN;
 
@@ -381,11 +396,28 @@ Based on the successful roadside_trees and greenhouses pattern, but with extra c
         '0001_move_legacy_models',
         '0002_update_content_types',
         '0003_alter_collection_required_bin_capacity_reference',
-        'NNNN_rename_waste_collection_tables'
+        '0004_rename_soilcom_col_publica_c5f9a3_idx_waste_colle_publica_23ad95_idx_and_more',
+        '0005_alter_aggregatedcollectionpropertyvalue_collections_and_more'
     );
 
     DELETE FROM django_migrations
-    WHERE app = 'soilcom';
+    WHERE app = 'soilcom'
+    AND name IN (
+        '0001_initial',
+        '0002_aggregatedcollectionpropertyvalue_approved_at_and_more',
+        '0003_alter_aggregatedcollectionpropertyvalue_publication_status_and_more',
+        '0004_alter_collection_min_bin_size_and_required_bin_capacity',
+        '0005_georeferencedcollector_and_more',
+        '0006_add_is_derived_to_collectionpropertyvalue',
+        '0006_alter_aggregatedcollectionpropertyvalue_publication_status_and_more',
+        '0007_enforce_unique_derived_cpv',
+        '0008_merge_20260217_0951',
+        '0009_alter_collection_required_bin_capacity_and_more',
+        '0010_add_sorting_method_and_established',
+        '0011_collection_inline_waste_fields',
+        '0012_remove_wastestream_model',
+        '0013_move_models_to_sources'
+    );
 
     INSERT INTO django_migrations (app, name, applied)
     VALUES ('waste_collection', '0001_initial', NOW());
@@ -393,15 +425,34 @@ Based on the successful roadside_trees and greenhouses pattern, but with extra c
     COMMIT;
     ```
 
-    Replace `NNNN_rename_waste_collection_tables` with the actual rename migration filename.
+12. **Deploy code** with the clean baseline and without the shim only after the cutover SQL is complete.
 
-12. **Deploy code** with the clean baseline and without the shim only after the cutover SQL is complete
+    Recommended release order:
+
+    - stop any automatic migration step from the old release image
+    - run the SQL above against the production database
+    - deploy the new code containing only `waste_collection.0001_initial` and no `sources.legacy_soilcom`
+    - run `python manage.py migrate`
+
+    Do not leave the system in the intermediate state longer than necessary, because the old code would see the historical migration rows as missing.
 
 13. **Smoke test**:
     ```bash
     docker compose exec web python manage.py showmigrations waste_collection
     docker compose exec web python manage.py shell -c "from sources.waste_collection.models import Collection, CollectionPropertyValue, AggregatedCollectionPropertyValue; print(Collection.objects.count(), CollectionPropertyValue.objects.count(), AggregatedCollectionPropertyValue.objects.count())"
     ```
+
+    Snapshot rehearsal completed 2026-04-09:
+
+    - restored production snapshot in dev accepted the cutover SQL and `python manage.py migrate`
+    - `django_migrations` reduced to `waste_collection.0001_initial`
+    - Postgres counts and targeted smoke tests passed
+
+    Production verification completed 2026-04-09:
+
+    - production `django_migrations` reduced to `waste_collection.0001_initial`
+    - canonical `waste_collection_*` tables and row counts matched the rehearsal snapshot
+    - sample published collections loaded normally via Postgres smoke checks
 
 ### Key Differences from Greenhouses
 
@@ -410,13 +461,29 @@ Based on the successful roadside_trees and greenhouses pattern, but with extra c
 | Concrete models | 7 | 10 |
 | Explicit many-to-many tables | 0 | 9 |
 | Proxy models in app state | minimal | 4 important proxies |
-| Current shim status | already removed | still active |
-| Cleanup prerequisite | inventory module-path data migration | runtime/shim seam cleanup plus table and join-table rename rollout |
+| Current shim status | already removed | removed in repo and production |
+| Cleanup prerequisite | inventory module-path data migration | post-cutover legacy artifact and documentation cleanup |
 
 ### Risk Considerations
 
 - **More tables than greenhouses** means more rename operations to coordinate
 - **Explicit many-to-many tables** add extra rename and validation surface beyond model tables
-- **Fresh database setup** must be verified before deleting `sources.legacy_soilcom`
-- **String-based model labels** may still assume `soilcom.*` in a few code paths and tests
-- **Content types and review/export flows** need smoke tests after cutover because this module is heavily used across the app
+- **Fresh database setup** and production cutover are now verified, but follow-up cleanup should stay small and targeted
+- **Known leftover georeferenced `soilcom_*` tables** are legacy artifacts and should not be mistaken for active schema ownership
+- **Legacy `soilcom` content types and permissions** still exist for obsolete models and should be removed in a dedicated follow-up rather than bundled into the cutover
+
+### Post-completion cleanup opportunities
+
+**Repo/doc cleanup completed 2026-04-09:**
+
+- updated `docs/04_design_decisions/2026-02-10_sources_consolidation_plan.md` so it records the completed migration outcome instead of the transitional shim/table strategy as the current target state
+- updated `docs/04_design_decisions/2026-02-09_module_ux_harmonization_guideline.md` so `waste_collection` references the canonical `sources.waste_collection` app and current explorer structure
+- updated `processes/PRODUCTION_ROADMAP.md` and `processes/SUMMARY.md` to use `waste_collection` as the active source-domain reference instead of the retired Soilcom path
+- updated legacy documentation/examples in `utils/file_export/views.py` and `sources/waste_collection/ontology/README.md`
+- deleted the unused `sources/waste_collection/model_definitions.py` artifact after confirming repo search found no imports of that file
+
+**Separate follow-up migration or DB cleanup:**
+
+- drop the empty legacy tables `soilcom_georeferencedcollector` and `soilcom_georeferencedwastecollection` only in a dedicated migration/SQL follow-up
+- remove the obsolete `soilcom` content types for `georeferencedcollector`, `georeferencedwastecollection`, `wastestream`, `wastestreamallowed`, and `wastestreamcategory` together with their dependent `auth_permission` rows
+- keep those content-type cleanups separate from the completed re-baseline, even though current production checks show zero `object_management_reviewaction` and zero `django_admin_log` rows for those legacy content types

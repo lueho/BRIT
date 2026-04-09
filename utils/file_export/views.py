@@ -156,10 +156,10 @@ class FilteredListFileExportView(LoginRequiredMixin, View):
 class GenericUserCreatedObjectExportView(FilteredListFileExportView):
     """
     Generic export view for any UserCreatedObject-derived model.
-    Subclasses must define model_label (e.g. 'soilcom.Collection').
+    Subclasses must define model_label (e.g. 'waste_collection.Collection').
     """
 
-    model_label = None  # e.g. 'soilcom.Collection'
+    model_label = None  # e.g. 'waste_collection.Collection'
 
     def _dispatch_task(self, request, file_format, filter_params, export_context):
         """Dispatch the generic UserCreatedObject export task."""

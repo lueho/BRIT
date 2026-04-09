@@ -268,7 +268,7 @@ The home page (`home.html`) shows module cards that link to different entry poin
 Case studies are currently mounted in confusing ways:
 - `case_studies/hamburg/` AND `maps/hamburg/` → same app
 - `case_studies/nantes/` AND `maps/nantes/` → same app
-- `waste_collection/` → `case_studies.soilcom`
+- `waste_collection/` → `sources.waste_collection`
 - `closecycle/` → `case_studies.closecycle`
 
 **Proposed consolidation:**
@@ -317,7 +317,7 @@ Case studies are currently mounted in confusing ways:
 - [ ] Extract explorer card CSS to shared file
 - [ ] Add `explorer_url` to all list views
 
-### 5.7 Waste Collection (SOILCOM)
+### 5.7 Waste Collection
 - [ ] Add to sidebar navigation, linking to primary model list (Collections)
 - [ ] Rename `wastecollection-dashboard` → `wastecollection-explorer`
 - [ ] Extract explorer card CSS to shared file
@@ -498,7 +498,7 @@ The `filtered_list.html` Learning tab infrastructure already exists and auto-hid
 1. A **featured resource** card (the most relevant external learning material)
 2. A **resource list** with links to additional lectures/courses
 
-Use the component pattern already established in `soilcom/includes/learning_materials.html`:
+Use the component pattern already established in `waste_collection/includes/learning_materials.html`:
 
 ```html
 {% block learning_pane_body %}
@@ -667,7 +667,7 @@ Sources is structurally different from other explorers (Materials, Processes, et
 |---|---|---|
 | Materials Explorer | Entity types within `materials` app | 1 app |
 | Processes Explorer | Entity types within `processes` app | 1 app |
-| **Sources Explorer** | Source types across multiple apps | `soilcom`, `greenhouses`, `flexibi_hamburg` |
+| **Sources Explorer** | Source types across multiple apps | `waste_collection`, `greenhouses`, `roadside_trees` |
 
 Despite this structural difference, the visual pattern is identical: explorer cards with icon, title, description, count, and browse link, using the shared `explorer-cards.css` styles.
 

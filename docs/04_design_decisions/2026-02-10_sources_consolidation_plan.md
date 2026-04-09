@@ -1,7 +1,7 @@
 # Sources Module Consolidation Plan
 
 **Date:** 2026-02-10
-**Status:** In progress (adapter-first transition underway)
+**Status:** Completed 2026-04-09 (historical decision record; follow-up cleanup may still continue)
 **Decision:** Option A — consolidate all source-type apps into `sources/`
 **Context:** Sources domain ontology (Section 9 of UX Harmonization Guideline),
 Geodataset Harmonization Pipeline proposal
@@ -20,7 +20,7 @@ FLEXIBI Nantes, FLEXIBI Hamburg) rather than by domain concept (sources of
 bioresources). As the platform evolves, the project origin becomes less relevant
 and the domain concept becomes the primary organizing principle.
 
-## 2. Current State
+## 2. Current State at Decision Time
 
 ```
 sources/                             # Shell: TemplateView explorer only
@@ -34,7 +34,7 @@ Total: ~7,800 lines source + ~8,800 lines tests = ~16,600 lines to move.
 
 Database tables: `soilcom_*`, `flexibi_nantes_*`, `flexibi_hamburg_*`.
 
-## 2a. Current Execution Strategy
+## 2a. Execution Strategy Used During Transition
 
 Rather than moving models, app labels, and URL ownership all at once, the
 refactor is currently proceeding through small compatibility slices that:
@@ -161,6 +161,13 @@ Validated and committed slices completed so far:
   `makemigrations --check --dry-run` for `greenhouses`, `waste_collection`,
   `flexibi_nantes`, and `soilcom`
 
+## 2c. Final Outcome (2026-04-09)
+
+- `sources.waste_collection`, `sources.greenhouses`, `sources.roadside_trees`, and `sources.urban_green_spaces` now own the canonical source-domain runtime surface
+- the `soilcom`, `flexibi_nantes`, and `flexibi_hamburg` migration-history transitions are complete
+- `waste_collection`, `greenhouses`, `roadside_trees`, and `urban_green_spaces` now use clean baselines aligned to their current schema ownership
+- the temporary migration shims used during the transition have been retired from active settings/runtime
+
 ## 3. Target State
 
 ```
@@ -236,13 +243,13 @@ sources/
     └── (new migrations using SeparateDatabaseAndState)
 ```
 
-## 4. Database Migration Strategy
+## 4. Historical Database Migration Strategy
 
-Django names tables as `<app_label>_<model_name>`. Moving models from
-`case_studies.soilcom` to `sources` would change table names (e.g.,
-`soilcom_collection` → `sources_collection`).
+Django names tables as `<app_label>_<model_name>`. At the start of the refactor,
+moving models from `case_studies.soilcom` to `sources` would have changed table
+names (e.g., `soilcom_collection` → `sources_collection`).
 
-**Strategy: Keep existing table names using `db_table` Meta option.**
+**Transitional strategy used at that point: keep existing table names using `db_table` Meta option.**
 
 ```python
 class Collection(NamedUserCreatedObject):
@@ -250,11 +257,10 @@ class Collection(NamedUserCreatedObject):
         db_table = "soilcom_collection"  # Preserve existing table name
 ```
 
-This avoids data migration entirely. The tables stay where they are in the
-database; only the Python code moves to a new app.
+This was the bridge-phase approach before the later table-rename and clean-baseline rollout.
 
-For the Django migration history, use `SeparateDatabaseAndState` to tell Django
-the models moved without actually altering the database:
+For the Django migration history, the transition used `SeparateDatabaseAndState`
+to tell Django the models moved without immediately altering the database:
 
 ```python
 # sources/migrations/0002_move_waste_collection_models.py
@@ -280,8 +286,11 @@ class Migration(migrations.Migration):
     ]
 ```
 
-Combined with a corresponding migration in `soilcom` that removes the models
+Combined with a corresponding migration in `soilcom` that removed the models
 from its state (also using `SeparateDatabaseAndState` with `database_operations=[]`).
+
+That historical strategy has now been superseded for waste collection by canonical
+`waste_collection_*` tables and a clean `waste_collection.0001_initial` baseline.
 
 ## 5. URL Migration Strategy
 
@@ -336,7 +345,7 @@ External files that import from the three apps (outside their own code/tests):
 
 ## 7. Implementation Phases
 
-### Bridge Phase: adapter-first transition (current)
+### Bridge Phase: adapter-first transition (historical)
 
 - [x] Scaffold nested domain apps under `sources`
 - [x] Add selector adapters for shared source-domain entrypoints
@@ -366,7 +375,7 @@ External files that import from the three apps (outside their own code/tests):
 - [x] Add viewset adapters where `sources`-owned routers still imported
   directly from `case_studies.*`
 
-### Near-term next steps
+### Near-term next steps identified at the time
 
 1. Collapse the remaining intentional compatibility re-exports only after the
    migration-shim phase can be retired without breaking fresh database setup.

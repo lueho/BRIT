@@ -11,7 +11,7 @@
 - Created `TESTING_SUMMARY.md` with detailed documentation
 
 ### ✅ Production Roadmap (Complete)
-- **Analyzed soilcom module** (most developed app in BRIT)
+- **Analyzed waste_collection module** (one of the most developed source-domain apps in BRIT)
 - **Analyzed materials module** (simpler reference)
 - **Identified common patterns** used across the project
 - **Created detailed 7-phase roadmap** for production transformation
@@ -215,10 +215,10 @@ class {Model}CRUDViewsTestCase(
 ## Risk Mitigation
 
 ### Risk: Complex inline formsets
-**Mitigation**: Follow materials/soilcom patterns exactly, test incrementally
+**Mitigation**: Follow materials/waste_collection patterns exactly, test incrementally
 
 ### Risk: UI/UX complexity with many related objects  
-**Mitigation**: Use tabs, accordions, and progressive disclosure; study soilcom detail views
+**Mitigation**: Use tabs, accordions, and progressive disclosure; study waste_collection detail views
 
 ### Risk: Breaking existing mock views
 **Mitigation**: Use feature flags or separate URL namespaces during transition
@@ -244,7 +244,7 @@ See `PRODUCTION_ROADMAP.md` for:
 The processes module has:
 - ✅ **Solid foundation** (models, admin, tests)
 - ✅ **Clear path forward** (detailed roadmap)
-- ✅ **Proven patterns** (from soilcom/materials)
+- ✅ **Proven patterns** (from waste_collection/materials)
 - ✅ **Realistic timeline** (40-114 hours based on scope)
 
 **Ready to begin Phase 1 implementation.**
