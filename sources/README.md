@@ -60,6 +60,125 @@ They help the platform:
 
 In that sense, source-domain apps are not isolated feature modules. They are domain-specific entrypoints through which the wider BRIT ecosystem understands the origin, generation, and potential availability of bioresources.
 
+## Typical parts of a source-domain app
+
+Although source domains differ in subject matter, they usually combine the same kinds of concerns.
+
+- geographic origin data
+  - where the bioresource arises
+  - administrative areas, catchments, sites, facilities, routes, or mapped features
+- descriptive data and analysis
+  - how the bioresource has been generated, collected, maintained, harvested, or otherwise made available
+  - this covers raw observations, status-quo records, historical records, and statistical analysis describing past or current conditions
+  - examples include collection-system settings, operational attributes, management regimes, process descriptions, observed amounts, and observed compositions
+- predictive models
+  - calibrated models that estimate or predict generated amount, composition, or availability for a given catchment and time span
+  - these models are often derived from descriptive data, but they are not the same thing and should remain conceptually distinct
+- assumptions and scenarios
+  - user-created artificial inputs that represent expert judgment where real-world data is sparse or unavailable
+  - this includes explicit assumptions, boundary assumptions such as minimum and maximum values, and reproducible scenario definitions used to run models under different conditions
+  - these objects improve usability and planning support, but they must remain clearly separated from observed real-world data
+- spatial aspects
+  - geometry, regional aggregation, map views, GeoJSON outputs, or location-linked interpretation
+- temporal aspects
+  - seasons, frequencies, reporting periods, yearly versions, or time-dependent behavior
+
+Descriptive, predictive, and assumption-based parts are closely related but serve different purposes. Descriptive data explains what has been observed or how a system currently works. Predictive models use assumptions or calibrated relationships to estimate what is likely to be generated under defined spatial and temporal conditions. Assumptions and scenarios capture intentional user-defined inputs for planning, exploration, or inventory setup. All three can have spatial and temporal dimensions, but the structure should keep the distinction visible to developers, maintainers, and users.
+
+## Recommended structure for a source-domain app
+
+Source-domain apps should follow a similar internal shape so they stay easy to understand, maintain, and integrate with the `sources` hub.
+
+### Core integration surface
+
+- `apps.py`
+  - Django app configuration
+- `plugin.py`
+  - the domain's `SourceDomainPlugin` descriptor
+- `urls.py`
+  - the domain's canonical URL configuration
+
+### Domain runtime surface
+
+- `models.py`
+  - core domain records describing origin, descriptive observations, predictive model objects, and scenario or assumption objects where applicable
+- `views.py`
+  - HTML views for browsing, detail, editing, review, descriptive analysis, predictive results, scenario setup, or map pages
+- `forms.py`
+  - domain-specific editing and filtering forms, including assumption or scenario input forms where relevant
+- `filters.py`
+  - reusable filtersets for tables, explorer pages, and exports
+- `serializers.py`
+  - API and export serializers
+- `viewsets.py`
+  - API endpoints where applicable
+- `router.py`
+  - domain router wiring when an API surface exists
+- `admin.py`
+  - admin registration
+- `tests/`
+  - domain-local tests covering the app's behavior
+
+### Optional but common domain integration modules
+
+- `selectors.py`
+  - small read-model helpers such as published counts and explorer statistics
+- `exports.py`
+  - `SourceDomainExport` registrations for file export
+- `renderers.py`
+  - domain-specific export renderers
+- `tasks.py`
+  - background jobs that belong to the domain
+- `signals.py`
+  - domain-local signal registration only where needed
+- `geojson.py`
+  - map-oriented serialization helpers
+- `inventory/`
+  - domain inventory algorithms or lookup integration
+- `templates/`
+  - domain templates
+- `static/`
+  - domain JS/CSS/images
+- `management/`
+  - domain management commands
+
+### Optional concern-oriented substructure for larger apps
+
+If a domain grows large, organize by concern without breaking the shared outer shape.
+Typical internal concern groups are:
+
+- origin and geography
+- generation or gathering system description
+- descriptive observations and analysis
+- predictive estimation or forecasting
+- assumptions and scenarios
+- temporal interpretation
+- map and export presentation
+
+For small apps, keeping these concerns in the main modules is fine.
+For larger apps, extract cohesive helpers or subpackages, but keep the main entry modules stable so the app still looks familiar across domains.
+
+Where descriptive, predictive, and assumption-based parts coexist, the app structure and interface should make their difference obvious. Users should be able to tell whether they are looking at observed or recorded domain data, at model-based estimates and predictions derived from that data, or at explicitly user-defined assumptions and scenarios.
+
+## Recommended design principles for source-domain apps
+
+- keep domain logic inside the domain app
+  - models, selectors, estimation logic, and views should live with the source domain
+- keep hub integration thin and explicit
+  - use plugin metadata and shared contracts instead of ad hoc core imports
+- separate descriptive data from predictive models
+  - descriptive records, descriptive analysis, and calibrated predictive models may be related, but they should not collapse into the same concept in code, docs, or UI
+- make the descriptive/predictive distinction legible in the interface
+  - users should be able to recognize whether a value is observed, aggregated from observations, statistically described, or model-predicted
+- keep assumptions and scenarios separate from observed data
+  - user-defined artificial inputs are valuable, but they must be stored and presented as assumptions rather than being mixed into real-world evidence
+- design for reproducibility and track record
+  - scenario definitions, assumption values, model inputs, and resulting outputs should be storable, reviewable, and repeatable later
+- treat spatial and temporal behavior as cross-cutting concerns
+  - do not force them into separate apps if they belong naturally to the same source domain
+- prefer shared core helpers over one-off integration code
+  - if multiple domains need the same integration pattern, the `sources` core should own it
+
 ## What a source-domain plugin is intended to do
 
 - identify a source domain through a stable `slug` and human-readable `verbose_name`
@@ -122,6 +241,158 @@ The currently stable integration surfaces are:
 - explorer participation through `explorer_context_var` and `published_count_getter`
 
 Everything else inside `sources` should be treated as core implementation detail unless it is documented here.
+
+## Core helpers provided today
+
+At the moment, the `sources` hub provides a small but useful set of integration helpers.
+
+- contracts in `sources.contracts`
+  - `SourceDomainPlugin` defines the basic plugin descriptor
+  - `SourceDomainExport` defines export registrations
+- registry functions in `sources.registry`
+  - `get_source_domain_plugins()` returns all discovered plugins
+  - `get_source_domain_plugin(slug)` resolves a plugin by slug
+  - `get_hub_source_domain_plugins()` returns plugins mounted into the hub URL surface
+  - `get_explorer_context()` builds explorer counters from plugin metadata
+- helper methods on `SourceDomainPlugin`
+  - `get_app_module()` resolves the app module path from `app_config`
+  - `get_urlpatterns()` resolves URL patterns from `urlconf`
+  - `get_published_count()` resolves the configured published-count getter
+- hub URL composition in `sources.urls`
+  - plugins that opt into hub mounting are included automatically
+- explorer composition in `sources.views.SourcesExplorerView`
+  - the explorer view consumes registry-built context instead of hard-coded domain counts
+- export discovery through `utils.file_export.registry_init`
+  - plugins with the `exports` capability can register file exports without core hard-coded imports
+
+These helpers should be preferred over custom cross-app glue when integrating a new source-domain app.
+
+## Shared BRIT functionality source-domain apps should reuse
+
+Source-domain apps should not only reuse the narrow `sources` plugin contract. They should also build on the shared BRIT platform modules that already solve recurring problems such as ownership, review, referencing, and map interaction.
+
+The goal is to keep source-domain code relatively high level: domain apps should focus on domain models, domain logic, and domain-specific workflows, while cross-cutting infrastructure should come from shared modules.
+
+### User-created objects and review workflow
+
+If a source-domain record is created or curated by users, it should normally build on `utils.object_management` rather than implementing its own ownership or moderation flow.
+
+Key reusable surfaces include:
+
+- `utils.object_management.models.UserCreatedObject`
+  - shared owner tracking
+  - shared publication states: `private`, `review`, `published`, `declined`, `archived`
+  - shared transition methods such as `submit_for_review()`, `withdraw_from_review()`, `approve()`, `reject()`, and `archive()`
+- `utils.object_management.models.ReviewAction`
+  - shared audit trail for submission, approval, rejection, withdrawal, and comments
+- `utils.object_management.permissions`
+  - centralized permission checks and queryset filtering
+  - helpers such as `filter_queryset_for_user()`, `apply_scope_filter()`, and `get_object_policy()`
+- `utils.object_management.views`
+  - generic CRUD, modal CRUD, review, list, autocomplete, and filter views for `UserCreatedObject` models
+- `utils.object_management.viewsets.UserCreatedObjectViewSet`
+  - shared API behavior for publication scopes and review actions
+- `utils.forms.UserCreatedObjectFormMixin`
+  - shared backend permission validation for form fields that reference user-created objects
+
+Source-domain apps should therefore prefer:
+
+- inheriting from `UserCreatedObject` for reviewable domain content
+- using the existing review workflow instead of inventing custom review states or moderator actions
+- using shared permission and policy helpers so templates and APIs stay consistent with backend behavior
+- using the shared generic views and viewsets as a base where possible, only adding domain-specific behavior on top
+
+### Maps and spatial user interface
+
+Source-domain apps with spatial data should reuse the existing `maps` module for geometry editing, map configuration, and GeoJSON delivery instead of shipping custom one-off map infrastructure.
+
+Key reusable surfaces include:
+
+- `maps.forms`
+  - geometry editing forms based on `LeafletWidget`
+  - reusable region, catchment, and geodataset forms that show the expected integration style
+- `maps.views.MapMixin`
+  - shared map-context construction for pages that need an attached `MapConfiguration`
+- `maps.models`
+  - `MapConfiguration`, `MapLayerConfiguration`, and `ModelMapConfiguration` for configurable map display
+  - reusable geographic objects such as regions, catchments, polygons, and geodatasets
+- `maps.serializers.MapConfigurationSerializer`
+  - shared frontend map configuration serialization
+- `maps.mixins.CachedGeoJSONMixin`
+  - shared GeoJSON endpoint behavior with caching, bbox filtering, versioning, and streaming support for larger datasets
+
+Source-domain apps should therefore prefer:
+
+- storing and exposing geometry through the shared maps stack where possible
+- using shared map configuration and layer concepts for display
+- using the established GeoJSON and map-view patterns instead of creating separate frontend map conventions
+- integrating domain-specific map layers into the existing map system rather than building custom spatial UI from scratch
+
+### Bibliographic references
+
+Source-domain apps should use the `bibliography` module for documentary references instead of inventing domain-local citation models.
+
+Key reusable surfaces include:
+
+- `bibliography.models.Source`
+  - the shared model for bibliographic references
+- `bibliography` author, licence, URL validation, and reference-management functionality
+  - shared handling of reference metadata rather than domain-local implementations
+- `utils.forms.SourcesFieldMixin`
+  - shared form integration for a `sources` many-to-many field that points to `bibliography.Source`
+  - includes the reference selection widget and autocomplete integration
+
+Source-domain apps should therefore prefer:
+
+- linking domain records to `bibliography.Source` for references
+- using the shared reference widget and autocomplete flow in forms
+- relying on the bibliography app for reference creation and maintenance rather than duplicating reference fields inside the domain app
+
+### Shared form, filter, and selection patterns
+
+Source-domain apps should also reuse BRIT's general UI plumbing where it already exists.
+
+Important examples include:
+
+- `utils.forms.SourcesFieldMixin`
+  - for reference selection
+- `utils.forms.UserCreatedObjectFormMixin`
+  - for secure object-reference validation in forms
+- `utils.object_management.views` autocomplete and select-option views
+  - for ownership-aware object picking
+- `utils.filters.BaseCrispyFilterSet`
+  - for consistent filter-form rendering
+
+The intent is not that every domain app must look identical. The intent is that source-domain apps should share the same platform-level behavior for review, permissions, map interaction, and referencing, so domain code stays focused on the source domain itself.
+
+## Core helpers that should be added next
+
+To keep future source-domain apps aligned, the `sources` core should gradually provide more shared helper surfaces where multiple domains repeat the same patterns.
+
+Recommended next additions are:
+
+- plugin validation helpers
+  - central validation for duplicate slugs, hub-mount rules, and explorer metadata completeness
+- richer hub metadata
+  - optional plugin-declared labels, ordering, icons, descriptions, and navigation metadata for explorer and hub pages
+- shared explorer-card helpers
+  - a standard way for domains to contribute explorer cards or summary panels instead of only raw count values
+- shared map integration helpers
+  - common registration patterns for GeoJSON endpoints, map layers, or region-based summaries
+- shared temporal integration helpers
+  - standard contracts for reporting periods, seasonal dimensions, and time-series summary metadata
+- shared descriptive-data helpers
+  - standard patterns for observed values, descriptive statistics, provenance of observations, and status-quo summaries
+- shared predictive-model helpers
+  - standard registration or helper surfaces for calibrated models, estimation outputs, prediction metadata, and predictive summaries
+- shared assumption and scenario helpers
+  - standard contracts for explicit assumption values, boundary scenarios, scenario runs, and the separation of scenario artifacts from observed data
+- shared testing helpers
+  - reusable tests or assertions for plugin validity, hub inclusion, explorer integration, and export registration
+- shared documentation conventions
+  - a lightweight checklist or template for what each domain app should document about its origin data, descriptive layer, predictive layer, assumption and scenario layer, spatial behavior, and temporal behavior
+
+The goal is not to force all domains into one abstract framework. The goal is to centralize only the repeated integration seams so each domain app can stay domain-specific while still fitting cleanly into the same hub architecture.
 
 ## Required behavior
 
