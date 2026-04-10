@@ -218,7 +218,7 @@ class AnalyticalMethod(NamedUserCreatedObject):
     sources = models.ManyToManyField(
         Source,
         blank=True,
-        help_text="Sources or references for this analytical method.",
+        help_text="References for this analytical method.",
     )
 
     class Meta:
@@ -542,7 +542,7 @@ class MaterialPropertyValue(NumericMeasurementMixin, UserCreatedObject):
     sources = models.ManyToManyField(
         Source,
         blank=True,
-        help_text="Sources or references for this measurement.",
+        help_text="References for this measurement.",
     )
     average = models.DecimalField(max_digits=20, decimal_places=10)
     standard_deviation = models.DecimalField(
@@ -922,7 +922,7 @@ class ComponentMeasurement(NumericMeasurementMixin, UserCreatedObject):
     sources = models.ManyToManyField(
         Source,
         blank=True,
-        help_text="Sources or references for this measurement.",
+        help_text="References for this measurement.",
     )
     unit = models.ForeignKey(
         Unit,

@@ -245,7 +245,7 @@ class SourceBibtexArticleImportView(PermissionRequiredMixin, FormView):
         context = super().get_context_data(**kwargs)
         context.update(
             {
-                "form_title": "Create New Source from BibTeX @article",
+                "form_title": "Create New Reference from BibTeX @article",
                 "submit_button_text": "Import",
             }
         )
@@ -259,12 +259,12 @@ class SourceBibtexArticleImportView(PermissionRequiredMixin, FormView):
             return self.form_invalid(form)
 
         if len(sources) == 1:
-            messages.success(self.request, "Source created successfully.")
+            messages.success(self.request, "Reference created successfully.")
             return HttpResponseRedirect(sources[0].get_absolute_url())
 
         messages.success(
             self.request,
-            f"{len(sources)} sources created successfully.",
+            f"{len(sources)} references created successfully.",
         )
         return HttpResponseRedirect(reverse_lazy("source-list-owned"))
 
@@ -284,7 +284,7 @@ class SourceModalDetailView(UserCreatedObjectModalDetailView):
             self.object, context={"request": self.request}
         )
         context.update(
-            {"modal_title": "Source details", "object_data": serializer.data}
+            {"modal_title": "Reference details", "object_data": serializer.data}
         )
         return context
 

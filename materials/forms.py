@@ -518,7 +518,7 @@ class AddComponentModalForm(ModalModelForm):
 
 
 class AddLiteratureSourceForm(ModalForm):
-    source = ModelChoiceField(queryset=Source.objects.all())
+    source = ModelChoiceField(queryset=Source.objects.all(), label="Reference")
 
     class Meta:
         fields = ("source",)

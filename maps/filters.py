@@ -146,7 +146,7 @@ class GeoDataSetFilterSet(UserCreatedObjectScopedFilterSet):
                 filter_by=("scope", "name"),
             )
         ),
-        label="Source",
+        label="Reference",
     )
 
     def __init__(self, *args, **kwargs):

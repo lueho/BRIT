@@ -222,7 +222,7 @@ class ProcessReferenceInlineForm(forms.ModelForm):
             url="source-autocomplete",
             label_field="label",
         ),
-        label="Source",
+        label="Reference",
     )
 
     class Meta:

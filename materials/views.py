@@ -1461,7 +1461,7 @@ class AddSourceView(
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(
-            {"form_title": "Select a source to add", "submit_button_text": "Add"}
+            {"form_title": "Select a reference to add", "submit_button_text": "Add"}
         )
         return context
 

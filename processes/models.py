@@ -500,7 +500,7 @@ class ProcessReference(models.Model):
             raise ValidationError(
                 {
                     "title": _(
-                        "Provide either a bibliographic source or a custom reference title."
+                        "Provide either a bibliographic reference or a custom reference title."
                     )
                 }
             )

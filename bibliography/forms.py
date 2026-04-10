@@ -285,7 +285,7 @@ class SourceSimpleFilterForm(SimpleModelForm):
             url="source-autocomplete",
             label_field="text",
         ),
-        label="Source",
+        label="Reference",
     )
 
     class Meta:

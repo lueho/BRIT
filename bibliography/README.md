@@ -1,31 +1,31 @@
 # Bibliography Module
 
 ## Overview
-The Bibliography module is a component of the Bioresource Inventory Tool (BRIT) that manages bibliographic references. It provides functionality for storing, organizing, and retrieving information about various types of sources such as articles, books, datasets, and websites.
+The Bibliography module is a component of the Bioresource Inventory Tool (BRIT) that manages bibliographic references. It provides functionality for storing, organizing, and retrieving information about various types of references such as articles, books, datasets, and websites.
 
 ## Features
-- Management of bibliographic sources with detailed metadata
+- Management of bibliographic references with detailed metadata
 - Author management with proper name formatting
-- License tracking for sources
-- URL validation for online sources
+- License tracking for references
+- URL validation for online references
 - BibTeX formatting support
-- Autocomplete functionality for authors and sources
+- Autocomplete functionality for authors and references
 
 ## Models
 
 ### Author
-Represents an author of a bibliographic source with fields for:
+Represents an author of a bibliographic reference with fields for:
 - First, middle, and last names
 - Suffix
 - Preferred citation format
 
 ### Licence
-Represents a license under which a source is published:
+Represents a license under which a reference is published:
 - Name
 - Reference URL
 
 ### Source
-Represents a bibliographic source with fields for:
+Represents a bibliographic reference with fields for:
 - Type (article, dataset, book, website, custom)
 - Title
 - Authors (many-to-many relationship)
@@ -42,7 +42,7 @@ Represents a bibliographic source with fields for:
 
 ### SourceAuthor
 A through model for the many-to-many relationship between Source and Author:
-- Maintains the position/order of authors for a source
+- Maintains the position/order of authors for a reference
 
 ## Views
 The module provides a complete set of views for managing bibliographic data:
@@ -90,4 +90,4 @@ erDiagram
 ```
 
 ## Integration
-The Bibliography module integrates with other BRIT modules by providing reference information for data sources used throughout the application.
+The Bibliography module integrates with other BRIT modules by providing bibliographic reference information for objects used throughout the application.
