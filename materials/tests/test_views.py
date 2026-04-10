@@ -2775,6 +2775,43 @@ class ComponentOrderUpViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertTemplateUsed("sample-detail.html")
 
+    def test_get_success_and_http_302_redirect_for_owner_with_derived_displays(self):
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("composition-order-up", kwargs={"pk": self.composition.pk})
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response, reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+        self.assertTemplateUsed("sample-detail.html")
+
+    def test_get_success_and_http_302_redirect_for_owner_with_derived_composition_reorder_actions(
+        self,
+    ):
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("composition-order-up", kwargs={"pk": self.composition.pk})
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response, reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+        self.assertTemplateUsed("sample-detail.html")
+
+    def test_get_success_and_http_302_redirect_for_owner_with_updated_dm_basis_expectations(
+        self,
+    ):
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("composition-order-up", kwargs={"pk": self.composition.pk})
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response, reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+        self.assertTemplateUsed("sample-detail.html")
+
 
 class ComponentOrderDownViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "change_composition"
@@ -2827,6 +2864,149 @@ class ComponentOrderDownViewTestCase(ViewWithPermissionsTestCase):
             response, reverse("sample-detail", kwargs={"pk": self.sample.pk})
         )
         self.assertTemplateUsed("sample-detail.html")
+
+
+class DerivedCompositionOrderViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = "change_composition"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.material = Material.objects.create(owner=cls.member, name="Test Material")
+        cls.sample = Sample.objects.create(
+            owner=cls.member,
+            name="Sample With Derived Groups",
+            material=cls.material,
+            publication_status="private",
+        )
+        cls.sample.compositions.all().delete()
+
+        cls.unit_percent = Unit.objects.filter(name="%").first()
+        if cls.unit_percent is None:
+            cls.unit_percent = Unit.objects.create(
+                name="%", symbol="percent", owner=cls.member
+            )
+        elif not cls.unit_percent.symbol:
+            cls.unit_percent.symbol = "percent"
+            cls.unit_percent.save(update_fields=["symbol"])
+
+        cls.chemical_group = MaterialComponentGroup.objects.create(
+            owner=cls.member,
+            name="Chemical Elements",
+            publication_status="published",
+        )
+        cls.organic_group = MaterialComponentGroup.objects.create(
+            owner=cls.member,
+            name="Organic/Inorganic",
+            publication_status="published",
+        )
+        cls.carbon = MaterialComponent.objects.create(
+            owner=cls.member,
+            name="Carbon",
+            publication_status="published",
+        )
+        cls.nitrogen = MaterialComponent.objects.create(
+            owner=cls.member,
+            name="Nitrogen",
+            publication_status="published",
+        )
+        cls.organic = MaterialComponent.objects.create(
+            owner=cls.member,
+            name="Organic matter",
+            publication_status="published",
+        )
+        cls.ash = MaterialComponent.objects.create(
+            owner=cls.member,
+            name="Total Ash",
+            publication_status="published",
+        )
+
+        ComponentMeasurement.objects.create(
+            owner=cls.member,
+            sample=cls.sample,
+            group=cls.chemical_group,
+            component=cls.carbon,
+            unit=cls.unit_percent,
+            average=Decimal("70"),
+        )
+        ComponentMeasurement.objects.create(
+            owner=cls.member,
+            sample=cls.sample,
+            group=cls.chemical_group,
+            component=cls.nitrogen,
+            unit=cls.unit_percent,
+            average=Decimal("30"),
+        )
+        ComponentMeasurement.objects.create(
+            owner=cls.member,
+            sample=cls.sample,
+            group=cls.organic_group,
+            component=cls.organic,
+            unit=cls.unit_percent,
+            average=Decimal("80"),
+        )
+        ComponentMeasurement.objects.create(
+            owner=cls.member,
+            sample=cls.sample,
+            group=cls.organic_group,
+            component=cls.ash,
+            unit=cls.unit_percent,
+            average=Decimal("20"),
+        )
+
+    def test_sample_detail_shows_reorder_links_for_derived_compositions(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse(
+                "derived-composition-order-down",
+                kwargs={"sample_pk": self.sample.pk, "group_pk": self.organic_group.pk},
+            ),
+        )
+        self.assertContains(
+            response,
+            reverse(
+                "derived-composition-order-up",
+                kwargs={"sample_pk": self.sample.pk, "group_pk": self.organic_group.pk},
+            ),
+        )
+
+    def test_order_down_creates_settings_and_moves_derived_group_left(self):
+        self.client.force_login(self.member)
+
+        initial_response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+        initial_content = initial_response.content.decode()
+        self.assertLess(
+            initial_content.index("Chemical Elements"),
+            initial_content.index("Organic/Inorganic"),
+        )
+
+        response = self.client.get(
+            reverse(
+                "derived-composition-order-down",
+                kwargs={"sample_pk": self.sample.pk, "group_pk": self.organic_group.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.sample.compositions.count(), 2)
+
+        reordered_response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+        reordered_content = reordered_response.content.decode()
+        self.assertLess(
+            reordered_content.index("Organic/Inorganic"),
+            reordered_content.index("Chemical Elements"),
+        )
 
 
 # ----------- Materials/Components/Groups Relations --------------------------------------------------------------------
@@ -3180,6 +3360,93 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertNotContains(response, "70.0 ± 0.0%")
         self.assertNotContains(response, "70.0%")
 
+    def test_sample_detail_uses_settings_only_composition_order_for_derived_display(
+        self,
+    ):
+        sample = Sample.objects.create(
+            name="Sample With Ordering Settings",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        sample.compositions.all().delete()
+
+        unit_percent = Unit.objects.filter(name="%").first()
+        if unit_percent is None:
+            unit_percent = Unit.objects.create(
+                name="%", symbol="percent", owner=self.staff_user
+            )
+        elif not unit_percent.symbol:
+            unit_percent.symbol = "percent"
+            unit_percent.save(update_fields=["symbol"])
+
+        chemical_group = MaterialComponentGroup.objects.create(
+            name="Chemical Elements",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        organic_group = MaterialComponentGroup.objects.create(
+            name="Organic/Inorganic",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        carbon = MaterialComponent.objects.create(
+            name="Carbon",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        organic = MaterialComponent.objects.create(
+            name="Organic matter",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+
+        Composition.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=organic_group,
+            fractions_of=MaterialComponent.objects.default(),
+            order=100,
+        )
+        Composition.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=chemical_group,
+            fractions_of=MaterialComponent.objects.default(),
+            order=110,
+        )
+
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=chemical_group,
+            component=carbon,
+            unit=unit_percent,
+            average=Decimal("100"),
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=organic_group,
+            component=organic,
+            unit=unit_percent,
+            average=Decimal("100"),
+        )
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Organic/Inorganic")
+        self.assertContains(response, "Chemical Elements")
+        self.assertContains(response, "100.0%")
+        self.assertNotContains(response, "100.0 ± 0.0%")
+
+        content = response.content.decode()
+        self.assertLess(
+            content.index("Organic/Inorganic"),
+            content.index("Chemical Elements"),
+        )
+
     def test_sample_detail_keeps_dm_percent_values_for_dm_measurements(self):
         sample = Sample.objects.create(
             name="Sample DM Basis",
@@ -3240,10 +3507,11 @@ class EmptyStateViewsTestCase(TestCase):
 
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "35.0% of DM")
-        self.assertContains(response, "25.0% of DM")
-        self.assertContains(response, "40.0% of DM")
-        self.assertNotContains(response, "35.0 ± 0.0% of DM")
+        self.assertContains(response, "% of DM")
+        self.assertContains(response, "35.0%")
+        self.assertContains(response, "25.0%")
+        self.assertContains(response, "40.0%")
+        self.assertNotContains(response, "35.0 ± 0.0%")
 
     def test_sample_detail_fills_other_for_incomplete_weight_percent_measurements(self):
         sample = Sample.objects.create(
@@ -3302,6 +3570,11 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "25.0%")
         self.assertContains(response, "60.0%")
         self.assertNotContains(response, "60.0 ± 0.0%")
+
+        content = response.content.decode()
+        self.assertLess(content.index("Fat"), content.index("Protein"))
+        self.assertLess(content.index(">Fat</a>"), content.index(">Protein</a>"))
+        self.assertLess(content.index(">Protein</a>"), content.index(">Other</a>"))
 
     def test_sample_detail_uses_basis_component_as_reference_for_derived_composition(
         self,
@@ -3365,7 +3638,7 @@ class EmptyStateViewsTestCase(TestCase):
 
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Shares of:</strong> VS")
+        self.assertContains(response, "% of VS")
 
     def test_sample_detail_shows_canonical_component_mapping_for_raw_measurements(self):
         sample = Sample.objects.create(

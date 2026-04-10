@@ -583,6 +583,16 @@ urlpatterns = [
         name="composition-order-down",
     ),
     path(
+        "samples/<int:sample_pk>/derived-compositions/<int:group_pk>/order_up/",
+        views.DerivedCompositionOrderUpView.as_view(),
+        name="derived-composition-order-up",
+    ),
+    path(
+        "samples/<int:sample_pk>/derived-compositions/<int:group_pk>/order_down/",
+        views.DerivedCompositionOrderDownView.as_view(),
+        name="derived-composition-order-down",
+    ),
+    path(
         "materialcomponentgroups/settings/<int:pk>/add_source/",
         views.AddSourceView.as_view(),
         name="add_source",

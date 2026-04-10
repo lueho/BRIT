@@ -931,6 +931,32 @@ class SampleDetailView(UserCreatedObjectDetailView):
             charts[f"composition-chart-{composition.id}"] = chart.as_dict()
         return charts
 
+    def _get_composition_settings_by_group(self):
+        composition_settings_by_group = {}
+        for composition in self.object.compositions.order_by("order", "id"):
+            composition_settings_by_group.setdefault(composition.group_id, composition)
+        return composition_settings_by_group
+
+    @staticmethod
+    def _group_sort_key(group, composition_settings_by_group):
+        composition_setting = composition_settings_by_group.get(group.pk)
+        if composition_setting is None:
+            return (1, group.name.lower(), group.pk)
+        return (0, composition_setting.order, group.name.lower(), group.pk)
+
+    def _sort_component_measurements(
+        self, component_measurements, composition_settings_by_group
+    ):
+        return sorted(
+            component_measurements,
+            key=lambda measurement: (
+                self._group_sort_key(measurement.group, composition_settings_by_group),
+                -Decimal(measurement.average),
+                measurement.component.name.lower(),
+                measurement.pk,
+            ),
+        )
+
     def _build_derived_compositions(self, component_measurements):
         grouped_values = {}
         grouped_components = defaultdict(dict)
@@ -965,13 +991,18 @@ class SampleDetailView(UserCreatedObjectDetailView):
         percent_unit = Unit.objects.filter(name="%").first() or Unit(
             name="%", symbol="percent"
         )
+        composition_settings_by_group = self._get_composition_settings_by_group()
         compositions = []
 
         for group_id, group in sorted(
-            grouped_values.items(), key=lambda item: item[1].name.lower()
+            grouped_values.items(),
+            key=lambda item: self._group_sort_key(
+                item[1], composition_settings_by_group
+            ),
         ):
             is_dm_basis = group_is_dm_basis[group_id]
-            display_unit = "% of DM" if is_dm_basis else "%"
+            display_unit = "%"
+            composition_setting = composition_settings_by_group.get(group_id)
             basis_components = group_basis_components[group_id]
             if basis_components:
                 basis_counts = Counter(component.pk for component in basis_components)
@@ -1054,6 +1085,9 @@ class SampleDetailView(UserCreatedObjectDetailView):
             shares.sort(
                 key=lambda share: (
                     share["component"] == other_component.pk,
+                    0
+                    if share["component"] == other_component.pk
+                    else -share["average"],
                     share["component_name"].lower(),
                 )
             )
@@ -1068,6 +1102,11 @@ class SampleDetailView(UserCreatedObjectDetailView):
                     "fractions_of_name": reference_component.name,
                     "shares": shares,
                     "is_derived": True,
+                    "settings_pk": (
+                        composition_setting.pk
+                        if composition_setting is not None
+                        else None
+                    ),
                 }
             )
 
@@ -1116,8 +1155,14 @@ class SampleDetailView(UserCreatedObjectDetailView):
             .prefetch_related("sources")
             .order_by("group__name", "component__name", "id")
         )
+        composition_settings_by_group = self._get_composition_settings_by_group()
+        component_measurements = self._sort_component_measurements(
+            component_measurements, composition_settings_by_group
+        )
 
-        persisted_compositions = self.object.compositions.all()
+        persisted_compositions = self.object.compositions.filter(
+            shares__isnull=False
+        ).distinct()
         if persisted_compositions.exists():
             compositions = CompositionModelSerializer(
                 persisted_compositions, many=True
@@ -1401,6 +1446,78 @@ class CompositionOrderDownView(UserOwnsObjectMixin, SingleObjectMixin, RedirectV
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
         self.object.order_down()
+        return super().get(request, *args, **kwargs)
+
+
+def ensure_derived_composition_settings(sample, owner):
+    composition_settings_by_group = {}
+    for composition in sample.compositions.order_by("order", "id"):
+        composition_settings_by_group.setdefault(composition.group_id, composition)
+
+    default_component = MaterialComponent.objects.default()
+    for measurement in sample.component_measurements.select_related("group").order_by(
+        "group__name", "group_id", "id"
+    ):
+        if measurement.group_id in composition_settings_by_group:
+            continue
+        composition_settings_by_group[measurement.group_id] = (
+            Composition.objects.create(
+                owner=owner,
+                sample=sample,
+                group=measurement.group,
+                fractions_of=default_component,
+            )
+        )
+
+    return composition_settings_by_group
+
+
+class _DerivedCompositionOrderView(
+    LoginRequiredMixin, UserPassesTestMixin, RedirectView
+):
+    sample = None
+    group = None
+
+    def get_sample(self):
+        if self.sample is None:
+            self.sample = get_object_or_404(Sample, pk=self.kwargs["sample_pk"])
+        return self.sample
+
+    def get_group(self):
+        if self.group is None:
+            self.group = get_object_or_404(
+                MaterialComponentGroup, pk=self.kwargs["group_pk"]
+            )
+        return self.group
+
+    def test_func(self):
+        sample = self.get_sample()
+        policy = get_object_policy(self.request.user, sample, request=self.request)
+        return policy["can_manage_samples"]
+
+    def get_redirect_url(self, *args, **kwargs):
+        return reverse("sample-detail", kwargs={"pk": self.get_sample().pk})
+
+
+class DerivedCompositionOrderUpView(_DerivedCompositionOrderView):
+    def get(self, request, *args, **kwargs):
+        sample = self.get_sample()
+        group = self.get_group()
+        composition_settings_by_group = ensure_derived_composition_settings(
+            sample, request.user
+        )
+        composition_settings_by_group[group.pk].order_up()
+        return super().get(request, *args, **kwargs)
+
+
+class DerivedCompositionOrderDownView(_DerivedCompositionOrderView):
+    def get(self, request, *args, **kwargs):
+        sample = self.get_sample()
+        group = self.get_group()
+        composition_settings_by_group = ensure_derived_composition_settings(
+            sample, request.user
+        )
+        composition_settings_by_group[group.pk].order_down()
         return super().get(request, *args, **kwargs)
 
 

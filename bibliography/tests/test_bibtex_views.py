@@ -39,7 +39,7 @@ class SourceBibtexArticleImportViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse("source-bibtex-article-import"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Create New Source from BibTeX @article")
+        self.assertContains(response, "Create New Reference from BibTeX @article")
         self.assertContains(response, "Source creation mode")
         self.assertContains(response, "Manual")
         self.assertContains(response, "BibTeX @article")

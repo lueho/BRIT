@@ -27,93 +27,74 @@
   {% endif %}
 {% endblock detail_top_image %}
 {% block detail_body %}
-  <p class="card-text">
-    <strong>Name:</strong>
-    <br>
-    {{ object.name }}
-  </p>
-  <p class="card-text">
-    <strong>Material:</strong>
-    <br>
-    <a href="{% url 'material-detail-modal' object.material.pk %}"
-       class="modal-link">{{ object.material.name }}</a>
-  </p>
-  {% if object.series %}
-    <p class="card-text">
-      <strong>Series:</strong>
-      <br>
-      <a href="{% url 'sampleseries-detail-modal' object.series.pk %}"
-         class="modal-link">{{ object.series.name }}</a>
-    </p>
-  {% endif %}
-  {% if object.timestep %}
-    <p class="card-text">
-      <strong>Timestep:</strong>
-      <br>
-      {{ object.timestep }}
-    </p>
-  {% endif %}
-  {% if object.datetime %}
-    <p class="card-text">
-      <strong>Date/Time:</strong>
-      <br>
-      {{ object.datetime|date:"Y-m-d H:i" }}
-    </p>
-  {% endif %}
-  {% if object.location %}
-    <p class="card-text">
-      <strong>Location:</strong>
-      <br>
-      {{ object.location }}
-    </p>
-  {% endif %}
-  {% if object.description %}
-    <p class="card-text">
-      <strong>Description:</strong>
-      <br>
-      {{ object.description }}
-    </p>
-  {% endif %}
-  {% if object.analysis_date %}
-    <p class="card-text">
-      <strong>Analysis Date:</strong>
-      <br>
-      {{ object.analysis_date|date:"Y-m-d" }}
-    </p>
-  {% endif %}
-  {% if object.analysis_laboratory %}
-    <p class="card-text">
-      <strong>Laboratory:</strong>
-      <br>
-      {{ object.analysis_laboratory }}
-    </p>
-  {% endif %}
-  {% if object.lab_accreditation %}
-    <p class="card-text">
-      <strong>Lab Accreditation:</strong>
-      <br>
-      {{ object.lab_accreditation }}
-    </p>
-  {% endif %}
-  {% if object.analysis_objective %}
-    <p class="card-text">
-      <strong>Analysis Objective:</strong>
-      <br>
-      {{ object.analysis_objective }}
-    </p>
-  {% endif %}
-  {% with sample_sources=object.sources.all %}
-    {% if sample_sources %}
-      <p class="card-text">
-        <strong>Sources:</strong>
-        <br>
-        {% for source in sample_sources %}
-          <a href="{% url 'source-detail-modal' source.pk %}" class="modal-link">{{ source.abbreviation }}</a>
-          {% if not forloop.last %},{% endif %}
-        {% endfor %}
-      </p>
+  <dl class="row mb-0 sample-detail-fields">
+    <dt class="col-sm-4">Material</dt>
+    <dd class="col-sm-8">
+      <a href="{% url 'material-detail-modal' object.material.pk %}"
+         class="modal-link">{{ object.material.name }}</a>
+    </dd>
+    {% if object.series %}
+      <dt class="col-sm-4">Series</dt>
+      <dd class="col-sm-8">
+        <a href="{% url 'sampleseries-detail-modal' object.series.pk %}"
+           class="modal-link">{{ object.series.name }}</a>
+      </dd>
     {% endif %}
-  {% endwith %}
+    {% if object.timestep %}
+      <dt class="col-sm-4">Timestep</dt>
+      <dd class="col-sm-8">
+        {{ object.timestep }}
+      </dd>
+    {% endif %}
+    {% if object.datetime %}
+      <dt class="col-sm-4">Date/Time</dt>
+      <dd class="col-sm-8">
+        {{ object.datetime|date:"Y-m-d H:i" }}
+      </dd>
+    {% endif %}
+    {% if object.location %}
+      <dt class="col-sm-4">Location</dt>
+      <dd class="col-sm-8">
+        {{ object.location }}
+      </dd>
+    {% endif %}
+    {% if object.analysis_date %}
+      <dt class="col-sm-4">Analysis Date</dt>
+      <dd class="col-sm-8">
+        {{ object.analysis_date|date:"Y-m-d" }}
+      </dd>
+    {% endif %}
+    {% if object.analysis_laboratory %}
+      <dt class="col-sm-4">Laboratory</dt>
+      <dd class="col-sm-8">
+        {{ object.analysis_laboratory }}
+      </dd>
+    {% endif %}
+    {% if object.lab_accreditation %}
+      <dt class="col-sm-4">Accreditation</dt>
+      <dd class="col-sm-8">
+        {{ object.lab_accreditation }}
+      </dd>
+    {% endif %}
+    {% if object.analysis_objective %}
+      <dt class="col-sm-4">Objective</dt>
+      <dd class="col-sm-8">
+        {{ object.analysis_objective }}
+      </dd>
+    {% endif %}
+    {% with sample_sources=object.sources.all %}
+      {% if sample_sources %}
+        <dt class="col-sm-4">Sources</dt>
+        <dd class="col-sm-8">
+          {% for source in sample_sources %}
+            <a href="{% url 'source-detail-modal' source.pk %}" class="modal-link">{{ source.abbreviation }}</a>
+            {% if not forloop.last %},{% endif %}
+          {% endfor %}
+        </dd>
+      {% endif %}
+    {% endwith %}
+  </dl>
+  {% if object.description %}<p class="card-text mt-2 text-muted small">{{ object.description }}</p>{% endif %}
 {% endblock detail_body %}
 {% block detail_header_primary_actions %}
   <div class="btn-group me-2" role="group">
@@ -168,25 +149,39 @@
       <i class="fas fa-trash"></i> Delete
     </a>
   {% endif %}
+  {% if policy.is_private and policy.can_submit_review %}
+    <hr class="my-2">
+    <form method="post"
+          action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}"
+          class="mb-2">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary w-100">
+        <i class="fas fa-paper-plane"></i> Submit for Review
+      </button>
+    </form>
+  {% endif %}
 {% endblock options_primary_actions %}
+{% block options_review_actions %}
+  {% if policy.can_view_review_feedback %}
+    <a class="btn {% if policy.is_declined %}btn-outline-danger{% else %}btn-outline-info{% endif %} w-100 mb-2"
+       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+      <i class="fas fa-clipboard-check"></i> {{ policy.review_feedback_label }}
+    </a>
+  {% elif policy.is_in_review and not review_mode %}
+    {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
+      <a class="btn btn-outline-secondary w-100 mb-2"
+         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+        <i class="fas fa-clipboard-check"></i> Review view
+      </a>
+    {% endif %}
+  {% endif %}
+{% endblock options_review_actions %}
 {% block options_secondary_actions %}
-  <hr class="my-2">
-  <a class="btn btn-outline-secondary w-100 mb-2"
-     href="{% url 'sample-list' %}">
-    <i class="fas fa-list"></i> Public Samples
-  </a>
-  <a class="btn btn-outline-secondary w-100 mb-2"
-     href="{% url 'sample-list-owned' %}">
-    <i class="fas fa-list"></i> My Samples
-  </a>
-  <a class="btn btn-outline-secondary w-100 mb-2"
-     href="{% url 'materials-explorer' %}">
-    <i class="fas fa-table-cells-large"></i> Explorer
-  </a>
 {% endblock options_secondary_actions %}
 {% block options_export %}
   {% if component_measurements %}
     <hr class="my-2">
+    <p class="text-muted small fw-semibold text-uppercase mb-1 mt-2">Export</p>
     <button type="button"
             class="btn btn-outline-primary w-100 mb-2"
             id="exportBtn"
@@ -203,32 +198,32 @@
     <div class="col col-12">
       <div class="card shadow h-100 tab-card">
         <div class="card-header tab-card-header bg-body-tertiary border-bottom-0 py-3">
-          <h5 class="mb-0">Measurements</h5>
+          <h5 class="mb-0">Measurement Data</h5>
           <ul class="nav nav-tabs card-header-tabs"
               id="sample-measurements-tabs"
               role="tablist">
             <li class="nav-item" role="presentation">
               <a class="nav-link active"
-                 id="sample-properties-tab-link"
-                 data-bs-toggle="tab"
-                 href="#sample-properties-tab"
-                 role="tab"
-                 aria-controls="sample-properties-tab"
-                 aria-selected="true">
-                Properties
-                <span class="badge text-bg-secondary ms-1">{{ properties|length }}</span>
-              </a>
-            </li>
-            <li class="nav-item" role="presentation">
-              <a class="nav-link"
                  id="sample-component-measurements-tab-link"
                  data-bs-toggle="tab"
                  href="#sample-component-measurements-tab"
                  role="tab"
                  aria-controls="sample-component-measurements-tab"
-                 aria-selected="false">
-                Component Measurements
+                 aria-selected="true">
+                Mass-related Measurements
                 <span class="badge text-bg-secondary ms-1">{{ component_measurements|length }}</span>
+              </a>
+            </li>
+            <li class="nav-item" role="presentation">
+              <a class="nav-link"
+                 id="sample-properties-tab-link"
+                 data-bs-toggle="tab"
+                 href="#sample-properties-tab"
+                 role="tab"
+                 aria-controls="sample-properties-tab"
+                 aria-selected="false">
+                Non-mass Measurements
+                <span class="badge text-bg-secondary ms-1">{{ properties|length }}</span>
               </a>
             </li>
           </ul>
@@ -236,116 +231,23 @@
         <div class="card-body tab-content p-0"
              id="sample-measurements-tabs-content">
           <div class="tab-pane fade show active"
-               id="sample-properties-tab"
-               role="tabpanel"
-               aria-labelledby="sample-properties-tab-link">
-            {% if properties %}
-              <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                  <thead>
-                    <tr>
-                      <th>Property</th>
-                      <th>Value</th>
-                      <th>Basis</th>
-                      <th>Method</th>
-                      <th>Sources</th>
-                      {% if user.is_authenticated %}<th class="text-end">Edit</th>{% endif %}
-                      {% if policy.can_add_property %}<th class="remove-property collapse multi-collapse">Remove</th>{% endif %}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for property in properties %}
-                      <tr>
-                        <td>
-                          <a href="{% url 'materialproperty-detail-modal' property.property.pk %}"
-                             class="modal-link">{{ property.property.name }}</a>
-                          {% if property.canonical_property.pk != property.property.pk %}
-                            <div class="small text-muted">Comparable as {{ property.canonical_property.name }}</div>
-                          {% endif %}
-                        </td>
-                        <td class="text-nowrap">
-                          {{ property.average|trim_decimal:6 }}
-                          {% if property.display_standard_deviation != None %}
-                            ± {{ property.display_standard_deviation|trim_decimal:6 }}
-                          {% endif %}
-                          {{ property.unit }}
-                        </td>
-                        <td>{{ property.basis_component.name|default:"-" }}</td>
-                        <td>
-                          {% if property.analytical_method %}
-                            <a href="{% url 'analyticalmethod-detail-modal' property.analytical_method.pk %}"
-                               class="modal-link">{{ property.analytical_method.name }}</a>
-                          {% else %}
-                            -
-                          {% endif %}
-                        </td>
-                        <td>
-                          {% for source in property.sources.all %}
-                            <a href="{% url 'source-detail-modal' source.pk %}" class="modal-link">{{ source.abbreviation }}</a>
-                            {% if not forloop.last %},{% endif %}
-                          {% empty %}
-                            -
-                          {% endfor %}
-                        </td>
-                        {% if user.is_authenticated %}
-                          {% object_policy property as property_policy %}
-                          <td class="text-end text-nowrap">
-                            {% if property_policy.can_edit %}
-                              <a href="{% url 'materialpropertyvalue-update' property.id %}"
-                                 title="Edit property value">
-                                <i class="fas fa-fw fa-pen-to-square"></i>
-                              </a>
-                            {% else %}
-                              <span class="text-muted">-</span>
-                            {% endif %}
-                          </td>
-                        {% endif %}
-                        {% if policy.can_add_property %}
-                          <td class="remove-property collapse multi-collapse">
-                            <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}"
-                               class="modal-link">
-                              <i class="fas fa-fw fa-trash"></i>
-                            </a>
-                          </td>
-                        {% endif %}
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            {% else %}
-              <div class="p-3 text-muted">
-                {% if not user.is_authenticated %}
-                  No properties recorded. Log in to add properties.
-                {% elif policy.is_owner or policy.can_add_property %}
-                  No properties recorded. Add your first property.
-                {% else %}
-                  No properties recorded.
-                {% endif %}
-              </div>
-            {% endif %}
-            {% if policy.can_add_property %}
-              <div class="p-3 border-top">
-                <a href="{% url 'sample-add-property' object.id %}">
-                  <i class="fas fa-fw fa-plus"></i> Add property
-                </a>
-                {% if properties %}
-                  <a class="ms-3"
-                     href="javascript:void(0);"
-                     data-bs-toggle="collapse"
-                     data-bs-target=".remove-property"
-                     aria-expanded="false"
-                     aria-controls="remove-property">
-                    <i class="fas fa-fw fa-minus"></i> Remove properties
-                  </a>
-                {% endif %}
-              </div>
-            {% endif %}
-          </div>
-          <div class="tab-pane fade"
                id="sample-component-measurements-tab"
                role="tabpanel"
                aria-labelledby="sample-component-measurements-tab-link">
+            <div class="d-flex justify-content-between align-items-start p-3 border-bottom bg-body-tertiary gap-3 flex-wrap">
+              <div>
+                <div class="fw-semibold">Raw view</div>
+                <div class="small text-muted">
+                  Recorded mass-related component measurements as provided. For the normalized composition view, see below.
+                </div>
+              </div>
+              {% if data.compositions %}
+                <a class="btn btn-sm btn-outline-secondary"
+                   href="#normalized-compositions">
+                  <i class="fas fa-arrow-down"></i> Normalized view below
+                </a>
+              {% endif %}
+            </div>
             {% if measurements_by_group %}
               <div class="d-flex justify-content-end p-3 border-bottom">
                 <div class="btn-group btn-group-sm" role="group">
@@ -478,20 +380,148 @@
               </div>
             {% endif %}
           </div>
+          <div class="tab-pane fade"
+               id="sample-properties-tab"
+               role="tabpanel"
+               aria-labelledby="sample-properties-tab-link">
+            <div class="px-3 py-2 border-bottom bg-body-tertiary small text-muted">
+              Measurements that are not part of the mass composition breakdown.
+            </div>
+            {% if properties %}
+              <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                  <thead>
+                    <tr>
+                      <th>Property</th>
+                      <th>Value</th>
+                      <th>Basis</th>
+                      <th>Method</th>
+                      <th>Sources</th>
+                      {% if user.is_authenticated %}<th class="text-end">Edit</th>{% endif %}
+                      {% if policy.can_add_property %}<th class="remove-property collapse multi-collapse">Remove</th>{% endif %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for property in properties %}
+                      <tr>
+                        <td>
+                          <a href="{% url 'materialproperty-detail-modal' property.property.pk %}"
+                             class="modal-link">{{ property.property.name }}</a>
+                          {% if property.canonical_property.pk != property.property.pk %}
+                            <div class="small text-muted">Comparable as {{ property.canonical_property.name }}</div>
+                          {% endif %}
+                        </td>
+                        <td class="text-nowrap">
+                          {{ property.average|trim_decimal:6 }}
+                          {% if property.display_standard_deviation != None %}
+                            ± {{ property.display_standard_deviation|trim_decimal:6 }}
+                          {% endif %}
+                          {{ property.unit }}
+                        </td>
+                        <td>{{ property.basis_component.name|default:"-" }}</td>
+                        <td>
+                          {% if property.analytical_method %}
+                            <a href="{% url 'analyticalmethod-detail-modal' property.analytical_method.pk %}"
+                               class="modal-link">{{ property.analytical_method.name }}</a>
+                          {% else %}
+                            -
+                          {% endif %}
+                        </td>
+                        <td>
+                          {% for source in property.sources.all %}
+                            <a href="{% url 'source-detail-modal' source.pk %}" class="modal-link">{{ source.abbreviation }}</a>
+                            {% if not forloop.last %},{% endif %}
+                          {% empty %}
+                            -
+                          {% endfor %}
+                        </td>
+                        {% if user.is_authenticated %}
+                          {% object_policy property as property_policy %}
+                          <td class="text-end text-nowrap">
+                            {% if property_policy.can_edit %}
+                              <a href="{% url 'materialpropertyvalue-update' property.id %}"
+                                 title="Edit property value">
+                                <i class="fas fa-fw fa-pen-to-square"></i>
+                              </a>
+                            {% else %}
+                              <span class="text-muted">-</span>
+                            {% endif %}
+                          </td>
+                        {% endif %}
+                        {% if policy.can_add_property %}
+                          <td class="remove-property collapse multi-collapse">
+                            <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}"
+                               class="modal-link">
+                              <i class="fas fa-fw fa-trash"></i>
+                            </a>
+                          </td>
+                        {% endif %}
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="p-3 text-muted">
+                {% if not user.is_authenticated %}
+                  No properties recorded. Log in to add properties.
+                {% elif policy.is_owner or policy.can_add_property %}
+                  No properties recorded. Add your first property.
+                {% else %}
+                  No properties recorded.
+                {% endif %}
+              </div>
+            {% endif %}
+            {% if policy.can_add_property %}
+              <div class="p-3 border-top">
+                <a href="{% url 'sample-add-property' object.id %}">
+                  <i class="fas fa-fw fa-plus"></i> Add property
+                </a>
+                {% if properties %}
+                  <a class="ms-3"
+                     href="javascript:void(0);"
+                     data-bs-toggle="collapse"
+                     data-bs-target=".remove-property"
+                     aria-expanded="false"
+                     aria-controls="remove-property">
+                    <i class="fas fa-fw fa-minus"></i> Remove properties
+                  </a>
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
         </div>
       </div>
     </div>
   {% endwith %}
   {# --- Composition Cards --- #}
   {% if data.compositions %}
+    <div class="col col-12 mt-4 mb-n2" id="normalized-compositions">
+      <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+        <div>
+          <h6 class="text-muted text-uppercase fw-semibold mb-1 small">Mass-related Measurements</h6>
+          <div class="fw-semibold">Normalized view</div>
+          <div class="small text-muted">
+            Derived from the raw mass-related measurements above. Each group is normalized to 100%, and missing fractions are shown as Other.
+          </div>
+        </div>
+        <a class="btn btn-sm btn-outline-secondary"
+           data-bs-toggle="tab"
+           href="#sample-component-measurements-tab"
+           role="tab"
+           aria-controls="sample-component-measurements-tab"
+           aria-selected="false">
+          <i class="fas fa-arrow-up"></i> View raw measurements
+        </a>
+      </div>
+    </div>
     {% for composition in data.compositions %}
-      <div class="col col-12 col-md-6 col-lg-3 mt-4">
+      <div class="col col-12 col-md-6 col-xl-3 col-lg-4 mt-4">
         <div class="card shadow h-100 tab-card">
           <div class="card-header tab-card-header bg-body-tertiary border-bottom-0 py-3">
             <h5 class="mb-0">
               <a href="{% url 'materialcomponentgroup-detail-modal' composition.group %}"
                  class="modal-link text-decoration-none text-body">{{ composition.group_name }}</a>
-              {% if composition.is_derived %}<span class="badge text-bg-info ms-2">Derived</span>{% endif %}
             </h5>
             <ul class="nav nav-tabs card-header-tabs"
                 id="composition-tabs-{{ composition.id }}"
@@ -522,13 +552,14 @@
                  id="composition-table-{{ composition.id }}-tab"
                  role="tabpanel"
                  aria-labelledby="composition-table-tab-{{ composition.id }}">
-              <table class="table">
+              <table class="table table-sm">
                 <thead>
                   <tr>
                     <th>Component</th>
-                    <th>Share</th>
+                    <th class="text-end">Share</th>
                   </tr>
                 </thead>
+                <caption class="text-muted small px-2 pb-1 text-end">% of {{ composition.fractions_of_name }}</caption>
                 <tbody>
                   {% for share in composition.shares %}
                     <tr>
@@ -536,12 +567,10 @@
                         <a href="{% url 'materialcomponent-detail-modal' share.component %}"
                            class="modal-link">{{ share.component_name }}</a>
                       </td>
-                      {# <td>{{ share.average }} ± {{ share.standard_deviation }} %</td>#}
-                      <td>{{ share.as_percentage }}</td>
+                      <td class="text-end text-nowrap">{{ share.as_percentage }}</td>
                     </tr>
                   {% endfor %}
                 </tbody>
-                <tfoot></tfoot>
               </table>
             </div>
             <div class="tab-pane fade p-0"
@@ -550,32 +579,45 @@
                  aria-labelledby="composition-chart-tab-{{ composition.id }}">
               <div id="composition-chart-{{ composition.id }}"></div>
             </div>
-            <strong>Shares of:</strong> {{ composition.fractions_of_name }}
           </div>
-          <div class="card-footer d-flex">
-            {% if policy.can_manage_samples and not composition.is_derived %}
-              <a id="move-group-{{ composition.id }}-left"
-                 href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}"
-                 class="me-3 nowrap">
-                <i class="fas fa-fw fa-arrow-left"></i>
-              </a>
-              <a id="edit-group-{{ composition.id }}"
-                 href="{% url 'composition-update' composition.id %}?next={{ request.path }}"
-                 class="me-3 nowrap">
-                <i class="fas fa-fw fa-pen-to-square"></i> Edit
-              </a>
-              <a id="remove-group-{{ composition.id }}"
-                 href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}"
-                 class="me-3 nowrap modal-link">
-                <i class="fas fa-fw fa-trash"></i> Delete
-              </a>
-              <a id="move-group-{{ composition.id }}-right"
-                 href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}"
-                 class="ms-auto nowrap">
-                <i class="fas fa-fw fa-arrow-right"></i>
-              </a>
-            {% elif composition.is_derived %}
-              <small class="text-muted">Derived from component measurements</small>
+          <div class="card-footer d-flex align-items-center">
+            {% if policy.can_manage_samples %}
+              {% if composition.is_derived %}
+                <a id="move-derived-group-{{ composition.group }}-left"
+                   href="{% url 'derived-composition-order-down' sample_pk=object.pk group_pk=composition.group %}?next={{ request.path }}"
+                   class="me-3 nowrap"
+                   title="Move group left">
+                  <i class="fas fa-fw fa-arrow-left"></i>
+                </a>
+                <span class="text-muted small">Order</span>
+                <a id="move-derived-group-{{ composition.group }}-right"
+                   href="{% url 'derived-composition-order-up' sample_pk=object.pk group_pk=composition.group %}?next={{ request.path }}"
+                   class="ms-auto nowrap"
+                   title="Move group right">
+                  <i class="fas fa-fw fa-arrow-right"></i>
+                </a>
+              {% else %}
+                <a id="move-group-{{ composition.id }}-left"
+                   href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}"
+                   class="me-3 nowrap">
+                  <i class="fas fa-fw fa-arrow-left"></i>
+                </a>
+                <a id="edit-group-{{ composition.id }}"
+                   href="{% url 'composition-update' composition.id %}?next={{ request.path }}"
+                   class="me-3 nowrap">
+                  <i class="fas fa-fw fa-pen-to-square"></i> Edit
+                </a>
+                <a id="remove-group-{{ composition.id }}"
+                   href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}"
+                   class="me-3 nowrap modal-link">
+                  <i class="fas fa-fw fa-trash"></i> Delete
+                </a>
+                <a id="move-group-{{ composition.id }}-right"
+                   href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}"
+                   class="ms-auto nowrap">
+                  <i class="fas fa-fw fa-arrow-right"></i>
+                </a>
+              {% endif %}
             {% endif %}
           </div>
         </div>
