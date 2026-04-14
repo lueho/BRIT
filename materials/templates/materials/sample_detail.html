@@ -451,9 +451,24 @@
                 {% endfor %}
               </div>
             {% else %}
-              <div class="p-3 text-muted">No component measurements.</div>
+              <div class="p-3">
+                <div class="rounded border border-dashed bg-body-tertiary p-3">
+                  <div class="fw-semibold mb-1">No mass-related measurements yet</div>
+                  <div class="text-muted small">
+                    Add component measurements such as ash, protein, carbon, or other mass-related fractions to document the raw measurement set for this sample.
+                  </div>
+                  {% if policy.can_manage_samples and perms.materials.add_componentmeasurement %}
+                    <div class="mt-3">
+                      <a class="btn btn-sm btn-outline-primary"
+                         href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
+                        <i class="fas fa-plus"></i> Add the first mass-related measurement
+                      </a>
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
             {% endif %}
-            {% if policy.can_manage_samples and perms.materials.add_componentmeasurement %}
+            {% if measurements_by_group and policy.can_manage_samples and perms.materials.add_componentmeasurement %}
               <div class="p-3 border-top">
                 <a href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
                   <i class="fas fa-fw fa-plus"></i> Add mass-related measurement
@@ -718,23 +733,34 @@
           <h5 class="mb-0">Compositions</h5>
         </div>
         <div class="card-body">
-          <div class="p-3 text-muted">
-            {% if not user.is_authenticated %}
-              No compositions available. Log in to create compositions.
-            {% elif policy.can_manage_samples %}
-              No compositions available. Create your first composition.
-            {% else %}
-              No compositions available.
-            {% endif %}
+          <div class="p-3">
+            <div class="rounded border border-dashed bg-body-tertiary p-3">
+              <div class="fw-semibold mb-1">No normalized compositions yet</div>
+              <div class="text-muted small">
+                Composition groups appear here once mass-related measurements can be normalized to 100%, or when a composition is added manually for this sample.
+              </div>
+              {% if policy.can_manage_samples and perms.materials.add_componentmeasurement %}
+                <div class="mt-3 d-flex gap-2 flex-wrap">
+                  <a class="btn btn-sm btn-outline-primary"
+                     href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
+                    <i class="fas fa-plus"></i> Add mass-related measurement
+                  </a>
+                  <a class="btn btn-sm btn-outline-secondary"
+                     href="{% url 'sample-add-composition' object.id %}?next={{ request.path }}">
+                    <i class="fas fa-plus"></i> Add composition manually
+                  </a>
+                </div>
+              {% elif policy.can_manage_samples %}
+                <div class="mt-3">
+                  <a class="btn btn-sm btn-outline-secondary"
+                     href="{% url 'sample-add-composition' object.id %}?next={{ request.path }}">
+                    <i class="fas fa-plus"></i> Add composition manually
+                  </a>
+                </div>
+              {% endif %}
+            </div>
           </div>
         </div>
-        {% if policy.can_manage_samples %}
-          <div class="card-footer">
-            <a href="{% url 'sample-add-composition' object.id %}?next={{ request.path }}">
-              <i class="fas fa-fw fa-plus"></i> Add composition
-            </a>
-          </div>
-        {% endif %}
       </div>
     </div>
   {% endif %}

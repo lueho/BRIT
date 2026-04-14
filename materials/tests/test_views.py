@@ -3246,6 +3246,77 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "Composition groups")
         self.assertContains(response, "Measurement groups")
 
+    def test_sample_detail_empty_mass_measurements_anonymous(self):
+        sample = Sample.objects.create(
+            name="Massless Sample",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        sample.compositions.all().delete()
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No mass-related measurements yet")
+        self.assertContains(
+            response,
+            "Add component measurements such as ash, protein, carbon, or other mass-related fractions",
+        )
+        self.assertNotContains(response, "Add the first mass-related measurement")
+
+    def test_sample_detail_empty_mass_measurements_owner_sees_cta_with_permission(self):
+        sample = Sample.objects.create(
+            name="Massless Sample",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.regular_user,
+            publication_status="private",
+        )
+        content_type = ContentType.objects.get_for_model(ComponentMeasurement)
+        permission, _ = Permission.objects.get_or_create(
+            codename="add_componentmeasurement",
+            content_type=content_type,
+            defaults={"name": "Can add component measurement"},
+        )
+        self.regular_user.user_permissions.add(permission)
+        sample.compositions.all().delete()
+
+        self.client.force_login(self.regular_user)
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Add the first mass-related measurement")
+
+    def test_sample_detail_empty_compositions_owner_sees_manual_and_measurement_actions(
+        self,
+    ):
+        sample = Sample.objects.create(
+            name="Compositionless Sample",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.regular_user,
+            publication_status="private",
+        )
+        content_type = ContentType.objects.get_for_model(ComponentMeasurement)
+        permission, _ = Permission.objects.get_or_create(
+            codename="add_componentmeasurement",
+            content_type=content_type,
+            defaults={"name": "Can add component measurement"},
+        )
+        self.regular_user.user_permissions.add(permission)
+        sample.compositions.all().delete()
+
+        self.client.force_login(self.regular_user)
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No normalized compositions yet")
+        self.assertContains(
+            response,
+            "Composition groups appear here once mass-related measurements can be normalized to 100%",
+        )
+        self.assertContains(response, "Add composition manually")
+        self.assertContains(response, "Add mass-related measurement")
+
     def test_sample_detail_shows_default_composition(self):
         sample = Sample.objects.create(
             name="Test Sample",
