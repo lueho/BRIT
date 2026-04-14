@@ -79,11 +79,13 @@ class SourcesListViewTestCase(ViewWithPermissionsTestCase):
     def test_get_http_301_redirect_for_anonymous(self):
         response = self.client.get(reverse(self.url_name))
         self.assertEqual(response.status_code, 301)
+        self.assertEqual(response["Location"], reverse("sources-explorer"))
 
     def test_get_http_301_redirect_for_outsiders(self):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse(self.url_name))
         self.assertEqual(response.status_code, 301)
+        self.assertEqual(response["Location"], reverse("sources-explorer"))
 
 
 class SourceDomainHubRoutingTestCase(SimpleTestCase):

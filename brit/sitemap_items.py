@@ -76,7 +76,7 @@ SITEMAP_ITEMS = [
     "/materials/compositions/",
     "/materials/compositions/create/",
     "/materials/compositions/create/modal/",
-    "/sources/list/",
+    "/sources/explorer/",
     "/inventories/scenarios/",
     "/inventories/scenarios/user/",
     "/inventories/scenarios/autocomplete/name/",

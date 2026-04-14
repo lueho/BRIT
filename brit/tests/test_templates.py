@@ -1,7 +1,15 @@
 from cookie_consent.models import Cookie, CookieGroup
 from django.template.loader import render_to_string
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
+
+from brit.sitemap_items import SITEMAP_ITEMS
+
+
+class SitemapItemsTestCase(SimpleTestCase):
+    def test_sources_explorer_is_canonical_sitemap_entry(self):
+        self.assertIn("/sources/explorer/", SITEMAP_ITEMS)
+        self.assertNotIn("/sources/list/", SITEMAP_ITEMS)
 
 
 class CookieConsentTemplateHardeningTests(TestCase):
