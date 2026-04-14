@@ -116,7 +116,6 @@ dependencies = [
     { name = "crispy-bootstrap5" },
     { name = "dj-database-url" },
     { name = "django" },
-    { name = "django-bootstrap-modal-forms" },
     { name = "django-cookie-consent" },
     { name = "django-crispy-forms" },
     { name = "django-extra-views" },
@@ -165,7 +164,6 @@ requires-dist = [
     { name = "crispy-bootstrap5", specifier = ">=2026.3" },
     { name = "dj-database-url", specifier = ">=3.1.2" },
     { name = "django", specifier = ">=5.2.13" },
-    { name = "django-bootstrap-modal-forms", specifier = ">=3.0.5" },
     { name = "django-cookie-consent", specifier = ">=1.0.0" },
     { name = "django-crispy-forms", specifier = ">=2.6" },
     { name = "django-extra-views", specifier = ">=0.16.0" },
@@ -574,18 +572,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d1/a2/e58bec8d7941b914af52a67c35b5709eceed2caa2848f28437f1666ed668/django_appconf-1.2.0.tar.gz", hash = "sha256:15a88d60dd942d6059f467412fe4581db632ef03018a3c183fb415d6fc9e5cec", size = 16127, upload-time = "2025-11-08T15:46:27.304Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e8/e6/4c34d94dfb74bbcbc489606e61f1924933de30d22c593dd1f429f35fbd7f/django_appconf-1.2.0-py3-none-any.whl", hash = "sha256:b81bce5ef0ceb9d84df48dfb623a32235d941c78cc5e45dbb6947f154ea277f4", size = 6500, upload-time = "2025-11-08T15:46:25.957Z" },
-]
-
-[[package]]
-name = "django-bootstrap-modal-forms"
-version = "3.0.5"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "django" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/4f/92/d1d37315c897e2ad311242d617d87e26f507e0446bdfd6a0ef265501d138/django_bootstrap_modal_forms-3.0.5.tar.gz", hash = "sha256:322930953c68e1dcd4c5dc073612c77ff4d68c46074a55d98db2de6e7860050b", size = 38292, upload-time = "2024-09-28T13:39:55.656Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/e7/84a437e7d413e14627b82d6f3478960d01e88b5e927f673cee536e6907ba/django_bootstrap_modal_forms-3.0.5-py3-none-any.whl", hash = "sha256:e56bbe05fb29c5aa9e0f3c0277b0d8363b81cc6c4e4aaf152cedea883edae58a", size = 29560, upload-time = "2024-09-28T13:39:53.645Z" },
 ]
 
 [[package]]

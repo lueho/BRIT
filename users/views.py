@@ -1,10 +1,11 @@
-from bootstrap_modal_forms.generic import BSModalLoginView
 from django.contrib.auth.mixins import AccessMixin, LoginRequiredMixin
 from django.contrib.auth.models import User
 from django.http import HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import DeleteView, TemplateView
 from django_tomselect.autocompletes import AutocompleteModelView
+
+from utils.modal import BSModalLoginView
 
 from .forms import CustomAuthenticationForm
 
@@ -25,7 +26,7 @@ class ModalLoginView(BSModalLoginView):
     authentication_form = CustomAuthenticationForm
     template_name = "modal_form.html"
     success_message = "Success: You were successfully logged in."
-    extra_context = dict(success_url=reverse_lazy("login"))
+    extra_context = {"success_url": reverse_lazy("login")}
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

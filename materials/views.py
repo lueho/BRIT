@@ -2,7 +2,6 @@ import json
 from collections import Counter, defaultdict
 from decimal import Decimal
 
-from bootstrap_modal_forms.generic import BSModalFormView, BSModalUpdateView
 from crispy_forms.helper import FormHelper
 from django.contrib.auth.mixins import (
     LoginRequiredMixin,
@@ -20,6 +19,7 @@ from extra_views import UpdateWithInlinesView
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
 from utils.file_export.views import SingleObjectFileExportView
+from utils.modal import BSModalFormView, BSModalUpdateView
 from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,

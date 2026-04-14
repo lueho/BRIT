@@ -31,7 +31,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.sitemaps",
     "crispy_forms",
-    "bootstrap_modal_forms",
     "crispy_bootstrap5",
     "django.contrib.gis",
     "extra_views",

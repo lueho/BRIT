@@ -2,12 +2,6 @@ import logging
 from datetime import datetime
 from urllib.parse import unquote, urlparse
 
-from bootstrap_modal_forms.generic import (
-    BSModalCreateView,
-    BSModalDeleteView,
-    BSModalReadView,
-    BSModalUpdateView,
-)
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import (
@@ -34,6 +28,12 @@ from django_tomselect.autocompletes import AutocompleteModelView
 from django_tomselect.constants import EXCLUDEBY_VAR, FILTERBY_VAR
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
+from utils.modal import (
+    BSModalCreateView,
+    BSModalDeleteView,
+    BSModalReadView,
+    BSModalUpdateView,
+)
 from utils.object_management.filters import ReviewDashboardFilterSet
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.object_management.permissions import (

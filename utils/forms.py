@@ -1,6 +1,5 @@
 import json
 
-from bootstrap_modal_forms.mixins import CreateUpdateAjaxMixin, PopRequestMixin
 from crispy_forms.helper import FormHelper
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.forms import (
@@ -15,6 +14,8 @@ from django_tomselect.forms import (
     TomSelectModelChoiceField,
     TomSelectModelMultipleChoiceField,
 )
+
+from utils.modal import CreateUpdateAjaxMixin, PopRequestMixin
 
 from .widgets import (
     CreateEnabledTomSelectModelMultipleWidget,
