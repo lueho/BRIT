@@ -10,8 +10,8 @@
 - **This ADR covers unit handling only**
   It documents unit-model direction, value-level unit storage, and remaining cleanup around unit representation.
 
-- **Broader materials schema and measurement-storage roadmap lives elsewhere**
-  Use [Materials database target-state plan](2026-04-14_materials_database_target_state_plan.md) for the materials-module target state and [Property unification current state and remaining work](2026-03-25_property_unification_current_state_and_remaining_work.md) for the cross-domain property architecture.
+- **The materials roadmap is consolidated elsewhere**
+  Use [Materials database target-state plan](2026-04-14_materials_database_target_state_plan.md) as the single authoritative roadmap for the materials module. Use [Property unification current state and remaining work](2026-03-25_property_unification_current_state_and_remaining_work.md) only for the cross-domain property architecture constraints that the materials roadmap must respect.
 
 ---
 

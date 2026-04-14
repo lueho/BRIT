@@ -5,6 +5,14 @@
 - **Source**: `Target report 1.2_R1_Database structure_TUHH.docx`
 - **Scope**: `materials` app database structure and its immediate cross-app dependencies
 
+## Documentation Boundary
+
+- **This document is the single authoritative roadmap for the materials module**
+  It owns the sequencing, target state, gaps, implementation strategy, and definition of done for materials-related schema and workflow changes.
+
+- **Related ADRs remain supporting architecture records, not parallel roadmap documents**
+  Use [Property unification current state and remaining work](2026-03-25_property_unification_current_state_and_remaining_work.md) for cross-domain property-architecture constraints and [Unified unit handling](2025-02-06_unified_unit_handling.md) for unit-handling constraints that this roadmap must respect.
+
 ## 1. Context
 
 The referenced report describes the intended target state of the BRIT materials data model for CLOSECYCLE. The key architectural ideas are:
@@ -166,6 +174,28 @@ The report explicitly values storing data as found. That means:
 - write raw measurements first
 - derive normalized compositions when needed for analysis or export
 - progressively reduce direct write dependencies on normalized-only models
+
+### 5.5 Adopt already-decided property architecture as a constraint, not a separate roadmap
+
+This roadmap should treat the cross-domain property decision as settled input.
+
+For materials work, that means:
+
+- keep `MaterialProperty` as the materials-owned concrete property table
+- keep `utils.properties` as the shared behavior layer for forms, serializers, measurement helpers, and abstract contracts
+- do not treat the generic `Property` table as the long-term target for materials definitions
+- do not collapse materials-specific semantics such as `basis_component` and `analytical_method` into an overly generic cross-domain value model
+
+### 5.6 Adopt already-decided unit direction as a constraint, not a separate roadmap
+
+This roadmap should also treat unit handling as an architectural constraint that is already partially implemented.
+
+For materials work, that means:
+
+- `MaterialPropertyValue.unit` is already the authoritative value-level unit field
+- `allowed_units` remains the intended validation boundary for property-specific unit choice
+- `MaterialProperty.unit` should be treated as a compatibility or display label unless and until a broader definition-level migration is justified
+- future materials read and write paths should prefer value-level unit behavior instead of reintroducing dependence on definition-level unit strings
 
 ## 6. Phased Delivery Plan
 
