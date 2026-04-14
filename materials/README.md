@@ -2,7 +2,15 @@
 
 ## Overview
 
-The `materials` app manages bioresource definitions, laboratory-style sample data, compositions, and measurement-related metadata.
+The `materials` app manages the current BRIT implementation for bioresource definitions, laboratory-style sample data, compositions, and measurement-related metadata.
+
+## Documentation Intent
+
+- **This README describes the current implementation**
+  It is intended as a current-state module overview for contributors.
+
+- **Roadmap and target-state planning live elsewhere**
+  Use [Materials database target-state plan](../docs/04_design_decisions/2026-04-14_materials_database_target_state_plan.md) for the materials schema roadmap, [Property unification current state and remaining work](../docs/04_design_decisions/2026-03-25_property_unification_current_state_and_remaining_work.md) for cross-domain property architecture, and [Unified unit handling](../docs/04_design_decisions/2025-02-06_unified_unit_handling.md) for unit-related architecture and remaining work.
 
 ## Scope
 
@@ -13,7 +21,7 @@ The `materials` app manages bioresource definitions, laboratory-style sample dat
   Sample series and individual samples, including temporal context.
 
 - **Composition layer**
-  Component groups, compositions, and weight shares.
+  Component groups, persisted compositions, and weight shares.
 
 - **Measurement layer**
   Materials-specific properties, property values, raw component measurements, and analytical methods.
@@ -62,13 +70,27 @@ The `materials` app manages bioresource definitions, laboratory-style sample dat
   Groups related properties for aggregation logic.
 
 - **`MaterialPropertyValue`**
-  Stores a measured property value and related metadata.
+  Stores a measured property value with value-level unit metadata and optional basis and analytical-method metadata.
 
 - **`ComponentMeasurement`**
   Stores raw component measurements for a sample.
 
 - **`AnalyticalMethod`**
   Stores laboratory method metadata and related sources.
+
+## Current Composition Handling
+
+- **Persisted composition path**
+  `Composition` and `WeightShare` remain active persisted structures in the current app.
+
+- **Raw measurement path**
+  `ComponentMeasurement` stores raw per-sample component measurements with unit, basis, and provenance context.
+
+- **Derived read behavior already exists**
+  Some current read paths derive composition displays from raw component measurements when persisted composition rows are absent.
+
+- **Roadmap is separate**
+  Any future shift in canonical storage or normalization strategy is tracked in the design-decision documents linked above rather than in this README.
 
 ## App Boundaries
 
@@ -100,4 +122,4 @@ The `materials` app manages bioresource definitions, laboratory-style sample dat
 - **Architecture context**
   See [Architecture Overview](../docs/02_developer_guide/architecture.md).
 
-_Last updated: 2026-03-06_
+_Last updated: 2026-04-14_

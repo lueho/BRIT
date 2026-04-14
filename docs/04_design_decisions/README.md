@@ -7,6 +7,7 @@ This section contains Architecture Decision Records (ADRs) and major design rati
 - Provide context and rationale for future contributors.
 
 ## Recent design records
+- [2026-04-14: Materials database target-state plan](2026-04-14_materials_database_target_state_plan.md)
 - [2026-04-09: Sources plugin decoupling roadmap](2026-04-09_sources_plugin_decoupling_roadmap.md)
 - [2026-03-25: Property unification current state and remaining work](2026-03-25_property_unification_current_state_and_remaining_work.md)
 - [2026-02-10: Sources module consolidation decision record](2026-02-10_sources_consolidation_decision_record.md)
