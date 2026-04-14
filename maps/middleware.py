@@ -1,6 +1,8 @@
 import logging
 import time
 
+from django.conf import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -15,18 +17,21 @@ class CacheMonitoringMiddleware:
 
         response = self.get_response(request)
 
-        if 'geojson' in request.path:
+        if "geojson" in request.path:
             duration = time.time() - start_time
 
-            cache_status = response.get('X-Cache-Status', 'UNKNOWN')
-            response['X-Cache-Time'] = f"{duration:.4f}"
+            cache_status = response.get("X-Cache-Status", "UNKNOWN")
+            response["X-Cache-Time"] = f"{duration:.4f}"
+
+            if getattr(settings, "TESTING", False):
+                return response
 
             log_level = logging.WARNING if duration > 1.0 else logging.INFO
             logger.log(
                 log_level,
                 f"GeoJSON Request: {request.method} {request.get_full_path()} | "
                 f"Status: {response.status_code} | Duration: {duration:.4f}s | "
-                f"Cache: {cache_status}"
+                f"Cache: {cache_status}",
             )
 
         return response
