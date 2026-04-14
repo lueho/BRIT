@@ -32,10 +32,6 @@ class SourcesExplorerViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
 
     @patch(
-        "sources.views.get_explorer_context",
-        return_value={"collection_count": 13, "greenhouse_count": 7},
-    )
-    @patch(
         "sources.views.get_source_domain_explorer_cards",
         return_value=(
             {
@@ -51,19 +47,16 @@ class SourcesExplorerViewTestCase(ViewWithPermissionsTestCase):
             },
         ),
     )
-    def test_context_uses_registry_explorer_context(
-        self, mock_get_source_domain_explorer_cards, mock_get_explorer_context
+    def test_context_uses_registry_explorer_cards(
+        self, mock_get_source_domain_explorer_cards
     ):
         response = self.client.get(reverse(self.url_name))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["collection_count"], 13)
-        self.assertEqual(response.context["greenhouse_count"], 7)
         self.assertEqual(
             response.context["source_domain_explorer_cards"],
             mock_get_source_domain_explorer_cards.return_value,
         )
-        mock_get_explorer_context.assert_called_once_with()
         mock_get_source_domain_explorer_cards.assert_called_once_with()
 
     def test_template_renders_plugin_driven_explorer_cards(self):
@@ -198,10 +191,9 @@ class UrbanGreenSpacesPluginIntegrationTestCase(SimpleTestCase):
 
 
 class GreenhousesPluginIntegrationTestCase(SimpleTestCase):
-    def test_greenhouses_plugin_exposes_explorer_counter_metadata(self):
+    def test_greenhouses_plugin_exposes_published_count_metadata(self):
         plugin = get_source_domain_plugin("greenhouses")
 
-        self.assertEqual(plugin.explorer_context_var, "greenhouse_count")
         self.assertEqual(
             plugin.published_count_getter,
             "sources.greenhouses.selectors.published_greenhouse_count",
@@ -221,10 +213,9 @@ class GreenhousesPluginIntegrationTestCase(SimpleTestCase):
 
 
 class WasteCollectionPluginIntegrationTestCase(SimpleTestCase):
-    def test_waste_collection_plugin_exposes_explorer_counter_metadata(self):
+    def test_waste_collection_plugin_exposes_published_count_metadata(self):
         plugin = get_source_domain_plugin("waste_collection")
 
-        self.assertEqual(plugin.explorer_context_var, "collection_count")
         self.assertEqual(
             plugin.published_count_getter,
             "sources.waste_collection.selectors.published_collection_count",

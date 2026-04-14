@@ -38,10 +38,10 @@ def _validate_source_domain_plugin(
             f"{discovered_app_name}.plugin.plugin mount_path requires mount_in_hub=True"
         )
 
-    if bool(plugin.explorer_context_var) != bool(plugin.published_count_getter):
+    if plugin.explorer_card is not None and not plugin.published_count_getter:
         raise ValueError(
-            f"{discovered_app_name}.plugin.plugin must provide both "
-            f"explorer_context_var and published_count_getter together"
+            f"{discovered_app_name}.plugin.plugin explorer_card requires a "
+            f"published_count_getter"
         )
 
     if plugin.explorer_card is not None and not isinstance(
@@ -143,17 +143,6 @@ def get_source_domain_plugin(slug: str) -> SourceDomainPlugin:
 
 def get_hub_source_domain_plugins() -> tuple[SourceDomainPlugin, ...]:
     return tuple(plugin for plugin in _SOURCE_DOMAIN_PLUGINS if plugin.mount_in_hub)
-
-
-def get_explorer_context() -> dict[str, int | None]:
-    context: dict[str, int | None] = {}
-
-    for plugin in _SOURCE_DOMAIN_PLUGINS:
-        if not plugin.explorer_context_var:
-            continue
-        context[plugin.explorer_context_var] = plugin.get_published_count()
-
-    return context
 
 
 def get_source_domain_explorer_cards() -> tuple[dict[str, object], ...]:

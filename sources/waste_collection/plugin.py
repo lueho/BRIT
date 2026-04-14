@@ -14,7 +14,6 @@ plugin = SourceDomainPlugin(
         "tasks",
         "templates",
     ),
-    explorer_context_var="collection_count",
     published_count_getter="sources.waste_collection.selectors.published_collection_count",
     explorer_card=SourceDomainExplorerCard(
         title="Household Waste Collection",

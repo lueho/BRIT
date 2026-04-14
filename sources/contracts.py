@@ -37,7 +37,6 @@ class SourceDomainPlugin:
     capabilities: tuple[str, ...] = ()
     mount_in_hub: bool = False
     mount_path: str = ""
-    explorer_context_var: str | None = None
     published_count_getter: str | None = None
     explorer_card: SourceDomainExplorerCard | None = None
     legacy_redirects: SourceDomainLegacyRedirects | None = None

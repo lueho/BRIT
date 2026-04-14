@@ -123,8 +123,9 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             capabilities=duplicate_b.capabilities,
             mount_in_hub=duplicate_b.mount_in_hub,
             mount_path=duplicate_b.mount_path,
-            explorer_context_var=duplicate_b.explorer_context_var,
             published_count_getter=duplicate_b.published_count_getter,
+            explorer_card=duplicate_b.explorer_card,
+            legacy_redirects=duplicate_b.legacy_redirects,
         )
 
         with self.assertRaisesMessage(
@@ -143,8 +144,9 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             capabilities=greenhouses.capabilities,
             mount_in_hub=True,
             mount_path=roadside_trees.mount_path,
-            explorer_context_var=greenhouses.explorer_context_var,
             published_count_getter=greenhouses.published_count_getter,
+            explorer_card=greenhouses.explorer_card,
+            legacy_redirects=greenhouses.legacy_redirects,
         )
 
         with self.assertRaisesMessage(
@@ -162,8 +164,9 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             capabilities=plugin.capabilities,
             mount_in_hub=False,
             mount_path="greenhouses/",
-            explorer_context_var=plugin.explorer_context_var,
             published_count_getter=plugin.published_count_getter,
+            explorer_card=plugin.explorer_card,
+            legacy_redirects=plugin.legacy_redirects,
         )
 
         with self.assertRaisesMessage(ValueError, "mount_path requires mount_in_hub"):
@@ -181,13 +184,14 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             capabilities=plugin.capabilities,
             mount_in_hub=plugin.mount_in_hub,
             mount_path=plugin.mount_path,
-            explorer_context_var="greenhouse_count",
             published_count_getter=None,
+            explorer_card=plugin.explorer_card,
+            legacy_redirects=plugin.legacy_redirects,
         )
 
         with self.assertRaisesMessage(
             ValueError,
-            "must provide both explorer_context_var and published_count_getter together",
+            "explorer_card requires a published_count_getter",
         ):
             _validate_source_domain_plugin(
                 plugin, discovered_app_name="sources.greenhouses"
@@ -203,8 +207,9 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             capabilities=plugin.capabilities,
             mount_in_hub=plugin.mount_in_hub,
             mount_path=plugin.mount_path,
-            explorer_context_var=plugin.explorer_context_var,
             published_count_getter=plugin.published_count_getter,
+            explorer_card=plugin.explorer_card,
+            legacy_redirects=plugin.legacy_redirects,
         )
 
         with self.assertRaisesMessage(
