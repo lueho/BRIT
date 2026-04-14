@@ -600,23 +600,29 @@
   {# --- Composition Cards --- #}
   {% if data.compositions %}
     <div class="col col-12 mt-4 mb-n2" id="normalized-compositions">
-      <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-        <div>
-          <h6 class="text-muted text-uppercase fw-semibold mb-1 small">Mass-related Measurements</h6>
-          <div class="fw-semibold">Normalized view</div>
-          <div class="small text-muted">
-            Derived from the raw mass-related measurements above. Each group is normalized to 100%, and missing fractions are shown as Other.
+      {% with primary_composition=data.compositions.0 %}
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <h6 class="text-muted text-uppercase fw-semibold mb-1 small">Mass-related Measurements</h6>
+            <div class="fw-semibold">Normalized view</div>
+            <div class="small text-muted">
+              {% if primary_composition.is_derived %}
+                Derived from the raw mass-related measurements above. Each group is normalized to 100%, and missing fractions are shown as Other.
+              {% else %}
+                Saved composition groups for this sample. These cards reflect the stored composition records rather than an on-the-fly derivation from the raw measurements above.
+              {% endif %}
+            </div>
           </div>
+          <a class="btn btn-sm btn-outline-secondary"
+             data-bs-toggle="tab"
+             href="#sample-component-measurements-tab"
+             role="tab"
+             aria-controls="sample-component-measurements-tab"
+             aria-selected="false">
+            <i class="fas fa-arrow-up"></i> View raw measurements
+          </a>
         </div>
-        <a class="btn btn-sm btn-outline-secondary"
-           data-bs-toggle="tab"
-           href="#sample-component-measurements-tab"
-           role="tab"
-           aria-controls="sample-component-measurements-tab"
-           aria-selected="false">
-          <i class="fas fa-arrow-up"></i> View raw measurements
-        </a>
-      </div>
+      {% endwith %}
     </div>
     {% for composition in data.compositions %}
       <div class="col col-12 col-md-6 col-xl-3 col-lg-4 mt-4">
@@ -626,6 +632,14 @@
               <a href="{% url 'materialcomponentgroup-detail-modal' composition.group %}"
                  class="modal-link text-decoration-none text-body">{{ composition.group_name }}</a>
             </h5>
+            <div class="d-flex align-items-center gap-2 flex-wrap small mt-2">
+              {% if composition.is_derived %}
+                <span class="badge rounded-pill text-bg-light border">Derived</span>
+              {% else %}
+                <span class="badge rounded-pill text-bg-light border">Saved composition</span>
+              {% endif %}
+              <span class="text-muted">% of {{ composition.fractions_of_name }}</span>
+            </div>
             <ul class="nav nav-tabs card-header-tabs"
                 id="composition-tabs-{{ composition.id }}"
                 role="tablist">
@@ -689,20 +703,24 @@
                 <a id="move-derived-group-{{ composition.group }}-left"
                    href="{% url 'derived-composition-order-down' sample_pk=object.pk group_pk=composition.group %}?next={{ request.path }}"
                    class="me-3 nowrap"
-                   title="Move group left">
+                   title="Move group left"
+                   aria-label="Move derived group {{ composition.group_name }} left">
                   <i class="fas fa-fw fa-arrow-left"></i>
                 </a>
-                <span class="text-muted small">Order</span>
+                <span class="text-muted small">Order derived group</span>
                 <a id="move-derived-group-{{ composition.group }}-right"
                    href="{% url 'derived-composition-order-up' sample_pk=object.pk group_pk=composition.group %}?next={{ request.path }}"
                    class="ms-auto nowrap"
-                   title="Move group right">
+                   title="Move group right"
+                   aria-label="Move derived group {{ composition.group_name }} right">
                   <i class="fas fa-fw fa-arrow-right"></i>
                 </a>
               {% else %}
                 <a id="move-group-{{ composition.id }}-left"
                    href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}"
-                   class="me-3 nowrap">
+                   class="me-3 nowrap"
+                   title="Move group left"
+                   aria-label="Move saved composition group {{ composition.group_name }} left">
                   <i class="fas fa-fw fa-arrow-left"></i>
                 </a>
                 <a id="edit-group-{{ composition.id }}"
@@ -717,7 +735,9 @@
                 </a>
                 <a id="move-group-{{ composition.id }}-right"
                    href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}"
-                   class="ms-auto nowrap">
+                   class="ms-auto nowrap"
+                   title="Move group right"
+                   aria-label="Move saved composition group {{ composition.group_name }} right">
                   <i class="fas fa-fw fa-arrow-right"></i>
                 </a>
               {% endif %}

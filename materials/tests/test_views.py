@@ -3383,6 +3383,11 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "Chemical Elements")
         self.assertContains(response, "30.0%")
         self.assertContains(response, "70.0%")
+        self.assertContains(
+            response,
+            "Derived from the raw mass-related measurements above. Each group is normalized to 100%, and missing fractions are shown as Other.",
+        )
+        self.assertContains(response, "Derived")
         self.assertNotContains(response, "30.0 ± 0.0%")
         self.assertNotContains(response, "No compositions available")
 
@@ -3463,8 +3468,17 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "20.0 ± 0.0%")
         self.assertContains(response, "80.0 ± 0.0%")
+        self.assertContains(
+            response,
+            "Saved composition groups for this sample. These cards reflect the stored composition records rather than an on-the-fly derivation from the raw measurements above.",
+        )
+        self.assertContains(response, "Saved composition")
         self.assertNotContains(response, "70.0 ± 0.0%")
         self.assertNotContains(response, "70.0%")
+        self.assertNotContains(
+            response,
+            "Derived from the raw mass-related measurements above. Each group is normalized to 100%, and missing fractions are shown as Other.",
+        )
 
     def test_sample_detail_uses_settings_only_composition_order_for_derived_display(
         self,
