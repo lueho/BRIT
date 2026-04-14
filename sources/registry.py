@@ -5,6 +5,75 @@ from django.apps import apps
 from sources.contracts import SourceDomainPlugin
 
 
+def _optional_module_exists(module_name: str) -> bool:
+    try:
+        import_module(module_name)
+    except ModuleNotFoundError as exc:
+        if exc.name == module_name:
+            return False
+        raise
+    return True
+
+
+def _validate_source_domain_plugin(
+    plugin: SourceDomainPlugin, *, discovered_app_name: str
+) -> None:
+    if not plugin.slug:
+        raise ValueError(
+            f"{discovered_app_name}.plugin.plugin must define a non-empty slug"
+        )
+
+    if plugin.get_app_module() != discovered_app_name:
+        raise ValueError(
+            f"{discovered_app_name}.plugin.plugin app_config must point back to "
+            f"the discovered app"
+        )
+
+    if plugin.mount_path and not plugin.mount_in_hub:
+        raise ValueError(
+            f"{discovered_app_name}.plugin.plugin mount_path requires mount_in_hub=True"
+        )
+
+    if bool(plugin.explorer_context_var) != bool(plugin.published_count_getter):
+        raise ValueError(
+            f"{discovered_app_name}.plugin.plugin must provide both "
+            f"explorer_context_var and published_count_getter together"
+        )
+
+    if "exports" in plugin.capabilities:
+        module_name = f"{plugin.get_app_module()}.exports"
+        if not _optional_module_exists(module_name):
+            raise ValueError(
+                f"{discovered_app_name}.plugin.plugin declares 'exports' "
+                f"capability but {module_name} is missing"
+            )
+
+
+def _validate_source_domain_plugins(plugins: tuple[SourceDomainPlugin, ...]) -> None:
+    seen_slugs: dict[str, str] = {}
+    seen_mount_paths: dict[str, str] = {}
+
+    for plugin in plugins:
+        existing_slug_owner = seen_slugs.get(plugin.slug)
+        if existing_slug_owner is not None:
+            raise ValueError(
+                f"Duplicate source-domain plugin slug '{plugin.slug}' declared by "
+                f"{existing_slug_owner} and {plugin.get_app_module()}"
+            )
+        seen_slugs[plugin.slug] = plugin.get_app_module()
+
+        if not plugin.mount_in_hub:
+            continue
+
+        existing_mount_owner = seen_mount_paths.get(plugin.mount_path)
+        if existing_mount_owner is not None:
+            raise ValueError(
+                f"Duplicate source-domain hub mount_path '{plugin.mount_path}' "
+                f"declared by {existing_mount_owner} and {plugin.get_app_module()}"
+            )
+        seen_mount_paths[plugin.mount_path] = plugin.get_app_module()
+
+
 def _discover_source_domain_plugins() -> tuple[SourceDomainPlugin, ...]:
     plugins: list[SourceDomainPlugin] = []
 
@@ -26,9 +95,13 @@ def _discover_source_domain_plugins() -> tuple[SourceDomainPlugin, ...]:
             raise TypeError(
                 f"{app_config.name}.plugin.plugin must be a SourceDomainPlugin instance"
             )
+
+        _validate_source_domain_plugin(plugin, discovered_app_name=app_config.name)
         plugins.append(plugin)
 
-    return tuple(sorted(plugins, key=lambda plugin: plugin.slug))
+    discovered_plugins = tuple(sorted(plugins, key=lambda plugin: plugin.slug))
+    _validate_source_domain_plugins(discovered_plugins)
+    return discovered_plugins
 
 
 _SOURCE_DOMAIN_PLUGINS: tuple[SourceDomainPlugin, ...] = (

@@ -13,7 +13,12 @@ from sources.greenhouses.models import (
     GrowthTimeStepSet,
     NantesGreenhouses,
 )
-from sources.registry import get_source_domain_plugin, get_source_domain_plugins
+from sources.registry import (
+    _validate_source_domain_plugin,
+    _validate_source_domain_plugins,
+    get_source_domain_plugin,
+    get_source_domain_plugins,
+)
 from sources.roadside_trees.models import HamburgRoadsideTrees
 from sources.urban_green_spaces.models import HamburgGreenAreas
 from sources.waste_collection.models import (
@@ -104,6 +109,137 @@ class SourceDomainPluginContractTestCase(SimpleTestCase):
             self.assertTrue(
                 all(isinstance(export, SourceDomainExport) for export in exports)
             )
+
+
+class SourceDomainPluginValidationTestCase(SimpleTestCase):
+    def test_validation_rejects_duplicate_plugin_slugs(self):
+        duplicate_a = get_source_domain_plugin("greenhouses")
+        duplicate_b = get_source_domain_plugin("waste_collection")
+        duplicate_b = duplicate_b.__class__(
+            slug=duplicate_a.slug,
+            verbose_name=duplicate_b.verbose_name,
+            app_config=duplicate_b.app_config,
+            urlconf=duplicate_b.urlconf,
+            capabilities=duplicate_b.capabilities,
+            mount_in_hub=duplicate_b.mount_in_hub,
+            mount_path=duplicate_b.mount_path,
+            explorer_context_var=duplicate_b.explorer_context_var,
+            published_count_getter=duplicate_b.published_count_getter,
+        )
+
+        with self.assertRaisesMessage(
+            ValueError, "Duplicate source-domain plugin slug"
+        ):
+            _validate_source_domain_plugins((duplicate_a, duplicate_b))
+
+    def test_validation_rejects_duplicate_hub_mount_paths(self):
+        roadside_trees = get_source_domain_plugin("roadside_trees")
+        greenhouses = get_source_domain_plugin("greenhouses")
+        greenhouses = greenhouses.__class__(
+            slug=greenhouses.slug,
+            verbose_name=greenhouses.verbose_name,
+            app_config=greenhouses.app_config,
+            urlconf=greenhouses.urlconf,
+            capabilities=greenhouses.capabilities,
+            mount_in_hub=True,
+            mount_path=roadside_trees.mount_path,
+            explorer_context_var=greenhouses.explorer_context_var,
+            published_count_getter=greenhouses.published_count_getter,
+        )
+
+        with self.assertRaisesMessage(
+            ValueError, "Duplicate source-domain hub mount_path"
+        ):
+            _validate_source_domain_plugins((roadside_trees, greenhouses))
+
+    def test_validation_rejects_mount_path_without_hub_mount(self):
+        plugin = get_source_domain_plugin("greenhouses")
+        plugin = plugin.__class__(
+            slug=plugin.slug,
+            verbose_name=plugin.verbose_name,
+            app_config=plugin.app_config,
+            urlconf=plugin.urlconf,
+            capabilities=plugin.capabilities,
+            mount_in_hub=False,
+            mount_path="greenhouses/",
+            explorer_context_var=plugin.explorer_context_var,
+            published_count_getter=plugin.published_count_getter,
+        )
+
+        with self.assertRaisesMessage(ValueError, "mount_path requires mount_in_hub"):
+            _validate_source_domain_plugin(
+                plugin, discovered_app_name="sources.greenhouses"
+            )
+
+    def test_validation_rejects_incomplete_explorer_metadata(self):
+        plugin = get_source_domain_plugin("greenhouses")
+        plugin = plugin.__class__(
+            slug=plugin.slug,
+            verbose_name=plugin.verbose_name,
+            app_config=plugin.app_config,
+            urlconf=plugin.urlconf,
+            capabilities=plugin.capabilities,
+            mount_in_hub=plugin.mount_in_hub,
+            mount_path=plugin.mount_path,
+            explorer_context_var="greenhouse_count",
+            published_count_getter=None,
+        )
+
+        with self.assertRaisesMessage(
+            ValueError,
+            "must provide both explorer_context_var and published_count_getter together",
+        ):
+            _validate_source_domain_plugin(
+                plugin, discovered_app_name="sources.greenhouses"
+            )
+
+    def test_validation_rejects_app_config_pointing_to_other_app(self):
+        plugin = get_source_domain_plugin("greenhouses")
+        plugin = plugin.__class__(
+            slug=plugin.slug,
+            verbose_name=plugin.verbose_name,
+            app_config="sources.waste_collection.apps.WasteCollectionConfig",
+            urlconf=plugin.urlconf,
+            capabilities=plugin.capabilities,
+            mount_in_hub=plugin.mount_in_hub,
+            mount_path=plugin.mount_path,
+            explorer_context_var=plugin.explorer_context_var,
+            published_count_getter=plugin.published_count_getter,
+        )
+
+        with self.assertRaisesMessage(
+            ValueError, "app_config must point back to the discovered app"
+        ):
+            _validate_source_domain_plugin(
+                plugin, discovered_app_name="sources.greenhouses"
+            )
+
+    @patch("sources.registry.import_module")
+    def test_validation_rejects_exports_capability_without_exports_module(
+        self, mock_import_module
+    ):
+        missing_module = "example.fake.exports"
+
+        def import_side_effect(module_name):
+            if module_name == missing_module:
+                raise ModuleNotFoundError(name=missing_module)
+            return MagicMock()
+
+        mock_import_module.side_effect = import_side_effect
+
+        plugin = get_source_domain_plugin("greenhouses").__class__(
+            slug="fake",
+            verbose_name="Fake",
+            app_config="example.fake.apps.FakeConfig",
+            urlconf="example.fake.urls",
+            capabilities=("exports",),
+        )
+
+        with self.assertRaisesMessage(
+            ValueError,
+            "declares 'exports' capability but example.fake.exports is missing",
+        ):
+            _validate_source_domain_plugin(plugin, discovered_app_name="example.fake")
 
 
 class SourcesModelAdapterTestCase(SimpleTestCase):
