@@ -3193,13 +3193,13 @@ class EmptyStateViewsTestCase(TestCase):
         )
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No non-mass measurements yet")
-        self.assertContains(response, "Non-mass Measurements")
+        self.assertContains(response, "No other sample properties yet")
+        self.assertContains(response, "Other Sample Properties")
         self.assertContains(
             response,
             "Add measurements such as moisture, density, pH, or other sample properties",
         )
-        self.assertNotContains(response, "Add the first non-mass measurement")
+        self.assertNotContains(response, "Add the first other sample property")
 
     def test_sample_detail_empty_properties_owner_sees_actionable_message(self):
         sample = Sample.objects.create(
@@ -3218,9 +3218,9 @@ class EmptyStateViewsTestCase(TestCase):
         self.client.force_login(self.regular_user)
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No non-mass measurements yet")
-        self.assertContains(response, "Add the first non-mass measurement")
-        self.assertContains(response, "Add non-mass measurement")
+        self.assertContains(response, "No other sample properties yet")
+        self.assertContains(response, "Add the first other sample property")
+        self.assertContains(response, "Add other sample property")
 
     def test_sample_detail_shows_sample_identity_block_and_summary(self):
         sample = Sample.objects.create(
@@ -3234,17 +3234,20 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            '<div class="small text-muted text-uppercase fw-semibold mb-1">Sample</div>',
+            '<div class="small text-muted text-uppercase fw-semibold mb-1">Identity</div>',
             html=True,
         )
         self.assertContains(response, "Spruce Sample")
         self.assertContains(response, "Wood chips")
         self.assertContains(response, "Standalone sample")
-        self.assertContains(response, "Summary")
-        self.assertContains(response, "Mass-related measurements")
-        self.assertContains(response, "Non-mass measurements")
+        self.assertContains(response, "About this sample")
+        self.assertContains(response, "At a glance")
+        self.assertContains(response, "Composition data")
+        self.assertContains(response, "Other sample properties")
         self.assertContains(response, "Composition groups")
-        self.assertContains(response, "Measurement groups")
+        self.assertContains(response, "Raw data groups")
+        self.assertContains(response, "Completeness")
+        self.assertContains(response, "Data basis and interpretation")
 
     def test_sample_detail_shows_sample_sources_as_badge_links(self):
         sample = Sample.objects.create(
@@ -3271,6 +3274,27 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "SRC-1")
         self.assertContains(response, "badge bg-light text-dark text-decoration-none")
 
+    def test_sample_detail_private_owner_sees_workspace_panels(self):
+        sample = Sample.objects.create(
+            name="Workspace Sample",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.regular_user,
+            publication_status="private",
+        )
+
+        self.client.force_login(self.regular_user)
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Workspace")
+        self.assertContains(response, "Editorial status")
+        self.assertContains(response, "Completeness")
+        self.assertContains(response, "Create")
+        self.assertContains(response, "Edit")
+        self.assertContains(response, "Review")
+        self.assertContains(response, "Danger zone")
+        self.assertContains(response, "Description present")
+
     def test_sample_detail_empty_mass_measurements_anonymous(self):
         sample = Sample.objects.create(
             name="Massless Sample",
@@ -3283,12 +3307,12 @@ class EmptyStateViewsTestCase(TestCase):
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No mass-related measurements yet")
+        self.assertContains(response, "No composition data yet")
         self.assertContains(
             response,
             "Add component measurements such as ash, protein, carbon, or other mass-related fractions",
         )
-        self.assertNotContains(response, "Add the first mass-related measurement")
+        self.assertNotContains(response, "Add the first composition data entry")
 
     def test_sample_detail_empty_mass_measurements_owner_sees_cta_with_permission(self):
         sample = Sample.objects.create(
@@ -3310,7 +3334,7 @@ class EmptyStateViewsTestCase(TestCase):
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Add the first mass-related measurement")
+        self.assertContains(response, "Add the first composition data entry")
 
     def test_sample_detail_empty_compositions_owner_sees_manual_and_measurement_actions(
         self,
@@ -3340,7 +3364,7 @@ class EmptyStateViewsTestCase(TestCase):
             "Composition groups appear here once mass-related measurements can be normalized to 100%",
         )
         self.assertContains(response, "Add composition manually")
-        self.assertContains(response, "Add mass-related measurement")
+        self.assertContains(response, "Add composition data")
 
     def test_sample_detail_shows_default_composition(self):
         sample = Sample.objects.create(
@@ -4235,12 +4259,12 @@ class SampleDetailTemplateReviewUITests(TestCase):
                 publication_status=UserCreatedObject.STATUS_PUBLISHED,
             )
 
-    def test_private_sample_shows_submit_button_for_owner(self):
+    def test_private_sample_shows_submit_for_review_button_for_owner(self):
         self.client.force_login(self.owner)
         url = reverse("sample-detail", kwargs={"pk": self.private_sample.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Submit for Review")
+        self.assertContains(response, "Submit for review")
 
     def test_review_sample_shows_review_view_link_for_owner(self):
         self.client.force_login(self.owner)

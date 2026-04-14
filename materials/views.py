@@ -20,6 +20,7 @@ from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
 from utils.file_export.views import SingleObjectFileExportView
 from utils.modal import BSModalFormView, BSModalUpdateView
+from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,
@@ -900,6 +901,82 @@ class SampleDetailView(UserCreatedObjectDetailView):
     model = Sample
 
     @staticmethod
+    def _build_completeness_checks(
+        obj,
+        sample_summary,
+        property_values,
+        component_measurements,
+    ):
+        has_any_measurement_data = bool(
+            sample_summary["component_measurement_count"]
+            or sample_summary["property_value_count"]
+        )
+        methods_complete = (
+            has_any_measurement_data
+            and all(
+                measurement.analytical_method_id
+                for measurement in component_measurements
+            )
+            and all(
+                property_value.analytical_method_id
+                for property_value in property_values
+            )
+        )
+        units_complete = (
+            has_any_measurement_data
+            and all(measurement.unit_id for measurement in component_measurements)
+            and all(property_value.unit_id for property_value in property_values)
+        )
+
+        checks = [
+            {
+                "label": "Description present",
+                "complete": bool(obj.description),
+            },
+            {
+                "label": "At least one source linked",
+                "complete": bool(sample_summary["sample_source_count"]),
+            },
+            {
+                "label": "At least one raw data group",
+                "complete": bool(sample_summary["component_measurement_group_count"]),
+            },
+            {
+                "label": "Normalization available",
+                "complete": bool(sample_summary["composition_count"]),
+            },
+            {
+                "label": "Units complete",
+                "complete": units_complete,
+            },
+            {
+                "label": "Methods complete",
+                "complete": methods_complete,
+            },
+        ]
+        completed_count = sum(1 for check in checks if check["complete"])
+        return {
+            "checks": checks,
+            "completed_count": completed_count,
+            "total_count": len(checks),
+            "score": round((completed_count / len(checks)) * 100) if checks else 0,
+            "warning_count": len(checks) - completed_count,
+        }
+
+    def _build_workflow_summary(self, completeness):
+        review_actions = ReviewAction.for_object(self.object)
+        review_comment_count = review_actions.filter(
+            action=ReviewAction.ACTION_COMMENT
+        ).count()
+        return {
+            "status": self.object.get_publication_status_display(),
+            "owner": getattr(self.object.owner, "username", self.object.owner),
+            "last_modified": self.object.lastmodified_at,
+            "review_comment_count": review_comment_count,
+            "validation_warning_count": completeness["warning_count"],
+        }
+
+    @staticmethod
     def _normalize_unit_name(unit):
         return (getattr(unit, "name", "") or "").strip().lower().replace(" ", "")
 
@@ -1184,6 +1261,32 @@ class SampleDetailView(UserCreatedObjectDetailView):
             "sample_source_count": self.object.sources.count(),
         }
 
+        sample_completeness = self._build_completeness_checks(
+            self.object,
+            sample_summary,
+            property_values,
+            component_measurements,
+        )
+        sample_workflow = self._build_workflow_summary(sample_completeness)
+        sample_policy = get_object_policy(
+            self.request.user, self.object, request=self.request
+        )
+        sample_layout_mode = (
+            "workspace"
+            if any(
+                (
+                    sample_policy["can_manage_samples"],
+                    sample_policy["can_add_property"],
+                    sample_policy["can_edit"],
+                    sample_policy["can_duplicate"],
+                    sample_policy["can_delete"],
+                    sample_policy["can_submit_review"],
+                    sample_policy["can_view_review_feedback"],
+                )
+            )
+            else "explore"
+        )
+
         data["compositions"] = compositions
 
         context.update(
@@ -1193,6 +1296,9 @@ class SampleDetailView(UserCreatedObjectDetailView):
                 "property_values": property_values,
                 "component_measurements": component_measurements,
                 "sample_summary": sample_summary,
+                "sample_completeness": sample_completeness,
+                "sample_workflow": sample_workflow,
+                "sample_layout_mode": sample_layout_mode,
             }
         )
         return context

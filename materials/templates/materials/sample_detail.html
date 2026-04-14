@@ -31,9 +31,18 @@
   <div class="rounded border bg-body-tertiary p-3 mb-3">
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
       <div>
-        <div class="small text-muted text-uppercase fw-semibold mb-1">Sample</div>
+        <div class="small text-muted text-uppercase fw-semibold mb-1">Identity</div>
         <h2 class="h4 mb-1">{{ object.name }}</h2>
         <div class="text-muted">{{ object.material.name }}</div>
+        <div class="small text-muted mt-2">
+          {% if object.description %}
+            {{ object.description|truncatewords:20 }}
+          {% elif object.location %}
+            Sample record for {{ object.material.name|lower }} collected in {{ object.location }}.
+          {% else %}
+            Sample record for {{ object.material.name|lower }} with linked composition and property data.
+          {% endif %}
+        </div>
       </div>
       <div class="d-flex flex-wrap gap-2 justify-content-md-end">
         {% if object.series %}
@@ -45,80 +54,153 @@
           <span class="badge rounded-pill text-bg-light">{{ object.datetime|date:"Y-m-d H:i" }}</span>
         {% endif %}
         {% if object.location %}<span class="badge rounded-pill text-bg-light">{{ object.location }}</span>{% endif %}
+        {% if sample_summary.component_measurement_count %}
+          <span class="badge rounded-pill text-bg-light">Raw data available</span>
+        {% endif %}
+        {% if sample_summary.composition_count %}
+          <span class="badge rounded-pill text-bg-light">Normalized view available</span>
+        {% endif %}
       </div>
     </div>
   </div>
-  <dl class="row mb-0 sample-detail-fields">
-    <dt class="col-sm-4">Material</dt>
-    <dd class="col-sm-8">
-      <a href="{% url 'material-detail-modal' object.material.pk %}"
-         class="modal-link">{{ object.material.name }}</a>
-    </dd>
-    {% if object.series %}
-      <dt class="col-sm-4">Series</dt>
-      <dd class="col-sm-8">
-        <a href="{% url 'sampleseries-detail-modal' object.series.pk %}"
-           class="modal-link">{{ object.series.name }}</a>
-      </dd>
-    {% endif %}
-    {% if object.timestep %}
-      <dt class="col-sm-4">Timestep</dt>
-      <dd class="col-sm-8">
-        {{ object.timestep }}
-      </dd>
-    {% endif %}
-    {% if object.datetime %}
-      <dt class="col-sm-4">Date/Time</dt>
-      <dd class="col-sm-8">
-        {{ object.datetime|date:"Y-m-d H:i" }}
-      </dd>
-    {% endif %}
-    {% if object.location %}
-      <dt class="col-sm-4">Location</dt>
-      <dd class="col-sm-8">
-        {{ object.location }}
-      </dd>
-    {% endif %}
-    {% if object.analysis_date %}
-      <dt class="col-sm-4">Analysis Date</dt>
-      <dd class="col-sm-8">
-        {{ object.analysis_date|date:"Y-m-d" }}
-      </dd>
-    {% endif %}
-    {% if object.analysis_laboratory %}
-      <dt class="col-sm-4">Laboratory</dt>
-      <dd class="col-sm-8">
-        {{ object.analysis_laboratory }}
-      </dd>
-    {% endif %}
-    {% if object.lab_accreditation %}
-      <dt class="col-sm-4">Accreditation</dt>
-      <dd class="col-sm-8">
-        {{ object.lab_accreditation }}
-      </dd>
-    {% endif %}
-    {% if object.analysis_objective %}
-      <dt class="col-sm-4">Objective</dt>
-      <dd class="col-sm-8">
-        {{ object.analysis_objective }}
-      </dd>
-    {% endif %}
-    {% with sample_sources=object.sources.all %}
-      {% if sample_sources %}
-        <dt class="col-sm-4">Sources</dt>
-        <dd class="col-sm-8">
-          <div class="d-flex flex-wrap gap-2">
-            {% for source in sample_sources %}
-              <a href="{% url 'source-detail-modal' source.pk %}"
-                 class="modal-link badge bg-light text-dark text-decoration-none"
-                 title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:"Source" }}</a>
-            {% endfor %}
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-lg-7" id="sample-context">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted text-uppercase fw-semibold mb-1">Context</div>
+          <h3 class="h6 mb-3">About this sample</h3>
+          <dl class="row mb-0 sample-detail-fields">
+            <dt class="col-sm-4">Material</dt>
+            <dd class="col-sm-8">
+              <a href="{% url 'material-detail-modal' object.material.pk %}"
+                 class="modal-link">{{ object.material.name }}</a>
+            </dd>
+            {% if object.series %}
+              <dt class="col-sm-4">Series</dt>
+              <dd class="col-sm-8">
+                <a href="{% url 'sampleseries-detail-modal' object.series.pk %}"
+                   class="modal-link">{{ object.series.name }}</a>
+              </dd>
+            {% endif %}
+            {% if object.timestep %}
+              <dt class="col-sm-4">Timestep</dt>
+              <dd class="col-sm-8">
+                {{ object.timestep }}
+              </dd>
+            {% endif %}
+            {% if object.datetime %}
+              <dt class="col-sm-4">Date/Time</dt>
+              <dd class="col-sm-8">
+                {{ object.datetime|date:"Y-m-d H:i" }}
+              </dd>
+            {% endif %}
+            {% if object.location %}
+              <dt class="col-sm-4">Location</dt>
+              <dd class="col-sm-8">
+                {{ object.location }}
+              </dd>
+            {% endif %}
+            {% if object.analysis_date %}
+              <dt class="col-sm-4">Analysis Date</dt>
+              <dd class="col-sm-8">
+                {{ object.analysis_date|date:"Y-m-d" }}
+              </dd>
+            {% endif %}
+            {% if object.analysis_laboratory %}
+              <dt class="col-sm-4">Laboratory</dt>
+              <dd class="col-sm-8">
+                {{ object.analysis_laboratory }}
+              </dd>
+            {% endif %}
+            {% if object.lab_accreditation %}
+              <dt class="col-sm-4">Accreditation</dt>
+              <dd class="col-sm-8">
+                {{ object.lab_accreditation }}
+              </dd>
+            {% endif %}
+            {% if object.analysis_objective %}
+              <dt class="col-sm-4">Objective</dt>
+              <dd class="col-sm-8">
+                {{ object.analysis_objective }}
+              </dd>
+            {% endif %}
+            {% with sample_sources=object.sources.all %}
+              {% if sample_sources %}
+                <dt class="col-sm-4">Sources</dt>
+                <dd class="col-sm-8">
+                  <div class="d-flex flex-wrap gap-2">
+                    {% for source in sample_sources %}
+                      <a href="{% url 'source-detail-modal' source.pk %}"
+                         class="modal-link badge bg-light text-dark text-decoration-none"
+                         title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:"Source" }}</a>
+                    {% endfor %}
+                  </div>
+                </dd>
+              {% endif %}
+            {% endwith %}
+          </dl>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-5">
+      <div class="card shadow-sm h-100" id="sample-overview">
+        <div class="card-body">
+          <div class="small text-muted text-uppercase fw-semibold mb-1">Quality and provenance</div>
+          <h3 class="h6 mb-3">At a glance</h3>
+          <div class="row g-3 align-items-stretch">
+            <div class="col-6">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Composition data</div>
+                <div class="h4 mb-0">{{ sample_summary.component_measurement_count }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Other sample properties</div>
+                <div class="h4 mb-0">{{ sample_summary.property_value_count }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Composition groups</div>
+                <div class="h4 mb-0">{{ sample_summary.composition_count }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Raw data groups</div>
+                <div class="h4 mb-0">{{ sample_summary.component_measurement_group_count }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Completeness</div>
+                <div class="h4 mb-0">{{ sample_completeness.score }}%</div>
+                <div class="small text-muted mt-1">
+                  {{ sample_completeness.completed_count }} of {{ sample_completeness.total_count }} checks complete
+                </div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Normalization</div>
+                <div class="fw-semibold mb-0">
+                  {% if sample_summary.composition_count %}
+                    Available
+                  {% else %}
+                    Not yet available
+                  {% endif %}
+                </div>
+                <div class="small text-muted mt-1">
+                  {{ sample_summary.sample_source_count }} linked source{{ sample_summary.sample_source_count|pluralize }}
+                </div>
+              </div>
+            </div>
           </div>
-        </dd>
-      {% endif %}
-    {% endwith %}
-  </dl>
-  {% if object.description %}<p class="card-text mt-2 text-muted small">{{ object.description }}</p>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
 {% endblock detail_body %}
 {% block detail_header_primary_actions %}
   <div class="btn-group me-2" role="group">
@@ -151,68 +233,162 @@
       <i class="fas fa-table-cells-large"></i> <span class="d-none d-md-inline">Explorer</span>
     </a>
   </div>
+  {% if sample_summary.component_measurement_count or sample_summary.property_value_count %}
+    <a class="btn btn-sm btn-primary me-2"
+       href="#sample-measurements-tabs"
+       title="Explore measurements">
+      <i class="fas fa-chart-column"></i> <span class="d-none d-md-inline">Explore measurements</span>
+    </a>
+  {% endif %}
+  {% if sample_summary.sample_source_count %}
+    <a class="btn btn-sm btn-outline-secondary me-2"
+       href="#sample-context"
+       title="View source context">
+      <i class="fas fa-book"></i> <span class="d-none d-md-inline">View sources</span>
+    </a>
+  {% endif %}
   {{ block.super }}
 {% endblock detail_header_primary_actions %}
+{% block options_tab_title %}
+  {% if sample_layout_mode == "workspace" %}
+    Workspace
+  {% else %}
+    Explore
+  {% endif %}
+{% endblock options_tab_title %}
 {% block options_primary_actions %}
   {% object_policy object as policy %}
-  {% if policy.can_manage_samples and perms.materials.add_componentmeasurement %}
-    <a class="btn btn-primary w-100 mb-2"
-       href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
-      <i class="fas fa-plus"></i> Add mass-related measurement
-    </a>
-  {% endif %}
-  {% if policy.can_add_property %}
-    <a class="btn btn-outline-primary w-100 mb-2"
-       href="{% url 'sample-add-property' object.id %}">
-      <i class="fas fa-plus"></i> Add non-mass measurement
-    </a>
-  {% endif %}
-  {% if policy.can_edit or policy.can_duplicate or policy.can_delete %}<hr class="my-2">{% endif %}
-  {% if policy.can_edit %}
-    <a class="btn btn-outline-primary w-100 mb-2"
-       href="{% url 'sample-update' object.id %}?next={{ request.get_full_path|urlencode }}">
-      <i class="fas fa-pen-to-square"></i> Edit
-    </a>
-  {% endif %}
-  {% if policy.can_duplicate %}
-    <a class="btn btn-outline-secondary w-100 mb-2"
-       href="{% url 'sample-duplicate' object.id %}">
-      <i class="fas fa-copy"></i> Duplicate
-    </a>
-  {% endif %}
-  {% if policy.can_delete %}
-    <hr class="my-2">
-    <a class="btn btn-outline-danger w-100 mb-2 modal-link"
-       href="{% url 'sample-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">
-      <i class="fas fa-trash"></i> Delete
-    </a>
-  {% endif %}
-  {% if policy.is_private and policy.can_submit_review %}
-    <hr class="my-2">
-    <form method="post"
-          action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}"
-          class="mb-2">
-      {% csrf_token %}
-      <button type="submit" class="btn btn-primary w-100">
-        <i class="fas fa-paper-plane"></i> Submit for Review
-      </button>
-    </form>
+  {% if sample_layout_mode == "workspace" %}
+    <p class="text-muted small fw-semibold text-uppercase mb-1">Workflow</p>
+    <div class="rounded border bg-body-tertiary p-3 mb-3">
+      <div class="fw-semibold mb-2">Editorial status</div>
+      <dl class="row small mb-0">
+        <dt class="col-6">Status</dt>
+        <dd class="col-6">
+          {{ sample_workflow.status }}
+        </dd>
+        <dt class="col-6">Owner</dt>
+        <dd class="col-6">
+          {{ sample_workflow.owner }}
+        </dd>
+        <dt class="col-6">Last edited</dt>
+        <dd class="col-6">
+          {{ sample_workflow.last_modified|date:"Y-m-d H:i" }}
+        </dd>
+        <dt class="col-6">Review comments</dt>
+        <dd class="col-6">
+          {{ sample_workflow.review_comment_count }}
+        </dd>
+        <dt class="col-6">Validation warnings</dt>
+        <dd class="col-6">
+          {{ sample_workflow.validation_warning_count }}
+        </dd>
+      </dl>
+    </div>
+    <p class="text-muted small fw-semibold text-uppercase mb-1">Completeness</p>
+    <div class="rounded border mb-3 overflow-hidden">
+      {% for check in sample_completeness.checks %}
+        <div class="d-flex align-items-center justify-content-between gap-2 px-3 py-2 {% if not forloop.last %}border-bottom{% endif %}">
+          <span class="small">{{ check.label }}</span>
+          {% if check.complete %}
+            <span class="badge text-bg-success">Complete</span>
+          {% else %}
+            <span class="badge text-bg-warning">Needs work</span>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    <p class="text-muted small fw-semibold text-uppercase mb-1">Create</p>
+    {% if policy.can_manage_samples and perms.materials.add_componentmeasurement %}
+      <a class="btn btn-primary w-100 mb-2"
+         href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
+        <i class="fas fa-plus"></i> Add composition data
+      </a>
+    {% endif %}
+    {% if policy.can_add_property %}
+      <a class="btn btn-outline-primary w-100 mb-2"
+         href="{% url 'sample-add-property' object.id %}">
+        <i class="fas fa-plus"></i> Add other sample property
+      </a>
+    {% endif %}
+    {% if policy.can_duplicate %}
+      <a class="btn btn-outline-secondary w-100 mb-3"
+         href="{% url 'sample-duplicate' object.id %}">
+        <i class="fas fa-copy"></i> Duplicate record
+      </a>
+    {% endif %}
+    {% if policy.can_edit or policy.can_manage_samples %}
+      <p class="text-muted small fw-semibold text-uppercase mb-1">Edit</p>
+    {% endif %}
+    {% if policy.can_edit %}
+      <a class="btn btn-outline-primary w-100 mb-2"
+         href="{% url 'sample-update' object.id %}?next={{ request.get_full_path|urlencode }}">
+        <i class="fas fa-pen-to-square"></i> Edit sample metadata
+      </a>
+    {% endif %}
+    {% if policy.can_manage_samples and data.compositions %}
+      <a class="btn btn-outline-secondary w-100 mb-3"
+         href="#normalized-compositions">
+        <i class="fas fa-arrow-down-up-across-line"></i> Reorder groups
+      </a>
+    {% endif %}
+    {% if policy.can_submit_review or policy.can_view_review_feedback or policy.is_in_review %}
+      <p class="text-muted small fw-semibold text-uppercase mb-1">Review</p>
+    {% endif %}
+    {% if policy.is_private and policy.can_submit_review %}
+      <form method="post"
+            action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}"
+            class="mb-2">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="fas fa-paper-plane"></i> Submit for review
+        </button>
+      </form>
+    {% endif %}
+    {% if policy.can_view_review_feedback %}
+      <a class="btn {% if policy.is_declined %}btn-outline-danger{% else %}btn-outline-info{% endif %} w-100 mb-2"
+         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+        <i class="fas fa-clipboard-check"></i> {{ policy.review_feedback_label }}
+      </a>
+    {% elif policy.is_in_review and not review_mode %}
+      {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
+        <a class="btn btn-outline-secondary w-100 mb-2"
+           href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+          <i class="fas fa-clipboard-check"></i> Review view
+        </a>
+      {% endif %}
+    {% endif %}
+    {% if policy.can_delete %}
+      <p class="text-muted small fw-semibold text-uppercase mb-1 mt-3">Danger zone</p>
+      <a class="btn btn-outline-danger w-100 mb-2 modal-link"
+         href="{% url 'sample-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">
+        <i class="fas fa-trash"></i> Delete
+      </a>
+    {% endif %}
+  {% else %}
+    <p class="text-muted small fw-semibold text-uppercase mb-1">Explore</p>
+    {% if sample_summary.component_measurement_count or sample_summary.property_value_count %}
+      <a class="btn btn-primary w-100 mb-2" href="#sample-measurements-tabs">
+        <i class="fas fa-chart-column"></i> Explore measurements
+      </a>
+    {% endif %}
+    {% if data.compositions %}
+      <a class="btn btn-outline-secondary w-100 mb-2"
+         href="#normalized-compositions">
+        <i class="fas fa-chart-pie"></i> View normalized composition
+      </a>
+    {% endif %}
+    {% if sample_summary.sample_source_count %}
+      <a class="btn btn-outline-secondary w-100 mb-2" href="#sample-context">
+        <i class="fas fa-book"></i> View sources
+      </a>
+    {% endif %}
+    {% if not user.is_authenticated %}
+      <div class="small text-muted mt-2">Log in to edit data, add measurements, and submit updates for review.</div>
+    {% endif %}
   {% endif %}
 {% endblock options_primary_actions %}
 {% block options_review_actions %}
-  {% if policy.can_view_review_feedback %}
-    <a class="btn {% if policy.is_declined %}btn-outline-danger{% else %}btn-outline-info{% endif %} w-100 mb-2"
-       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
-      <i class="fas fa-clipboard-check"></i> {{ policy.review_feedback_label }}
-    </a>
-  {% elif policy.is_in_review and not review_mode %}
-    {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
-      <a class="btn btn-outline-secondary w-100 mb-2"
-         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
-        <i class="fas fa-clipboard-check"></i> Review view
-      </a>
-    {% endif %}
-  {% endif %}
 {% endblock options_review_actions %}
 {% block options_secondary_actions %}
 {% endblock options_secondary_actions %}
@@ -232,55 +408,14 @@
   {% object_policy object as policy %}
   {% with properties=property_values %}
     {% regroup component_measurements by group as measurements_by_group %}
-    <div class="col col-12 mb-4">
-      <div class="card shadow-sm h-100">
-        <div class="card-body py-3">
-          <div class="small text-muted text-uppercase fw-semibold mb-2">Summary</div>
-          <div class="row g-3 align-items-stretch">
-            <div class="col-6 col-lg-3">
-              <div class="border rounded p-3 h-100">
-                <div class="small text-muted">Mass-related measurements</div>
-                <div class="h4 mb-0">{{ sample_summary.component_measurement_count }}</div>
-              </div>
-            </div>
-            <div class="col-6 col-lg-3">
-              <div class="border rounded p-3 h-100">
-                <div class="small text-muted">Non-mass measurements</div>
-                <div class="h4 mb-0">{{ sample_summary.property_value_count }}</div>
-              </div>
-            </div>
-            <div class="col-6 col-lg-3">
-              <div class="border rounded p-3 h-100">
-                <div class="small text-muted">Composition groups</div>
-                <div class="h4 mb-0">{{ sample_summary.composition_count }}</div>
-              </div>
-            </div>
-            <div class="col-6 col-lg-3">
-              <div class="border rounded p-3 h-100">
-                <div class="small text-muted">Measurement groups</div>
-                <div class="h4 mb-0">{{ sample_summary.component_measurement_group_count }}</div>
-              </div>
-            </div>
-            {% if object.analysis_laboratory or object.analysis_date %}
-              <div class="col-12">
-                <div class="rounded border border-dashed bg-body-tertiary px-3 py-2 small text-muted d-flex gap-3 flex-wrap">
-                  {% if object.analysis_laboratory %}
-                    <span><strong class="text-body">Laboratory:</strong> {{ object.analysis_laboratory }}</span>
-                  {% endif %}
-                  {% if object.analysis_date %}
-                    <span><strong class="text-body">Analysis date:</strong> {{ object.analysis_date|date:"Y-m-d" }}</span>
-                  {% endif %}
-                </div>
-              </div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
     <div class="col col-12">
       <div class="card shadow h-100 tab-card">
         <div class="card-header tab-card-header bg-body-tertiary border-bottom-0 py-3">
-          <h5 class="mb-0">Measurement Data</h5>
+          <div class="small text-muted text-uppercase fw-semibold mb-1">Measurements</div>
+          <h5 class="mb-1">Measurement workspace</h5>
+          <div class="small text-muted mb-3">
+            Explore composition data and other sample properties from one comparison surface, then drill down into groups, basis, methods, and sources.
+          </div>
           <ul class="nav nav-tabs card-header-tabs"
               id="sample-measurements-tabs"
               role="tablist">
@@ -292,7 +427,7 @@
                  role="tab"
                  aria-controls="sample-component-measurements-tab"
                  aria-selected="true">
-                Mass-related Measurements
+                Composition Data
                 <span class="badge text-bg-secondary ms-1">{{ component_measurements|length }}</span>
               </a>
             </li>
@@ -304,7 +439,7 @@
                  role="tab"
                  aria-controls="sample-properties-tab"
                  aria-selected="false">
-                Non-mass Measurements
+                Other Sample Properties
                 <span class="badge text-bg-secondary ms-1">{{ properties|length }}</span>
               </a>
             </li>
@@ -318,9 +453,9 @@
                aria-labelledby="sample-component-measurements-tab-link">
             <div class="d-flex justify-content-between align-items-start p-3 border-bottom bg-body-tertiary gap-3 flex-wrap">
               <div>
-                <div class="fw-semibold">Raw view</div>
+                <div class="fw-semibold">Composition data</div>
                 <div class="small text-muted">
-                  Recorded mass-related component measurements as provided. For the normalized composition view, see below.
+                  Raw mass-related component measurements grouped by composition category. Use the normalized composition view below when you want shares that sum to 100% within a group.
                 </div>
               </div>
               {% if data.compositions %}
@@ -453,7 +588,7 @@
             {% else %}
               <div class="p-3">
                 <div class="rounded border border-dashed bg-body-tertiary p-3">
-                  <div class="fw-semibold mb-1">No mass-related measurements yet</div>
+                  <div class="fw-semibold mb-1">No composition data yet</div>
                   <div class="text-muted small">
                     Add component measurements such as ash, protein, carbon, or other mass-related fractions to document the raw measurement set for this sample.
                   </div>
@@ -461,7 +596,7 @@
                     <div class="mt-3">
                       <a class="btn btn-sm btn-outline-primary"
                          href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
-                        <i class="fas fa-plus"></i> Add the first mass-related measurement
+                        <i class="fas fa-plus"></i> Add the first composition data entry
                       </a>
                     </div>
                   {% endif %}
@@ -471,7 +606,7 @@
             {% if measurements_by_group and policy.can_manage_samples and perms.materials.add_componentmeasurement %}
               <div class="p-3 border-top">
                 <a href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
-                  <i class="fas fa-fw fa-plus"></i> Add mass-related measurement
+                  <i class="fas fa-fw fa-plus"></i> Add composition data
                 </a>
               </div>
             {% endif %}
@@ -481,7 +616,7 @@
                role="tabpanel"
                aria-labelledby="sample-properties-tab-link">
             <div class="px-3 py-2 border-bottom bg-body-tertiary small text-muted">
-              Measurements that are not part of the mass composition breakdown.
+              Other sample properties such as moisture, density, pH, and related analytical results that are not part of the composition breakdown.
             </div>
             {% if properties %}
               <div class="table-responsive">
@@ -561,7 +696,7 @@
             {% else %}
               <div class="p-3">
                 <div class="rounded border border-dashed bg-body-tertiary p-3">
-                  <div class="fw-semibold mb-1">No non-mass measurements yet</div>
+                  <div class="fw-semibold mb-1">No other sample properties yet</div>
                   <div class="text-muted small">
                     Add measurements such as moisture, density, pH, or other sample properties that are not part of the mass composition breakdown.
                   </div>
@@ -569,7 +704,7 @@
                     <div class="mt-3">
                       <a class="btn btn-sm btn-outline-primary"
                          href="{% url 'sample-add-property' object.id %}">
-                        <i class="fas fa-plus"></i> Add the first non-mass measurement
+                        <i class="fas fa-plus"></i> Add the first other sample property
                       </a>
                     </div>
                   {% endif %}
@@ -579,7 +714,7 @@
             {% if policy.can_add_property %}
               <div class="p-3 border-top">
                 <a href="{% url 'sample-add-property' object.id %}">
-                  <i class="fas fa-fw fa-plus"></i> Add non-mass measurement
+                  <i class="fas fa-fw fa-plus"></i> Add other sample property
                 </a>
                 {% if properties %}
                   <button class="btn btn-link ms-3 p-0 align-baseline text-decoration-none"
@@ -751,7 +886,7 @@
     <div class="col col-12 mt-4">
       <div class="card shadow h-100">
         <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-          <h5 class="mb-0">Compositions</h5>
+          <h5 class="mb-0">Normalized composition</h5>
         </div>
         <div class="card-body">
           <div class="p-3">
@@ -764,7 +899,7 @@
                 <div class="mt-3 d-flex gap-2 flex-wrap">
                   <a class="btn btn-sm btn-outline-primary"
                      href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
-                    <i class="fas fa-plus"></i> Add mass-related measurement
+                    <i class="fas fa-plus"></i> Add composition data
                   </a>
                   <a class="btn btn-sm btn-outline-secondary"
                      href="{% url 'sample-add-composition' object.id %}?next={{ request.path }}">
@@ -785,6 +920,49 @@
       </div>
     </div>
   {% endif %}
+  <div class="col col-12 mt-4" id="sample-provenance">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase fw-semibold mb-1">Quality and provenance</div>
+        <h5 class="mb-3">Data basis and interpretation</h5>
+        <div class="row g-3">
+          <div class="col-12 col-lg-8">
+            <ul class="small text-muted mb-0">
+              <li>Composition data can be explored as raw group measurements or as normalized shares.</li>
+              <li>
+                Normalized groups sum to 100%, and any missing fraction is shown as <strong>Other</strong>.
+              </li>
+              <li>Basis components, units, sample sizes, methods, sources, and comments are shown inline where available.</li>
+              <li>
+                Use the raw measurement tables when you need analytical context; use the normalized view when you need a quick compositional comparison.
+              </li>
+            </ul>
+          </div>
+          <div class="col-12 col-lg-4">
+            <div class="border rounded p-3 h-100 bg-body-tertiary">
+              <div class="small text-muted mb-1">Linked provenance</div>
+              <div class="fw-semibold mb-2">
+                {{ sample_summary.sample_source_count }} source{{ sample_summary.sample_source_count|pluralize }}
+              </div>
+              {% with sample_sources=object.sources.all %}
+                {% if sample_sources %}
+                  <div class="d-flex flex-wrap gap-2">
+                    {% for source in sample_sources %}
+                      <a href="{% url 'source-detail-modal' source.pk %}"
+                         class="modal-link badge bg-light text-dark text-decoration-none"
+                         title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:"Source" }}</a>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <div class="small text-muted">No source record linked yet.</div>
+                {% endif %}
+              {% endwith %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 {% endblock second_row %}
 {% block detail_with_options_scripts %}
   {{ charts|json_script:"charts" }}
