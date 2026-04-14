@@ -35,14 +35,6 @@ urlpatterns = [
         ),
     ),
     path(
-        "green_areas/map/",
-        RedirectView.as_view(
-            url="/sources/green_areas/map/",
-            permanent=True,
-            query_string=True,
-        ),
-    ),
-    path(
         "api/",
         RedirectView.as_view(
             url="/sources/api/",

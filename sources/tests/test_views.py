@@ -100,9 +100,11 @@ class SourceDomainHubRoutingTestCase(SimpleTestCase):
     def test_registry_exposes_plugin_declared_legacy_redirect_mounts(self):
         redirects = get_source_domain_legacy_redirects()
 
-        self.assertEqual(len(redirects), 1)
+        self.assertEqual(len(redirects), 2)
         self.assertEqual(redirects[0].mount_path, "case_studies/hamburg/")
         self.assertEqual(redirects[0].urlconf, "sources.roadside_trees.legacy_urls")
+        self.assertEqual(redirects[1].mount_path, "case_studies/hamburg/")
+        self.assertEqual(redirects[1].urlconf, "sources.urban_green_spaces.legacy_urls")
 
     def test_registry_exposes_plugin_declared_map_mounts(self):
         map_mounts = get_source_domain_map_mounts()
@@ -226,6 +228,25 @@ class UrbanGreenSpacesPluginIntegrationTestCase(SimpleTestCase):
         self.assertIsNotNone(plugin.map_mount)
         self.assertEqual(plugin.map_mount.mount_path, "hamburg/")
         self.assertEqual(plugin.map_mount.urlconf, "sources.urban_green_spaces.urls")
+
+    def test_urban_green_spaces_plugin_exposes_legacy_redirect_metadata(self):
+        plugin = get_source_domain_plugin("urban_green_spaces")
+
+        self.assertIsNotNone(plugin.legacy_redirects)
+        self.assertEqual(plugin.legacy_redirects.mount_path, "case_studies/hamburg/")
+        self.assertEqual(
+            plugin.legacy_redirects.urlconf,
+            "sources.urban_green_spaces.legacy_urls",
+        )
+
+    def test_legacy_hamburg_green_areas_url_redirects_to_maps(self):
+        response = self.client.get(
+            "/case_studies/hamburg/green_areas/map/",
+            follow=False,
+        )
+
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response["Location"], "/maps/hamburg/green_areas/map/")
 
 
 class GreenhousesPluginIntegrationTestCase(SimpleTestCase):

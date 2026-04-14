@@ -1,4 +1,8 @@
-from sources.contracts import SourceDomainMapMount, SourceDomainPlugin
+from sources.contracts import (
+    SourceDomainLegacyRedirects,
+    SourceDomainMapMount,
+    SourceDomainPlugin,
+)
 
 plugin = SourceDomainPlugin(
     slug="urban_green_spaces",
@@ -9,5 +13,9 @@ plugin = SourceDomainPlugin(
     map_mount=SourceDomainMapMount(
         mount_path="hamburg/",
         urlconf="sources.urban_green_spaces.urls",
+    ),
+    legacy_redirects=SourceDomainLegacyRedirects(
+        mount_path="case_studies/hamburg/",
+        urlconf="sources.urban_green_spaces.legacy_urls",
     ),
 )
