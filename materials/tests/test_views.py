@@ -3193,9 +3193,13 @@ class EmptyStateViewsTestCase(TestCase):
         )
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No non-mass measurements yet")
+        self.assertContains(response, "Non-mass Measurements")
         self.assertContains(
-            response, "No properties recorded. Log in to add properties."
+            response,
+            "Add measurements such as moisture, density, pH, or other sample properties",
         )
+        self.assertNotContains(response, "Add the first non-mass measurement")
 
     def test_sample_detail_empty_properties_owner_sees_actionable_message(self):
         sample = Sample.objects.create(
@@ -3204,12 +3208,43 @@ class EmptyStateViewsTestCase(TestCase):
             owner=self.regular_user,
             publication_status="published",
         )
+        content_type = ContentType.objects.get_for_model(MaterialPropertyValue)
+        permission, _ = Permission.objects.get_or_create(
+            codename="add_materialpropertyvalue",
+            content_type=content_type,
+            defaults={"name": "Can add material property value"},
+        )
+        self.regular_user.user_permissions.add(permission)
         self.client.force_login(self.regular_user)
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response, "No properties recorded. Add your first property."
+        self.assertContains(response, "No non-mass measurements yet")
+        self.assertContains(response, "Add the first non-mass measurement")
+        self.assertContains(response, "Add non-mass measurement")
+
+    def test_sample_detail_shows_sample_identity_block_and_summary(self):
+        sample = Sample.objects.create(
+            name="Spruce Sample",
+            material=Material.objects.create(name="Wood chips", type="material"),
+            owner=self.regular_user,
+            location="Hamburg",
+            publication_status="published",
         )
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            '<div class="small text-muted text-uppercase fw-semibold mb-1">Sample</div>',
+            html=True,
+        )
+        self.assertContains(response, "Spruce Sample")
+        self.assertContains(response, "Wood chips")
+        self.assertContains(response, "Standalone sample")
+        self.assertContains(response, "Summary")
+        self.assertContains(response, "Mass-related measurements")
+        self.assertContains(response, "Non-mass measurements")
+        self.assertContains(response, "Composition groups")
+        self.assertContains(response, "Measurement groups")
 
     def test_sample_detail_shows_default_composition(self):
         sample = Sample.objects.create(

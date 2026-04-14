@@ -1174,6 +1174,16 @@ class SampleDetailView(UserCreatedObjectDetailView):
             compositions = self._build_derived_compositions(component_measurements)
             charts = self._build_derived_composition_charts(compositions)
 
+        sample_summary = {
+            "component_measurement_count": len(component_measurements),
+            "component_measurement_group_count": len(
+                {measurement.group_id for measurement in component_measurements}
+            ),
+            "property_value_count": property_values.count(),
+            "composition_count": len(compositions),
+            "sample_source_count": self.object.sources.count(),
+        }
+
         data["compositions"] = compositions
 
         context.update(
@@ -1182,6 +1192,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
                 "charts": charts,
                 "property_values": property_values,
                 "component_measurements": component_measurements,
+                "sample_summary": sample_summary,
             }
         )
         return context

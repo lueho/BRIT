@@ -6,7 +6,10 @@
   BRIT | Sample: {{ object.name }}
 {% endblock title %}
 {% block detail_header %}
-  Sample: {{ object.name }}
+  <div class="d-flex flex-column">
+    <span class="text-truncate">{{ object.name }}</span>
+    <span class="small text-muted fw-normal text-truncate">{{ object.material.name }}</span>
+  </div>
 {% endblock detail_header %}
 {% block detail_top_image %}
   {% if object.display_image %}
@@ -27,6 +30,26 @@
   {% endif %}
 {% endblock detail_top_image %}
 {% block detail_body %}
+  <div class="rounded border bg-body-tertiary p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div>
+        <div class="small text-muted text-uppercase fw-semibold mb-1">Sample</div>
+        <h2 class="h4 mb-1">{{ object.name }}</h2>
+        <div class="text-muted">{{ object.material.name }}</div>
+      </div>
+      <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+        {% if object.series %}
+          <span class="badge rounded-pill text-bg-light">Series: {{ object.series.name }}</span>
+        {% else %}
+          <span class="badge rounded-pill text-bg-light">Standalone sample</span>
+        {% endif %}
+        {% if object.datetime %}
+          <span class="badge rounded-pill text-bg-light">{{ object.datetime|date:"Y-m-d H:i" }}</span>
+        {% endif %}
+        {% if object.location %}<span class="badge rounded-pill text-bg-light">{{ object.location }}</span>{% endif %}
+      </div>
+    </div>
+  </div>
   <dl class="row mb-0 sample-detail-fields">
     <dt class="col-sm-4">Material</dt>
     <dd class="col-sm-8">
@@ -131,6 +154,19 @@
 {% endblock detail_header_primary_actions %}
 {% block options_primary_actions %}
   {% object_policy object as policy %}
+  {% if policy.can_manage_samples and perms.materials.add_componentmeasurement %}
+    <a class="btn btn-primary w-100 mb-2"
+       href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
+      <i class="fas fa-plus"></i> Add mass-related measurement
+    </a>
+  {% endif %}
+  {% if policy.can_add_property %}
+    <a class="btn btn-outline-primary w-100 mb-2"
+       href="{% url 'sample-add-property' object.id %}">
+      <i class="fas fa-plus"></i> Add non-mass measurement
+    </a>
+  {% endif %}
+  {% if policy.can_edit or policy.can_duplicate or policy.can_delete %}<hr class="my-2">{% endif %}
   {% if policy.can_edit %}
     <a class="btn btn-outline-primary w-100 mb-2"
        href="{% url 'sample-update' object.id %}?next={{ request.get_full_path|urlencode }}">
@@ -144,6 +180,7 @@
     </a>
   {% endif %}
   {% if policy.can_delete %}
+    <hr class="my-2">
     <a class="btn btn-outline-danger w-100 mb-2 modal-link"
        href="{% url 'sample-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">
       <i class="fas fa-trash"></i> Delete
@@ -192,9 +229,53 @@
 {% endblock options_export %}
 {% block second_row %}
   {% object_policy object as policy %}
-  {# --- Measurements Card (Properties + Component Measurements) --- #}
   {% with properties=property_values %}
     {% regroup component_measurements by group as measurements_by_group %}
+    <div class="col col-12 mb-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-body py-3">
+          <div class="small text-muted text-uppercase fw-semibold mb-2">Summary</div>
+          <div class="row g-3 align-items-stretch">
+            <div class="col-6 col-lg-3">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Mass-related measurements</div>
+                <div class="h4 mb-0">{{ sample_summary.component_measurement_count }}</div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Non-mass measurements</div>
+                <div class="h4 mb-0">{{ sample_summary.property_value_count }}</div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Composition groups</div>
+                <div class="h4 mb-0">{{ sample_summary.composition_count }}</div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Measurement groups</div>
+                <div class="h4 mb-0">{{ sample_summary.component_measurement_group_count }}</div>
+              </div>
+            </div>
+            {% if object.analysis_laboratory or object.analysis_date %}
+              <div class="col-12">
+                <div class="rounded border border-dashed bg-body-tertiary px-3 py-2 small text-muted d-flex gap-3 flex-wrap">
+                  {% if object.analysis_laboratory %}
+                    <span><strong class="text-body">Laboratory:</strong> {{ object.analysis_laboratory }}</span>
+                  {% endif %}
+                  {% if object.analysis_date %}
+                    <span><strong class="text-body">Analysis date:</strong> {{ object.analysis_date|date:"Y-m-d" }}</span>
+                  {% endif %}
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="col col-12">
       <div class="card shadow h-100 tab-card">
         <div class="card-header tab-card-header bg-body-tertiary border-bottom-0 py-3">
@@ -375,7 +456,7 @@
             {% if policy.can_manage_samples and perms.materials.add_componentmeasurement %}
               <div class="p-3 border-top">
                 <a href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
-                  <i class="fas fa-fw fa-plus"></i> Add measurement
+                  <i class="fas fa-fw fa-plus"></i> Add mass-related measurement
                 </a>
               </div>
             {% endif %}
@@ -462,30 +543,37 @@
                 </table>
               </div>
             {% else %}
-              <div class="p-3 text-muted">
-                {% if not user.is_authenticated %}
-                  No properties recorded. Log in to add properties.
-                {% elif policy.is_owner or policy.can_add_property %}
-                  No properties recorded. Add your first property.
-                {% else %}
-                  No properties recorded.
-                {% endif %}
+              <div class="p-3">
+                <div class="rounded border border-dashed bg-body-tertiary p-3">
+                  <div class="fw-semibold mb-1">No non-mass measurements yet</div>
+                  <div class="text-muted small">
+                    Add measurements such as moisture, density, pH, or other sample properties that are not part of the mass composition breakdown.
+                  </div>
+                  {% if policy.can_add_property %}
+                    <div class="mt-3">
+                      <a class="btn btn-sm btn-outline-primary"
+                         href="{% url 'sample-add-property' object.id %}">
+                        <i class="fas fa-plus"></i> Add the first non-mass measurement
+                      </a>
+                    </div>
+                  {% endif %}
+                </div>
               </div>
             {% endif %}
             {% if policy.can_add_property %}
               <div class="p-3 border-top">
                 <a href="{% url 'sample-add-property' object.id %}">
-                  <i class="fas fa-fw fa-plus"></i> Add property
+                  <i class="fas fa-fw fa-plus"></i> Add non-mass measurement
                 </a>
                 {% if properties %}
-                  <a class="ms-3"
-                     href="javascript:void(0);"
-                     data-bs-toggle="collapse"
-                     data-bs-target=".remove-property"
-                     aria-expanded="false"
-                     aria-controls="remove-property">
+                  <button class="btn btn-link ms-3 p-0 align-baseline text-decoration-none"
+                          type="button"
+                          data-bs-toggle="collapse"
+                          data-bs-target=".remove-property"
+                          aria-expanded="false"
+                          aria-controls="remove-property">
                     <i class="fas fa-fw fa-minus"></i> Remove properties
-                  </a>
+                  </button>
                 {% endif %}
               </div>
             {% endif %}
