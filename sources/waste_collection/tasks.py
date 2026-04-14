@@ -1,13 +1,73 @@
+import logging
 from types import SimpleNamespace
 
 from celery import chord
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db.models import F
 from django.utils import timezone
 
 from bibliography.utils import check_url, find_wayback_snapshot_for_year
 from brit.celery import app
+from maps.db_functions import SimplifyPreserveTopology
+from maps.signals import get_geojson_cache
+from maps.utils import build_collection_cache_key
 from sources.waste_collection.filters import WasteFlyerFilter
+from sources.waste_collection.geojson import (
+    GEOMETRY_SIMPLIFY_TOLERANCE,
+    Collection,
+    WasteCollectionGeometrySerializer,
+)
 from sources.waste_collection.models import WasteFlyer
+
+logger = logging.getLogger(__name__)
+
+
+@app.task(bind=True, name="warm_collection_geojson_cache")
+def warm_collection_geojson_cache(self):
+    qs = (
+        Collection.objects.filter(publication_status="published")
+        .select_related(
+            "catchment",
+            "catchment__region",
+            "catchment__region__borders",
+            "waste_category",
+            "collection_system",
+        )
+        .annotate(
+            simplified_geom=SimplifyPreserveTopology(
+                F("catchment__region__borders__geom"),
+                GEOMETRY_SIMPLIFY_TOLERANCE,
+            )
+        )
+    )
+
+    logger.info("Starting Collection GeoJSON cache warm-up")
+
+    try:
+        serializer = WasteCollectionGeometrySerializer(qs, many=True)
+        data = serializer.data
+        cache_key = build_collection_cache_key(scope="published")
+        cache = get_geojson_cache()
+        timeout = getattr(settings, "GEOJSON_CACHE_TIMEOUT", 86400)
+        cache.set(cache_key, data, timeout=timeout)
+
+        feature_count = (
+            len(data.get("features", [])) if isinstance(data, dict) else len(data)
+        )
+        logger.info(
+            "Collection GeoJSON cache warmed: %d features, key=%s",
+            feature_count,
+            cache_key,
+        )
+        return {
+            "status": "success",
+            "features_count": feature_count,
+            "cache_key": cache_key,
+        }
+    except Exception as e:
+        logger.exception("Failed to warm Collection GeoJSON cache: %s", e)
+        return {"status": "error", "error": str(e)}
 
 
 @app.task(name="check_wasteflyer_url", trail=True)
@@ -81,4 +141,5 @@ __all__ = [
     "check_wasteflyer_urls",
     "check_wasteflyer_urls_callback",
     "cleanup_orphaned_waste_flyers",
+    "warm_collection_geojson_cache",
 ]

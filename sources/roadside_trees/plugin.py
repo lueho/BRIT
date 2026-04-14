@@ -37,5 +37,5 @@ plugin = SourceDomainPlugin(
         "/case_studies/hamburg/roadside_trees/export/",
         "/case_studies/hamburg/roadside_trees/catchment_autocomplete/",
     ),
-    geojson_cache_warmer="maps.tasks.warm_roadside_tree_geojson_cache",
+    geojson_cache_warmer="sources.roadside_trees.tasks.warm_roadside_tree_geojson_cache",
 )

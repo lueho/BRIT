@@ -58,7 +58,7 @@ plugin = SourceDomainPlugin(
         "/waste_collection/catchment_selection/",
         "/waste_collection/collections/export/",
     ),
-    geojson_cache_warmer="maps.tasks.warm_collection_geojson_cache",
+    geojson_cache_warmer="sources.waste_collection.tasks.warm_collection_geojson_cache",
     explorer_card=SourceDomainExplorerCard(
         title="Household Waste Collection",
         description=(

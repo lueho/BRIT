@@ -194,7 +194,7 @@ class RoadsideTreesPluginIntegrationTestCase(SimpleTestCase):
 
         self.assertEqual(
             plugin.geojson_cache_warmer,
-            "maps.tasks.warm_roadside_tree_geojson_cache",
+            "sources.roadside_trees.tasks.warm_roadside_tree_geojson_cache",
         )
 
     def test_roadside_tree_templates_resolve_from_sources(self):
@@ -361,7 +361,7 @@ class WasteCollectionPluginIntegrationTestCase(SimpleTestCase):
 
         self.assertEqual(
             plugin.geojson_cache_warmer,
-            "maps.tasks.warm_collection_geojson_cache",
+            "sources.waste_collection.tasks.warm_collection_geojson_cache",
         )
 
 

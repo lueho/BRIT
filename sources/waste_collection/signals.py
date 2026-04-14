@@ -49,7 +49,7 @@ def _schedule_cache_warmup():
             return
 
     try:
-        from maps.tasks import warm_collection_geojson_cache
+        from sources.waste_collection.tasks import warm_collection_geojson_cache
 
         # Delay warmup by 5 seconds to allow any batch updates to complete
         warm_collection_geojson_cache.apply_async(countdown=5)

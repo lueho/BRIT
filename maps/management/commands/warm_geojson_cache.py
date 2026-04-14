@@ -40,11 +40,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        from maps.tasks import (
-            warm_all_geojson_caches,
-            warm_collection_geojson_cache,
-            warm_roadside_tree_geojson_cache,
-        )
+        from maps.tasks import warm_all_geojson_caches
+        from sources.roadside_trees.tasks import warm_roadside_tree_geojson_cache
+        from sources.waste_collection.tasks import warm_collection_geojson_cache
 
         warm_trees = options["trees"]
         warm_collections = options["collections"]
