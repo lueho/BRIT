@@ -2,7 +2,11 @@ from importlib import import_module
 
 from django.apps import apps
 
-from sources.contracts import SourceDomainExplorerCard, SourceDomainPlugin
+from sources.contracts import (
+    SourceDomainExplorerCard,
+    SourceDomainLegacyRedirects,
+    SourceDomainPlugin,
+)
 
 
 def _optional_module_exists(module_name: str) -> bool:
@@ -46,6 +50,14 @@ def _validate_source_domain_plugin(
         raise TypeError(
             f"{discovered_app_name}.plugin.plugin explorer_card must be a "
             f"SourceDomainExplorerCard instance"
+        )
+
+    if plugin.legacy_redirects is not None and not isinstance(
+        plugin.legacy_redirects, SourceDomainLegacyRedirects
+    ):
+        raise TypeError(
+            f"{discovered_app_name}.plugin.plugin legacy_redirects must be a "
+            f"SourceDomainLegacyRedirects instance"
         )
 
     if "exports" in plugin.capabilities:
@@ -167,3 +179,14 @@ def get_source_domain_explorer_cards() -> tuple[dict[str, object], ...]:
         )
 
     return tuple(sorted(cards, key=lambda card: (card["order"], card["title"])))
+
+
+def get_source_domain_legacy_redirects() -> tuple[SourceDomainLegacyRedirects, ...]:
+    redirects: list[SourceDomainLegacyRedirects] = []
+
+    for plugin in _SOURCE_DOMAIN_PLUGINS:
+        if plugin.legacy_redirects is None:
+            continue
+        redirects.append(plugin.legacy_redirects)
+
+    return tuple(sorted(redirects, key=lambda redirect: redirect.mount_path))

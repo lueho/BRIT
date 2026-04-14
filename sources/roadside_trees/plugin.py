@@ -1,4 +1,4 @@
-from sources.contracts import SourceDomainPlugin
+from sources.contracts import SourceDomainLegacyRedirects, SourceDomainPlugin
 
 plugin = SourceDomainPlugin(
     slug="roadside_trees",
@@ -15,4 +15,8 @@ plugin = SourceDomainPlugin(
     ),
     mount_in_hub=True,
     mount_path="",
+    legacy_redirects=SourceDomainLegacyRedirects(
+        mount_path="case_studies/hamburg/",
+        urlconf="sources.roadside_trees.legacy_urls",
+    ),
 )

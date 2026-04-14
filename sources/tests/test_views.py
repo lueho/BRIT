@@ -8,6 +8,7 @@ from django.urls import reverse
 from sources.registry import (
     get_hub_source_domain_plugins,
     get_source_domain_explorer_cards,
+    get_source_domain_legacy_redirects,
     get_source_domain_plugin,
 )
 from sources.roadside_trees.views import HamburgRoadsideTreesListFileExportView
@@ -99,6 +100,13 @@ class SourceDomainHubRoutingTestCase(SimpleTestCase):
             ("roadside_trees",),
         )
 
+    def test_registry_exposes_plugin_declared_legacy_redirect_mounts(self):
+        redirects = get_source_domain_legacy_redirects()
+
+        self.assertEqual(len(redirects), 1)
+        self.assertEqual(redirects[0].mount_path, "case_studies/hamburg/")
+        self.assertEqual(redirects[0].urlconf, "sources.roadside_trees.legacy_urls")
+
     def test_registry_keeps_plugins_discoverable_by_slug(self):
         self.assertEqual(get_source_domain_plugin("greenhouses").slug, "greenhouses")
         self.assertEqual(
@@ -126,6 +134,16 @@ class RoadsideTreesPluginIntegrationTestCase(SimpleTestCase):
 
         self.assertTrue(plugin.mount_in_hub)
         self.assertEqual(plugin.mount_path, "")
+
+    def test_roadside_trees_plugin_exposes_legacy_redirect_metadata(self):
+        plugin = get_source_domain_plugin("roadside_trees")
+
+        self.assertIsNotNone(plugin.legacy_redirects)
+        self.assertEqual(plugin.legacy_redirects.mount_path, "case_studies/hamburg/")
+        self.assertEqual(
+            plugin.legacy_redirects.urlconf,
+            "sources.roadside_trees.legacy_urls",
+        )
 
     def test_roadside_tree_templates_resolve_from_sources(self):
         self.assertIn(

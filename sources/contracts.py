@@ -23,6 +23,12 @@ class SourceDomainExplorerCard:
 
 
 @dataclass(frozen=True)
+class SourceDomainLegacyRedirects:
+    mount_path: str
+    urlconf: str
+
+
+@dataclass(frozen=True)
 class SourceDomainPlugin:
     slug: str
     verbose_name: str
@@ -34,6 +40,7 @@ class SourceDomainPlugin:
     explorer_context_var: str | None = None
     published_count_getter: str | None = None
     explorer_card: SourceDomainExplorerCard | None = None
+    legacy_redirects: SourceDomainLegacyRedirects | None = None
 
     def get_published_count(self) -> int | None:
         if not self.published_count_getter:
