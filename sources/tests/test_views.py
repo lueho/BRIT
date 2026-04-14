@@ -3,12 +3,13 @@ from unittest.mock import patch
 from django.contrib.staticfiles import finders
 from django.template.loader import get_template
 from django.test import SimpleTestCase
-from django.urls import reverse
+from django.urls import resolve, reverse
 
 from sources.registry import (
     get_hub_source_domain_plugins,
     get_source_domain_explorer_cards,
     get_source_domain_legacy_redirects,
+    get_source_domain_map_mounts,
     get_source_domain_plugin,
     get_source_domain_public_mounts,
 )
@@ -103,6 +104,17 @@ class SourceDomainHubRoutingTestCase(SimpleTestCase):
         self.assertEqual(redirects[0].mount_path, "case_studies/hamburg/")
         self.assertEqual(redirects[0].urlconf, "sources.roadside_trees.legacy_urls")
 
+    def test_registry_exposes_plugin_declared_map_mounts(self):
+        map_mounts = get_source_domain_map_mounts()
+
+        self.assertEqual(len(map_mounts), 3)
+        self.assertEqual(map_mounts[0].mount_path, "hamburg/")
+        self.assertEqual(map_mounts[0].urlconf, "sources.roadside_trees.urls")
+        self.assertEqual(map_mounts[1].mount_path, "hamburg/")
+        self.assertEqual(map_mounts[1].urlconf, "sources.urban_green_spaces.urls")
+        self.assertEqual(map_mounts[2].mount_path, "nantes/")
+        self.assertEqual(map_mounts[2].urlconf, "sources.greenhouses.urls")
+
     def test_registry_exposes_plugin_declared_public_mounts(self):
         public_mounts = get_source_domain_public_mounts()
 
@@ -149,6 +161,13 @@ class RoadsideTreesPluginIntegrationTestCase(SimpleTestCase):
             plugin.legacy_redirects.urlconf,
             "sources.roadside_trees.legacy_urls",
         )
+
+    def test_roadside_trees_plugin_exposes_map_mount_metadata(self):
+        plugin = get_source_domain_plugin("roadside_trees")
+
+        self.assertIsNotNone(plugin.map_mount)
+        self.assertEqual(plugin.map_mount.mount_path, "hamburg/")
+        self.assertEqual(plugin.map_mount.urlconf, "sources.roadside_trees.urls")
 
     def test_roadside_tree_templates_resolve_from_sources(self):
         self.assertIn(
@@ -201,6 +220,13 @@ class UrbanGreenSpacesPluginIntegrationTestCase(SimpleTestCase):
 
         self.assertFalse(plugin.mount_in_hub)
 
+    def test_urban_green_spaces_plugin_exposes_map_mount_metadata(self):
+        plugin = get_source_domain_plugin("urban_green_spaces")
+
+        self.assertIsNotNone(plugin.map_mount)
+        self.assertEqual(plugin.map_mount.mount_path, "hamburg/")
+        self.assertEqual(plugin.map_mount.urlconf, "sources.urban_green_spaces.urls")
+
 
 class GreenhousesPluginIntegrationTestCase(SimpleTestCase):
     def test_greenhouses_plugin_exposes_published_count_metadata(self):
@@ -222,6 +248,19 @@ class GreenhousesPluginIntegrationTestCase(SimpleTestCase):
         self.assertEqual(
             reverse("greenhouse-list"), "/case_studies/nantes/greenhouses/"
         )
+
+    def test_greenhouses_plugin_keeps_current_maps_route_mounted(self):
+        self.assertEqual(
+            resolve("/maps/nantes/greenhouses/map/").url_name,
+            "NantesGreenhouses",
+        )
+
+    def test_greenhouses_plugin_exposes_map_mount_metadata(self):
+        plugin = get_source_domain_plugin("greenhouses")
+
+        self.assertIsNotNone(plugin.map_mount)
+        self.assertEqual(plugin.map_mount.mount_path, "nantes/")
+        self.assertEqual(plugin.map_mount.urlconf, "sources.greenhouses.urls")
 
     def test_greenhouses_plugin_exposes_public_mount_metadata(self):
         plugin = get_source_domain_plugin("greenhouses")

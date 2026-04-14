@@ -1,5 +1,7 @@
 from django.urls import include, path
 
+from sources.registry import get_source_domain_map_mounts
+
 from .router import router
 from .views import (
     AttributeAutocompleteView,
@@ -300,9 +302,10 @@ urlpatterns = [
         NutsAndLauCatchmentPedigreeAPI.as_view(),
         name="data.nuts_lau_catchment_options",
     ),
-    path("nantes/", include("sources.greenhouses.urls")),
-    path("hamburg/", include("sources.roadside_trees.urls")),
-    path("hamburg/", include("sources.urban_green_spaces.urls")),
+    *[
+        path(map_mount.mount_path, include(map_mount.urlconf))
+        for map_mount in get_source_domain_map_mounts()
+    ],
     path("locations/", LocationPublishedListView.as_view(), name="location-list"),
     path(
         "locations/user/", LocationPrivateListView.as_view(), name="location-list-owned"

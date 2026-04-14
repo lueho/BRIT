@@ -5,6 +5,7 @@ from django.apps import apps
 from sources.contracts import (
     SourceDomainExplorerCard,
     SourceDomainLegacyRedirects,
+    SourceDomainMapMount,
     SourceDomainPlugin,
     SourceDomainPublicMount,
 )
@@ -59,6 +60,14 @@ def _validate_source_domain_plugin(
         raise TypeError(
             f"{discovered_app_name}.plugin.plugin legacy_redirects must be a "
             f"SourceDomainLegacyRedirects instance"
+        )
+
+    if plugin.map_mount is not None and not isinstance(
+        plugin.map_mount, SourceDomainMapMount
+    ):
+        raise TypeError(
+            f"{discovered_app_name}.plugin.plugin map_mount must be a "
+            f"SourceDomainMapMount instance"
         )
 
     if plugin.public_mount is not None and not isinstance(
@@ -203,6 +212,21 @@ def get_source_domain_legacy_redirects() -> tuple[SourceDomainLegacyRedirects, .
         redirects.append(plugin.legacy_redirects)
 
     return tuple(sorted(redirects, key=lambda redirect: redirect.mount_path))
+
+
+def get_source_domain_map_mounts() -> tuple[SourceDomainMapMount, ...]:
+    map_mounts: list[SourceDomainMapMount] = []
+
+    for plugin in _SOURCE_DOMAIN_PLUGINS:
+        if plugin.map_mount is None:
+            continue
+        map_mounts.append(plugin.map_mount)
+
+    return tuple(
+        sorted(
+            map_mounts, key=lambda map_mount: (map_mount.mount_path, map_mount.urlconf)
+        )
+    )
 
 
 def get_source_domain_public_mounts() -> tuple[SourceDomainPublicMount, ...]:

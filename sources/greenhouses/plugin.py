@@ -1,5 +1,6 @@
 from sources.contracts import (
     SourceDomainExplorerCard,
+    SourceDomainMapMount,
     SourceDomainPlugin,
     SourceDomainPublicMount,
 )
@@ -11,6 +12,10 @@ plugin = SourceDomainPlugin(
     urlconf="sources.greenhouses.urls",
     capabilities=("api", "exports", "forms", "html_views", "tasks", "templates"),
     published_count_getter="sources.greenhouses.selectors.published_greenhouse_count",
+    map_mount=SourceDomainMapMount(
+        mount_path="nantes/",
+        urlconf="sources.greenhouses.urls",
+    ),
     public_mount=SourceDomainPublicMount(
         mount_path="case_studies/nantes/",
         urlconf="sources.greenhouses.urls",

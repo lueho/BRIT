@@ -126,6 +126,7 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             published_count_getter=duplicate_b.published_count_getter,
             explorer_card=duplicate_b.explorer_card,
             legacy_redirects=duplicate_b.legacy_redirects,
+            map_mount=duplicate_b.map_mount,
             public_mount=duplicate_b.public_mount,
         )
 
@@ -148,6 +149,7 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             published_count_getter=greenhouses.published_count_getter,
             explorer_card=greenhouses.explorer_card,
             legacy_redirects=greenhouses.legacy_redirects,
+            map_mount=greenhouses.map_mount,
             public_mount=greenhouses.public_mount,
         )
 
@@ -170,6 +172,7 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             published_count_getter=waste_collection.published_count_getter,
             explorer_card=waste_collection.explorer_card,
             legacy_redirects=waste_collection.legacy_redirects,
+            map_mount=waste_collection.map_mount,
             public_mount=greenhouses.public_mount,
         )
 
@@ -177,6 +180,30 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             ValueError, "Duplicate source-domain public mount_path"
         ):
             _validate_source_domain_plugins((greenhouses, waste_collection))
+
+    def test_validation_rejects_invalid_map_mount_metadata(self):
+        plugin = get_source_domain_plugin("greenhouses")
+        plugin = plugin.__class__(
+            slug=plugin.slug,
+            verbose_name=plugin.verbose_name,
+            app_config=plugin.app_config,
+            urlconf=plugin.urlconf,
+            capabilities=plugin.capabilities,
+            mount_in_hub=plugin.mount_in_hub,
+            mount_path=plugin.mount_path,
+            published_count_getter=plugin.published_count_getter,
+            explorer_card=plugin.explorer_card,
+            legacy_redirects=plugin.legacy_redirects,
+            map_mount="nantes/",
+            public_mount=plugin.public_mount,
+        )
+
+        with self.assertRaisesMessage(
+            TypeError, "map_mount must be a SourceDomainMapMount instance"
+        ):
+            _validate_source_domain_plugin(
+                plugin, discovered_app_name="sources.greenhouses"
+            )
 
     def test_validation_rejects_mount_path_without_hub_mount(self):
         plugin = get_source_domain_plugin("greenhouses")
@@ -191,6 +218,7 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             published_count_getter=plugin.published_count_getter,
             explorer_card=plugin.explorer_card,
             legacy_redirects=plugin.legacy_redirects,
+            map_mount=plugin.map_mount,
             public_mount=plugin.public_mount,
         )
 
@@ -212,6 +240,7 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             published_count_getter=None,
             explorer_card=plugin.explorer_card,
             legacy_redirects=plugin.legacy_redirects,
+            map_mount=plugin.map_mount,
             public_mount=plugin.public_mount,
         )
 
@@ -236,6 +265,7 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             published_count_getter=plugin.published_count_getter,
             explorer_card=plugin.explorer_card,
             legacy_redirects=plugin.legacy_redirects,
+            map_mount=plugin.map_mount,
             public_mount=plugin.public_mount,
         )
 
