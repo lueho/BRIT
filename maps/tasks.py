@@ -11,6 +11,8 @@ from celery import shared_task
 from django.conf import settings
 from django.core.cache import caches
 
+from sources.registry import get_source_domain_geojson_cache_warmers
+
 logger = logging.getLogger(__name__)
 
 
@@ -151,20 +153,12 @@ def warm_all_geojson_caches(self):
     """
     results = {}
 
-    # Warm Collection cache
-    try:
-        result = warm_collection_geojson_cache.apply()
-        results["collection"] = result.get()
-    except Exception as e:
-        logger.exception("Failed to warm collection cache: %s", e)
-        results["collection"] = {"status": "error", "error": str(e)}
-
-    # Warm Roadside Trees cache
-    try:
-        result = warm_roadside_tree_geojson_cache.apply()
-        results["roadside_trees"] = result.get()
-    except Exception as e:
-        logger.exception("Failed to warm roadside trees cache: %s", e)
-        results["roadside_trees"] = {"status": "error", "error": str(e)}
+    for slug, warmer in get_source_domain_geojson_cache_warmers():
+        try:
+            result = warmer.apply()
+            results[slug] = result.get()
+        except Exception as e:
+            logger.exception("Failed to warm %s cache: %s", slug, e)
+            results[slug] = {"status": "error", "error": str(e)}
 
     return results

@@ -55,6 +55,7 @@ class SourceDomainPlugin:
     map_mount: SourceDomainMapMount | None = None
     public_mount: SourceDomainPublicMount | None = None
     sitemap_items: tuple[str, ...] = ()
+    geojson_cache_warmer: str | None = None
 
     def get_published_count(self) -> int | None:
         if not self.published_count_getter:
@@ -69,3 +70,11 @@ class SourceDomainPlugin:
 
     def get_urlpatterns(self):
         return import_module(self.urlconf).urlpatterns
+
+    def get_geojson_cache_warmer(self):
+        if not self.geojson_cache_warmer:
+            return None
+
+        module_path, attr_name = self.geojson_cache_warmer.rsplit(".", 1)
+        warmer = getattr(import_module(module_path), attr_name)
+        return warmer

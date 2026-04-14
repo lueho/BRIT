@@ -86,6 +86,14 @@ def _validate_source_domain_plugin(
             f"tuple of strings"
         )
 
+    if plugin.geojson_cache_warmer is not None and not isinstance(
+        plugin.geojson_cache_warmer, str
+    ):
+        raise TypeError(
+            f"{discovered_app_name}.plugin.plugin geojson_cache_warmer must be a "
+            f"dotted task path string"
+        )
+
     if "exports" in plugin.capabilities:
         module_name = f"{plugin.get_app_module()}.exports"
         if not _optional_module_exists(module_name):
@@ -262,3 +270,15 @@ def get_source_domain_sitemap_items() -> tuple[str, ...]:
             sitemap_items.append(item)
 
     return tuple(sitemap_items)
+
+
+def get_source_domain_geojson_cache_warmers() -> tuple[tuple[str, object], ...]:
+    warmers: list[tuple[str, object]] = []
+
+    for plugin in _SOURCE_DOMAIN_PLUGINS:
+        warmer = plugin.get_geojson_cache_warmer()
+        if warmer is None:
+            continue
+        warmers.append((plugin.slug, warmer))
+
+    return tuple(warmers)

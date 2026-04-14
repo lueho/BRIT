@@ -8,6 +8,7 @@ from django.urls import resolve, reverse
 from sources.registry import (
     get_hub_source_domain_plugins,
     get_source_domain_explorer_cards,
+    get_source_domain_geojson_cache_warmers,
     get_source_domain_legacy_redirects,
     get_source_domain_map_mounts,
     get_source_domain_plugin,
@@ -135,6 +136,14 @@ class SourceDomainHubRoutingTestCase(SimpleTestCase):
         self.assertNotIn("/maps/nantes/roadside_trees/export/", sitemap_items)
         self.assertNotIn("/case_studies/nantes/roadside_trees/export/", sitemap_items)
 
+    def test_registry_exposes_plugin_declared_geojson_cache_warmers(self):
+        warmers = get_source_domain_geojson_cache_warmers()
+
+        self.assertEqual(
+            tuple(slug for slug, _warmer in warmers),
+            ("roadside_trees", "waste_collection"),
+        )
+
     def test_registry_keeps_plugins_discoverable_by_slug(self):
         self.assertEqual(get_source_domain_plugin("greenhouses").slug, "greenhouses")
         self.assertEqual(
@@ -179,6 +188,14 @@ class RoadsideTreesPluginIntegrationTestCase(SimpleTestCase):
         self.assertIsNotNone(plugin.map_mount)
         self.assertEqual(plugin.map_mount.mount_path, "hamburg/")
         self.assertEqual(plugin.map_mount.urlconf, "sources.roadside_trees.urls")
+
+    def test_roadside_trees_plugin_exposes_geojson_cache_warmer_metadata(self):
+        plugin = get_source_domain_plugin("roadside_trees")
+
+        self.assertEqual(
+            plugin.geojson_cache_warmer,
+            "maps.tasks.warm_roadside_tree_geojson_cache",
+        )
 
     def test_roadside_tree_templates_resolve_from_sources(self):
         self.assertIn(
@@ -338,6 +355,14 @@ class WasteCollectionPluginIntegrationTestCase(SimpleTestCase):
 
         self.assertIn("/waste_collection/collections/", plugin.sitemap_items)
         self.assertIn("/waste_collection/collections/export/", plugin.sitemap_items)
+
+    def test_waste_collection_plugin_exposes_geojson_cache_warmer_metadata(self):
+        plugin = get_source_domain_plugin("waste_collection")
+
+        self.assertEqual(
+            plugin.geojson_cache_warmer,
+            "maps.tasks.warm_collection_geojson_cache",
+        )
 
 
 class SourceDomainExplorerCardRegistryTestCase(SimpleTestCase):
