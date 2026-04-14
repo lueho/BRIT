@@ -128,6 +128,7 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             legacy_redirects=duplicate_b.legacy_redirects,
             map_mount=duplicate_b.map_mount,
             public_mount=duplicate_b.public_mount,
+            sitemap_items=duplicate_b.sitemap_items,
         )
 
         with self.assertRaisesMessage(
@@ -151,6 +152,7 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             legacy_redirects=greenhouses.legacy_redirects,
             map_mount=greenhouses.map_mount,
             public_mount=greenhouses.public_mount,
+            sitemap_items=greenhouses.sitemap_items,
         )
 
         with self.assertRaisesMessage(
@@ -174,6 +176,7 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             legacy_redirects=waste_collection.legacy_redirects,
             map_mount=waste_collection.map_mount,
             public_mount=greenhouses.public_mount,
+            sitemap_items=waste_collection.sitemap_items,
         )
 
         with self.assertRaisesMessage(
@@ -196,10 +199,36 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             legacy_redirects=plugin.legacy_redirects,
             map_mount="nantes/",
             public_mount=plugin.public_mount,
+            sitemap_items=plugin.sitemap_items,
         )
 
         with self.assertRaisesMessage(
             TypeError, "map_mount must be a SourceDomainMapMount instance"
+        ):
+            _validate_source_domain_plugin(
+                plugin, discovered_app_name="sources.greenhouses"
+            )
+
+    def test_validation_rejects_invalid_sitemap_items_metadata(self):
+        plugin = get_source_domain_plugin("greenhouses")
+        plugin = plugin.__class__(
+            slug=plugin.slug,
+            verbose_name=plugin.verbose_name,
+            app_config=plugin.app_config,
+            urlconf=plugin.urlconf,
+            capabilities=plugin.capabilities,
+            mount_in_hub=plugin.mount_in_hub,
+            mount_path=plugin.mount_path,
+            published_count_getter=plugin.published_count_getter,
+            explorer_card=plugin.explorer_card,
+            legacy_redirects=plugin.legacy_redirects,
+            map_mount=plugin.map_mount,
+            public_mount=plugin.public_mount,
+            sitemap_items=["/maps/nantes/greenhouses/map/"],
+        )
+
+        with self.assertRaisesMessage(
+            TypeError, "sitemap_items must be a tuple of strings"
         ):
             _validate_source_domain_plugin(
                 plugin, discovered_app_name="sources.greenhouses"
@@ -220,6 +249,7 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             legacy_redirects=plugin.legacy_redirects,
             map_mount=plugin.map_mount,
             public_mount=plugin.public_mount,
+            sitemap_items=plugin.sitemap_items,
         )
 
         with self.assertRaisesMessage(ValueError, "mount_path requires mount_in_hub"):
@@ -242,6 +272,7 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             legacy_redirects=plugin.legacy_redirects,
             map_mount=plugin.map_mount,
             public_mount=plugin.public_mount,
+            sitemap_items=plugin.sitemap_items,
         )
 
         with self.assertRaisesMessage(
@@ -267,6 +298,7 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             legacy_redirects=plugin.legacy_redirects,
             map_mount=plugin.map_mount,
             public_mount=plugin.public_mount,
+            sitemap_items=plugin.sitemap_items,
         )
 
         with self.assertRaisesMessage(

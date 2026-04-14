@@ -16,7 +16,10 @@ class Command(BaseCommand):
 
         output_file = os.path.join("brit", "sitemap_items.py")
         with open(output_file, "w") as f:
-            f.write("SITEMAP_ITEMS = [\n")
+            f.write(
+                "from sources.registry import get_source_domain_sitemap_items\n\n\n"
+            )
+            f.write("BASE_SITEMAP_ITEMS = [\n")
             for pattern in patterns:
                 if not any(pattern.startswith(excluded) for excluded in exclude_paths):
                     if "<" not in pattern:
@@ -25,6 +28,9 @@ class Command(BaseCommand):
                         if clean_pattern:
                             f.write(f"    '{clean_pattern}',\n")
             f.write("]\n")
+            f.write(
+                "\n\nSITEMAP_ITEMS = [*BASE_SITEMAP_ITEMS, *get_source_domain_sitemap_items()]\n"
+            )
 
         self.stdout.write(
             self.style.SUCCESS(f"Successfully generated sitemap items in {output_file}")

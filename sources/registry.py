@@ -78,6 +78,14 @@ def _validate_source_domain_plugin(
             f"SourceDomainPublicMount instance"
         )
 
+    if not isinstance(plugin.sitemap_items, tuple) or not all(
+        isinstance(item, str) for item in plugin.sitemap_items
+    ):
+        raise TypeError(
+            f"{discovered_app_name}.plugin.plugin sitemap_items must be a "
+            f"tuple of strings"
+        )
+
     if "exports" in plugin.capabilities:
         module_name = f"{plugin.get_app_module()}.exports"
         if not _optional_module_exists(module_name):
@@ -240,3 +248,17 @@ def get_source_domain_public_mounts() -> tuple[SourceDomainPublicMount, ...]:
     return tuple(
         sorted(public_mounts, key=lambda public_mount: public_mount.mount_path)
     )
+
+
+def get_source_domain_sitemap_items() -> tuple[str, ...]:
+    sitemap_items: list[str] = []
+    seen_items: set[str] = set()
+
+    for plugin in _SOURCE_DOMAIN_PLUGINS:
+        for item in plugin.sitemap_items:
+            if item in seen_items:
+                continue
+            seen_items.add(item)
+            sitemap_items.append(item)
+
+    return tuple(sitemap_items)

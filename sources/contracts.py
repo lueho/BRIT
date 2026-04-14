@@ -54,6 +54,7 @@ class SourceDomainPlugin:
     legacy_redirects: SourceDomainLegacyRedirects | None = None
     map_mount: SourceDomainMapMount | None = None
     public_mount: SourceDomainPublicMount | None = None
+    sitemap_items: tuple[str, ...] = ()
 
     def get_published_count(self) -> int | None:
         if not self.published_count_getter:

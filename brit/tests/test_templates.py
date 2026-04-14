@@ -11,6 +11,14 @@ class SitemapItemsTestCase(SimpleTestCase):
         self.assertIn("/sources/explorer/", SITEMAP_ITEMS)
         self.assertNotIn("/sources/list/", SITEMAP_ITEMS)
 
+    def test_source_plugin_sitemap_entries_are_composed_dynamically(self):
+        self.assertIn("/maps/nantes/greenhouses/export/", SITEMAP_ITEMS)
+        self.assertIn("/waste_collection/collections/", SITEMAP_ITEMS)
+
+    def test_stale_nantes_roadside_tree_sitemap_entries_are_absent(self):
+        self.assertNotIn("/maps/nantes/roadside_trees/export/", SITEMAP_ITEMS)
+        self.assertNotIn("/case_studies/nantes/roadside_trees/export/", SITEMAP_ITEMS)
+
 
 class CookieConsentTemplateHardeningTests(TestCase):
     """Regression tests for cookie-consent template compatibility and behavior."""

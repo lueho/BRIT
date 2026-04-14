@@ -12,6 +12,7 @@ from sources.registry import (
     get_source_domain_map_mounts,
     get_source_domain_plugin,
     get_source_domain_public_mounts,
+    get_source_domain_sitemap_items,
 )
 from sources.roadside_trees.views import HamburgRoadsideTreesListFileExportView
 from utils.tests.testcases import ViewWithPermissionsTestCase
@@ -125,6 +126,14 @@ class SourceDomainHubRoutingTestCase(SimpleTestCase):
         self.assertEqual(public_mounts[0].urlconf, "sources.greenhouses.urls")
         self.assertEqual(public_mounts[1].mount_path, "waste_collection/")
         self.assertEqual(public_mounts[1].urlconf, "sources.waste_collection.urls")
+
+    def test_registry_exposes_plugin_declared_sitemap_items(self):
+        sitemap_items = get_source_domain_sitemap_items()
+
+        self.assertIn("/maps/nantes/greenhouses/export/", sitemap_items)
+        self.assertIn("/waste_collection/collections/", sitemap_items)
+        self.assertNotIn("/maps/nantes/roadside_trees/export/", sitemap_items)
+        self.assertNotIn("/case_studies/nantes/roadside_trees/export/", sitemap_items)
 
     def test_registry_keeps_plugins_discoverable_by_slug(self):
         self.assertEqual(get_source_domain_plugin("greenhouses").slug, "greenhouses")
@@ -283,6 +292,13 @@ class GreenhousesPluginIntegrationTestCase(SimpleTestCase):
         self.assertEqual(plugin.map_mount.mount_path, "nantes/")
         self.assertEqual(plugin.map_mount.urlconf, "sources.greenhouses.urls")
 
+    def test_greenhouses_plugin_exposes_sitemap_metadata(self):
+        plugin = get_source_domain_plugin("greenhouses")
+
+        self.assertIn("/maps/nantes/greenhouses/export/", plugin.sitemap_items)
+        self.assertIn("/case_studies/nantes/greenhouses/export/", plugin.sitemap_items)
+        self.assertNotIn("/maps/nantes/roadside_trees/export/", plugin.sitemap_items)
+
     def test_greenhouses_plugin_exposes_public_mount_metadata(self):
         plugin = get_source_domain_plugin("greenhouses")
 
@@ -316,6 +332,12 @@ class WasteCollectionPluginIntegrationTestCase(SimpleTestCase):
         self.assertIsNotNone(plugin.public_mount)
         self.assertEqual(plugin.public_mount.mount_path, "waste_collection/")
         self.assertEqual(plugin.public_mount.urlconf, "sources.waste_collection.urls")
+
+    def test_waste_collection_plugin_exposes_sitemap_metadata(self):
+        plugin = get_source_domain_plugin("waste_collection")
+
+        self.assertIn("/waste_collection/collections/", plugin.sitemap_items)
+        self.assertIn("/waste_collection/collections/export/", plugin.sitemap_items)
 
 
 class SourceDomainExplorerCardRegistryTestCase(SimpleTestCase):
