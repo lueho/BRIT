@@ -10,6 +10,7 @@ from sources.registry import (
     get_source_domain_explorer_cards,
     get_source_domain_legacy_redirects,
     get_source_domain_plugin,
+    get_source_domain_public_mounts,
 )
 from sources.roadside_trees.views import HamburgRoadsideTreesListFileExportView
 from utils.tests.testcases import ViewWithPermissionsTestCase
@@ -101,6 +102,15 @@ class SourceDomainHubRoutingTestCase(SimpleTestCase):
         self.assertEqual(len(redirects), 1)
         self.assertEqual(redirects[0].mount_path, "case_studies/hamburg/")
         self.assertEqual(redirects[0].urlconf, "sources.roadside_trees.legacy_urls")
+
+    def test_registry_exposes_plugin_declared_public_mounts(self):
+        public_mounts = get_source_domain_public_mounts()
+
+        self.assertEqual(len(public_mounts), 2)
+        self.assertEqual(public_mounts[0].mount_path, "case_studies/nantes/")
+        self.assertEqual(public_mounts[0].urlconf, "sources.greenhouses.urls")
+        self.assertEqual(public_mounts[1].mount_path, "waste_collection/")
+        self.assertEqual(public_mounts[1].urlconf, "sources.waste_collection.urls")
 
     def test_registry_keeps_plugins_discoverable_by_slug(self):
         self.assertEqual(get_source_domain_plugin("greenhouses").slug, "greenhouses")
@@ -213,6 +223,13 @@ class GreenhousesPluginIntegrationTestCase(SimpleTestCase):
             reverse("greenhouse-list"), "/case_studies/nantes/greenhouses/"
         )
 
+    def test_greenhouses_plugin_exposes_public_mount_metadata(self):
+        plugin = get_source_domain_plugin("greenhouses")
+
+        self.assertIsNotNone(plugin.public_mount)
+        self.assertEqual(plugin.public_mount.mount_path, "case_studies/nantes/")
+        self.assertEqual(plugin.public_mount.urlconf, "sources.greenhouses.urls")
+
 
 class WasteCollectionPluginIntegrationTestCase(SimpleTestCase):
     def test_waste_collection_plugin_exposes_published_count_metadata(self):
@@ -232,6 +249,13 @@ class WasteCollectionPluginIntegrationTestCase(SimpleTestCase):
 
     def test_waste_collection_plugin_keeps_current_public_entry_point(self):
         self.assertEqual(reverse("collection-list"), "/waste_collection/collections/")
+
+    def test_waste_collection_plugin_exposes_public_mount_metadata(self):
+        plugin = get_source_domain_plugin("waste_collection")
+
+        self.assertIsNotNone(plugin.public_mount)
+        self.assertEqual(plugin.public_mount.mount_path, "waste_collection/")
+        self.assertEqual(plugin.public_mount.urlconf, "sources.waste_collection.urls")
 
 
 class SourceDomainExplorerCardRegistryTestCase(SimpleTestCase):

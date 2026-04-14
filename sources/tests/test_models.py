@@ -126,6 +126,7 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             published_count_getter=duplicate_b.published_count_getter,
             explorer_card=duplicate_b.explorer_card,
             legacy_redirects=duplicate_b.legacy_redirects,
+            public_mount=duplicate_b.public_mount,
         )
 
         with self.assertRaisesMessage(
@@ -147,12 +148,35 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             published_count_getter=greenhouses.published_count_getter,
             explorer_card=greenhouses.explorer_card,
             legacy_redirects=greenhouses.legacy_redirects,
+            public_mount=greenhouses.public_mount,
         )
 
         with self.assertRaisesMessage(
             ValueError, "Duplicate source-domain hub mount_path"
         ):
             _validate_source_domain_plugins((roadside_trees, greenhouses))
+
+    def test_validation_rejects_duplicate_public_mount_paths(self):
+        greenhouses = get_source_domain_plugin("greenhouses")
+        waste_collection = get_source_domain_plugin("waste_collection")
+        waste_collection = waste_collection.__class__(
+            slug=waste_collection.slug,
+            verbose_name=waste_collection.verbose_name,
+            app_config=waste_collection.app_config,
+            urlconf=waste_collection.urlconf,
+            capabilities=waste_collection.capabilities,
+            mount_in_hub=waste_collection.mount_in_hub,
+            mount_path=waste_collection.mount_path,
+            published_count_getter=waste_collection.published_count_getter,
+            explorer_card=waste_collection.explorer_card,
+            legacy_redirects=waste_collection.legacy_redirects,
+            public_mount=greenhouses.public_mount,
+        )
+
+        with self.assertRaisesMessage(
+            ValueError, "Duplicate source-domain public mount_path"
+        ):
+            _validate_source_domain_plugins((greenhouses, waste_collection))
 
     def test_validation_rejects_mount_path_without_hub_mount(self):
         plugin = get_source_domain_plugin("greenhouses")
@@ -167,6 +191,7 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             published_count_getter=plugin.published_count_getter,
             explorer_card=plugin.explorer_card,
             legacy_redirects=plugin.legacy_redirects,
+            public_mount=plugin.public_mount,
         )
 
         with self.assertRaisesMessage(ValueError, "mount_path requires mount_in_hub"):
@@ -187,6 +212,7 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             published_count_getter=None,
             explorer_card=plugin.explorer_card,
             legacy_redirects=plugin.legacy_redirects,
+            public_mount=plugin.public_mount,
         )
 
         with self.assertRaisesMessage(
@@ -210,6 +236,7 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             published_count_getter=plugin.published_count_getter,
             explorer_card=plugin.explorer_card,
             legacy_redirects=plugin.legacy_redirects,
+            public_mount=plugin.public_mount,
         )
 
         with self.assertRaisesMessage(

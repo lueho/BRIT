@@ -6,7 +6,10 @@ from django.urls import include, path
 from django.views.generic import RedirectView, TemplateView
 from rest_framework.authtoken.views import obtain_auth_token
 
-from sources.registry import get_source_domain_legacy_redirects
+from sources.registry import (
+    get_source_domain_legacy_redirects,
+    get_source_domain_public_mounts,
+)
 from utils.views import DynamicRedirectView
 
 from .sitemaps import DynamicViewSitemap, HomepageSitemap
@@ -49,8 +52,10 @@ urlpatterns = [
         path(redirect.mount_path, include(redirect.urlconf))
         for redirect in get_source_domain_legacy_redirects()
     ],
-    path("case_studies/nantes/", include("sources.greenhouses.urls")),
-    path("waste_collection/", include("sources.waste_collection.urls")),
+    *[
+        path(public_mount.mount_path, include(public_mount.urlconf))
+        for public_mount in get_source_domain_public_mounts()
+    ],
     path("closecycle/", include("case_studies.closecycle.urls")),
     path("bibliography/", include("bibliography.urls")),
     path("cookies/", include("cookie_consent.urls")),

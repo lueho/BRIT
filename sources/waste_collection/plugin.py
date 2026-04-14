@@ -1,4 +1,8 @@
-from sources.contracts import SourceDomainExplorerCard, SourceDomainPlugin
+from sources.contracts import (
+    SourceDomainExplorerCard,
+    SourceDomainPlugin,
+    SourceDomainPublicMount,
+)
 
 plugin = SourceDomainPlugin(
     slug="waste_collection",
@@ -15,6 +19,10 @@ plugin = SourceDomainPlugin(
         "templates",
     ),
     published_count_getter="sources.waste_collection.selectors.published_collection_count",
+    public_mount=SourceDomainPublicMount(
+        mount_path="waste_collection/",
+        urlconf="sources.waste_collection.urls",
+    ),
     explorer_card=SourceDomainExplorerCard(
         title="Household Waste Collection",
         description=(

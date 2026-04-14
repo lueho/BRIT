@@ -6,6 +6,7 @@ from sources.contracts import (
     SourceDomainExplorerCard,
     SourceDomainLegacyRedirects,
     SourceDomainPlugin,
+    SourceDomainPublicMount,
 )
 
 
@@ -60,6 +61,14 @@ def _validate_source_domain_plugin(
             f"SourceDomainLegacyRedirects instance"
         )
 
+    if plugin.public_mount is not None and not isinstance(
+        plugin.public_mount, SourceDomainPublicMount
+    ):
+        raise TypeError(
+            f"{discovered_app_name}.plugin.plugin public_mount must be a "
+            f"SourceDomainPublicMount instance"
+        )
+
     if "exports" in plugin.capabilities:
         module_name = f"{plugin.get_app_module()}.exports"
         if not _optional_module_exists(module_name):
@@ -72,6 +81,7 @@ def _validate_source_domain_plugin(
 def _validate_source_domain_plugins(plugins: tuple[SourceDomainPlugin, ...]) -> None:
     seen_slugs: dict[str, str] = {}
     seen_mount_paths: dict[str, str] = {}
+    seen_public_mount_paths: dict[str, str] = {}
 
     for plugin in plugins:
         existing_slug_owner = seen_slugs.get(plugin.slug)
@@ -81,6 +91,20 @@ def _validate_source_domain_plugins(plugins: tuple[SourceDomainPlugin, ...]) -> 
                 f"{existing_slug_owner} and {plugin.get_app_module()}"
             )
         seen_slugs[plugin.slug] = plugin.get_app_module()
+
+        if plugin.public_mount is not None:
+            existing_public_mount_owner = seen_public_mount_paths.get(
+                plugin.public_mount.mount_path
+            )
+            if existing_public_mount_owner is not None:
+                raise ValueError(
+                    f"Duplicate source-domain public mount_path "
+                    f"'{plugin.public_mount.mount_path}' declared by "
+                    f"{existing_public_mount_owner} and {plugin.get_app_module()}"
+                )
+            seen_public_mount_paths[plugin.public_mount.mount_path] = (
+                plugin.get_app_module()
+            )
 
         if not plugin.mount_in_hub:
             continue
@@ -179,3 +203,16 @@ def get_source_domain_legacy_redirects() -> tuple[SourceDomainLegacyRedirects, .
         redirects.append(plugin.legacy_redirects)
 
     return tuple(sorted(redirects, key=lambda redirect: redirect.mount_path))
+
+
+def get_source_domain_public_mounts() -> tuple[SourceDomainPublicMount, ...]:
+    public_mounts: list[SourceDomainPublicMount] = []
+
+    for plugin in _SOURCE_DOMAIN_PLUGINS:
+        if plugin.public_mount is None:
+            continue
+        public_mounts.append(plugin.public_mount)
+
+    return tuple(
+        sorted(public_mounts, key=lambda public_mount: public_mount.mount_path)
+    )
