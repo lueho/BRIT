@@ -21,71 +21,39 @@
         <i class="fas fa-expand-arrows-alt me-1"></i> Source Types
     </h6>
     <div class="row g-3 mb-4 sources-explorer-cards">
-        <div class="col-12 col-sm-6 col-xl-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-light border-0 py-3">
-                    <h5 class="mb-0">
-                        <a href="{% url 'collection-list' %}"
-                           class="text-decoration-none text-body text-decoration-underline-hover">
-                            <i class="fas fa-fw fa-recycle me-2"></i>Household Waste Collection
+        {% for card in source_domain_explorer_cards %}
+            <div class="col-12 col-sm-6 col-xl-4">
+                <div class="card shadow h-100">
+                    <div class="card-header bg-light border-0 py-3">
+                        <h5 class="mb-0">
+                            <a href="{% url card.url_name %}"
+                               class="text-decoration-none text-body text-decoration-underline-hover">
+                                {% if card.icon_class %}<i class="{{ card.icon_class }} me-2"></i>{% endif %}
+                                {{ card.title }}
+                            </a>
+                        </h5>
+                    </div>
+                    <div class="card-img">
+                        <a class="d-flex align-items-center justify-content-center stretched-link"
+                           href="{% url card.url_name %}">
+                            <img class="w-100 m-0 p-1"
+                                 src="{% static card.image_path %}"
+                                 alt="{{ card.image_alt }}"
+                                 width="1772"
+                                 height="1772">
                         </a>
-                    </h5>
-                </div>
-                <div class="card-img">
-                    <a class="d-flex align-items-center justify-content-center stretched-link"
-                       href="{% url 'collection-list' %}">
-                        <img class="w-100 m-0 p-1"
-                             src="{% static 'img/waste_collection_cover_card.png' %}"
-                             alt="Household Waste Collection Cover Image"
-                             width="1772"
-                             height="1772">
-                    </a>
-                </div>
-                <div class="card-body d-flex flex-column">
-                    <p class="card-text flex-grow-1">
-                        Collection system parameters, waste streams, frequencies, and container types that determine biowaste volumes from households.
-                    </p>
-                    <p class="text-muted small mb-3">{{ collection_count }} published records</p>
-                    <div>
-                        <a href="{% url 'collection-list' %}"
-                           class="btn btn-sm btn-outline-primary"
-                           title="Open household waste collection list">Open list</a>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <p class="card-text flex-grow-1">{{ card.description }}</p>
+                        <p class="text-muted small mb-3">{{ card.published_count }} published records</p>
+                        <div>
+                            <a href="{% url card.url_name %}"
+                               class="btn btn-sm btn-outline-primary"
+                               title="{{ card.cta_label }}">{{ card.cta_label }}</a>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-light border-0 py-3">
-                    <h5 class="mb-0">
-                        <a href="{% url 'greenhouse-list' %}"
-                           class="text-decoration-none text-body text-decoration-underline-hover">
-                            <i class="fas fa-fw fa-seedling me-2"></i>Greenhouses
-                        </a>
-                    </h5>
-                </div>
-                <div class="card-img">
-                    <a class="d-flex align-items-center justify-content-center stretched-link"
-                       href="{% url 'greenhouse-list' %}">
-                        <img class="w-100 m-0 p-1"
-                             src="{% static 'img/greenhouses_cover_card.png' %}"
-                             alt="Greenhouses Cover Image"
-                             width="1772"
-                             height="1772">
-                    </a>
-                </div>
-                <div class="card-body d-flex flex-column">
-                    <p class="card-text flex-grow-1">
-                        Greenhouse facilities near Nantes, France, with growth cycles, cultures, and residue generation data from the FLEXIBI project.
-                    </p>
-                    <p class="text-muted small mb-3">{{ greenhouse_count }} published records</p>
-                    <div>
-                        <a href="{% url 'greenhouse-list' %}"
-                           class="btn btn-sm btn-outline-primary"
-                           title="Open greenhouse list">Open list</a>
-                    </div>
-                </div>
-            </div>
-        </div>
+        {% endfor %}
     </div>
 {% endblock content %}

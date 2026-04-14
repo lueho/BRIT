@@ -2,7 +2,7 @@ from importlib import import_module
 
 from django.apps import apps
 
-from sources.contracts import SourceDomainPlugin
+from sources.contracts import SourceDomainExplorerCard, SourceDomainPlugin
 
 
 def _optional_module_exists(module_name: str) -> bool:
@@ -38,6 +38,14 @@ def _validate_source_domain_plugin(
         raise ValueError(
             f"{discovered_app_name}.plugin.plugin must provide both "
             f"explorer_context_var and published_count_getter together"
+        )
+
+    if plugin.explorer_card is not None and not isinstance(
+        plugin.explorer_card, SourceDomainExplorerCard
+    ):
+        raise TypeError(
+            f"{discovered_app_name}.plugin.plugin explorer_card must be a "
+            f"SourceDomainExplorerCard instance"
         )
 
     if "exports" in plugin.capabilities:
@@ -134,3 +142,28 @@ def get_explorer_context() -> dict[str, int | None]:
         context[plugin.explorer_context_var] = plugin.get_published_count()
 
     return context
+
+
+def get_source_domain_explorer_cards() -> tuple[dict[str, object], ...]:
+    cards: list[dict[str, object]] = []
+
+    for plugin in _SOURCE_DOMAIN_PLUGINS:
+        if plugin.explorer_card is None:
+            continue
+
+        cards.append(
+            {
+                "slug": plugin.slug,
+                "title": plugin.explorer_card.title,
+                "description": plugin.explorer_card.description,
+                "url_name": plugin.explorer_card.url_name,
+                "image_path": plugin.explorer_card.image_path,
+                "image_alt": plugin.explorer_card.image_alt,
+                "icon_class": plugin.explorer_card.icon_class,
+                "cta_label": plugin.explorer_card.cta_label,
+                "order": plugin.explorer_card.order,
+                "published_count": plugin.get_published_count(),
+            }
+        )
+
+    return tuple(sorted(cards, key=lambda card: (card["order"], card["title"])))

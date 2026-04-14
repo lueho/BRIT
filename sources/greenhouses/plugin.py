@@ -1,4 +1,4 @@
-from sources.contracts import SourceDomainPlugin
+from sources.contracts import SourceDomainExplorerCard, SourceDomainPlugin
 
 plugin = SourceDomainPlugin(
     slug="greenhouses",
@@ -8,4 +8,16 @@ plugin = SourceDomainPlugin(
     capabilities=("api", "exports", "forms", "html_views", "tasks", "templates"),
     explorer_context_var="greenhouse_count",
     published_count_getter="sources.greenhouses.selectors.published_greenhouse_count",
+    explorer_card=SourceDomainExplorerCard(
+        title="Greenhouses",
+        description=(
+            "Greenhouse facilities near Nantes, France, with growth cycles, cultures, "
+            "and residue generation data from the FLEXIBI project."
+        ),
+        url_name="greenhouse-list",
+        image_path="img/greenhouses_cover_card.png",
+        image_alt="Greenhouses cover image",
+        icon_class="fas fa-fw fa-seedling",
+        order=20,
+    ),
 )
