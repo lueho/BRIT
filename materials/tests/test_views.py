@@ -3246,6 +3246,31 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "Composition groups")
         self.assertContains(response, "Measurement groups")
 
+    def test_sample_detail_shows_sample_sources_as_badge_links(self):
+        sample = Sample.objects.create(
+            name="Sourced Sample",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        source = Source.objects.create(
+            abbreviation="SRC-1",
+            title="Sample Source",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        sample.sources.add(source)
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse("source-detail-modal", kwargs={"pk": source.pk}),
+        )
+        self.assertContains(response, "SRC-1")
+        self.assertContains(response, "badge bg-light text-dark text-decoration-none")
+
     def test_sample_detail_empty_mass_measurements_anonymous(self):
         sample = Sample.objects.create(
             name="Massless Sample",

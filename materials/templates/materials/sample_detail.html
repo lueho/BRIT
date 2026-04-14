@@ -14,13 +14,11 @@
 {% block detail_top_image %}
   {% if object.display_image %}
     <div class="card-img-top">
-      <img class="w-100 m-0"
+      <img class="w-100 m-0 object-fit-cover"
            src="{{ object.display_image.url }}"
            alt="{% if object.display_image_source == 'series' %}Series image for {{ object.name }}{% else %}Image of sample{% endif %}"
            width="1200"
-           height="300"
-           style="max-height: 300px;
-                  object-fit: cover">
+           height="300">
       {% if object.display_image_source == 'series' %}
         <div class="small text-muted px-3 py-2 bg-body-tertiary border-top">
           <i class="fas fa-image me-1"></i> Showing the image from the linked sample series.
@@ -109,10 +107,13 @@
       {% if sample_sources %}
         <dt class="col-sm-4">Sources</dt>
         <dd class="col-sm-8">
-          {% for source in sample_sources %}
-            <a href="{% url 'source-detail-modal' source.pk %}" class="modal-link">{{ source.abbreviation }}</a>
-            {% if not forloop.last %},{% endif %}
-          {% endfor %}
+          <div class="d-flex flex-wrap gap-2">
+            {% for source in sample_sources %}
+              <a href="{% url 'source-detail-modal' source.pk %}"
+                 class="modal-link badge bg-light text-dark text-decoration-none"
+                 title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:"Source" }}</a>
+            {% endfor %}
+          </div>
         </dd>
       {% endif %}
     {% endwith %}
@@ -400,8 +401,7 @@
                                   <td>
                                     {% if measurement.analytical_method %}
                                       <a href="{% url 'analyticalmethod-detail-modal' measurement.analytical_method.pk %}"
-                                         class="modal-link text-truncate d-inline-block"
-                                         style="max-width: 120px"
+                                         class="modal-link text-truncate d-inline-block mw-100"
                                          title="{{ measurement.analytical_method.name }}">
                                         {{ measurement.analytical_method.name }}
                                       </a>
@@ -525,8 +525,9 @@
                         </td>
                         <td>
                           {% for source in property.sources.all %}
-                            <a href="{% url 'source-detail-modal' source.pk %}" class="modal-link">{{ source.abbreviation }}</a>
-                            {% if not forloop.last %},{% endif %}
+                            <a href="{% url 'source-detail-modal' source.pk %}"
+                               class="modal-link badge bg-light text-dark text-decoration-none"
+                               title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:"Source" }}</a>
                           {% empty %}
                             -
                           {% endfor %}
