@@ -124,6 +124,7 @@ known-first-party = ["brit"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+preview = true
 
 
 [tool.djlint]
