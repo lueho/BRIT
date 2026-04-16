@@ -553,6 +553,7 @@ class MaterialPropertyValueCreateView(
         return policy["can_add_property"]
 
     def form_valid(self, form):
+        form.instance.sample = self.sample
         response = super().form_valid(form)
         self.sample.properties.add(self.object)
         return response
@@ -572,9 +573,10 @@ class MaterialPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
     model = MaterialPropertyValue
 
     def get_success_url(self):
-        return reverse(
-            "sample-detail", kwargs={"pk": self.object.sample_set.first().pk}
-        )
+        related_sample = self.object.related_sample
+        if related_sample is None:
+            return ""
+        return reverse("sample-detail", kwargs={"pk": related_sample.pk})
 
 
 class MaterialPropertyValueUpdateView(UserCreatedObjectUpdateView):
@@ -663,7 +665,8 @@ class AnalyticalMethodDetailView(UserCreatedObjectDetailView):
         context = super().get_context_data(**kwargs)
         related_samples = (
             Sample.objects.filter(
-                Q(properties__analytical_method=self.object)
+                Q(property_values__analytical_method=self.object)
+                | Q(properties__analytical_method=self.object)
                 | Q(component_measurements__analytical_method=self.object)
             )
             .select_related("material", "series")
@@ -824,17 +827,15 @@ class SampleRepresentationMixin:
         gallery_urls = self.get_gallery_context_urls()
         context.update(gallery_urls)
         if getattr(self, "representation_mode", "list") == "gallery":
-            context.update(
-                {
-                    "representation_mode": "gallery",
-                    "public_representation_url": gallery_urls["public_gallery_url"]
-                    or context.get("public_url"),
-                    "private_representation_url": gallery_urls["private_gallery_url"]
-                    or context.get("private_url"),
-                    "review_representation_url": gallery_urls["review_gallery_url"]
-                    or context.get("review_url"),
-                }
-            )
+            context.update({
+                "representation_mode": "gallery",
+                "public_representation_url": gallery_urls["public_gallery_url"]
+                or context.get("public_url"),
+                "private_representation_url": gallery_urls["private_gallery_url"]
+                or context.get("private_url"),
+                "review_representation_url": gallery_urls["review_gallery_url"]
+                or context.get("review_url"),
+            })
         return context
 
 
@@ -1112,15 +1113,13 @@ class SampleDetailView(UserCreatedObjectDetailView):
                 if component_percent <= 0:
                     continue
 
-                shares.append(
-                    {
-                        "component": component_data["component"].pk,
-                        "component_name": component_data["component"].name,
-                        "average": float(component_percent / Decimal("100")),
-                        "standard_deviation": None,
-                        "as_percentage": f"{round(component_percent, 1)}{display_unit}",
-                    }
-                )
+                shares.append({
+                    "component": component_data["component"].pk,
+                    "component_name": component_data["component"].name,
+                    "average": float(component_percent / Decimal("100")),
+                    "standard_deviation": None,
+                    "as_percentage": f"{round(component_percent, 1)}{display_unit}",
+                })
 
             if not shares:
                 continue
@@ -1149,15 +1148,13 @@ class SampleDetailView(UserCreatedObjectDetailView):
                         f"{round(updated_percent, 1)}{display_unit}"
                     )
                 else:
-                    shares.append(
-                        {
-                            "component": other_component.pk,
-                            "component_name": other_component.name,
-                            "average": float(other_gap / Decimal("100")),
-                            "standard_deviation": None,
-                            "as_percentage": f"{round(other_gap, 1)}{display_unit}",
-                        }
-                    )
+                    shares.append({
+                        "component": other_component.pk,
+                        "component_name": other_component.name,
+                        "average": float(other_gap / Decimal("100")),
+                        "standard_deviation": None,
+                        "as_percentage": f"{round(other_gap, 1)}{display_unit}",
+                    })
 
             shares.sort(
                 key=lambda share: (
@@ -1169,23 +1166,19 @@ class SampleDetailView(UserCreatedObjectDetailView):
                 )
             )
 
-            compositions.append(
-                {
-                    "id": f"derived-{group_id}",
-                    "group": group.pk,
-                    "group_name": group.name,
-                    "sample": self.object.pk,
-                    "fractions_of": reference_component.pk,
-                    "fractions_of_name": reference_component.name,
-                    "shares": shares,
-                    "is_derived": True,
-                    "settings_pk": (
-                        composition_setting.pk
-                        if composition_setting is not None
-                        else None
-                    ),
-                }
-            )
+            compositions.append({
+                "id": f"derived-{group_id}",
+                "group": group.pk,
+                "group_name": group.name,
+                "sample": self.object.pk,
+                "fractions_of": reference_component.pk,
+                "fractions_of_name": reference_component.name,
+                "shares": shares,
+                "is_derived": True,
+                "settings_pk": (
+                    composition_setting.pk if composition_setting is not None else None
+                ),
+            })
 
         return compositions
 
@@ -1195,13 +1188,13 @@ class SampleDetailView(UserCreatedObjectDetailView):
             labels = [share["component_name"] for share in composition["shares"]]
             values = [share["average"] for share in composition["shares"]]
             chart = DoughnutChart(
-                id=f"materialCompositionChart-{composition['id']}",
+                id=f"materialCompositionChart-{composition["id"]}",
                 title="Composition",
                 unit="%",
                 labels=labels,
                 data=[{"label": "Fraction", "unit": "%", "data": values}],
             )
-            charts[f"composition-chart-{composition['id']}"] = chart.as_dict()
+            charts[f"composition-chart-{composition["id"]}"] = chart.as_dict()
         return charts
 
     def get_context_data(self, **kwargs):
@@ -1210,7 +1203,8 @@ class SampleDetailView(UserCreatedObjectDetailView):
             self.object, context={"request": self.request}
         ).data
         property_values = (
-            self.object.properties.select_related(
+            self.object.get_property_values_queryset()
+            .select_related(
                 "property",
                 "property__comparable_property",
                 "basis_component",
@@ -1253,9 +1247,9 @@ class SampleDetailView(UserCreatedObjectDetailView):
 
         sample_summary = {
             "component_measurement_count": len(component_measurements),
-            "component_measurement_group_count": len(
-                {measurement.group_id for measurement in component_measurements}
-            ),
+            "component_measurement_group_count": len({
+                measurement.group_id for measurement in component_measurements
+            }),
             "property_value_count": property_values.count(),
             "composition_count": len(compositions),
             "sample_source_count": self.object.sources.count(),
@@ -1273,34 +1267,30 @@ class SampleDetailView(UserCreatedObjectDetailView):
         )
         sample_layout_mode = (
             "workspace"
-            if any(
-                (
-                    sample_policy["can_manage_samples"],
-                    sample_policy["can_add_property"],
-                    sample_policy["can_edit"],
-                    sample_policy["can_duplicate"],
-                    sample_policy["can_delete"],
-                    sample_policy["can_submit_review"],
-                    sample_policy["can_view_review_feedback"],
-                )
-            )
+            if any((
+                sample_policy["can_manage_samples"],
+                sample_policy["can_add_property"],
+                sample_policy["can_edit"],
+                sample_policy["can_duplicate"],
+                sample_policy["can_delete"],
+                sample_policy["can_submit_review"],
+                sample_policy["can_view_review_feedback"],
+            ))
             else "explore"
         )
 
         data["compositions"] = compositions
 
-        context.update(
-            {
-                "data": data,
-                "charts": charts,
-                "property_values": property_values,
-                "component_measurements": component_measurements,
-                "sample_summary": sample_summary,
-                "sample_completeness": sample_completeness,
-                "sample_workflow": sample_workflow,
-                "sample_layout_mode": sample_layout_mode,
-            }
-        )
+        context.update({
+            "data": data,
+            "charts": charts,
+            "property_values": property_values,
+            "component_measurements": component_measurements,
+            "sample_summary": sample_summary,
+            "sample_completeness": sample_completeness,
+            "sample_workflow": sample_workflow,
+            "sample_layout_mode": sample_layout_mode,
+        })
         return context
 
 
@@ -1373,8 +1363,9 @@ class SampleAddPropertyView(UserCreatedObjectCreateView):
     permission_required = "materials.add_materialpropertyvalue"
 
     def form_valid(self, form):
-        property_value = form.save()
         sample = Sample.objects.get(pk=self.kwargs.get("pk"))
+        form.instance.sample = sample
+        property_value = form.save()
         sample.properties.add(property_value)
         return HttpResponseRedirect(self.get_success_url())
 
@@ -1387,9 +1378,10 @@ class SampleModalAddPropertyView(UserPassesTestMixin, UserCreatedObjectModalCrea
     permission_required = "materials.add_materialpropertyvalue"
 
     def form_valid(self, form):
-        form.instance.owner = self.request.user
-        property_value = form.save()
         sample = Sample.objects.get(pk=self.kwargs.get("pk"))
+        form.instance.owner = self.request.user
+        form.instance.sample = sample
+        property_value = form.save()
         sample.properties.add(property_value)
         return HttpResponseRedirect(self.get_success_url())
 
@@ -1528,9 +1520,10 @@ class AddComponentView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {"form_title": "Select a component to add", "submit_button_text": "Add"}
-        )
+        context.update({
+            "form_title": "Select a component to add",
+            "submit_button_text": "Add",
+        })
         return context
 
     def form_valid(self, form):
@@ -1665,12 +1658,10 @@ class AddCompositionView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "form_title": "Select a component group to add",
-                "submit_button_text": "Add",
-            }
-        )
+        context.update({
+            "form_title": "Select a component group to add",
+            "submit_button_text": "Add",
+        })
         return context
 
     def form_valid(self, form):
@@ -1694,9 +1685,10 @@ class AddSourceView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {"form_title": "Select a reference to add", "submit_button_text": "Add"}
-        )
+        context.update({
+            "form_title": "Select a reference to add",
+            "submit_button_text": "Add",
+        })
         return context
 
     def form_valid(self, form):
@@ -1727,9 +1719,10 @@ class AddSeasonalVariationView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {"form_title": "Select a distribution to add", "submit_button_text": "Add"}
-        )
+        context.update({
+            "form_title": "Select a distribution to add",
+            "submit_button_text": "Add",
+        })
         return context
 
     def form_valid(self, form):
@@ -1751,9 +1744,10 @@ class RemoveSeasonalVariationView(UserCreatedObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {"form_title": "Remove seasonal variation", "submit_button_text": "Remove"}
-        )
+        context.update({
+            "form_title": "Remove seasonal variation",
+            "submit_button_text": "Remove",
+        })
         return context
 
     def get_success_url(self):

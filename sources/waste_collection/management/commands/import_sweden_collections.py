@@ -598,25 +598,21 @@ def _build_food_waste_record(
     source_urls = [u for u in [_SOURCE_URLS.get(data_year)] if u]
     pvs = []
     if food_kg is not None:
-        pvs.append(
-            {
-                "property_id": _PROP_SPECIFIC,
-                "unit_name": _UNIT_KG,
-                "year": data_year,
-                "average": food_kg,
-                "flyer_urls": source_urls,
-            }
-        )
+        pvs.append({
+            "property_id": _PROP_SPECIFIC,
+            "unit_name": _UNIT_KG,
+            "year": data_year,
+            "average": food_kg,
+            "flyer_urls": source_urls,
+        })
     if conn_rate is not None:
-        pvs.append(
-            {
-                "property_id": _PROP_CONN_RATE,
-                "unit_name": _UNIT_PCT_HH,
-                "year": data_year,
-                "average": conn_rate,
-                "flyer_urls": source_urls,
-            }
-        )
+        pvs.append({
+            "property_id": _PROP_CONN_RATE,
+            "unit_name": _UNIT_PCT_HH,
+            "year": data_year,
+            "average": conn_rate,
+            "flyer_urls": source_urls,
+        })
     return {
         **_resolve_catchment_key(city),
         "collection_system": _COLLECTION_SYSTEM_DOOR_TO_DOOR,
@@ -1269,9 +1265,10 @@ class Command(BaseCommand):
             type=str,
             default="",
             help=(
-                "Optional raw JSON artifact from prepare_sweden_2024_map_data. "
-                "Legacy prepared CSV files are also accepted. Rows flagged for "
-                "manual review are ignored."
+                "Optional Sweden 2024 map-data artifact from "
+                "prepare_sweden_2024_map_data. Prefer the reviewed CSV after "
+                "manual corrections; the raw JSON provenance artifact is also "
+                "accepted. Rows still flagged for manual review are ignored."
             ),
         )
 
@@ -1282,7 +1279,7 @@ class Command(BaseCommand):
     def _get_token(self, api_url: str, username: str, password: str) -> str:
         """Obtain a DRF token via the token-auth endpoint."""
         try:
-            url = f"{api_url.rstrip('/')}/api-token-auth/"
+            url = f"{api_url.rstrip("/")}/api-token-auth/"
             payload = json.dumps({"username": username, "password": password}).encode()
             req = Request(
                 url,
@@ -1311,14 +1308,12 @@ class Command(BaseCommand):
     ) -> dict:
         """POST one batch of records to the import endpoint; return stats dict."""
         try:
-            url = f"{api_url.rstrip('/')}/waste_collection/api/collection/import/"
-            payload = json.dumps(
-                {
-                    "records": records,
-                    "publication_status": publication_status,
-                    "dry_run": dry_run,
-                }
-            ).encode()
+            url = f"{api_url.rstrip("/")}/waste_collection/api/collection/import/"
+            payload = json.dumps({
+                "records": records,
+                "publication_status": publication_status,
+                "dry_run": dry_run,
+            }).encode()
             req = Request(
                 url,
                 data=payload,
@@ -1446,32 +1441,32 @@ class Command(BaseCommand):
                 stats = result.get("stats", {})
                 self._merge_stats(totals, stats)
                 self.stdout.write(
-                    f" created={stats.get('created', 0)}"
-                    f" updated={stats.get('updated', 0)}"
-                    f" skipped={stats.get('skipped', 0)}\n"
+                    f" created={stats.get("created", 0)}"
+                    f" updated={stats.get("updated", 0)}"
+                    f" skipped={stats.get("skipped", 0)}\n"
                 )
 
         self.stdout.write("\n=== Import Summary ===\n")
-        self.stdout.write(f"  Collections created:  {totals['created']}\n")
-        self.stdout.write(f"  Collections updated:  {totals['updated']}\n")
-        self.stdout.write(f"  Collections skipped:  {totals['skipped']}\n")
-        self.stdout.write(f"  Predecessor links:    {totals['predecessor_links']}\n")
-        self.stdout.write(f"  CPVs created:         {totals['cpv_created']}\n")
-        self.stdout.write(f"  CPVs skipped:         {totals['cpv_skipped']}\n")
-        self.stdout.write(f"  Flyers created:       {totals['flyers_created']}\n")
-        self.stdout.write(f"  Collectors created:   {totals['collectors_created']}\n")
+        self.stdout.write(f"  Collections created:  {totals["created"]}\n")
+        self.stdout.write(f"  Collections updated:  {totals["updated"]}\n")
+        self.stdout.write(f"  Collections skipped:  {totals["skipped"]}\n")
+        self.stdout.write(f"  Predecessor links:    {totals["predecessor_links"]}\n")
+        self.stdout.write(f"  CPVs created:         {totals["cpv_created"]}\n")
+        self.stdout.write(f"  CPVs skipped:         {totals["cpv_skipped"]}\n")
+        self.stdout.write(f"  Flyers created:       {totals["flyers_created"]}\n")
+        self.stdout.write(f"  Collectors created:   {totals["collectors_created"]}\n")
         if totals["warnings"]:
-            self.stdout.write(f"\n  Warnings ({len(totals['warnings'])}):\n")
+            self.stdout.write(f"\n  Warnings ({len(totals["warnings"])}):\n")
             for w in totals["warnings"]:
                 self.stdout.write(f"    {w}\n")
         if totals["changes"] and dry_run:
             self.stdout.write(
-                f"\n  Changes that would be made ({len(totals['changes'])}):\n"
+                f"\n  Changes that would be made ({len(totals["changes"])}):\n"
             )
             for change in totals["changes"][:20]:  # Show first 20 changes
                 self.stdout.write(f"    {change}\n")
             if len(totals["changes"]) > 20:
-                self.stdout.write(f"    ... and {len(totals['changes']) - 20} more\n")
+                self.stdout.write(f"    ... and {len(totals["changes"]) - 20} more\n")
 
     @staticmethod
     def _merge_stats(totals: dict, stats: dict) -> None:

@@ -202,8 +202,22 @@ class SampleModelSerializer(ModelSerializer):
         source="series", read_only=True, view_name="sampleseries-detail"
     )
     compositions = CompositionModelSerializer(many=True)
-    properties = MaterialPropertyValueModelSerializer(many=True)
+    properties = SerializerMethodField()
     sources = SourceAbbreviationSerializer(many=True)
+
+    def get_properties(self, obj):
+        request = self.context.get("request")
+        queryset = obj.get_property_values_queryset().select_related(
+            "property",
+            "basis_component",
+            "analytical_method",
+            "unit",
+        )
+        return MaterialPropertyValueModelSerializer(
+            queryset.order_by("property__name", "id"),
+            many=True,
+            context={"request": request},
+        ).data
 
     class Meta:
         model = Sample
@@ -272,8 +286,18 @@ class CompositionAPISerializer(ModelSerializer):
 
 class SampleAPISerializer(ModelSerializer):
     timestep = StringRelatedField()
-    properties = MaterialPropertyAPISerializer(many=True)
+    properties = SerializerMethodField()
     compositions = CompositionAPISerializer(many=True)
+
+    def get_properties(self, obj):
+        queryset = obj.get_property_values_queryset().select_related(
+            "property",
+            "basis_component",
+            "unit",
+        )
+        return MaterialPropertyAPISerializer(
+            queryset.order_by("property__name", "id"), many=True
+        ).data
 
     class Meta:
         model = Sample

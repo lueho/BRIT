@@ -101,15 +101,15 @@ Target outcome:
 ### 3.1 Already aligned with the report
 
 - **Domain-owned property definitions**
-  - `MaterialProperty` already exists as the concrete materials property table
-- **Value-level measurement metadata**
-  - `MaterialPropertyValue` already includes `unit`, `basis_component`, `analytical_method`, and `sources`
-- **Raw measurement storage**
-  - `ComponentMeasurement` already stores raw per-sample component measurements with unit, basis, method, and sources
-- **Sampling context**
-  - `SampleSeries` and `Sample` already capture material, timesteps, dates, location text, laboratory context, and sources
-- **Term harmonization bridge**
-  - `comparable_component` and `comparable_property` already support canonical alias mapping for equivalent raw terms
+  - `MaterialProperty(PropertyBase)` already follows the current BRIT direction of domain-owned concrete property tables
+  - `MaterialPropertyValue` already stores unit, basis, analytical method, and sources
+  - `ComponentMeasurement` already stores raw component measurements per sample
+  - `SampleDetailView` already contains a derived composition read path built from `ComponentMeasurement`, but that logic is still view-local
+  - `Sample` and `SampleSeries` already carry much of the sampling context
+  - `BaseMaterial` supports comparable aliases for components, but not a real recursive hierarchy
+  - there is no separate semantic definition layer for materials/components yet
+  - legacy normalized composition storage (`Composition` + `WeightShare`) is still an active first-class structure
+  - `MaterialPropertyValue` is still attached to `Sample` through `Sample.properties` as a many-to-many relation instead of belonging directly to one sample
 
 ### 3.2 Not yet aligned with the report
 
@@ -121,8 +121,8 @@ Target outcome:
   - `MaterialPropertyValue` is linked through `Sample.properties` many-to-many instead of a direct foreign key
 - **Legacy normalized composition storage is still primary in many code paths**
   - `Composition` and `WeightShare` remain central to views, serializers, and APIs
-- **No on-the-fly normalization service is the canonical read path yet**
-  - derived normalized views are not yet the main abstraction
+- **Derived normalization exists, but not yet as a shared canonical service**
+  - raw-first derived composition logic exists in at least one important read path, but it is still view-local and is not yet the main serializer/API abstraction
 
 ## 4. Gap Summary
 
@@ -132,7 +132,7 @@ Target outcome:
 | Stored material separate from semantic definition | Alias-only canonical mapping on material/property terms | Add dedicated semantic definition and reference-mapping models |
 | Measurement belongs to sample with provenance | `ComponentMeasurement` does; `MaterialPropertyValue` does not | Move `MaterialPropertyValue` to direct sample ownership |
 | Property definition separated from value | Largely present already | Harden unit/basis authority and reduce legacy fallback behavior over time |
-| Raw-first storage, normalized on demand | Raw component measurement exists, but legacy normalized storage is still active | Make raw measurement canonical and shift normalized compositions to derived/compatibility status |
+| Raw-first storage, normalized on demand | Raw component measurement exists and a derived read path already exists, but persisted normalized structures still dominate shared APIs and forms | Extract a shared normalization service, migrate consumers gradually, and shift normalized compositions to derived/compatibility status |
 
 ## 5. Recommended BRIT Implementation Strategy
 
@@ -212,12 +212,17 @@ Deliverables:
   - `ComponentMeasurement`
   - `MaterialPropertyValue`
 - inventory all read paths that assume normalized composition is the primary representation
+- record current database shape before schema work, including counts for:
+  - `MaterialPropertyValue` linked to zero, one, or multiple samples
+  - samples that currently have persisted property values, raw component measurements, both, or neither
+  - compositions that cannot be reconstructed from current raw measurements without loss
 - add focused regression tests around:
   - sample detail rendering
   - serializers/API payloads
   - import paths
   - filter behavior
   - duplication behavior for samples and sample series
+- produce a compatibility matrix for each major read/write surface, identifying whether it will remain persisted, become derived, or run in dual-path compatibility mode during transition
 - document current data volumes and nullability assumptions before schema migrations
 
 Why first:
@@ -233,6 +238,7 @@ Recommended model direction:
 
 - add an explicit decomposition relation for `BaseMaterial`
 - prefer a dedicated relation model over a single self-FK if the same child may reasonably appear in multiple parent contexts
+- keep the first implementation slice source-facing on `BaseMaterial` rather than coupling hierarchy immediately to a future semantic-definition layer
 
 Recommended additions:
 
@@ -256,9 +262,16 @@ Success criteria:
 - a material can be decomposed recursively without changing imported names
 - existing material CRUD remains stable
 
-## Phase 2 - Add semantic definition and reference mapping
+## Phase 2 - Conditional semantic definition and reference mapping
 
-Goal: separate stored material entries from their semantic meaning.
+Goal: separate stored material entries from their semantic meaning when there is a concrete consumer that justifies the extra abstraction.
+
+Start this phase only when at least one concrete consumer is defined, such as:
+
+- search/filter behavior that must align equivalent raw terms through shared definition nodes
+- export or interoperability mappings to external reference systems
+- curator workflows that need explicit canonical concepts beyond `comparable_component`
+- cross-dataset analytics that cannot be expressed cleanly with the current comparable-field bridge
 
 Recommended model direction:
 
@@ -287,6 +300,7 @@ Bridge from current state:
 
 Implementation steps:
 
+- define write ownership and governance for definition nodes and external mappings before introducing new models
 - introduce the new models without deleting comparable fields
 - create helpers to resolve the effective canonical definition for a material/component
 - update search/filter logic to prefer the definition layer where available
@@ -319,6 +333,9 @@ Implementation steps:
 - backfill it from existing `Sample.properties` links
 - add validation to prevent one property value from being attached to multiple samples during transition
 - update forms, serializers, views, duplication logic, and imports to use `sample.property_values`
+- update model helpers, serializers, views, URL resolution, duplication logic, imports, and any reverse-relation assumptions to use `sample.property_values`
+- make `Sample.properties` read-only compatibility state as soon as practical
+- update tests/factories to create sample-owned property values through the FK path rather than `Sample.properties.add(...)`
 - once all call sites are migrated, remove or deprecate `Sample.properties`
 
 Optional follow-up in the same phase:
@@ -329,10 +346,11 @@ Optional follow-up in the same phase:
 Success criteria:
 
 - every `MaterialPropertyValue` belongs to exactly one sample
+- new writes use direct reverse relations instead of many-to-many indirection
 - sample detail pages and APIs use direct reverse relations instead of many-to-many indirection
 - provenance remains explicit at sample and measurement level
 
-## Phase 4 - Make raw measurements the canonical composition source
+## Phase 4 - Extract and adopt raw-first derived normalization
 
 Goal: shift the primary truth from normalized `WeightShare` storage to raw component measurements.
 
@@ -340,15 +358,24 @@ Recommended direction:
 
 - `ComponentMeasurement` becomes the canonical persisted representation for component-level observations
 - normalized compositions become a derived read model
+- build from the derived composition logic that already exists in `SampleDetailView`, but extract it into a shared service instead of letting view-local logic become the long-term integration point
 
 Implementation steps:
 
-- introduce a normalization service/helper layer that can:
+- Phase 4a - extract a shared normalization service/helper layer that can:
   - collect raw component measurements for a sample and group
   - normalize them to fractions or percentages on demand
   - expose warnings when normalization is partial or assumptions are required
-- add read-side helpers/serializers for normalized composition output without requiring `WeightShare` writes
-- migrate views currently reading `Composition`/`WeightShare` to use the derived normalization path where feasible
+- Phase 4a - define one canonical read contract for mixed-state samples during transition:
+  - resolve each composition group independently rather than switching the entire sample to either persisted-only or derived-only mode
+  - if raw `ComponentMeasurement` data exists for a group, the derived normalized output for that group is authoritative
+  - if a group has no raw measurements yet, fall back to persisted `WeightShare` compatibility data for that group
+  - preserve ordering and `fractions_of` from `Composition` settings where available
+  - if raw-derived output and persisted normalized values disagree for the same group, expose the raw-derived output as canonical and surface an explicit warning for validation/cleanup
+- Phase 4a - expose one shared serializer/helper output shape for both raw-derived groups and persisted-fallback groups so UI/API consumers do not need separate code paths; if consumers need origin visibility, add explicit metadata fields instead of divergent schemas
+- add dedicated tests for the shared normalization rules so view behavior and API behavior cannot drift
+- Phase 4b - migrate read-side helpers/serializers to normalized composition output without requiring `WeightShare` writes
+- migrate views currently reading `Composition`/`WeightShare` to use the shared derived normalization path where feasible
 - restrict creation of new `WeightShare` data to compatibility workflows only
 - once the new path is stable, stop treating `WeightShare` as the authoritative storage model
 
@@ -372,7 +399,8 @@ Candidate cleanup items:
 
 - deprecate and then remove `Sample.properties`
 - reduce direct UI/API dependence on `Composition` and `WeightShare`
-- decide whether `Composition`/`WeightShare` remain as a legacy compatibility layer or can be retired fully
+- move `WeightShare` to compatibility-only status and decide later whether it can be retired fully
+- decide whether `Composition` remains as a lightweight settings model for group ordering and `fractions_of` or can also be retired
 - review whether `MaterialProperty.unit` should remain only as a compatibility label while `allowed_units` and value-level `unit` stay authoritative
 
 Only do this phase when:
@@ -387,16 +415,18 @@ Only do this phase when:
 |---|---|---|
 | 1 | Phase 0 - baseline and safety | protects all later schema work |
 | 2 | Phase 3 - measurement ownership | highest semantic mismatch with the report and relatively self-contained |
-| 3 | Phase 4 - raw-first normalization | central report requirement and closely related to Phase 3 |
-| 4 | Phase 1 - recursive hierarchy | important, but can be introduced additively once the measurement path is safer |
-| 5 | Phase 2 - semantic definition layer | valuable but can build on the already improved structural base |
-| 6 | Phase 5 - cleanup | only after new paths are proven |
+| 3 | Phase 4a - shared normalization service extraction | builds on an existing derived path and creates one canonical implementation before wider read migration |
+| 4 | Phase 4b - migrate selected consumers | moves serializers/views toward the raw-first path without removing compatibility too early |
+| 5 | Phase 1 - recursive hierarchy | important, but can be introduced additively once the measurement path is safer |
+| 6 | Phase 2 - conditional semantic definition layer | should wait until a concrete consumer justifies the added abstraction and governance overhead |
+| 7 | Phase 5 - cleanup | only after new paths are proven |
 
 Notes on ordering:
 
 - Phase 1 and Phase 2 can be swapped if a concrete dataset urgently needs semantic mapping before hierarchical decomposition.
 - Phase 3 should happen before major API or import work that expands property-value usage further.
-- Phase 4 should not start until Phase 0 has identified all normalized-composition dependencies.
+- Phase 4a should not start until Phase 0 has identified all normalized-composition dependencies.
+- Phase 4b should not start until the shared normalization service is covered by focused tests.
 
 ## 8. Non-Goals
 
@@ -421,8 +451,9 @@ The materials module can be considered aligned with the report once all of the f
 - stored material records can point to separate semantic definition nodes and external references
 - each material property measurement belongs directly to one sample
 - raw component measurements are the canonical stored representation for component composition data
-- normalized compositions are derived on demand instead of being the primary truth
-- current UI/API/import workflows use the new canonical paths
+- normalized compositions are derived on demand instead of being the primary truth, with any temporary persisted fallback clearly bounded as compatibility-only
+- current UI/API/import workflows use the new canonical paths, with any remaining compatibility surfaces clearly bounded
+- if `Composition` remains, it is clearly bounded as a settings/helper model rather than the primary store of normalized truth
 - any remaining legacy structures are clearly marked as compatibility-only or retired
 
 ## 10. Immediate Next Step

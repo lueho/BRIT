@@ -23,6 +23,7 @@ from sources.waste_collection.sweden_2024_map_data import (
     load_prepared_map_details,
     load_raw_map_data,
     load_raw_map_details,
+    load_reviewed_map_details,
     write_raw_map_data,
 )
 
@@ -113,6 +114,35 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
         self.addCleanup(csv_path.unlink)
 
         details = load_prepared_map_details(csv_path)
+
+        self.assertEqual(
+            details,
+            {
+                "0180": {
+                    "no_collection": False,
+                    "sorting_method": "Separate bins",
+                    "bag_material": "Collection Support Item: Paper bags",
+                }
+            },
+        )
+
+    def test_load_reviewed_map_details_ignores_manual_review_rows(self):
+        with NamedTemporaryFile(
+            "w", suffix=".csv", delete=False, encoding="utf-8"
+        ) as handle:
+            handle.write(
+                "lau_id,municipality_name,sorting_label,sorting_method,sorting_confidence,sorting_pixels,bag_label,bag_material,bag_confidence,bag_pixels,collection_system,no_collection,needs_manual_review,review_reasons\n"
+            )
+            handle.write(
+                "0180,Stockholm,Separata kärl,Separate bins,0.88,12,Papper,Collection Support Item: Paper bags,0.80,10,Door to door,0,0,\n"
+            )
+            handle.write(
+                "0181,Södertälje,ET,,0.71,7,ET,,0.69,7,No separate collection,1,1,needs review\n"
+            )
+            csv_path = Path(handle.name)
+        self.addCleanup(csv_path.unlink)
+
+        details = load_reviewed_map_details(csv_path)
 
         self.assertEqual(
             details,
@@ -413,7 +443,7 @@ class PrepareSweden2024MapDataCommandTestCase(SimpleTestCase):
         "sources.waste_collection.management.commands.prepare_sweden_2024_map_data.write_raw_map_data"
     )
     @patch(
-        "sources.waste_collection.management.commands.prepare_sweden_2024_map_data.write_prepared_map_rows"
+        "sources.waste_collection.management.commands.prepare_sweden_2024_map_data.write_reviewed_map_rows"
     )
     def test_command_writes_raw_output_and_optional_review_csv(
         self, mock_write_review, mock_write_raw, mock_extract
@@ -457,7 +487,7 @@ class PrepareSweden2024MapDataCommandTestCase(SimpleTestCase):
                 "prepare_sweden_2024_map_data",
                 pdf=str(pdf_path),
                 output=str(output_path),
-                review_output=str(review_path),
+                reviewed_output=str(review_path),
                 stdout=stdout,
             )
 
@@ -467,7 +497,7 @@ class PrepareSweden2024MapDataCommandTestCase(SimpleTestCase):
 
         output = stdout.getvalue()
         self.assertIn("Wrote raw map data for 2 municipalities", output)
-        self.assertIn("Wrote derived review CSV for 2 municipalities", output)
+        self.assertIn("Wrote editable reviewed CSV for 2 municipalities", output)
         self.assertIn("assigned=283", output)
         self.assertIn("assigned=279", output)
         self.assertIn("Rows flagged for manual review: 1", output)

@@ -132,6 +132,25 @@ class SampleFilterTestCase(TestCase):
         self.assertEqual(filtr.form.fields["parameter"].label, "Parameter")
         self.assertEqual(filtr.form.fields["raw_parameter"].label, "Raw parameter")
 
+    def test_parameter_filter_matches_sample_owned_property_values(self):
+        sample_owned = Sample.objects.create(
+            name="Sample D",
+            material=self.substrate_material,
+        )
+        MaterialPropertyValue.objects.create(
+            sample=sample_owned,
+            property=self.parameter_n,
+            average=Decimal("15"),
+            standard_deviation=Decimal("0"),
+        )
+
+        filtr = SampleFilter(
+            data={"parameter": self.parameter_n.pk},
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertIn(sample_owned, filtr.qs)
+
     def test_substrate_material_queryset_only_contains_complex_substrates(self):
         filtr = SampleFilter(queryset=Sample.objects.all())
 

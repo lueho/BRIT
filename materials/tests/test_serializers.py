@@ -96,6 +96,15 @@ class SampleSerializerTestCase(TestCase):
         with mute_signals(post_save):
             source = Source.objects.create(title="Test Source")
         sample.sources.add(source)
+        property_obj = MaterialProperty.objects.create(name="Dry Matter", unit="%")
+        unit = Unit.objects.create(name="Percent")
+        MaterialPropertyValue.objects.create(
+            sample=sample,
+            property=property_obj,
+            unit=unit,
+            average=Decimal("42.0"),
+            standard_deviation=Decimal("1.5"),
+        )
 
     def setUp(self):
         self.sample = Sample.objects.get(name="Test Sample")
@@ -119,6 +128,18 @@ class SampleSerializerTestCase(TestCase):
         self.assertIn("compositions", data)
         self.assertIn("properties", data)
         self.assertIn("sources", data)
+
+    def test_serializer_includes_sample_owned_property_values(self):
+        request = RequestFactory().get(
+            reverse("sample-detail", kwargs={"pk": self.sample.id})
+        )
+        data = SampleModelSerializer(self.sample, context={"request": request}).data
+
+        self.assertEqual(len(data["properties"]), 1)
+        self.assertEqual(
+            data["properties"][0]["property_name"],
+            "Dry Matter",
+        )
 
 
 class CompositionSerializerTestCase(TestCase):

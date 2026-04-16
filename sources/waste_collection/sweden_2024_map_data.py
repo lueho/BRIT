@@ -217,9 +217,9 @@ def _load_projected_regions() -> (
         geom.transform(MAP_PROJECTION_SRID)
         polygons = []
         for polygon in _iter_polygons(geom):
-            polygons.append(
-                [_coord_xy(coord) for coord in polygon.exterior_ring.coords]
-            )
+            polygons.append([
+                _coord_xy(coord) for coord in polygon.exterior_ring.coords
+            ])
         regions.append(
             _ProjectedRegion(
                 lau_id=(region.lau_id or "").zfill(4),
@@ -514,7 +514,7 @@ def write_raw_map_data(raw_map_data: RawMapData, output_path: str | Path) -> Non
         handle.write("\n")
 
 
-def write_prepared_map_rows(
+def write_reviewed_map_rows(
     rows: list[dict[str, str]], output_path: str | Path
 ) -> None:
     output_path = Path(output_path)
@@ -525,17 +525,23 @@ def write_prepared_map_rows(
         writer.writerows(rows)
 
 
+def write_prepared_map_rows(
+    rows: list[dict[str, str]], output_path: str | Path
+) -> None:
+    write_reviewed_map_rows(rows, output_path)
+
+
 def load_raw_map_data(raw_path: str | Path) -> RawMapData:
     raw_path = Path(raw_path)
     with raw_path.open(encoding="utf-8") as handle:
         payload = json.load(handle)
     if payload.get("format") != RAW_FILE_FORMAT:
         raise Sweden2024MapDataError(
-            f"Expected {RAW_FILE_FORMAT} format, found {payload.get('format')}."
+            f"Expected {RAW_FILE_FORMAT} format, found {payload.get("format")}."
         )
     if payload.get("version") != RAW_FILE_VERSION:
         raise Sweden2024MapDataError(
-            f"Expected version {RAW_FILE_VERSION}, found {payload.get('version')}."
+            f"Expected version {RAW_FILE_VERSION}, found {payload.get("version")}."
         )
     rows = [
         RawMapRow(
@@ -584,14 +590,18 @@ def load_raw_map_details(raw_path: str | Path) -> dict[str, dict[str, object]]:
     return _prepared_rows_to_map_details(build_prepared_rows(raw_map_data))
 
 
-def load_prepared_map_details(csv_path: str | Path) -> dict[str, dict[str, object]]:
+def load_reviewed_map_details(csv_path: str | Path) -> dict[str, dict[str, object]]:
     csv_path = Path(csv_path)
     with csv_path.open(newline="", encoding="utf-8") as handle:
         return _prepared_rows_to_map_details(list(csv.DictReader(handle)))
+
+
+def load_prepared_map_details(csv_path: str | Path) -> dict[str, dict[str, object]]:
+    return load_reviewed_map_details(csv_path)
 
 
 def load_map_details(map_path: str | Path) -> dict[str, dict[str, object]]:
     map_path = Path(map_path)
     if map_path.suffix.lower() == ".json":
         return load_raw_map_details(map_path)
-    return load_prepared_map_details(map_path)
+    return load_reviewed_map_details(map_path)

@@ -314,6 +314,21 @@ class MaterialPropertyValueTestCase(TestCase):
         self.assertEqual(value.display_average, value.average)
         self.assertEqual(value.display_standard_deviation, value.standard_deviation)
 
+    def test_related_sample_prefers_direct_sample_fk(self):
+        material = Material.objects.create(name="Digestate")
+        sample = Sample.objects.create(name="Owned Sample", material=material)
+        prop = MaterialProperty.objects.create(name="Nitrogen", unit="g/kg")
+        unit = Unit.objects.create(name="mg/kg")
+        value = MaterialPropertyValue.objects.create(
+            sample=sample,
+            property=prop,
+            unit=unit,
+            average=Decimal("27.3"),
+            standard_deviation=Decimal("0.1337"),
+        )
+
+        self.assertEqual(value.related_sample, sample)
+
 
 class ComponentMeasurementTestCase(TestCase):
     def test_display_standard_deviation_is_none_when_missing(self):

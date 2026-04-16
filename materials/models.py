@@ -2,9 +2,10 @@ from builtins import property as builtin_property
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Max
-from django.db.models.signals import post_save, pre_save
+from django.db.models import Max, Q
+from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
 
@@ -517,6 +518,14 @@ class MaterialPropertyGroup(NamedUserCreatedObject):
 class MaterialPropertyValue(NumericMeasurementMixin, UserCreatedObject):
     """Concrete numeric measurement record linked to ``MaterialProperty``."""
 
+    sample = models.ForeignKey(
+        "Sample",
+        related_name="property_values",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        help_text="The sample this measurement belongs to.",
+    )
     property = models.ForeignKey(MaterialProperty, on_delete=models.PROTECT)
     basis_component = models.ForeignKey(
         MaterialComponent,
@@ -552,9 +561,10 @@ class MaterialPropertyValue(NumericMeasurementMixin, UserCreatedObject):
         blank=True,
     )
 
-    def duplicate(self, creator):
+    def duplicate(self, creator, sample=None):
         duplicate = MaterialPropertyValue.objects.create(
             owner=creator,
+            sample=sample,
             property=self.property,
             basis_component=self.basis_component,
             unit=self.unit,
@@ -570,8 +580,14 @@ class MaterialPropertyValue(NumericMeasurementMixin, UserCreatedObject):
     def canonical_property(self):
         return self.property.canonical_property
 
+    @builtin_property
+    def related_sample(self):
+        if self.sample_id:
+            return self.sample
+        return self.sample_set.first()
+
     def get_absolute_url(self):
-        sample = self.sample_set.first()
+        sample = self.related_sample
         if sample is None:
             return ""
         return sample.get_absolute_url()
@@ -639,7 +655,19 @@ class Sample(NamedUserCreatedObject):
         help_text="If the sample represents a specific time step in a series, select it here.",
     )
     sources = models.ManyToManyField(Source)
-    properties = models.ManyToManyField(MaterialPropertyValue)
+    properties = models.ManyToManyField(
+        MaterialPropertyValue,
+        related_name="sample_set",
+        related_query_name="legacy_sample",
+    )
+
+    def get_property_values_queryset(self):
+        legacy_property_value_ids = self.properties.filter(
+            sample__isnull=True
+        ).values_list("pk", flat=True)
+        return MaterialPropertyValue.objects.filter(
+            Q(sample=self) | Q(pk__in=legacy_property_value_ids)
+        ).distinct()
 
     @property
     def group_ids(self):
@@ -710,13 +738,60 @@ class Sample(NamedUserCreatedObject):
             duplicate_composition.sample = duplicate
             duplicate_composition.save()
 
-        for prop in self.properties.all():
-            duplicate.properties.add(prop.duplicate(creator))
+        for prop in self.get_property_values_queryset():
+            duplicate_property_value = prop.duplicate(creator, sample=duplicate)
+            duplicate.properties.add(duplicate_property_value)
 
         for measurement in self.component_measurements.all():
             measurement.duplicate(creator, sample=duplicate)
 
         return duplicate
+
+
+@receiver(m2m_changed, sender=Sample.properties.through)
+def validate_sample_property_value_links(
+    sender, instance, action, reverse, model, pk_set, **kwargs
+):
+    if action != "pre_add" or not pk_set:
+        return
+
+    if reverse:
+        if instance.sample_id and any(
+            sample_pk != instance.sample_id for sample_pk in pk_set
+        ):
+            raise ValidationError(
+                "A material property value cannot be attached to multiple samples."
+            )
+        if instance.sample_id is None and len(pk_set) > 1:
+            raise ValidationError(
+                "A material property value can only be attached to one sample."
+            )
+        return
+
+    conflicting_values = model.objects.filter(pk__in=pk_set).exclude(
+        sample__isnull=True
+    )
+    conflicting_values = conflicting_values.exclude(sample=instance)
+    if conflicting_values.exists():
+        raise ValidationError(
+            "A material property value cannot be attached to multiple samples."
+        )
+
+
+@receiver(m2m_changed, sender=Sample.properties.through)
+def backfill_sample_property_value_links(
+    sender, instance, action, reverse, model, pk_set, **kwargs
+):
+    if action != "post_add" or not pk_set:
+        return
+
+    if reverse:
+        if instance.sample_id is None:
+            instance.sample_id = next(iter(pk_set))
+            instance.save(update_fields=["sample"])
+        return
+
+    model.objects.filter(pk__in=pk_set, sample__isnull=True).update(sample=instance)
 
 
 @receiver(post_save, sender=Sample)

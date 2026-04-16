@@ -273,7 +273,10 @@ class SampleFilter(UserCreatedObjectScopedFilterSet):
         comparable_ids = MaterialProperty.objects.filter(
             Q(pk=canonical_property.pk) | Q(comparable_property=canonical_property)
         ).values_list("pk", flat=True)
-        return queryset.filter(properties__property_id__in=comparable_ids).distinct()
+        return queryset.filter(
+            Q(property_values__property_id__in=comparable_ids)
+            | Q(properties__property_id__in=comparable_ids)
+        ).distinct()
 
     def filter_raw_parameter(self, queryset, name, value):
         canonical_component = value.canonical_component
