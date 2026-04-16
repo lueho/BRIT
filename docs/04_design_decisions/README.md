@@ -8,9 +8,10 @@ This section contains Architecture Decision Records (ADRs) and major design rati
 
 ## Recent design records
 - [2026-04-14: Materials database target-state plan (authoritative materials roadmap)](2026-04-14_materials_database_target_state_plan.md)
-- [2026-04-09: Sources plugin decoupling roadmap](2026-04-09_sources_plugin_decoupling_roadmap.md)
 - [2026-03-25: Property unification current state and remaining work](2026-03-25_property_unification_current_state_and_remaining_work.md)
 - [2026-02-10: Sources module consolidation decision record](2026-02-10_sources_consolidation_decision_record.md)
+
+Operational documentation for the current `sources` plugin contract lives in `sources/README.md` rather than in this ADR index.
 
 ## How to Add an ADR
 1. Copy the template below into a new file in this folder.
@@ -38,4 +39,4 @@ _What becomes easier or harder as a result?_
 
 *Add new ADRs or design records as needed. For rationale behind major decisions, use the template above.*
 
-_Last updated: 2026-04-09_
+_Last updated: 2026-04-16_

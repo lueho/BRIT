@@ -207,8 +207,22 @@ In practice, most built-in source-domain plugins also own files such as:
 - `urls.py`
 - `plugin.py`
 - `tests/`
-
-These are common domain-app files, not the strict minimum contract required for discovery.
+- `forms.py`
+- `views.py`
+- `filters.py`
+- `serializers.py`
+- `viewsets.py`
+- `router.py`
+- `selectors.py`
+- `exports.py`
+- `renderers.py`
+- `tasks.py`
+- `signals.py`
+- `geojson.py`
+- `inventory/`
+- `templates/`
+- `static/`
+- `management/`
 
 ## `plugin.py` contract
 
@@ -222,8 +236,13 @@ The descriptor currently declares:
 - `capabilities`
 - `mount_in_hub`
 - `mount_path`
-- `explorer_context_var`
 - `published_count_getter`
+- `explorer_card`
+- `legacy_redirects`
+- `map_mount`
+- `public_mount`
+- `sitemap_items`
+- `geojson_cache_warmer`
 
 `app_config` is also used to derive the app module path for optional plugin-side integrations such as exports.
 
@@ -234,11 +253,20 @@ The plugin model is intentionally small: the core `sources` app consumes explici
 The currently stable integration surfaces are:
 
 - `sources.contracts.SourceDomainPlugin`
+- `sources.contracts.SourceDomainExplorerCard`
+- `sources.contracts.SourceDomainLegacyRedirects`
+- `sources.contracts.SourceDomainMapMount`
+- `sources.contracts.SourceDomainPublicMount`
 - `sources.contracts.SourceDomainExport`
 - the `<app>.plugin` discovery convention
 - the optional `<app>.exports` convention for plugins with the `exports` capability
 - hub mounting through `mount_in_hub` and `mount_path`
-- explorer participation through `explorer_context_var` and `published_count_getter`
+- explorer participation through `explorer_card` and `published_count_getter`
+- root-level public mounts through `public_mount`
+- map URL composition through `map_mount`
+- compatibility redirects through `legacy_redirects`
+- source-owned sitemap contributions through `sitemap_items`
+- GeoJSON cache warmer orchestration through `geojson_cache_warmer`
 
 Everything else inside `sources` should be treated as core implementation detail unless it is documented here.
 
@@ -248,20 +276,36 @@ At the moment, the `sources` hub provides a small but useful set of integration 
 
 - contracts in `sources.contracts`
   - `SourceDomainPlugin` defines the basic plugin descriptor
+  - `SourceDomainExplorerCard` defines explorer card metadata
+  - `SourceDomainLegacyRedirects` defines plugin-owned compatibility redirects
+  - `SourceDomainMapMount` defines plugin-owned map URL mounts
+  - `SourceDomainPublicMount` defines plugin-owned root-level public mounts
   - `SourceDomainExport` defines export registrations
 - registry functions in `sources.registry`
   - `get_source_domain_plugins()` returns all discovered plugins
   - `get_source_domain_plugin(slug)` resolves a plugin by slug
   - `get_hub_source_domain_plugins()` returns plugins mounted into the hub URL surface
-  - `get_explorer_context()` builds explorer counters from plugin metadata
+  - `get_source_domain_explorer_cards()` returns explorer card metadata with published counts
+  - `get_source_domain_legacy_redirects()` returns plugin-declared legacy redirect mounts
+  - `get_source_domain_map_mounts()` returns plugin-declared map URL mounts
+  - `get_source_domain_public_mounts()` returns plugin-declared root-level public mounts
+  - `get_source_domain_sitemap_items()` returns deduplicated plugin sitemap entries
+  - `get_source_domain_geojson_cache_warmers()` returns plugin-owned GeoJSON warmers
 - helper methods on `SourceDomainPlugin`
   - `get_app_module()` resolves the app module path from `app_config`
   - `get_urlpatterns()` resolves URL patterns from `urlconf`
   - `get_published_count()` resolves the configured published-count getter
+  - `get_geojson_cache_warmer()` resolves the configured warmer task
 - hub URL composition in `sources.urls`
   - plugins that opt into hub mounting are included automatically
 - explorer composition in `sources.views.SourcesExplorerView`
-  - the explorer view consumes registry-built context instead of hard-coded domain counts
+  - the explorer view consumes registry-built plugin card metadata instead of hard-coded domain counts
+- root URL composition in `brit.urls`
+  - plugin-declared public mounts, legacy redirects, and map mounts are included without hard-coded domain imports
+- sitemap composition in `brit.sitemap_items`
+  - plugin-declared sitemap entries are appended dynamically through the registry
+- GeoJSON warming in `maps.tasks` and `maps.management.commands.warm_geojson_cache`
+  - core orchestration iterates plugin-declared warmers instead of importing domain tasks directly
 - export discovery through `utils.file_export.registry_init`
   - plugins with the `exports` capability can register file exports without core hard-coded imports
 
@@ -365,34 +409,26 @@ Important examples include:
 
 The intent is not that every domain app must look identical. The intent is that source-domain apps should share the same platform-level behavior for review, permissions, map interaction, and referencing, so domain code stays focused on the source domain itself.
 
-## Core helpers that should be added next
+## Current optional integration responsibilities
 
-To keep future source-domain apps aligned, the `sources` core should gradually provide more shared helper surfaces where multiple domains repeat the same patterns.
+Optional plugin metadata should be used only when the plugin actually participates in that integration surface.
 
-Recommended next additions are:
-
-- plugin validation helpers
-  - central validation for duplicate slugs, hub-mount rules, and explorer metadata completeness
-- richer hub metadata
-  - optional plugin-declared labels, ordering, icons, descriptions, and navigation metadata for explorer and hub pages
-- shared explorer-card helpers
-  - a standard way for domains to contribute explorer cards or summary panels instead of only raw count values
-- shared map integration helpers
-  - common registration patterns for GeoJSON endpoints, map layers, or region-based summaries
-- shared temporal integration helpers
-  - standard contracts for reporting periods, seasonal dimensions, and time-series summary metadata
-- shared descriptive-data helpers
-  - standard patterns for observed values, descriptive statistics, provenance of observations, and status-quo summaries
-- shared predictive-model helpers
-  - standard registration or helper surfaces for calibrated models, estimation outputs, prediction metadata, and predictive summaries
-- shared assumption and scenario helpers
-  - standard contracts for explicit assumption values, boundary scenarios, scenario runs, and the separation of scenario artifacts from observed data
-- shared testing helpers
-  - reusable tests or assertions for plugin validity, hub inclusion, explorer integration, and export registration
-- shared documentation conventions
-  - a lightweight checklist or template for what each domain app should document about its origin data, descriptive layer, predictive layer, assumption and scenario layer, spatial behavior, and temporal behavior
-
-The goal is not to force all domains into one abstract framework. The goal is to centralize only the repeated integration seams so each domain app can stay domain-specific while still fitting cleanly into the same hub architecture.
+- `mount_in_hub` and `mount_path`
+  - mount the plugin under the `/sources/` hub URL surface
+- `explorer_card` and `published_count_getter`
+  - contribute an explorer card with a live published-object count
+- `public_mount`
+  - expose a root-level public URL mount owned by the plugin
+- `map_mount`
+  - expose a plugin-owned map URL mount
+- `legacy_redirects`
+  - expose compatibility redirects owned by the plugin
+- `sitemap_items`
+  - contribute canonical URL paths to the composed sitemap list
+- `geojson_cache_warmer`
+  - let maps orchestration warm plugin-owned GeoJSON caches without direct imports
+- `exports` capability plus `<app>.exports`
+  - register plugin-owned file exports through the shared export discovery path
 
 ## Required behavior
 
@@ -400,7 +436,14 @@ The goal is not to force all domains into one abstract framework. The goal is to
 - `app_config` must point at the Django app config class.
 - `urlconf` must point at the domain URL module.
 - Plugins mounted under `/sources/` must set `mount_in_hub=True`.
-- Plugins contributing explorer counters must provide both `explorer_context_var` and `published_count_getter`.
+- `mount_path` requires `mount_in_hub=True`.
+- Plugins contributing explorer cards must provide both `explorer_card` and `published_count_getter`.
+- `public_mount`, when present, must be a `SourceDomainPublicMount` with a unique `mount_path`.
+- `map_mount`, when present, must be a `SourceDomainMapMount`.
+- `legacy_redirects`, when present, must be a `SourceDomainLegacyRedirects`.
+- `sitemap_items` must be a tuple of strings.
+- `geojson_cache_warmer`, when present, must be a dotted task path string.
+- Plugins declaring the `exports` capability must provide `<app>.exports`.
 
 ## Discovery model
 
@@ -418,15 +461,13 @@ Each entry must be a `SourceDomainExport` instance with:
 - `serializer`
 - `renderers`
 
-The file export subsystem discovers these export adapters dynamically through the source-domain registry rather than importing concrete domain apps in core code.
-
 ## Optional capabilities
 
 Capabilities are descriptive metadata used to document what a plugin provides.
 Typical values include `api`, `exports`, `forms`, `html_views`, `signals`, `tasks`, `templates`, `static_assets`, and `legacy_redirects`.
 
-## Current migration state
+## Current architecture state
 
-The registry is now discovery-driven for installed source-domain apps.
-Only plugins that opt into `mount_in_hub=True` are mounted automatically under `/sources/`.
-Other source-domain apps can keep their current public entry points until their URLs are migrated behind the hub.
+- The registry is discovery-driven for installed source-domain apps.
+- Hub routing, explorer cards, public mounts, map mounts, compatibility redirects, sitemap entries, and GeoJSON warmers are all composed from plugin metadata.
+- Plugins can still own canonical public URLs outside `/sources/` through explicit mount metadata rather than core hard-coded imports.
