@@ -706,6 +706,118 @@ Deliverables:
   - materialized snapshot
   - PostgreSQL foreign table
 
+### Phase 0 implementation tasks
+
+- **Task 0.1 - Lock the post-refactor meaning of `GeoDataset`**
+  - Decide explicitly that `GeoDataset` is the stable logical dataset identity shown to users, not merely a thin wrapper around one hardcoded model route and not one unrelated top-level object per refresh cycle.
+  - This decision must be recorded clearly enough that later work on versions, imports, and inventories can build on it without redefining the dataset concept.
+  - Primary file targets:
+    - `docs/04_design_decisions/2026-04-16_dataset_registry_and_federated_geodata_target_state_plan.md`
+    - `maps/models.py`
+    - `inventories/models.py`
+
+- **Task 0.2 - Audit all runtime coupling to `model_name`**
+  - Enumerate every place where dataset identity currently depends on `GeoDataset.model_name`, `GIS_SOURCE_MODELS`, CamelCase route names, or hardcoded model assumptions.
+  - The audit should cover model fields, URL resolution, view lookup, tests, and user-facing navigation so that Phase 1 can remove coupling systematically rather than leaving hidden dependencies behind.
+  - Primary file targets:
+    - `maps/models.py`
+    - `maps/views.py`
+    - `maps/urls.py`
+    - `maps/forms.py`
+    - `maps/tests/test_views.py`
+    - `maps/tests/test_filters.py`
+
+- **Task 0.3 - Reconcile documented promises with implemented behavior**
+  - Review the no-code onboarding story documented in `maps/README.md` against the actual runtime path and make every mismatch explicit.
+  - In particular, settle whether the documented generic dataset fields, routes, and rollout assumptions already exist, are partially implemented, or still need to be created in Phase 1.
+  - Primary file targets:
+    - `maps/README.md`
+    - `docs/04_design_decisions/2026-02-09_module_ux_harmonization_guideline.md`
+    - `maps/models.py`
+    - `maps/urls.py`
+
+- **Task 0.4 - Define the minimum Phase 1 metadata contract**
+  - Agree on the smallest metadata set that makes a local table/view-backed dataset genuinely explorable through registry metadata rather than bespoke code.
+  - At minimum this contract should decide how BRIT stores backend type, physical relation identity, geometry column, primary key column, label/display configuration, and visible/filterable/searchable/exportable field allowlists.
+  - Primary file targets:
+    - `maps/models.py`
+    - `maps/forms.py`
+    - `maps/admin.py`
+
+- **Task 0.5 - Define the dataset runtime adapter boundary**
+  - Specify the minimal interface the generic map/table/detail surfaces need from any backend so that the UI layer does not care whether the data comes from a Django model, raw database relation, or later a federated source.
+  - The contract should cover schema introspection, geometry resolution, primary-key lookup, safe filtered querying, single-feature lookup, and count/extent summaries where supported.
+  - Primary file targets:
+    - `maps/views.py`
+    - `maps/mixins.py`
+    - `maps/viewsets.py`
+
+- **Task 0.6 - Settle model placement and compatibility policy**
+  - Decide whether new backend/configuration models remain in `maps` or move into a more cross-cutting layer, and document the rationale so Phase 1 is not blocked by structural churn.
+  - Decide which existing routes and fields remain temporarily as compatibility paths during migration, and which ones are expected to become compatibility-only immediately.
+  - Primary file targets:
+    - `maps/models.py`
+    - `maps/urls.py`
+    - `maps/views.py`
+    - `docs/04_design_decisions/2026-04-16_dataset_registry_and_federated_geodata_target_state_plan.md`
+
+### Phase 0 baseline audit snapshot
+
+- **Current `GeoDataset` model contract is still model-bound**
+  - `maps/models.py` currently defines `GeoDataset` with `preview`, `publish`, `region`, `model_name`, `sources`, `data_content_type`, `data_object_id`, and `map_configuration`.
+  - `GeoDataset.get_absolute_url()` still resolves by `return reverse(f"{self.model_name}")`, so dataset navigation is still coupled directly to stored route/model identifiers rather than dataset identity.
+  - `GIS_SOURCE_MODELS` remains a hardcoded tuple containing values such as `HamburgRoadsideTrees`, `NantesGreenhouses`, `NutsRegion`, and `WasteCollection`.
+
+- **Current create, filter, and admin surfaces still expose `model_name` as a first-class choice**
+  - `maps/forms.py` still defines `GeoDataSetModelForm.Meta.fields = ("name", "publish", "model_name", "sources", "description")`.
+  - `maps/filters.py` still exposes `model_name = ChoiceFilter(choices=GIS_SOURCE_MODELS, label="Dataset type")` in `GeoDataSetFilterSet`.
+  - `maps/admin.py` currently registers `GeoDataset` with only minimal admin customization (`autocomplete_fields = ["region"]`), which is far below the metadata review surface described by the target architecture.
+
+- **Current runtime map lookup is not dataset-scoped yet**
+  - `maps/views.py` still implements `FilteredMapMixin.get_dataset()` as `GeoDataset.objects.get(model_name=self.model_name)` and contains an explicit TODO indicating that lookup should move to `pk`.
+  - The generic-looking `GeoDataSetPublishedFilteredMapView`, `GeoDataSetReviewFilteredMapView`, and `GeoDataSetPrivateFilteredMapView` therefore still depend on a model-bound selector rather than a dataset-bound runtime contract.
+  - `maps/urls.py` currently provides list, gallery, create, update, delete, and autocomplete routes for `GeoDataset`, but it does not provide the dataset-scoped generic runtime route promised by the README (`/maps/geodatasets/<pk>/map/`).
+
+- **Hardcoded compatibility map routes are still part of the active public surface**
+  - `maps/urls.py` still defines `path("nutsregions/map/", NutsRegionPublishedMapView.as_view(), name="NutsRegion")`.
+  - The same URL file also mounts additional source-domain map URLs through `sources.registry`, which means the compatibility surface is a combination of core hardcoded routes and plugin-provided routes rather than one registry-driven dataset routing scheme.
+  - Existing tests still validate this model-bound behavior, for example `maps/tests/test_views.py` asserts `reverse("NutsRegion")` and constructs test datasets with `model_name="NutsRegion"`.
+
+- **The README currently over-promises relative to production code**
+  - `maps/README.md` states that a user can register a dataset using fields such as table name, geometry field, display fields, and filter fields.
+  - It also states that the feature is governed by `ENABLE_GENERIC_DATASET` and that the resulting runtime map view is available at `/maps/geodatasets/<pk>/map/`.
+  - Those fields and routes are not the authoritative runtime path in the current implementation, so the README currently documents an intended architecture rather than fully delivered behavior.
+
+- **Downstream inventory code already depends on `GeoDataset` as a stable selection object**
+  - `inventories/models.py` uses `GeoDataset` foreign keys in both `InventoryAlgorithm` and `ScenarioInventoryConfiguration`.
+  - `Scenario.available_geodatasets()`, `Scenario.evaluated_geodatasets()`, and `Scenario.available_inventory_algorithms()` all query through `GeoDataset` identity and region, which is compatible with the target direction.
+  - `inventories/forms.py` and `inventories/views.py` build autocomplete and configuration flows directly on `GeoDataset` IDs, so Phase 1 should preserve `GeoDataset` as the downstream-facing identity even while removing route/model-name coupling.
+
+### Phase 0 dependency matrix
+
+| Current coupling point | Replacement target | Compatibility strategy | Phase 1 owner/file targets |
+|---|---|---|---|
+| `GeoDataset.model_name` and `GIS_SOURCE_MODELS` in `maps/models.py` | Registry metadata that describes backend type and dataset identity independently of Python model names | Keep `model_name` only as a temporary compatibility field while new metadata-backed routes come online | `maps/models.py`, `maps/migrations/`, `maps/forms.py` |
+| `GeoDataset.get_absolute_url()` resolves via `reverse(self.model_name)` | Dataset-scoped route resolved by dataset identity such as `pk` or slug | Preserve legacy named map routes as compatibility aliases or redirects until templates and links move over | `maps/models.py`, `maps/urls.py`, `maps/views.py` |
+| `FilteredMapMixin.get_dataset()` uses `GeoDataset.objects.get(model_name=self.model_name)` | Generic runtime lookup by dataset identity with backend adapter resolution | Keep model-bound map subclasses only as temporary wrappers around the new dataset runtime path | `maps/views.py`, `maps/mixins.py` |
+| `GeoDataSetModelForm` and `GeoDataSetFilterSet` expose `model_name` as a first-class user choice | Backend metadata, dataset category, or adapter-backed dataset type fields that reflect the registry contract | Continue accepting `model_name` in old forms/filters only until equivalent metadata fields exist and list filtering is migrated | `maps/forms.py`, `maps/filters.py`, `maps/models.py` |
+| `maps/templates/maps/geodataset_list.html` displays `object.model_name` as dataset type | Dataset type or backend summary derived from registry metadata | Render both values temporarily if needed while existing rows are backfilled | `maps/templates/maps/geodataset_list.html`, `maps/models.py` |
+| Hardcoded route names such as `name="NutsRegion"` in `maps/urls.py` plus plugin-mounted source map routes | One generic dataset route family for list/detail/table/map, with optional source-domain overlays on top | Treat existing hardcoded and plugin routes as compatibility surface until dataset-scoped navigation is stable | `maps/urls.py`, `maps/views.py`, `sources/registry.py` |
+| `MapMixin.get_map_configuration()` derives `model_name` from `self.model.__name__` and resolves `ModelMapConfiguration` plus `api_basename` assumptions | Map configuration resolution keyed by dataset registry identity or explicit dataset backend metadata rather than Django model class name | Keep existing model-based map configuration lookup as a fallback during migration | `maps/views.py`, `maps/models.py`, `maps/serializers.py` |
+| Tests in `maps/tests/test_views.py` and `maps/tests/test_filters.py` create datasets with `model_name` and assert routes like `reverse("NutsRegion")` | Tests centered on dataset-scoped routes, adapter-backed lookup, and metadata-driven filtering | Retain a small compatibility test slice while the new registry path is introduced | `maps/tests/test_views.py`, `maps/tests/test_filters.py` |
+| `inventories` selects datasets by `GeoDataset` FK and ID-driven autocomplete/configuration flows | Keep `GeoDataset` as the stable downstream-facing selection object, then add version/current-selection semantics later | Do not break `GeoDataset` foreign key usage in Phase 1; layer version-aware selection on top in a later phase | `inventories/models.py`, `inventories/forms.py`, `inventories/views.py` |
+
+### Phase 0 immediate conclusions from the audit
+
+- **`GeoDataset` should remain the stable downstream-facing dataset object**
+  - Inventory integration already points in that direction, so the refactor should decouple routing/runtime access from `model_name` without replacing `GeoDataset` as the main selection object.
+
+- **The first implementation boundary is route/runtime decoupling, not federation**
+  - The most immediate architectural mismatch is that dataset navigation, map lookup, filters, and tests are still keyed by `model_name` and hardcoded route names.
+
+- **The first concrete documentation debt is the README mismatch**
+  - Phase 1 should either make the documented metadata-driven path true or narrow the README until the implementation catches up.
+
 Success criteria:
 
 - there is one agreed-on starting-point document or issue summary
@@ -730,6 +842,73 @@ Deliverables:
 - implement generic table/detail/map querying from registry metadata
 - make `GeoDataset.get_absolute_url()` independent from `model_name`
 - reduce `GIS_SOURCE_MODELS` to compatibility-only status or remove it where safe
+
+### Phase 1 implementation tasks
+
+- **Task 1.1 - Refactor `GeoDataset` into a real registry contract**
+  - Update the model layer so the local table/view-backed path is represented by authoritative runtime metadata instead of being described only in documentation.
+  - Preserve a minimal compatibility story where needed, but stop treating `model_name` as the primary runtime identity for new generic exploration.
+  - Primary file targets:
+    - `maps/models.py`
+    - `maps/migrations/`
+    - `maps/forms.py`
+    - `maps/admin.py`
+
+- **Task 1.2 - Introduce true dataset-scoped generic routes**
+  - Add the generic dataset detail, table, and map route shape needed by the registry so users can open a dataset by stable dataset identity rather than by a hardcoded model-specific map name.
+  - Existing CRUD/list/gallery routes for `GeoDataset` should remain aligned with this new runtime surface rather than pointing users back into model-bound paths.
+  - Primary file targets:
+    - `maps/urls.py`
+    - `maps/views.py`
+
+- **Task 1.3 - Replace `model_name`-based dataset resolution in map views**
+  - Rework the current `FilteredMapMixin` pattern so the generic map surface resolves datasets by dataset identity instead of `GeoDataset.objects.get(model_name=...)`.
+  - The Phase 1 implementation should prove that at least one real dataset can be rendered without introducing a bespoke view subclass for that dataset.
+  - Primary file targets:
+    - `maps/views.py`
+    - `maps/mixins.py`
+
+- **Task 1.4 - Implement the first generic local backend/query path**
+  - Deliver one backend path for local PostGIS tables or views that supports schema introspection, safe allowlisted filtering, geometry access, pagination, and single-feature lookup.
+  - This first slice should validate the registry runtime without yet taking on federation, advanced import orchestration, or harmonization logic.
+  - Primary file targets:
+    - `maps/views.py`
+    - `maps/viewsets.py`
+    - `maps/filters.py`
+    - `maps/mixins.py`
+
+- **Task 1.5 - Make map configuration compatible with runtime datasets**
+  - Update map-configuration resolution so a dataset registered at runtime can still participate in the normal map rendering flow without depending on a fixed model-name-driven API basename.
+  - This is the point where generic routing and generic map configuration must meet cleanly.
+  - Primary file targets:
+    - `maps/models.py`
+    - `maps/views.py`
+    - `maps/viewsets.py`
+
+- **Task 1.6 - Repoint user-facing dataset navigation to the generic runtime surface**
+  - Update list/gallery/detail navigation so user-facing dataset cards lead to the dataset-driven table/map/detail flow, not to legacy `model_name`-backed URLs.
+  - This keeps the Maps UX aligned with the registry architecture rather than hiding legacy coupling behind the main user entry points.
+  - Primary file targets:
+    - `maps/templates/maps/geodataset_list.html`
+    - `maps/templates/maps/geodataset_gallery.html`
+    - any new or updated dataset runtime templates in `maps/templates/maps/`
+
+- **Task 1.7 - Keep inventory coupling stable for now, but document the next boundary**
+  - Continue letting inventories reference `GeoDataset` during the first local-registry slice, but document clearly that version-pinning and current-version selection are later-phase concerns.
+  - The Phase 1 goal is to avoid breaking downstream dataset references while still moving the registry toward stable dataset identity.
+  - Primary file targets:
+    - `inventories/models.py`
+    - `inventories/views.py`
+    - `inventories/forms.py`
+    - this roadmap document
+
+- **Task 1.8 - Add regression tests and one real pilot dataset demonstration**
+  - Add tests that prove the new dataset path works end-to-end for a local PostGIS relation without relying on `model_name` lookup, and that field exposure obeys explicit allowlists.
+  - The phase should end with one real pilot example that demonstrates the architecture rather than only a model refactor.
+  - Primary file targets:
+    - `maps/tests/test_views.py`
+    - `maps/tests/test_filters.py`
+    - additional `maps/tests/` modules if needed
 
 Success criteria:
 
