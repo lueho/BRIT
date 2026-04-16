@@ -1,5 +1,6 @@
 import hashlib
 import json
+from importlib import import_module
 
 from django.conf import settings
 from django.core.cache import caches
@@ -134,9 +135,11 @@ def ensure_initial_data(stdout=None):
     created["default_map_configuration"] = map_config_created
 
     # Ensure layers are set
-    default_map_config.layers.set(
-        [default_region_layer, default_catchment_layer, default_feature_layer]
-    )
+    default_map_config.layers.set([
+        default_region_layer,
+        default_catchment_layer,
+        default_feature_layer,
+    ])
     log("Set layers for Default Map Configuration")
 
 
@@ -217,6 +220,14 @@ def get_nuts_region_cache_key(level=None, parent_id=None, nuts_id=None, filters=
     return ":".join(parts)
 
 
+def _get_waste_collection_model():
+    try:
+        module = import_module("sources.waste_collection.geojson")
+    except (ImportError, ModuleNotFoundError):
+        return None
+    return getattr(module, "Collection", None)
+
+
 def compute_collection_dataset_version(scope="published", user=None):
     """Compute a scope-aware dataset version hash for Collections.
 
@@ -232,9 +243,12 @@ def compute_collection_dataset_version(scope="published", user=None):
     """
     from django.db.models import Count, Max, Min
 
-    from sources.waste_collection.geojson import Collection
+    collection_model = _get_waste_collection_model()
+    if collection_model is None:
+        base = f"{scope}:0:0:0:0"
+        return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
 
-    qs = Collection.objects.all()
+    qs = collection_model.objects.all()
 
     if scope == "published":
         qs = qs.filter(publication_status="published")
@@ -289,7 +303,7 @@ def build_collection_cache_key(
             ids_sorted = sorted([str(int(x)) for x in id_list])
         except (ValueError, TypeError):
             ids_sorted = sorted([str(x) for x in id_list])
-        return f"collection_geojson:id:{','.join(ids_sorted)}:dv:{dv}"
+        return f"collection_geojson:id:{",".join(ids_sorted)}:dv:{dv}"
 
     # Build filter part
     filter_part = _generate_filter_key_part(filters)

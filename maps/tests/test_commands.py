@@ -1,4 +1,5 @@
 import io
+from unittest.mock import Mock, patch
 
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -164,3 +165,32 @@ class RegionAttributeValueUnitBackfillCommandTests(TestCase):
                 fail_on_unresolved=True,
                 stdout=out,
             )
+
+
+class WarmGeojsonCacheCommandTests(TestCase):
+    @patch(
+        "maps.management.commands.warm_geojson_cache.get_source_domain_geojson_cache_warmers"
+    )
+    def test_selected_missing_plugin_is_skipped_without_error(self, mock_get_warmers):
+        out = io.StringIO()
+        mock_get_warmers.return_value = ()
+
+        call_command("warm_geojson_cache", trees=True, stdout=out)
+
+        self.assertIn("Roadside Trees: skipped (plugin not installed)", out.getvalue())
+
+    @patch(
+        "maps.management.commands.warm_geojson_cache.get_source_domain_geojson_cache_warmers"
+    )
+    def test_selected_registered_plugin_uses_registry_warmer(self, mock_get_warmers):
+        out = io.StringIO()
+        result = Mock()
+        result.get.return_value = {"status": "success", "features_count": 2}
+        warmer = Mock()
+        warmer.apply.return_value = result
+        mock_get_warmers.return_value = (("roadside_trees", warmer),)
+
+        call_command("warm_geojson_cache", trees=True, stdout=out)
+
+        warmer.apply.assert_called_once_with()
+        self.assertIn("Roadside Trees: 2 features cached", out.getvalue())

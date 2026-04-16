@@ -298,6 +298,26 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         self._available_models_cache = available_models
         return available_models
 
+    def _get_fallback_queryset(self):
+        from django.apps import apps
+
+        fallback_models = sorted(
+            (
+                model
+                for model in apps.get_models()
+                if (
+                    issubclass(model, UserCreatedObject)
+                    and not model._meta.abstract
+                    and self._is_primary_model_module(model)
+                    and hasattr(model, "objects")
+                )
+            ),
+            key=lambda model: (model._meta.app_label, model._meta.model_name),
+        )
+        if fallback_models:
+            return fallback_models[0].objects.none()
+        return ReviewAction.objects.none()
+
     def get_filterset_kwargs(self, filterset_class):
         """Override to pass available_models and provide a dummy queryset.
 
@@ -316,17 +336,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             # Use the first available model's queryset as a dummy
             kwargs["queryset"] = available_models[0].objects.none()
         else:
-            # No models available, create an empty queryset from UserCreatedObject subclass
-            # This shouldn't happen in practice, but provides a fallback
-            try:
-                # Try to get Collection as fallback
-                from sources.waste_collection.selectors import empty_collection_queryset
-
-                kwargs["queryset"] = empty_collection_queryset()
-            except ImportError:
-                # If Collection doesn't exist, we have bigger problems
-                # Return empty list-like object
-                kwargs["queryset"] = []
+            kwargs["queryset"] = self._get_fallback_queryset()
 
         kwargs["available_models"] = available_models
         return kwargs
@@ -404,13 +414,11 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             model_class._meta.model_name == "collection"
             and model_class._meta.app_label == "waste_collection"
         ):
-            search_filters.extend(
-                [
-                    Q(catchment__name__icontains=search),
-                    Q(waste_category__name__icontains=search),
-                    Q(collection_system__name__icontains=search),
-                ]
-            )
+            search_filters.extend([
+                Q(catchment__name__icontains=search),
+                Q(waste_category__name__icontains=search),
+                Q(collection_system__name__icontains=search),
+            ])
 
         if not search_filters:
             return queryset.none()
@@ -595,13 +603,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         available_models = self.get_available_models()
         if available_models:
             return available_models[0].objects.none()
-        # Fallback
-        try:
-            from sources.waste_collection.selectors import empty_collection_queryset
-
-            return empty_collection_queryset()
-        except ImportError:
-            return UserCreatedObject.objects.none()
+        return self._get_fallback_queryset()
 
     def paginate_queryset(self, queryset, page_size):
         """Override to prevent parent FilterView from paginating the dummy queryset.
@@ -627,18 +629,16 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         page_number = self.request.GET.get("page")
         page_obj = paginator.get_page(page_number)
 
-        context.update(
-            {
-                "title": "Content Review Dashboard",
-                "list_type": "review",
-                "header": "Content Review Dashboard",
-                "review_items": page_obj.object_list,
-                "object_list": page_obj.object_list,  # For template compatibility
-                "page_obj": page_obj,
-                "paginator": paginator,
-                "is_paginated": page_obj.has_other_pages(),
-            }
-        )
+        context.update({
+            "title": "Content Review Dashboard",
+            "list_type": "review",
+            "header": "Content Review Dashboard",
+            "review_items": page_obj.object_list,
+            "object_list": page_obj.object_list,  # For template compatibility
+            "page_obj": page_obj,
+            "paginator": paginator,
+            "is_paginated": page_obj.has_other_pages(),
+        })
         return context
 
 
@@ -1109,7 +1109,7 @@ class UserCreatedObjectListMixin:
 
     def get_create_permission(self):
         if self.model:
-            return f"{self.model.__module__.split('.')[-2]}.add_{self.model.__name__.lower()}"
+            return f"{self.model.__module__.split(".")[-2]}.add_{self.model.__name__.lower()}"
         return None
 
     def get_list_type(self):
@@ -1123,17 +1123,15 @@ class UserCreatedObjectListMixin:
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         # Base context
-        context.update(
-            {
-                "header": self.get_header(),
-                "create_url": self.get_create_url(),
-                "create_url_text": self.get_create_url_text(),
-                "create_permission": self.get_create_permission(),
-                "list_type": self.get_list_type(),
-                "private_list_owner": self.get_private_list_owner(),
-                "dashboard_url": self.get_dashboard_url(),
-            }
-        )
+        context.update({
+            "header": self.get_header(),
+            "create_url": self.get_create_url(),
+            "create_url_text": self.get_create_url_text(),
+            "create_permission": self.get_create_permission(),
+            "list_type": self.get_list_type(),
+            "private_list_owner": self.get_private_list_owner(),
+            "dashboard_url": self.get_dashboard_url(),
+        })
 
         # Scope switcher context (urls, counts, active scope)
         try:
@@ -1277,28 +1275,26 @@ class UserCreatedObjectListMixin:
         # Active scope from list_type (public/private/review)
         active_scope = self.get_list_type()
 
-        context.update(
-            {
-                "active_scope": active_scope,
-                "public_url": public_url,
-                "private_url": private_url,
-                "review_url": review_url,
-                "public_representation_url": public_url,
-                "private_representation_url": private_url,
-                "review_representation_url": review_url,
-                "public_count": public_count,
-                "private_count": private_count,
-                "review_count": review_count,
-                "representation_mode": "list",
-                "public_gallery_url": None,
-                "private_gallery_url": None,
-                "review_gallery_url": None,
-                # Map URLs for header view toggle (may be None if model has no map views)
-                "public_map_url": public_map_url,
-                "private_map_url": private_map_url,
-                "review_map_url": review_map_url,
-            }
-        )
+        context.update({
+            "active_scope": active_scope,
+            "public_url": public_url,
+            "private_url": private_url,
+            "review_url": review_url,
+            "public_representation_url": public_url,
+            "private_representation_url": private_url,
+            "review_representation_url": review_url,
+            "public_count": public_count,
+            "private_count": private_count,
+            "review_count": review_count,
+            "representation_mode": "list",
+            "public_gallery_url": None,
+            "private_gallery_url": None,
+            "review_gallery_url": None,
+            # Map URLs for header view toggle (may be None if model has no map views)
+            "public_map_url": public_map_url,
+            "private_map_url": private_map_url,
+            "review_map_url": review_map_url,
+        })
         return context
 
 
@@ -1419,14 +1415,12 @@ class PrivateObjectFilterView(PrivateObjectListMixin, FilterDefaultsMixin, Filte
 class PublishedObjectListView(PublishedObjectListMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "header": self.model._meta.verbose_name_plural.capitalize(),
-                "create_url": self.model.create_url,
-                "create_url_text": f"New {self.model._meta.verbose_name}",
-                "create_permission": f"{self.model.__module__.split('.')[-2]}.add_{self.model.__name__.lower()}",
-            }
-        )
+        context.update({
+            "header": self.model._meta.verbose_name_plural.capitalize(),
+            "create_url": self.model.create_url,
+            "create_url_text": f"New {self.model._meta.verbose_name}",
+            "create_permission": f"{self.model.__module__.split(".")[-2]}.add_{self.model.__name__.lower()}",
+        })
         return context
 
     def get_template_names(self):
@@ -1597,9 +1591,10 @@ class UserCreatedObjectCreateView(
                 if hasattr(model._meta, "verbose_name"):
                     model_name = model._meta.verbose_name.capitalize()
 
-        context.update(
-            {"form_title": f"Create New {model_name}", "submit_button_text": "Save"}
-        )
+        context.update({
+            "form_title": f"Create New {model_name}",
+            "submit_button_text": "Save",
+        })
         return context
 
     def get_success_message(self, cleaned_data):
@@ -1652,9 +1647,10 @@ class UserCreatedObjectModalCreateView(PermissionRequiredMixin, BSModalCreateVie
         if model and hasattr(model._meta, "verbose_name"):
             model_name = model._meta.verbose_name.capitalize()
 
-        context.update(
-            {"modal_title": f"Create New {model_name}", "submit_button_text": "Save"}
-        )
+        context.update({
+            "modal_title": f"Create New {model_name}",
+            "submit_button_text": "Save",
+        })
         return context
 
     def get_success_message(self):
@@ -1705,12 +1701,10 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
             except Exception:
                 logs = []
 
-        context.update(
-            {
-                "show_review_panel": show_panel,
-                "review_logs": logs,
-            }
-        )
+        context.update({
+            "show_review_panel": show_panel,
+            "review_logs": logs,
+        })
         return context
 
 
@@ -1931,11 +1925,9 @@ class UserCreatedObjectModalDetailView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "modal_title": f"Details of {self.object._meta.verbose_name}",
-            }
-        )
+        context.update({
+            "modal_title": f"Details of {self.object._meta.verbose_name}",
+        })
         return context
 
     def get_template_names(self):
@@ -1965,12 +1957,10 @@ class UserCreatedObjectUpdateView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "form_title": f"Update {self.object._meta.verbose_name}",
-                "submit_button_text": "Save",
-            }
-        )
+        context.update({
+            "form_title": f"Update {self.object._meta.verbose_name}",
+            "submit_button_text": "Save",
+        })
         return context
 
     def get_template_names(self):
@@ -2000,13 +1990,11 @@ class UserCreatedObjectCreateWithInlinesView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "form_title": f"Create New {self.form_class._meta.model._meta.verbose_name}",
-                "submit_button_text": "Save",
-                "formset_helper": self.formset_helper_class(),
-            }
-        )
+        context.update({
+            "form_title": f"Create New {self.form_class._meta.model._meta.verbose_name}",
+            "submit_button_text": "Save",
+            "formset_helper": self.formset_helper_class(),
+        })
         return context
 
     def get_template_names(self):
@@ -2036,13 +2024,11 @@ class UserCreatedObjectUpdateWithInlinesView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "form_title": f"Update {self.object._meta.verbose_name}",
-                "submit_button_text": "Save",
-                "formset_helper": self.formset_helper_class(),
-            }
-        )
+        context.update({
+            "form_title": f"Update {self.object._meta.verbose_name}",
+            "submit_button_text": "Save",
+            "formset_helper": self.formset_helper_class(),
+        })
         return context
 
     def get_template_names(self):
@@ -2073,12 +2059,10 @@ class UserCreatedObjectModalUpdateView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "modal_title": f"Update {self.object._meta.verbose_name}",
-                "submit_button_text": "Save",
-            }
-        )
+        context.update({
+            "modal_title": f"Update {self.object._meta.verbose_name}",
+            "submit_button_text": "Save",
+        })
         return context
 
 
@@ -2106,12 +2090,10 @@ class UserCreatedObjectModalArchiveView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "modal_title": f"Archive {self.object._meta.verbose_name}",
-                "submit_button_text": "Archive",
-            }
-        )
+        context.update({
+            "modal_title": f"Archive {self.object._meta.verbose_name}",
+            "submit_button_text": "Archive",
+        })
         return context
 
     def get_success_url(self):
@@ -2131,12 +2113,10 @@ class UserCreatedObjectModalDeleteView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "form_title": f"Delete {self.object._meta.verbose_name}",
-                "submit_button_text": "Delete",
-            }
-        )
+        context.update({
+            "form_title": f"Delete {self.object._meta.verbose_name}",
+            "submit_button_text": "Delete",
+        })
         return context
 
     def get_success_url(self):

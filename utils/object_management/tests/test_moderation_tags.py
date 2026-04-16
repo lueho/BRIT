@@ -104,6 +104,20 @@ class MarkdownToHtmlFilterTests(TestCase):
         self.assertIn("<p>Second comment</p>", rendered)
         self.assertNotIn("; ;", rendered)
 
+    @patch(
+        "utils.object_management.templatetags.moderation_tags.import_module",
+        side_effect=ModuleNotFoundError(
+            "sources.waste_collection.description_formatting"
+        ),
+    )
+    def test_collection_description_filter_works_without_plugin_formatter(
+        self, _mock_import_module
+    ):
+        rendered = collection_description_to_html("First comment ;; Second comment")
+
+        self.assertIn("<p>First comment</p>", rendered)
+        self.assertIn("<p>Second comment</p>", rendered)
+
     def test_headings_are_not_rendered_as_h_tags(self):
         rendered = markdown_to_html("## Heading\nNormal")
 

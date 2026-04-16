@@ -7,10 +7,11 @@ from maps.utils import compute_collection_dataset_version
 
 
 class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
-    @patch("sources.waste_collection.geojson.Collection")
+    @patch("maps.utils.import_module")
     def test_compute_collection_dataset_version_uses_sources_collection_adapter(
-        self, mock_collection
+        self, mock_import_module
     ):
+        mock_collection = Mock()
         base_qs = Mock()
         published_qs = Mock()
         mock_collection.objects.all.return_value = base_qs
@@ -21,6 +22,7 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
             "min_id": 4,
             "max_id": 9,
         }
+        mock_import_module.return_value = Mock(Collection=mock_collection)
 
         version = compute_collection_dataset_version(scope="published")
 
@@ -28,6 +30,17 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
         mock_collection.objects.all.assert_called_once_with()
         base_qs.filter.assert_called_once_with(publication_status="published")
         published_qs.aggregate.assert_called_once()
+
+    @patch(
+        "maps.utils.import_module",
+        side_effect=ModuleNotFoundError("sources.waste_collection.geojson"),
+    )
+    def test_compute_collection_dataset_version_returns_empty_signature_without_plugin(
+        self, _mock_import_module
+    ):
+        version = compute_collection_dataset_version(scope="published")
+
+        self.assertEqual(len(version), 12)
 
     @patch("maps.tasks.get_source_domain_geojson_cache_warmers")
     def test_warm_all_geojson_caches_uses_plugin_declared_warmers(

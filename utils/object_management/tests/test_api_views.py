@@ -2,6 +2,7 @@
 
 from datetime import date
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
@@ -25,6 +26,7 @@ from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.object_management.review_context import (
     _is_collection,
     _is_collection_property_value,
+    build_review_context,
 )
 from utils.properties.models import Property, Unit
 
@@ -474,6 +476,22 @@ class ReviewAPIViewsTests(TestCase):
         self.assertEqual(
             ctx["frequency_display"]["rows"][1]["standard"], "Every 2 weeks"
         )
+
+    @patch(
+        "utils.object_management.review_context.import_module",
+        side_effect=ModuleNotFoundError("sources.waste_collection.frequency_service"),
+    )
+    def test_review_context_frequency_display_degrades_safely_without_plugin_service(
+        self, _mock_import_module
+    ):
+        ctx = build_review_context(self.review_collection)
+
+        self.assertIn("frequency_display", ctx)
+        self.assertEqual(
+            ctx["frequency_display"]["canonical_label"], "Seasonal flexibility"
+        )
+        self.assertEqual(ctx["frequency_display"]["rows"], [])
+        self.assertIsNone(ctx["frequency_display"]["schedule_summary"])
 
     def test_review_context_does_not_include_review_guidance(self):
         """BRIT context payload contains only domain data; guidance is assembled by MCP."""

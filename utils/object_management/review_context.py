@@ -12,14 +12,11 @@ from __future__ import annotations
 import logging
 from datetime import date, datetime
 from decimal import Decimal
+from importlib import import_module
 from typing import Any
 
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
-
-from sources.waste_collection.frequency_service import (
-    CollectionFrequencyScheduleService,
-)
 
 from .models import ReviewAction
 
@@ -307,8 +304,11 @@ def _serialize_collection_frequency(obj: Any) -> dict[str, Any] | None:
     if frequency is None:
         return None
     try:
-        rows = CollectionFrequencyScheduleService.rows_from_frequency(frequency)
-        display_rows = CollectionFrequencyScheduleService.display_rows(frequency)
+        schedule_service = _get_collection_frequency_schedule_service()
+        if schedule_service is None:
+            raise LookupError("Collection frequency schedule service is unavailable")
+        rows = schedule_service.rows_from_frequency(frequency)
+        display_rows = schedule_service.display_rows(frequency)
         is_year_round = (
             len(display_rows) == 1 and display_rows[0]["segment"] == "All year"
         )
@@ -316,7 +316,7 @@ def _serialize_collection_frequency(obj: Any) -> dict[str, Any] | None:
             "id": frequency.pk,
             "canonical_label": frequency.name,
             "type": getattr(frequency, "type", None),
-            "schedule_summary": CollectionFrequencyScheduleService.summary(rows),
+            "schedule_summary": schedule_service.summary(rows),
             "rows": display_rows,
             "is_year_round": is_year_round,
             "summary": display_rows[0]["standard"] if is_year_round else None,
@@ -338,6 +338,14 @@ def _serialize_collection_frequency(obj: Any) -> dict[str, Any] | None:
             "summary": None,
             "options": [],
         }
+
+
+def _get_collection_frequency_schedule_service():
+    try:
+        module = import_module("sources.waste_collection.frequency_service")
+    except (ImportError, ModuleNotFoundError):
+        return None
+    return getattr(module, "CollectionFrequencyScheduleService", None)
 
 
 def _serialize_model_fields(obj: Any) -> dict[str, Any]:

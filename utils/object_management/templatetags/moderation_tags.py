@@ -1,5 +1,6 @@
 import logging
 import re
+from importlib import import_module
 from urllib.parse import quote
 
 from django import template
@@ -11,13 +12,10 @@ from django.test import RequestFactory
 from django.urls import reverse
 from django.utils.html import escape, mark_safe
 
-from sources.waste_collection.description_formatting import (
-    normalize_collection_description,
-)
-
 register = template.Library()
 
 _BOLD_PATTERN = re.compile(r"\*\*(.+?)\*\*")
+_LEGACY_SECTION_SEPARATOR_RE = re.compile(r"(?:\s*;\s*){2,}")
 
 
 @register.filter
@@ -37,8 +35,21 @@ def markdown_to_html(value):
 
 @register.filter
 def collection_description_to_html(value):
-    text = normalize_collection_description(value)
+    text = _normalize_collection_description(value)
     return mark_safe(_render_limited_markdown(text))
+
+
+def _normalize_collection_description(value):
+    try:
+        module = import_module("sources.waste_collection.description_formatting")
+    except (ImportError, ModuleNotFoundError):
+        text = "" if value is None else str(value)
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        if _LEGACY_SECTION_SEPARATOR_RE.search(text) is None:
+            return text
+        parts = [part.strip() for part in _LEGACY_SECTION_SEPARATOR_RE.split(text)]
+        return "\n".join(part for part in parts if part)
+    return module.normalize_collection_description(value)
 
 
 def _render_limited_markdown(text: str) -> str:
@@ -334,7 +345,7 @@ def detail_or_review_url(context, obj, use_back=False):
                 next_param = ""
                 try:
                     if request is not None:
-                        next_param = f"?next={quote(request.get_full_path(), safe='')}"
+                        next_param = f"?next={quote(request.get_full_path(), safe="")}"
                 except Exception:  # pragma: no cover - defensive
                     next_param = ""
                 return f"{review_url}{next_param}"
@@ -358,7 +369,7 @@ def detail_or_review_url(context, obj, use_back=False):
                     try:
                         if request is not None:
                             next_param = (
-                                f"?next={quote(request.get_full_path(), safe='')}"
+                                f"?next={quote(request.get_full_path(), safe="")}"
                             )
                     except Exception:  # pragma: no cover - defensive
                         next_param = ""
@@ -375,7 +386,7 @@ def detail_or_review_url(context, obj, use_back=False):
         # Optionally include ?back=<current_path> for detail pages coming from lists
         if use_back and request is not None:
             try:
-                return f"{absolute_url}?back={quote(request.get_full_path(), safe='')}"
+                return f"{absolute_url}?back={quote(request.get_full_path(), safe="")}"
             except Exception:  # pragma: no cover - defensive
                 return absolute_url
         return absolute_url
@@ -416,7 +427,7 @@ def detail_or_review_url(context, obj, use_back=False):
                 next_param = ""
                 try:
                     if request is not None:
-                        next_param = f"?next={quote(request.get_full_path(), safe='')}"
+                        next_param = f"?next={quote(request.get_full_path(), safe="")}"
                 except Exception:  # pragma: no cover - defensive
                     next_param = ""
                 return f"{review_url}{next_param}"
@@ -430,7 +441,7 @@ def detail_or_review_url(context, obj, use_back=False):
             if use_back and request is not None:
                 try:
                     return (
-                        f"{absolute_url}?back={quote(request.get_full_path(), safe='')}"
+                        f"{absolute_url}?back={quote(request.get_full_path(), safe="")}"
                     )
                 except Exception:  # pragma: no cover - defensive
                     return absolute_url

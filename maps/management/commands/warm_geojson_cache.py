@@ -17,9 +17,16 @@ Usage:
 
 from django.core.management.base import BaseCommand
 
+from sources.registry import get_source_domain_geojson_cache_warmers
+
 
 class Command(BaseCommand):
     help = "Warm GeoJSON caches to prevent timeout on first request"
+
+    FLAG_TO_PLUGIN = {
+        "trees": ("roadside_trees", "Roadside Trees"),
+        "collections": ("waste_collection", "Waste Collections"),
+    }
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -41,12 +48,11 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from maps.tasks import warm_all_geojson_caches
-        from sources.roadside_trees.tasks import warm_roadside_tree_geojson_cache
-        from sources.waste_collection.tasks import warm_collection_geojson_cache
 
         warm_trees = options["trees"]
         warm_collections = options["collections"]
         run_async = options["run_async"]
+        warmers_by_slug = dict(get_source_domain_geojson_cache_warmers())
 
         # If neither flag specified, warm all
         if not warm_trees and not warm_collections:
@@ -72,18 +78,20 @@ class Command(BaseCommand):
 
         # Individual cache warming
         if warm_trees:
-            self._warm_cache(
-                "Roadside Trees",
-                warm_roadside_tree_geojson_cache,
-                run_async,
-            )
+            self._warm_selected_cache("trees", warmers_by_slug, run_async)
 
         if warm_collections:
-            self._warm_cache(
-                "Waste Collections",
-                warm_collection_geojson_cache,
-                run_async,
+            self._warm_selected_cache("collections", warmers_by_slug, run_async)
+
+    def _warm_selected_cache(self, option_name, warmers_by_slug, run_async):
+        slug, display_name = self.FLAG_TO_PLUGIN[option_name]
+        task = warmers_by_slug.get(slug)
+        if task is None:
+            self.stdout.write(
+                self.style.WARNING(f"{display_name}: skipped (plugin not installed)")
             )
+            return
+        self._warm_cache(display_name, task, run_async)
 
     def _warm_cache(self, name, task, run_async):
         if run_async:
@@ -102,12 +110,12 @@ class Command(BaseCommand):
         if data.get("status") == "success":
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"{name}: {data.get('features_count', 0):,} features cached"
+                    f"{name}: {data.get("features_count", 0):,} features cached"
                 )
             )
         else:
             self.stdout.write(
-                self.style.ERROR(f"{name}: Failed - {data.get('error', 'Unknown')}")
+                self.style.ERROR(f"{name}: Failed - {data.get("error", "Unknown")}")
             )
 
     def _report_results(self, results):
