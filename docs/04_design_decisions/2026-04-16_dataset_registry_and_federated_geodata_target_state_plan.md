@@ -197,22 +197,80 @@ The user-facing identity of a dataset should survive storage refactors.
 - moving from local table to materialized view should not require URL redesign
 - moving from federated-live to snapshot should not break downstream references
 
-### 3.5 Progressive enhancement
+### 3.5 Stable dataset identity, explicit dataset versions
 
-The first generic dataset experience only needs to be correct, safe, and useful.
+BRIT should distinguish clearly between:
 
-- advanced analytics
-- semantic mapping
-- scheduled drift detection
-- cross-dataset joins
+- the logical dataset identity
+- the currently exposed dataset state
+- immutable historical versions or snapshots of that dataset
 
-should come after the baseline registry works reliably.
+This is especially important for imported external datasets that are refreshed over time.
 
-### 3.6 UX consistency with existing module direction
+Recommended rule:
+
+- a provider dataset such as `Roadside trees - County X` should usually have one stable `GeoDataset` identity
+- each import or upstream release can create a new dataset version or snapshot when reproducibility matters
+- the normal user-facing dataset page should point to the current approved version by default
+- downstream analytical consumers must be able to choose whether they bind to the moving current dataset or to a fixed version
+
+The long-term plan should therefore avoid two extremes:
+
+- **not only in-place overwrite with no version record**
+  - this loses auditability and makes historical analysis unreproducible
+- **not one unrelated top-level dataset per refresh cycle**
+  - this clutters the registry and makes users treat time iterations as entirely different datasets when they are really versions of one source
+
+### 3.6 Import strategy by upstream change pattern
+
+Different external sources need different physical handling, but under one consistent contract.
+
+#### Periodic full releases
+
+Examples:
+
+- annual roadside-tree export from a county
+- yearly published inventory table from a ministry
+
+Recommended handling:
+
+- ingest each release as an immutable version or snapshot
+- expose one stable dataset identity that points to the latest approved version for normal browsing
+- keep older versions available for reproducible analysis, QA, and rollback
+
+This usually fits better than appending into one ever-changing table because each release is effectively a new authoritative state of the same dataset.
+
+#### Continuous upstream updates
+
+Examples:
+
+- a provider updates records daily or weekly in place
+- BRIT pulls from an operational system with no formal annual release boundary
+
+Recommended handling:
+
+- maintain a stable current representation for normal exploration
+- also record refresh runs and, where analytically important, periodic snapshots or changelog-style version points
+- use a materialized current table/view or equivalent registry-backed surface for performance and predictable querying
+
+This usually fits better than creating a brand-new top-level table for every refresh event.
+
+#### Append-only event streams or naturally temporal data
+
+If the upstream dataset is genuinely cumulative and the row model itself is temporal, appending may be correct. Even then, BRIT should still expose version metadata for import runs so that users know what upstream state they are seeing.
+
+### 3.7 Prefer PostgreSQL-native backends first
+
+BRIT should solve the common case first:
+
+- local PostGIS tables/views/materialized views
+- PostgreSQL foreign tables and related DB-native mechanisms
+
+### 3.8 UX consistency with existing module direction
 
 This roadmap should follow the existing UX guidance that the primary module entry is the main list of `GeoDataset` records, with explorer/list/detail/map patterns remaining consistent with other BRIT modules.
 
-### 3.7 Source-domain ownership of harmonization
+### 3.9 Source-domain ownership of harmonization
 
 The generic registry layer should not try to understand the semantics of every domain.
 
@@ -220,7 +278,7 @@ The generic registry layer should not try to understand the semantics of every d
 - source-domain apps own canonical domain schemas, semantic mappings, unit normalization rules, and integration logic for incompatible same-domain datasets
 - cross-provider harmonization belongs to the domain app because only the domain app can define what counts as equivalence, acceptable downgrade, or required analytical minimum
 
-### 3.8 Integration must preserve partial truth
+### 3.10 Integration must preserve partial truth
 
 Harmonization should not require every dataset to be equally rich.
 
@@ -266,6 +324,8 @@ A user can:
 For each dataset BRIT knows at least:
 
 - registry metadata
+- stable dataset identity
+- current exposed version
 - physical backend type
 - schema and geometry metadata
 - provenance and bibliography references
@@ -274,6 +334,13 @@ For each dataset BRIT knows at least:
 - whether the dataset is generic-only or has additional domain semantics
 - whether the dataset participates in a harmonized domain integration pipeline
 - what coverage status it contributes to for its declared region or regions
+
+For imported datasets BRIT should also know at least:
+
+- import mode, for example full replacement, incremental append, or federated-live
+- refresh cadence, for example annual, monthly, on demand, or continuous
+- upstream release identifier or upstream last-modified marker where available
+- whether the current surface is reproducible or only the latest moving state
 
 ### 4.4 What no longer needs code changes
 
@@ -303,6 +370,7 @@ Code may still be justified for:
 For a domain such as roadside trees, the final user experience should look like this:
 
 - each county dataset remains available as its own `GeoDataset` with its own provenance and raw feature set
+- each county dataset can expose both its current version and older imported releases where policy allows
 - the `sources.roadside_trees` domain app defines the canonical integrated roadside-tree representation
 - harmonized records from all integrated county datasets become queryable together through one integrated roadside-tree surface
 - a Germany-wide map can display all integrated roadside-tree objects together
@@ -412,7 +480,29 @@ Later, if justified:
 - file-backed virtual adapter
 - HTTP feature service adapter
 
-### 7.3 Keep federation inside the database boundary first
+### 7.3 Add an import-run and dataset-version contract
+
+Imported external datasets need first-class lifecycle objects, not only backend connection metadata.
+
+Recommended conceptual objects:
+
+- `GeoDataset`
+  - stable logical dataset identity shown to users
+- `GeoDatasetVersion`
+  - immutable version or snapshot of one dataset, with upstream release metadata, imported-at timestamp, schema signature, and reproducibility status
+- `GeoDatasetImportRun`
+  - operational record of one attempted refresh, including source location, started/finished timestamps, status, row counts, and validation results
+- current-version binding
+  - marks which version is the current exposed one for normal browsing and for domain harmonization defaults
+
+This lets BRIT support all of the following without changing the user-facing dataset identity:
+
+- annual full replacements
+- rolling current datasets
+- rollback to a previous import
+- domain harmonization pinned either to latest approved data or to a specific reproducible release set
+
+### 7.4 Keep federation inside the database boundary first
 
 The simplest credible path to federation is not direct arbitrary remote querying from Django.
 
@@ -430,7 +520,7 @@ This keeps:
 - one geometry capability layer
 - one optimization strategy
 
-### 7.4 Separate introspection from exposure policy
+### 7.5 Separate introspection from exposure policy
 
 Discovered columns are not automatically public columns.
 
@@ -445,7 +535,7 @@ The registry should store, per dataset:
 
 This keeps introspection safe and reviewable.
 
-### 7.5 Treat live federation and immutable snapshots as different products
+### 7.6 Treat live federation and immutable snapshots as different products
 
 BRIT should explicitly distinguish:
 
@@ -460,7 +550,7 @@ BRIT should explicitly distinguish:
 
 The same logical dataset may expose more than one operational mode over time.
 
-### 7.6 Preserve domain-specific harmonization as an overlay
+### 7.7 Preserve domain-specific harmonization as an overlay
 
 The geodataset harmonization pipeline remains valuable, but should sit on top of the registry, not beside it.
 
@@ -470,7 +560,7 @@ That means:
 - generic registry support should also allow simple passthrough datasets that are only explorable, not harmonized
 - harmonized datasets and passthrough datasets should share the same registry and exploration surface
 
-### 7.7 Let source-domain apps own canonical integration contracts
+### 7.8 Let source-domain apps own canonical integration contracts
 
 The registry should not own the canonical schema of roadside trees, greenhouses, waste-collection assets, or future domains.
 
@@ -487,7 +577,7 @@ Recommended boundary:
 
 This keeps the generic registry simple while allowing domain-specific intelligence where it belongs.
 
-### 7.8 Add first-class integrated domain surfaces
+### 7.9 Add first-class integrated domain surfaces
 
 In addition to raw/provider datasets, BRIT should support logical integrated domain surfaces.
 
@@ -605,18 +695,26 @@ Goal: support both live browsing and reproducible analytical use.
 Deliverables:
 
 - dataset version/snapshot model or equivalent version contract
+- import-run model or equivalent refresh audit contract
 - refresh metadata:
   - last refreshed
   - upstream last seen
   - refresh status
   - refresh mode
+- import/update strategy classification per dataset, for example:
+  - full replacement with immutable snapshots
+  - moving current dataset plus periodic snapshots
+  - incremental append with temporal semantics
 - optional materialization flow for turning federated-live data into reproducible snapshots
+- current-version binding so one stable dataset identity can resolve to the latest approved version without changing URLs
 - ability for downstream consumers to select either current dataset or fixed snapshot
 
 Success criteria:
 
 - BRIT can support both exploratory live maps and reproducible inventory inputs without conflating the two
 - dataset freshness and immutability are visible and machine-readable
+- annual imported datasets do not need a brand-new top-level registry identity for each refresh
+- historical imported releases can still be inspected or pinned when required
 
 ## Phase 5 - Semantic overlays and downstream integration contracts
 
@@ -674,6 +772,7 @@ Use this section to evaluate whether the roadmap is actually moving forward.
 | Column exposure allowlists enforced |  |  |  |
 | Federated read-only foreign table support |  |  |  |
 | Dataset freshness/version semantics visible in UI |  |  |  |
+| Imported datasets have explicit import-run and current-version contracts |  |  |  |
 | Downstream consumers select datasets by stable dataset identity |  |  |  |
 | Source-domain apps define canonical harmonization contracts for same-domain datasets |  |  |  |
 | At least one integrated domain map combines harmonized records across providers |  |  |  |
@@ -688,6 +787,7 @@ The roadmap should be considered substantively achieved when all of the followin
 - users cannot tell from the baseline UI whether a dataset is backed by a local table or foreign table except where provenance/freshness labels intentionally disclose it
 - no new URL/view/filter/template code is required for ordinary dataset onboarding
 - domain-specific code is only needed for semantic enrichment or non-generic workflows
+- imported datasets can be refreshed without collapsing dataset identity and version into one concept
 - at least one domain has a real integrated cross-provider analytical surface
 - that integrated surface includes a map that shows integrated regions and grays not-yet-integrated ones
 
@@ -700,6 +800,8 @@ The effort is drifting off course if:
 - introspection exposes arbitrary columns by default
 - live federated data and frozen snapshots are not distinguishable
 - the README continues to promise behavior that the codebase does not actually implement
+- every annual import becomes a completely separate top-level dataset with no stable identity linking them
+- refreshes overwrite imported data in place with no recoverable version boundary where reproducibility matters
 - same-domain datasets remain explorable only in isolation with no path to an integrated analytical view
 - the generic registry starts absorbing domain semantics that should instead live in the responsible source-domain app
 
@@ -748,7 +850,18 @@ Mitigation direction:
 - add FDW-based federation before non-SQL connectors
 - keep advanced harmonization as a later overlay, not a prerequisite
 
-### 10.5 Open design question: model placement
+### 10.5 Reproducibility versus storage-cost trade-off
+
+Keeping every imported release as an immutable snapshot improves auditability, rollback, and analytical reproducibility, but increases storage and operational complexity.
+
+Mitigation direction:
+
+- make snapshot retention policy explicit per dataset class
+- default annual or formally released datasets toward immutable snapshots
+- allow continuously refreshed operational datasets to keep only selected snapshots where full retention is not justified
+- let high-value downstream workflows pin required versions before retention cleanup
+
+### 10.6 Open design question: model placement
 
 The current name `GeoDataset` is probably still appropriate for the user-facing registry object, but the backend/configuration models may need to live either in `maps` or in a more cross-cutting data-access module. The roadmap does not require that answer immediately, but Phase 0 should settle the boundary.
 
@@ -760,6 +873,7 @@ The next practical implementation slice should be narrow and reality-based:
 - choose the authoritative metadata fields for local table-backed datasets
 - decouple URL/view lookup from `model_name`
 - deliver one real end-to-end example where a manually created PostGIS table is registered and explored without code changes
+- choose the first concrete versioning pattern for imported external datasets, with annual roadside-tree releases as the reference case
 - define the pilot domain contract for a first harmonized integrated view, with `roadside_trees` as the most natural candidate
 
 That slice is small enough to validate the architecture and large enough to prove the core promise.
