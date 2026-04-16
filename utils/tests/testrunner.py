@@ -193,8 +193,7 @@ class SerialAwareTestRunner(DiscoverRunner):
         return super().setup_databases(**kwargs)
 
     def run_tests(self, test_labels, extra_tests=None, **kwargs):
-        # Check if we have any serial tests to handle
-        if not SERIAL_TESTS:
+        if not SERIAL_TESTS or getattr(self, "parallel", 0) in (0, 1):
             # No serial tests, use Django's standard test runner
             result = super().run_tests(test_labels, extra_tests=extra_tests, **kwargs)
             if self._stats:

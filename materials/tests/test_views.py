@@ -841,7 +841,7 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse(self.url_name, kwargs={"pk": self.value.pk})
         response = self.client.get(url)
-        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertRedirects(response, f"{reverse("auth_login")}?next={url}")
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -861,7 +861,7 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse(self.url_name, kwargs={"pk": self.value.pk})
         response = self.client.post(url)
-        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertRedirects(response, f"{reverse("auth_login")}?next={url}")
 
     def test_post_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -1119,7 +1119,7 @@ class MaterialPropertyValueCreateAndDetailViewTestCase(ViewWithPermissionsTestCa
         self.client.force_login(self.member)
 
         response = self.client.post(
-            f"{reverse('materialpropertyvalue-create')}?sample={self.sample.pk}",
+            f"{reverse("materialpropertyvalue-create")}?sample={self.sample.pk}",
             data={
                 "property": self.property.pk,
                 "basis_component": self.default_basis.pk,
@@ -1144,7 +1144,7 @@ class MaterialPropertyValueCreateAndDetailViewTestCase(ViewWithPermissionsTestCa
         self.client.force_login(self.member)
 
         response = self.client.post(
-            f"{reverse('materialpropertyvalue-create')}?sample={self.sample.pk}",
+            f"{reverse("materialpropertyvalue-create")}?sample={self.sample.pk}",
             data={
                 "property": self.property.pk,
                 "basis_component": self.default_basis.pk,
@@ -1363,14 +1363,14 @@ class ComponentMeasurementCreateAndDetailViewTestCase(ViewWithPermissionsTestCas
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            f"{reverse('componentmeasurement-create')}?sample={self.sample.pk}",
+            f"{reverse("componentmeasurement-create")}?sample={self.sample.pk}",
         )
 
     def test_create_view_creates_measurement_for_related_sample_and_redirects(self):
         self.client.force_login(self.member)
 
         response = self.client.post(
-            f"{reverse('componentmeasurement-create')}?sample={self.sample.pk}",
+            f"{reverse("componentmeasurement-create")}?sample={self.sample.pk}",
             data={
                 "group": self.group.pk,
                 "component": self.component.pk,
@@ -1400,7 +1400,7 @@ class ComponentMeasurementCreateAndDetailViewTestCase(ViewWithPermissionsTestCas
         self.client.force_login(self.member)
 
         response = self.client.post(
-            f"{reverse('componentmeasurement-create')}?sample={self.sample.pk}",
+            f"{reverse("componentmeasurement-create")}?sample={self.sample.pk}",
             data={
                 "group": self.group.pk,
                 "component": self.component.pk,
@@ -1669,10 +1669,10 @@ class BackURLNavigationTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
     def test_sampleseries_detail_shows_back_to_results_button(self):
         """Detail page shows 'Back to results' button when back parameter is present."""
         self.client.force_login(self.non_owner_user)
-        list_url = f"{reverse('sampleseries-list')}?scope=published"
+        list_url = f"{reverse("sampleseries-list")}?scope=published"
         detail_url = (
-            f"{reverse('sampleseries-detail', kwargs={'pk': self.published_object.pk})}"
-            f"?back={quote(list_url, safe='')}"
+            f"{reverse("sampleseries-detail", kwargs={"pk": self.published_object.pk})}"
+            f"?back={quote(list_url, safe="")}"
         )
         response = self.client.get(detail_url)
         self.assertEqual(response.status_code, 200)
@@ -1682,7 +1682,7 @@ class BackURLNavigationTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
     def test_sampleseries_list_back_param_present_in_detail_links(self):
         """Sample series list links contain ?back= pointing to the current list URL."""
         self.client.force_login(self.staff_user)
-        list_url = f"{reverse('sampleseries-list')}?scope=published"
+        list_url = f"{reverse("sampleseries-list")}?scope=published"
         response = self.client.get(list_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "?back=")
@@ -1690,7 +1690,7 @@ class BackURLNavigationTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
     def test_sampleseries_list_with_filters_back_param_contains_filters(self):
         """The back param on detail links encodes active filter/sort state."""
         self.client.force_login(self.staff_user)
-        list_url = f"{reverse('sampleseries-list')}?scope=published"
+        list_url = f"{reverse("sampleseries-list")}?scope=published"
         response = self.client.get(list_url)
         self.assertEqual(response.status_code, 200)
         expected_back_fragment = quote(list_url, safe="")
@@ -2019,7 +2019,7 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("sample-add-property", kwargs={"pk": self.sample.pk})
         response = self.client.get(url)
-        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertRedirects(response, f"{reverse("auth_login")}?next={url}")
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -2045,7 +2045,7 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("sample-add-property", kwargs={"pk": self.sample.pk})
         response = self.client.post(url)
-        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertRedirects(response, f"{reverse("auth_login")}?next={url}")
 
     def test_post_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -2176,7 +2176,7 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("sample-add-property-modal", kwargs={"pk": self.sample.pk})
         response = self.client.get(url)
-        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertRedirects(response, f"{reverse("auth_login")}?next={url}")
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -2202,7 +2202,7 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("sample-add-property-modal", kwargs={"pk": self.sample.pk})
         response = self.client.post(url)
-        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertRedirects(response, f"{reverse("auth_login")}?next={url}")
 
     def test_post_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -2322,7 +2322,7 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("sample-duplicate", kwargs={"pk": self.sample.pk})
         response = self.client.get(url)
-        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertRedirects(response, f"{reverse("auth_login")}?next={url}")
 
     def test_get_http_200_ok_for_owner(self):
         self.client.force_login(self.sample.owner)
@@ -2341,7 +2341,7 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("sample-duplicate", kwargs={"pk": self.sample.pk})
         response = self.client.post(url)
-        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertRedirects(response, f"{reverse("auth_login")}?next={url}")
 
     def test_post_success_and_http_302_redirect_for_owner(self):
         self.client.force_login(self.sample.owner)
@@ -2572,7 +2572,7 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
         redirect_url = reverse(
             "composition-detail", kwargs={"pk": self.unpublished_object.pk}
         )
-        self.assertRedirects(response, f"{reverse('auth_login')}?next={redirect_url}")
+        self.assertRedirects(response, f"{reverse("auth_login")}?next={redirect_url}")
 
     def test_detail_view_nonexistent_object(self):
         url = self.get_detail_url(pk=9999)  # Assuming this PK does not exist
@@ -2666,6 +2666,7 @@ class AddComponentViewTestCase(ViewWithPermissionsTestCase):
         material = Material.objects.create(name="Test Material")
         cls.component_group = MaterialComponentGroup.objects.create(name="Test Group")
         cls.series = SampleSeries.objects.create(
+            owner=cls.member,
             name="Test Series",
             material=material,
             publication_status="published",
@@ -2682,7 +2683,7 @@ class AddComponentViewTestCase(ViewWithPermissionsTestCase):
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("composition-add-component", kwargs={"pk": self.composition.pk})
         response = self.client.get(url)
-        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertRedirects(response, f"{reverse("auth_login")}?next={url}")
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -2708,7 +2709,7 @@ class AddComponentViewTestCase(ViewWithPermissionsTestCase):
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("composition-add-component", kwargs={"pk": self.composition.pk})
         response = self.client.post(url)
-        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertRedirects(response, f"{reverse("auth_login")}?next={url}")
 
     def test_post_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -2769,7 +2770,7 @@ class ComponentOrderUpViewTestCase(ViewWithPermissionsTestCase):
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("composition-order-up", kwargs={"pk": self.composition.pk})
         response = self.client.get(url)
-        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertRedirects(response, f"{reverse("auth_login")}?next={url}")
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -2859,7 +2860,7 @@ class ComponentOrderDownViewTestCase(ViewWithPermissionsTestCase):
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("composition-order-down", kwargs={"pk": self.composition.pk})
         response = self.client.get(url)
-        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertRedirects(response, f"{reverse("auth_login")}?next={url}")
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -3042,7 +3043,7 @@ class AddCompositionViewTestCase(ViewWithPermissionsTestCase):
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("sampleseries-add-composition", kwargs={"pk": self.series.pk})
         response = self.client.get(url)
-        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertRedirects(response, f"{reverse("auth_login")}?next={url}")
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -3068,7 +3069,7 @@ class AddCompositionViewTestCase(ViewWithPermissionsTestCase):
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("sampleseries-add-composition", kwargs={"pk": self.series.pk})
         response = self.client.post(url)
-        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertRedirects(response, f"{reverse("auth_login")}?next={url}")
 
     def test_post_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -3191,7 +3192,7 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.redirect_chain,
-            [(f"{reverse('material-list-review')}?scope=review", 302)],
+            [(f"{reverse("material-list-review")}?scope=review", 302)],
         )
         self.assertContains(response, "Reset filters")
         self.assertContains(response, "Review Material")
@@ -3442,11 +3443,18 @@ class EmptyStateViewsTestCase(TestCase):
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Chemical Elements")
-        self.assertContains(response, "30.0%")
-        self.assertContains(response, "70.0%")
-        self.assertContains(
-            response,
-            "Derived from the raw mass-related measurements above. Each group is normalized to 100%, and missing fractions are shown as Other.",
+        compositions = response.context["data"]["compositions"]
+        self.assertEqual(len(compositions), 1)
+        composition = compositions[0]
+        self.assertTrue(composition["is_derived"])
+        self.assertEqual(composition["group_name"], "Chemical Elements")
+        self.assertEqual(
+            {share["component_name"] for share in composition["shares"]},
+            {"Carbon", "Nitrogen"},
+        )
+        self.assertEqual(
+            {share["as_percentage"] for share in composition["shares"]},
+            {"30.0%", "70.0%"},
         )
         self.assertContains(response, "Derived")
         self.assertNotContains(response, "30.0 ± 0.0%")
@@ -3527,18 +3535,24 @@ class EmptyStateViewsTestCase(TestCase):
 
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "20.0 ± 0.0%")
-        self.assertContains(response, "80.0 ± 0.0%")
-        self.assertContains(
-            response,
-            "Saved composition groups for this sample. These cards reflect the stored composition records rather than an on-the-fly derivation from the raw measurements above.",
+        compositions = response.context["data"]["compositions"]
+        self.assertEqual(len(compositions), 1)
+        composition = compositions[0]
+        self.assertFalse(composition["is_derived"])
+        self.assertEqual(composition["group_name"], "Macronutrients")
+        self.assertEqual(
+            {share["component_name"] for share in composition["shares"]},
+            {"Phosphorus", "Potassium"},
+        )
+        self.assertEqual(
+            {share["as_percentage"] for share in composition["shares"]},
+            {"20.0 ± 0.0%", "80.0 ± 0.0%"},
         )
         self.assertContains(response, "Saved composition")
         self.assertNotContains(response, "70.0 ± 0.0%")
         self.assertNotContains(response, "70.0%")
         self.assertNotContains(
-            response,
-            "Derived from the raw mass-related measurements above. Each group is normalized to 100%, and missing fractions are shown as Other.",
+            response, "Derived from raw measurements, each group normalized to 100%."
         )
 
     def test_sample_detail_uses_settings_only_composition_order_for_derived_display(
