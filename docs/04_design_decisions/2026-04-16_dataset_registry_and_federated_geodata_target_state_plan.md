@@ -53,6 +53,10 @@ This direction is already visible in the codebase, but only partially:
 - the documented metadata fields for table/geometry/display/filter configuration are not yet reflected as the authoritative runtime path in the current `GeoDataset` model
 - the current generic dataset path is therefore more a design direction than a completed architecture
 
+There is an even higher-level product goal above dataset registration and harmonization: the resulting data should ultimately become jointly usable in the inventory app. That is the point where the overall workflow is completed.
+
+So this roadmap is not only about making datasets visible in `maps`. It is also about making them dependable downstream building blocks for cross-domain inventory evaluation.
+
 This document turns that direction into a concrete target-state roadmap.
 
 ## 2. Target State to Reach
@@ -164,6 +168,17 @@ Target outcome:
 - regions where source datasets exist but are not yet integrated can be shown as not yet integrated
 - regions with no available dataset can be shown separately from integration gaps where useful
 - uncovered or not-yet-integrated regions can be grayed so users can immediately see the current analytical footprint
+
+### 2.9 Inventory-ready downstream evaluation
+
+The long-term workflow is only complete when registered and harmonized datasets can be evaluated together in the inventory app.
+
+Target outcome:
+
+- inventories can reference datasets and harmonized domain views through stable dataset contracts
+- inventories can deliberately choose current datasets or pinned dataset versions depending on reproducibility needs
+- cross-domain evaluation can combine multiple harmonized inputs without depending on hardcoded model names or one-off import logic
+- inventory users can still inspect provenance, freshness, coverage, and integration status of the inputs they are evaluating
 
 ## 3. Principles and Constraints
 
@@ -319,6 +334,15 @@ Harmonization should not require every dataset to be equally rich.
 - if one dataset provides crown diameter in centimeters and another in meters, both can still contribute after explicit normalization
 - if a field is absent in a source dataset, the integrated record should carry `null` or lower-detail information rather than forcing invented values
 
+### 3.12 Inventory app is the main downstream completion point
+
+The architecture should treat the inventory app as the main downstream integration target for this work.
+
+- dataset registration is not an end in itself
+- harmonized domain views are not an end in themselves
+- both should converge on stable, inspectable, version-aware inputs that inventories can evaluate together
+- if a design choice improves map visibility but makes inventory consumption brittle, the roadmap should prefer the more inventory-stable option
+
 ## 4. Final-State Vision
 
 In the final state, BRIT behaves as a geodata workbench rather than a set of hardcoded map pages.
@@ -351,6 +375,7 @@ A user can:
 - reuse datasets in inventories or analyses through stable dataset references
 - switch between individual raw/provider datasets and integrated domain views
 - open a domain-wide integrated map and immediately see which regions are already analytically covered and which are not yet integrated
+- run inventory evaluations that consume multiple registered or harmonized datasets together through stable references
 
 ### 4.3 What the system knows
 
@@ -414,6 +439,18 @@ For a domain such as roadside trees, the final user experience should look like 
 
 The same pattern should apply to other domains where cross-provider integration is meaningful.
 
+### 4.7 What completion of the end-to-end workflow looks like
+
+The full workflow should ultimately look like this:
+
+- external or local datasets are registered in BRIT through the generic registry contract
+- recurring imports and live/federated sources are versioned and tracked explicitly
+- source-domain apps harmonize incompatible same-domain datasets where cross-provider analysis is needed
+- integrated domain views and coverage summaries become available for exploration and QA
+- the inventory app can then evaluate multiple registered and harmonized datasets together as stable, inspectable inputs
+
+At that point, `maps` is no longer only a viewing surface. It becomes the governed data-entry layer for downstream inventory evaluation.
+
 ## 5. Current State in BRIT
 
 ### 5.1 Already aligned with the direction
@@ -459,6 +496,7 @@ The same pattern should apply to other domains where cross-provider integration 
 | Downstream stable references | Current coupling often assumes model-specific endpoints | Let consumers bind to dataset IDs/contracts rather than Python model names |
 | Same-domain harmonization | Described in a separate proposal, but not clearly positioned in the registry target state | Define the boundary where source-domain apps own canonical schemas, mappings, and integrated analytical views |
 | Integrated coverage-aware domain maps | No explicit cross-domain contract for coverage status | Add integrated domain surfaces that show harmonized objects together and distinguish integrated from not-yet-integrated regions |
+| Inventory-ready downstream evaluation | Inventories are mentioned, but not yet framed as the architectural completion point | Make inventory consumption an explicit design driver for dataset identity, versioning, and harmonization contracts |
 
 ## 7. Recommended BRIT Architecture
 
@@ -785,6 +823,7 @@ Deliverables:
   - integrated coverage
   - source data exists but is not yet integrated
   - no known source data available
+- demonstrate that at least one inventory-facing workflow can consume the resulting dataset contracts without bespoke model-name wiring
 
 Success criteria:
 
@@ -792,6 +831,7 @@ Success criteria:
 - downstream modules no longer depend on Python model names for basic dataset selection
 - at least one pilot domain such as roadside trees can be explored both as individual provider datasets and as one integrated cross-provider map
 - the integrated map clearly distinguishes covered from not-yet-integrated regions
+- the inventory app has a credible path to consume the same stable dataset and version contracts used by `maps`
 
 ## Phase 6 - Operational polish and deprecation cleanup
 
@@ -828,6 +868,7 @@ Use this section to evaluate whether the roadmap is actually moving forward.
 | Dataset freshness/version semantics visible in UI |  |  |  |
 | Imported datasets have explicit import-run and current-version contracts |  |  |  |
 | Downstream consumers select datasets by stable dataset identity |  |  |  |
+| Inventory app can evaluate registered and harmonized datasets through stable contracts |  |  |  |
 | Source-domain apps define canonical harmonization contracts for same-domain datasets |  |  |  |
 | At least one integrated domain map combines harmonized records across providers |  |  |  |
 | Coverage maps distinguish integrated from not-yet-integrated regions |  |  |  |
@@ -842,6 +883,7 @@ The roadmap should be considered substantively achieved when all of the followin
 - no new URL/view/filter/template code is required for ordinary dataset onboarding
 - domain-specific code is only needed for semantic enrichment or non-generic workflows
 - imported datasets can be refreshed without collapsing dataset identity and version into one concept
+- the inventory app can consume the same registered datasets and harmonized views through stable contracts rather than bespoke source-specific glue
 - at least one domain has a real integrated cross-provider analytical surface
 - that integrated surface includes a map that shows integrated regions and grays not-yet-integrated ones
 
@@ -858,6 +900,7 @@ The effort is drifting off course if:
 - every annual import becomes a completely separate top-level dataset with no stable identity linking them
 - refreshes overwrite imported data in place with no recoverable version boundary where reproducibility matters
 - same-domain datasets remain explorable only in isolation with no path to an integrated analytical view
+- the inventory app still needs source-specific one-off glue for ordinary dataset consumption because the registry contract is not actually stable enough
 - the generic registry starts absorbing domain semantics that should instead live in the responsible source-domain app
 
 ## 10. Risks and Open Questions
