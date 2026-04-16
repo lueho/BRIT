@@ -63,7 +63,12 @@ dev = [
     "flower>=2.0.1",
 ]
 
-pdf_parsing = ["pypdf>=6.9.2", "pymupdf>=1.27.2.2", "ocrmypdf>=17.4.1"]
+pdf_parsing = [
+    "pdfplumber>=0.11.7",
+    "pypdf>=6.9.2",
+    "pymupdf>=1.27.2.2",
+    "ocrmypdf>=17.4.1",
+]
 
 # Ruff configuration for linting and formatting
 [tool.ruff]
