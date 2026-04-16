@@ -28,47 +28,21 @@
   {% endif %}
 {% endblock detail_top_image %}
 {% block detail_body %}
-  <div class="rounded border bg-body-tertiary p-3 mb-3">
-    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-      <div>
-        <div class="small text-muted text-uppercase fw-semibold mb-1">Identity</div>
-        <h2 class="h4 mb-1">{{ object.name }}</h2>
-        <div class="text-muted">{{ object.material.name }}</div>
-        <div class="small text-muted mt-2">
-          {% if object.description %}
-            {{ object.description|truncatewords:20 }}
-          {% elif object.location %}
-            Sample record for {{ object.material.name|lower }} collected in {{ object.location }}.
-          {% else %}
-            Sample record for {{ object.material.name|lower }} with linked composition and property data.
-          {% endif %}
-        </div>
-      </div>
-      <div class="d-flex flex-wrap gap-2 justify-content-md-end">
-        {% if object.series %}
-          <span class="badge rounded-pill text-bg-light">Series: {{ object.series.name }}</span>
-        {% else %}
-          <span class="badge rounded-pill text-bg-light">Standalone sample</span>
-        {% endif %}
-        {% if object.datetime %}
-          <span class="badge rounded-pill text-bg-light">{{ object.datetime|date:"Y-m-d H:i" }}</span>
-        {% endif %}
-        {% if object.location %}<span class="badge rounded-pill text-bg-light">{{ object.location }}</span>{% endif %}
-        {% if sample_summary.component_measurement_count %}
-          <span class="badge rounded-pill text-bg-light">Raw data available</span>
-        {% endif %}
-        {% if sample_summary.composition_count %}
-          <span class="badge rounded-pill text-bg-light">Normalized view available</span>
-        {% endif %}
-      </div>
-    </div>
-  </div>
   <div class="row g-3 mb-4">
     <div class="col-12 col-lg-7" id="sample-context">
       <div class="card shadow-sm h-100">
         <div class="card-body">
           <div class="small text-muted text-uppercase fw-semibold mb-1">Context</div>
           <h3 class="h6 mb-3">About this sample</h3>
+          {% if object.description %}
+            <div class="mb-3">
+              <div class="small text-muted sample-description-clamp"
+                   id="sampleDescription">{{ object.description|linebreaksbr }}</div>
+              <button class="btn btn-link btn-sm p-0 d-none"
+                      id="sampleDescriptionToggle"
+                      type="button">Read more</button>
+            </div>
+          {% endif %}
           <dl class="row mb-0 sample-detail-fields">
             <dt class="col-sm-4">Material</dt>
             <dd class="col-sm-8">
@@ -145,7 +119,7 @@
     <div class="col-12 col-lg-5">
       <div class="card shadow-sm h-100" id="sample-overview">
         <div class="card-body">
-          <div class="small text-muted text-uppercase fw-semibold mb-1">Quality and provenance</div>
+          <div class="small text-muted text-uppercase fw-semibold mb-1">Overview</div>
           <h3 class="h6 mb-3">At a glance</h3>
           <div class="row g-3 align-items-stretch">
             <div class="col-6">
@@ -191,9 +165,6 @@
                     Not yet available
                   {% endif %}
                 </div>
-                <div class="small text-muted mt-1">
-                  {{ sample_summary.sample_source_count }} linked source{{ sample_summary.sample_source_count|pluralize }}
-                </div>
               </div>
             </div>
           </div>
@@ -202,6 +173,8 @@
     </div>
   </div>
 {% endblock detail_body %}
+{% block detail_footer_wrapper %}
+{% endblock detail_footer_wrapper %}
 {% block detail_header_primary_actions %}
   <div class="btn-group me-2" role="group">
     {% with back_url=request.GET.back %}
@@ -227,11 +200,6 @@
         <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">List</span>
       </a>
     {% endif %}
-    <a class="btn btn-sm btn-outline-secondary"
-       href="{% url 'materials-explorer' %}"
-       title="Open Explorer (dashboard)">
-      <i class="fas fa-table-cells-large"></i> <span class="d-none d-md-inline">Explorer</span>
-    </a>
   </div>
   {% if sample_summary.component_measurement_count or sample_summary.property_value_count %}
     <a class="btn btn-sm btn-primary me-2"
@@ -240,14 +208,6 @@
       <i class="fas fa-chart-column"></i> <span class="d-none d-md-inline">Explore measurements</span>
     </a>
   {% endif %}
-  {% if sample_summary.sample_source_count %}
-    <a class="btn btn-sm btn-outline-secondary me-2"
-       href="#sample-context"
-       title="View source context">
-      <i class="fas fa-book"></i> <span class="d-none d-md-inline">View sources</span>
-    </a>
-  {% endif %}
-  {{ block.super }}
 {% endblock detail_header_primary_actions %}
 {% block options_tab_title %}
   {% if sample_layout_mode == "workspace" %}
@@ -394,8 +354,7 @@
 {% endblock options_secondary_actions %}
 {% block options_export %}
   {% if component_measurements %}
-    <hr class="my-2">
-    <p class="text-muted small fw-semibold text-uppercase mb-1 mt-2">Export</p>
+    <p class="text-muted small fw-semibold text-uppercase mb-1">Export</p>
     <button type="button"
             class="btn btn-outline-primary w-100 mb-2"
             id="exportBtn"
@@ -496,8 +455,7 @@
                     </h2>
                     <div id="collapse-{{ forloop.counter }}"
                          class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
-                         aria-labelledby="heading-{{ forloop.counter }}"
-                         data-bs-parent="#measurementsAccordion">
+                         aria-labelledby="heading-{{ forloop.counter }}">
                       <div class="accordion-body p-0">
                         <div class="table-responsive">
                           <table class="table table-sm table-striped mb-0">
@@ -920,51 +878,19 @@
       </div>
     </div>
   {% endif %}
-  <div class="col col-12 mt-4" id="sample-provenance">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <div class="small text-muted text-uppercase fw-semibold mb-1">Quality and provenance</div>
-        <h5 class="mb-3">Data basis and interpretation</h5>
-        <div class="row g-3">
-          <div class="col-12 col-lg-8">
-            <ul class="small text-muted mb-0">
-              <li>Composition data can be explored as raw group measurements or as normalized shares.</li>
-              <li>
-                Normalized groups sum to 100%, and any missing fraction is shown as <strong>Other</strong>.
-              </li>
-              <li>Basis components, units, sample sizes, methods, sources, and comments are shown inline where available.</li>
-              <li>
-                Use the raw measurement tables when you need analytical context; use the normalized view when you need a quick compositional comparison.
-              </li>
-            </ul>
-          </div>
-          <div class="col-12 col-lg-4">
-            <div class="border rounded p-3 h-100 bg-body-tertiary">
-              <div class="small text-muted mb-1">Linked provenance</div>
-              <div class="fw-semibold mb-2">
-                {{ sample_summary.sample_source_count }} source{{ sample_summary.sample_source_count|pluralize }}
-              </div>
-              {% with sample_sources=object.sources.all %}
-                {% if sample_sources %}
-                  <div class="d-flex flex-wrap gap-2">
-                    {% for source in sample_sources %}
-                      <a href="{% url 'source-detail-modal' source.pk %}"
-                         class="modal-link badge bg-light text-dark text-decoration-none"
-                         title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:"Source" }}</a>
-                    {% endfor %}
-                  </div>
-                {% else %}
-                  <div class="small text-muted">No source record linked yet.</div>
-                {% endif %}
-              {% endwith %}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 {% endblock second_row %}
 {% block detail_with_options_scripts %}
+  <style>
+    .sample-description-clamp {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .sample-description-clamp.expanded {
+      -webkit-line-clamp: unset;
+    }
+  </style>
   {{ charts|json_script:"charts" }}
   <script>
     const charts = JSON.parse(document.getElementById("charts").textContent);
@@ -1069,6 +995,19 @@
           alert('Failed to check export progress: ' + error.message);
         });
     }
+
+    (function() {
+      const desc = document.getElementById('sampleDescription');
+      const toggle = document.getElementById('sampleDescriptionToggle');
+      if (!desc || !toggle) return;
+      if (desc.scrollHeight > desc.clientHeight) {
+        toggle.classList.remove('d-none');
+        toggle.addEventListener('click', function() {
+          desc.classList.toggle('expanded');
+          toggle.textContent = desc.classList.contains('expanded') ? 'Show less' : 'Read more';
+        });
+      }
+    })();
 
   </script>
 {% endblock detail_with_options_scripts %}

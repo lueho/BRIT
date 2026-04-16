@@ -85,14 +85,16 @@
             {% endif %}
           {% endblock detail_body %}
         </div>
-        <div class="card-footer d-flex">
-          {% block detail_card_footer %}
-            {% block detail_footer_left %}
-            {% endblock detail_footer_left %}
-            {% block detail_footer_right %}
-            {% endblock detail_footer_right %}
-          {% endblock detail_card_footer %}
-        </div>
+        {% block detail_footer_wrapper %}
+          <div class="card-footer d-flex">
+            {% block detail_card_footer %}
+              {% block detail_footer_left %}
+              {% endblock detail_footer_left %}
+              {% block detail_footer_right %}
+              {% endblock detail_footer_right %}
+            {% endblock detail_card_footer %}
+          </div>
+        {% endblock detail_footer_wrapper %}
       </div>
     </div>
     <div class="col-lg-4">
