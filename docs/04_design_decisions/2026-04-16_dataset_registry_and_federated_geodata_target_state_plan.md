@@ -122,6 +122,12 @@ Target outcome:
 - the query path is bounded, audited, and metadata-driven
 - BRIT knows whether a dataset is local, federated-live, or federated-cached
 - admins can decide when live access is acceptable and when local snapshotting is required instead
+- the core registry remains open to multiple source-access patterns, for example:
+  - PostgreSQL-native federation
+  - authenticated WFS or similar feature-service access
+  - authenticated file download workflows
+  - managed imports from file URLs such as CSV, GeoJSON, or Excel
+- regardless of source type, the user-facing dataset should still expose the same baseline metadata, provenance, refresh, and exploration contract wherever technically possible
 
 ### 2.6 Domain integration without per-dataset code
 
@@ -259,18 +265,45 @@ This usually fits better than creating a brand-new top-level table for every ref
 
 If the upstream dataset is genuinely cumulative and the row model itself is temporal, appending may be correct. Even then, BRIT should still expose version metadata for import runs so that users know what upstream state they are seeing.
 
-### 3.7 Prefer PostgreSQL-native backends first
+### 3.7 Stable core capabilities, flexible source connectors
+
+BRIT should keep the basic dataset experience stable while staying flexible about how data enters or is accessed.
+
+The stable core should define at least:
+
+- dataset identity
+- provenance and source metadata
+- exposure policy and allowlists
+- schema summary
+- refresh and version status
+- map/table/detail exploration surfaces where applicable
+- domain-harmonization hooks for downstream source apps
+
+The flexible edge should allow multiple connector or ingestion modes, for example:
+
+- direct database relation registration
+- PostgreSQL foreign tables
+- authenticated WFS or other feature-service connectors
+- authenticated HTTP download of files
+- managed imports from remote Excel, CSV, GeoJSON, or similar files
+
+The architectural rule should be:
+
+- vary the source connector as needed
+- keep the user-facing dataset contract and downstream integration contract as stable as possible
+
+### 3.8 Prefer PostgreSQL-native backends first
 
 BRIT should solve the common case first:
 
 - local PostGIS tables/views/materialized views
 - PostgreSQL foreign tables and related DB-native mechanisms
 
-### 3.8 UX consistency with existing module direction
+### 3.9 UX consistency with existing module direction
 
 This roadmap should follow the existing UX guidance that the primary module entry is the main list of `GeoDataset` records, with explorer/list/detail/map patterns remaining consistent with other BRIT modules.
 
-### 3.9 Source-domain ownership of harmonization
+### 3.10 Source-domain ownership of harmonization
 
 The generic registry layer should not try to understand the semantics of every domain.
 
@@ -278,7 +311,7 @@ The generic registry layer should not try to understand the semantics of every d
 - source-domain apps own canonical domain schemas, semantic mappings, unit normalization rules, and integration logic for incompatible same-domain datasets
 - cross-provider harmonization belongs to the domain app because only the domain app can define what counts as equivalence, acceptable downgrade, or required analytical minimum
 
-### 3.10 Integration must preserve partial truth
+### 3.11 Integration must preserve partial truth
 
 Harmonization should not require every dataset to be equally rich.
 
@@ -455,7 +488,7 @@ The exact model names can change, but the separation of concerns should remain.
 
 ### 7.2 Introduce a small dataset adapter contract
 
-The generic UI/query layer should not care whether a dataset comes from a Django model or a foreign table.
+The generic UI/query layer should not care whether a dataset comes from a Django model, a foreign table, an authenticated WFS workflow, or a managed Excel import.
 
 Recommended adapter responsibilities:
 
@@ -465,6 +498,13 @@ Recommended adapter responsibilities:
 - build safe filtered queries from allowlisted metadata
 - fetch a single feature by identity
 - provide count/extent summaries where possible
+
+In practice this implies two separable concerns:
+
+- a **source connector or ingestion adapter** that knows how to authenticate, fetch, refresh, and validate an upstream source
+- a **dataset runtime adapter** that exposes the resulting dataset to BRIT's generic map/table/detail/query surfaces
+
+BRIT should standardize the second layer more strictly than the first.
 
 Initial backend types to support:
 
@@ -479,6 +519,15 @@ Later, if justified:
 - remote SQL proxy adapter
 - file-backed virtual adapter
 - HTTP feature service adapter
+
+Connector/ingestion modes that the architecture should remain open to include:
+
+- PostgreSQL-native federation
+- authenticated feature-service fetches such as WFS
+- authenticated file downloads
+- scheduled imports from Excel, CSV, GeoJSON, or similar source files
+
+Not every connector needs the same implementation style. Some may materialize into local tables, while others may remain live or semi-live. What matters is that they converge on the same registry contract once inside BRIT.
 
 ### 7.3 Add an import-run and dataset-version contract
 
@@ -512,6 +561,8 @@ Prefer this order:
 - PostgreSQL materialized views
 - PostgreSQL foreign tables via approved FDW workflow
 - only later consider non-SQL remote adapters
+
+This ordering is a delivery preference, not a permanent architectural exclusion. The long-term design should remain open to non-database connectors when they are operationally justified.
 
 This keeps:
 
@@ -681,12 +732,14 @@ Deliverables:
 - add admin guidance and validation for federated dataset registration
 - distinguish live federated vs cached federated datasets in metadata and UI
 - document operational requirements for DBAs/admins, including read-only credentials and ownership boundaries
+- document the generalized source-connector contract so later authenticated WFS or file-download connectors can plug into the same registry without redesigning the user-facing dataset model
 
 Success criteria:
 
 - a read-only external PostGIS dataset exposed through approved database federation can be registered as a `GeoDataset`
 - users can browse and filter it through the same baseline UI as local datasets
 - the UI clearly indicates that the dataset is federated and whether results are live or cached
+- the architecture is still ready for later non-database connectors without introducing a second competing dataset concept
 
 ## Phase 4 - Versioning, refresh, and reproducibility
 
@@ -771,6 +824,7 @@ Use this section to evaluate whether the roadmap is actually moving forward.
 | `GeoDataset` independent from hardcoded `model_name` routing |  |  |  |
 | Column exposure allowlists enforced |  |  |  |
 | Federated read-only foreign table support |  |  |  |
+| Stable registry contract supports multiple connector and ingestion modes |  |  |  |
 | Dataset freshness/version semantics visible in UI |  |  |  |
 | Imported datasets have explicit import-run and current-version contracts |  |  |  |
 | Downstream consumers select datasets by stable dataset identity |  |  |  |
@@ -800,6 +854,7 @@ The effort is drifting off course if:
 - introspection exposes arbitrary columns by default
 - live federated data and frozen snapshots are not distinguishable
 - the README continues to promise behavior that the codebase does not actually implement
+- each new source type requires inventing a separate user-facing dataset concept instead of plugging into the same core registry contract
 - every annual import becomes a completely separate top-level dataset with no stable identity linking them
 - refreshes overwrite imported data in place with no recoverable version boundary where reproducibility matters
 - same-domain datasets remain explorable only in isolation with no path to an integrated analytical view
@@ -850,7 +905,18 @@ Mitigation direction:
 - add FDW-based federation before non-SQL connectors
 - keep advanced harmonization as a later overlay, not a prerequisite
 
-### 10.5 Reproducibility versus storage-cost trade-off
+### 10.5 Connector proliferation risk
+
+Supporting many upstream access patterns can devolve into a hard-to-maintain plugin zoo if BRIT does not define a strong common contract.
+
+Mitigation direction:
+
+- keep the core dataset registry and runtime adapter contract small and strict
+- allow connector diversity mainly at the fetch/auth/refresh edge
+- prefer materializing unusual sources into a standard internal representation when live querying would complicate the generic surfaces too much
+- require every connector to expose the same provenance, refresh, and failure metadata to the registry
+
+### 10.6 Reproducibility versus storage-cost trade-off
 
 Keeping every imported release as an immutable snapshot improves auditability, rollback, and analytical reproducibility, but increases storage and operational complexity.
 
@@ -861,7 +927,7 @@ Mitigation direction:
 - allow continuously refreshed operational datasets to keep only selected snapshots where full retention is not justified
 - let high-value downstream workflows pin required versions before retention cleanup
 
-### 10.6 Open design question: model placement
+### 10.7 Open design question: model placement
 
 The current name `GeoDataset` is probably still appropriate for the user-facing registry object, but the backend/configuration models may need to live either in `maps` or in a more cross-cutting data-access module. The roadmap does not require that answer immediately, but Phase 0 should settle the boundary.
 
