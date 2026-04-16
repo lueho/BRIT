@@ -128,7 +128,7 @@ class CompositionDoughnutChartSerializer(ModelSerializer):
 class MaterialPropertyValueModelSerializer(
     NumericMeasurementSerializerMixin, ModelSerializer
 ):
-    property_name = StringRelatedField(source="property")
+    property_name = ReadOnlyField(source="property.name")
     property_url = HyperlinkedRelatedField(
         source="property", read_only=True, view_name="materialproperty-detail-modal"
     )
