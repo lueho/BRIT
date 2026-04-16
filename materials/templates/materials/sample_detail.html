@@ -371,10 +371,7 @@
       <div class="card shadow h-100 tab-card">
         <div class="card-header tab-card-header bg-body-tertiary border-bottom-0 py-3">
           <div class="small text-muted text-uppercase fw-semibold mb-1">Measurements</div>
-          <h5 class="mb-1">Measurement workspace</h5>
-          <div class="small text-muted mb-3">
-            Explore composition data and other sample properties from one comparison surface, then drill down into groups, basis, methods, and sources.
-          </div>
+          <h5 class="mb-3">Measurement workspace</h5>
           <ul class="nav nav-tabs card-header-tabs"
               id="sample-measurements-tabs"
               role="tablist">
@@ -410,34 +407,29 @@
                id="sample-component-measurements-tab"
                role="tabpanel"
                aria-labelledby="sample-component-measurements-tab-link">
-            <div class="d-flex justify-content-between align-items-start p-3 border-bottom bg-body-tertiary gap-3 flex-wrap">
-              <div>
-                <div class="fw-semibold">Composition data</div>
-                <div class="small text-muted">
-                  Raw mass-related component measurements grouped by composition category. Use the normalized composition view below when you want shares that sum to 100% within a group.
-                </div>
-              </div>
-              {% if data.compositions %}
-                <a class="btn btn-sm btn-outline-secondary"
-                   href="#normalized-compositions">
-                  <i class="fas fa-arrow-down"></i> Normalized view below
-                </a>
-              {% endif %}
-            </div>
             {% if measurements_by_group %}
-              <div class="d-flex justify-content-end p-3 border-bottom">
-                <div class="btn-group btn-group-sm" role="group">
-                  <button type="button"
-                          class="btn btn-outline-secondary btn-sm"
-                          onclick="expandAllGroups()">
-                    <i class="fas fa-expand-alt"></i> Expand
-                  </button>
-                  <button type="button"
-                          class="btn btn-outline-secondary btn-sm"
-                          onclick="collapseAllGroups()">
-                    <i class="fas fa-compress-alt"></i> Collapse
-                  </button>
+              <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom bg-body-tertiary">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="small text-muted">{{ measurements_by_group|length }} group{{ measurements_by_group|length|pluralize }}</span>
+                  <div class="btn-group btn-group-sm" role="group">
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            onclick="expandAllGroups()">
+                      <i class="fas fa-expand-alt"></i> <span class="d-none d-md-inline">Expand</span>
+                    </button>
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            onclick="collapseAllGroups()">
+                      <i class="fas fa-compress-alt"></i> <span class="d-none d-md-inline">Collapse</span>
+                    </button>
+                  </div>
                 </div>
+                {% if data.compositions %}
+                  <a class="btn btn-sm btn-outline-secondary"
+                     href="#normalized-compositions">
+                    <i class="fas fa-arrow-down"></i> <span class="d-none d-md-inline">Normalized view</span>
+                  </a>
+                {% endif %}
               </div>
               <div class="accordion accordion-flush" id="measurementsAccordion">
                 {% for group in measurements_by_group %}
@@ -573,9 +565,6 @@
                id="sample-properties-tab"
                role="tabpanel"
                aria-labelledby="sample-properties-tab-link">
-            <div class="px-3 py-2 border-bottom bg-body-tertiary small text-muted">
-              Other sample properties such as moisture, density, pH, and related analytical results that are not part of the composition breakdown.
-            </div>
             {% if properties %}
               <div class="table-responsive">
                 <table class="table table-sm mb-0">
@@ -695,25 +684,20 @@
   {% if data.compositions %}
     <div class="col col-12 mt-4 mb-n2" id="normalized-compositions">
       {% with primary_composition=data.compositions.0 %}
-        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+        <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
           <div>
-            <h6 class="text-muted text-uppercase fw-semibold mb-1 small">Mass-related Measurements</h6>
-            <div class="fw-semibold">Normalized view</div>
+            <h6 class="text-muted text-uppercase fw-semibold mb-0 small">Normalized compositions</h6>
             <div class="small text-muted">
               {% if primary_composition.is_derived %}
-                Derived from the raw mass-related measurements above. Each group is normalized to 100%, and missing fractions are shown as Other.
+                Derived from raw measurements, each group normalized to 100%.
               {% else %}
-                Saved composition groups for this sample. These cards reflect the stored composition records rather than an on-the-fly derivation from the raw measurements above.
+                Saved composition records for this sample.
               {% endif %}
             </div>
           </div>
           <a class="btn btn-sm btn-outline-secondary"
-             data-bs-toggle="tab"
-             href="#sample-component-measurements-tab"
-             role="tab"
-             aria-controls="sample-component-measurements-tab"
-             aria-selected="false">
-            <i class="fas fa-arrow-up"></i> View raw measurements
+             href="#sample-measurements-tabs">
+            <i class="fas fa-arrow-up"></i> Raw measurements
           </a>
         </div>
       {% endwith %}
@@ -722,40 +706,44 @@
       <div class="col col-12 col-md-6 col-xl-3 col-lg-4 mt-4">
         <div class="card shadow h-100 tab-card">
           <div class="card-header tab-card-header bg-body-tertiary border-bottom-0 py-3">
-            <h5 class="mb-0">
-              <a href="{% url 'materialcomponentgroup-detail-modal' composition.group %}"
-                 class="modal-link text-decoration-none text-body">{{ composition.group_name }}</a>
-            </h5>
-            <div class="d-flex align-items-center gap-2 flex-wrap small mt-2">
-              {% if composition.is_derived %}
-                <span class="badge rounded-pill text-bg-light border">Derived</span>
-              {% else %}
-                <span class="badge rounded-pill text-bg-light border">Saved composition</span>
-              {% endif %}
-              <span class="text-muted">% of {{ composition.fractions_of_name }}</span>
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div>
+                <h5 class="mb-0">
+                  <a href="{% url 'materialcomponentgroup-detail-modal' composition.group %}"
+                     class="modal-link text-decoration-none text-body">{{ composition.group_name }}</a>
+                </h5>
+                <div class="d-flex align-items-center gap-2 flex-wrap small mt-1">
+                  {% if composition.is_derived %}
+                    <span class="badge rounded-pill text-bg-light border">Derived</span>
+                  {% else %}
+                    <span class="badge rounded-pill text-bg-light border">Saved</span>
+                  {% endif %}
+                  <span class="text-muted">% of {{ composition.fractions_of_name }}</span>
+                </div>
+              </div>
+              <ul class="nav nav-pills mb-0"
+                  id="composition-tabs-{{ composition.id }}"
+                  role="tablist">
+                <li class="nav-item">
+                  <a class="nav-link active py-1 px-2 small"
+                     id="composition-table-tab-{{ composition.id }}"
+                     data-bs-toggle="tab"
+                     href="#composition-table-{{ composition.id }}-tab"
+                     role="tab"
+                     aria-controls="composition-table-{{ composition.id }}-tab"
+                     aria-selected="true">Table</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link py-1 px-2 small"
+                     id="composition-chart-tab-{{ composition.id }}"
+                     data-bs-toggle="tab"
+                     href="#composition-chart-{{ composition.id }}-tab"
+                     role="tab"
+                     aria-controls="composition-chart-{{ composition.id }}-tab"
+                     aria-selected="false">Chart</a>
+                </li>
+              </ul>
             </div>
-            <ul class="nav nav-tabs card-header-tabs"
-                id="composition-tabs-{{ composition.id }}"
-                role="tablist">
-              <li class="nav-item">
-                <a class="nav-link active"
-                   id="composition-table-tab-{{ composition.id }}"
-                   data-bs-toggle="tab"
-                   href="#composition-table-{{ composition.id }}-tab"
-                   role="tab"
-                   aria-controls="composition-table-{{ composition.id }}-tab"
-                   aria-selected="true">Table</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link"
-                   id="composition-chart-tab-{{ composition.id }}"
-                   data-bs-toggle="tab"
-                   href="#composition-chart-{{ composition.id }}-tab"
-                   role="tab"
-                   aria-controls="composition-chart-{{ composition.id }}-tab"
-                   aria-selected="false">Chart</a>
-              </li>
-            </ul>
           </div>
           <div class="card-body tab-content"
                id="composition-tabs-{{ composition.id }}-content">
@@ -770,7 +758,6 @@
                     <th class="text-end">Share</th>
                   </tr>
                 </thead>
-                <caption class="text-muted small px-2 pb-1 text-end">% of {{ composition.fractions_of_name }}</caption>
                 <tbody>
                   {% for share in composition.shares %}
                     <tr>
@@ -791,8 +778,8 @@
               <div id="composition-chart-{{ composition.id }}"></div>
             </div>
           </div>
-          <div class="card-footer d-flex align-items-center">
-            {% if policy.can_manage_samples %}
+          {% if policy.can_manage_samples %}
+            <div class="card-footer d-flex align-items-center">
               {% if composition.is_derived %}
                 <a id="move-derived-group-{{ composition.group }}-left"
                    href="{% url 'derived-composition-order-down' sample_pk=object.pk group_pk=composition.group %}?next={{ request.path }}"
@@ -835,8 +822,8 @@
                   <i class="fas fa-fw fa-arrow-right"></i>
                 </a>
               {% endif %}
-            {% endif %}
-          </div>
+            </div>
+          {% endif %}
         </div>
       </div>
     {% endfor %}
