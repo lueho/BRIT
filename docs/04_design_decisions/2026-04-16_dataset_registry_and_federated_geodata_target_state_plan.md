@@ -2,7 +2,7 @@
 
 - **Status**: Proposed
 - **Date**: 2026-04-16
-- **Scope**: `maps` dataset onboarding, exploration, and long-term federation of external geospatial data sources
+- **Scope**: `maps` dataset onboarding, standalone exploration, long-term federation of external geospatial data sources, and domain-level harmonized integration across incompatible datasets
 
 ## Documentation Boundary
 
@@ -30,6 +30,20 @@ The final step beyond local onboarding is federation:
 - those datasets should still appear as normal `GeoDataset` entries in the UI
 - BRIT should preserve provenance, access control, and reproducibility boundaries even when the physical data lives elsewhere
 
+There is a second requirement beyond standalone dataset visibility: datasets of the same domain should be harmonized so they can be analyzed together.
+
+Examples:
+
+- German counties may each publish their own roadside-tree datasets
+- all of those datasets represent the same domain, but differ in schema, semantics, units, completeness, and level of detail
+- each source dataset should remain explorable on its own terms
+- the responsible source-domain app should also be able to integrate them into one canonical cross-provider view for analysis and mapping
+
+This means the target architecture needs two layers that coexist:
+
+- a **generic dataset registry layer** for standalone registration and exploration of any one dataset
+- a **domain harmonization layer** owned by the relevant source-domain app for integrating incompatible datasets of the same domain into a common analytical view
+
 This direction is already visible in the codebase, but only partially:
 
 - `maps.GeoDataset` already exists as user-managed metadata
@@ -43,7 +57,7 @@ This document turns that direction into a concrete target-state roadmap.
 
 ## 2. Target State to Reach
 
-The desired end state is not just “dynamic map views.” It is a general BRIT dataset registry with safe, metadata-driven exploration and optional federation.
+The desired end state is not just “dynamic map views.” It is a general BRIT dataset registry with safe, metadata-driven exploration, optional federation, and domain-owned harmonized integrated views.
 
 ### 2.1 Dataset-first architecture
 
@@ -120,6 +134,31 @@ Target outcome:
 - simple onboarding never requires a bespoke plugin
 - plugins become the exception for domain intelligence, not the default for visibility
 
+### 2.7 Domain-level harmonized integration
+
+Datasets in the same domain should be integrable even when their raw structures differ.
+
+Target outcome:
+
+- each source-domain app defines the canonical analytical shape for its own domain
+- provider-specific source datasets are mapped into that canonical shape through domain-owned configuration and transformation logic
+- semantic differences such as column names, coded categories, or taxonomic granularity are normalized in the domain layer rather than in the generic registry core
+- unit mismatches are normalized explicitly
+- missing or lower-detail source data remains usable through `null` values, canonical fallback fields, or clearly documented downgraded resolution rather than being excluded entirely
+
+### 2.8 Integrated coverage-aware domain views
+
+For each domain, BRIT should be able to expose one integrated view that sits alongside the standalone source datasets.
+
+Target outcome:
+
+- users can open an integrated domain map such as “Roadside trees in Germany”
+- the integrated view shows harmonized objects from all successfully integrated datasets in that domain
+- regions with integrated coverage are highlighted
+- regions where source datasets exist but are not yet integrated can be shown as not yet integrated
+- regions with no available dataset can be shown separately from integration gaps where useful
+- uncovered or not-yet-integrated regions can be grayed so users can immediately see the current analytical footprint
+
 ## 3. Principles and Constraints
 
 ### 3.1 Configuration over code
@@ -173,6 +212,22 @@ should come after the baseline registry works reliably.
 
 This roadmap should follow the existing UX guidance that the primary module entry is the main list of `GeoDataset` records, with explorer/list/detail/map patterns remaining consistent with other BRIT modules.
 
+### 3.7 Source-domain ownership of harmonization
+
+The generic registry layer should not try to understand the semantics of every domain.
+
+- `maps` owns dataset registration and generic exploration
+- source-domain apps own canonical domain schemas, semantic mappings, unit normalization rules, and integration logic for incompatible same-domain datasets
+- cross-provider harmonization belongs to the domain app because only the domain app can define what counts as equivalence, acceptable downgrade, or required analytical minimum
+
+### 3.8 Integration must preserve partial truth
+
+Harmonization should not require every dataset to be equally rich.
+
+- if one roadside-tree dataset provides species and another only genus, both can still contribute to the integrated roadside-tree view
+- if one dataset provides crown diameter in centimeters and another in meters, both can still contribute after explicit normalization
+- if a field is absent in a source dataset, the integrated record should carry `null` or lower-detail information rather than forcing invented values
+
 ## 4. Final-State Vision
 
 In the final state, BRIT behaves as a geodata workbench rather than a set of hardcoded map pages.
@@ -203,6 +258,8 @@ A user can:
 - filter and inspect features using safe generic UI controls
 - compare snapshots or versions when the dataset supports versioning
 - reuse datasets in inventories or analyses through stable dataset references
+- switch between individual raw/provider datasets and integrated domain views
+- open a domain-wide integrated map and immediately see which regions are already analytically covered and which are not yet integrated
 
 ### 4.3 What the system knows
 
@@ -215,6 +272,8 @@ For each dataset BRIT knows at least:
 - permissions and exposure policy
 - whether the data is live, cached, or immutable
 - whether the dataset is generic-only or has additional domain semantics
+- whether the dataset participates in a harmonized domain integration pipeline
+- what coverage status it contributes to for its declared region or regions
 
 ### 4.4 What no longer needs code changes
 
@@ -238,6 +297,21 @@ Code may still be justified for:
 - non-tabular remote protocols that need new connector implementations
 - advanced semantic or analytical adapters
 - non-generic visualizations beyond the baseline map/table/detail surfaces
+
+### 4.6 What an integrated domain experience looks like
+
+For a domain such as roadside trees, the final user experience should look like this:
+
+- each county dataset remains available as its own `GeoDataset` with its own provenance and raw feature set
+- the `sources.roadside_trees` domain app defines the canonical integrated roadside-tree representation
+- harmonized records from all integrated county datasets become queryable together through one integrated roadside-tree surface
+- a Germany-wide map can display all integrated roadside-tree objects together
+- the same map can shade counties by coverage status, for example:
+  - integrated
+  - source dataset available but not yet integrated
+  - no known dataset available
+
+The same pattern should apply to other domains where cross-provider integration is meaningful.
 
 ## 5. Current State in BRIT
 
@@ -268,6 +342,8 @@ Code may still be justified for:
   - there is not yet a first-class model for external connections, foreign servers, refresh policy, or query safety
 - **Versioning/freshness semantics are not yet standardized across generic datasets**
   - datasets do not yet uniformly express snapshot/live/cached behavior
+- **No first-class contract yet exists for domain-integrated views and coverage maps**
+  - the current direction documents harmonization ideas, but the registry roadmap did not yet explicitly define how source-domain apps own same-domain integration or how integrated coverage should be surfaced to users
 
 ## 6. Gap Summary
 
@@ -280,6 +356,8 @@ Code may still be justified for:
 | External federation | Not first-class | Add safe read-only federation model and operations workflow |
 | Provenance and freshness semantics | Partial via existing sources and owner/publication concepts | Standardize provider, licence, update mode, snapshot/live semantics |
 | Downstream stable references | Current coupling often assumes model-specific endpoints | Let consumers bind to dataset IDs/contracts rather than Python model names |
+| Same-domain harmonization | Described in a separate proposal, but not clearly positioned in the registry target state | Define the boundary where source-domain apps own canonical schemas, mappings, and integrated analytical views |
+| Integrated coverage-aware domain maps | No explicit cross-domain contract for coverage status | Add integrated domain surfaces that show harmonized objects together and distinguish integrated from not-yet-integrated regions |
 
 ## 7. Recommended BRIT Architecture
 
@@ -391,6 +469,40 @@ That means:
 - canonical source-type target models still make sense where BRIT needs semantic harmonization
 - generic registry support should also allow simple passthrough datasets that are only explorable, not harmonized
 - harmonized datasets and passthrough datasets should share the same registry and exploration surface
+
+### 7.7 Let source-domain apps own canonical integration contracts
+
+The registry should not own the canonical schema of roadside trees, greenhouses, waste-collection assets, or future domains.
+
+Recommended boundary:
+
+- the registry layer owns dataset discovery, exposure, backend access, and generic exploration
+- each source-domain app owns:
+  - canonical analytical fields for its domain
+  - source-to-canonical field mappings
+  - code/value harmonization
+  - unit normalization
+  - level-of-detail reconciliation rules
+  - domain-specific quality thresholds for calling a region integrated
+
+This keeps the generic registry simple while allowing domain-specific intelligence where it belongs.
+
+### 7.8 Add first-class integrated domain surfaces
+
+In addition to raw/provider datasets, BRIT should support logical integrated domain surfaces.
+
+Recommended conceptual objects:
+
+- **raw dataset entries**
+  - one `GeoDataset` per provider-specific dataset or snapshot
+- **harmonized domain records**
+  - canonical per-feature records produced by the source-domain app
+- **integrated domain views**
+  - queryable surfaces built from all harmonized records of a domain
+- **coverage summaries**
+  - region-level status records indicating whether a region is integrated, partially integrated, raw-only, or uncovered
+
+These may be implemented as tables, views, materialized views, or equivalent registry-backed surfaces depending on performance and reproducibility needs.
 
 ## 8. Phased Delivery Plan
 
@@ -508,19 +620,27 @@ Success criteria:
 
 ## Phase 5 - Semantic overlays and downstream integration contracts
 
-Goal: let generic datasets participate in source-domain workflows without reintroducing per-dataset hardcoding.
+Goal: let source-domain apps harmonize incompatible same-domain datasets into integrated analytical views without reintroducing per-dataset hardcoding.
 
 Deliverables:
 
 - add optional semantic mapping layer for datasets that correspond to domain concepts
+- define per-domain canonical analytical contracts in the relevant source-domain apps
+- support field aliasing, coded-value normalization, unit normalization, and level-of-detail reconciliation without rewriting source provenance away
 - let inventories and source-domain tools reference datasets through stable dataset contracts
-- support optional field aliasing and semantic annotation without rewriting raw data
 - align with the existing harmonization-pipeline work where canonical target models are needed
+- add at least one integrated domain surface that combines harmonized records across provider datasets
+- add region-level coverage status for integrated domain surfaces so maps can distinguish:
+  - integrated coverage
+  - source data exists but is not yet integrated
+  - no known source data available
 
 Success criteria:
 
 - generic registry datasets and harmonized canonical datasets can coexist under one consistent dataset contract
 - downstream modules no longer depend on Python model names for basic dataset selection
+- at least one pilot domain such as roadside trees can be explored both as individual provider datasets and as one integrated cross-provider map
+- the integrated map clearly distinguishes covered from not-yet-integrated regions
 
 ## Phase 6 - Operational polish and deprecation cleanup
 
@@ -555,6 +675,9 @@ Use this section to evaluate whether the roadmap is actually moving forward.
 | Federated read-only foreign table support |  |  |  |
 | Dataset freshness/version semantics visible in UI |  |  |  |
 | Downstream consumers select datasets by stable dataset identity |  |  |  |
+| Source-domain apps define canonical harmonization contracts for same-domain datasets |  |  |  |
+| At least one integrated domain map combines harmonized records across providers |  |  |  |
+| Coverage maps distinguish integrated from not-yet-integrated regions |  |  |  |
 
 ### 9.2 Definition of “the vision is materially real”
 
@@ -565,6 +688,8 @@ The roadmap should be considered substantively achieved when all of the followin
 - users cannot tell from the baseline UI whether a dataset is backed by a local table or foreign table except where provenance/freshness labels intentionally disclose it
 - no new URL/view/filter/template code is required for ordinary dataset onboarding
 - domain-specific code is only needed for semantic enrichment or non-generic workflows
+- at least one domain has a real integrated cross-provider analytical surface
+- that integrated surface includes a map that shows integrated regions and grays not-yet-integrated ones
 
 ### 9.3 Anti-goals that indicate failure
 
@@ -575,6 +700,8 @@ The effort is drifting off course if:
 - introspection exposes arbitrary columns by default
 - live federated data and frozen snapshots are not distinguishable
 - the README continues to promise behavior that the codebase does not actually implement
+- same-domain datasets remain explorable only in isolation with no path to an integrated analytical view
+- the generic registry starts absorbing domain semantics that should instead live in the responsible source-domain app
 
 ## 10. Risks and Open Questions
 
@@ -633,5 +760,6 @@ The next practical implementation slice should be narrow and reality-based:
 - choose the authoritative metadata fields for local table-backed datasets
 - decouple URL/view lookup from `model_name`
 - deliver one real end-to-end example where a manually created PostGIS table is registered and explored without code changes
+- define the pilot domain contract for a first harmonized integrated view, with `roadside_trees` as the most natural candidate
 
 That slice is small enough to validate the architecture and large enough to prove the core promise.
