@@ -660,8 +660,7 @@ class AnalyticalMethodDetailView(UserCreatedObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         related_samples = (
-            Sample.objects
-            .filter(
+            Sample.objects.filter(
                 Q(property_values__analytical_method=self.object)
                 | Q(component_measurements__analytical_method=self.object)
             )
@@ -892,6 +891,16 @@ class SampleModalCreateView(UserCreatedObjectModalCreateView):
 
 class SampleDetailView(UserCreatedObjectDetailView):
     model = Sample
+
+    V2_FLAG_VALUES = {"v2", "new", "experimental"}
+
+    def _is_v2_experience(self):
+        return self.request.GET.get("experience", "").lower() in self.V2_FLAG_VALUES
+
+    def get_template_names(self):
+        if self._is_v2_experience():
+            return ["materials/sample_detail_v2.html"]
+        return super().get_template_names()
 
     @staticmethod
     def _build_completeness_checks(
@@ -1180,13 +1189,13 @@ class SampleDetailView(UserCreatedObjectDetailView):
             labels = [share["component_name"] for share in composition["shares"]]
             values = [share["average"] for share in composition["shares"]]
             chart = DoughnutChart(
-                id=f"materialCompositionChart-{composition['id']}",
+                id=f"materialCompositionChart-{composition["id"]}",
                 title="Composition",
                 unit="%",
                 labels=labels,
                 data=[{"label": "Fraction", "unit": "%", "data": values}],
             )
-            charts[f"composition-chart-{composition['id']}"] = chart.as_dict()
+            charts[f"composition-chart-{composition["id"]}"] = chart.as_dict()
         return charts
 
     def get_context_data(self, **kwargs):
@@ -1195,8 +1204,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
             self.object, context={"request": self.request}
         ).data
         property_values = (
-            self.object
-            .get_property_values_queryset()
+            self.object.get_property_values_queryset()
             .select_related(
                 "property",
                 "property__comparable_property",
@@ -1208,8 +1216,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
             .order_by("property__name", "id")
         )
         component_measurements = (
-            self.object.component_measurements
-            .select_related(
+            self.object.component_measurements.select_related(
                 "group",
                 "component",
                 "component__comparable_component",
@@ -1285,7 +1292,143 @@ class SampleDetailView(UserCreatedObjectDetailView):
             "sample_workflow": sample_workflow,
             "sample_layout_mode": sample_layout_mode,
         })
+
+        if self._is_v2_experience():
+            context.update(
+                self._build_v2_context(
+                    compositions=compositions,
+                    component_measurements=component_measurements,
+                    property_values=property_values,
+                    sample_policy=sample_policy,
+                )
+            )
+
         return context
+
+    def _build_v2_context(
+        self,
+        compositions,
+        component_measurements,
+        property_values,
+        sample_policy,
+    ):
+        """Extra context exclusively for the v2 prototype layout."""
+        group_sparklines = self._build_group_sparklines(
+            compositions, component_measurements
+        )
+        grouped_measurements = self._group_measurements_by_group_id(
+            component_measurements
+        )
+        primary_source = self.object.sources.first()
+        review_timeline = self._build_review_timeline()
+        related = self._build_related_samples(limit=8)
+
+        edit_requested = self.request.GET.get("mode", "").lower() == "edit"
+        edit_mode_enabled = edit_requested and any(
+            sample_policy[key]
+            for key in (
+                "can_manage_samples",
+                "can_edit",
+                "can_add_property",
+            )
+        )
+        return {
+            "group_sparklines": group_sparklines,
+            "grouped_measurements": grouped_measurements,
+            "primary_source": primary_source,
+            "sample_policy": sample_policy,
+            "review_timeline": review_timeline,
+            "related_samples": related,
+            "edit_mode_enabled": edit_mode_enabled,
+            "edit_mode_requested": edit_requested,
+        }
+
+    @staticmethod
+    def _group_measurements_by_group_id(component_measurements):
+        grouped = defaultdict(list)
+        for measurement in component_measurements:
+            grouped[measurement.group_id].append(measurement)
+        return dict(grouped)
+
+    @staticmethod
+    def _build_group_sparklines(compositions, component_measurements):
+        """Tiny per-group bars for the hero composition band."""
+        by_group = {}
+        for composition in compositions:
+            group_id = composition.get("group")
+            segments = [
+                {
+                    "label": share["component_name"],
+                    "value": float(share.get("average", 0) or 0),
+                }
+                for share in composition.get("shares", [])
+            ]
+            by_group[group_id] = {
+                "group_id": group_id,
+                "name": composition.get("group_name", ""),
+                "anchor": f"group-{group_id}",
+                "segments": segments,
+                "is_derived": composition.get("is_derived", False),
+                "measurement_count": 0,
+            }
+        for measurement in component_measurements:
+            entry = by_group.setdefault(
+                measurement.group_id,
+                {
+                    "group_id": measurement.group_id,
+                    "name": measurement.group.name,
+                    "anchor": f"group-{measurement.group_id}",
+                    "segments": [],
+                    "is_derived": True,
+                    "measurement_count": 0,
+                },
+            )
+            entry["measurement_count"] += 1
+        return sorted(by_group.values(), key=lambda entry: entry["name"].lower())
+
+    def _build_review_timeline(self):
+        try:
+            actions = (
+                ReviewAction.for_object(self.object)
+                .select_related("user")
+                .order_by("created_at", "id")
+            )
+        except Exception:
+            return []
+        timeline = []
+        for action in actions:
+            timeline.append({
+                "action": action.action,
+                "label": action.get_action_display()
+                if hasattr(action, "get_action_display")
+                else action.action,
+                "user": getattr(action.user, "username", None),
+                "created_at": action.created_at,
+                "comment": getattr(action, "comment", "") or "",
+            })
+        return timeline
+
+    def _build_related_samples(self, limit=8):
+        related = {"series": [], "material": []}
+        base_qs = filter_queryset_for_user(Sample.objects.all(), self.request.user)
+        if getattr(self.object, "series_id", None):
+            series_qs = (
+                base_qs.filter(series_id=self.object.series_id)
+                .exclude(pk=self.object.pk)
+                .select_related("material", "timestep")
+                .order_by("timestep__order", "name")[:limit]
+            )
+            related["series"] = list(series_qs)
+        if getattr(self.object, "material_id", None):
+            exclude_pks = {self.object.pk, *(s.pk for s in related["series"])}
+            material_qs = (
+                base_qs.filter(material_id=self.object.material_id)
+                .exclude(pk__in=exclude_pks)
+                .select_related("series", "timestep")
+                .order_by("-lastmodified_at")[:limit]
+            )
+            related["material"] = list(material_qs)
+        return related
 
 
 class SampleUpdateView(UserCreatedObjectUpdateView):

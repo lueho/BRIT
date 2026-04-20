@@ -3326,6 +3326,34 @@ class EmptyStateViewsTestCase(TestCase):
             "workspace so anonymous explorers see the interpretation first.",
         )
 
+    def test_sample_detail_v2_flag_renders_prototype_template(self):
+        sample = Sample.objects.create(
+            name="Prototype Sample",
+            material=Material.objects.create(name="Proto Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "materials/sample_detail_v2.html")
+        self.assertContains(response, 'class="sdv2"')
+
+    def test_sample_detail_default_flag_still_uses_classic_template(self):
+        sample = Sample.objects.create(
+            name="Classic Sample",
+            material=Material.objects.create(name="Classic Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "materials/sample_detail.html")
+        self.assertNotContains(response, 'class="sdv2"')
+
     def test_sample_detail_shows_section_intro_and_quick_nav(self):
         sample = Sample.objects.create(
             name="Navigable Sample",

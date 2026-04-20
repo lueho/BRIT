@@ -1,0 +1,725 @@
+{% extends "base.html" %}
+{% load static %}
+{% load custom_tags %}
+{% load moderation_tags %}
+{% block title %}
+  BRIT · {{ object.name }} · v2 preview
+{% endblock title %}
+{% block style_sheets %}
+  <link href="{% static 'css/sample_detail_v2.css' %}" rel="stylesheet">
+{% endblock style_sheets %}
+{% block content %}
+  <div class="sdv2"
+       data-sample-id="{{ object.id }}"
+       data-edit-enabled="{% if edit_mode_enabled %}1{% else %}0{% endif %}"
+       data-can-edit="{% if sample_policy.can_edit or sample_policy.can_manage_samples or sample_policy.can_add_property %}1{% else %}0{% endif %}">
+    {# ─── Sticky rail: breadcrumb + mode toggle + palette hint ─── #}
+    <nav class="sdv2-rail" aria-label="Sample navigation">
+      <ol class="sdv2-crumbs" aria-label="Breadcrumb">
+        <li>
+          <a href="{% url 'materials-explorer' %}">Materials</a>
+        </li>
+        <li>
+          <a href="{% url 'sample-list' %}">Samples</a>
+        </li>
+        {% if object.material %}
+          <li>
+            <a href="{% url 'material-detail' object.material.pk %}">{{ object.material.name }}</a>
+          </li>
+        {% endif %}
+        {% if object.series %}
+          <li>
+            <a href="{% url 'sampleseries-detail' object.series.pk %}">{{ object.series.name }}</a>
+          </li>
+        {% endif %}
+        <li aria-current="page" class="sdv2-crumb-current">{{ object.name }}</li>
+      </ol>
+      <div class="sdv2-rail-actions">
+        <span class="sdv2-status-pill sdv2-status-{{ object.publication_status|default:'private' }}"
+              title="Publication status">{{ object.get_publication_status_display }}</span>
+        <div class="sdv2-mode-toggle" role="group" aria-label="View mode">
+          <a class="sdv2-mode {% if not edit_mode_enabled %}is-active{% endif %}"
+             href="?experience=v2">Explore</a>
+          <button class="sdv2-mode"
+                  type="button"
+                  data-sdv2-compare
+                  disabled
+                  title="Compare mode (coming soon)">Compare</button>
+          {% if sample_policy.can_edit or sample_policy.can_manage_samples or sample_policy.can_add_property %}
+            <a class="sdv2-mode {% if edit_mode_enabled %}is-active{% endif %}"
+               href="?experience=v2&amp;mode=edit">Edit</a>
+          {% endif %}
+        </div>
+        <button class="sdv2-palette-trigger" type="button" data-sdv2-palette-open>
+          <span class="sdv2-kbd">⌘</span><span class="sdv2-kbd">K</span>
+          <span class="sdv2-palette-hint">Quick actions</span>
+        </button>
+        <a class="sdv2-classic-link"
+           href="{% url 'sample-detail' object.pk %}"
+           title="Switch back to the classic detail view">Classic view</a>
+      </div>
+    </nav>
+    {# ─── Hero ─── #}
+    <header class="sdv2-hero">
+      <div class="sdv2-hero-identity">
+        <div class="sdv2-hero-kicker">Sample</div>
+        <h1 class="sdv2-hero-title">{{ object.name }}</h1>
+        <div class="sdv2-hero-material">
+          {% if object.material %}
+            <a href="{% url 'material-detail' object.material.pk %}"
+               class="sdv2-material-link">{{ object.material.name }}</a>
+          {% else %}
+            <span class="text-muted">Unlinked material</span>
+          {% endif %}
+        </div>
+        <ul class="sdv2-hero-meta" aria-label="Sample metadata">
+          {% if object.series %}
+            <li>
+              <span class="sdv2-meta-label">Series</span>
+              <a href="{% url 'sampleseries-detail' object.series.pk %}"
+                 class="modal-link">{{ object.series.name }}</a>
+            </li>
+          {% endif %}
+          {% if object.timestep %}
+            <li>
+              <span class="sdv2-meta-label">Timestep</span>
+              {{ object.timestep }}
+            </li>
+          {% endif %}
+          {% if object.datetime %}
+            <li>
+              <span class="sdv2-meta-label">When</span>
+              <time datetime="{{ object.datetime|date:'c' }}">{{ object.datetime|date:'Y-m-d' }}</time>
+            </li>
+          {% endif %}
+          {% if object.location %}
+            <li>
+              <span class="sdv2-meta-label">Where</span>
+              {{ object.location }}
+            </li>
+          {% endif %}
+          {% if object.analysis_laboratory %}
+            <li>
+              <span class="sdv2-meta-label">Lab</span>
+              {{ object.analysis_laboratory }}
+            </li>
+          {% endif %}
+        </ul>
+        <div class="sdv2-hero-counts">
+          <span>
+            <strong>{{ sample_summary.component_measurement_count }}</strong> measurements
+          </span>
+          <span>
+            <strong>{{ sample_summary.component_measurement_group_count }}</strong> groups
+          </span>
+          <span>
+            <strong>{{ sample_summary.property_value_count }}</strong> properties
+          </span>
+          <span>
+            <strong>{{ sample_summary.sample_source_count }}</strong> sources
+          </span>
+        </div>
+      </div>
+      <div class="sdv2-sparkband" aria-label="Composition groups at a glance">
+        {% if group_sparklines %}
+          {% for group in group_sparklines %}
+            <a class="sdv2-spark"
+               href="#group-{{ group.group_id }}"
+               title="Jump to {{ group.name }}">
+              <span class="sdv2-spark-name">{{ group.name }}</span>
+              <span class="sdv2-spark-bar"
+                    role="img"
+                    aria-label="{{ group.name }} composition">
+                {% if group.segments %}
+                  {% for segment in group.segments %}
+                    <span class="sdv2-spark-seg sdv2-spark-seg-{{ forloop.counter0|modulo:8 }}"
+                          style="flex:{{ segment.value }}"
+                          title="{{ segment.label }}"></span>
+                  {% endfor %}
+                {% else %}
+                  <span class="sdv2-spark-empty"></span>
+                {% endif %}
+              </span>
+              <span class="sdv2-spark-count">{{ group.measurement_count }} rows</span>
+            </a>
+          {% endfor %}
+        {% else %}
+          <div class="sdv2-spark-placeholder">No composition data yet.</div>
+        {% endif %}
+      </div>
+      <div class="sdv2-hero-provenance">
+        {% if primary_source %}
+          <span class="sdv2-prov-label">Primary source</span>
+          <a href="{% url 'source-detail-modal' primary_source.pk %}"
+             class="modal-link sdv2-prov-link">{{ primary_source.title|default:primary_source.abbreviation }}</a>
+          {% if sample_summary.sample_source_count > 1 %}
+            <span class="sdv2-prov-more">+{{ sample_summary.sample_source_count|add:'-1' }} more</span>
+          {% endif %}
+        {% else %}
+          <span class="text-muted">No source linked.</span>
+        {% endif %}
+      </div>
+    </header>
+    {# ─── Completeness strip ─── #}
+    <div class="sdv2-completeness" role="group" aria-label="Data completeness">
+      <div class="sdv2-completeness-score">
+        <span class="sdv2-completeness-value">{{ sample_completeness.score }}%</span>
+        <span class="sdv2-completeness-label">complete</span>
+      </div>
+      <div class="sdv2-completeness-track"
+           role="progressbar"
+           aria-valuenow="{{ sample_completeness.score }}"
+           aria-valuemin="0"
+           aria-valuemax="100">
+        <div class="sdv2-completeness-bar sdv2-completeness-bar-{% if sample_completeness.score == 100 %}done{% elif sample_completeness.score >= 60 %}ok{% else %}warn{% endif %}"
+             data-score="{{ sample_completeness.score }}"></div>
+      </div>
+      <ul class="sdv2-completeness-checks">
+        {% for check in sample_completeness.checks %}
+          <li class="sdv2-check {% if check.complete %}sdv2-check-done{% else %}sdv2-check-todo{% endif %}"
+              title="{% if check.complete %}Complete{% else %}Needs work{% endif %}">
+            <span class="sdv2-check-dot" aria-hidden="true"></span>
+            {{ check.label }}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {# ─── Review banner (only when review-relevant) ─── #}
+    {% if object.publication_status == 'review' or object.publication_status == 'declined' %}
+      <div class="sdv2-review-banner sdv2-review-banner-{{ object.publication_status }}"
+           role="status">
+        <div class="sdv2-review-banner-icon" aria-hidden="true">
+          <i class="fas fa-{% if object.publication_status == 'review' %}hourglass-half{% else %}triangle-exclamation{% endif %}"></i>
+        </div>
+        <div class="sdv2-review-banner-body">
+          <div class="sdv2-review-banner-title">
+            {% if object.publication_status == 'review' %}
+              In review
+            {% else %}
+              Review declined
+            {% endif %}
+          </div>
+          <div class="sdv2-review-banner-text">
+            {% if review_timeline %}
+              Last action <strong>{{ review_timeline|last|get_item:'label'|default:'—' }}</strong>
+              by {{ review_timeline|last|get_item:'user'|default:'someone' }}
+              on {{ review_timeline|last|get_item:'created_at'|date:'Y-m-d' }}.
+            {% else %}
+              Awaiting moderator action.
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+    {# ─── Main column + related aside ─── #}
+    <div class="sdv2-layout">
+      <main class="sdv2-main">
+        {% if object.description %}
+          <section class="sdv2-about" aria-label="About this sample">
+            <h2 class="sdv2-section-title">About</h2>
+            <div class="sdv2-about-body">{{ object.description|linebreaksbr }}</div>
+          </section>
+        {% endif %}
+        {# ─── Composition group cards ─── #}
+        {% if data.compositions %}
+          <section class="sdv2-groups" aria-label="Composition groups">
+            <div class="sdv2-section-header">
+              <h2 class="sdv2-section-title">Composition</h2>
+              <span class="sdv2-section-hint">
+                {% with first=data.compositions|first %}
+                  {% if first.is_derived %}
+                    Derived from raw measurements; each group normalized to 100%.
+                  {% else %}
+                    Stored composition records for this sample.
+                  {% endif %}
+                {% endwith %}
+              </span>
+            </div>
+            {% for composition in data.compositions %}
+              {% with group_pk=composition.group raws=grouped_measurements|get_item:composition.group %}
+                <article class="sdv2-group-card"
+                         id="group-{{ group_pk }}"
+                         data-group-id="{{ group_pk }}"
+                         data-derived="{% if composition.is_derived %}1{% else %}0{% endif %}">
+                  <header class="sdv2-group-header">
+                    <div class="sdv2-group-title">
+                      <a href="{% url 'materialcomponentgroup-detail-modal' group_pk %}"
+                         class="modal-link sdv2-group-name">{{ composition.group_name }}</a>
+                      <span class="sdv2-group-badges">
+                        <span class="sdv2-badge sdv2-badge-sum"
+                              title="Total percentage across components">Σ 100.0%</span>
+                        <span class="sdv2-badge sdv2-badge-{% if composition.is_derived %}derived{% else %}saved{% endif %}">
+                          {% if composition.is_derived %}
+                            Derived
+                          {% else %}
+                            Saved
+                          {% endif %}
+                        </span>
+                        <span class="sdv2-group-fractions">% of {{ composition.fractions_of_name }}</span>
+                      </span>
+                    </div>
+                    <div class="sdv2-group-tools" role="group" aria-label="Group actions">
+                      <a class="sdv2-affordance"
+                         href="#group-{{ group_pk }}"
+                         title="Permalink to this group"
+                         aria-label="Permalink">
+                        <i class="fas fa-link"></i>
+                      </a>
+                      <button class="sdv2-affordance"
+                              type="button"
+                              data-sdv2-cite="{{ object.name }} · {{ composition.group_name }}"
+                              title="Copy citation snippet">
+                        <i class="fas fa-quote-right"></i>
+                      </button>
+                      {% if edit_mode_enabled and sample_policy.can_manage_samples %}
+                        <a class="sdv2-affordance sdv2-affordance-edit"
+                           href="{% if composition.is_derived %}{% url 'componentmeasurement-create' %}?sample={{ object.id }}&amp;group={{ group_pk }}{% else %}{% url 'composition-update' composition.id %}?next={{ request.get_full_path|urlencode }}{% endif %}"
+                           title="Edit this group">
+                          <i class="fas fa-pen-to-square"></i>
+                        </a>
+                      {% endif %}
+                    </div>
+                  </header>
+                  <div class="sdv2-group-body">
+                    <div class="sdv2-group-chart">
+                      <div id="composition-chart-{{ composition.id }}"
+                           class="sdv2-donut"
+                           role="img"
+                           aria-label="{{ composition.group_name }} composition chart"></div>
+                    </div>
+                    <div class="sdv2-group-table-wrap">
+                      <table class="sdv2-group-table">
+                        <thead>
+                          <tr>
+                            <th scope="col">Component</th>
+                            <th scope="col" class="sdv2-num">Share</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {% for share in composition.shares %}
+                            <tr>
+                              <td>
+                                <a href="{% url 'materialcomponent-detail-modal' share.component %}"
+                                   class="modal-link">{{ share.component_name }}</a>
+                              </td>
+                              <td class="sdv2-num sdv2-share">{{ share.as_percentage }}</td>
+                            </tr>
+                          {% endfor %}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  {% if raws %}
+                    <details class="sdv2-raws">
+                      <summary>
+                        <span class="sdv2-raws-label">Raw measurements</span>
+                        <span class="sdv2-raws-count">{{ raws|length }}</span>
+                      </summary>
+                      <div class="sdv2-raws-body">
+                        <table class="sdv2-raws-table">
+                          <thead>
+                            <tr>
+                              <th scope="col">Component</th>
+                              <th scope="col">Basis</th>
+                              <th scope="col" class="sdv2-num">Value</th>
+                              <th scope="col" class="sdv2-num">n</th>
+                              <th scope="col">Method</th>
+                              <th scope="col">Sources</th>
+                              {% if edit_mode_enabled %}<th scope="col" class="sdv2-num">Edit</th>{% endif %}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {% for measurement in raws %}
+                              <tr>
+                                <td>
+                                  <span class="sdv2-raw-component">{{ measurement.component.name }}</span>
+                                  {% if measurement.canonical_component.pk != measurement.component.pk %}
+                                    <span class="sdv2-alias-chip"
+                                          title="Canonical: {{ measurement.canonical_component.name }}">
+                                      ↔ {{ measurement.canonical_component.name }}
+                                    </span>
+                                  {% endif %}
+                                </td>
+                                <td>{{ measurement.basis_component.name|default:"—" }}</td>
+                                <td class="sdv2-num">
+                                  <strong>{{ measurement.average|trim_decimal:4 }}</strong>
+                                  {% if measurement.display_standard_deviation != None %}
+                                    <span class="sdv2-sd">± {{ measurement.display_standard_deviation|trim_decimal:2 }}</span>
+                                  {% endif %}
+                                  <span class="sdv2-unit">{{ measurement.unit }}</span>
+                                </td>
+                                <td class="sdv2-num">{{ measurement.sample_size|default:"—" }}</td>
+                                <td>
+                                  {% if measurement.analytical_method %}
+                                    <a href="{% url 'analyticalmethod-detail-modal' measurement.analytical_method.pk %}"
+                                       class="modal-link">{{ measurement.analytical_method.name }}</a>
+                                  {% else %}
+                                    <span class="text-muted">—</span>
+                                  {% endif %}
+                                </td>
+                                <td class="sdv2-sources">
+                                  {% for source in measurement.sources.all %}
+                                    <a href="{% url 'source-detail-modal' source.pk %}"
+                                       class="modal-link sdv2-source-chip"
+                                       title="{{ source.title|default:source.abbreviation }}">
+                                      {{ source.abbreviation|default:"src" }}
+                                    </a>
+                                  {% empty %}
+                                    <span class="text-muted">—</span>
+                                  {% endfor %}
+                                </td>
+                                {% if edit_mode_enabled %}
+                                  <td class="sdv2-num">
+                                    {% object_policy measurement as mp %}
+                                    {% if mp.can_edit %}
+                                      <a href="{% url 'componentmeasurement-update' measurement.pk %}"
+                                         title="Edit measurement">
+                                        <i class="fas fa-pen-to-square"></i>
+                                      </a>
+                                    {% endif %}
+                                  </td>
+                                {% endif %}
+                              </tr>
+                            {% endfor %}
+                          </tbody>
+                        </table>
+                        {% if edit_mode_enabled and sample_policy.can_manage_samples %}
+                          <a class="sdv2-raws-add"
+                             href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}&amp;group={{ group_pk }}">
+                            <i class="fas fa-plus"></i> Add measurement row
+                          </a>
+                        {% endif %}
+                      </div>
+                    </details>
+                  {% endif %}
+                  <footer class="sdv2-group-footer">
+                    <div class="sdv2-affordances" role="group" aria-label="Export actions">
+                      <button type="button"
+                              class="sdv2-affordance sdv2-affordance-ghost"
+                              data-sdv2-export="json"
+                              data-sdv2-group="{{ group_pk }}"
+                              title="Copy this group as JSON">
+                        <i class="fas fa-code"></i> JSON
+                      </button>
+                      <button type="button"
+                              class="sdv2-affordance sdv2-affordance-ghost"
+                              data-sdv2-export="csv"
+                              data-sdv2-group="{{ group_pk }}"
+                              title="Copy this group as CSV">
+                        <i class="fas fa-table"></i> CSV
+                      </button>
+                      <button type="button"
+                              class="sdv2-affordance sdv2-affordance-ghost"
+                              data-sdv2-permalink="#group-{{ group_pk }}"
+                              title="Copy permalink">
+                        <i class="fas fa-link"></i> Link
+                      </button>
+                    </div>
+                  </footer>
+                </article>
+              {% endwith %}
+            {% endfor %}
+          </section>
+        {% else %}
+          <section class="sdv2-groups sdv2-groups-empty">
+            <div class="sdv2-empty">
+              <div class="sdv2-empty-title">No composition data yet</div>
+              <div class="sdv2-empty-body">
+                Composition groups appear here once component measurements can be normalized, or when a composition is added manually.
+              </div>
+              {% if sample_policy.can_manage_samples %}
+                <div class="sdv2-empty-actions">
+                  {% if perms.materials.add_componentmeasurement %}
+                    <a class="sdv2-btn sdv2-btn-primary"
+                       href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
+                      <i class="fas fa-plus"></i> Add composition data
+                    </a>
+                  {% endif %}
+                  <a class="sdv2-btn"
+                     href="{% url 'sample-add-composition' object.id %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="fas fa-plus"></i> Add composition manually
+                  </a>
+                </div>
+              {% endif %}
+            </div>
+          </section>
+        {% endif %}
+        {# ─── Properties band ─── #}
+        <section class="sdv2-properties"
+                 id="properties"
+                 aria-label="Sample properties">
+          <div class="sdv2-section-header">
+            <h2 class="sdv2-section-title">Properties</h2>
+            <span class="sdv2-section-hint">Non-mass sample properties such as moisture, density, pH.</span>
+          </div>
+          {% if property_values %}
+            <table class="sdv2-properties-table">
+              <thead>
+                <tr>
+                  <th scope="col">Property</th>
+                  <th scope="col" class="sdv2-num">Value</th>
+                  <th scope="col">Basis</th>
+                  <th scope="col">Method</th>
+                  <th scope="col">Sources</th>
+                  {% if edit_mode_enabled %}<th scope="col" class="sdv2-num">Edit</th>{% endif %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for prop in property_values %}
+                  <tr id="property-{{ prop.id }}">
+                    <td>
+                      <a href="{% url 'materialproperty-detail-modal' prop.property.pk %}"
+                         class="modal-link">{{ prop.property.name }}</a>
+                      {% if prop.canonical_property.pk != prop.property.pk %}
+                        <span class="sdv2-alias-chip"
+                              title="Canonical: {{ prop.canonical_property.name }}">
+                          ↔ {{ prop.canonical_property.name }}
+                        </span>
+                      {% endif %}
+                    </td>
+                    <td class="sdv2-num">
+                      <strong>{{ prop.average|trim_decimal:6 }}</strong>
+                      {% if prop.display_standard_deviation != None %}
+                        <span class="sdv2-sd">± {{ prop.display_standard_deviation|trim_decimal:6 }}</span>
+                      {% endif %}
+                      <span class="sdv2-unit">{{ prop.unit }}</span>
+                    </td>
+                    <td>{{ prop.basis_component.name|default:"—" }}</td>
+                    <td>
+                      {% if prop.analytical_method %}
+                        <a href="{% url 'analyticalmethod-detail-modal' prop.analytical_method.pk %}"
+                           class="modal-link">{{ prop.analytical_method.name }}</a>
+                      {% else %}
+                        <span class="text-muted">—</span>
+                      {% endif %}
+                    </td>
+                    <td class="sdv2-sources">
+                      {% for source in prop.sources.all %}
+                        <a href="{% url 'source-detail-modal' source.pk %}"
+                           class="modal-link sdv2-source-chip"
+                           title="{{ source.title|default:source.abbreviation }}">
+                          {{ source.abbreviation|default:"src" }}
+                        </a>
+                      {% empty %}
+                        <span class="text-muted">—</span>
+                      {% endfor %}
+                    </td>
+                    {% if edit_mode_enabled %}
+                      <td class="sdv2-num">
+                        {% object_policy prop as pp %}
+                        {% if pp.can_edit %}
+                          <a href="{% url 'materialpropertyvalue-update' prop.id %}"
+                             title="Edit property value">
+                            <i class="fas fa-pen-to-square"></i>
+                          </a>
+                        {% endif %}
+                      </td>
+                    {% endif %}
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% if edit_mode_enabled and sample_policy.can_add_property %}
+              <a class="sdv2-btn sdv2-btn-ghost"
+                 href="{% url 'sample-add-property' object.id %}">
+                <i class="fas fa-plus"></i> Add property
+              </a>
+            {% endif %}
+          {% else %}
+            <div class="sdv2-empty">
+              <div class="sdv2-empty-title">No properties yet</div>
+              <div class="sdv2-empty-body">
+                Add measurements such as moisture, density, pH, or other sample properties that are not part of the mass composition breakdown.
+              </div>
+              {% if sample_policy.can_add_property %}
+                <div class="sdv2-empty-actions">
+                  <a class="sdv2-btn sdv2-btn-primary"
+                     href="{% url 'sample-add-property' object.id %}">
+                    <i class="fas fa-plus"></i> Add the first property
+                  </a>
+                </div>
+              {% endif %}
+            </div>
+          {% endif %}
+        </section>
+        {# ─── Provenance timeline ─── #}
+        <section class="sdv2-timeline" aria-label="Provenance timeline">
+          <div class="sdv2-section-header">
+            <h2 class="sdv2-section-title">Provenance</h2>
+            <span class="sdv2-section-hint">Key events in this sample's lifecycle.</span>
+          </div>
+          <ol class="sdv2-timeline-list">
+            {% if object.analysis_date %}
+              <li class="sdv2-timeline-item sdv2-timeline-analysis">
+                <span class="sdv2-timeline-dot"></span>
+                <div class="sdv2-timeline-content">
+                  <div class="sdv2-timeline-title">Analysed</div>
+                  <div class="sdv2-timeline-date">{{ object.analysis_date|date:'Y-m-d' }}</div>
+                  {% if object.analysis_laboratory %}
+                    <div class="sdv2-timeline-meta">at {{ object.analysis_laboratory }}</div>
+                  {% endif %}
+                </div>
+              </li>
+            {% endif %}
+            <li class="sdv2-timeline-item sdv2-timeline-created">
+              <span class="sdv2-timeline-dot"></span>
+              <div class="sdv2-timeline-content">
+                <div class="sdv2-timeline-title">Record created</div>
+                <div class="sdv2-timeline-date">{{ object.created_at|date:'Y-m-d H:i' }}</div>
+                <div class="sdv2-timeline-meta">by {{ object.owner.username|default:'—' }}</div>
+              </div>
+            </li>
+            {% for event in review_timeline %}
+              <li class="sdv2-timeline-item sdv2-timeline-review sdv2-timeline-{{ event.action }}">
+                <span class="sdv2-timeline-dot"></span>
+                <div class="sdv2-timeline-content">
+                  <div class="sdv2-timeline-title">{{ event.label }}</div>
+                  <div class="sdv2-timeline-date">{{ event.created_at|date:'Y-m-d H:i' }}</div>
+                  {% if event.user %}<div class="sdv2-timeline-meta">by {{ event.user }}</div>{% endif %}
+                  {% if event.comment %}<div class="sdv2-timeline-comment">{{ event.comment|truncatechars:200 }}</div>{% endif %}
+                </div>
+              </li>
+            {% endfor %}
+            <li class="sdv2-timeline-item sdv2-timeline-now">
+              <span class="sdv2-timeline-dot"></span>
+              <div class="sdv2-timeline-content">
+                <div class="sdv2-timeline-title">Last modified</div>
+                <div class="sdv2-timeline-date">{{ object.lastmodified_at|date:'Y-m-d H:i' }}</div>
+              </div>
+            </li>
+          </ol>
+        </section>
+      </main>
+      {# ─── Related samples aside ─── #}
+      <aside class="sdv2-related" aria-label="Related samples">
+        {% if related_samples.series %}
+          <section class="sdv2-related-section">
+            <h3 class="sdv2-related-title">
+              Same series
+              <a href="{% url 'sampleseries-detail' object.series.pk %}"
+                 class="sdv2-related-more">view all</a>
+            </h3>
+            <ul class="sdv2-related-list">
+              {% for s in related_samples.series %}
+                <li>
+                  <a href="{% url 'sample-detail' s.pk %}?experience=v2"
+                     class="sdv2-related-link">
+                    <span class="sdv2-related-name">{{ s.name }}</span>
+                    {% if s.timestep %}<span class="sdv2-related-meta">{{ s.timestep }}</span>{% endif %}
+                  </a>
+                </li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+        {% if related_samples.material %}
+          <section class="sdv2-related-section">
+            <h3 class="sdv2-related-title">Same material</h3>
+            <ul class="sdv2-related-list">
+              {% for s in related_samples.material %}
+                <li>
+                  <a href="{% url 'sample-detail' s.pk %}?experience=v2"
+                     class="sdv2-related-link">
+                    <span class="sdv2-related-name">{{ s.name }}</span>
+                    {% if s.series %}<span class="sdv2-related-meta">{{ s.series.name }}</span>{% endif %}
+                  </a>
+                </li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+        {% if not related_samples.series and not related_samples.material %}
+          <section class="sdv2-related-section">
+            <h3 class="sdv2-related-title">Related samples</h3>
+            <p class="sdv2-related-empty">No related samples visible yet.</p>
+          </section>
+        {% endif %}
+      </aside>
+    </div>
+    {# ─── Command palette (very lightweight) ─── #}
+    <dialog class="sdv2-palette" id="sdv2Palette" aria-label="Quick actions">
+      <form method="dialog" class="sdv2-palette-form">
+        <label class="sdv2-palette-label" for="sdv2PaletteInput">Jump to…</label>
+        <input type="text"
+               id="sdv2PaletteInput"
+               class="sdv2-palette-input"
+               autocomplete="off"
+               placeholder="Type to filter actions and sections">
+        <ul class="sdv2-palette-list" role="listbox">
+          {% for group in group_sparklines %}
+            <li>
+              <a data-sdv2-palette-item href="#group-{{ group.group_id }}">Jump to {{ group.name }}</a>
+            </li>
+          {% endfor %}
+          <li>
+            <a data-sdv2-palette-item href="#properties">Jump to Properties</a>
+          </li>
+          {% if sample_policy.can_manage_samples and perms.materials.add_componentmeasurement %}
+            <li>
+              <a data-sdv2-palette-item
+                 href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">Add composition data</a>
+            </li>
+          {% endif %}
+          {% if sample_policy.can_add_property %}
+            <li>
+              <a data-sdv2-palette-item
+                 href="{% url 'sample-add-property' object.id %}">Add property</a>
+            </li>
+          {% endif %}
+          {% if sample_policy.can_edit %}
+            <li>
+              <a data-sdv2-palette-item
+                 href="{% url 'sample-update' object.id %}?next={{ request.get_full_path|urlencode }}">Edit sample metadata</a>
+            </li>
+          {% endif %}
+          {% if sample_policy.can_duplicate %}
+            <li>
+              <a data-sdv2-palette-item href="{% url 'sample-duplicate' object.id %}">Duplicate sample</a>
+            </li>
+          {% endif %}
+          <li>
+            <a data-sdv2-palette-item href="{% url 'sample-detail' object.pk %}">Open classic view</a>
+          </li>
+          {% if sample_policy.can_delete %}
+            <li>
+              <a data-sdv2-palette-item
+                 class="sdv2-palette-danger"
+                 href="{% url 'sample-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">Delete sample</a>
+            </li>
+          {% endif %}
+        </ul>
+        <div class="sdv2-palette-footer">
+          <span><span class="sdv2-kbd">↑</span><span class="sdv2-kbd">↓</span> navigate</span>
+          <span><span class="sdv2-kbd">↵</span> open</span>
+          <span><span class="sdv2-kbd">Esc</span> close</span>
+        </div>
+      </form>
+    </dialog>
+    {{ data.compositions|json_script:"sdv2-export-data" }}
+  </div>
+{% endblock content %}
+{% block javascript %}
+  {{ charts|json_script:"charts" }}
+  <script>
+    (function () {
+      const raw = document.getElementById("charts");
+      if (!raw) return;
+      const charts = JSON.parse(raw.textContent);
+      Object.keys(charts).forEach(key => {
+        const container = document.getElementById(key);
+        if (!container || container.dataset.rendered === "1") return;
+        const canvas = document.createElement("canvas");
+        canvas.id = key + "-canvas";
+        container.appendChild(canvas);
+        container.dataset.rendered = "1";
+        const ctx = canvas.getContext("2d");
+        try {
+          new Chart(ctx, charts[key]);
+        } catch (err) {
+          console.warn("sdv2 chart render failed", key, err);
+        }
+      });
+    })();
+  </script>
+  <script src="{% static 'js/sample_detail_v2.js' %}"></script>
+{% endblock javascript %}

@@ -23,6 +23,28 @@ def class_name(obj):
 
 
 @register.filter
+def modulo(value, divisor):
+    """Return ``value % divisor`` as an integer, or ``0`` on failure."""
+
+    try:
+        return int(value) % int(divisor)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return 0
+
+
+@register.filter
+def get_item(container, key):
+    """Generic dict/mapping item access safe for template use."""
+
+    if container is None:
+        return None
+    try:
+        return container[key]
+    except (KeyError, IndexError, TypeError):
+        return getattr(container, str(key), None)
+
+
+@register.filter
 def trim_decimal(value, places=10):
     """Format numeric values without trailing zeros."""
 
