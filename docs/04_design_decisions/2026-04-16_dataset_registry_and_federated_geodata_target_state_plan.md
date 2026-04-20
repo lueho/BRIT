@@ -689,7 +689,7 @@ These may be implemented as tables, views, materialized views, or equivalent reg
 
 Goal: document reality and stop the roadmap from drifting away from the code.
 
-Phase status: audit complete; remaining work is explicit architectural definition for Tasks 0.4, 0.5, and 0.6.
+Phase status: complete; the audit and architecture-boundary decisions for Tasks 0.1 through 0.6 are now recorded, and Phase 1 can proceed against this baseline.
 
 Deliverables:
 
@@ -746,6 +746,50 @@ Deliverables:
     - `maps/forms.py`
     - `maps/admin.py`
 
+### Phase 0 decision for Task 0.4 - Minimum Phase 1 metadata contract
+
+- **Keep `GeoDataset` as the stable dataset identity and layer runtime metadata onto it**
+  - Phase 1 should extend `GeoDataset` rather than introduce a separate user-facing dataset identity model.
+  - Existing descriptive fields such as `name`, `description`, `preview`, `region`, `sources`, and `map_configuration` remain part of the dataset contract.
+  - Existing `model_name` should move to compatibility-only status once the new runtime metadata is available.
+
+- **Required runtime metadata for the first local registry slice**
+  - `backend_type`
+    - identifies how the dataset is resolved at runtime
+    - Phase 1 should support at least local table and local view style backends, while leaving room for later materialized and federated backends
+  - physical relation identity
+    - BRIT should store a stable database relation reference rather than infer it from a Django model name
+    - this should be represented as either `schema_name` plus `relation_name` or an equivalent normalized relation identifier
+  - `geometry_column`
+    - the authoritative geometry field used for map rendering and spatial extent logic
+  - `primary_key_column`
+    - the authoritative unique row identifier used for detail lookup, pagination stability, and feature URLs
+
+- **Required presentation metadata for safe generic exploration**
+  - `label_field` or equivalent primary display field
+    - defines the default human-readable feature label in lists, popups, and detail navigation
+  - `visible_columns`
+    - allowlist for fields that may appear in generic table/detail/map presentation
+  - `filterable_columns`
+    - allowlist for fields exposed to generic filtering controls
+  - `searchable_columns`
+    - allowlist for fields eligible for free-text search behavior where implemented
+  - `exportable_columns`
+    - allowlist for fields that may leave BRIT through export surfaces
+
+- **Fields that are explicitly not required for the minimum Phase 1 contract**
+  - versioning and refresh metadata
+    - those belong to later phases focused on reproducibility and imports
+  - federated credential/configuration details
+    - those belong to later backend-specific work and should not be mixed into the minimum local registry contract
+  - semantic harmonization metadata
+    - those belong to domain-level overlays rather than baseline dataset registration
+
+- **Admin and form implications of the minimum contract**
+  - Phase 1 admin/editor surfaces should expose the runtime metadata above as explicit dataset configuration, rather than hiding them behind code or documentation.
+  - The first pass does not need a polished end-user self-service workflow; it does need one authoritative editable metadata surface for staff or developers.
+  - `model_name` may remain temporarily visible only where necessary for compatibility, but new generic dataset setup should rely on the new runtime metadata instead.
+
 - **Task 0.5 - Define the dataset runtime adapter boundary**
   - Specify the minimal interface the generic map/table/detail surfaces need from any backend so that the UI layer does not care whether the data comes from a Django model, raw database relation, or later a federated source.
   - The contract should cover schema introspection, geometry resolution, primary-key lookup, safe filtered querying, single-feature lookup, and count/extent summaries where supported.
@@ -753,6 +797,47 @@ Deliverables:
     - `maps/views.py`
     - `maps/mixins.py`
     - `maps/viewsets.py`
+
+### Phase 0 decision for Task 0.5 - Dataset runtime adapter boundary
+
+- **Introduce one dataset runtime adapter contract behind the generic views**
+  - Phase 1 should resolve a registered `GeoDataset` into one runtime adapter instance that hides whether the backing data comes from a Django model, a local relation, or a later federated backend.
+  - Generic map, table, detail, and export surfaces should depend on this adapter contract rather than on `model_name`, `ModelMapConfiguration`, or hardcoded view subclasses.
+
+- **The adapter owns data resolution, not user-facing routing**
+  - Generic dataset routes, permissions, templates, and response shapes should remain in the `maps` view and viewset layer.
+  - The adapter should provide data access and schema behavior; it should not generate canonical BRIT URLs.
+  - This keeps routing, moderation, and UX policy centralized while still allowing multiple backend implementations.
+
+- **Minimum adapter responsibilities for the first local registry slice**
+  - dataset identity binding
+    - resolve from one `GeoDataset` instance and validate that the configured backend metadata is sufficient to run
+  - schema introspection
+    - return the authoritative primary key field, geometry field, label field, scalar column metadata, and the configured visible, filterable, searchable, and exportable allowlists
+  - filtered collection query
+    - build a safe allowlisted query path for generic table and map browsing
+    - support filtering, search, ordering, pagination, and optional bounding-box restriction where the backend can do so
+  - single-feature lookup
+    - return one feature or row by configured primary key for detail views and feature drill-down
+  - feature serialization inputs
+    - expose enough structured row and field information for generic serializers to build table rows, map features, labels, and detail payloads without backend-specific template logic
+  - aggregate helpers
+    - provide count and extent summaries where supported so the generic UI can support totals, viewport logic, and lightweight summary endpoints
+  - cache/version inputs
+    - expose a stable dataset-version signal or the raw ingredients needed by the generic caching layer to compute one
+
+- **Responsibilities that should stay outside the adapter**
+  - map configuration serialization and layer URL assembly
+    - these should stay in the generic `maps` view and serializer layer, even if they become dataset-scoped rather than model-scoped
+  - permission enforcement and publication-state policy
+    - these should remain governed by the existing object-management and view permission patterns
+  - domain-specific semantic overlays
+    - those belong to later source-domain composition, not to the baseline runtime adapter
+
+- **Direct implications for the current runtime**
+  - The future adapter contract should replace the current `FilteredMapMixin.get_dataset()` and `GeoDataset.objects.get(model_name=...)` pattern with dataset-identity-based resolution.
+  - It should also replace the current reliance on model-name-derived `api_basename` discovery in `MapMixin` with explicit dataset-backed runtime configuration.
+  - `CachedGeoJSONMixin` and the generic viewset layer should become reusable consumers of adapter-backed query and version behavior rather than requiring one bespoke model viewset per dataset.
 
 - **Task 0.6 - Settle model placement and compatibility policy**
   - Decide whether new backend/configuration models remain in `maps` or move into a more cross-cutting layer, and document the rationale so Phase 1 is not blocked by structural churn.
@@ -762,6 +847,40 @@ Deliverables:
     - `maps/urls.py`
     - `maps/views.py`
     - `docs/04_design_decisions/2026-04-16_dataset_registry_and_federated_geodata_target_state_plan.md`
+
+### Phase 0 decision for Task 0.6 - Model placement and compatibility policy
+
+- **Keep the first registry implementation in `maps`**
+  - Phase 1 should keep new registry metadata, adapter resolution, and generic dataset runtime work inside `maps` rather than creating a new cross-cutting app immediately.
+  - This is the lowest-risk path because `GeoDataset`, `MapConfiguration`, current list and gallery UX, and the relevant map/runtime views already live there.
+  - `inventories` and other downstream consumers already depend on `maps.GeoDataset`, so moving the core identity concept during Phase 1 would add churn without solving the main blocker.
+
+- **Use `GeoDataset` as the continuity anchor during migration**
+  - Existing `GeoDataset` primary keys and downstream foreign keys remain authoritative.
+  - New runtime metadata should attach to `GeoDataset` directly or through `maps`-local helper models that are clearly subordinate to it.
+  - Do not introduce a second competing user-facing dataset identity in Phase 1.
+
+- **Define the canonical path versus compatibility-only paths**
+  - Canonical for new work
+    - dataset-scoped generic routes resolved by stable dataset identity
+    - runtime behavior driven by explicit dataset metadata and the adapter contract
+  - Compatibility-only during migration
+    - `GeoDataset.model_name`
+    - `GIS_SOURCE_MODELS`
+    - hardcoded named routes such as `NutsRegion`
+    - model-name-derived `ModelMapConfiguration` lookup and `api_basename` inference
+    - source-domain map mounts used as the primary way to open registry-backed datasets
+
+- **Compatibility expectations for Phase 1**
+  - Existing list, gallery, CRUD, autocomplete, and downstream `GeoDataset` selection workflows should continue to work while the canonical runtime path changes underneath them.
+  - `GeoDataset.get_absolute_url()` should move toward the dataset-scoped canonical route when the new runtime metadata is present, while retaining a controlled fallback for legacy rows that still rely on `model_name`.
+  - New generic datasets introduced in Phase 1 should not require `model_name` to function.
+  - Existing hardcoded or plugin-provided routes may continue to exist for bespoke domain behavior, but they should no longer define the baseline registry path.
+
+- **Admin and form policy during migration**
+  - The authoritative configuration surface for new registry-backed datasets should live in `maps` admin and form tooling.
+  - Legacy fields may remain visible where needed for existing rows, but they should be treated as migration-era compatibility inputs rather than the preferred setup path.
+  - Phase 1 should favor explicit staff-editable metadata over hidden conventions or route-name inference.
 
 ### Phase 0 baseline audit snapshot
 
@@ -822,15 +941,18 @@ Deliverables:
 
 ### Phase 0 status checkpoint and retrospective
 
-- **Phase 0 is not fully complete yet**
-  - The discovery and audit portion of Phase 0 is complete enough to support Phase 1 planning.
-  - However, the phase is not fully closed because Tasks 0.4, 0.5, and 0.6 still require explicit architectural decisions rather than only audit findings.
+- **Phase 0 is now complete**
+  - The discovery and audit portion is complete.
+  - The remaining architecture-boundary decisions for Tasks 0.4, 0.5, and 0.6 have now been recorded in this document.
 
 - **Completed in Phase 0 so far**
   - `GeoDataset` has been confirmed as the stable downstream-facing dataset object rather than a throwaway wrapper around hardcoded model routes.
   - Runtime coupling to `model_name`, `GIS_SOURCE_MODELS`, CamelCase route names, and model-based map configuration has been audited and captured in one place.
   - The mismatch between the current `maps/README.md` onboarding story and the implemented runtime path is now explicit.
   - A dependency matrix now identifies the main replacement targets and compatibility surfaces for Phase 1.
+  - The minimum Phase 1 metadata contract has now been defined for the first local registry slice.
+  - The dataset runtime adapter boundary is now defined for the generic map, table, and detail surfaces.
+  - Model placement and compatibility policy are now settled well enough to start Phase 1 without structural ambiguity.
 
 - **What Phase 0 taught us**
   - The biggest blocker is not federated storage itself; it is the fact that dataset identity, routing, and view lookup are still entangled with Django model names.
@@ -838,14 +960,13 @@ Deliverables:
   - The current compatibility surface is broader than one field or one route: it spans forms, filters, templates, tests, map configuration lookup, and plugin-mounted map URLs.
   - Documentation drift is a first-class planning signal here: the README already describes a target architecture that the runtime has not fully implemented, so Phase 1 must either fulfill or narrow that promise quickly.
 
-- **Remaining work required to close Phase 0**
-  - Define and record the minimum Phase 1 metadata contract for local registry-backed datasets.
-  - Define and record the minimal runtime adapter interface required by generic map, table, and detail views.
-  - Make an explicit decision on model placement and on which old routes and fields remain compatibility-only during migration.
+- **Immediate consequence for the next phase**
+  - Phase 1 can now focus on implementation rather than further Phase 0 clarification work.
+  - The next step is to build the first local registry-backed runtime slice against the contract and compatibility policy defined here.
 
 - **Exit recommendation**
-  - Treat Phase 0 as **audit-complete but decision-incomplete**.
-  - Close the phase only after the three remaining design-definition tasks are written into this document as concrete decisions, not just task statements.
+  - Treat Phase 0 as complete and use this document as the entry baseline for Phase 1 execution.
+  - Reopen Phase 0 only if implementation uncovers a missing architectural decision rather than a normal Phase 1 design refinement.
 
 Success criteria:
 
