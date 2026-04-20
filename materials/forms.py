@@ -725,31 +725,6 @@ class PlainTextComponentWidget(Widget):
         #                  f"<input type='hidden' name='{name}' value='{value}'>")
 
 
-class ModalInlineComponentShare(InlineFormSetFactory):
-    model = WeightShare
-    fields = ("component", "average", "standard_deviation")
-    factory_kwargs = {
-        "form": WeightShareInlineForm,
-        "formset": WeightShareInlineFormset,
-        "extra": 1,
-        "min_num": 1,
-        "can_delete": True,
-        "widgets": {
-            "component": PlainTextComponentWidget(),
-            "average": NumberInput(attrs={"min": 0, "max": 100, "step": 0.01}),
-            "standard_deviation": NumberInput(
-                attrs={"min": 0, "max": 100, "step": 0.01}
-            ),
-        },
-    }
-
-
-class AddTemporalDistributionForm(ModalModelForm):
-    class Meta:
-        model = Composition
-        fields = "__all__"
-
-
 class ComponentShareDistributionFormSetHelper(FormHelper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -12,9 +12,8 @@ from django.db.models import Q
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import NoReverseMatch, reverse, reverse_lazy
-from django.views.generic import ListView, RedirectView, TemplateView, View
+from django.views.generic import RedirectView, TemplateView, View
 from django.views.generic.detail import SingleObjectMixin
-from extra_views import UpdateWithInlinesView
 
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
@@ -28,7 +27,6 @@ from utils.object_management.permissions import (
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
-    PublishedObjectListView,
     ReviewObjectFilterView,
     ReviewObjectListView,
     UserCreatedObjectAutocompleteView,
@@ -69,7 +67,6 @@ from .forms import (
     ComponentMeasurementModelForm,
     ComponentModalModelForm,
     ComponentModelForm,
-    ComponentShareDistributionFormSetHelper,
     Composition,
     CompositionModalModelForm,
     CompositionModelForm,
@@ -82,7 +79,6 @@ from .forms import (
     MaterialPropertyModelForm,
     MaterialPropertyValueModalModelForm,
     MaterialPropertyValueModelForm,
-    ModalInlineComponentShare,
     SampleAddCompositionForm,
     SampleModalModelForm,
     SampleModelForm,
@@ -662,7 +658,8 @@ class AnalyticalMethodDetailView(UserCreatedObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         related_samples = (
-            Sample.objects.filter(
+            Sample.objects
+            .filter(
                 Q(property_values__analytical_method=self.object)
                 | Q(component_measurements__analytical_method=self.object)
             )
@@ -867,12 +864,6 @@ class SampleReviewListView(SampleRepresentationMixin, ReviewObjectFilterView):
     model = Sample
     filterset_class = SampleFilter
     dashboard_url = reverse_lazy("materials-explorer")
-
-
-class FeaturedSampleListView(PublishedObjectListView):
-    template_name = "featured_sample_list.html"
-    model = Sample
-    queryset = Sample.objects.filter(series__publish=True)
 
 
 class SampleCreateView(UserCreatedObjectCreateView):
@@ -1185,13 +1176,13 @@ class SampleDetailView(UserCreatedObjectDetailView):
             labels = [share["component_name"] for share in composition["shares"]]
             values = [share["average"] for share in composition["shares"]]
             chart = DoughnutChart(
-                id=f"materialCompositionChart-{composition["id"]}",
+                id=f"materialCompositionChart-{composition['id']}",
                 title="Composition",
                 unit="%",
                 labels=labels,
                 data=[{"label": "Fraction", "unit": "%", "data": values}],
             )
-            charts[f"composition-chart-{composition["id"]}"] = chart.as_dict()
+            charts[f"composition-chart-{composition['id']}"] = chart.as_dict()
         return charts
 
     def get_context_data(self, **kwargs):
@@ -1200,7 +1191,8 @@ class SampleDetailView(UserCreatedObjectDetailView):
             self.object, context={"request": self.request}
         ).data
         property_values = (
-            self.object.get_property_values_queryset()
+            self.object
+            .get_property_values_queryset()
             .select_related(
                 "property",
                 "property__comparable_property",
@@ -1212,7 +1204,8 @@ class SampleDetailView(UserCreatedObjectDetailView):
             .order_by("property__name", "id")
         )
         component_measurements = (
-            self.object.component_measurements.select_related(
+            self.object.component_measurements
+            .select_related(
                 "group",
                 "component",
                 "component__comparable_component",
@@ -1460,36 +1453,6 @@ class CompositionUpdateView(UserCreatedObjectUpdateWithInlinesView):
         form_helper = FormHelper()
         form_helper.form_tag = False
         context = {"inline_helper": inline_helper, "form_helper": form_helper}
-        context.update(kwargs)
-        return super().get_context_data(**context)
-
-
-# TODO: Improve or EOL
-class CompositionModalUpdateView(
-    PermissionRequiredMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView
-):
-    model = Composition
-    inlines = [
-        ModalInlineComponentShare,
-    ]
-    fields = []
-    template_name = "modal_form_with_formset.html"
-    permission_required = (
-        "materials.change_composition",
-        "materials.change_weightshare",
-    )
-
-    def get_context_data(self, **kwargs):
-        inline_helper = ComponentShareDistributionFormSetHelper()
-        inline_helper.form_tag = False
-        form_helper = FormHelper()
-        form_helper.form_tag = False
-        context = {
-            "form_title": "Change the composition",
-            "submit_button_text": "Save",
-            "inline_helper": inline_helper,
-            "form_helper": form_helper,
-        }
         context.update(kwargs)
         return super().get_context_data(**context)
 
@@ -1752,14 +1715,6 @@ class RemoveSeasonalVariationView(UserCreatedObjectDetailView):
         success_url = self.get_success_url()
         self.get_object().remove_temporal_distribution(self.get_distribution())
         return HttpResponseRedirect(success_url)
-
-
-class FeaturedMaterialListView(ListView):
-    template_name = "featured_materials_list.html"
-    model = SampleSeries
-
-    def get_queryset(self):
-        return SampleSeries.objects.filter(publish=True)
 
 
 # ----------- Sample Export Views --------------------------------------------------------------------------------------

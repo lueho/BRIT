@@ -101,11 +101,6 @@ class BaseMaterial(NamedUserCreatedObject):
         unique_together = [["name", "owner"]]
 
 
-class MaterialManager(models.Manager):
-    def get_queryset(self):
-        return super().get_queryset().filter(type="material")
-
-
 class Material(BaseMaterial):
     """
     Generic material class for many purposes. E.g. this is used as top level definition to link semantic definition of
