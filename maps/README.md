@@ -83,51 +83,46 @@ This module is used throughout BRIT to:
 - Attach spatial attributes to geographic entities
 - Provide the foundation for spatial analysis and visualization
 
-## Adding a New Map Dataset (User Guide)
+## Current GeoDataset Workflow
 
-### System Summary
-The Maps module supports dynamic registration and visualization of new geospatial datasets without code changes. Each dataset is described in the `GeoDataset` model, referencing a database table containing geodata. When a dataset is registered, the system automatically generates a map view, filter form, and query interface using the dataset's metadata. This is controlled by the `ENABLE_GENERIC_DATASET` feature flag for safe rollout.
+### What `GeoDataset` currently does
+The current implementation uses `GeoDataset` primarily as a metadata record for datasets that are already backed by existing map views and routes.
 
-### Step-by-Step Guide
+Today, a `GeoDataset` can:
+- appear in the maps list and gallery views
+- store descriptive metadata such as name, description, preview image, region, sources, and map configuration
+- link to an existing map experience through `model_name`
+- be managed through the existing create, update, delete, autocomplete, and admin workflows
 
-**Given:** You have a table in the database containing geospatial data (e.g., a PostGIS table with geometry and attribute columns).
+### What `GeoDataset` does not yet do
+The current implementation does **not** yet provide a fully metadata-driven registry for arbitrary geospatial tables or views.
 
-#### 1. Prepare Your Data Table
-- Ensure your table exists in the database (e.g., via SQL, migration, or import).
-- The table must have a primary key column (usually `id`).
-- It must contain a geometry column (e.g., `geom`, `geometry`, etc.).
-- Add any attribute columns you want to display or filter on.
+In particular, it does **not** currently support:
+- registering an arbitrary PostGIS table or view purely through metadata
+- storing runtime fields such as table name, geometry column, display fields, or filter fields on `GeoDataset`
+- automatically creating a dataset-scoped map route such as `/maps/geodatasets/<pk>/map/`
+- replacing hardcoded or plugin-provided map routes with one generic registry-backed runtime path
 
-#### 2. Register the Dataset in the Admin
-- Go to the Django admin panel.
-- Navigate to **Maps → GeoDatasets**.
-- Click **Add GeoDataset**.
-- Fill out the following fields:
-  - **Name**: Human-readable name for the dataset.
-  - **Region**: The region the dataset belongs to.
-  - **Table name**: Exact name of your database table (case-sensitive).
-  - **Geometry field**: Name of the geometry column in your table.
-  - **Display fields**: Comma-separated list of columns to show in popups/tooltips.
-  - **Filter fields**: Comma-separated list of columns users can filter by (these will become form fields).
-  - (Optional) **Map configuration**: Choose a map config for styling.
+### Current user-facing workflow
 
-#### 3. Enable the Generic Dataset Feature (if not already enabled)
-- In your Django settings, set `ENABLE_GENERIC_DATASET = True`.
-- Restart the app if needed.
+#### 1. Create or edit a `GeoDataset` metadata record
+- Use the existing maps forms or Django admin to create and maintain `GeoDataset` records.
+- These records are used to organize and describe datasets that BRIT already knows how to display.
 
-#### 4. Access the Map View
-- Go to `/maps/geodatasets/<pk>/map/` where `<pk>` is the ID of your new GeoDataset.
-- You will see a map with your data, a filter form for the allowed fields, and attribute popups.
+#### 2. Browse dataset metadata
+- Published datasets are available through the maps list and gallery views.
+- Private datasets are available through the corresponding owner-scoped views.
 
-#### 5. (Optional) Customize Map Layer Styling
-- Edit the **MapConfiguration** and **MapLayerConfiguration** in the admin to adjust colors, icons, and display settings for your new dataset.
+#### 3. Open an existing dataset map/view
+- Opening a `GeoDataset` currently depends on its `model_name`.
+- `GeoDataset.get_absolute_url()` resolves to an existing named route rather than a dataset-scoped generic map page.
+- Those routes currently come either from hardcoded core map views or from source-domain plugin map mounts.
 
-#### 6. Test and Validate
-- Use the filter form to query your dataset.
-- Check that only the allowed fields are exposed and that sensitive columns are not available for filtering.
-- If needed, adjust the GeoDataset metadata.
+#### 4. Adjust associated styling and references
+- `GeoDataset` records can still be associated with sources and map configurations.
+- Styling remains driven by the existing `MapConfiguration` and `MapLayerConfiguration` models.
 
-### Notes
-- No code changes or migrations are required for new datasets—everything is driven by metadata.
-- For advanced customizations (e.g., custom serializers or API endpoints), consult the developer documentation or contact the development team.
-- If you encounter errors, check that your table and columns exist and that the feature flag is enabled.
+### Notes for developers
+- This README documents the **current implemented behavior** only.
+- The future metadata-driven dataset registry is tracked in `docs/04_design_decisions/2026-04-16_dataset_registry_and_federated_geodata_target_state_plan.md`.
+- If you are planning new dataset-registry work, use the planning document as the authoritative roadmap instead of treating this README as a future-state specification.

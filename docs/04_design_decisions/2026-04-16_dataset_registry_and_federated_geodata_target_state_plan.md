@@ -1,16 +1,16 @@
 # Dataset Registry and Federated Geodata Target-State Plan
 
-- **Status**: Proposed
+- **Status**: Active roadmap; Phase 0 audit complete, Phase 0 design-definition still in progress
 - **Date**: 2026-04-16
 - **Scope**: `maps` dataset onboarding, standalone exploration, long-term federation of external geospatial data sources, and domain-level harmonized integration across incompatible datasets
 
 ## Documentation Boundary
 
 - **This document is the single authoritative roadmap for BRIT's generic dataset onboarding and federation direction**
-  It owns the target state, sequencing, gap analysis, evaluation criteria, and delivery phases for making new geodata explorable with little or no code.
+It owns the target state, sequencing, gap analysis, evaluation criteria, delivery phases, and implementation-progress tracking for making new geodata explorable with little or no code.
 
 - **Related records remain supporting documents, not parallel roadmaps**
-  Use [Geodataset Harmonization Pipeline](2026-02-10_geodataset_harmonization_pipeline.md) for the source-type-specific harmonized ingestion architecture and [Module UX Harmonization Guideline](2026-02-09_module_ux_harmonization_guideline.md) for the broader explorer/list/detail UX constraints this roadmap should follow.
+Use [Geodataset Harmonization Pipeline](2026-02-10_geodataset_harmonization_pipeline.md) for the source-type-specific harmonized ingestion architecture and [Module UX Harmonization Guideline](2026-02-09_module_ux_harmonization_guideline.md) for the broader explorer/list/detail UX constraints this roadmap should follow.
 
 ## 1. Context
 
@@ -47,7 +47,7 @@ This means the target architecture needs two layers that coexist:
 This direction is already visible in the codebase, but only partially:
 
 - `maps.GeoDataset` already exists as user-managed metadata
-- `maps/README.md` already documents a no-code generic dataset workflow
+- `maps/README.md` now documents the current as-is `GeoDataset` workflow and points future registry work back to this roadmap
 - the `maps` list/gallery UX already treats `GeoDataset` as a primary user-facing object
 - the implementation still centers on `model_name` and hardcoded `GIS_SOURCE_MODELS`
 - the documented metadata fields for table/geometry/display/filter configuration are not yet reflected as the authoritative runtime path in the current `GeoDataset` model
@@ -689,6 +689,8 @@ These may be implemented as tables, views, materialized views, or equivalent reg
 
 Goal: document reality and stop the roadmap from drifting away from the code.
 
+Phase status: audit complete; remaining work is explicit architectural definition for Tasks 0.4, 0.5, and 0.6.
+
 Deliverables:
 
 - inventory all current `GeoDataset` read/write paths
@@ -817,6 +819,33 @@ Deliverables:
 
 - **The first concrete documentation debt is the README mismatch**
   - Phase 1 should either make the documented metadata-driven path true or narrow the README until the implementation catches up.
+
+### Phase 0 status checkpoint and retrospective
+
+- **Phase 0 is not fully complete yet**
+  - The discovery and audit portion of Phase 0 is complete enough to support Phase 1 planning.
+  - However, the phase is not fully closed because Tasks 0.4, 0.5, and 0.6 still require explicit architectural decisions rather than only audit findings.
+
+- **Completed in Phase 0 so far**
+  - `GeoDataset` has been confirmed as the stable downstream-facing dataset object rather than a throwaway wrapper around hardcoded model routes.
+  - Runtime coupling to `model_name`, `GIS_SOURCE_MODELS`, CamelCase route names, and model-based map configuration has been audited and captured in one place.
+  - The mismatch between the current `maps/README.md` onboarding story and the implemented runtime path is now explicit.
+  - A dependency matrix now identifies the main replacement targets and compatibility surfaces for Phase 1.
+
+- **What Phase 0 taught us**
+  - The biggest blocker is not federated storage itself; it is the fact that dataset identity, routing, and view lookup are still entangled with Django model names.
+  - `GeoDataset` already behaves like the correct downstream selection object in `inventories`, which means the safest migration path is to preserve that identity while replacing the runtime plumbing behind it.
+  - The current compatibility surface is broader than one field or one route: it spans forms, filters, templates, tests, map configuration lookup, and plugin-mounted map URLs.
+  - Documentation drift is a first-class planning signal here: the README already describes a target architecture that the runtime has not fully implemented, so Phase 1 must either fulfill or narrow that promise quickly.
+
+- **Remaining work required to close Phase 0**
+  - Define and record the minimum Phase 1 metadata contract for local registry-backed datasets.
+  - Define and record the minimal runtime adapter interface required by generic map, table, and detail views.
+  - Make an explicit decision on model placement and on which old routes and fields remain compatibility-only during migration.
+
+- **Exit recommendation**
+  - Treat Phase 0 as **audit-complete but decision-incomplete**.
+  - Close the phase only after the three remaining design-definition tasks are written into this document as concrete decisions, not just task statements.
 
 Success criteria:
 
