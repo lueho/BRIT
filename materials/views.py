@@ -52,8 +52,10 @@ from .filters import (
     MaterialComponentListFilter,
     MaterialListFilter,
     MaterialPropertyListFilter,
+    PublishedSampleFilter,
     SampleFilter,
     SampleSeriesFilter,
+    UserOwnedSampleFilter,
 )
 from .forms import (
     AddComponentModalForm,
@@ -835,11 +837,13 @@ class SampleRepresentationMixin:
 
 class SamplePublishedGalleryView(SampleRepresentationMixin, PublishedObjectFilterView):
     template_name = "materials/sample_gallery.html"
+    filterset_class = PublishedSampleFilter
     representation_mode = "gallery"
 
 
 class SamplePrivateGalleryView(SampleRepresentationMixin, PrivateObjectFilterView):
     template_name = "materials/sample_gallery.html"
+    filterset_class = UserOwnedSampleFilter
     representation_mode = "gallery"
 
 
@@ -850,13 +854,13 @@ class SampleReviewGalleryView(SampleRepresentationMixin, ReviewObjectFilterView)
 
 class SamplePublishedListView(SampleRepresentationMixin, PublishedObjectFilterView):
     model = Sample
-    filterset_class = SampleFilter
+    filterset_class = PublishedSampleFilter
     dashboard_url = reverse_lazy("materials-explorer")
 
 
 class SamplePrivateListView(SampleRepresentationMixin, PrivateObjectFilterView):
     model = Sample
-    filterset_class = SampleFilter
+    filterset_class = UserOwnedSampleFilter
     dashboard_url = reverse_lazy("materials-explorer")
 
 

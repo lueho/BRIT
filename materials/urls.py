@@ -374,7 +374,7 @@ urlpatterns = [
     ),
     path(
         "components/<int:pk>/update/modal/",
-        views.ComponentUpdateView.as_view(),
+        views.ComponentModalUpdateView.as_view(),
         name="materialcomponent-update-modal",
     ),
     path(
@@ -596,6 +596,11 @@ urlpatterns = [
         "materialcomponentgroups/settings/<int:pk>/add_source/",
         views.AddSourceView.as_view(),
         name="add_source",
+    ),
+    path(
+        "materialcomponentgroups/settings/<int:pk>/add_seasonal_variation/",
+        views.AddSeasonalVariationView.as_view(),
+        name="add_seasonal_variation",
     ),
     path(
         "materialcomponentgroups/settings/<int:pk>/remove_seasonal_variation/<int:distribution_pk>/",

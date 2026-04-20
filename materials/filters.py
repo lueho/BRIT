@@ -359,7 +359,7 @@ class PublishedSampleFilter(SampleFilter):
         empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
-                url="sample-autocomplete-published",
+                url="sample-autocomplete-public",
             )
         ),
     )
@@ -373,7 +373,7 @@ class UserOwnedSampleFilter(SampleFilter):
         empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
-                url="sample-autocomplete-owned",
+                url="sample-autocomplete-user",
             )
         ),
     )
