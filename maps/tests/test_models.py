@@ -1,6 +1,7 @@
 from django.contrib.gis.geos import GEOSGeometry, Point
 from django.db.models import QuerySet
 from django.test import TestCase
+from django.urls import reverse
 
 from maps.models import GeoPolygon, Location
 from utils.properties.models import PropertyBase, Unit
@@ -9,6 +10,9 @@ from ..models import (
     Attribute,
     Catchment,
     CategoricalAttribute,
+    GeoDataset,
+    GeoDatasetColumnPolicy,
+    GeoDatasetRuntimeConfiguration,
     LauRegion,
     NutsRegion,
     Region,
@@ -108,6 +112,63 @@ class CatchmentPostDeleteTestCase(TestCase):
     def test_non_custom_regions_are_exempted_from_deletion(self):
         self.catchment_2.delete()
         Region.objects.get(name="Test Region To Stay")
+
+
+class GeoDatasetModelTestCase(TestCase):
+    def setUp(self):
+        self.region = Region.objects.create(name="Test Region")
+
+    def test_get_absolute_url_uses_canonical_dataset_detail_route(self):
+        dataset = GeoDataset.objects.create(name="Dataset", region=self.region)
+
+        self.assertEqual(
+            dataset.get_absolute_url(),
+            reverse("geodataset-detail", kwargs={"pk": dataset.pk}),
+        )
+
+    def test_get_features_api_basename_prefers_explicit_field(self):
+        dataset = GeoDataset.objects.create(
+            name="Dataset",
+            region=self.region,
+            model_name="NutsRegion",
+        )
+        GeoDatasetRuntimeConfiguration.objects.create(
+            dataset=dataset,
+            features_api_basename="api-custom-dataset",
+        )
+
+        self.assertEqual(dataset.get_features_api_basename(), "api-custom-dataset")
+
+    def test_get_features_api_basename_falls_back_to_runtime_model_name(self):
+        dataset = GeoDataset.objects.create(name="Dataset", region=self.region)
+        GeoDatasetRuntimeConfiguration.objects.create(
+            dataset=dataset,
+            backend_type="django_model",
+            runtime_model_name="NutsRegion",
+        )
+
+        self.assertEqual(dataset.get_features_api_basename(), "api-nuts-region")
+
+    def test_column_policy_helpers_return_allowlisted_columns(self):
+        dataset = GeoDataset.objects.create(name="Dataset", region=self.region)
+        GeoDatasetColumnPolicy.objects.create(
+            dataset=dataset,
+            column_name="name",
+            is_visible=True,
+            is_searchable=True,
+        )
+        GeoDatasetColumnPolicy.objects.create(
+            dataset=dataset,
+            column_name="category",
+            is_visible=True,
+            is_filterable=True,
+            is_exportable=True,
+        )
+
+        self.assertEqual(dataset.get_visible_columns(), ["category", "name"])
+        self.assertEqual(dataset.get_filterable_columns(), ["category"])
+        self.assertEqual(dataset.get_searchable_columns(), ["name"])
+        self.assertEqual(dataset.get_exportable_columns(), ["category"])
 
 
 class CatchmentPedigreeTestCase(TestCase):

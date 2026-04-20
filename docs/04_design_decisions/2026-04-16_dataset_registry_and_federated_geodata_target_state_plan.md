@@ -753,29 +753,33 @@ Deliverables:
   - Existing descriptive fields such as `name`, `description`, `preview`, `region`, `sources`, and `map_configuration` remain part of the dataset contract.
   - Existing `model_name` should move to compatibility-only status once the new runtime metadata is available.
 
+- **Use normalized subordinate models from the start rather than JSON-style field lists on `GeoDataset`**
+  - The Phase 1 contract should be normalized at the database level from the beginning, even for the first local registry slice.
+  - `GeoDataset` remains the stable dataset identity, but runtime configuration that has its own structure should live in subordinate `maps` models rather than in denormalized list fields.
+  - In particular, per-column exposure policy should be represented as one row per dataset column, not as `JSONField` or array-based allowlists stored directly on `GeoDataset`.
+
 - **Required runtime metadata for the first local registry slice**
-  - `backend_type`
+  - dataset backend metadata
     - identifies how the dataset is resolved at runtime
     - Phase 1 should support at least local table and local view style backends, while leaving room for later materialized and federated backends
+    - this metadata should live in a normalized subordinate model such as a dataset backend or relation binding record rather than being spread across loosely related scalar fields without structure
   - physical relation identity
     - BRIT should store a stable database relation reference rather than infer it from a Django model name
-    - this should be represented as either `schema_name` plus `relation_name` or an equivalent normalized relation identifier
-  - `geometry_column`
+    - this should be represented as normalized runtime metadata such as `schema_name` plus `relation_name` on a backend/configuration model or an equivalent normalized relation identifier
+  - geometry and identity metadata
     - the authoritative geometry field used for map rendering and spatial extent logic
-  - `primary_key_column`
     - the authoritative unique row identifier used for detail lookup, pagination stability, and feature URLs
+    - the default human-readable label/display field used in generic list, popup, and detail navigation
+    - these fields should be represented in the normalized runtime metadata layer, not as ad hoc conventions
 
 - **Required presentation metadata for safe generic exploration**
-  - `label_field` or equivalent primary display field
-    - defines the default human-readable feature label in lists, popups, and detail navigation
-  - `visible_columns`
-    - allowlist for fields that may appear in generic table/detail/map presentation
-  - `filterable_columns`
-    - allowlist for fields exposed to generic filtering controls
-  - `searchable_columns`
-    - allowlist for fields eligible for free-text search behavior where implemented
-  - `exportable_columns`
-    - allowlist for fields that may leave BRIT through export surfaces
+  - one normalized dataset-column metadata row per exposed scalar column
+    - stores the authoritative runtime column name and any derived display label
+    - records whether the column is visible, filterable, searchable, orderable, and exportable
+    - provides the place to add richer per-column metadata later without another schema reversal
+  - one clear distinction between relation-level metadata and column-level metadata
+    - relation-level concerns such as backend type, schema, relation name, geometry field, primary key, and default label belong together
+    - column-level exposure policy belongs in a dedicated subordinate model rather than in multiple parallel allowlist fields
 
 - **Fields that are explicitly not required for the minimum Phase 1 contract**
   - versioning and refresh metadata
@@ -787,6 +791,7 @@ Deliverables:
 
 - **Admin and form implications of the minimum contract**
   - Phase 1 admin/editor surfaces should expose the runtime metadata above as explicit dataset configuration, rather than hiding them behind code or documentation.
+  - The editing workflow should support both relation-level metadata and normalized per-column policy records.
   - The first pass does not need a polished end-user self-service workflow; it does need one authoritative editable metadata surface for staff or developers.
   - `model_name` may remain temporarily visible only where necessary for compatibility, but new generic dataset setup should rely on the new runtime metadata instead.
 
@@ -857,7 +862,7 @@ Deliverables:
 
 - **Use `GeoDataset` as the continuity anchor during migration**
   - Existing `GeoDataset` primary keys and downstream foreign keys remain authoritative.
-  - New runtime metadata should attach to `GeoDataset` directly or through `maps`-local helper models that are clearly subordinate to it.
+  - New runtime metadata should attach to `GeoDataset` through `maps`-local helper models that are clearly subordinate to it wherever that metadata has its own structure or lifecycle.
   - Do not introduce a second competing user-facing dataset identity in Phase 1.
 
 - **Define the canonical path versus compatibility-only paths**
@@ -981,13 +986,13 @@ Goal: make ordinary local tables/views explorable without code changes.
 Deliverables:
 
 - extend the dataset metadata model so the table/view-backed path is real, not only documented
-- support authoritative storage of:
-  - backend type
+- support authoritative normalized storage of:
+  - backend/runtime relation metadata
   - schema/table identifier
   - geometry column
   - primary key column
-  - visible/filterable columns
   - label/display configuration
+  - one row per exposed dataset column with explicit visibility and query/export policy
 - implement safe schema introspection for local PostGIS relations
 - implement generic table/detail/map querying from registry metadata
 - make `GeoDataset.get_absolute_url()` independent from `model_name`
@@ -998,6 +1003,7 @@ Deliverables:
 - **Task 1.1 - Refactor `GeoDataset` into a real registry contract**
   - Update the model layer so the local table/view-backed path is represented by authoritative runtime metadata instead of being described only in documentation.
   - Preserve a minimal compatibility story where needed, but stop treating `model_name` as the primary runtime identity for new generic exploration.
+  - Use normalized subordinate models from the beginning for backend/relation metadata and per-column exposure policy instead of `JSONField` or parallel allowlist arrays on `GeoDataset`.
   - Primary file targets:
     - `maps/models.py`
     - `maps/migrations/`
@@ -1019,7 +1025,7 @@ Deliverables:
     - `maps/mixins.py`
 
 - **Task 1.4 - Implement the first generic local backend/query path**
-  - Deliver one backend path for local PostGIS tables or views that supports schema introspection, safe allowlisted filtering, geometry access, pagination, and single-feature lookup.
+  - Deliver one backend path for local PostGIS tables or views that supports schema introspection, safe filtering derived from normalized dataset-column policy, geometry access, pagination, and single-feature lookup.
   - This first slice should validate the registry runtime without yet taking on federation, advanced import orchestration, or harmonization logic.
   - Primary file targets:
     - `maps/views.py`
@@ -1053,7 +1059,7 @@ Deliverables:
     - this roadmap document
 
 - **Task 1.8 - Add regression tests and one real pilot dataset demonstration**
-  - Add tests that prove the new dataset path works end-to-end for a local PostGIS relation without relying on `model_name` lookup, and that field exposure obeys explicit allowlists.
+  - Add tests that prove the new dataset path works end-to-end for a local PostGIS relation without relying on `model_name` lookup, and that field exposure obeys normalized per-column policy records.
   - The phase should end with one real pilot example that demonstrates the architecture rather than only a model refactor.
   - Primary file targets:
     - `maps/tests/test_views.py`

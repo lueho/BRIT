@@ -121,24 +121,44 @@ class MapMixin:
         """Override to provide a custom feature ID"""
         return None
 
-    def get_features_geometries_url(self):
+    def get_features_layer_api_basename(self):
         if self.features_layer_api_basename:
+            return self.features_layer_api_basename
+
+        if hasattr(self, "object") and self.object:
+            getter = getattr(self.object, "get_features_api_basename", None)
+            if callable(getter):
+                api_basename = getter()
+                if api_basename:
+                    self.features_layer_api_basename = api_basename
+                    return api_basename
+
+        if self.model_name:
+            api_basename_candidate = f"{self.api_prefix}{self.model_name.lower()}"
             try:
-                return reverse(
-                    f"{self.features_layer_api_basename}{self.api_geom_suffix}"
-                )
+                reverse(f"{api_basename_candidate}{self.api_geom_suffix}")
+                self.features_layer_api_basename = api_basename_candidate
+                return api_basename_candidate
+            except NoReverseMatch:
+                return None
+
+        return None
+
+    def get_features_geometries_url(self):
+        api_basename = self.get_features_layer_api_basename()
+        if api_basename:
+            try:
+                return reverse(f"{api_basename}{self.api_geom_suffix}")
             except NoReverseMatch:
                 return None
         return None
 
     def get_features_layer_details_url_template(self):
-        if self.features_layer_api_basename:
+        api_basename = self.get_features_layer_api_basename()
+        if api_basename:
             try:
                 template = (
-                    reverse(
-                        f"{self.features_layer_api_basename}-detail",
-                        kwargs={"pk": None},
-                    )
+                    reverse(f"{api_basename}-detail", kwargs={"pk": None})
                     .replace("None", "")
                     .rstrip("/")
                     + "/"
@@ -149,9 +169,10 @@ class MapMixin:
         return None
 
     def get_features_layer_summary_url(self):
-        if self.features_layer_api_basename:
+        api_basename = self.get_features_layer_api_basename()
+        if api_basename:
             try:
-                return reverse(f"{self.features_layer_api_basename}-summaries")
+                return reverse(f"{api_basename}-summaries")
             except NoReverseMatch:
                 return None
         return None
@@ -223,18 +244,7 @@ class MapMixin:
             except MapConfiguration.DoesNotExist:
                 pass
 
-        # If no MapConfiguration is found, fall back to default. While the default has api_basenames for the region
-        # and the catchment layer, the api_basename for the features layer is not set and needs to be found.
-
-        # If the api_basename is not found via MapConfiguration instance and is not set explicitly but the view has a
-        # model associated with it, try to find the API by naming convention.
-        if not self.features_layer_api_basename and self.model_name:
-            api_basename_candidate = f"{self.api_prefix}{self.model_name.lower()}"
-            try:
-                reverse(f"{api_basename_candidate}{self.api_geom_suffix}")
-                self.features_layer_api_basename = api_basename_candidate
-            except NoReverseMatch:
-                pass
+        self.get_features_layer_api_basename()
 
         self._cached_map_configuration = MapConfiguration.objects.prefetch_related(
             "layers__style"
@@ -303,6 +313,8 @@ class MapMixin:
         """
         Override this method to post-process the map configuration before returning it.
         """
+        if not map_config:
+            return {}
         if not map_config.get("regionId") or not map_config.get(
             "regionLayerGeometriesUrl"
         ):
@@ -317,14 +329,12 @@ class MapMixin:
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "map_title": self.get_map_title(),
-                "map_config": self.post_process_map_config(
-                    self.get_map_config_serialized()
-                ),
-            }
-        )
+        context.update({
+            "map_title": self.get_map_title(),
+            "map_config": self.post_process_map_config(
+                self.get_map_config_serialized()
+            ),
+        })
         return context
 
 
@@ -349,7 +359,10 @@ class GeoDataSetRepresentationMixin:
 
     def get_queryset(self):
         return (
-            super().get_queryset().select_related("region").prefetch_related("sources")
+            super()
+            .get_queryset()
+            .select_related("region", "runtime_configuration")
+            .prefetch_related("sources", "column_policies")
         )
 
     def get_gallery_context_urls(self):
@@ -374,16 +387,14 @@ class GeoDataSetRepresentationMixin:
         gallery_urls = self.get_gallery_context_urls()
         context.update(gallery_urls)
         if getattr(self, "representation_mode", "list") == "gallery":
-            context.update(
-                {
-                    "representation_mode": "gallery",
-                    "public_representation_url": gallery_urls["public_gallery_url"]
-                    or context.get("public_url"),
-                    "private_representation_url": gallery_urls["private_gallery_url"]
-                    or context.get("private_url"),
-                    "review_representation_url": context.get("review_url"),
-                }
-            )
+            context.update({
+                "representation_mode": "gallery",
+                "public_representation_url": gallery_urls["public_gallery_url"]
+                or context.get("public_url"),
+                "private_representation_url": gallery_urls["private_gallery_url"]
+                or context.get("private_url"),
+                "review_representation_url": context.get("review_url"),
+            })
         return context
 
 
@@ -419,11 +430,9 @@ class GeoDataSetFormMixin(FormMixin):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "form": self.get_form(),
-            }
-        )
+        context.update({
+            "form": self.get_form(),
+        })
         return context
 
     def get_form(self, form_class=None):
@@ -443,13 +452,71 @@ class GeoDataSetCreateView(UserCreatedObjectCreateView):
         return kwargs
 
 
+class GeoDataSetDetailView(MapMixin, UserCreatedObjectDetailView):
+    model = GeoDataset
+    template_name = "maps/geodataset_detail.html"
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .select_related("region", "map_configuration", "runtime_configuration")
+            .prefetch_related("sources", "column_policies")
+        )
+
+    def get_map_title(self):
+        return self.object.name
+
+    def get_region_feature_id(self):
+        return self.object.region_id
+
+    def get_map_configuration(self):
+        if self._cached_map_configuration is not None:
+            return self._cached_map_configuration
+
+        if self.object.map_configuration_id:
+            self._cached_map_configuration = (
+                MapConfiguration.objects.prefetch_related("layers__style")
+                .filter(pk=self.object.map_configuration_id)
+                .first()
+            )
+            return self._cached_map_configuration
+
+        self._cached_map_configuration = (
+            MapConfiguration.objects.prefetch_related("layers__style")
+            .filter(name="Default Map Configuration")
+            .first()
+        )
+        return self._cached_map_configuration
+
+
 class FilteredMapMixin(MapMixin):
     model_name = None  # TODO: Remove this for pk
     template_name = "filtered_map.html"
 
     def get_dataset(self):
+        dataset_pk = self.kwargs.get("pk")
+        if dataset_pk is not None:
+            try:
+                return (
+                    GeoDataset.objects.select_related(
+                        "region", "map_configuration", "runtime_configuration"
+                    )
+                    .prefetch_related("sources", "column_policies")
+                    .get(pk=dataset_pk)
+                )
+            except GeoDataset.DoesNotExist as err:
+                raise ImproperlyConfigured(
+                    f"No GeoDataset with pk {dataset_pk} found."
+                ) from err
         try:
-            return GeoDataset.objects.get(model_name=self.model_name)
+            return (
+                GeoDataset.objects.select_related(
+                    "region", "map_configuration", "runtime_configuration"
+                )
+                .prefetch_related("sources", "column_policies")
+                .get(model_name=self.model_name)
+            )
         except GeoDataset.DoesNotExist as err:
             raise ImproperlyConfigured(
                 f"No GeoDataset with model_name {self.model_name} found."
@@ -475,11 +542,9 @@ class FilteredMapMixin(MapMixin):
             total_count = self.object_list.count()
         except Exception:
             total_count = None
-        context.update(
-            {
-                "total_count": total_count,
-            }
-        )
+        context.update({
+            "total_count": total_count,
+        })
         return context
 
 
@@ -1214,6 +1279,7 @@ class ClearGeojsonCacheView(UserPassesTestMixin, View):
     def get(self, request, *args, **kwargs):
         pattern = request.GET.get("pattern", "*")
         clear_geojson_cache_pattern(pattern)
-        return JsonResponse(
-            {"status": "success", "message": f"Cache cleared with pattern: {pattern}"}
-        )
+        return JsonResponse({
+            "status": "success",
+            "message": f"Cache cleared with pattern: {pattern}",
+        })

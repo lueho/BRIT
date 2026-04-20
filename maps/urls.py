@@ -30,6 +30,7 @@ from .views import (
     ClearGeojsonCacheView,
     GeoDataSetAutocompleteView,
     GeoDataSetCreateView,
+    GeoDataSetDetailView,
     GeoDataSetModalDeleteView,
     GeoDataSetPrivateFilterView,
     GeoDataSetPrivateGalleryView,
@@ -94,6 +95,11 @@ urlpatterns = [
     ),
     path(
         "geodatasets/create/", GeoDataSetCreateView.as_view(), name="geodataset-create"
+    ),
+    path(
+        "geodatasets/<int:pk>/",
+        GeoDataSetDetailView.as_view(),
+        name="geodataset-detail",
     ),
     path(
         "geodatasets/<int:pk>/update/",

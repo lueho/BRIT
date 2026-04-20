@@ -34,6 +34,7 @@ from ..models import (
     Attribute,
     Catchment,
     GeoDataset,
+    GeoDatasetRuntimeConfiguration,
     GeoPolygon,
     LauRegion,
     Location,
@@ -93,10 +94,10 @@ class MapMixinTestCase(TestCase):
 
     def mock_reverse_side_effect(name, *args, **kwargs):
         if "-detail" in name:
-            return f"https://example.com/api/{name.split('-')[1]}/"
+            return f"https://example.com/api/{name.split("-")[1]}/"
         else:
-            return f"https://example.com/api/{name.split('-')[1]}/" + (
-                f"{name.split('-')[2]}/" if len(name.split("-")) > 2 else ""
+            return f"https://example.com/api/{name.split("-")[1]}/" + (
+                f"{name.split("-")[2]}/" if len(name.split("-")) > 2 else ""
             )
 
     def test_get_map_title(self):
@@ -264,6 +265,11 @@ class GeoDataSetRepresentationViewsTestCase(ViewWithPermissionsTestCase):
             region=cls.region,
             model_name="NutsRegion",
         )
+        GeoDatasetRuntimeConfiguration.objects.create(
+            dataset=cls.dataset,
+            backend_type="django_model",
+            runtime_model_name="NutsRegion",
+        )
         cls.dataset.sources.add(cls.source)
 
     def test_public_gallery_renders_preview_cards(self):
@@ -289,7 +295,7 @@ class GeoDataSetRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         )
         self.assertRedirects(
             response,
-            f"{settings.LOGIN_URL}?next={reverse('geodataset-gallery-owned')}%3Fscope%3Dprivate",
+            f"{settings.LOGIN_URL}?next={reverse("geodataset-gallery-owned")}%3Fscope%3Dprivate",
         )
 
     def test_owned_gallery_renders_for_owner(self):
@@ -304,6 +310,33 @@ class GeoDataSetRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse("maps_list"), {"scope": "published"})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Maps gallery")
+
+    def test_dataset_absolute_url_points_to_dataset_detail_route(self):
+        self.assertEqual(
+            self.dataset.get_absolute_url(),
+            reverse("geodataset-detail", kwargs={"pk": self.dataset.pk}),
+        )
+
+    def test_dataset_detail_renders_for_anonymous(self):
+        response = self.client.get(
+            reverse("geodataset-detail", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.dataset.name)
+        self.assertContains(response, reverse("api-nuts-region-geojson"))
+
+    def test_dataset_detail_prefers_explicit_features_api_basename(self):
+        runtime_configuration = self.dataset.get_runtime_configuration()
+        runtime_configuration.features_api_basename = "api-region"
+        runtime_configuration.save(update_fields=["features_api_basename"])
+
+        response = self.client.get(
+            reverse("geodataset-detail", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("api-region-geojson"))
 
 
 # ----------- Location CRUD---------------------------------------------------------------------------------------------
@@ -774,20 +807,18 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         view.formset = view.get_formset()
         self.assertTrue(view.formset.is_valid())
         geom = MultiPolygon(
-            Polygon(
-                (
-                    (0, 0),
-                    (0, 2),
-                    (0, 4),
-                    (2, 4),
-                    (2, 3),
-                    (3, 3),
-                    (3, 1),
-                    (2, 1),
-                    (2, 0),
-                    (0, 0),
-                )
-            )
+            Polygon((
+                (0, 0),
+                (0, 2),
+                (0, 4),
+                (2, 4),
+                (2, 3),
+                (3, 3),
+                (3, 1),
+                (2, 1),
+                (2, 0),
+                (0, 0),
+            ))
         )
         geom.normalize()
         self.assertTrue(view.create_region_borders().geom.equals_exact(geom))
@@ -832,20 +863,18 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         view.formset = view.get_formset()
         self.assertTrue(view.formset.is_valid())
         geom = MultiPolygon(
-            Polygon(
-                (
-                    (0, 0),
-                    (0, 2),
-                    (0, 4),
-                    (2, 4),
-                    (2, 3),
-                    (3, 3),
-                    (3, 1),
-                    (2, 1),
-                    (2, 0),
-                    (0, 0),
-                )
-            )
+            Polygon((
+                (0, 0),
+                (0, 2),
+                (0, 4),
+                (2, 4),
+                (2, 3),
+                (3, 3),
+                (3, 1),
+                (2, 1),
+                (2, 0),
+                (0, 0),
+            ))
         )
         geom.normalize()
         expected_region = Region.objects.create(
@@ -873,20 +902,18 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
             response, reverse("catchment-detail", kwargs={"pk": catchment.pk})
         )
         geom = MultiPolygon(
-            Polygon(
-                (
-                    (0, 0),
-                    (0, 2),
-                    (0, 4),
-                    (2, 4),
-                    (2, 3),
-                    (3, 3),
-                    (3, 1),
-                    (2, 1),
-                    (2, 0),
-                    (0, 0),
-                )
-            )
+            Polygon((
+                (0, 0),
+                (0, 2),
+                (0, 4),
+                (2, 4),
+                (2, 3),
+                (3, 3),
+                (3, 1),
+                (2, 1),
+                (2, 0),
+                (0, 0),
+            ))
         )
         geom.normalize()
         expected_region = Region.objects.create(
@@ -1552,7 +1579,7 @@ class GeoJSONCachingTests(TestCase):
     def test_cache_invalidation_on_save(self):
         """Verify cache is invalidated when a relevant model instance is saved."""
         region = Region.objects.create(name=f"UniqueRegion_{uuid.uuid4()}")
-        url = f"{reverse('api-region-geojson')}?id={region.pk}"
+        url = f"{reverse("api-region-geojson")}?id={region.pk}"
         list_url = self.regions_geojson_url
         list_key = get_region_cache_key(filters=None)
         detail_key = get_region_cache_key(region_id=region.pk)

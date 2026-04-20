@@ -5,6 +5,8 @@ from .models import (
     Catchment,
     CategoricalAttribute,
     GeoDataset,
+    GeoDatasetColumnPolicy,
+    GeoDatasetRuntimeConfiguration,
     Location,
     MapConfiguration,
     MapLayerConfiguration,
@@ -15,6 +17,17 @@ from .models import (
     RegionAttributeValue,
     RegionProperty,
 )
+
+
+class GeoDatasetRuntimeConfigurationInline(admin.StackedInline):
+    model = GeoDatasetRuntimeConfiguration
+    extra = 0
+    max_num = 1
+
+
+class GeoDatasetColumnPolicyInline(admin.TabularInline):
+    model = GeoDatasetColumnPolicy
+    extra = 0
 
 
 @admin.register(Attribute)
@@ -41,6 +54,41 @@ class CatchmentModelAdmin(admin.ModelAdmin):
 @admin.register(GeoDataset)
 class GeoDatasetModelAdmin(admin.ModelAdmin):
     autocomplete_fields = ["region"]
+    list_display = ["name", "model_name", "region"]
+    search_fields = ["name", "model_name", "region__name"]
+    inlines = [GeoDatasetRuntimeConfigurationInline, GeoDatasetColumnPolicyInline]
+
+
+@admin.register(GeoDatasetRuntimeConfiguration)
+class GeoDatasetRuntimeConfigurationAdmin(admin.ModelAdmin):
+    autocomplete_fields = ["dataset"]
+    list_display = [
+        "dataset",
+        "backend_type",
+        "runtime_model_name",
+        "schema_name",
+        "relation_name",
+    ]
+    search_fields = [
+        "dataset__name",
+        "runtime_model_name",
+        "schema_name",
+        "relation_name",
+    ]
+
+
+@admin.register(GeoDatasetColumnPolicy)
+class GeoDatasetColumnPolicyAdmin(admin.ModelAdmin):
+    autocomplete_fields = ["dataset"]
+    list_display = [
+        "dataset",
+        "column_name",
+        "is_visible",
+        "is_filterable",
+        "is_searchable",
+        "is_exportable",
+    ]
+    search_fields = ["dataset__name", "column_name", "display_label"]
 
 
 @admin.register(Location)

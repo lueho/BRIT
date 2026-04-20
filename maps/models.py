@@ -3,6 +3,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.db.models import MultiPolygonField, PointField
 from django.contrib.gis.geos import GEOSGeometry
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models, transaction
 from django.db.models.signals import post_delete, post_save, pre_save
@@ -36,6 +37,19 @@ GIS_SOURCE_MODELS = (
     ("NutsRegion", "NutsRegion"),
     ("WasteCollection", "WasteCollection"),
 )
+
+BACKEND_TYPE_CHOICES = (
+    ("legacy_model", "Legacy model"),
+    ("django_model", "Django model"),
+    ("local_relation", "Local relation"),
+)
+
+LEGACY_FEATURES_API_BASENAMES = {
+    "HamburgRoadsideTrees": "api-hamburg-roadside-trees",
+    "NantesGreenhouses": "api-nantes-greenhouses",
+    "NutsRegion": "api-nuts-region",
+    "WasteCollection": "api-waste-collection",
+}
 
 LAYER_TYPE_CHOICES = [
     ("region", "Region"),
@@ -282,7 +296,7 @@ class Location(NamedUserCreatedObject):
         verbose_name = "Location"
 
     def __str__(self):
-        return f"{self.name}{' at ' + self.address if self.address else ''}"
+        return f"{self.name}{" at " + self.address if self.address else ""}"
 
 
 class GeoPolygon(models.Model):
@@ -534,7 +548,7 @@ class GeoDataset(NamedUserCreatedObject):
         Region, on_delete=models.CASCADE, null=False, related_name="geodatasets"
     )
     model_name = models.CharField(
-        max_length=56, choices=GIS_SOURCE_MODELS, null=True
+        max_length=56, choices=GIS_SOURCE_MODELS, blank=True, null=True
     )  # TODO remove when switch to generic view is done
     sources = models.ManyToManyField(Source, related_name="geodatasets")
     data_content_type = models.ForeignKey(
@@ -549,8 +563,110 @@ class GeoDataset(NamedUserCreatedObject):
         related_name="geodatasets",
     )
 
+    def get_runtime_configuration(self):
+        try:
+            return self.runtime_configuration
+        except ObjectDoesNotExist:
+            return None
+
+    def get_runtime_model_name(self):
+        runtime_configuration = self.get_runtime_configuration()
+        if runtime_configuration and runtime_configuration.runtime_model_name:
+            return runtime_configuration.runtime_model_name
+        if self.model_name:
+            return self.model_name
+        return ""
+
+    def get_features_api_basename(self):
+        runtime_configuration = self.get_runtime_configuration()
+        if runtime_configuration and runtime_configuration.features_api_basename:
+            return runtime_configuration.features_api_basename
+        runtime_model_name = self.get_runtime_model_name()
+        return LEGACY_FEATURES_API_BASENAMES.get(runtime_model_name, "")
+
+    def get_visible_columns(self):
+        return list(
+            self.column_policies.filter(is_visible=True).values_list(
+                "column_name", flat=True
+            )
+        )
+
+    def get_filterable_columns(self):
+        return list(
+            self.column_policies.filter(is_filterable=True).values_list(
+                "column_name", flat=True
+            )
+        )
+
+    def get_searchable_columns(self):
+        return list(
+            self.column_policies.filter(is_searchable=True).values_list(
+                "column_name", flat=True
+            )
+        )
+
+    def get_exportable_columns(self):
+        return list(
+            self.column_policies.filter(is_exportable=True).values_list(
+                "column_name", flat=True
+            )
+        )
+
     def get_absolute_url(self):
-        return reverse(f"{self.model_name}")
+        try:
+            return reverse("geodataset-detail", kwargs={"pk": self.pk})
+        except NoReverseMatch:
+            if self.model_name:
+                return reverse(f"{self.model_name}")
+            return reverse("geodataset-list")
+
+
+class GeoDatasetRuntimeConfiguration(models.Model):
+    dataset = models.OneToOneField(
+        GeoDataset,
+        on_delete=models.CASCADE,
+        related_name="runtime_configuration",
+    )
+    backend_type = models.CharField(
+        max_length=32, choices=BACKEND_TYPE_CHOICES, default="legacy_model"
+    )
+    runtime_model_name = models.CharField(max_length=100, blank=True)
+    schema_name = models.CharField(max_length=100, blank=True)
+    relation_name = models.CharField(max_length=255, blank=True)
+    geometry_column = models.CharField(max_length=100, blank=True)
+    primary_key_column = models.CharField(max_length=100, blank=True)
+    label_field = models.CharField(max_length=100, blank=True)
+    features_api_basename = models.CharField(max_length=100, blank=True)
+
+    def __str__(self):
+        return f"Runtime config for {self.dataset}"
+
+
+class GeoDatasetColumnPolicy(models.Model):
+    dataset = models.ForeignKey(
+        GeoDataset,
+        on_delete=models.CASCADE,
+        related_name="column_policies",
+    )
+    column_name = models.CharField(max_length=100)
+    display_label = models.CharField(max_length=100, blank=True)
+    is_visible = models.BooleanField(default=False)
+    is_filterable = models.BooleanField(default=False)
+    is_searchable = models.BooleanField(default=False)
+    is_exportable = models.BooleanField(default=False)
+    is_orderable = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["dataset", "column_name"],
+                name="maps_geodatasetcolumnpolicy_dataset_column_unique",
+            )
+        ]
+        ordering = ["column_name"]
+
+    def __str__(self):
+        return f"{self.dataset}: {self.column_name}"
 
 
 class Attribute(PropertyBase):

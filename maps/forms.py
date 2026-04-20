@@ -4,11 +4,13 @@ from django.contrib.gis.forms import MultiPolygonField
 from django.db.models import Subquery
 from django.forms import (
     BaseFormSet,
+    CharField,
     ChoiceField,
     DateField,
     DateInput,
     ModelChoiceField,
     MultipleChoiceField,
+    Textarea,
     ValidationError,
 )
 from django.forms.widgets import CheckboxSelectMultiple, RadioSelect
@@ -29,9 +31,12 @@ from utils.forms import (
 from utils.properties.forms import NumericMeasurementFieldsFormMixin
 
 from .models import (
+    BACKEND_TYPE_CHOICES,
     Attribute,
     Catchment,
     GeoDataset,
+    GeoDatasetColumnPolicy,
+    GeoDatasetRuntimeConfiguration,
     GeoPolygon,
     LauRegion,
     Location,
@@ -47,9 +52,178 @@ class GeoDataSetModelForm(
 ):
     # sources field and __init__ logic provided by SourcesFieldMixin
 
+    backend_type = ChoiceField(choices=BACKEND_TYPE_CHOICES, required=False)
+    runtime_model_name = CharField(required=False)
+    schema_name = CharField(required=False)
+    relation_name = CharField(required=False)
+    geometry_column = CharField(required=False)
+    primary_key_column = CharField(required=False)
+    label_field = CharField(required=False)
+    features_api_basename = CharField(required=False)
+    visible_columns = CharField(required=False, widget=Textarea)
+    filterable_columns = CharField(required=False, widget=Textarea)
+    searchable_columns = CharField(required=False, widget=Textarea)
+    exportable_columns = CharField(required=False, widget=Textarea)
+
     class Meta:
         model = GeoDataset
-        fields = ("name", "publish", "model_name", "sources", "description")
+        fields = (
+            "name",
+            "publish",
+            "model_name",
+            "sources",
+            "description",
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        runtime_configuration = None
+        if self.instance and self.instance.pk:
+            runtime_configuration = self.instance.get_runtime_configuration()
+
+        self.initial.setdefault(
+            "backend_type",
+            (
+                runtime_configuration.backend_type
+                if runtime_configuration
+                else "legacy_model"
+            ),
+        )
+        self.initial.setdefault(
+            "runtime_model_name",
+            (runtime_configuration.runtime_model_name if runtime_configuration else ""),
+        )
+        self.initial.setdefault(
+            "schema_name",
+            runtime_configuration.schema_name if runtime_configuration else "",
+        )
+        self.initial.setdefault(
+            "relation_name",
+            runtime_configuration.relation_name if runtime_configuration else "",
+        )
+        self.initial.setdefault(
+            "geometry_column",
+            runtime_configuration.geometry_column if runtime_configuration else "",
+        )
+        self.initial.setdefault(
+            "primary_key_column",
+            (runtime_configuration.primary_key_column if runtime_configuration else ""),
+        )
+        self.initial.setdefault(
+            "label_field",
+            runtime_configuration.label_field if runtime_configuration else "",
+        )
+        self.initial.setdefault(
+            "features_api_basename",
+            (
+                runtime_configuration.features_api_basename
+                if runtime_configuration
+                else ""
+            ),
+        )
+        self.initial.setdefault(
+            "visible_columns",
+            "\n".join(self.instance.get_visible_columns())
+            if self.instance and self.instance.pk
+            else "",
+        )
+        self.initial.setdefault(
+            "filterable_columns",
+            "\n".join(self.instance.get_filterable_columns())
+            if self.instance and self.instance.pk
+            else "",
+        )
+        self.initial.setdefault(
+            "searchable_columns",
+            "\n".join(self.instance.get_searchable_columns())
+            if self.instance and self.instance.pk
+            else "",
+        )
+        self.initial.setdefault(
+            "exportable_columns",
+            "\n".join(self.instance.get_exportable_columns())
+            if self.instance and self.instance.pk
+            else "",
+        )
+
+    @staticmethod
+    def _parse_column_names(raw_value):
+        column_names = []
+        seen = set()
+        for line in (raw_value or "").splitlines():
+            for part in line.split(","):
+                column_name = part.strip()
+                if column_name and column_name not in seen:
+                    seen.add(column_name)
+                    column_names.append(column_name)
+        return column_names
+
+    def save(self, commit=True):
+        instance = super().save(commit=commit)
+        runtime_configuration, _ = GeoDatasetRuntimeConfiguration.objects.get_or_create(
+            dataset=instance
+        )
+        runtime_configuration.backend_type = (
+            self.cleaned_data.get("backend_type") or "legacy_model"
+        )
+        runtime_configuration.runtime_model_name = self.cleaned_data.get(
+            "runtime_model_name", ""
+        )
+        runtime_configuration.schema_name = self.cleaned_data.get("schema_name", "")
+        runtime_configuration.relation_name = self.cleaned_data.get("relation_name", "")
+        runtime_configuration.geometry_column = self.cleaned_data.get(
+            "geometry_column", ""
+        )
+        runtime_configuration.primary_key_column = self.cleaned_data.get(
+            "primary_key_column", ""
+        )
+        runtime_configuration.label_field = self.cleaned_data.get("label_field", "")
+        runtime_configuration.features_api_basename = self.cleaned_data.get(
+            "features_api_basename", ""
+        )
+        runtime_configuration.save()
+
+        visible_columns = set(
+            self._parse_column_names(self.cleaned_data.get("visible_columns", ""))
+        )
+        filterable_columns = set(
+            self._parse_column_names(self.cleaned_data.get("filterable_columns", ""))
+        )
+        searchable_columns = set(
+            self._parse_column_names(self.cleaned_data.get("searchable_columns", ""))
+        )
+        exportable_columns = set(
+            self._parse_column_names(self.cleaned_data.get("exportable_columns", ""))
+        )
+
+        all_columns = (
+            visible_columns
+            | filterable_columns
+            | searchable_columns
+            | exportable_columns
+        )
+        existing_policies = {
+            policy.column_name: policy
+            for policy in GeoDatasetColumnPolicy.objects.filter(dataset=instance)
+        }
+        for column_name in all_columns:
+            policy = existing_policies.pop(column_name, None)
+            if policy is None:
+                policy = GeoDatasetColumnPolicy(
+                    dataset=instance, column_name=column_name
+                )
+            policy.is_visible = column_name in visible_columns
+            policy.is_filterable = column_name in filterable_columns
+            policy.is_searchable = column_name in searchable_columns
+            policy.is_exportable = column_name in exportable_columns
+            policy.save()
+
+        if existing_policies:
+            GeoDatasetColumnPolicy.objects.filter(
+                pk__in=[policy.pk for policy in existing_policies.values()]
+            ).delete()
+
+        return instance
 
 
 class LocationModelForm(SimpleModelForm):
@@ -305,22 +479,22 @@ class NutsRegionQueryForm(SimpleForm):
         helper.layout = Layout(
             Field(
                 "level_0",
-                data_optionsapi=f"{reverse('data.nuts_region_options')}",
+                data_optionsapi=f"{reverse("data.nuts_region_options")}",
                 data_lvl=0,
             ),
             Field(
                 "level_1",
-                data_optionsapi=f"{reverse('data.nuts_region_options')}",
+                data_optionsapi=f"{reverse("data.nuts_region_options")}",
                 data_lvl=1,
             ),
             Field(
                 "level_2",
-                data_optionsapi=f"{reverse('data.nuts_region_options')}",
+                data_optionsapi=f"{reverse("data.nuts_region_options")}",
                 data_lvl=2,
             ),
             Field(
                 "level_3",
-                data_optionsapi=f"{reverse('data.nuts_region_options')}",
+                data_optionsapi=f"{reverse("data.nuts_region_options")}",
                 data_lvl=3,
             ),
         )
@@ -360,22 +534,22 @@ class NutsAndLauCatchmentQueryForm(SimpleForm):
         helper.layout = Layout(
             Field(
                 "level_0",
-                data_optionsapi=f"{reverse('data.nuts_lau_catchment_options')}",
+                data_optionsapi=f"{reverse("data.nuts_lau_catchment_options")}",
                 data_lvl=0,
             ),
             Field(
                 "level_1",
-                data_optionsapi=f"{reverse('data.nuts_lau_catchment_options')}",
+                data_optionsapi=f"{reverse("data.nuts_lau_catchment_options")}",
                 data_lvl=1,
             ),
             Field(
                 "level_2",
-                data_optionsapi=f"{reverse('data.nuts_lau_catchment_options')}",
+                data_optionsapi=f"{reverse("data.nuts_lau_catchment_options")}",
                 data_lvl=2,
             ),
             Field(
                 "level_3",
-                data_optionsapi=f"{reverse('data.nuts_lau_catchment_options')}",
+                data_optionsapi=f"{reverse("data.nuts_lau_catchment_options")}",
                 data_lvl=3,
             ),
             Field("level_4", data_lvl=4),

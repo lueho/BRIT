@@ -1,0 +1,53 @@
+{% extends "detail_with_options.html" %}
+{% load static %}
+{% load leaflet_tags %}
+
+{% block title %}
+  BRIT | {{ object.name }}
+{% endblock title %}
+
+{% block detail_header %}
+  {{ object.name }}
+{% endblock detail_header %}
+
+{% block detail_body %}
+  {% if object.description %}<p class="card-text">{{ object.description }}</p>{% endif %}
+  <div class="mb-3">
+    {% if object.region %}<div class="small text-muted mb-2">{{ object.region.name }}</div>{% endif %}
+    {% leaflet_js %}
+    {% leaflet_css %}
+    <div class="card shadow-sm overflow-hidden">
+      <div class="card-body map-card-body map-height p-0">{% leaflet_map "main" %}</div>
+    </div>
+  </div>
+{% endblock detail_body %}
+
+{% block options_secondary_actions %}
+  {{ block.super }}
+  <a class="btn btn-outline-secondary w-100 mb-2"
+     href="{% url 'geodataset-list' %}">
+    <i class="fas fa-table-cells-large"></i> Explorer
+  </a>
+{% endblock options_secondary_actions %}
+
+{% block learning_content %}
+  {% include "maps/includes/learning_materials.html" %}
+{% endblock learning_content %}
+
+{% block javascript %}
+  {{ block.super }}
+  <script src="{% static 'js/maps.min.js' %}"></script>
+  <script src="{% static 'js/streaming-geojson.min.js' %}"></script>
+  {{ map_config|json_script:"mapConfig" }}
+  <script type="text/javascript">
+    const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
+
+    if (typeof fetchFeatureGeometriesWithProgress !== "undefined") {
+      window.fetchFeatureGeometries = fetchFeatureGeometriesWithProgress;
+    }
+
+    window.onload = () => {
+      loadMap(mapConfig);
+    };
+  </script>
+{% endblock javascript %}
