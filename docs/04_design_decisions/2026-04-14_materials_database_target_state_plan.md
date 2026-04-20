@@ -1,7 +1,8 @@
 # Materials Database Target-State Plan
 
-- **Status**: Proposed
+- **Status**: In progress
 - **Date**: 2026-04-14
+- **Last updated**: 2026-04-20
 - **Source**: `Target report 1.2_R1_Database structure_TUHH.docx`
 - **Scope**: `materials` app database structure and its immediate cross-app dependencies
 
@@ -32,7 +33,7 @@ The current BRIT codebase already implements parts of this target state, but not
 - `BaseMaterial` supports comparable aliases for components, but not a real recursive hierarchy
 - there is no separate semantic definition layer for materials/components yet
 - legacy normalized composition storage (`Composition` + `WeightShare`) is still an active first-class structure
-- `MaterialPropertyValue` is still attached to `Sample` through `Sample.properties` as a many-to-many relation instead of belonging directly to one sample
+- `MaterialPropertyValue` now belongs directly to `Sample` through `MaterialPropertyValue.sample`
 
 This document translates the report into a repo-specific implementation plan that fits the current BRIT architecture.
 
@@ -109,7 +110,7 @@ Target outcome:
   - `BaseMaterial` supports comparable aliases for components, but not a real recursive hierarchy
   - there is no separate semantic definition layer for materials/components yet
   - legacy normalized composition storage (`Composition` + `WeightShare`) is still an active first-class structure
-  - `MaterialPropertyValue` is still attached to `Sample` through `Sample.properties` as a many-to-many relation instead of belonging directly to one sample
+  - `MaterialPropertyValue` now belongs directly to `Sample` through `MaterialPropertyValue.sample`, and the legacy `Sample.properties` path has been removed from the schema
 
 ### 3.2 Not yet aligned with the report
 
@@ -117,8 +118,6 @@ Target outcome:
   - `BaseMaterial` has no parent/child decomposition relation
 - **No separate semantic definition layer**
   - there is no dedicated model for semantic definitions or external reference mappings
-- **Property values do not directly belong to one sample**
-  - `MaterialPropertyValue` is linked through `Sample.properties` many-to-many instead of a direct foreign key
 - **Legacy normalized composition storage is still primary in many code paths**
   - `Composition` and `WeightShare` remain central to views, serializers, and APIs
 - **Derived normalization exists, but not yet as a shared canonical service**
@@ -130,7 +129,7 @@ Target outcome:
 |---|---|---|
 | Recursive material decomposition | No explicit material hierarchy | Add recursive decomposition model and update queries/UI |
 | Stored material separate from semantic definition | Alias-only canonical mapping on material/property terms | Add dedicated semantic definition and reference-mapping models |
-| Measurement belongs to sample with provenance | `ComponentMeasurement` does; `MaterialPropertyValue` does not | Move `MaterialPropertyValue` to direct sample ownership |
+| Measurement belongs to sample with provenance | `ComponentMeasurement` and `MaterialPropertyValue` now both belong directly to `Sample` | Preserve direct sample ownership as the canonical path and avoid reintroducing indirection in later phases |
 | Property definition separated from value | Largely present already | Harden unit/basis authority and reduce legacy fallback behavior over time |
 | Raw-first storage, normalized on demand | Raw component measurement exists and a derived read path already exists, but persisted normalized structures still dominate shared APIs and forms | Extract a shared normalization service, migrate consumers gradually, and shift normalized compositions to derived/compatibility status |
 
@@ -203,6 +202,8 @@ For materials work, that means:
 
 Goal: make later schema changes low-risk and observable.
 
+Phase status: complete enough for the ownership migration slice; the baseline inventory, focused regression coverage, and dev-database preservation checks were completed before and during Phase 3 rollout.
+
 Deliverables:
 
 - inventory all write paths that touch:
@@ -229,6 +230,25 @@ Why first:
 
 - later phases will change ownership and read semantics
 - the plan needs stable regression coverage before changing central models
+
+### Phase 0 checkpoint and retrospective
+
+- **Phase 0 delivered the minimum safety baseline for the ownership migration**
+  - the main `Sample.properties` read and write paths were inventoried across models, views, filters, serializers, and tests
+  - focused regression coverage was added or updated for duplication behavior, filter behavior, serializer payloads, and sample-property CRUD views
+  - the migration sequence was designed additively first, then destructively, rather than removing the legacy link path up front
+
+- **A real dev-database snapshot was recorded before the destructive step**
+  - before `materials.0014_remove_sample_properties`, the dev database contained 100 samples, 160 `MaterialPropertyValue` rows, 155 rows already carrying `sample_id`, 5 rows still lacking `sample_id`, and 166 legacy join-table links in `materials_sample_properties`
+  - the baseline also identified 6 extra legacy links that would require cloning rather than a simple one-row backfill
+
+- **The destructive migration was verified against real legacy data**
+  - after applying `materials.0014_remove_sample_properties` on dev, the legacy join table was gone, all 166 resulting `MaterialPropertyValue` rows had non-null `sample_id`, and all pre-existing sample-property links were preserved
+  - the multi-link legacy cases were preserved by cloning value rows and copying their `sources` links where required
+
+- **What Phase 0 taught us**
+  - the main risk was not adding `MaterialPropertyValue.sample`; it was preserving ambiguous legacy ownership cases safely when removing `Sample.properties`
+  - a production-safe plan for this slice needs both regression coverage and a data-preserving normalization migration, not just runtime refactors
 
 ## Phase 1 - Introduce recursive material structure
 
@@ -316,6 +336,8 @@ Success criteria:
 
 Goal: ensure each measurement record belongs to a concrete sample.
 
+Phase status: complete for the direct-ownership slice implemented on 2026-04-20.
+
 Recommended schema change:
 
 - add `sample = ForeignKey(Sample, related_name="property_values", ...)` to `MaterialPropertyValue`
@@ -349,6 +371,25 @@ Success criteria:
 - new writes use direct reverse relations instead of many-to-many indirection
 - sample detail pages and APIs use direct reverse relations instead of many-to-many indirection
 - provenance remains explicit at sample and measurement level
+
+### Phase 3 implementation checkpoint and retrospective
+
+- **Schema and migration outcome**
+  - `materials.0013_materialpropertyvalue_sample` introduced `MaterialPropertyValue.sample`
+  - `materials.0014_remove_sample_properties` normalized remaining legacy links, cloned ambiguous multi-link rows where needed, copied `sources` links for those clones, and then removed `Sample.properties`
+
+- **Runtime outcome**
+  - runtime code now treats `MaterialPropertyValue.sample` and `sample.property_values` as the authoritative ownership path
+  - the temporary `m2m_changed` transition receivers are no longer needed and were removed
+  - model helpers, view logic, filters, and duplication behavior were updated to stop relying on `Sample.properties` and `sample_set`
+
+- **Verification outcome**
+  - focused Dockerized Django tests passed for the materials slice after the refactor
+  - the destructive migration was applied on the dev database and verified to preserve all sample-property ownership links, including the previously ambiguous multi-link legacy cases
+
+- **Immediate consequence for the roadmap**
+  - the measurement-ownership mismatch with the report is now closed
+  - the next high-value step is no longer Phase 3 design work; it is Phase 4a extraction of a shared raw-first normalization contract
 
 ## Phase 4 - Extract and adopt raw-first derived normalization
 
@@ -397,7 +438,7 @@ Goal: remove superseded structures once new paths are stable.
 
 Candidate cleanup items:
 
-- deprecate and then remove `Sample.properties`
+- verify that no deferred compatibility assumptions outside the migrated materials slice still reference the retired `Sample.properties` path
 - reduce direct UI/API dependence on `Composition` and `WeightShare`
 - move `WeightShare` to compatibility-only status and decide later whether it can be retired fully
 - decide whether `Composition` remains as a lightweight settings model for group ordering and `fractions_of` or can also be retired
@@ -424,7 +465,7 @@ Only do this phase when:
 Notes on ordering:
 
 - Phase 1 and Phase 2 can be swapped if a concrete dataset urgently needs semantic mapping before hierarchical decomposition.
-- Phase 3 should happen before major API or import work that expands property-value usage further.
+- Phase 3 has now been completed and should be treated as a prerequisite already satisfied for later materials work.
 - Phase 4a should not start until Phase 0 has identified all normalized-composition dependencies.
 - Phase 4b should not start until the shared normalization service is covered by focused tests.
 
@@ -458,10 +499,10 @@ The materials module can be considered aligned with the report once all of the f
 
 ## 10. Immediate Next Step
 
-If work should start now, the best first implementation slice is:
+If work should continue now, the best next implementation slice is:
 
-1. Phase 0 inventory of all `Sample.properties`, `Composition`, and `WeightShare` reads/writes
-2. Phase 3 design and migration of `MaterialPropertyValue.sample`
-3. regression tests for sample detail, duplication, serializers, and imports
+1. Phase 4a extraction of one shared normalization service from the current `SampleDetailView`-local derived composition logic
+2. define and test the mixed-state read contract for groups that have raw `ComponentMeasurement` data versus persisted `WeightShare` fallback data
+3. migrate the first shared serializer/helper consumers onto that canonical normalization output without expanding new `WeightShare` write dependence
 
-That slice is the smallest high-value step because it improves semantic correctness immediately and reduces later migration complexity for the raw-first measurement architecture.
+That slice is now the smallest high-value step because the measurement-ownership path is already explicit and production-safe, while the largest remaining architectural mismatch with the report is that normalized composition behavior is still view-local and persisted-first in too many read paths.
