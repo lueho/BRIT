@@ -381,7 +381,8 @@ class SampleTestCase(TestCase):
     def test_duplicate_creates_new_instance_with_identical_field_values(self):
         creator = User.objects.create(username="creator")
         property_value = MaterialPropertyValue.objects.get(average=Decimal("12.3"))
-        self.sample.properties.add(property_value)
+        property_value.sample = self.sample
+        property_value.save(update_fields=["sample"])
         duplicate = self.sample.duplicate(creator)
         self.assertIsInstance(duplicate, Sample)
         self.assertNotEqual(duplicate, self.sample)
@@ -393,7 +394,6 @@ class SampleTestCase(TestCase):
                 "image",
                 "created_at",
                 "lastmodified_at",
-                "properties",
                 "sources",
             ]:
                 if field.name == "name":
@@ -411,16 +411,16 @@ class SampleTestCase(TestCase):
                         group=composition.group,
                         fractions_of=composition.fractions_of,
                     )
-            elif field.name == "properties":
-                self.assertTrue(self.sample.properties.exists())
-                self.assertTrue(duplicate.properties.exists())
-                for prop in self.sample.properties.all():
-                    duplicate.properties.get(
-                        owner=creator,
-                        property=prop.property,
-                        average=prop.average,
-                        standard_deviation=prop.standard_deviation,
-                    )
+
+        self.assertTrue(self.sample.property_values.exists())
+        self.assertTrue(duplicate.property_values.exists())
+        for prop in self.sample.property_values.all():
+            duplicate.property_values.get(
+                owner=creator,
+                property=prop.property,
+                average=prop.average,
+                standard_deviation=prop.standard_deviation,
+            )
 
 
 class CompositionTestCase(TestCase):

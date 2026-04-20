@@ -61,30 +61,29 @@ class SampleFilterTestCase(TestCase):
             average=Decimal("10"),
             standard_deviation=Decimal("0"),
         )
-        k_value = MaterialPropertyValue.objects.create(
+        MaterialPropertyValue.objects.create(
+            sample=cls.sample_non_substrate,
             property=cls.parameter_k,
             average=Decimal("20"),
             standard_deviation=Decimal("0"),
         )
-        cls.sample_substrate.properties.add(n_value)
-        cls.sample_non_substrate.properties.add(k_value)
+        n_value.sample = cls.sample_substrate
+        n_value.save(update_fields=["sample"])
         cls.sample_equivalent = Sample.objects.create(
             name="Sample C",
             material=cls.substrate_material,
         )
-        cls.sample_substrate.properties.add(
-            MaterialPropertyValue.objects.create(
-                property=cls.organic_matter_property,
-                average=Decimal("55"),
-                standard_deviation=Decimal("0"),
-            )
+        MaterialPropertyValue.objects.create(
+            sample=cls.sample_substrate,
+            property=cls.organic_matter_property,
+            average=Decimal("55"),
+            standard_deviation=Decimal("0"),
         )
-        cls.sample_equivalent.properties.add(
-            MaterialPropertyValue.objects.create(
-                property=cls.volatile_solids_property,
-                average=Decimal("60"),
-                standard_deviation=Decimal("0"),
-            )
+        MaterialPropertyValue.objects.create(
+            sample=cls.sample_equivalent,
+            property=cls.volatile_solids_property,
+            average=Decimal("60"),
+            standard_deviation=Decimal("0"),
         )
 
         cls.raw_parameter_group = MaterialComponentGroup.objects.create(

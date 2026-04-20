@@ -554,9 +554,7 @@ class MaterialPropertyValueCreateView(
 
     def form_valid(self, form):
         form.instance.sample = self.sample
-        response = super().form_valid(form)
-        self.sample.properties.add(self.object)
-        return response
+        return super().form_valid(form)
 
 
 class MaterialPropertyValueDetailView(
@@ -666,7 +664,6 @@ class AnalyticalMethodDetailView(UserCreatedObjectDetailView):
         related_samples = (
             Sample.objects.filter(
                 Q(property_values__analytical_method=self.object)
-                | Q(properties__analytical_method=self.object)
                 | Q(component_measurements__analytical_method=self.object)
             )
             .select_related("material", "series")
@@ -797,7 +794,7 @@ class SampleRepresentationMixin:
             super()
             .get_queryset()
             .select_related("material", "series", "timestep")
-            .prefetch_related("sources", "properties")
+            .prefetch_related("sources", "property_values")
         )
 
     def get_gallery_context_urls(self):
@@ -1365,8 +1362,7 @@ class SampleAddPropertyView(UserCreatedObjectCreateView):
     def form_valid(self, form):
         sample = Sample.objects.get(pk=self.kwargs.get("pk"))
         form.instance.sample = sample
-        property_value = form.save()
-        sample.properties.add(property_value)
+        form.save()
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
@@ -1381,8 +1377,7 @@ class SampleModalAddPropertyView(UserPassesTestMixin, UserCreatedObjectModalCrea
         sample = Sample.objects.get(pk=self.kwargs.get("pk"))
         form.instance.owner = self.request.user
         form.instance.sample = sample
-        property_value = form.save()
-        sample.properties.add(property_value)
+        form.save()
         return HttpResponseRedirect(self.get_success_url())
 
     def test_func(self):

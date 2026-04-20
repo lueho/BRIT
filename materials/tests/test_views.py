@@ -834,9 +834,12 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
             material=material,
         )
         cls.value = MaterialPropertyValue.objects.create(
-            owner=cls.member, property=prop, average=123.312, standard_deviation=0.1337
+            owner=cls.member,
+            sample=sample,
+            property=prop,
+            average=123.312,
+            standard_deviation=0.1337,
         )
-        sample.properties.add(cls.value)
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse(self.url_name, kwargs={"pk": self.value.pk})
@@ -872,10 +875,7 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 
     def test_post_success_and_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
-        sample = self.value.sample_set.first()
-        # Fix: Ensure sample exists and has a valid pk before using in reverse()
-        self.assertIsNotNone(sample, "Sample should exist and be related to the value")
-        self.assertIsNotNone(sample.pk, "Sample should have a valid pk")
+        sample = self.value.sample
         sample = Sample.objects.get(name="Test Sample")
         response = self.client.post(
             reverse(self.url_name, kwargs={"pk": self.value.pk})
@@ -943,6 +943,7 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         )
         cls.value = MaterialPropertyValue.objects.create(
             owner=cls.owner,
+            sample=cls.sample,
             property=cls.property,
             basis_component=cls.default_basis,
             unit=cls.unit,
@@ -950,7 +951,6 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
             standard_deviation=Decimal("0.5"),
             publication_status="private",
         )
-        cls.sample.properties.add(cls.value)
 
     def test_sample_detail_shows_property_edit_link_for_owner(self):
         self.client.force_login(self.owner)
@@ -998,15 +998,15 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
             comparable_property=canonical_property,
             publication_status="published",
         )
-        value = MaterialPropertyValue.objects.create(
+        MaterialPropertyValue.objects.create(
             owner=self.owner,
+            sample=self.sample,
             property=aliased_property,
             unit=self.unit,
             average=Decimal("61.0"),
             standard_deviation=Decimal("0.5"),
             publication_status="private",
         )
-        self.sample.properties.add(value)
 
         self.client.force_login(self.owner)
         response = self.client.get(
@@ -1029,6 +1029,7 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_sample_detail_hides_missing_property_standard_deviation(self):
         value = MaterialPropertyValue.objects.create(
             owner=self.owner,
+            sample=self.sample,
             property=self.property,
             basis_component=self.default_basis,
             unit=self.unit,
@@ -1036,7 +1037,6 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
             standard_deviation=None,
             publication_status="private",
         )
-        self.sample.properties.add(value)
 
         self.client.force_login(self.owner)
         response = self.client.get(
@@ -1106,6 +1106,7 @@ class MaterialPropertyValueCreateAndDetailViewTestCase(ViewWithPermissionsTestCa
         )
         cls.value = MaterialPropertyValue.objects.create(
             owner=cls.member,
+            sample=cls.sample,
             property=cls.property,
             basis_component=cls.default_basis,
             unit=cls.unit,
@@ -1113,7 +1114,6 @@ class MaterialPropertyValueCreateAndDetailViewTestCase(ViewWithPermissionsTestCa
             standard_deviation=Decimal("0.5"),
             publication_status="private",
         )
-        cls.sample.properties.add(cls.value)
 
     def test_create_view_creates_value_for_related_sample_and_redirects(self):
         self.client.force_login(self.member)
@@ -1138,7 +1138,7 @@ class MaterialPropertyValueCreateAndDetailViewTestCase(ViewWithPermissionsTestCa
         value = MaterialPropertyValue.objects.get(average=Decimal("18.25"))
         self.assertEqual(value.owner, self.member)
         self.assertEqual(value.sample, self.sample)
-        self.assertIn(value, self.sample.properties.all())
+        self.assertIn(value, self.sample.property_values.all())
 
     def test_create_view_allows_missing_standard_deviation(self):
         self.client.force_login(self.member)
@@ -1506,15 +1506,15 @@ class AnalyticalMethodDetailViewSamplesTestCase(ViewWithPermissionsTestCase):
             material=cls.material,
             publication_status="published",
         )
-        visible_property = MaterialPropertyValue.objects.create(
+        MaterialPropertyValue.objects.create(
             owner=cls.owner,
+            sample=cls.visible_sample,
             property=cls.property,
             unit=cls.unit,
             analytical_method=cls.method,
             average=Decimal("42.0"),
             standard_deviation=Decimal("0.0"),
         )
-        cls.visible_sample.properties.add(visible_property)
         ComponentMeasurement.objects.create(
             owner=cls.owner,
             sample=cls.visible_sample,
@@ -1857,25 +1857,25 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     @classmethod
     def create_published_object(cls):
         published_sample = super().create_published_object()
-        property_value = MaterialPropertyValue.objects.create(
+        MaterialPropertyValue.objects.create(
+            sample=published_sample,
             property=cls.property,
             average=123.3,
             standard_deviation=0.13,
             publication_status="published",
         )
-        published_sample.properties.add(property_value)
         return published_sample
 
     @classmethod
     def create_unpublished_object(cls):
         unpublished_sample = super().create_unpublished_object()
-        property_value = MaterialPropertyValue.objects.create(
+        MaterialPropertyValue.objects.create(
+            sample=unpublished_sample,
             property=cls.property,
             average=123.3,
             standard_deviation=0.13,
             publication_status=unpublished_sample.publication_status,
         )
-        unpublished_sample.properties.add(property_value)
         return unpublished_sample
 
     def test_update_view_prefills_material_autocomplete_with_material_name(self):
@@ -2081,7 +2081,7 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         value = MaterialPropertyValue.objects.get(
             average=Decimal("123.321"), standard_deviation=Decimal("0.1337")
         )
-        self.assertIn(value, self.sample.properties.all())
+        self.assertIn(value, self.sample.property_values.all())
 
     def test_post_persists_selected_unit(self):
         self.client.force_login(self.sample.owner)
@@ -2238,7 +2238,7 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         value = MaterialPropertyValue.objects.get(
             average=Decimal("123.321"), standard_deviation=Decimal("0.1337")
         )
-        self.assertIn(value, self.sample.properties.all())
+        self.assertIn(value, self.sample.property_values.all())
 
     def test_post_persists_selected_unit(self):
         self.client.force_login(self.sample.owner)
@@ -3261,6 +3261,92 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "Composition groups")
         self.assertContains(response, "Raw data groups")
         self.assertContains(response, "Completeness")
+
+    def test_sample_detail_places_normalized_composition_before_measurement_workspace(
+        self,
+    ):
+        sample = Sample.objects.create(
+            name="Ordered Sample",
+            material=Material.objects.create(name="Ordered Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        sample.compositions.all().delete()
+
+        unit_percent = Unit.objects.filter(name="%").first()
+        if unit_percent is None:
+            unit_percent = Unit.objects.create(
+                name="%", symbol="percent", owner=self.staff_user
+            )
+
+        group = MaterialComponentGroup.objects.create(
+            name="Chemical Elements",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        carbon = MaterialComponent.objects.create(
+            name="Carbon",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        nitrogen = MaterialComponent.objects.create(
+            name="Nitrogen",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=carbon,
+            unit=unit_percent,
+            average=Decimal("60"),
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=nitrogen,
+            unit=unit_percent,
+            average=Decimal("40"),
+        )
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+        normalized_anchor = body.find('id="normalized-compositions"')
+        workspace_anchor = body.find("Measurement workspace")
+        self.assertGreater(normalized_anchor, -1)
+        self.assertGreater(workspace_anchor, -1)
+        self.assertLess(
+            normalized_anchor,
+            workspace_anchor,
+            "Derived normalized composition should appear before the raw measurement "
+            "workspace so anonymous explorers see the interpretation first.",
+        )
+
+    def test_sample_detail_shows_section_intro_and_quick_nav(self):
+        sample = Sample.objects.create(
+            name="Navigable Sample",
+            material=Material.objects.create(
+                name="Navigable Material", type="material"
+            ),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Composition &amp; properties")
+        self.assertContains(response, "What we measured and what it means")
+        self.assertContains(
+            response,
+            "Raw component measurements are the canonical record",
+        )
+        self.assertContains(response, 'href="#sample-measurements-tabs"')
+        self.assertContains(response, 'href="#sample-properties-tab-link"')
 
     def test_sample_detail_shows_sample_sources_as_badge_links(self):
         sample = Sample.objects.create(
