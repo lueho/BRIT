@@ -50,6 +50,11 @@ CSV_FIELDNAMES = [
     "needs_manual_review",
     "review_reasons",
 ]
+REVIEW_FIELDNAMES = [
+    field_name
+    for field_name in CSV_FIELDNAMES
+    if field_name not in {"lau_id", "municipality_name"}
+]
 RAW_FILE_FORMAT = "sweden-2024-map-raw"
 RAW_FILE_VERSION = 1
 
@@ -75,6 +80,7 @@ class RawMapRow:
     municipality_name: str
     sorting_assignment: MapAssignment | None
     bag_assignment: MapAssignment | None
+    reviewed_fields: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -366,17 +372,23 @@ def build_prepared_row(
     municipality_name: str,
     sorting_assignment: MapAssignment | None,
     bag_assignment: MapAssignment | None,
+    reviewed_fields: dict[str, str] | None = None,
 ) -> dict[str, str]:
+    reviewed_fields = reviewed_fields or {}
     sorting_label = sorting_assignment.label if sorting_assignment else ""
     bag_label = bag_assignment.label if bag_assignment else ""
-    no_collection = sorting_label in NO_COLLECTION_LABELS or bag_label == "ET"
-    sorting_method = ""
-    bag_material = ""
-    if not no_collection:
-        sorting_method = LEFT_LABEL_TO_SORTING_METHOD.get(sorting_label, "")
-        bag_material = RIGHT_LABEL_TO_BAG_MATERIAL.get(bag_label, "")
+    detected_no_collection = sorting_label in NO_COLLECTION_LABELS or bag_label == "ET"
+    if "no_collection" in reviewed_fields:
+        no_collection = _is_truthy(reviewed_fields.get("no_collection"))
+    else:
+        no_collection = detected_no_collection
+    detected_sorting_method = ""
+    detected_bag_material = ""
+    if not detected_no_collection:
+        detected_sorting_method = LEFT_LABEL_TO_SORTING_METHOD.get(sorting_label, "")
+        detected_bag_material = RIGHT_LABEL_TO_BAG_MATERIAL.get(bag_label, "")
     reasons: list[str] = []
-    if no_collection:
+    if detected_no_collection:
         if sorting_label == "ET" and bag_label not in ("", "ET"):
             reasons.append("sorting ET disagrees with bag map")
         if sorting_label == "Ingen utsortering" and bag_label not in ("", "ET"):
@@ -384,9 +396,9 @@ def build_prepared_row(
         if bag_label == "ET" and sorting_label not in ("", "ET", "Ingen utsortering"):
             reasons.append("bag ET disagrees with sorting map")
     else:
-        if not sorting_method:
+        if not detected_sorting_method:
             reasons.append("sorting method unresolved")
-        if not bag_material:
+        if not detected_bag_material:
             reasons.append("bag material unresolved")
     if sorting_assignment and sorting_assignment.confidence < 0.55:
         reasons.append("sorting confidence below 0.55")
@@ -396,6 +408,31 @@ def build_prepared_row(
         reasons.append("sorting map unclassified")
     if not bag_assignment and not no_collection:
         reasons.append("bag map unclassified")
+    sorting_method = (
+        reviewed_fields.get("sorting_method", "").strip()
+        if "sorting_method" in reviewed_fields
+        else detected_sorting_method
+    )
+    bag_material = (
+        reviewed_fields.get("bag_material", "").strip()
+        if "bag_material" in reviewed_fields
+        else detected_bag_material
+    )
+    collection_system = (
+        reviewed_fields.get("collection_system", "").strip()
+        if "collection_system" in reviewed_fields
+        else ("No separate collection" if no_collection else "Door to door")
+    )
+    if "needs_manual_review" in reviewed_fields:
+        needs_manual_review = (
+            "1" if _is_truthy(reviewed_fields.get("needs_manual_review")) else "0"
+        )
+    else:
+        needs_manual_review = "1" if reasons else "0"
+    if "review_reasons" in reviewed_fields:
+        review_reasons = reviewed_fields.get("review_reasons", "")
+    else:
+        review_reasons = "; ".join(reasons)
     return {
         "lau_id": lau_id,
         "municipality_name": municipality_name,
@@ -413,12 +450,10 @@ def build_prepared_row(
         "bag_pixels": (
             str(bag_assignment.classified_pixels) if bag_assignment else "0"
         ),
-        "collection_system": (
-            "No separate collection" if no_collection else "Door to door"
-        ),
+        "collection_system": collection_system,
         "no_collection": "1" if no_collection else "0",
-        "needs_manual_review": "1" if reasons else "0",
-        "review_reasons": "; ".join(reasons),
+        "needs_manual_review": needs_manual_review,
+        "review_reasons": review_reasons,
     }
 
 
@@ -429,9 +464,21 @@ def build_prepared_rows(raw_map_data: RawMapData) -> list[dict[str, str]]:
             municipality_name=row.municipality_name,
             sorting_assignment=row.sorting_assignment,
             bag_assignment=row.bag_assignment,
+            reviewed_fields=row.reviewed_fields,
         )
         for row in raw_map_data.rows
     ]
+
+
+def _review_fields_from_row(raw_row: RawMapRow) -> dict[str, str]:
+    prepared_row = build_prepared_row(
+        lau_id=raw_row.lau_id,
+        municipality_name=raw_row.municipality_name,
+        sorting_assignment=raw_row.sorting_assignment,
+        bag_assignment=raw_row.bag_assignment,
+        reviewed_fields=raw_row.reviewed_fields,
+    )
+    return {field_name: prepared_row[field_name] for field_name in REVIEW_FIELDNAMES}
 
 
 def extract_raw_map_data(pdf_path: str | Path) -> RawMapData:
@@ -505,6 +552,7 @@ def write_raw_map_data(raw_map_data: RawMapData, output_path: str | Path) -> Non
                 "municipality_name": row.municipality_name,
                 "sorting_assignment": _assignment_to_dict(row.sorting_assignment),
                 "bag_assignment": _assignment_to_dict(row.bag_assignment),
+                **_review_fields_from_row(row),
             }
             for row in raw_map_data.rows
         ],
@@ -531,7 +579,7 @@ def write_prepared_map_rows(
     write_reviewed_map_rows(rows, output_path)
 
 
-def load_raw_map_data(raw_path: str | Path) -> RawMapData:
+def _load_raw_payload(raw_path: str | Path) -> dict[str, object]:
     raw_path = Path(raw_path)
     with raw_path.open(encoding="utf-8") as handle:
         payload = json.load(handle)
@@ -543,15 +591,47 @@ def load_raw_map_data(raw_path: str | Path) -> RawMapData:
         raise Sweden2024MapDataError(
             f"Expected version {RAW_FILE_VERSION}, found {payload.get("version")}."
         )
-    rows = [
-        RawMapRow(
-            lau_id=str(row.get("lau_id") or "").strip().zfill(4),
-            municipality_name=str(row.get("municipality_name") or "").strip(),
-            sorting_assignment=_assignment_from_dict(row.get("sorting_assignment")),
-            bag_assignment=_assignment_from_dict(row.get("bag_assignment")),
-        )
-        for row in payload.get("rows") or []
-    ]
+    return payload
+
+
+def _raw_row_from_payload_row(row: dict[str, object]) -> RawMapRow:
+    reviewed_fields = {
+        field_name: "" if row.get(field_name) is None else str(row.get(field_name))
+        for field_name in REVIEW_FIELDNAMES
+        if field_name in row
+    }
+    return RawMapRow(
+        lau_id=str(row.get("lau_id") or "").strip().zfill(4),
+        municipality_name=str(row.get("municipality_name") or "").strip(),
+        sorting_assignment=_assignment_from_dict(row.get("sorting_assignment")),
+        bag_assignment=_assignment_from_dict(row.get("bag_assignment")),
+        reviewed_fields=reviewed_fields or None,
+    )
+
+
+def _reviewed_row_from_raw_payload_row(row: dict[str, object]) -> dict[str, str]:
+    if any(field_name in row for field_name in REVIEW_FIELDNAMES):
+        reviewed_row = {
+            "lau_id": str(row.get("lau_id") or "").strip().zfill(4),
+            "municipality_name": str(row.get("municipality_name") or "").strip(),
+        }
+        for field_name in REVIEW_FIELDNAMES:
+            value = row.get(field_name, "")
+            reviewed_row[field_name] = "" if value is None else str(value)
+        return reviewed_row
+    raw_row = _raw_row_from_payload_row(row)
+    return build_prepared_row(
+        lau_id=raw_row.lau_id,
+        municipality_name=raw_row.municipality_name,
+        sorting_assignment=raw_row.sorting_assignment,
+        bag_assignment=raw_row.bag_assignment,
+        reviewed_fields=raw_row.reviewed_fields,
+    )
+
+
+def load_raw_map_data(raw_path: str | Path) -> RawMapData:
+    payload = _load_raw_payload(raw_path)
+    rows = [_raw_row_from_payload_row(row) for row in payload.get("rows") or []]
     return RawMapData(
         rows=rows,
         left_transform=_transform_from_dict(payload.get("left_transform")),
@@ -586,8 +666,11 @@ def _prepared_rows_to_map_details(
 
 
 def load_raw_map_details(raw_path: str | Path) -> dict[str, dict[str, object]]:
-    raw_map_data = load_raw_map_data(raw_path)
-    return _prepared_rows_to_map_details(build_prepared_rows(raw_map_data))
+    payload = _load_raw_payload(raw_path)
+    reviewed_rows = [
+        _reviewed_row_from_raw_payload_row(row) for row in payload.get("rows") or []
+    ]
+    return _prepared_rows_to_map_details(reviewed_rows)
 
 
 def load_reviewed_map_details(csv_path: str | Path) -> dict[str, dict[str, object]]:

@@ -126,6 +126,71 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
             },
         )
 
+    def test_load_raw_map_details_prefers_reviewed_json_fields(self):
+        payload = {
+            "format": "sweden-2024-map-raw",
+            "version": 1,
+            "left_transform": {
+                "scale_multiplier": 0.97,
+                "dx": 0,
+                "dy": 0,
+                "assigned_count": 283,
+            },
+            "right_transform": {
+                "scale_multiplier": 0.94,
+                "dx": 18,
+                "dy": 18,
+                "assigned_count": 279,
+            },
+            "rows": [
+                {
+                    "lau_id": "0180",
+                    "municipality_name": "Stockholm",
+                    "sorting_assignment": {
+                        "label": "Separata kärl",
+                        "classified_pixels": 12,
+                        "confidence": 0.88,
+                    },
+                    "bag_assignment": {
+                        "label": "Papper",
+                        "classified_pixels": 10,
+                        "confidence": 0.80,
+                    },
+                    "sorting_label": "Separata kärl",
+                    "sorting_method": "Four compartments bin",
+                    "sorting_confidence": "0.880",
+                    "sorting_pixels": "12",
+                    "bag_label": "Papper",
+                    "bag_material": "Collection Support Item: Plastic bags",
+                    "bag_confidence": "0.800",
+                    "bag_pixels": "10",
+                    "collection_system": "Door to door",
+                    "no_collection": "0",
+                    "needs_manual_review": "0",
+                    "review_reasons": "",
+                }
+            ],
+        }
+        with NamedTemporaryFile(
+            "w", suffix=".json", delete=False, encoding="utf-8"
+        ) as handle:
+            json.dump(payload, handle)
+            raw_path = Path(handle.name)
+        self.addCleanup(raw_path.unlink)
+
+        details = load_raw_map_details(raw_path)
+
+        self.assertEqual(
+            details,
+            {
+                "0180": {
+                    "no_collection": False,
+                    "sorting_method": "Four compartments bin",
+                    "bag_material": "Collection Support Item: Plastic bags",
+                }
+            },
+        )
+
     def test_load_reviewed_map_details_ignores_manual_review_rows(self):
         with NamedTemporaryFile(
             "w", suffix=".csv", delete=False, encoding="utf-8"
@@ -167,6 +232,20 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
                     bag_assignment=MapAssignment(
                         label="Papper", classified_pixels=10, confidence=0.80
                     ),
+                    reviewed_fields={
+                        "sorting_label": "Separata kärl",
+                        "sorting_method": "Separate bins",
+                        "sorting_confidence": "0.880",
+                        "sorting_pixels": "12",
+                        "bag_label": "Papper",
+                        "bag_material": "Collection Support Item: Paper bags",
+                        "bag_confidence": "0.800",
+                        "bag_pixels": "10",
+                        "collection_system": "Door to door",
+                        "no_collection": "0",
+                        "needs_manual_review": "0",
+                        "review_reasons": "",
+                    },
                 )
             ],
             left_transform=MapTransform(0.97, 0, 0, 283),
@@ -429,6 +508,18 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
                             "classified_pixels": 10,
                             "confidence": 0.80,
                         },
+                        "sorting_label": "Separata kärl",
+                        "sorting_method": "Separate bins",
+                        "sorting_confidence": "0.880",
+                        "sorting_pixels": "12",
+                        "bag_label": "Papper",
+                        "bag_material": "Collection Support Item: Paper bags",
+                        "bag_confidence": "0.800",
+                        "bag_pixels": "10",
+                        "collection_system": "Door to door",
+                        "no_collection": "0",
+                        "needs_manual_review": "0",
+                        "review_reasons": "",
                     }
                 ],
             },
