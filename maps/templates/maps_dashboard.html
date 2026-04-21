@@ -1,20 +1,28 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
-{% block title %}BRIT | Maps | Explorer{% endblock %}
+{% block title %}
+    BRIT | Maps | Explorer
+{% endblock title %}
+
+{% block breadcrumbs %}
+    <li class="breadcrumb-item">
+        <a href="{% url 'home' %}">BRIT</a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page">Maps Explorer</li>
+{% endblock breadcrumbs %}
 
 {% block content %}
 
     <div class="row">
         <div class="col col-12 col-md-6">
             <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">Maps Explorer</h5></div>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0">Maps Explorer</h5>
+                </div>
                 <div class="card-body">
-                    <p class="card-text">
-                        The maps module provides all the basic tools for building and managing maps.
-                    </p>
+                    <p class="card-text">The maps module provides all the basic tools for building and managing maps.</p>
                 </div>
-                <div class="card-footer">
-                </div>
+                <div class="card-footer"></div>
             </div>
         </div>
     </div>
@@ -23,7 +31,10 @@
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'maps_list' %}" class="stretched-link text-decoration-none text-body">Datasets</a></h5>
+                    <h5 class="mb-0">
+                        <a href="{% url 'maps_list' %}"
+                           class="stretched-link text-decoration-none text-body">Datasets</a>
+                    </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
@@ -40,7 +51,10 @@
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'catchment-list' %}" class="stretched-link text-decoration-none text-body">Catchments</a></h5>
+                    <h5 class="mb-0">
+                        <a href="{% url 'catchment-list' %}"
+                           class="stretched-link text-decoration-none text-body">Catchments</a>
+                    </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">

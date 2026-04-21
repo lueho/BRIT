@@ -4,6 +4,17 @@
 {% block title %}
   BRIT | {{ object.name }} details
 {% endblock title %}
+{% block breadcrumbs %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'home' %}">BRIT</a>
+  </li>
+  {% if object.list_url %}
+    <li class="breadcrumb-item">
+      <a href="{{ object.list_url }}">{{ object.get_verbose_name_plural|capfirst }}</a>
+    </li>
+  {% endif %}
+  <li class="breadcrumb-item active" aria-current="page">{{ object.name }}</li>
+{% endblock breadcrumbs %}
 {% block content %}
   {# Obsolete rejection card removed: owners of declined items are redirected to the review feedback view #}
   <div class="row my-4">

@@ -7,6 +7,7 @@ This section contains Architecture Decision Records (ADRs) and major design rati
 - Provide context and rationale for future contributors.
 
 ## Recent design records
+- [2026-04-21: Breadcrumb navigation target-state plan](2026-04-21_breadcrumb_navigation_target_state_plan.md)
 - [2026-04-16: Dataset registry and federated geodata target-state plan](2026-04-16_dataset_registry_and_federated_geodata_target_state_plan.md)
 - [2026-04-14: Materials database target-state plan (authoritative materials roadmap)](2026-04-14_materials_database_target_state_plan.md)
 - [2026-03-25: Property unification current state and remaining work](2026-03-25_property_unification_current_state_and_remaining_work.md)
@@ -40,4 +41,4 @@ _What becomes easier or harder as a result?_
 
 *Add new ADRs or design records as needed. For rationale behind major decisions, use the template above.*
 
-_Last updated: 2026-04-20_
+_Last updated: 2026-04-21_

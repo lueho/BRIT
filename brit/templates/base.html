@@ -53,12 +53,29 @@
       <div id="layoutSidenav_nav">{% include "partials/_sidebar.html" %}</div>
       <div id="layoutSidenav_content">
         <main>
-          <div class="container-fluid p-4">
-            <h1>Bioresource Information Tool</h1>
-            <div class="my-4"></div>
-            <!-- <ol class="breadcrumb my-4">
-                        <li class="breadcrumb-item active">Breadcrumbs</li>
-                    </ol> -->
+          <div class="{% block page_container_class %}container-fluid p-4{% endblock page_container_class %}">
+            {% block page_chrome %}
+              <div class="page-breadcrumb-rail">
+                <nav aria-label="Breadcrumb">
+                  <ol class="breadcrumb page-breadcrumbs mb-0">
+                    {% block breadcrumbs %}
+                      <li class="breadcrumb-item">
+                        <a href="{% url 'home' %}">BRIT</a>
+                      </li>
+                      {% if object and object.name %}
+                        <li class="breadcrumb-item active" aria-current="page">{{ object.name }}</li>
+                      {% elif header %}
+                        <li class="breadcrumb-item active" aria-current="page">{{ header }}</li>
+                      {% elif title %}
+                        <li class="breadcrumb-item active" aria-current="page">{{ title }}</li>
+                      {% elif request.resolver_match.url_name %}
+                        <li class="breadcrumb-item active" aria-current="page">{{ request.resolver_match.url_name|title }}</li>
+                      {% endif %}
+                    {% endblock breadcrumbs %}
+                  </ol>
+                </nav>
+              </div>
+            {% endblock page_chrome %}
             {% block content %}
             {% endblock content %}
           </div>
