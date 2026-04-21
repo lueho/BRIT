@@ -13,7 +13,7 @@ from django_filters import CharFilter, FilterSet
 from django_filters.views import FilterView
 from factory.django import mute_signals
 
-from bibliography.models import Source
+from bibliography.models import Author, Source
 from distributions.models import TemporalDistribution
 from maps.models import Catchment, Region
 from sources.waste_collection.models import (
@@ -23,7 +23,10 @@ from sources.waste_collection.models import (
 )
 from sources.waste_collection.views import CollectionDetailView
 from utils.object_management.models import ReviewAction, UserCreatedObject
-from utils.object_management.views import ReviewDashboardView
+from utils.object_management.views import (
+    ReviewDashboardView,
+    UserCreatedObjectCreateView,
+)
 from utils.properties.models import Property, Unit
 
 from ..views import FilterDefaultsMixin, PublishedObjectFilterView
@@ -472,6 +475,12 @@ class MockFilterView(FilterDefaultsMixin, FilterView):
     filterset_class = MockFilterSet
 
 
+class TestPropertyCreateView(UserCreatedObjectCreateView):
+    model = Property
+    fields = ["name", "unit"]
+    permission_required = "properties.add_property"
+
+
 class FilterDefaultsMixinTest(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
@@ -521,6 +530,102 @@ class PublishedObjectsFilterViewTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context_data["filter"].data, {"name": ["Other name"]})
+
+
+class BreadcrumbContractViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="breadcrumb-owner")
+        cls.creator = User.objects.create_user(username="breadcrumb-creator")
+        cls.creator.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Property),
+                codename="add_property",
+            )
+        )
+        cls.author = Author.objects.create(
+            first_names="Ada",
+            last_names="Lovelace",
+            owner=cls.owner,
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
+        )
+
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def test_author_list_uses_module_and_section_breadcrumbs(self):
+        response = self.client.get(reverse("author-list"), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'<a href="{reverse("bibliography-explorer")}">Bibliography</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">Authors</li>',
+            html=True,
+        )
+        self.assertNotContains(
+            response,
+            f'<a href="{reverse("bibliography-explorer")}">Explorer</a>',
+            html=True,
+        )
+
+    def test_author_detail_uses_string_label_in_breadcrumbs(self):
+        response = self.client.get(self.author.detail_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'<a href="{reverse("bibliography-explorer")}">Bibliography</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            f'<a href="{reverse("author-list")}">Authors</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            f'<li aria-current="page" class="breadcrumb-item active">{self.author.get_breadcrumb_object_label()}</li>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            f"<title>\n  BRIT | {self.author.get_breadcrumb_object_label()}\n</title>",
+            html=True,
+        )
+
+    def test_shared_create_form_renders_module_section_and_action_breadcrumbs(self):
+        request = self.factory.get(reverse("property-create"))
+        request.user = self.creator
+
+        response = TestPropertyCreateView.as_view()(request)
+        response.render()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'<a href="{reverse("properties-dashboard")}">Properties</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            f'<a href="{reverse("property-list")}">Properties</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">Create</li>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            "<title>\n  BRIT | Create Property\n</title>",
+            html=True,
+        )
 
 
 class ReadAccessArchivedDetailTests(TestCase):

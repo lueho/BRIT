@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from bibliography.models import Source
 from sources.waste_collection.models import Collection, WasteCategory
+from utils.properties.models import Property
 
 from ..models import ReviewAction, UserCreatedObject
 
@@ -184,3 +185,20 @@ class ReviewWorkflowModelTests(TestCase):
 
         self.assertTrue(self.collection.has_review_feedback)
         self.assertEqual(self.collection.latest_review_feedback_action.pk, rejection.pk)
+
+
+class BreadcrumbLabelModelTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(username="breadcrumb-model-owner")
+
+    def test_plural_breadcrumb_label_uses_model_metadata(self):
+        self.assertEqual(Property.get_breadcrumb_plural_label(), "properties")
+
+    def test_object_breadcrumb_label_uses_string_representation(self):
+        source = Source.objects.create(
+            owner=self.owner,
+            title="Canonical breadcrumb source",
+            citation_key="CanonicalKey",
+        )
+
+        self.assertEqual(source.get_breadcrumb_object_label(), str(source))

@@ -17,7 +17,7 @@
     {% endblock meta %}
     <title>
       {% block title %}
-        BRIT | Bioresource Information Tool
+        BRIT | {{ breadcrumb_page_title|default:title|default:form_title|default:"Bioresource Information Tool" }}
       {% endblock title %}
     </title>
     {% include "partials/_analytics.html" %}
@@ -62,14 +62,56 @@
                       <li class="breadcrumb-item">
                         <a href="{% url 'home' %}">BRIT</a>
                       </li>
-                      {% if object and object.name %}
-                        <li class="breadcrumb-item active" aria-current="page">{{ object.name }}</li>
+                      {% if breadcrumb_module_label or breadcrumb_section_label or breadcrumb_object_label or breadcrumb_action_label %}
+                        {% if breadcrumb_module_label %}
+                          <li class="breadcrumb-item{% if not breadcrumb_section_label and not breadcrumb_object_label and not breadcrumb_action_label %} active{% endif %}"
+                              {% if not breadcrumb_section_label and not breadcrumb_object_label and not breadcrumb_action_label %}aria-current="page"{% endif %}>
+                            {% if breadcrumb_module_url %}
+                              {% if breadcrumb_section_label or breadcrumb_object_label or breadcrumb_action_label %}
+                                <a href="{{ breadcrumb_module_url }}">{{ breadcrumb_module_label }}</a>
+                              {% else %}
+                                {{ breadcrumb_module_label }}
+                              {% endif %}
+                            {% else %}
+                              {{ breadcrumb_module_label }}
+                            {% endif %}
+                          </li>
+                        {% endif %}
+                        {% if breadcrumb_section_label %}
+                          <li class="breadcrumb-item{% if not breadcrumb_object_label and not breadcrumb_action_label %} active{% endif %}"
+                              {% if not breadcrumb_object_label and not breadcrumb_action_label %}aria-current="page"{% endif %}>
+                            {% if breadcrumb_section_url %}
+                              {% if breadcrumb_object_label or breadcrumb_action_label %}
+                                <a href="{{ breadcrumb_section_url }}">{{ breadcrumb_section_label }}</a>
+                              {% else %}
+                                {{ breadcrumb_section_label }}
+                              {% endif %}
+                            {% else %}
+                              {{ breadcrumb_section_label }}
+                            {% endif %}
+                          </li>
+                        {% endif %}
+                        {% if breadcrumb_object_label %}
+                          <li class="breadcrumb-item{% if not breadcrumb_action_label %} active{% endif %}"
+                              {% if not breadcrumb_action_label %}aria-current="page"{% endif %}>
+                            {% if breadcrumb_object_url and breadcrumb_action_label %}
+                              <a href="{{ breadcrumb_object_url }}">{{ breadcrumb_object_label }}</a>
+                            {% else %}
+                              {{ breadcrumb_object_label }}
+                            {% endif %}
+                          </li>
+                        {% endif %}
+                        {% if breadcrumb_action_label %}
+                          <li class="breadcrumb-item active" aria-current="page">{{ breadcrumb_action_label }}</li>
+                        {% endif %}
+                      {% elif object %}
+                        <li class="breadcrumb-item active" aria-current="page">{{ object.get_breadcrumb_object_label }}</li>
                       {% elif header %}
                         <li class="breadcrumb-item active" aria-current="page">{{ header }}</li>
                       {% elif title %}
                         <li class="breadcrumb-item active" aria-current="page">{{ title }}</li>
-                      {% elif request.resolver_match.url_name %}
-                        <li class="breadcrumb-item active" aria-current="page">{{ request.resolver_match.url_name|title }}</li>
+                      {% elif breadcrumb_page_title %}
+                        <li class="breadcrumb-item active" aria-current="page">{{ breadcrumb_page_title }}</li>
                       {% endif %}
                     {% endblock breadcrumbs %}
                   </ol>

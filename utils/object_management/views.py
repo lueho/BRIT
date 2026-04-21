@@ -21,7 +21,8 @@ from django.db.models import Q
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string, select_template
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
+from django.utils.text import capfirst
 from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
 from django_filters.views import FilterView
 from django_tomselect.autocompletes import AutocompleteModelView
@@ -60,6 +61,111 @@ from ..views import (
 from .redirects import ReviewActionRedirectResolver
 
 logger = logging.getLogger(__name__)
+
+
+DEFAULT_BREADCRUMB_MODULES = {
+    "bibliography": ("Bibliography", "bibliography-explorer"),
+    "inventories": ("Inventories", "inventories-explorer"),
+    "maps": ("Maps", "maps-dashboard"),
+    "materials": ("Materials", "materials-explorer"),
+    "processes": ("Processes", "processes-dashboard"),
+    "properties": ("Properties", "properties-dashboard"),
+    "sources": ("Sources", "sources-explorer"),
+    "utils": ("Utilities", "utils-dashboard"),
+    "waste_collection": ("Waste Collection", "wastecollection-explorer"),
+}
+
+
+def _get_breadcrumb_model(view):
+    model = getattr(view, "model", None)
+    if model is not None:
+        return model
+
+    form_class = getattr(view, "form_class", None)
+    form_meta = getattr(form_class, "_meta", None)
+    return getattr(form_meta, "model", None)
+
+
+def _get_default_breadcrumb_module(model):
+    if model is None:
+        return None, None
+    return DEFAULT_BREADCRUMB_MODULES.get(model._meta.app_label, (None, None))
+
+
+def _get_default_breadcrumb_module_url(model):
+    _, route_name = _get_default_breadcrumb_module(model)
+    if not route_name:
+        return None
+
+    try:
+        return reverse(route_name)
+    except NoReverseMatch:
+        return None
+
+
+def _get_default_breadcrumb_section_label(model):
+    if model is None:
+        return None
+
+    getter = getattr(model, "get_breadcrumb_plural_label", None)
+    label = (
+        getter()
+        if callable(getter)
+        else getattr(model._meta, "verbose_name_plural", None)
+    )
+    if label is None:
+        return None
+    return capfirst(str(label))
+
+
+def _get_default_breadcrumb_object_label(obj):
+    if obj is None:
+        return None
+
+    getter = getattr(obj, "get_breadcrumb_object_label", None)
+    label = getter() if callable(getter) else str(obj)
+    if label is None:
+        return None
+    return str(label)
+
+
+def _get_model_list_url(model):
+    if model is None:
+        return None
+
+    getter = getattr(model, "public_list_url", None)
+    if not callable(getter):
+        getter = getattr(model, "list_url", None)
+    if callable(getter):
+        return getter()
+    return getter
+
+
+def _build_breadcrumb_context(
+    *,
+    module_label=None,
+    module_url=None,
+    section_label=None,
+    section_url=None,
+    object_label=None,
+    object_url=None,
+    action_label=None,
+    page_title=None,
+):
+    return {
+        key: value
+        for key, value in {
+            "breadcrumb_module_label": module_label,
+            "breadcrumb_module_url": module_url,
+            "breadcrumb_section_label": section_label,
+            "breadcrumb_section_url": section_url,
+            "breadcrumb_object_label": object_label,
+            "breadcrumb_object_url": object_url,
+            "breadcrumb_action_label": action_label,
+            "breadcrumb_page_title": page_title,
+        }.items()
+        if value is not None
+    }
 
 
 def parse_tomselect_filter_expression(raw_expression):
@@ -1056,6 +1162,10 @@ class UserCreatedObjectListMixin:
     header = None
     list_type = None
     dashboard_url = None
+    breadcrumb_module_label = None
+    breadcrumb_module_url = None
+    breadcrumb_page_title = None
+    breadcrumb_section_label = None
     model = None
 
     def get_queryset(self):
@@ -1122,6 +1232,15 @@ class UserCreatedObjectListMixin:
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        object_list = context.get("object_list")
+        breadcrumb_model = getattr(object_list, "model", None) or getattr(
+            self, "model", None
+        )
+        default_module_label, _ = _get_default_breadcrumb_module(breadcrumb_model)
+        breadcrumb_section_label = (
+            self.breadcrumb_section_label
+            or _get_default_breadcrumb_section_label(breadcrumb_model)
+        )
         # Base context
         context.update({
             "header": self.get_header(),
@@ -1132,6 +1251,22 @@ class UserCreatedObjectListMixin:
             "private_list_owner": self.get_private_list_owner(),
             "dashboard_url": self.get_dashboard_url(),
         })
+        context.update(
+            _build_breadcrumb_context(
+                module_label=self.breadcrumb_module_label or default_module_label,
+                module_url=(
+                    self.breadcrumb_module_url
+                    or self.get_dashboard_url()
+                    or _get_default_breadcrumb_module_url(breadcrumb_model)
+                ),
+                section_label=breadcrumb_section_label,
+                page_title=(
+                    self.breadcrumb_page_title
+                    or self.get_header()
+                    or breadcrumb_section_label
+                ),
+            )
+        )
 
         # Scope switcher context (urls, counts, active scope)
         try:
@@ -1578,23 +1713,30 @@ class UserCreatedObjectCreateView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        model = _get_breadcrumb_model(self)
         model_name = "Object"
 
-        if hasattr(self, "model") and self.model:
-            model = self.model
-            if hasattr(model._meta, "verbose_name"):
-                model_name = model._meta.verbose_name.capitalize()
-        elif hasattr(self, "form_class") and self.form_class:
-            form_meta = getattr(self.form_class, "_meta", None)
-            if form_meta and hasattr(form_meta, "model"):
-                model = form_meta.model
-                if hasattr(model._meta, "verbose_name"):
-                    model_name = model._meta.verbose_name.capitalize()
+        if model is not None:
+            getter = getattr(model, "get_breadcrumb_singular_label", None)
+            if callable(getter):
+                model_name = capfirst(str(getter()))
 
         context.update({
             "form_title": f"Create New {model_name}",
             "submit_button_text": "Save",
         })
+        default_module_label, _ = _get_default_breadcrumb_module(model)
+        breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
+        context.update(
+            _build_breadcrumb_context(
+                module_label=default_module_label,
+                module_url=_get_default_breadcrumb_module_url(model),
+                section_label=breadcrumb_section_label,
+                section_url=_get_model_list_url(model),
+                action_label="Create",
+                page_title=f"Create {model_name}",
+            )
+        )
         return context
 
     def get_success_message(self, cleaned_data):
@@ -1691,6 +1833,9 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
         context = super().get_context_data(**kwargs)
         obj = self.object
         request = self.request
+        default_module_label, _ = _get_default_breadcrumb_module(obj.__class__)
+        breadcrumb_section_label = _get_default_breadcrumb_section_label(obj.__class__)
+        breadcrumb_object_label = _get_default_breadcrumb_object_label(obj)
         # Show review panel when explicitly requested via ?review=1
         show_panel = request.GET.get("review") is not None
 
@@ -1705,6 +1850,16 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
             "show_review_panel": show_panel,
             "review_logs": logs,
         })
+        context.update(
+            _build_breadcrumb_context(
+                module_label=default_module_label,
+                module_url=_get_default_breadcrumb_module_url(obj.__class__),
+                section_label=breadcrumb_section_label,
+                section_url=getattr(obj, "list_url", None),
+                object_label=breadcrumb_object_label,
+                page_title=breadcrumb_object_label,
+            )
+        )
         return context
 
 
@@ -1957,10 +2112,26 @@ class UserCreatedObjectUpdateView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        model = self.object.__class__
+        default_module_label, _ = _get_default_breadcrumb_module(model)
+        breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
+        breadcrumb_object_label = _get_default_breadcrumb_object_label(self.object)
         context.update({
             "form_title": f"Update {self.object._meta.verbose_name}",
             "submit_button_text": "Save",
         })
+        context.update(
+            _build_breadcrumb_context(
+                module_label=default_module_label,
+                module_url=_get_default_breadcrumb_module_url(model),
+                section_label=breadcrumb_section_label,
+                section_url=_get_model_list_url(model),
+                object_label=breadcrumb_object_label,
+                object_url=getattr(self.object, "detail_url", None),
+                action_label="Update",
+                page_title=f"Update {self.object._meta.verbose_name}",
+            )
+        )
         return context
 
     def get_template_names(self):
@@ -1990,11 +2161,25 @@ class UserCreatedObjectCreateWithInlinesView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        model = _get_breadcrumb_model(self)
+        model_name = capfirst(str(model.get_breadcrumb_singular_label()))
         context.update({
-            "form_title": f"Create New {self.form_class._meta.model._meta.verbose_name}",
+            "form_title": f"Create New {model_name}",
             "submit_button_text": "Save",
             "formset_helper": self.formset_helper_class(),
         })
+        default_module_label, _ = _get_default_breadcrumb_module(model)
+        breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
+        context.update(
+            _build_breadcrumb_context(
+                module_label=default_module_label,
+                module_url=_get_default_breadcrumb_module_url(model),
+                section_label=breadcrumb_section_label,
+                section_url=_get_model_list_url(model),
+                action_label="Create",
+                page_title=f"Create {model_name}",
+            )
+        )
         return context
 
     def get_template_names(self):
@@ -2024,11 +2209,27 @@ class UserCreatedObjectUpdateWithInlinesView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        model = self.object.__class__
+        default_module_label, _ = _get_default_breadcrumb_module(model)
+        breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
+        breadcrumb_object_label = _get_default_breadcrumb_object_label(self.object)
         context.update({
             "form_title": f"Update {self.object._meta.verbose_name}",
             "submit_button_text": "Save",
             "formset_helper": self.formset_helper_class(),
         })
+        context.update(
+            _build_breadcrumb_context(
+                module_label=default_module_label,
+                module_url=_get_default_breadcrumb_module_url(model),
+                section_label=breadcrumb_section_label,
+                section_url=_get_model_list_url(model),
+                object_label=breadcrumb_object_label,
+                object_url=getattr(self.object, "detail_url", None),
+                action_label="Update",
+                page_title=f"Update {self.object._meta.verbose_name}",
+            )
+        )
         return context
 
     def get_template_names(self):

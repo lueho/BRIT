@@ -104,6 +104,17 @@ class CRUDUrlsMixin(models.Model):
     def get_verbose_name_plural(cls):
         return cls._meta.verbose_name_plural
 
+    @classmethod
+    def get_breadcrumb_singular_label(cls):
+        return cls.get_verbose_name()
+
+    @classmethod
+    def get_breadcrumb_plural_label(cls):
+        return cls.get_verbose_name_plural()
+
+    def get_breadcrumb_object_label(self):
+        return str(self)
+
 
 class Redirect(models.Model):
     """

@@ -2,6 +2,9 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% load crispy_forms_filters %}
+{% block title %}
+  BRIT | {{ breadcrumb_page_title|default:form_title|default:"Bioresource Information Tool" }}
+{% endblock title %}
 {% block content %}
   <div class="row">
     <div class="col">

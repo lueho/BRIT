@@ -1,20 +1,24 @@
 # Breadcrumb Navigation Target-State Plan
-
-- **Status**: Active roadmap
-- **Date**: 2026-04-21
-- **Scope**: shared breadcrumb/page-chrome behavior across `base.html`, shared CRUD templates, explorer/dashboard pages, nested source-domain pages, static/error pages, and supporting view/model metadata needed to make breadcrumbs logical and stable throughout BRIT
-
-## Documentation Boundary
-
-- **This document is the single authoritative roadmap for breadcrumb navigation in BRIT**
-  It owns the target information architecture for breadcrumbs, the current-state gap analysis, the rollout order, and the definition of done for making breadcrumb navigation consistent across the application.
-
-- **Related records remain supporting documents, not parallel roadmap documents**
-  Use the shared module UX guidance and existing module-specific target-state plans as supporting constraints. This roadmap specifically owns breadcrumb hierarchy, labels, fallback behavior, and rollout sequencing.
-
-## 1. Context
-
-BRIT has grown over time from a mix of module-specific CRUD pages, explorer dashboards, plugin-mounted source domains, and a few custom detail experiences. As a result, breadcrumb navigation is currently inconsistent in both structure and quality.
+ 
+ - **Status**: Active roadmap; documentation boundary established, shared breadcrumb rail landed, Phase 1 not started
+ - **Date**: 2026-04-21
+ - **Last updated**: 2026-04-21
+ - **Scope**: shared breadcrumb/page-chrome behavior across `base.html`, shared CRUD templates, explorer/dashboard pages, nested source-domain pages, static/error pages, and supporting view/model metadata needed to make breadcrumbs logical and stable throughout BRIT
+ 
+ ## Documentation Boundary
+ 
+ - **This document is the single authoritative roadmap for breadcrumb navigation in BRIT**
+  It owns the target information architecture for breadcrumbs, the rollout order, progress tracking, and the definition of done for making breadcrumb navigation consistent across the application.
+ 
+ - **Current-state breadcrumb behavior is documented in `brit/README.md`**
+  The `brit` core-module README is the authoritative as-is reference for the shared breadcrumb rail, current template behavior, and known current limitations.
+ 
+ - **Related records remain supporting architecture records, not parallel roadmap documents**
+  Use the shared module UX guidance and existing module-specific target-state plans as supporting constraints. This roadmap specifically owns breadcrumb hierarchy, label changes, fallback-behavior changes, and rollout sequencing.
+ 
+ ## 1. Context
+ 
+ BRIT has grown over time from a mix of module-specific CRUD pages, explorer dashboards, plugin-mounted source domains, and a few custom detail experiences. As a result, breadcrumb navigation is currently inconsistent in both structure and quality.
 
 Examples of the current mismatch include:
 
@@ -25,13 +29,15 @@ Examples of the current mismatch include:
 - some pages use user-facing labels such as `Inventories`, while the breadcrumb exposes an internal entity label such as `Scenarios`
 - the browser title and breadcrumb fallback logic are currently coupled loosely enough that some pages can show `BRIT | None`
 
-The recently introduced sticky breadcrumb rail in `base.html` makes breadcrumb navigation visible across a much larger part of the application. That increases the importance of getting both the hierarchy and the labels right.
-
-This roadmap turns breadcrumb navigation from a template convenience into an explicit BRIT-wide information-architecture concern.
-
-## 2. Target State to Reach
-
-The desired end state is not merely that every page has some breadcrumb. The target state is that breadcrumbs consistently communicate where the user is in BRIT's information architecture and give helpful return paths.
+ The recently introduced sticky breadcrumb rail in `base.html` makes breadcrumb navigation visible across a much larger part of the application. That increases the importance of getting both the hierarchy and the labels right.
+ 
+ This roadmap turns breadcrumb navigation from a template convenience into an explicit BRIT-wide information-architecture concern.
+ 
+ This document translates that direction into a repo-specific target-state and rollout plan.
+ 
+ ## 2. Target State to Reach
+ 
+ The desired end state is not merely that every page has some breadcrumb. The target state is that breadcrumbs consistently communicate where the user is in BRIT's information architecture and give helpful return paths.
 
 ### 2.1 One shared hierarchy model
 
@@ -174,58 +180,55 @@ The safest sequence is:
 - migrate high-traffic/shared pages first
 - only then retire brittle fallback behavior where safe
 
-## 4. Current State in BRIT
+## 4. Progress Snapshot
 
-### 4.1 Shared template state
+### 4.1 Documentation boundary status
 
-The current shared breadcrumb surface already has good foundations:
+- **Current state now has one home**
+  - `brit/README.md` is the authoritative as-is reference for breadcrumb behavior.
 
-- `base.html` provides one global sticky breadcrumb rail
-- `filtered_list.html` provides one generic list breadcrumb implementation
-- `detail_with_options.html` provides one generic detail breadcrumb implementation
+- **Planning and progress now have one home**
+  - this roadmap is the authoritative target-state and rollout document.
 
-This is the correct architectural direction, because a large portion of the app already flows through these shared templates.
+- **Supporting UX records remain secondary**
+  - broader navigation and module-entry guidance may still live in supporting UX documents, but breadcrumb-specific rollout decisions should be recorded here.
 
-### 4.2 Current high-value problems
+### 4.2 Already-landed implementation precursors
 
-The current system still has several classes of defects and inconsistencies:
+- **Shared sticky breadcrumb rail exists**
+  - `brit/templates/base.html` now provides one shared sticky breadcrumb rail through `page_chrome` and `breadcrumbs` blocks.
 
-- **Generic middle crumb**
-  - shared list pages currently use `Explorer` as the parent crumb when `dashboard_url` exists
-  - this hides module identity and makes unrelated pages look structurally identical
+- **Shared list and detail templates already participate**
+  - `brit/templates/filtered_list.html` and `brit/templates/detail_with_options.html` already render breadcrumbs through shared template logic.
 
-- **Weak label derivation**
-  - some labels are derived from model metadata that is not sufficiently human-friendly for breadcrumbs
-  - this leads to wrong plurals, awkward casing, and compound-label drift
+- **Selected pages already provide explicit breadcrumbs**
+  - major explorer/dashboard pages and selected form pages already override `breadcrumbs` explicitly instead of relying only on the base fallback.
 
-- **Object-label assumption**
-  - shared detail breadcrumbs currently assume the current object can be represented as `object.name`
-  - this breaks on models whose canonical display field is something else
+- **Custom sample detail still uses its own rail intentionally**
+  - `materials/templates/materials/sample_detail_v2.html` keeps a custom sticky sample-detail rail and suppresses the shared base rail for that page.
 
-- **Fallback leakage**
-  - static or exceptional pages can fall back to `title` or `request.resolver_match.url_name|title`
-  - this produces labels such as `Privacypolicy` or `Redirect`
+### 4.3 Remaining blockers before the target state
 
-- **Hierarchy inconsistency across modules**
-  - some domains expose a module parent while others expose only a local entity type
-  - some nested source-domain pages expose different depth for similar concepts
+- shared list pages still expose the generic `Explorer` crumb
+- shared detail pages still assume `object.name`
+- some pages still fall through to weak title or route-name labels
+- nested source-domain paths are still inconsistent
+- page-title behavior is still weak enough to produce `BRIT | None` on some pages
 
-- **Module/entity conflation**
-  - some breadcrumbs show an internal entity label where the user expects a module label, for example `Scenarios` where the broader section is perceived as `Inventories`
+### 4.4 Phase status
 
-### 4.3 Current representative examples
-
-Current observed or reported examples include:
-
-- `BRIT > Explorer > Materials`
-- `BRIT > Explorer > Samples`
-- `BRIT > Materials > <Material>`
-- `BRIT > Collections > <Collection>` for a waste-collection page that conceptually belongs under `Sources`
-- `BRIT > Greenhouses` for a source-domain list that is structurally similar to other source-domain pages but does not expose the same parent path
-- blank detail breadcrumb endings on some bibliography detail pages
-- browser titles such as `BRIT | None` on pages without proper page-title context
+| Phase | Status | Notes |
+|---|---|---|
+| Phase 0 - information architecture and audit baseline | Complete | The target hierarchy has been documented and the as-is reference has been separated into `brit/README.md`. |
+| Phase 1 - shared breadcrumb data contract | Not started | Shared breadcrumb infrastructure exists, but the explicit module/section/object/action contract is not implemented yet. |
+| Phase 2 - major module normalization | Partial precursor work only | Several explorer/dashboard pages already define explicit breadcrumbs, but module-first consistency is not complete. |
+| Phase 3 - nested domains and custom detail experiences | Not started | No canonical nested-domain breadcrumb contract is implemented yet. |
+| Phase 4 - static/review/error cleanup | Not started | Weak fallback behavior still appears on static and exceptional pages. |
+| Phase 5 - regression hardening and cleanup | Not started | Breadcrumb-specific regression coverage and contract documentation are still incomplete. |
 
 ## 5. Gap Summary
+
+The gap summary below is derived from the current-state implementation documented in `brit/README.md` together with the roadmap baseline and observed breadcrumb defects.
 
 | Goal | Current state | Gap to close |
 |---|---|---|
