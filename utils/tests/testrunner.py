@@ -2,6 +2,7 @@
 Custom Django test runner that ensures all initial data is created before running tests.
 """
 
+import logging
 import statistics
 import time
 import unittest
@@ -11,7 +12,13 @@ from django.conf import settings
 from django.core.management import call_command
 from django.db.models.signals import post_migrate
 from django.dispatch import receiver
-from django.test.runner import DiscoverRunner
+from django.test.runner import (
+    DiscoverRunner,
+    filter_tests_by_tags,
+    iter_test_cases,
+    partition_suite_by_case,
+    reorder_tests,
+)
 
 # Module-level flag to ensure we only run ensure_initial_data once per test run
 _initial_data_loaded = False
@@ -192,60 +199,101 @@ class SerialAwareTestRunner(DiscoverRunner):
     def setup_databases(self, **kwargs):
         return super().setup_databases(**kwargs)
 
-    def run_tests(self, test_labels, extra_tests=None, **kwargs):
-        if not SERIAL_TESTS or getattr(self, "parallel", 0) in (0, 1):
-            # No serial tests, use Django's standard test runner
-            result = super().run_tests(test_labels, extra_tests=extra_tests, **kwargs)
-            if self._stats:
-                StopwatchTestResult.print_stats()
-            return result
-
-        # We have serial tests, so we need custom handling
-        # But we still want to use Django's proper test setup
-        suite = self.build_suite(test_labels, extra_tests)
-        serial_suite = unittest.TestSuite()
-        parallel_suite = unittest.TestSuite()
-
-        def is_serial(test):
-            # Check if test or its class is marked serial
-            test_method = getattr(test, "_testMethodName", None)
-            test_class = test.__class__
-            if test_class in SERIAL_TESTS:
+    def _is_serial_test(self, test):
+        test_method = getattr(test, "_testMethodName", None)
+        test_class = test.__class__
+        if test_class in SERIAL_TESTS:
+            return True
+        if test_method and hasattr(test_class, test_method):
+            method = getattr(test_class, test_method)
+            if method in SERIAL_TESTS:
                 return True
-            if test_method and hasattr(test_class, test_method):
-                method = getattr(test_class, test_method)
-                if method in SERIAL_TESTS:
-                    return True
-            return False
+        return False
 
-        # Flatten suite to individual tests
-        def flatten(suite):
-            for item in suite:
-                if isinstance(item, unittest.TestSuite):
-                    yield from flatten(item)
-                else:
-                    yield item
+    def build_suite(self, test_labels=None, extra_tests=None, **kwargs):
+        test_labels = test_labels or ["."]
 
-        for test in flatten(suite):
-            if is_serial(test):
-                serial_suite.addTest(test)
+        discover_kwargs = {}
+        if self.pattern is not None:
+            discover_kwargs["pattern"] = self.pattern
+        if self.top_level is not None:
+            discover_kwargs["top_level_dir"] = self.top_level
+        self.setup_shuffler()
+
+        all_tests = []
+        for label in test_labels:
+            tests = self.load_tests_for_label(label, discover_kwargs)
+            all_tests.extend(iter_test_cases(tests))
+        if extra_tests is None:
+            extra_tests = getattr(self, "_extra_tests", None)
+        if extra_tests:
+            all_tests.extend(iter_test_cases(self.test_suite(extra_tests)))
+
+        if self.tags or self.exclude_tags:
+            if self.tags:
+                self.log(
+                    f"Including test tag(s): {", ".join(sorted(self.tags))}.",
+                    level=logging.DEBUG,
+                )
+            if self.exclude_tags:
+                self.log(
+                    f"Excluding test tag(s): {", ".join(sorted(self.exclude_tags))}.",
+                    level=logging.DEBUG,
+                )
+            all_tests = filter_tests_by_tags(all_tests, self.tags, self.exclude_tags)
+
+        test_types = (unittest.loader._FailedTest, *self.reorder_by)
+        all_tests = list(
+            reorder_tests(
+                all_tests,
+                test_types,
+                shuffler=self._shuffler,
+                reverse=self.reverse,
+            )
+        )
+        self.log("Found %d test(s)." % len(all_tests))
+
+        parallel_tests = []
+        serial_tests = []
+        for test in all_tests:
+            if self._is_serial_test(test):
+                serial_tests.append(test)
             else:
-                parallel_suite.addTest(test)
+                parallel_tests.append(test)
 
-        # Run parallel tests first using Django's proper test execution
-        result = 0
-        if parallel_suite.countTestCases():
-            old_parallel = getattr(self, "parallel", 1)
-            result += self.run_suite(parallel_suite, **kwargs)
+        requested_parallel = self.parallel
+        if requested_parallel > 1 and parallel_tests:
+            parallel_suite = self.test_suite(parallel_tests)
+            subsuites = partition_suite_by_case(parallel_suite)
+            processes = min(requested_parallel, len(subsuites))
+            self.parallel = processes
+            if processes > 1:
+                parallel_suite = self.parallel_test_suite(
+                    subsuites,
+                    processes,
+                    self.failfast,
+                    self.debug_mode,
+                    self.buffer,
+                )
+        else:
+            parallel_suite = self.test_suite(parallel_tests)
+            if requested_parallel > 1:
+                self.parallel = 1
 
-        # Run serial tests with parallelism disabled
-        if serial_suite.countTestCases():
-            old_parallel = getattr(self, "parallel", 1)
-            self.parallel = 1
-            result += self.run_suite(serial_suite, **kwargs)
-            self.parallel = old_parallel
+        serial_suite = self.test_suite(serial_tests)
 
+        if parallel_tests and serial_tests:
+            return self.test_suite([parallel_suite, serial_suite])
+        if serial_tests:
+            return serial_suite
+        return parallel_suite
+
+    def run_tests(self, test_labels, extra_tests=None, **kwargs):
+        self._extra_tests = extra_tests
+        try:
+            result = super().run_tests(test_labels, **kwargs)
+        finally:
+            self._extra_tests = None
         if self._stats:
             StopwatchTestResult.print_stats()
-
         return result
