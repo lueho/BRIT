@@ -11,6 +11,7 @@ from materials.models import (
     ComponentMeasurement,
     Composition,
     Material,
+    MaterialCategory,
     MaterialComponent,
     MaterialComponentGroup,
     MaterialProperty,
@@ -84,6 +85,19 @@ class MaterialPropertyTestCase(TestCase):
         )
 
         self.assertEqual(alias.canonical_property, canonical)
+
+
+class ModelLabelMetadataTestCase(TestCase):
+    def test_irregular_plural_labels_are_explicit(self):
+        self.assertEqual(
+            MaterialCategory._meta.verbose_name_plural,
+            "material categories",
+        )
+        self.assertEqual(
+            MaterialProperty._meta.verbose_name_plural,
+            "material properties",
+        )
+        self.assertEqual(SampleSeries._meta.verbose_name_plural, "sample series")
 
 
 class MaterialTestCase(TestCase):

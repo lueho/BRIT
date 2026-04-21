@@ -40,7 +40,8 @@ def get_sample_substrate_category_name():
 
 
 class MaterialCategory(NamedUserCreatedObject):
-    pass
+    class Meta(NamedUserCreatedObject.Meta):
+        verbose_name_plural = "material categories"
 
 
 def get_or_create_sample_substrate_category():
@@ -288,6 +289,9 @@ class SampleSeries(NamedUserCreatedObject):
     distribution of material properties and compositions over time can be described.
     """
 
+    class Meta(NamedUserCreatedObject.Meta):
+        verbose_name_plural = "sample series"
+
     material = models.ForeignKey(
         Material,
         on_delete=models.PROTECT,
@@ -486,6 +490,9 @@ class MaterialProperty(PropertyBase):
         blank=True,
         help_text="Units that are acceptable for this property.",
     )
+
+    class Meta(PropertyBase.Meta):
+        verbose_name_plural = "material properties"
 
     @property
     def canonical_property(self):

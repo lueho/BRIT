@@ -22,6 +22,15 @@ from ..models import (
 )
 
 
+class ModelLabelMetadataTestCase(TestCase):
+    def test_irregular_plural_labels_are_explicit(self):
+        self.assertEqual(
+            GeoDatasetColumnPolicy._meta.verbose_name_plural,
+            "geo dataset column policies",
+        )
+        self.assertEqual(RegionProperty._meta.verbose_name_plural, "region properties")
+
+
 class TestLocationModel(TestCase):
     def setUp(self):
         self.location = Location.objects.create(

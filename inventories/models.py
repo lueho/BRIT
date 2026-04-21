@@ -293,6 +293,9 @@ class ScenarioStatus(models.Model):
         RUNNING = 2
         FINISHED = 3
 
+    class Meta:
+        verbose_name_plural = "scenario statuses"
+
     scenario = models.OneToOneField("Scenario", on_delete=models.CASCADE, null=True)
     status = models.IntegerField(choices=Status.choices, default=Status.CHANGED)
 

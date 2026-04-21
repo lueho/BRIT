@@ -6,9 +6,14 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from utils.object_management.models import get_default_owner
-from utils.properties.models import NumericMeasurementMixin, Unit
+from utils.properties.models import NumericMeasurementMixin, Property, Unit
 from utils.properties.units import UnitConversionError
 from utils.properties.utils import format_measurement_display
+
+
+class ModelLabelMetadataTestCase(TestCase):
+    def test_property_plural_label_is_explicit(self):
+        self.assertEqual(Property._meta.verbose_name_plural, "properties")
 
 
 class _FakeConvertedQuantity:

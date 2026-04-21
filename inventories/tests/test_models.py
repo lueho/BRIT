@@ -25,6 +25,11 @@ from ..models import (
 )
 
 
+class ModelLabelMetadataTestCase(TestCase):
+    def test_scenario_status_plural_label_is_explicit(self):
+        self.assertEqual(ScenarioStatus._meta.verbose_name_plural, "scenario statuses")
+
+
 class ScenarioTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):

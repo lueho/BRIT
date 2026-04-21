@@ -670,6 +670,7 @@ class GeoDatasetColumnPolicy(models.Model):
             )
         ]
         ordering = ["column_name"]
+        verbose_name_plural = "geo dataset column policies"
 
     def __str__(self):
         return f"{self.dataset}: {self.column_name}"
@@ -692,6 +693,9 @@ class RegionProperty(PropertyBase):
     """
 
     unit = models.CharField(max_length=127)
+
+    class Meta(PropertyBase.Meta):
+        verbose_name_plural = "region properties"
 
     def __str__(self):
         return f"{self.name} [{self.unit}]"

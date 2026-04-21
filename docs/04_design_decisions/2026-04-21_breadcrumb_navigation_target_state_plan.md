@@ -72,6 +72,16 @@ rather than:
 
 Explorer or dashboard wording may remain in page titles, but breadcrumbs should stay structural and concise.
 
+### 2.2.1 Model-owned singular and plural labels
+
+For model-backed CRUD pages, human-facing singular and plural labels should be owned by the models themselves.
+
+Target outcome:
+
+- shared views can safely read canonical singular and plural labels from model metadata
+- irregular plurals such as `categories`, `properties`, `policies`, `statuses`, and invariant forms such as `series` are defined explicitly in model `Meta`
+- breadcrumb fixes do not require page-specific pluralization patches when a model label changes later
+
 ### 2.3 Human-owned labels, not naive fallbacks
 
 Breadcrumb labels should come from explicit human-facing metadata rather than from route names, naive pluralization, or assumptions that every model exposes `name`.
@@ -257,6 +267,7 @@ Recommended direction:
 
 - give shared list/detail views a canonical way to expose user-facing singular/plural breadcrumb labels
 - stop depending on implicit pluralization or raw `_meta` defaults where they are not good enough
+- treat explicit model `verbose_name` and `verbose_name_plural` metadata as the default source of truth for model-backed list labels, especially for irregular plurals
 - provide a separate display-label helper for models whose detail label is not `name`
 
 ### 6.3 Keep `dashboard_url` as a link source, not as the label source
