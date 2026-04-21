@@ -126,6 +126,14 @@ class GeoDatasetModelTestCase(TestCase):
             reverse("geodataset-detail", kwargs={"pk": dataset.pk}),
         )
 
+    def test_get_map_url_uses_dataset_scoped_map_route(self):
+        dataset = GeoDataset.objects.create(name="Dataset", region=self.region)
+
+        self.assertEqual(
+            dataset.get_map_url(),
+            reverse("geodataset-map", kwargs={"pk": dataset.pk}),
+        )
+
     def test_get_features_api_basename_prefers_explicit_field(self):
         dataset = GeoDataset.objects.create(
             name="Dataset",

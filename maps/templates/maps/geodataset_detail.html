@@ -24,6 +24,10 @@
 
 {% block options_secondary_actions %}
   {{ block.super }}
+  <a class="btn btn-outline-primary w-100 mb-2"
+     href="{{ object.get_map_url }}">
+    <i class="fas fa-map"></i> Open filtered map
+  </a>
   <a class="btn btn-outline-secondary w-100 mb-2"
      href="{% url 'geodataset-list' %}">
     <i class="fas fa-table-cells-large"></i> Explorer

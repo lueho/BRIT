@@ -36,6 +36,7 @@ from .views import (
     GeoDataSetPrivateGalleryView,
     GeoDataSetPublishedFilterView,
     GeoDataSetPublishedGalleryView,
+    GeoDataSetRuntimeMapView,
     GeoDataSetUpdateView,
     LocationAutocompleteView,
     LocationCreateView,
@@ -100,6 +101,11 @@ urlpatterns = [
         "geodatasets/<int:pk>/",
         GeoDataSetDetailView.as_view(),
         name="geodataset-detail",
+    ),
+    path(
+        "geodatasets/<int:pk>/map/",
+        GeoDataSetRuntimeMapView.as_view(),
+        name="geodataset-map",
     ),
     path(
         "geodatasets/<int:pk>/update/",

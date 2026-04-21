@@ -338,6 +338,39 @@ class GeoDataSetRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("api-region-geojson"))
 
+    def test_dataset_map_route_renders_for_anonymous(self):
+        response = self.client.get(
+            reverse("geodataset-map", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.dataset.name)
+        self.assertContains(
+            response,
+            reverse("geodataset-detail", kwargs={"pk": self.dataset.pk}),
+        )
+        self.assertContains(response, reverse("api-nuts-region-geojson"))
+
+    def test_dataset_map_route_works_without_legacy_model_name(self):
+        dataset = GeoDataset.objects.create(
+            name="Runtime-only dataset",
+            owner=self.owner,
+            publication_status="published",
+            region=self.region,
+        )
+        GeoDatasetRuntimeConfiguration.objects.create(
+            dataset=dataset,
+            backend_type="django_model",
+            runtime_model_name="NutsRegion",
+        )
+        dataset.sources.add(self.source)
+
+        response = self.client.get(reverse("geodataset-map", kwargs={"pk": dataset.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, dataset.name)
+        self.assertContains(response, reverse("api-nuts-region-geojson"))
+
 
 # ----------- Location CRUD---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------

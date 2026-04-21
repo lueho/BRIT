@@ -1,6 +1,6 @@
 # Dataset Registry and Federated Geodata Target-State Plan
 
-- **Status**: Active roadmap; Phase 0 audit complete, Phase 0 design-definition still in progress
+- **Status**: Active roadmap; Phase 0 complete, Phase 1 Task 1.1 complete, Task 1.2 in progress
 - **Date**: 2026-04-16
 - **Scope**: `maps` dataset onboarding, standalone exploration, long-term federation of external geospatial data sources, and domain-level harmonized integration across incompatible datasets
 
@@ -1065,6 +1065,18 @@ Deliverables:
     - `maps/tests/test_views.py`
     - `maps/tests/test_filters.py`
     - additional `maps/tests/` modules if needed
+
+### Phase 1 status checkpoint
+
+- **Task 1.1 is complete**
+  - `GeoDataset` now stores runtime metadata through normalized subordinate models rather than flat runtime fields or JSON-style allowlists.
+  - `GeoDatasetRuntimeConfiguration` now holds backend and relation metadata, while `GeoDatasetColumnPolicy` stores one row per exposed dataset column.
+  - `maps/forms.py`, `maps/admin.py`, `maps/views.py`, and the pending `maps/migrations/0012_geodataset_runtime_metadata.py` have been updated to use that normalized contract.
+  - Focused Dockerized validation passed for `maps.tests.test_models`, `maps.tests.test_views`, `maps.tests.test_forms`, and `maps.tests.test_filters` using `brit.settings.testrunner`.
+
+- **Current next step**
+  - Finish Task 1.2 by adding the dataset-scoped runtime route family beyond the already-landed canonical dataset detail route.
+  - Use that route family to continue Task 1.3 by proving map views can resolve at least one dataset by stable dataset identity rather than by a hardcoded route name.
 
 Success criteria:
 

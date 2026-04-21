@@ -612,6 +612,12 @@ class GeoDataset(NamedUserCreatedObject):
             )
         )
 
+    def get_map_url(self):
+        try:
+            return reverse("geodataset-map", kwargs={"pk": self.pk})
+        except NoReverseMatch:
+            return self.get_absolute_url()
+
     def get_absolute_url(self):
         try:
             return reverse("geodataset-detail", kwargs={"pk": self.pk})

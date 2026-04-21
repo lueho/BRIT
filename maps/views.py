@@ -24,6 +24,10 @@ from maps.serializers import (
     RegionGeoFeatureModelSerializer,
 )
 from utils.forms import TomSelectFormsetHelper
+from utils.object_management.permissions import (
+    filter_queryset_for_user,
+    get_object_policy,
+)
 from utils.object_management.views import (
     CreateUserObjectMixin,
     OwnedObjectModelSelectOptionsView,
@@ -490,6 +494,16 @@ class GeoDataSetDetailView(MapMixin, UserCreatedObjectDetailView):
         return self._cached_map_configuration
 
 
+LEGACY_DATASET_RUNTIME_COMPATIBILITY = {
+    "NutsRegion": {
+        "model": NutsRegion,
+        "filterset_class": NutsRegionFilterSet,
+        "template_name": "nuts_region_map.html",
+        "features_api_basename": "api-nuts-region",
+    }
+}
+
+
 class FilteredMapMixin(MapMixin):
     model_name = None  # TODO: Remove this for pk
     template_name = "filtered_map.html"
@@ -544,6 +558,62 @@ class FilteredMapMixin(MapMixin):
             total_count = None
         context.update({
             "total_count": total_count,
+        })
+        return context
+
+
+class GeoDataSetRuntimeMapView(UserPassesTestMixin, FilteredMapMixin, FilterView):
+    paginate_by = None
+
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        dataset = self.get_dataset()
+        runtime_model_name = dataset.get_runtime_model_name()
+        compatibility = LEGACY_DATASET_RUNTIME_COMPATIBILITY.get(runtime_model_name)
+        if compatibility is None:
+            raise ImproperlyConfigured(
+                f"No dataset runtime compatibility registered for {runtime_model_name}."
+            )
+        self.object = dataset
+        self.model = compatibility["model"]
+        self.filterset_class = compatibility["filterset_class"]
+        self.template_name = compatibility["template_name"]
+        self.model_name = runtime_model_name
+        self.features_layer_api_basename = (
+            dataset.get_features_api_basename()
+            or compatibility["features_api_basename"]
+        )
+        self.map_title = dataset.name
+        self.dashboard_url = dataset.get_absolute_url()
+
+    def test_func(self):
+        policy = get_object_policy(
+            self.request.user,
+            self.get_dataset(),
+            request=self.request,
+        )
+        return (
+            policy["is_published"]
+            or policy["is_archived"]
+            or policy["is_owner"]
+            or policy["is_staff"]
+            or (policy["is_in_review"] and policy["is_moderator"])
+        )
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return filter_queryset_for_user(queryset, self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        dataset = self.get_dataset()
+        context.update({
+            "object": dataset,
+            "dataset": dataset,
+            "dashboard_url": dataset.get_absolute_url(),
+            "public_map_url": dataset.get_map_url(),
+            "private_map_url": dataset.get_map_url(),
+            "review_map_url": dataset.get_map_url(),
         })
         return context
 
