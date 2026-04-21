@@ -28,21 +28,47 @@
   {% endif %}
 {% endblock detail_top_image %}
 {% block detail_body %}
+  <div class="rounded border bg-body-tertiary p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div>
+        <div class="small text-muted text-uppercase fw-semibold mb-1">Identity</div>
+        <h2 class="h4 mb-1">{{ object.name }}</h2>
+        <div class="text-muted">{{ object.material.name }}</div>
+        <div class="small text-muted mt-2">
+          {% if object.description %}
+            {{ object.description|truncatewords:20 }}
+          {% elif object.location %}
+            Sample record for {{ object.material.name|lower }} collected in {{ object.location }}.
+          {% else %}
+            Sample record for {{ object.material.name|lower }} with linked composition and property data.
+          {% endif %}
+        </div>
+      </div>
+      <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+        {% if object.series %}
+          <span class="badge rounded-pill text-bg-light">Series: {{ object.series.name }}</span>
+        {% else %}
+          <span class="badge rounded-pill text-bg-light">Standalone sample</span>
+        {% endif %}
+        {% if object.datetime %}
+          <span class="badge rounded-pill text-bg-light">{{ object.datetime|date:"Y-m-d H:i" }}</span>
+        {% endif %}
+        {% if object.location %}<span class="badge rounded-pill text-bg-light">{{ object.location }}</span>{% endif %}
+        {% if sample_summary.component_measurement_count %}
+          <span class="badge rounded-pill text-bg-light">Raw data available</span>
+        {% endif %}
+        {% if sample_summary.composition_count %}
+          <span class="badge rounded-pill text-bg-light">Normalized view available</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
   <div class="row g-3 mb-4">
     <div class="col-12 col-lg-7" id="sample-context">
       <div class="card shadow-sm h-100">
         <div class="card-body">
           <div class="small text-muted text-uppercase fw-semibold mb-1">Context</div>
           <h3 class="h6 mb-3">About this sample</h3>
-          {% if object.description %}
-            <div class="mb-3">
-              <div class="small text-muted sample-description-clamp"
-                   id="sampleDescription">{{ object.description|linebreaksbr }}</div>
-              <button class="btn btn-link btn-sm p-0 d-none"
-                      id="sampleDescriptionToggle"
-                      type="button">Read more</button>
-            </div>
-          {% endif %}
           <dl class="row mb-0 sample-detail-fields">
             <dt class="col-sm-4">Material</dt>
             <dd class="col-sm-8">
@@ -119,58 +145,63 @@
     <div class="col-12 col-lg-5">
       <div class="card shadow-sm h-100" id="sample-overview">
         <div class="card-body">
-          <div class="small text-muted text-uppercase fw-semibold mb-1">Overview</div>
+          <div class="small text-muted text-uppercase fw-semibold mb-1">Quality and provenance</div>
           <h3 class="h6 mb-3">At a glance</h3>
-          <ul class="list-unstyled sample-overview-metrics mb-3">
-            <li class="d-flex justify-content-between align-items-baseline py-1 border-bottom">
-              <span class="small text-muted">Composition data
-                <span class="d-block text-muted fst-italic metric-hint">Raw component measurements</span>
-              </span>
-              <span class="h5 mb-0 fw-semibold">{{ sample_summary.component_measurement_count }}</span>
-            </li>
-            <li class="d-flex justify-content-between align-items-baseline py-1 border-bottom">
-              <span class="small text-muted">Raw data groups
-                <span class="d-block text-muted fst-italic metric-hint">Component groups with measurements</span>
-              </span>
-              <span class="h5 mb-0 fw-semibold">{{ sample_summary.component_measurement_group_count }}</span>
-            </li>
-            <li class="d-flex justify-content-between align-items-baseline py-1 border-bottom">
-              <span class="small text-muted">Composition groups
-                <span class="d-block text-muted fst-italic metric-hint">Normalized to 100%</span>
-              </span>
-              <span class="h5 mb-0 fw-semibold">{{ sample_summary.composition_count }}</span>
-            </li>
-            <li class="d-flex justify-content-between align-items-baseline py-1 border-bottom">
-              <span class="small text-muted">Other sample properties
-                <span class="d-block text-muted fst-italic metric-hint">Non-mass properties (moisture, density, …)</span>
-              </span>
-              <span class="h5 mb-0 fw-semibold">{{ sample_summary.property_value_count }}</span>
-            </li>
-            <li class="d-flex justify-content-between align-items-baseline py-1">
-              <span class="small text-muted">Completeness
-                <span class="d-block text-muted fst-italic metric-hint">
+          <div class="row g-3 align-items-stretch">
+            <div class="col-6">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Composition data</div>
+                <div class="h4 mb-0">{{ sample_summary.component_measurement_count }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Other sample properties</div>
+                <div class="h4 mb-0">{{ sample_summary.property_value_count }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Composition groups</div>
+                <div class="h4 mb-0">{{ sample_summary.composition_count }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Raw data groups</div>
+                <div class="h4 mb-0">{{ sample_summary.component_measurement_group_count }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Completeness</div>
+                <div class="h4 mb-0">{{ sample_completeness.score }}%</div>
+                <div class="small text-muted mt-1">
                   {{ sample_completeness.completed_count }} of {{ sample_completeness.total_count }} checks complete
-                </span>
-              </span>
-              <span class="h5 mb-0 fw-semibold">{{ sample_completeness.score }}%</span>
-            </li>
-          </ul>
-          <div class="progress sample-overview-progress"
-               role="progressbar"
-               aria-label="Completeness"
-               aria-valuenow="{{ sample_completeness.score }}"
-               aria-valuemin="0"
-               aria-valuemax="100">
-            <div class="progress-bar {% if sample_completeness.score == 100 %}bg-success{% elif sample_completeness.score >= 60 %}bg-info{% else %}bg-warning{% endif %}"
-                 style="width: {{ sample_completeness.score }}%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Normalization</div>
+                <div class="fw-semibold mb-0">
+                  {% if sample_summary.composition_count %}
+                    Available
+                  {% else %}
+                    Not yet available
+                  {% endif %}
+                </div>
+                <div class="small text-muted mt-1">
+                  {{ sample_summary.sample_source_count }} linked source{{ sample_summary.sample_source_count|pluralize }}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
 {% endblock detail_body %}
-{% block detail_footer_wrapper %}
-{% endblock detail_footer_wrapper %}
 {% block detail_header_primary_actions %}
   <div class="btn-group me-2" role="group">
     {% with back_url=request.GET.back %}
@@ -196,20 +227,27 @@
         <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">List</span>
       </a>
     {% endif %}
-  </div>
-  {% if data.compositions %}
-    <a class="btn btn-sm btn-primary me-2"
-       href="#normalized-compositions"
-       title="See the normalized composition for this sample">
-      <i class="fas fa-chart-pie"></i> <span class="d-none d-md-inline">View composition</span>
+    <a class="btn btn-sm btn-outline-secondary"
+       href="{% url 'materials-explorer' %}"
+       title="Open Explorer (dashboard)">
+      <i class="fas fa-table-cells-large"></i> <span class="d-none d-md-inline">Explorer</span>
     </a>
-  {% elif sample_summary.component_measurement_count or sample_summary.property_value_count %}
+  </div>
+  {% if sample_summary.component_measurement_count or sample_summary.property_value_count %}
     <a class="btn btn-sm btn-primary me-2"
        href="#sample-measurements-tabs"
        title="Explore measurements">
       <i class="fas fa-chart-column"></i> <span class="d-none d-md-inline">Explore measurements</span>
     </a>
   {% endif %}
+  {% if sample_summary.sample_source_count %}
+    <a class="btn btn-sm btn-outline-secondary me-2"
+       href="#sample-context"
+       title="View source context">
+      <i class="fas fa-book"></i> <span class="d-none d-md-inline">View sources</span>
+    </a>
+  {% endif %}
+  {{ block.super }}
 {% endblock detail_header_primary_actions %}
 {% block options_tab_title %}
   {% if sample_layout_mode == "workspace" %}
@@ -329,15 +367,15 @@
     {% endif %}
   {% else %}
     <p class="text-muted small fw-semibold text-uppercase mb-1">Explore</p>
-    {% if data.compositions %}
-      <a class="btn btn-primary w-100 mb-2" href="#normalized-compositions">
-        <i class="fas fa-chart-pie"></i> View composition
+    {% if sample_summary.component_measurement_count or sample_summary.property_value_count %}
+      <a class="btn btn-primary w-100 mb-2" href="#sample-measurements-tabs">
+        <i class="fas fa-chart-column"></i> Explore measurements
       </a>
     {% endif %}
-    {% if sample_summary.component_measurement_count or sample_summary.property_value_count %}
-      <a class="btn {% if data.compositions %}btn-outline-secondary{% else %}btn-primary{% endif %} w-100 mb-2"
-         href="#sample-measurements-tabs">
-        <i class="fas fa-chart-column"></i> Explore measurements
+    {% if data.compositions %}
+      <a class="btn btn-outline-secondary w-100 mb-2"
+         href="#normalized-compositions">
+        <i class="fas fa-chart-pie"></i> View normalized composition
       </a>
     {% endif %}
     {% if sample_summary.sample_source_count %}
@@ -356,7 +394,8 @@
 {% endblock options_secondary_actions %}
 {% block options_export %}
   {% if component_measurements %}
-    <p class="text-muted small fw-semibold text-uppercase mb-1">Export</p>
+    <hr class="my-2">
+    <p class="text-muted small fw-semibold text-uppercase mb-1 mt-2">Export</p>
     <button type="button"
             class="btn btn-outline-primary w-100 mb-2"
             id="exportBtn"
@@ -369,198 +408,14 @@
   {% object_policy object as policy %}
   {% with properties=property_values %}
     {% regroup component_measurements by group as measurements_by_group %}
-    {# --- Section intro: explain raw → derived relationship and offer quick nav --- #}
     <div class="col col-12">
-      <div class="d-flex justify-content-between align-items-end gap-3 flex-wrap mb-3">
-        <div>
-          <div class="small text-muted text-uppercase fw-semibold">Composition &amp; properties</div>
-          <h4 class="h5 mb-1">What we measured and what it means</h4>
-          <div class="small text-muted sample-section-intro">
-            Raw component measurements are the canonical record. Normalized compositions and derived views
-            are computed from those measurements.
-          </div>
-        </div>
-        <ul class="nav nav-pills small flex-wrap gap-1 sample-section-nav"
-            aria-label="Jump to section">
-          {% if data.compositions %}
-            <li class="nav-item">
-              <a class="nav-link py-1 px-2" href="#normalized-compositions">
-                <i class="fas fa-chart-pie me-1"></i>Normalized composition
-              </a>
-            </li>
-          {% endif %}
-          <li class="nav-item">
-            <a class="nav-link py-1 px-2" href="#sample-measurements-tabs">
-              <i class="fas fa-flask me-1"></i>Component measurements
-              <span class="badge ms-1 {% if component_measurements|length %}text-bg-secondary{% else %}text-bg-light border text-muted{% endif %}">{{ component_measurements|length }}</span>
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link py-1 px-2" href="#sample-properties-tab-link">
-              <i class="fas fa-vial me-1"></i>Sample properties
-              <span class="badge ms-1 {% if properties|length %}text-bg-secondary{% else %}text-bg-light border text-muted{% endif %}">{{ properties|length }}</span>
-            </a>
-          </li>
-        </ul>
-      </div>
-    </div>
-    {# --- Normalized compositions: derived interpretation shown first for quick reading --- #}
-    {% if data.compositions %}
-      <div class="col col-12" id="normalized-compositions">
-        {% with primary_composition=data.compositions.0 %}
-          <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-2">
-            <div>
-              <h5 class="mb-0">Normalized composition</h5>
-              <div class="small text-muted">
-                {% if primary_composition.is_derived %}
-                  Derived on the fly from the raw measurements below; each group normalized to 100%.
-                {% else %}
-                  Saved composition records for this sample.
-                {% endif %}
-              </div>
-            </div>
-            <a class="btn btn-sm btn-outline-secondary"
-               href="#sample-measurements-tabs">
-              <i class="fas fa-arrow-down"></i>
-              <span class="d-none d-md-inline">Raw measurements</span>
-            </a>
-          </div>
-        {% endwith %}
-      </div>
-      {% for composition in data.compositions %}
-        <div class="col col-12 col-md-6 col-xl-3 col-lg-4 mb-3">
-          <div class="card shadow-sm h-100 tab-card">
-            <div class="card-header tab-card-header bg-body-tertiary border-bottom-0 py-3">
-              <div class="d-flex justify-content-between align-items-start gap-2">
-                <div>
-                  <h6 class="mb-0">
-                    <a href="{% url 'materialcomponentgroup-detail-modal' composition.group %}"
-                       class="modal-link text-decoration-none text-body">{{ composition.group_name }}</a>
-                  </h6>
-                  <div class="d-flex align-items-center gap-2 flex-wrap small mt-1">
-                    {% if composition.is_derived %}
-                      <span class="badge rounded-pill text-bg-light border"
-                            title="Derived from raw measurements">Derived</span>
-                    {% else %}
-                      <span class="badge rounded-pill text-bg-light border"
-                            title="Stored composition record">Saved</span>
-                    {% endif %}
-                    <span class="text-muted">% of {{ composition.fractions_of_name }}</span>
-                  </div>
-                </div>
-                <ul class="nav nav-pills mb-0"
-                    id="composition-tabs-{{ composition.id }}"
-                    role="tablist">
-                  <li class="nav-item">
-                    <a class="nav-link active py-1 px-2 small"
-                       id="composition-table-tab-{{ composition.id }}"
-                       data-bs-toggle="tab"
-                       href="#composition-table-{{ composition.id }}-tab"
-                       role="tab"
-                       aria-controls="composition-table-{{ composition.id }}-tab"
-                       aria-selected="true">Table</a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link py-1 px-2 small"
-                       id="composition-chart-tab-{{ composition.id }}"
-                       data-bs-toggle="tab"
-                       href="#composition-chart-{{ composition.id }}-tab"
-                       role="tab"
-                       aria-controls="composition-chart-{{ composition.id }}-tab"
-                       aria-selected="false">Chart</a>
-                  </li>
-                </ul>
-              </div>
-            </div>
-            <div class="card-body tab-content"
-                 id="composition-tabs-{{ composition.id }}-content">
-              <div class="tab-pane fade show active"
-                   id="composition-table-{{ composition.id }}-tab"
-                   role="tabpanel"
-                   aria-labelledby="composition-table-tab-{{ composition.id }}">
-                <table class="table table-sm mb-0">
-                  <thead>
-                    <tr>
-                      <th>Component</th>
-                      <th class="text-end">Share</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for share in composition.shares %}
-                      <tr>
-                        <td>
-                          <a href="{% url 'materialcomponent-detail-modal' share.component %}"
-                             class="modal-link">{{ share.component_name }}</a>
-                        </td>
-                        <td class="text-end text-nowrap">{{ share.as_percentage }}</td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-              <div class="tab-pane fade p-0"
-                   id="composition-chart-{{ composition.id }}-tab"
-                   role="tabpanel"
-                   aria-labelledby="composition-chart-tab-{{ composition.id }}">
-                <div id="composition-chart-{{ composition.id }}"></div>
-              </div>
-            </div>
-            {% if policy.can_manage_samples %}
-              <div class="card-footer d-flex align-items-center">
-                {% if composition.is_derived %}
-                  <a id="move-derived-group-{{ composition.group }}-left"
-                     href="{% url 'derived-composition-order-down' sample_pk=object.pk group_pk=composition.group %}?next={{ request.path }}"
-                     class="me-3 nowrap"
-                     title="Move group left"
-                     aria-label="Move derived group {{ composition.group_name }} left">
-                    <i class="fas fa-fw fa-arrow-left"></i>
-                  </a>
-                  <span class="text-muted small">Order derived group</span>
-                  <a id="move-derived-group-{{ composition.group }}-right"
-                     href="{% url 'derived-composition-order-up' sample_pk=object.pk group_pk=composition.group %}?next={{ request.path }}"
-                     class="ms-auto nowrap"
-                     title="Move group right"
-                     aria-label="Move derived group {{ composition.group_name }} right">
-                    <i class="fas fa-fw fa-arrow-right"></i>
-                  </a>
-                {% else %}
-                  <a id="move-group-{{ composition.id }}-left"
-                     href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}"
-                     class="me-3 nowrap"
-                     title="Move group left"
-                     aria-label="Move saved composition group {{ composition.group_name }} left">
-                    <i class="fas fa-fw fa-arrow-left"></i>
-                  </a>
-                  <a id="edit-group-{{ composition.id }}"
-                     href="{% url 'composition-update' composition.id %}?next={{ request.path }}"
-                     class="me-3 nowrap">
-                    <i class="fas fa-fw fa-pen-to-square"></i> Edit
-                  </a>
-                  <a id="remove-group-{{ composition.id }}"
-                     href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}"
-                     class="me-3 nowrap modal-link">
-                    <i class="fas fa-fw fa-trash"></i> Delete
-                  </a>
-                  <a id="move-group-{{ composition.id }}-right"
-                     href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}"
-                     class="ms-auto nowrap"
-                     title="Move group right"
-                     aria-label="Move saved composition group {{ composition.group_name }} right">
-                    <i class="fas fa-fw fa-arrow-right"></i>
-                  </a>
-                {% endif %}
-              </div>
-            {% endif %}
-          </div>
-        </div>
-      {% endfor %}
-    {% endif %}
-    {# --- Measurement workspace: raw component measurements + other sample properties --- #}
-    <div class="col col-12 mt-2">
       <div class="card shadow h-100 tab-card">
         <div class="card-header tab-card-header bg-body-tertiary border-bottom-0 py-3">
           <div class="small text-muted text-uppercase fw-semibold mb-1">Measurements</div>
-          <h5 class="mb-3">Measurement workspace</h5>
+          <h5 class="mb-1">Measurement workspace</h5>
+          <div class="small text-muted mb-3">
+            Explore composition data and other sample properties from one comparison surface, then drill down into groups, basis, methods, and sources.
+          </div>
           <ul class="nav nav-tabs card-header-tabs"
               id="sample-measurements-tabs"
               role="tablist">
@@ -596,29 +451,34 @@
                id="sample-component-measurements-tab"
                role="tabpanel"
                aria-labelledby="sample-component-measurements-tab-link">
-            {% if measurements_by_group %}
-              <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom bg-body-tertiary">
-                <div class="d-flex align-items-center gap-2">
-                  <span class="small text-muted">{{ measurements_by_group|length }} group{{ measurements_by_group|length|pluralize }}</span>
-                  <div class="btn-group btn-group-sm" role="group">
-                    <button type="button"
-                            class="btn btn-outline-secondary btn-sm"
-                            onclick="expandAllGroups()">
-                      <i class="fas fa-expand-alt"></i> <span class="d-none d-md-inline">Expand</span>
-                    </button>
-                    <button type="button"
-                            class="btn btn-outline-secondary btn-sm"
-                            onclick="collapseAllGroups()">
-                      <i class="fas fa-compress-alt"></i> <span class="d-none d-md-inline">Collapse</span>
-                    </button>
-                  </div>
+            <div class="d-flex justify-content-between align-items-start p-3 border-bottom bg-body-tertiary gap-3 flex-wrap">
+              <div>
+                <div class="fw-semibold">Composition data</div>
+                <div class="small text-muted">
+                  Raw mass-related component measurements grouped by composition category. Use the normalized composition view below when you want shares that sum to 100% within a group.
                 </div>
-                {% if data.compositions %}
-                  <a class="btn btn-sm btn-outline-secondary"
-                     href="#normalized-compositions">
-                    <i class="fas fa-arrow-down"></i> <span class="d-none d-md-inline">Normalized view</span>
-                  </a>
-                {% endif %}
+              </div>
+              {% if data.compositions %}
+                <a class="btn btn-sm btn-outline-secondary"
+                   href="#normalized-compositions">
+                  <i class="fas fa-arrow-down"></i> Normalized view below
+                </a>
+              {% endif %}
+            </div>
+            {% if measurements_by_group %}
+              <div class="d-flex justify-content-end p-3 border-bottom">
+                <div class="btn-group btn-group-sm" role="group">
+                  <button type="button"
+                          class="btn btn-outline-secondary btn-sm"
+                          onclick="expandAllGroups()">
+                    <i class="fas fa-expand-alt"></i> Expand
+                  </button>
+                  <button type="button"
+                          class="btn btn-outline-secondary btn-sm"
+                          onclick="collapseAllGroups()">
+                    <i class="fas fa-compress-alt"></i> Collapse
+                  </button>
+                </div>
               </div>
               <div class="accordion accordion-flush" id="measurementsAccordion">
                 {% for group in measurements_by_group %}
@@ -636,7 +496,8 @@
                     </h2>
                     <div id="collapse-{{ forloop.counter }}"
                          class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
-                         aria-labelledby="heading-{{ forloop.counter }}">
+                         aria-labelledby="heading-{{ forloop.counter }}"
+                         data-bs-parent="#measurementsAccordion">
                       <div class="accordion-body p-0">
                         <div class="table-responsive">
                           <table class="table table-sm table-striped mb-0">
@@ -754,6 +615,9 @@
                id="sample-properties-tab"
                role="tabpanel"
                aria-labelledby="sample-properties-tab-link">
+            <div class="px-3 py-2 border-bottom bg-body-tertiary small text-muted">
+              Other sample properties such as moisture, density, pH, and related analytical results that are not part of the composition breakdown.
+            </div>
             {% if properties %}
               <div class="table-responsive">
                 <table class="table table-sm mb-0">
@@ -868,74 +732,239 @@
         </div>
       </div>
     </div>
-    {# --- Empty state for normalized compositions (shown after workspace when no compositions) --- #}
-    {% if not data.compositions %}
-      <div class="col col-12 mt-4">
-        <div class="card shadow h-100">
-          <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-            <h5 class="mb-0">Normalized composition</h5>
+  {% endwith %}
+  {# --- Composition Cards --- #}
+  {% if data.compositions %}
+    <div class="col col-12 mt-4 mb-n2" id="normalized-compositions">
+      {% with primary_composition=data.compositions.0 %}
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <h6 class="text-muted text-uppercase fw-semibold mb-1 small">Mass-related Measurements</h6>
+            <div class="fw-semibold">Normalized view</div>
+            <div class="small text-muted">
+              {% if primary_composition.is_derived %}
+                Derived from the raw mass-related measurements above. Each group is normalized to 100%, and missing fractions are shown as Other.
+              {% else %}
+                Saved composition groups for this sample. These cards reflect the stored composition records rather than an on-the-fly derivation from the raw measurements above.
+              {% endif %}
+            </div>
           </div>
-          <div class="card-body">
-            <div class="p-3">
-              <div class="rounded border border-dashed bg-body-tertiary p-3">
-                <div class="fw-semibold mb-1">No normalized compositions yet</div>
-                <div class="text-muted small">
-                  Composition groups appear here once mass-related measurements can be normalized to 100%, or when a composition is added manually for this sample.
-                </div>
-                {% if policy.can_manage_samples and perms.materials.add_componentmeasurement %}
-                  <div class="mt-3 d-flex gap-2 flex-wrap">
-                    <a class="btn btn-sm btn-outline-primary"
-                       href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
-                      <i class="fas fa-plus"></i> Add composition data
-                    </a>
-                    <a class="btn btn-sm btn-outline-secondary"
-                       href="{% url 'sample-add-composition' object.id %}?next={{ request.path }}">
-                      <i class="fas fa-plus"></i> Add composition manually
-                    </a>
-                  </div>
-                {% elif policy.can_manage_samples %}
-                  <div class="mt-3">
-                    <a class="btn btn-sm btn-outline-secondary"
-                       href="{% url 'sample-add-composition' object.id %}?next={{ request.path }}">
-                      <i class="fas fa-plus"></i> Add composition manually
-                    </a>
-                  </div>
-                {% endif %}
+          <a class="btn btn-sm btn-outline-secondary"
+             data-bs-toggle="tab"
+             href="#sample-component-measurements-tab"
+             role="tab"
+             aria-controls="sample-component-measurements-tab"
+             aria-selected="false">
+            <i class="fas fa-arrow-up"></i> View raw measurements
+          </a>
+        </div>
+      {% endwith %}
+    </div>
+    {% for composition in data.compositions %}
+      <div class="col col-12 col-md-6 col-xl-3 col-lg-4 mt-4">
+        <div class="card shadow h-100 tab-card">
+          <div class="card-header tab-card-header bg-body-tertiary border-bottom-0 py-3">
+            <h5 class="mb-0">
+              <a href="{% url 'materialcomponentgroup-detail-modal' composition.group %}"
+                 class="modal-link text-decoration-none text-body">{{ composition.group_name }}</a>
+            </h5>
+            <div class="d-flex align-items-center gap-2 flex-wrap small mt-2">
+              {% if composition.is_derived %}
+                <span class="badge rounded-pill text-bg-light border">Derived</span>
+              {% else %}
+                <span class="badge rounded-pill text-bg-light border">Saved composition</span>
+              {% endif %}
+              <span class="text-muted">% of {{ composition.fractions_of_name }}</span>
+            </div>
+            <ul class="nav nav-tabs card-header-tabs"
+                id="composition-tabs-{{ composition.id }}"
+                role="tablist">
+              <li class="nav-item">
+                <a class="nav-link active"
+                   id="composition-table-tab-{{ composition.id }}"
+                   data-bs-toggle="tab"
+                   href="#composition-table-{{ composition.id }}-tab"
+                   role="tab"
+                   aria-controls="composition-table-{{ composition.id }}-tab"
+                   aria-selected="true">Table</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link"
+                   id="composition-chart-tab-{{ composition.id }}"
+                   data-bs-toggle="tab"
+                   href="#composition-chart-{{ composition.id }}-tab"
+                   role="tab"
+                   aria-controls="composition-chart-{{ composition.id }}-tab"
+                   aria-selected="false">Chart</a>
+              </li>
+            </ul>
+          </div>
+          <div class="card-body tab-content"
+               id="composition-tabs-{{ composition.id }}-content">
+            <div class="tab-pane fade show active"
+                 id="composition-table-{{ composition.id }}-tab"
+                 role="tabpanel"
+                 aria-labelledby="composition-table-tab-{{ composition.id }}">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Component</th>
+                    <th class="text-end">Share</th>
+                  </tr>
+                </thead>
+                <caption class="text-muted small px-2 pb-1 text-end">% of {{ composition.fractions_of_name }}</caption>
+                <tbody>
+                  {% for share in composition.shares %}
+                    <tr>
+                      <td>
+                        <a href="{% url 'materialcomponent-detail-modal' share.component %}"
+                           class="modal-link">{{ share.component_name }}</a>
+                      </td>
+                      <td class="text-end text-nowrap">{{ share.as_percentage }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <div class="tab-pane fade p-0"
+                 id="composition-chart-{{ composition.id }}-tab"
+                 role="tabpanel"
+                 aria-labelledby="composition-chart-tab-{{ composition.id }}">
+              <div id="composition-chart-{{ composition.id }}"></div>
+            </div>
+          </div>
+          <div class="card-footer d-flex align-items-center">
+            {% if policy.can_manage_samples %}
+              {% if composition.is_derived %}
+                <a id="move-derived-group-{{ composition.group }}-left"
+                   href="{% url 'derived-composition-order-down' sample_pk=object.pk group_pk=composition.group %}?next={{ request.path }}"
+                   class="me-3 nowrap"
+                   title="Move group left"
+                   aria-label="Move derived group {{ composition.group_name }} left">
+                  <i class="fas fa-fw fa-arrow-left"></i>
+                </a>
+                <span class="text-muted small">Order derived group</span>
+                <a id="move-derived-group-{{ composition.group }}-right"
+                   href="{% url 'derived-composition-order-up' sample_pk=object.pk group_pk=composition.group %}?next={{ request.path }}"
+                   class="ms-auto nowrap"
+                   title="Move group right"
+                   aria-label="Move derived group {{ composition.group_name }} right">
+                  <i class="fas fa-fw fa-arrow-right"></i>
+                </a>
+              {% else %}
+                <a id="move-group-{{ composition.id }}-left"
+                   href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}"
+                   class="me-3 nowrap"
+                   title="Move group left"
+                   aria-label="Move saved composition group {{ composition.group_name }} left">
+                  <i class="fas fa-fw fa-arrow-left"></i>
+                </a>
+                <a id="edit-group-{{ composition.id }}"
+                   href="{% url 'composition-update' composition.id %}?next={{ request.path }}"
+                   class="me-3 nowrap">
+                  <i class="fas fa-fw fa-pen-to-square"></i> Edit
+                </a>
+                <a id="remove-group-{{ composition.id }}"
+                   href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}"
+                   class="me-3 nowrap modal-link">
+                  <i class="fas fa-fw fa-trash"></i> Delete
+                </a>
+                <a id="move-group-{{ composition.id }}-right"
+                   href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}"
+                   class="ms-auto nowrap"
+                   title="Move group right"
+                   aria-label="Move saved composition group {{ composition.group_name }} right">
+                  <i class="fas fa-fw fa-arrow-right"></i>
+                </a>
+              {% endif %}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="col col-12 mt-4">
+      <div class="card shadow h-100">
+        <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+          <h5 class="mb-0">Normalized composition</h5>
+        </div>
+        <div class="card-body">
+          <div class="p-3">
+            <div class="rounded border border-dashed bg-body-tertiary p-3">
+              <div class="fw-semibold mb-1">No normalized compositions yet</div>
+              <div class="text-muted small">
+                Composition groups appear here once mass-related measurements can be normalized to 100%, or when a composition is added manually for this sample.
               </div>
+              {% if policy.can_manage_samples and perms.materials.add_componentmeasurement %}
+                <div class="mt-3 d-flex gap-2 flex-wrap">
+                  <a class="btn btn-sm btn-outline-primary"
+                     href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
+                    <i class="fas fa-plus"></i> Add composition data
+                  </a>
+                  <a class="btn btn-sm btn-outline-secondary"
+                     href="{% url 'sample-add-composition' object.id %}?next={{ request.path }}">
+                    <i class="fas fa-plus"></i> Add composition manually
+                  </a>
+                </div>
+              {% elif policy.can_manage_samples %}
+                <div class="mt-3">
+                  <a class="btn btn-sm btn-outline-secondary"
+                     href="{% url 'sample-add-composition' object.id %}?next={{ request.path }}">
+                    <i class="fas fa-plus"></i> Add composition manually
+                  </a>
+                </div>
+              {% endif %}
             </div>
           </div>
         </div>
       </div>
-    {% endif %}
-  {% endwith %}
+    </div>
+  {% endif %}
+  <div class="col col-12 mt-4" id="sample-provenance">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase fw-semibold mb-1">Quality and provenance</div>
+        <h5 class="mb-3">Data basis and interpretation</h5>
+        <div class="row g-3">
+          <div class="col-12 col-lg-8">
+            <ul class="small text-muted mb-0">
+              <li>Composition data can be explored as raw group measurements or as normalized shares.</li>
+              <li>
+                Normalized groups sum to 100%, and any missing fraction is shown as <strong>Other</strong>.
+              </li>
+              <li>Basis components, units, sample sizes, methods, sources, and comments are shown inline where available.</li>
+              <li>
+                Use the raw measurement tables when you need analytical context; use the normalized view when you need a quick compositional comparison.
+              </li>
+            </ul>
+          </div>
+          <div class="col-12 col-lg-4">
+            <div class="border rounded p-3 h-100 bg-body-tertiary">
+              <div class="small text-muted mb-1">Linked provenance</div>
+              <div class="fw-semibold mb-2">
+                {{ sample_summary.sample_source_count }} source{{ sample_summary.sample_source_count|pluralize }}
+              </div>
+              {% with sample_sources=object.sources.all %}
+                {% if sample_sources %}
+                  <div class="d-flex flex-wrap gap-2">
+                    {% for source in sample_sources %}
+                      <a href="{% url 'source-detail-modal' source.pk %}"
+                         class="modal-link badge bg-light text-dark text-decoration-none"
+                         title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:"Source" }}</a>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <div class="small text-muted">No source record linked yet.</div>
+                {% endif %}
+              {% endwith %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 {% endblock second_row %}
 {% block detail_with_options_scripts %}
-  <style>
-    .sample-description-clamp {
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-    .sample-description-clamp.expanded {
-      -webkit-line-clamp: unset;
-    }
-    .sample-overview-metrics .metric-hint {
-      font-size: 0.72rem;
-    }
-    .sample-section-intro {
-      max-width: 60ch;
-    }
-    .sample-overview-progress {
-      height: 6px;
-    }
-    .sample-section-nav .nav-link {
-      color: var(--bs-body-color);
-    }
-    .sample-section-nav .nav-link:hover {
-      background-color: rgba(0, 0, 0, 0.04);
-    }
-  </style>
   {{ charts|json_script:"charts" }}
   <script>
     const charts = JSON.parse(document.getElementById("charts").textContent);
@@ -1040,19 +1069,6 @@
           alert('Failed to check export progress: ' + error.message);
         });
     }
-
-    (function() {
-      const desc = document.getElementById('sampleDescription');
-      const toggle = document.getElementById('sampleDescriptionToggle');
-      if (!desc || !toggle) return;
-      if (desc.scrollHeight > desc.clientHeight) {
-        toggle.classList.remove('d-none');
-        toggle.addEventListener('click', function() {
-          desc.classList.toggle('expanded');
-          toggle.textContent = desc.classList.contains('expanded') ? 'Show less' : 'Read more';
-        });
-      }
-    })();
 
   </script>
 {% endblock detail_with_options_scripts %}

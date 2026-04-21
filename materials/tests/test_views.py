@@ -3254,77 +3254,11 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "Wood chips")
         self.assertContains(response, "Hamburg")
         self.assertContains(response, "About this sample")
-        self.assertContains(response, "Overview")
         self.assertContains(response, "At a glance")
         self.assertContains(response, "Composition data")
         self.assertContains(response, "Other sample properties")
-        self.assertContains(response, "Composition groups")
         self.assertContains(response, "Raw data groups")
         self.assertContains(response, "Completeness")
-
-    def test_sample_detail_places_normalized_composition_before_measurement_workspace(
-        self,
-    ):
-        sample = Sample.objects.create(
-            name="Ordered Sample",
-            material=Material.objects.create(name="Ordered Material", type="material"),
-            owner=self.staff_user,
-            publication_status="published",
-        )
-        sample.compositions.all().delete()
-
-        unit_percent = Unit.objects.filter(name="%").first()
-        if unit_percent is None:
-            unit_percent = Unit.objects.create(
-                name="%", symbol="percent", owner=self.staff_user
-            )
-
-        group = MaterialComponentGroup.objects.create(
-            name="Chemical Elements",
-            owner=self.staff_user,
-            publication_status="published",
-        )
-        carbon = MaterialComponent.objects.create(
-            name="Carbon",
-            owner=self.staff_user,
-            publication_status="published",
-        )
-        nitrogen = MaterialComponent.objects.create(
-            name="Nitrogen",
-            owner=self.staff_user,
-            publication_status="published",
-        )
-        ComponentMeasurement.objects.create(
-            owner=self.staff_user,
-            sample=sample,
-            group=group,
-            component=carbon,
-            unit=unit_percent,
-            average=Decimal("60"),
-        )
-        ComponentMeasurement.objects.create(
-            owner=self.staff_user,
-            sample=sample,
-            group=group,
-            component=nitrogen,
-            unit=unit_percent,
-            average=Decimal("40"),
-        )
-
-        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
-
-        self.assertEqual(response.status_code, 200)
-        body = response.content.decode()
-        normalized_anchor = body.find('id="normalized-compositions"')
-        workspace_anchor = body.find("Measurement workspace")
-        self.assertGreater(normalized_anchor, -1)
-        self.assertGreater(workspace_anchor, -1)
-        self.assertLess(
-            normalized_anchor,
-            workspace_anchor,
-            "Derived normalized composition should appear before the raw measurement "
-            "workspace so anonymous explorers see the interpretation first.",
-        )
 
     def test_sample_detail_v2_flag_renders_prototype_template(self):
         sample = Sample.objects.create(
@@ -3367,14 +3301,14 @@ class EmptyStateViewsTestCase(TestCase):
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Composition &amp; properties")
-        self.assertContains(response, "What we measured and what it means")
-        self.assertContains(
-            response,
-            "Raw component measurements are the canonical record",
+        self.assertContains(response, "Measurement workspace")
+
+        v2_response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
         )
-        self.assertContains(response, 'href="#sample-measurements-tabs"')
-        self.assertContains(response, 'href="#sample-properties-tab-link"')
+        self.assertEqual(v2_response.status_code, 200)
+        self.assertContains(v2_response, "Quick actions")
+        self.assertContains(v2_response, "Classic view")
 
     def test_sample_detail_shows_sample_sources_as_badge_links(self):
         sample = Sample.objects.create(
@@ -3574,7 +3508,7 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertNotContains(response, "30.0 ± 0.0%")
         self.assertNotContains(response, "No compositions available")
 
-    def test_sample_detail_prefers_persisted_composition_over_measurement_fallback(
+    def test_sample_detail_prefers_raw_measurements_per_group_over_persisted_fallback(
         self,
     ):
         sample = Sample.objects.create(
@@ -3652,7 +3586,7 @@ class EmptyStateViewsTestCase(TestCase):
         compositions = response.context["data"]["compositions"]
         self.assertEqual(len(compositions), 1)
         composition = compositions[0]
-        self.assertFalse(composition["is_derived"])
+        self.assertTrue(composition["is_derived"])
         self.assertEqual(composition["group_name"], "Macronutrients")
         self.assertEqual(
             {share["component_name"] for share in composition["shares"]},
@@ -3660,13 +3594,116 @@ class EmptyStateViewsTestCase(TestCase):
         )
         self.assertEqual(
             {share["as_percentage"] for share in composition["shares"]},
-            {"20.0 ± 0.0%", "80.0 ± 0.0%"},
+            {"70.0%", "30.0%"},
         )
-        self.assertContains(response, "Saved composition")
+        self.assertEqual(composition["origin"], "raw_derived")
+        self.assertEqual(composition["warning_count"], 1)
+        self.assertContains(response, "Derived")
         self.assertNotContains(response, "70.0 ± 0.0%")
-        self.assertNotContains(response, "70.0%")
-        self.assertNotContains(
-            response, "Derived from raw measurements, each group normalized to 100%."
+        self.assertContains(response, "Normalized view")
+
+        v2_response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+        self.assertEqual(v2_response.status_code, 200)
+        self.assertContains(
+            v2_response,
+            "Raw measurements differ from the saved normalized composition for this group.",
+        )
+        self.assertContains(
+            v2_response, "Derived from raw measurements; each group normalized to 100%."
+        )
+
+    def test_sample_detail_uses_mixed_state_contract_per_group(self):
+        sample = Sample.objects.create(
+            name="Mixed-State Sample",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        sample.compositions.all().delete()
+
+        unit_percent = Unit.objects.filter(name="%").first()
+        if unit_percent is None:
+            unit_percent = Unit.objects.create(
+                name="%", symbol="percent", owner=self.staff_user
+            )
+        elif not unit_percent.symbol:
+            unit_percent.symbol = "percent"
+            unit_percent.save(update_fields=["symbol"])
+
+        persisted_group = MaterialComponentGroup.objects.create(
+            name="Persisted Group",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        raw_group = MaterialComponentGroup.objects.create(
+            name="Raw Group",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        protein = MaterialComponent.objects.create(
+            name="Protein",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        carbon = MaterialComponent.objects.create(
+            name="Carbon",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+
+        persisted_composition = Composition.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=persisted_group,
+            fractions_of=MaterialComponent.objects.default(),
+            order=100,
+        )
+        WeightShare.objects.create(
+            owner=self.staff_user,
+            composition=persisted_composition,
+            component=protein,
+            average=Decimal("1.0"),
+            standard_deviation=Decimal("0.0"),
+        )
+        Composition.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=raw_group,
+            fractions_of=MaterialComponent.objects.default(),
+            order=110,
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=raw_group,
+            component=carbon,
+            unit=unit_percent,
+            average=Decimal("100"),
+        )
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["composition_mode"], "mixed")
+        compositions = response.context["data"]["compositions"]
+        self.assertEqual(
+            [composition["group_name"] for composition in compositions],
+            ["Persisted Group", "Raw Group"],
+        )
+        self.assertEqual(
+            [composition["origin"] for composition in compositions],
+            ["persisted_fallback", "raw_derived"],
+        )
+
+        v2_response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+        self.assertEqual(v2_response.status_code, 200)
+        self.assertContains(
+            v2_response,
+            "Raw measurements are authoritative where present; saved compositions remain as fallback for other groups.",
         )
 
     def test_sample_detail_uses_settings_only_composition_order_for_derived_display(
@@ -3754,6 +3791,61 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertLess(
             content.index("Organic/Inorganic"),
             content.index("Chemical Elements"),
+        )
+
+    def test_sample_detail_classic_places_normalized_composition_after_measurement_workspace(
+        self,
+    ):
+        sample = Sample.objects.create(
+            name="Sample Layout Order",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        sample.compositions.all().delete()
+
+        unit_percent = Unit.objects.filter(name="%").first()
+        if unit_percent is None:
+            unit_percent = Unit.objects.create(
+                name="%", symbol="percent", owner=self.staff_user
+            )
+        elif not unit_percent.symbol:
+            unit_percent.symbol = "percent"
+            unit_percent.save(update_fields=["symbol"])
+
+        group = MaterialComponentGroup.objects.create(
+            name="Test Group",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        component = MaterialComponent.objects.create(
+            name="Test Component",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+
+        Composition.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            fractions_of=MaterialComponent.objects.default(),
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=component,
+            unit=unit_percent,
+            average=Decimal("100"),
+        )
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertLess(
+            content.index("Measurement workspace"),
+            content.index("Mass-related Measurements"),
         )
 
     def test_sample_detail_keeps_dm_percent_values_for_dm_measurements(self):
