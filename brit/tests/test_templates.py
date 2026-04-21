@@ -84,3 +84,54 @@ class CookieConsentTemplateHardeningTests(TestCase):
         self.assertIn("showCookieBar({", html)
         self.assertNotIn("legacyShowCookieBar", html)
         self.assertNotIn("cookiebar.js", html)
+
+
+class BreadcrumbModuleLandingTests(TestCase):
+    def test_bibliography_explorer_uses_module_label_in_title_and_breadcrumb(self):
+        response = self.client.get(reverse("bibliography-explorer"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "BRIT | Bibliography")
+        self.assertContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">Bibliography</li>',
+            html=True,
+        )
+        self.assertNotContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">Bibliography Explorer</li>',
+            html=True,
+        )
+
+    def test_waste_collection_explorer_uses_sources_module_parent(self):
+        response = self.client.get(reverse("wastecollection-explorer"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "BRIT | Waste Collection")
+        self.assertContains(
+            response,
+            f'<a href="{reverse("sources-explorer")}">Sources</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">Waste Collection</li>',
+            html=True,
+        )
+        self.assertNotContains(
+            response,
+            f'<a href="{reverse("sources-explorer")}">Sources Explorer</a>',
+            html=True,
+        )
+
+    def test_utils_dashboard_uses_utilities_label(self):
+        response = self.client.get(reverse("utils-dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "BRIT | Utilities")
+        self.assertContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">Utilities</li>',
+            html=True,
+        )
+        self.assertContains(response, '<h5 class="mb-0">Utilities</h5>', html=True)

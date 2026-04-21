@@ -3,7 +3,7 @@
 {% load crispy_forms_tags %}
 {% load crispy_forms_filters %}
 {% block title %}
-  BRIT | {{ breadcrumb_page_title|default:form_title|default:"Bioresource Information Tool" }}
+  BRIT | {% firstof breadcrumb_page_title form_title "Bioresource Information Tool" %}
 {% endblock title %}
 {% block content %}
   <div class="row">

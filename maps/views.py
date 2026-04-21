@@ -44,6 +44,7 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateView,
     get_tomselect_filter_pairs,
 )
+from utils.views import BreadcrumbContextMixin
 
 from .filters import (
     AttributeListFilter,
@@ -342,8 +343,10 @@ class MapMixin:
         return context
 
 
-class MapsDashboardView(TemplateView):
+class MapsDashboardView(BreadcrumbContextMixin, TemplateView):
     template_name = "maps_dashboard.html"
+    breadcrumb_module_label = "Maps"
+    breadcrumb_page_title = "Maps"
 
 
 # ----------- GeoDataSet CRUD ------------------------------------------------------------------------------------------

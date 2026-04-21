@@ -2,7 +2,7 @@
 {% load i18n %}
 {% load moderation_tags %}
 {% block title %}
-  BRIT | {{ breadcrumb_page_title|default:object.get_breadcrumb_object_label|default:"Bioresource Information Tool" }}
+  BRIT | {% firstof breadcrumb_page_title object.get_breadcrumb_object_label "Bioresource Information Tool" %}
 {% endblock title %}
 {% block content %}
   {# Obsolete rejection card removed: owners of declined items are redirected to the review feedback view #}

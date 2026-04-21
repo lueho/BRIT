@@ -10,6 +10,85 @@ from django.views.generic import ListView, TemplateView
 from .models import Redirect
 
 
+def build_breadcrumb_context(
+    *,
+    module_label=None,
+    module_url=None,
+    section_label=None,
+    section_url=None,
+    object_label=None,
+    object_url=None,
+    action_label=None,
+    page_title=None,
+):
+    return {
+        key: value
+        for key, value in {
+            "breadcrumb_module_label": module_label,
+            "breadcrumb_module_url": module_url,
+            "breadcrumb_section_label": section_label,
+            "breadcrumb_section_url": section_url,
+            "breadcrumb_object_label": object_label,
+            "breadcrumb_object_url": object_url,
+            "breadcrumb_action_label": action_label,
+            "breadcrumb_page_title": page_title,
+        }.items()
+        if value is not None
+    }
+
+
+class BreadcrumbContextMixin:
+    breadcrumb_module_label = None
+    breadcrumb_module_url = None
+    breadcrumb_section_label = None
+    breadcrumb_section_url = None
+    breadcrumb_object_label = None
+    breadcrumb_object_url = None
+    breadcrumb_action_label = None
+    breadcrumb_page_title = None
+
+    def get_breadcrumb_module_label(self):
+        return self.breadcrumb_module_label
+
+    def get_breadcrumb_module_url(self):
+        return self.breadcrumb_module_url
+
+    def get_breadcrumb_section_label(self):
+        return self.breadcrumb_section_label
+
+    def get_breadcrumb_section_url(self):
+        return self.breadcrumb_section_url
+
+    def get_breadcrumb_object_label(self):
+        return self.breadcrumb_object_label
+
+    def get_breadcrumb_object_url(self):
+        return self.breadcrumb_object_url
+
+    def get_breadcrumb_action_label(self):
+        return self.breadcrumb_action_label
+
+    def get_breadcrumb_page_title(self):
+        return self.breadcrumb_page_title
+
+    def get_breadcrumb_context(self):
+        return build_breadcrumb_context(
+            module_label=self.get_breadcrumb_module_label(),
+            module_url=self.get_breadcrumb_module_url(),
+            section_label=self.get_breadcrumb_section_label(),
+            section_url=self.get_breadcrumb_section_url(),
+            object_label=self.get_breadcrumb_object_label(),
+            object_url=self.get_breadcrumb_object_url(),
+            action_label=self.get_breadcrumb_action_label(),
+            page_title=self.get_breadcrumb_page_title(),
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(self.get_breadcrumb_context())
+        return context
+
+
 class NextOrSuccessUrlMixin:
     """
     If a 'next=<url>' parameter is given in the query string of the url,
@@ -133,29 +212,27 @@ class ModelSelectOptionsView(ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "include_empty_option": self.include_empty_option,
-                "selected": self.get_selected_object_pk(),
-            }
-        )
+        context.update({
+            "include_empty_option": self.include_empty_option,
+            "selected": self.get_selected_object_pk(),
+        })
         return context
 
     def get(self, request, *args, **kwargs):
         self.object_list = self.get_queryset()
-        return JsonResponse(
-            {
-                "options": render_to_string(
-                    self.template_name,
-                    context=self.get_context_data(),
-                    request=self.request,
-                )
-            }
-        )
+        return JsonResponse({
+            "options": render_to_string(
+                self.template_name,
+                context=self.get_context_data(),
+                request=self.request,
+            )
+        })
 
 
-class UtilsDashboardView(TemplateView):
+class UtilsDashboardView(BreadcrumbContextMixin, TemplateView):
     template_name = "utils_dashboard.html"
+    breadcrumb_module_label = "Utilities"
+    breadcrumb_page_title = "Utilities"
 
 
 class DynamicRedirectView(View):

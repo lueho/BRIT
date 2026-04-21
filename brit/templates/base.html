@@ -17,7 +17,7 @@
     {% endblock meta %}
     <title>
       {% block title %}
-        BRIT | {{ breadcrumb_page_title|default:title|default:form_title|default:"Bioresource Information Tool" }}
+        BRIT | {% firstof breadcrumb_page_title title form_title "Bioresource Information Tool" %}
       {% endblock title %}
     </title>
     {% include "partials/_analytics.html" %}

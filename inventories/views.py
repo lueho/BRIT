@@ -29,6 +29,7 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateView,
     get_tomselect_filter_value,
 )
+from utils.views import BreadcrumbContextMixin
 
 from .evaluations import ScenarioResult
 from .filters import ScenarioFilterSet
@@ -50,8 +51,10 @@ from .models import (
 from .tasks import run_inventory
 
 
-class InventoriesExplorerView(TemplateView):
+class InventoriesExplorerView(BreadcrumbContextMixin, TemplateView):
     template_name = "inventories_explorer.html"
+    breadcrumb_module_label = "Inventories"
+    breadcrumb_page_title = "Inventories"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -505,9 +508,10 @@ class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
         if scenario.status == 2:
             context = {"scenario": scenario, "task_list": {"tasks": []}}
             for task in RunningTask.objects.filter(scenario=scenario):
-                context["task_list"]["tasks"].append(
-                    {"task_id": task.uuid, "algorithm_name": task.algorithm.name}
-                )
+                context["task_list"]["tasks"].append({
+                    "task_id": task.uuid,
+                    "algorithm_name": task.algorithm.name,
+                })
 
             return render(request, "evaluation_progress.html", context)
         else:

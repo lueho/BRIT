@@ -5,7 +5,7 @@
 {% load moderation_tags %}
 {% load user_created_object_tags %}
 {% block title %}
-  BRIT | {{ breadcrumb_page_title|default:header|default:"Bioresource Information Tool" }}
+  BRIT | {% firstof breadcrumb_page_title header "Bioresource Information Tool" %}
 {% endblock title %}
 {% block custom_style %}
 {% endblock custom_style %}

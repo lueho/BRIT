@@ -30,7 +30,7 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateView,
     UserCreatedObjectUpdateWithInlinesView,
 )
-from utils.views import NextOrSuccessUrlMixin
+from utils.views import BreadcrumbContextMixin, NextOrSuccessUrlMixin
 
 from .filters import ProcessFilter
 from .forms import (
@@ -78,12 +78,10 @@ class ReviewObjectListView(ReviewObjectListMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "list_type": self.list_type,
-                "scope": "review",
-            }
-        )
+        context.update({
+            "list_type": self.list_type,
+            "scope": "review",
+        })
         return context
 
     def get_template_names(self):
@@ -97,10 +95,12 @@ class ReviewObjectListView(ReviewObjectListMixin, ListView):
 # ==============================================================================
 
 
-class ProcessDashboardView(TemplateView):
+class ProcessDashboardView(BreadcrumbContextMixin, TemplateView):
     """Main dashboard for the processes module."""
 
     template_name = "processes/dashboard.html"
+    breadcrumb_module_label = "Processes"
+    breadcrumb_page_title = "Processes"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

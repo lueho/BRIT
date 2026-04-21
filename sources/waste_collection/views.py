@@ -123,6 +123,7 @@ from utils.object_management.views import (
     WithdrawFromReviewModalView,
     WithdrawFromReviewView,
 )
+from utils.views import BreadcrumbContextMixin
 
 
 def _visible_collection_chain_for_user(collection, user):
@@ -159,8 +160,12 @@ def _frequency_display_context(frequency):
     }
 
 
-class CollectionExplorerView(TemplateView):
+class CollectionExplorerView(BreadcrumbContextMixin, TemplateView):
     template_name = "wastecollection_dashboard.html"
+    breadcrumb_module_label = "Sources"
+    breadcrumb_module_url = reverse_lazy("sources-explorer")
+    breadcrumb_section_label = "Waste Collection"
+    breadcrumb_page_title = "Waste Collection"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1053,15 +1058,13 @@ class CollectionCatchmentDetailView(CatchmentDetailView):
             if key:
                 grouped[key].append(collection)
 
-        context.update(
-            {
-                "downstream_published_collections": grouped["published"],
-                "downstream_review_collections": grouped["review"],
-                "downstream_private_collections": grouped["private"],
-                "downstream_declined_collections": grouped["declined"],
-                "downstream_archived_collections": grouped["archived"],
-            }
-        )
+        context.update({
+            "downstream_published_collections": grouped["published"],
+            "downstream_review_collections": grouped["review"],
+            "downstream_private_collections": grouped["private"],
+            "downstream_declined_collections": grouped["declined"],
+            "downstream_archived_collections": grouped["archived"],
+        })
         return context
 
 
@@ -1075,9 +1078,9 @@ class CollectionCatchmentModalDeleteView(UserCreatedObjectModalDeleteView):
 
     def get_success_url(self):
         if self.object.publication_status == "published":
-            return f"{reverse('collectioncatchment-list')}?scope=published"
+            return f"{reverse("collectioncatchment-list")}?scope=published"
         elif self.object.publication_status == "private":
-            return f"{reverse('collectioncatchment-list-owned')}?scope=private"
+            return f"{reverse("collectioncatchment-list-owned")}?scope=private"
 
 
 # ----------- CollectionCatchment Utils -------------------------------------------------------------------------------
@@ -1188,17 +1191,15 @@ class CollectionCopyView(CollectionCreateView):
         """
         initial = model_to_dict(self.object)
         waste_category = self.object.effective_waste_category
-        initial.update(
-            {
-                "waste_category": waste_category.id if waste_category else None,
-                "allowed_materials": [
-                    mat.id for mat in self.object.effective_allowed_materials
-                ],
-                "forbidden_materials": [
-                    mat.id for mat in self.object.effective_forbidden_materials
-                ],
-            }
-        )
+        initial.update({
+            "waste_category": waste_category.id if waste_category else None,
+            "allowed_materials": [
+                mat.id for mat in self.object.effective_allowed_materials
+            ],
+            "forbidden_materials": [
+                mat.id for mat in self.object.effective_forbidden_materials
+            ],
+        })
         self.object = None
         return initial
 
@@ -1248,17 +1249,15 @@ class CollectionCreateNewVersionView(CollectionCopyView):
         """
         initial = model_to_dict(self.object)
         waste_category = self.object.effective_waste_category
-        initial.update(
-            {
-                "waste_category": waste_category.id if waste_category else None,
-                "allowed_materials": [
-                    mat.id for mat in self.object.effective_allowed_materials
-                ],
-                "forbidden_materials": [
-                    mat.id for mat in self.object.effective_forbidden_materials
-                ],
-            }
-        )
+        initial.update({
+            "waste_category": waste_category.id if waste_category else None,
+            "allowed_materials": [
+                mat.id for mat in self.object.effective_allowed_materials
+            ],
+            "forbidden_materials": [
+                mat.id for mat in self.object.effective_forbidden_materials
+            ],
+        })
         if self.object.valid_until:
             initial["valid_from"] = self.object.valid_until + timedelta(days=1)
         else:
@@ -1693,17 +1692,15 @@ class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
     def get_initial(self):
         initial = super().get_initial()
         waste_category = self.object.effective_waste_category
-        initial.update(
-            {
-                "waste_category": waste_category.id if waste_category else None,
-                "allowed_materials": [
-                    mat.id for mat in self.object.effective_allowed_materials
-                ],
-                "forbidden_materials": [
-                    mat.id for mat in self.object.effective_forbidden_materials
-                ],
-            }
-        )
+        initial.update({
+            "waste_category": waste_category.id if waste_category else None,
+            "allowed_materials": [
+                mat.id for mat in self.object.effective_allowed_materials
+            ],
+            "forbidden_materials": [
+                mat.id for mat in self.object.effective_forbidden_materials
+            ],
+        })
         return initial
 
     def post(self, request, *args, **kwargs):

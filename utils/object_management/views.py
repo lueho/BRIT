@@ -57,6 +57,7 @@ from ..views import (
     ModelSelectOptionsView,
     NextOrSuccessUrlMixin,
     NoFormTagMixin,
+    build_breadcrumb_context,
 )
 from .redirects import ReviewActionRedirectResolver
 
@@ -139,33 +140,6 @@ def _get_model_list_url(model):
     if callable(getter):
         return getter()
     return getter
-
-
-def _build_breadcrumb_context(
-    *,
-    module_label=None,
-    module_url=None,
-    section_label=None,
-    section_url=None,
-    object_label=None,
-    object_url=None,
-    action_label=None,
-    page_title=None,
-):
-    return {
-        key: value
-        for key, value in {
-            "breadcrumb_module_label": module_label,
-            "breadcrumb_module_url": module_url,
-            "breadcrumb_section_label": section_label,
-            "breadcrumb_section_url": section_url,
-            "breadcrumb_object_label": object_label,
-            "breadcrumb_object_url": object_url,
-            "breadcrumb_action_label": action_label,
-            "breadcrumb_page_title": page_title,
-        }.items()
-        if value is not None
-    }
 
 
 def parse_tomselect_filter_expression(raw_expression):
@@ -1252,7 +1226,7 @@ class UserCreatedObjectListMixin:
             "dashboard_url": self.get_dashboard_url(),
         })
         context.update(
-            _build_breadcrumb_context(
+            build_breadcrumb_context(
                 module_label=self.breadcrumb_module_label or default_module_label,
                 module_url=(
                     self.breadcrumb_module_url
@@ -1728,7 +1702,7 @@ class UserCreatedObjectCreateView(
         default_module_label, _ = _get_default_breadcrumb_module(model)
         breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
         context.update(
-            _build_breadcrumb_context(
+            build_breadcrumb_context(
                 module_label=default_module_label,
                 module_url=_get_default_breadcrumb_module_url(model),
                 section_label=breadcrumb_section_label,
@@ -1851,7 +1825,7 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
             "review_logs": logs,
         })
         context.update(
-            _build_breadcrumb_context(
+            build_breadcrumb_context(
                 module_label=default_module_label,
                 module_url=_get_default_breadcrumb_module_url(obj.__class__),
                 section_label=breadcrumb_section_label,
@@ -2121,7 +2095,7 @@ class UserCreatedObjectUpdateView(
             "submit_button_text": "Save",
         })
         context.update(
-            _build_breadcrumb_context(
+            build_breadcrumb_context(
                 module_label=default_module_label,
                 module_url=_get_default_breadcrumb_module_url(model),
                 section_label=breadcrumb_section_label,
@@ -2171,7 +2145,7 @@ class UserCreatedObjectCreateWithInlinesView(
         default_module_label, _ = _get_default_breadcrumb_module(model)
         breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
         context.update(
-            _build_breadcrumb_context(
+            build_breadcrumb_context(
                 module_label=default_module_label,
                 module_url=_get_default_breadcrumb_module_url(model),
                 section_label=breadcrumb_section_label,
@@ -2219,7 +2193,7 @@ class UserCreatedObjectUpdateWithInlinesView(
             "formset_helper": self.formset_helper_class(),
         })
         context.update(
-            _build_breadcrumb_context(
+            build_breadcrumb_context(
                 module_label=default_module_label,
                 module_url=_get_default_breadcrumb_module_url(model),
                 section_label=breadcrumb_section_label,
