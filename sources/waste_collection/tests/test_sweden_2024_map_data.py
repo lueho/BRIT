@@ -20,6 +20,7 @@ from sources.waste_collection.sweden_2024_map_data import (
     RawMapRow,
     build_prepared_row,
     load_map_details,
+    load_map_import_details,
     load_prepared_map_details,
     load_raw_map_data,
     load_raw_map_details,
@@ -123,6 +124,44 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
                     "sorting_method": "Separate bins",
                     "bag_material": "Collection Support Item: Paper bags",
                 }
+            },
+        )
+
+    def test_load_map_import_details_includes_manual_review_metadata(self):
+        with NamedTemporaryFile(
+            "w", suffix=".csv", delete=False, encoding="utf-8"
+        ) as handle:
+            handle.write(
+                "lau_id,municipality_name,sorting_label,sorting_method,sorting_confidence,sorting_pixels,bag_label,bag_material,bag_confidence,bag_pixels,collection_system,no_collection,needs_manual_review,review_reasons\n"
+            )
+            handle.write(
+                "0180,Stockholm,Separata kärl,Separate bins,0.88,12,Papper,Collection Support Item: Paper bags,0.80,10,Door to door,0,0,\n"
+            )
+            handle.write(
+                "0181,Södertälje,ET,,0.71,7,ET,,0.69,7,No separate collection,1,1,bag ET disagrees with sorting map\n"
+            )
+            csv_path = Path(handle.name)
+        self.addCleanup(csv_path.unlink)
+
+        details = load_map_import_details(csv_path)
+
+        self.assertEqual(
+            details,
+            {
+                "0180": {
+                    "no_collection": False,
+                    "sorting_method": "Separate bins",
+                    "bag_material": "Collection Support Item: Paper bags",
+                    "needs_manual_review": False,
+                    "review_reasons": [],
+                },
+                "0181": {
+                    "no_collection": True,
+                    "sorting_method": None,
+                    "bag_material": None,
+                    "needs_manual_review": True,
+                    "review_reasons": ["bag ET disagrees with sorting map"],
+                },
             },
         )
 
@@ -450,6 +489,39 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
         self.assertEqual(updated[0]["sorting_method"], "")
         self.assertEqual(updated[0]["allowed_materials"], "")
         self.assertEqual(updated[0]["property_values"], [])
+
+    def test_apply_2024_map_details_adds_review_comment_for_manual_review_row(self):
+        records = [
+            {
+                "nuts_or_lau_id": "0180",
+                "waste_category": "Food waste",
+                "collection_system": "Door to door",
+                "sorting_method": "Separate bins",
+                "allowed_materials": "Collection Support Item: Paper bags",
+                "property_values": [{"property_id": 1}],
+            }
+        ]
+
+        updated = _apply_2024_map_details(
+            records,
+            {
+                "0180": {
+                    "no_collection": False,
+                    "sorting_method": "Separate bins",
+                    "bag_material": None,
+                    "needs_manual_review": True,
+                    "review_reasons": ["bag material unresolved; bag map unclassified"],
+                }
+            },
+        )
+
+        self.assertEqual(updated[0]["sorting_method"], "Separate bins")
+        self.assertEqual(updated[0]["allowed_materials"], "")
+        self.assertIn("review_comment", updated[0])
+        self.assertIn(
+            "bag material unresolved; bag map unclassified",
+            updated[0]["review_comment"],
+        )
 
     def test_write_raw_map_data(self):
         raw_map_data = RawMapData(

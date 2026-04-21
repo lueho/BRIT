@@ -470,12 +470,14 @@ class CollectionViewSetTestCase(APITestCase):
         )
 
         filtered_without_scope = self._get_collection_cache_key({"collector": "1"})
-        filtered_with_scope = self._get_collection_cache_key(
-            {"collector": "1", "scope": "published"}
-        )
-        filtered_other = self._get_collection_cache_key(
-            {"collector": "2", "scope": "published"}
-        )
+        filtered_with_scope = self._get_collection_cache_key({
+            "collector": "1",
+            "scope": "published",
+        })
+        filtered_other = self._get_collection_cache_key({
+            "collector": "2",
+            "scope": "published",
+        })
         self.assertEqual(
             filtered_without_scope,
             filtered_with_scope,
@@ -583,7 +585,7 @@ class CollectionReviewActionApiTestCase(APITestCase):
             owner=owner,
             title=f"{name} Source",
             abbreviation=f"{name}-source",
-            url=f"https://example.com/{name.lower().replace(' ', '-')}",
+            url=f"https://example.com/{name.lower().replace(" ", "-")}",
         )
         collection.sources.add(source)
         return collection
@@ -777,6 +779,82 @@ class CollectionImporterWorkflowTestCase(APITestCase):
                 valid_from=self.valid_from,
                 collection_system=self.collection_system,
             ).exists()
+        )
+
+    def test_import_review_comment_creates_comment_review_action(self):
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        stats = importer.run([
+            self._make_record()
+            | {"review_comment": "Please verify unresolved bag map interpretation."}
+        ])
+        self.assertEqual(stats["created"], 1)
+        self.assertEqual(stats["review_comments_created"], 1)
+
+        collection = Collection.objects.get(
+            owner=self.owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        comment_action = ReviewAction.for_object(collection).get(
+            action=ReviewAction.ACTION_COMMENT,
+            user=self.owner,
+        )
+        self.assertIn(
+            "Please verify unresolved bag map interpretation.",
+            comment_action.comment,
+        )
+
+    def test_import_review_comment_in_dry_run_counts_without_persisting(self):
+        importer = CollectionImporter(owner=self.owner, publication_status="private")
+        stats = importer.run(
+            [
+                self._make_record()
+                | {"review_comment": "Please verify unresolved dry-run map issue."}
+            ],
+            dry_run=True,
+        )
+
+        self.assertEqual(stats["created"], 1)
+        self.assertEqual(stats["review_comments_created"], 1)
+        self.assertFalse(
+            Collection.objects.filter(
+                owner=self.owner,
+                valid_from=self.valid_from,
+                collection_system=self.collection_system,
+            ).exists()
+        )
+
+    def test_bulk_import_endpoint_persists_review_comment(self):
+        self.client.force_login(self.staff_owner)
+
+        response = self.client.post(
+            reverse("api-waste-collection-bulk-import"),
+            {
+                "records": [
+                    self._make_record()
+                    | {
+                        "review_comment": "Please verify unresolved sorting map interpretation."
+                    }
+                ],
+                "publication_status": "private",
+                "dry_run": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        collection = Collection.objects.get(
+            owner=self.staff_owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        comment_action = ReviewAction.for_object(collection).get(
+            action=ReviewAction.ACTION_COMMENT,
+            user=self.staff_owner,
+        )
+        self.assertIn(
+            "Please verify unresolved sorting map interpretation.",
+            comment_action.comment,
         )
 
     def test_bulk_import_endpoint_preserves_material_lists(self):

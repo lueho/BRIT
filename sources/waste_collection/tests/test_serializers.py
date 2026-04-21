@@ -67,12 +67,14 @@ class CollectionModelSerializerTestCase(TestCase):
             valid_from=date(2020, 1, 1),
             description="This is a test case.",
         )
-        cls.collection.allowed_materials.set(
-            [cls.allowed_material_1, cls.allowed_material_2]
-        )
-        cls.collection.forbidden_materials.set(
-            [cls.forbidden_material_1, cls.forbidden_material_2]
-        )
+        cls.collection.allowed_materials.set([
+            cls.allowed_material_1,
+            cls.allowed_material_2,
+        ])
+        cls.collection.forbidden_materials.set([
+            cls.forbidden_material_1,
+            cls.forbidden_material_2,
+        ])
         cls.collection.flyers.add(waste_flyer_1)
         cls.collection.flyers.add(waste_flyer_2)
 
@@ -267,12 +269,14 @@ class CollectionFlatSerializerTestCase(TestCase):
             valid_from=date(2020, 1, 1),
             description="This is a test case.",
         )
-        cls.collection_nuts.allowed_materials.set(
-            [cls.allowed_material_1, cls.allowed_material_2]
-        )
-        cls.collection_nuts.forbidden_materials.set(
-            [cls.forbidden_material_1, cls.forbidden_material_2]
-        )
+        cls.collection_nuts.allowed_materials.set([
+            cls.allowed_material_1,
+            cls.allowed_material_2,
+        ])
+        cls.collection_nuts.forbidden_materials.set([
+            cls.forbidden_material_1,
+            cls.forbidden_material_2,
+        ])
         cls.collection_nuts.flyers.add(waste_flyer_1)
         cls.collection_nuts.flyers.add(waste_flyer_2)
 
@@ -294,12 +298,14 @@ class CollectionFlatSerializerTestCase(TestCase):
             frequency=frequency,
             description="This is a test case.",
         )
-        cls.collection_lau.allowed_materials.set(
-            [cls.allowed_material_1, cls.allowed_material_2]
-        )
-        cls.collection_lau.forbidden_materials.set(
-            [cls.forbidden_material_1, cls.forbidden_material_2]
-        )
+        cls.collection_lau.allowed_materials.set([
+            cls.allowed_material_1,
+            cls.allowed_material_2,
+        ])
+        cls.collection_lau.forbidden_materials.set([
+            cls.forbidden_material_1,
+            cls.forbidden_material_2,
+        ])
         cls.collection_lau.flyers.add(waste_flyer_1)
         cls.collection_lau.flyers.add(waste_flyer_2)
 
@@ -442,6 +448,7 @@ class CollectionImportRecordSerializerTestCase(TestCase):
         serializer = CollectionImportRecordSerializer()
         self.assertIn("allowed_materials", serializer.fields)
         self.assertIn("forbidden_materials", serializer.fields)
+        self.assertIn("review_comment", serializer.fields)
 
 
 class CollectionFrequencyMutationSerializerTestCase(TestCase):

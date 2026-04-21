@@ -32,7 +32,7 @@ from urllib.request import Request, urlopen
 import openpyxl
 from django.core.management.base import BaseCommand, CommandError
 
-from ...sweden_2024_map_data import load_map_details
+from ...sweden_2024_map_data import load_map_import_details
 
 # ---------------------------------------------------------------------------
 # Default file paths (local, relative to cwd)
@@ -45,6 +45,7 @@ _MUNICIPALITIES_CSV = Path("sweden_municipalities.csv")
 _MAP_DATA_2024 = Path("sweden_2024_map_data.json")
 _BATCH_SIZE = 50
 _VALID_STATUSES = ("private", "review")
+_SWEDEN_2024_REVIEW_NOTE_PREFIX = "Sweden 2024 map-data review note"
 
 # ---------------------------------------------------------------------------
 # Authoritative source URLs for Avfall Sverige annual reports
@@ -783,9 +784,36 @@ def _apply_2024_map_details(
         else:
             updated_record["sorting_method"] = details.get("sorting_method") or ""
             updated_record["allowed_materials"] = details.get("bag_material") or ""
+        review_comment = _build_2024_manual_review_comment(details)
+        if review_comment:
+            existing_review_comment = (
+                updated_record.get("review_comment") or ""
+            ).strip()
+            updated_record["review_comment"] = (
+                f"{existing_review_comment}\n\n{review_comment}"
+                if existing_review_comment
+                else review_comment
+            )
         updated_records.append(updated_record)
 
     return updated_records
+
+
+def _build_2024_manual_review_comment(details: dict[str, object]) -> str:
+    if not details.get("needs_manual_review"):
+        return ""
+    review_reasons = [
+        str(reason).strip()
+        for reason in (details.get("review_reasons") or [])
+        if str(reason).strip()
+    ]
+    if not review_reasons:
+        return ""
+    return (
+        f"{_SWEDEN_2024_REVIEW_NOTE_PREFIX}: imported from the reviewed Sweden "
+        f"2024 map artifact with unresolved issues. Please verify and resolve: "
+        f"{"; ".join(review_reasons)}."
+    )
 
 
 def _parse_pdf(path: Path, data_year: int) -> list[dict]:
@@ -1268,7 +1296,9 @@ class Command(BaseCommand):
                 "Optional Sweden 2024 map-data artifact from "
                 "prepare_sweden_2024_map_data. Prefer the reviewed CSV after "
                 "manual corrections; the raw JSON provenance artifact is also "
-                "accepted. Rows still flagged for manual review are ignored."
+                "accepted. Rows still flagged for manual review are imported "
+                "when possible and receive a review comment describing the "
+                "remaining issues."
             ),
         )
 
@@ -1365,9 +1395,15 @@ class Command(BaseCommand):
             map_data_path = Path(map_data_2024)
             if not map_data_path.exists():
                 raise CommandError(f"2024 map-data file not found: {map_data_path}")
-            prepared_map_details = load_map_details(map_data_path)
+            prepared_map_details = load_map_import_details(map_data_path)
+            manual_review_count = sum(
+                1
+                for details in prepared_map_details.values()
+                if details.get("needs_manual_review")
+            )
             self.stdout.write(
-                f"Loaded 2024 map details for {len(prepared_map_details)} municipalities.\n"
+                f"Loaded 2024 map details for {len(prepared_map_details)} municipalities "
+                f"({manual_review_count} still flagged for manual review).\n"
             )
 
         # Resolve auth token
@@ -1391,6 +1427,7 @@ class Command(BaseCommand):
             "cpv_created": 0,
             "cpv_skipped": 0,
             "flyers_created": 0,
+            "review_comments_created": 0,
             "collectors_created": 0,
             "warnings": [],
             "changes": [],
@@ -1454,6 +1491,9 @@ class Command(BaseCommand):
         self.stdout.write(f"  CPVs created:         {totals["cpv_created"]}\n")
         self.stdout.write(f"  CPVs skipped:         {totals["cpv_skipped"]}\n")
         self.stdout.write(f"  Flyers created:       {totals["flyers_created"]}\n")
+        self.stdout.write(
+            f"  Review comments:      {totals["review_comments_created"]}\n"
+        )
         self.stdout.write(f"  Collectors created:   {totals["collectors_created"]}\n")
         if totals["warnings"]:
             self.stdout.write(f"\n  Warnings ({len(totals["warnings"])}):\n")
@@ -1479,6 +1519,7 @@ class Command(BaseCommand):
             "cpv_created",
             "cpv_skipped",
             "flyers_created",
+            "review_comments_created",
             "collectors_created",
         ):
             totals[key] = totals.get(key, 0) + stats.get(key, 0)

@@ -516,7 +516,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
                 is_aggregated = False
 
             for value in values:
-                column_name = f"{property_name.lower().replace(' ', '_')}_{value.year}"
+                column_name = f"{property_name.lower().replace(" ", "_")}_{value.year}"
                 ordered_representation[column_name] = value.average
                 ordered_representation[f"{column_name}_unit"] = (
                     str(value.unit) if value.unit else ""
@@ -724,6 +724,7 @@ class CollectionImportRecordSerializer(serializers.Serializer):
     forbidden_materials = serializers.CharField(
         required=False, allow_null=True, allow_blank=True
     )
+    review_comment = serializers.CharField(required=False, allow_blank=True, default="")
     description = serializers.CharField(required=False, allow_blank=True, default="")
     sources = serializers.ListField(
         child=serializers.CharField(allow_blank=False, max_length=500),
@@ -798,20 +799,18 @@ class CollectionFrequencyScheduleRowMutationSerializer(serializers.Serializer):
     def validate(self, attrs):
         distribution = attrs["distribution"]
         if distribution.name != "Months of the year":
-            raise serializers.ValidationError(
-                {"distribution": "Only 'Months of the year' is currently supported."}
-            )
+            raise serializers.ValidationError({
+                "distribution": "Only 'Months of the year' is currently supported."
+            })
 
         for field_name in ("first_timestep", "last_timestep"):
             timestep = attrs[field_name]
             if timestep.distribution_id != distribution.id:
-                raise serializers.ValidationError(
-                    {
-                        field_name: (
-                            "Selected timestep must belong to the supplied temporal distribution."
-                        )
-                    }
-                )
+                raise serializers.ValidationError({
+                    field_name: (
+                        "Selected timestep must belong to the supplied temporal distribution."
+                    )
+                })
 
         attrs = CollectionFrequencyScheduleService.populate_counts_from_cadences(attrs)
         for field_name in ("standard", "option_1", "option_2", "option_3"):
@@ -820,22 +819,18 @@ class CollectionFrequencyScheduleRowMutationSerializer(serializers.Serializer):
                 None,
                 "",
             ):
-                raise serializers.ValidationError(
-                    {
-                        field_name: (
-                            "Enter a custom annual total or choose a cadence preset."
-                        )
-                    }
-                )
+                raise serializers.ValidationError({
+                    field_name: (
+                        "Enter a custom annual total or choose a cadence preset."
+                    )
+                })
 
         if attrs.get("standard") in (None, ""):
-            raise serializers.ValidationError(
-                {
-                    "standard": (
-                        "A standard service level is required for each schedule row."
-                    )
-                }
-            )
+            raise serializers.ValidationError({
+                "standard": (
+                    "A standard service level is required for each schedule row."
+                )
+            })
         return attrs
 
 
@@ -959,9 +954,9 @@ class CollectionMutationCreateSerializer(
         valid_from = attrs.get("valid_from")
         valid_until = attrs.get("valid_until")
         if valid_from and valid_until and valid_from >= valid_until:
-            raise serializers.ValidationError(
-                {"valid_until": ("Valid until date must be after the valid from date.")}
-            )
+            raise serializers.ValidationError({
+                "valid_until": ("Valid until date must be after the valid from date.")
+            })
         return attrs
 
 
@@ -1164,22 +1159,20 @@ class CollectionMutationVersionSerializer(
         valid_until = attrs.get("valid_until")
 
         if valid_from and valid_until and valid_from >= valid_until:
-            raise serializers.ValidationError(
-                {"valid_until": ("Valid until date must be after the valid from date.")}
-            )
+            raise serializers.ValidationError({
+                "valid_until": ("Valid until date must be after the valid from date.")
+            })
 
         if (
             valid_from
             and predecessor.valid_from
             and valid_from <= predecessor.valid_from
         ):
-            raise serializers.ValidationError(
-                {
-                    "valid_from": (
-                        "valid_from must be later than the predecessor valid_from date."
-                    )
-                }
-            )
+            raise serializers.ValidationError({
+                "valid_from": (
+                    "valid_from must be later than the predecessor valid_from date."
+                )
+            })
 
         return attrs
 

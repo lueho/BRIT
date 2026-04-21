@@ -76,6 +76,7 @@ _FREQUENCY_COUNT_FRAGMENT_RE = re.compile(
     re.IGNORECASE,
 )
 _IMPORTED_REFERENCE_URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
+_IMPORTED_REVIEW_COMMENT_PREFIX = "Import review note:"
 
 
 def _normalize_collector_lookup_key(value: str) -> str:
@@ -162,7 +163,7 @@ def _parse_whole_year_fixed_flexible_frequency(value: str) -> dict | None:
     return {
         "canonical_name": (
             f"Fixed-Flexible; Standard: {fragments[0]}; Optional: "
-            f"{', '.join(fragments[1:])}"
+            f"{", ".join(fragments[1:])}"
         ),
         "signature": (counts[0], tuple(sorted(option_counts))),
         "standard_count": counts[0],
@@ -217,6 +218,7 @@ class CollectionImporter:
             "cpv_unchanged": 0,
             "cpv_skipped": 0,
             "flyers_created": 0,
+            "review_comments_created": 0,
             "sources_created": 0,
             "warnings": [],
         }
@@ -367,6 +369,7 @@ class CollectionImporter:
 
         valid_until = record.get("valid_until")
         description = record.get("description") or ""
+        review_comment = str(record.get("review_comment") or "").strip()
         raw_frequency_name = record.get("frequency") or ""
         min_bin_size = record.get("min_bin_size")
         required_bin_capacity = record.get("required_bin_capacity")
@@ -403,7 +406,7 @@ class CollectionImporter:
                 collector.pk if collector else None
             ):
                 changes.append(
-                    f"collector: {collection.collector or 'None'} → {collector}"
+                    f"collector: {collection.collector or "None"} → {collector}"
                 )
                 collection.collector = collector
                 update_fields.append("collector")
@@ -413,7 +416,7 @@ class CollectionImporter:
                 fee_system.pk if fee_system else None
             ):
                 changes.append(
-                    f"fee_system: {collection.fee_system or 'None'} → {fee_system}"
+                    f"fee_system: {collection.fee_system or "None"} → {fee_system}"
                 )
                 collection.fee_system = fee_system
                 update_fields.append("fee_system")
@@ -423,7 +426,7 @@ class CollectionImporter:
                 frequency.pk if frequency else None
             ):
                 changes.append(
-                    f"frequency: {collection.frequency or 'None'} → {frequency}"
+                    f"frequency: {collection.frequency or "None"} → {frequency}"
                 )
                 collection.frequency = frequency
                 update_fields.append("frequency")
@@ -431,7 +434,7 @@ class CollectionImporter:
             # Update connection_type if different
             if connection_type and collection.connection_type != connection_type:
                 changes.append(
-                    f"connection_type: {collection.connection_type or 'None'} → {connection_type}"
+                    f"connection_type: {collection.connection_type or "None"} → {connection_type}"
                 )
                 collection.connection_type = connection_type
                 update_fields.append("connection_type")
@@ -441,7 +444,7 @@ class CollectionImporter:
                 sorting_method.pk if sorting_method else None
             ):
                 changes.append(
-                    f"sorting_method: {collection.sorting_method or 'None'} → {sorting_method}"
+                    f"sorting_method: {collection.sorting_method or "None"} → {sorting_method}"
                 )
                 collection.sorting_method = sorting_method
                 update_fields.append("sorting_method")
@@ -476,7 +479,7 @@ class CollectionImporter:
                 and collection.required_bin_capacity_reference != bin_cap_ref
             ):
                 changes.append(
-                    f"required_bin_capacity_reference: {collection.required_bin_capacity_reference or 'None'} → {bin_cap_ref}"
+                    f"required_bin_capacity_reference: {collection.required_bin_capacity_reference or "None"} → {bin_cap_ref}"
                 )
                 collection.required_bin_capacity_reference = bin_cap_ref
                 update_fields.append("required_bin_capacity_reference")
@@ -496,7 +499,7 @@ class CollectionImporter:
             # Ensure inline waste fields stay in sync with imported payload.
             if collection.waste_category_id != waste_category.id:
                 changes.append(
-                    f"waste_category: {collection.effective_waste_category or 'None'} → {waste_category}"
+                    f"waste_category: {collection.effective_waste_category or "None"} → {waste_category}"
                 )
                 collection.waste_category = waste_category
                 update_fields.append("waste_category")
@@ -542,7 +545,7 @@ class CollectionImporter:
             ):
                 stats["updated"] = stats.get("updated", 0) + 1
                 stats["changes"] = stats.get("changes", [])
-                stats["changes"].append(f"{label}: {', '.join(changes)}")
+                stats["changes"].append(f"{label}: {", ".join(changes)}")
             else:
                 stats["unchanged"] += 1
 
@@ -553,6 +556,12 @@ class CollectionImporter:
                 and not self.dry_run
             ):
                 self._submit_for_review(collection)
+
+            review_comment_changed = self._sync_import_review_comment(
+                collection, review_comment, stats
+            )
+            if review_comment_changed:
+                changes.append("review comment updated")
         else:
             predecessor = self._find_predecessor(
                 catchment,
@@ -613,6 +622,8 @@ class CollectionImporter:
 
             if self.publication_status == "review":
                 self._submit_for_review(collection)
+
+            self._sync_import_review_comment(collection, review_comment, stats)
 
         # Property values
         for pv in record.get("property_values") or []:
@@ -735,13 +746,13 @@ class CollectionImporter:
         if prop is None:
             stats["cpv_skipped"] += 1
             stats["warnings"].append(
-                f"Property id={pv['property_id']} not found — CPV skipped."
+                f"Property id={pv["property_id"]} not found — CPV skipped."
             )
             return
         if unit is None:
             stats["cpv_skipped"] += 1
             stats["warnings"].append(
-                f"Unit '{pv['unit_name']}' not found — CPV skipped."
+                f"Unit '{pv["unit_name"]}' not found — CPV skipped."
             )
             return
 
@@ -1345,6 +1356,50 @@ class CollectionImporter:
     def _submit_cpv_for_review(self, cpv: CollectionPropertyValue) -> None:
         """Submit a CPV for review and create the corresponding ReviewAction."""
         self._submit_for_review(cpv)
+
+    def _sync_import_review_comment(
+        self, obj, review_comment: str, stats: dict
+    ) -> bool:
+        normalized = self._normalize_import_review_comment(review_comment)
+        existing_comments = list(
+            ReviewAction.for_object(obj)
+            .filter(
+                action=ReviewAction.ACTION_COMMENT,
+                user=self.owner,
+                comment__startswith=_IMPORTED_REVIEW_COMMENT_PREFIX,
+            )
+            .order_by("id")
+        )
+        if len(existing_comments) == 1 and existing_comments[0].comment == normalized:
+            return False
+        if self.dry_run:
+            if normalized:
+                stats["review_comments_created"] += 1
+            return bool(normalized) or bool(existing_comments)
+        if existing_comments:
+            ReviewAction.objects.filter(
+                id__in=[comment.id for comment in existing_comments]
+            ).delete()
+        if not normalized:
+            return bool(existing_comments)
+        ReviewAction.objects.create(
+            content_type=ContentType.objects.get_for_model(obj.__class__),
+            object_id=obj.pk,
+            action=ReviewAction.ACTION_COMMENT,
+            comment=normalized,
+            user=self.owner,
+        )
+        stats["review_comments_created"] += 1
+        return True
+
+    @staticmethod
+    def _normalize_import_review_comment(review_comment: str) -> str:
+        review_comment = (review_comment or "").strip()
+        if not review_comment:
+            return ""
+        if review_comment.startswith(_IMPORTED_REVIEW_COMMENT_PREFIX):
+            return review_comment
+        return f"{_IMPORTED_REVIEW_COMMENT_PREFIX} {review_comment}"
 
     @staticmethod
     def _manual_review_note_for_frequency(

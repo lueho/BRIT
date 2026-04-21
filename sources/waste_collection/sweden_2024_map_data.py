@@ -641,27 +641,42 @@ def load_raw_map_data(raw_path: str | Path) -> RawMapData:
 
 def _prepared_rows_to_map_details(
     rows: list[dict[str, str]],
+    *,
+    include_manual_review: bool = False,
 ) -> dict[str, dict[str, object]]:
     details: dict[str, dict[str, object]] = {}
     for row in rows:
         lau_id = (row.get("lau_id") or "").strip().zfill(4)
-        if not lau_id or _is_truthy(row.get("needs_manual_review")):
+        needs_manual_review = _is_truthy(row.get("needs_manual_review"))
+        if not lau_id or (needs_manual_review and not include_manual_review):
             continue
+        review_reasons = [
+            reason.strip()
+            for reason in str(row.get("review_reasons") or "").split("|")
+            if reason.strip()
+        ]
         if _is_truthy(row.get("no_collection")):
             details[lau_id] = {
                 "no_collection": True,
                 "sorting_method": None,
                 "bag_material": None,
             }
+            if include_manual_review:
+                details[lau_id]["needs_manual_review"] = needs_manual_review
+                details[lau_id]["review_reasons"] = review_reasons
             continue
         sorting_method = (row.get("sorting_method") or "").strip() or None
         bag_material = (row.get("bag_material") or "").strip() or None
-        if sorting_method or bag_material:
-            details[lau_id] = {
-                "no_collection": False,
-                "sorting_method": sorting_method,
-                "bag_material": bag_material,
-            }
+        if not (sorting_method or bag_material or include_manual_review):
+            continue
+        details[lau_id] = {
+            "no_collection": False,
+            "sorting_method": sorting_method,
+            "bag_material": bag_material,
+        }
+        if include_manual_review:
+            details[lau_id]["needs_manual_review"] = needs_manual_review
+            details[lau_id]["review_reasons"] = review_reasons
     return details
 
 
@@ -673,10 +688,28 @@ def load_raw_map_details(raw_path: str | Path) -> dict[str, dict[str, object]]:
     return _prepared_rows_to_map_details(reviewed_rows)
 
 
+def load_raw_map_import_details(raw_path: str | Path) -> dict[str, dict[str, object]]:
+    payload = _load_raw_payload(raw_path)
+    reviewed_rows = [
+        _reviewed_row_from_raw_payload_row(row) for row in payload.get("rows") or []
+    ]
+    return _prepared_rows_to_map_details(reviewed_rows, include_manual_review=True)
+
+
 def load_reviewed_map_details(csv_path: str | Path) -> dict[str, dict[str, object]]:
     csv_path = Path(csv_path)
     with csv_path.open(newline="", encoding="utf-8") as handle:
         return _prepared_rows_to_map_details(list(csv.DictReader(handle)))
+
+
+def load_reviewed_map_import_details(
+    csv_path: str | Path,
+) -> dict[str, dict[str, object]]:
+    csv_path = Path(csv_path)
+    with csv_path.open(newline="", encoding="utf-8") as handle:
+        return _prepared_rows_to_map_details(
+            list(csv.DictReader(handle)), include_manual_review=True
+        )
 
 
 def load_prepared_map_details(csv_path: str | Path) -> dict[str, dict[str, object]]:
@@ -688,3 +721,10 @@ def load_map_details(map_path: str | Path) -> dict[str, dict[str, object]]:
     if map_path.suffix.lower() == ".json":
         return load_raw_map_details(map_path)
     return load_reviewed_map_details(map_path)
+
+
+def load_map_import_details(map_path: str | Path) -> dict[str, dict[str, object]]:
+    map_path = Path(map_path)
+    if map_path.suffix.lower() == ".json":
+        return load_raw_map_import_details(map_path)
+    return load_reviewed_map_import_details(map_path)
