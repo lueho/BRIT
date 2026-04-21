@@ -7,22 +7,27 @@ from django.views import View
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
+from utils.views import BreadcrumbContextMixin
+
 
 @method_decorator(xframe_options_exempt, name="dispatch")
 class HomeView(TemplateView):
     template_name = "home.html"
 
 
-class AboutView(TemplateView):
+class AboutView(BreadcrumbContextMixin, TemplateView):
     template_name = "about.html"
+    breadcrumb_page_title = "About"
 
 
-class LearningView(TemplateView):
+class LearningView(BreadcrumbContextMixin, TemplateView):
     template_name = "learning.html"
+    breadcrumb_page_title = "Learning"
 
 
-class PrivacyPolicyView(TemplateView):
+class PrivacyPolicyView(BreadcrumbContextMixin, TemplateView):
     template_name = "privacy_policy.html"
+    breadcrumb_page_title = "Privacy Policy"
 
 
 class CacheTestView(View):

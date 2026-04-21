@@ -1015,6 +1015,18 @@ class ReviewDashboardViewTests(TestCase):
         self.assertNotIn("Moderator Review Collection", item_names)
         self.assertIn("Review Collection Alpha", item_names)
 
+    def test_dashboard_uses_review_module_breadcrumb(self):
+        self.client.force_login(self.moderator_user)
+        response = self.client.get(reverse("object_management:review_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "BRIT | Content Review")
+        self.assertContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">Review</li>',
+            html=True,
+        )
+
     def test_dashboard_search_filter(self):
         self.client.force_login(self.moderator_user)
         response = self.client.get(

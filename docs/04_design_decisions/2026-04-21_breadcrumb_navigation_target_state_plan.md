@@ -1,6 +1,6 @@
 # Breadcrumb Navigation Target-State Plan
  
- - **Status**: Active roadmap; documentation boundary established, shared breadcrumb rail landed, Phase 1 not started
+ - **Status**: Active roadmap; Phases 1 and 2 landed on `feat/sticky-breadcrumbs`; Phase 4 static/review/error cleanup in progress
  - **Date**: 2026-04-21
  - **Last updated**: 2026-04-21
  - **Scope**: shared breadcrumb/page-chrome behavior across `base.html`, shared CRUD templates, explorer/dashboard pages, nested source-domain pages, static/error pages, and supporting view/model metadata needed to make breadcrumbs logical and stable throughout BRIT
@@ -220,11 +220,11 @@ The safest sequence is:
 | Phase | Status | Notes |
 |---|---|---|
 | Phase 0 - information architecture and audit baseline | Complete | The target hierarchy has been documented and the as-is reference has been separated into `brit/README.md`. |
-| Phase 1 - shared breadcrumb data contract | Not started | Shared breadcrumb infrastructure exists, but the explicit module/section/object/action contract is not implemented yet. |
-| Phase 2 - major module normalization | Partial precursor work only | Several explorer/dashboard pages already define explicit breadcrumbs, but module-first consistency is not complete. |
-| Phase 3 - nested domains and custom detail experiences | Not started | No canonical nested-domain breadcrumb contract is implemented yet. |
-| Phase 4 - static/review/error cleanup | Not started | Weak fallback behavior still appears on static and exceptional pages. |
-| Phase 5 - regression hardening and cleanup | Not started | Breadcrumb-specific regression coverage and contract documentation are still incomplete. |
+| Phase 1 - shared breadcrumb data contract | Complete | `utils.views.build_breadcrumb_context` and `BreadcrumbContextMixin` provide the shared module/section/object/action contract; shared list/detail/form templates delegate to the base contract via `{% firstof %}`. |
+| Phase 2 - major module normalization | Complete | Bibliography, Inventories, Maps, Materials, Processes, Sources, Utilities, and Sources > Waste Collection landing views all render module-first breadcrumbs through the shared contract. |
+| Phase 3 - nested domains and custom detail experiences | Not started | No canonical nested-domain breadcrumb contract beyond `Sources > Waste Collection` is implemented yet. |
+| Phase 4 - static/review/error cleanup | In progress | Static pages (home, about, learning, privacy policy) and the content review dashboard render deliberate breadcrumbs; 403/404/500 still rely on explicit per-template titles. |
+| Phase 5 - regression hardening and cleanup | Partial | Focused breadcrumb tests cover shared list/detail/form, module landing pages, the nested Sources > Waste Collection contract, the review dashboard, and static pages; broader coverage remains to be added. |
 
 ## 5. Gap Summary
 

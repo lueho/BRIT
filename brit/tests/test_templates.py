@@ -135,3 +135,49 @@ class BreadcrumbModuleLandingTests(TestCase):
             html=True,
         )
         self.assertContains(response, '<h5 class="mb-0">Utilities</h5>', html=True)
+
+
+class BreadcrumbStaticPageTests(TestCase):
+    def test_home_page_renders_default_title_without_extra_breadcrumb(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "BRIT | Bioresource Information Tool")
+
+    def test_about_page_uses_breadcrumb_contract(self):
+        response = self.client.get(reverse("about"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "BRIT | About")
+        self.assertContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">About</li>',
+            html=True,
+        )
+
+    def test_learning_page_uses_breadcrumb_contract(self):
+        response = self.client.get(reverse("learning"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "BRIT | Learning")
+        self.assertContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">Learning</li>',
+            html=True,
+        )
+
+    def test_privacy_policy_uses_human_breadcrumb_label(self):
+        response = self.client.get(reverse("privacypolicy"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "BRIT | Privacy Policy")
+        self.assertContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">Privacy Policy</li>',
+            html=True,
+        )
+        self.assertNotContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">Privacypolicy</li>',
+            html=True,
+        )

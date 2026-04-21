@@ -236,6 +236,8 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
     context_object_name = "review_items"
     paginate_by = getattr(settings, "REVIEW_DASHBOARD_PAGE_SIZE", 20)
     _available_models_cache = None
+    breadcrumb_module_label = "Review"
+    breadcrumb_page_title = "Content Review"
 
     def setup(self, request, *args, **kwargs):
         """Reset per-request cache."""
@@ -719,6 +721,12 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             "paginator": paginator,
             "is_paginated": page_obj.has_other_pages(),
         })
+        context.update(
+            build_breadcrumb_context(
+                module_label=self.breadcrumb_module_label,
+                page_title=self.breadcrumb_page_title,
+            )
+        )
         return context
 
 

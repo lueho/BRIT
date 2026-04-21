@@ -1,8 +1,5 @@
 {% extends "base.html" %}
 {% load static custom_tags %}
-{% block title %}
-  BRIT | Bioresource Information Tool
-{% endblock title %}
 {% block content %}
   {% user_in_group user "process-team" as can_view_processes %}
   <div class="row g-4 mb-4">
