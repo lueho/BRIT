@@ -736,29 +736,29 @@
   {# --- Composition Cards --- #}
   {% if data.compositions %}
     <div class="col col-12 mt-4 mb-n2" id="normalized-compositions">
-      {% with primary_composition=data.compositions.0 %}
-        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-          <div>
-            <h6 class="text-muted text-uppercase fw-semibold mb-1 small">Mass-related Measurements</h6>
-            <div class="fw-semibold">Normalized view</div>
-            <div class="small text-muted">
-              {% if primary_composition.is_derived %}
-                Derived from the raw mass-related measurements above. Each group is normalized to 100%, and missing fractions are shown as Other.
-              {% else %}
-                Saved composition groups for this sample. These cards reflect the stored composition records rather than an on-the-fly derivation from the raw measurements above.
-              {% endif %}
-            </div>
+      <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+        <div>
+          <h6 class="text-muted text-uppercase fw-semibold mb-1 small">Mass-related Measurements</h6>
+          <div class="fw-semibold">Normalized view</div>
+          <div class="small text-muted">
+            {% if composition_mode == 'mixed' %}
+              Raw measurements are authoritative for groups where they exist; saved compositions remain as fallback for the remaining groups.
+            {% elif composition_mode == 'derived' %}
+              Derived from the raw mass-related measurements above. Each group is normalized to 100%, and missing fractions are shown as Other.
+            {% else %}
+              Saved composition groups for this sample. These cards reflect the stored composition records rather than an on-the-fly derivation from the raw measurements above.
+            {% endif %}
           </div>
-          <a class="btn btn-sm btn-outline-secondary"
-             data-bs-toggle="tab"
-             href="#sample-component-measurements-tab"
-             role="tab"
-             aria-controls="sample-component-measurements-tab"
-             aria-selected="false">
-            <i class="fas fa-arrow-up"></i> View raw measurements
-          </a>
         </div>
-      {% endwith %}
+        <a class="btn btn-sm btn-outline-secondary"
+           data-bs-toggle="tab"
+           href="#sample-component-measurements-tab"
+           role="tab"
+           aria-controls="sample-component-measurements-tab"
+           aria-selected="false">
+          <i class="fas fa-arrow-up"></i> View raw measurements
+        </a>
+      </div>
     </div>
     {% for composition in data.compositions %}
       <div class="col col-12 col-md-6 col-xl-3 col-lg-4 mt-4">
@@ -799,6 +799,13 @@
               </li>
             </ul>
           </div>
+          {% if composition.warnings %}
+            <div class="px-3 pt-0 pb-2">
+              {% for warning in composition.warnings %}
+                <div class="alert alert-warning py-2 px-3 mb-2 small">{{ warning }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
           <div class="card-body tab-content"
                id="composition-tabs-{{ composition.id }}-content">
             <div class="tab-pane fade show active"

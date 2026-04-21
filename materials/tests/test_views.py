@@ -3598,9 +3598,18 @@ class EmptyStateViewsTestCase(TestCase):
         )
         self.assertEqual(composition["origin"], "raw_derived")
         self.assertEqual(composition["warning_count"], 1)
+        self.assertEqual(response.context["composition_mode"], "derived")
         self.assertContains(response, "Derived")
         self.assertNotContains(response, "70.0 ± 0.0%")
         self.assertContains(response, "Normalized view")
+        self.assertContains(
+            response,
+            "Raw measurements differ from the saved normalized composition for this group.",
+        )
+        self.assertContains(
+            response,
+            "Derived from the raw mass-related measurements above.",
+        )
 
         v2_response = self.client.get(
             reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
@@ -3695,6 +3704,11 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertEqual(
             [composition["origin"] for composition in compositions],
             ["persisted_fallback", "raw_derived"],
+        )
+        self.assertContains(
+            response,
+            "Raw measurements are authoritative for groups where they exist; "
+            "saved compositions remain as fallback for the remaining groups.",
         )
 
         v2_response = self.client.get(

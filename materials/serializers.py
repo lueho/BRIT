@@ -74,6 +74,13 @@ class CompositionModelSerializer(ModelSerializer):
 
 
 class CompositionDoughnutChartSerializer(ModelSerializer):
+    """Legacy doughnut chart payload for persisted ``Composition`` rows.
+
+    Kept for compatibility only. The canonical chart payload is now built from
+    :func:`materials.composition_normalization.get_sample_normalized_compositions`
+    output in ``SampleDetailView._build_composition_charts``.
+    """
+
     id = SerializerMethodField()
     title = ReadOnlyField(default="Composition")
     unit = ReadOnlyField(default="%")
