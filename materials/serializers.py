@@ -10,6 +10,7 @@ from bibliography.serializers import SourceAbbreviationSerializer
 from distributions.models import TemporalDistribution
 from utils.properties.serializers import NumericMeasurementSerializerMixin
 
+from .composition_normalization import get_sample_normalized_compositions
 from .models import (
     Composition,
     Material,
@@ -201,9 +202,12 @@ class SampleModelSerializer(ModelSerializer):
     series_url = HyperlinkedRelatedField(
         source="series", read_only=True, view_name="sampleseries-detail"
     )
-    compositions = CompositionModelSerializer(many=True)
+    compositions = SerializerMethodField()
     properties = SerializerMethodField()
     sources = SourceAbbreviationSerializer(many=True)
+
+    def get_compositions(self, obj):
+        return get_sample_normalized_compositions(obj)
 
     def get_properties(self, obj):
         request = self.context.get("request")
@@ -287,7 +291,10 @@ class CompositionAPISerializer(ModelSerializer):
 class SampleAPISerializer(ModelSerializer):
     timestep = StringRelatedField()
     properties = SerializerMethodField()
-    compositions = CompositionAPISerializer(many=True)
+    compositions = SerializerMethodField()
+
+    def get_compositions(self, obj):
+        return get_sample_normalized_compositions(obj)
 
     def get_properties(self, obj):
         queryset = obj.get_property_values_queryset().select_related(

@@ -1,6 +1,5 @@
 import json
-from collections import Counter, defaultdict
-from decimal import Decimal
+from collections import defaultdict
 
 from crispy_forms.helper import FormHelper
 from django.contrib.auth.mixins import (
@@ -41,10 +40,13 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateWithInlinesView,
     UserOwnsObjectMixin,
 )
-from utils.properties.models import Unit
-from utils.properties.units import UnitConversionError
 from utils.views import NextOrSuccessUrlMixin
 
+from .composition_normalization import (
+    get_sample_composition_settings_by_group,
+    get_sample_normalized_compositions,
+    get_sorted_component_measurements,
+)
 from .filters import (
     AnalyticalMethodListFilter,
     MaterialCategoryListFilter,
@@ -104,8 +106,6 @@ from .models import (
     get_or_create_sample_substrate_category,
 )
 from .serializers import (
-    CompositionDoughnutChartSerializer,
-    CompositionModelSerializer,
     SampleModelSerializer,
     SampleSeriesModelSerializer,
 )
@@ -978,212 +978,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
             "validation_warning_count": completeness["warning_count"],
         }
 
-    @staticmethod
-    def _normalize_unit_name(unit):
-        return (getattr(unit, "name", "") or "").strip().lower().replace(" ", "")
-
-    @staticmethod
-    def _normalize_component_name(component):
-        return (getattr(component, "name", "") or "").strip().lower().replace(" ", "")
-
-    def _is_percent_of_dm_measurement(self, measurement):
-        unit_name = self._normalize_unit_name(measurement.unit)
-        basis_name = self._normalize_component_name(measurement.basis_component)
-        return unit_name in {"%", "percent"} and basis_name in {"dm", "drymatter"}
-
-    def _to_weight_percent(self, value, unit, percent_unit):
-        if percent_unit is None:
-            return None
-
-        try:
-            converted_value = unit.convert(value, percent_unit)
-        except UnitConversionError:
-            return None
-
-        return Decimal(str(converted_value))
-
-    def _build_persisted_composition_charts(self, compositions):
-        charts = {}
-        for composition in compositions:
-            chart_data = CompositionDoughnutChartSerializer(composition).data
-            chart = DoughnutChart(**chart_data)
-            charts[f"composition-chart-{composition.id}"] = chart.as_dict()
-        return charts
-
-    def _get_composition_settings_by_group(self):
-        composition_settings_by_group = {}
-        for composition in self.object.compositions.order_by("order", "id"):
-            composition_settings_by_group.setdefault(composition.group_id, composition)
-        return composition_settings_by_group
-
-    @staticmethod
-    def _group_sort_key(group, composition_settings_by_group):
-        composition_setting = composition_settings_by_group.get(group.pk)
-        if composition_setting is None:
-            return (1, group.name.lower(), group.pk)
-        return (0, composition_setting.order, group.name.lower(), group.pk)
-
-    def _sort_component_measurements(
-        self, component_measurements, composition_settings_by_group
-    ):
-        return sorted(
-            component_measurements,
-            key=lambda measurement: (
-                self._group_sort_key(measurement.group, composition_settings_by_group),
-                -Decimal(measurement.average),
-                measurement.component.name.lower(),
-                measurement.pk,
-            ),
-        )
-
-    def _build_derived_compositions(self, component_measurements):
-        grouped_values = {}
-        grouped_components = defaultdict(dict)
-        group_is_dm_basis = defaultdict(lambda: True)
-        group_basis_components = defaultdict(list)
-        for measurement in component_measurements:
-            average = Decimal(measurement.average)
-            if average <= 0:
-                continue
-
-            grouped_values[measurement.group_id] = measurement.group
-            if not self._is_percent_of_dm_measurement(measurement):
-                group_is_dm_basis[measurement.group_id] = False
-            if measurement.basis_component is not None:
-                group_basis_components[measurement.group_id].append(
-                    measurement.basis_component
-                )
-            component_map = grouped_components[measurement.group_id]
-            component_map[measurement.component_id] = component_map.get(
-                measurement.component_id,
-                {
-                    "component": measurement.component,
-                    "measurements": [],
-                },
-            )
-            component_map[measurement.component_id]["measurements"].append(measurement)
-
-        if not grouped_values:
-            return []
-
-        other_component = MaterialComponent.objects.other()
-        percent_unit = Unit.objects.filter(name="%").first() or Unit(
-            name="%", symbol="percent"
-        )
-        composition_settings_by_group = self._get_composition_settings_by_group()
-        compositions = []
-
-        for group_id, group in sorted(
-            grouped_values.items(),
-            key=lambda item: self._group_sort_key(
-                item[1], composition_settings_by_group
-            ),
-        ):
-            is_dm_basis = group_is_dm_basis[group_id]
-            display_unit = "%"
-            composition_setting = composition_settings_by_group.get(group_id)
-            basis_components = group_basis_components[group_id]
-            if basis_components:
-                basis_counts = Counter(component.pk for component in basis_components)
-                reference_component_id = max(
-                    basis_counts, key=lambda component_id: basis_counts[component_id]
-                )
-                reference_component = next(
-                    component
-                    for component in basis_components
-                    if component.pk == reference_component_id
-                )
-            else:
-                reference_component = MaterialComponent.objects.default()
-            component_values = grouped_components[group_id]
-
-            shares = []
-            for component_data in component_values.values():
-                component_percent = Decimal("0.0")
-                for measurement in component_data["measurements"]:
-                    measurement_value = Decimal(measurement.average)
-                    if is_dm_basis:
-                        component_percent += measurement_value
-                    else:
-                        converted = self._to_weight_percent(
-                            measurement_value, measurement.unit, percent_unit
-                        )
-                        if converted is not None:
-                            component_percent += converted
-
-                if component_percent <= 0:
-                    continue
-
-                shares.append({
-                    "component": component_data["component"].pk,
-                    "component_name": component_data["component"].name,
-                    "average": float(component_percent / Decimal("100")),
-                    "standard_deviation": None,
-                    "as_percentage": f"{round(component_percent, 1)}{display_unit}",
-                })
-
-            if not shares:
-                continue
-
-            total_percent = sum(
-                (Decimal(str(share["average"])) * Decimal("100") for share in shares),
-                Decimal("0.0"),
-            )
-            if total_percent < Decimal("100"):
-                other_gap = Decimal("100") - total_percent
-                other_share = next(
-                    (
-                        share
-                        for share in shares
-                        if share["component"] == other_component.pk
-                    ),
-                    None,
-                )
-                if other_share is not None:
-                    existing_percent = Decimal(str(other_share["average"])) * Decimal(
-                        "100"
-                    )
-                    updated_percent = existing_percent + other_gap
-                    other_share["average"] = float(updated_percent / Decimal("100"))
-                    other_share["as_percentage"] = (
-                        f"{round(updated_percent, 1)}{display_unit}"
-                    )
-                else:
-                    shares.append({
-                        "component": other_component.pk,
-                        "component_name": other_component.name,
-                        "average": float(other_gap / Decimal("100")),
-                        "standard_deviation": None,
-                        "as_percentage": f"{round(other_gap, 1)}{display_unit}",
-                    })
-
-            shares.sort(
-                key=lambda share: (
-                    share["component"] == other_component.pk,
-                    0
-                    if share["component"] == other_component.pk
-                    else -share["average"],
-                    share["component_name"].lower(),
-                )
-            )
-
-            compositions.append({
-                "id": f"derived-{group_id}",
-                "group": group.pk,
-                "group_name": group.name,
-                "sample": self.object.pk,
-                "fractions_of": reference_component.pk,
-                "fractions_of_name": reference_component.name,
-                "shares": shares,
-                "is_derived": True,
-                "settings_pk": (
-                    composition_setting.pk if composition_setting is not None else None
-                ),
-            })
-
-        return compositions
-
-    def _build_derived_composition_charts(self, compositions):
+    def _build_composition_charts(self, compositions):
         charts = {}
         for composition in compositions:
             labels = [share["component_name"] for share in composition["shares"]]
@@ -1227,24 +1022,27 @@ class SampleDetailView(UserCreatedObjectDetailView):
             .prefetch_related("sources")
             .order_by("group__name", "component__name", "id")
         )
-        composition_settings_by_group = self._get_composition_settings_by_group()
-        component_measurements = self._sort_component_measurements(
-            component_measurements, composition_settings_by_group
+        composition_settings_by_group = get_sample_composition_settings_by_group(
+            self.object
         )
-
-        persisted_compositions = self.object.compositions.filter(
-            shares__isnull=False
-        ).distinct()
-        if persisted_compositions.exists():
-            compositions = CompositionModelSerializer(
-                persisted_compositions, many=True
-            ).data
-            for composition in compositions:
-                composition["is_derived"] = False
-            charts = self._build_persisted_composition_charts(persisted_compositions)
+        component_measurements = get_sorted_component_measurements(
+            self.object,
+            composition_settings_by_group=composition_settings_by_group,
+            component_measurements=component_measurements,
+        )
+        compositions = get_sample_normalized_compositions(
+            self.object,
+            component_measurements=component_measurements,
+            composition_settings_by_group=composition_settings_by_group,
+        )
+        charts = self._build_composition_charts(compositions)
+        composition_origins = {composition["origin"] for composition in compositions}
+        if len(composition_origins) > 1:
+            composition_mode = "mixed"
+        elif composition_origins == {"raw_derived"}:
+            composition_mode = "derived"
         else:
-            compositions = self._build_derived_compositions(component_measurements)
-            charts = self._build_derived_composition_charts(compositions)
+            composition_mode = "saved"
 
         sample_summary = {
             "component_measurement_count": len(component_measurements),
@@ -1285,6 +1083,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
         context.update({
             "data": data,
             "charts": charts,
+            "composition_mode": composition_mode,
             "property_values": property_values,
             "component_measurements": component_measurements,
             "sample_summary": sample_summary,
@@ -1352,7 +1151,12 @@ class SampleDetailView(UserCreatedObjectDetailView):
 
     @staticmethod
     def _build_group_sparklines(compositions, component_measurements):
-        """Tiny per-group bars for the hero composition band."""
+        """Tiny per-group bars for the hero composition band.
+
+        Alongside the stacked bar we expose the dominant component so the
+        sparkline carries a readable signal even at hero sizes where
+        segment shading alone is too subtle.
+        """
         by_group = {}
         for composition in compositions:
             group_id = composition.get("group")
@@ -1363,6 +1167,8 @@ class SampleDetailView(UserCreatedObjectDetailView):
                 }
                 for share in composition.get("shares", [])
             ]
+            dominant = max(segments, key=lambda seg: seg["value"]) if segments else None
+            total_value = sum(seg["value"] for seg in segments)
             by_group[group_id] = {
                 "group_id": group_id,
                 "name": composition.get("group_name", ""),
@@ -1370,6 +1176,13 @@ class SampleDetailView(UserCreatedObjectDetailView):
                 "segments": segments,
                 "is_derived": composition.get("is_derived", False),
                 "measurement_count": 0,
+                "component_count": len(segments),
+                "dominant_label": dominant["label"] if dominant else "",
+                "dominant_share": (
+                    (dominant["value"] / total_value * 100.0)
+                    if dominant and total_value
+                    else 0.0
+                ),
             }
         for measurement in component_measurements:
             entry = by_group.setdefault(
@@ -1381,6 +1194,9 @@ class SampleDetailView(UserCreatedObjectDetailView):
                     "segments": [],
                     "is_derived": True,
                     "measurement_count": 0,
+                    "component_count": 0,
+                    "dominant_label": "",
+                    "dominant_share": 0.0,
                 },
             )
             entry["measurement_count"] += 1

@@ -94,6 +94,21 @@ FALLBACK_COLORS = [
 # Column widths for the measurements table (matches header order)
 COLUMN_WIDTHS = [30, 15, 25, 12, 18, 6, 10, 25, 30, 40, 40]
 
+# Sample-property worksheet definition. Captures non-mass sample properties
+# such as moisture, density, pH that live on MaterialPropertyValue rather
+# than ComponentMeasurement.
+PROPERTY_HEADERS = [
+    "Property",
+    "Value",
+    "Standard deviation",
+    "Unit",
+    "Reference parameter, Base",
+    "Method",
+    "Source",
+    "Comments",
+]
+PROPERTY_COLUMN_WIDTHS = [30, 12, 18, 10, 25, 30, 40, 40]
+
 
 class SampleMeasurementsXLSXRenderer:
     """Renderer for exporting sample measurements to Excel format matching the import template."""
@@ -252,6 +267,88 @@ class SampleMeasurementsXLSXRenderer:
         for col_num, width in enumerate(COLUMN_WIDTHS, start=1):
             ws.column_dimensions[get_column_letter(col_num)].width = width
 
+    def _iter_property_values(self):
+        """Yield MaterialPropertyValue rows for the current sample.
+
+        Imported lazily to avoid any risk of an import cycle between
+        ``materials.models`` and the Celery task module that pulls in
+        ``materials.renderers``.
+        """
+        from .models import MaterialPropertyValue
+
+        return (
+            MaterialPropertyValue.objects.filter(sample=self.sample)
+            .select_related("property", "basis_component", "analytical_method", "unit")
+            .prefetch_related("sources")
+            .order_by("property__name")
+        )
+
+    @staticmethod
+    def _format_sources(sources):
+        if not sources:
+            return ""
+        return "; ".join(
+            s.abbreviation for s in sources if s.abbreviation
+        ) or "; ".join(str(s) for s in sources)
+
+    def _write_property_header(self, ws, row_num):
+        for col_num, header in enumerate(PROPERTY_HEADERS, start=1):
+            cell = ws.cell(row=row_num, column=col_num, value=header)
+            cell.font = STYLE_BOLD
+            cell.fill = STYLE_HEADER_FILL
+            cell.border = STYLE_HEADER_BORDER
+        return row_num + 1
+
+    def _write_property_row(self, ws, row_num, value):
+        sources = list(value.sources.all())
+        cells_data = [
+            (1, value.property.name if value.property else ""),
+            (
+                2,
+                float(value.average) if value.average is not None else "",
+            ),
+            (
+                3,
+                float(value.standard_deviation)
+                if value.standard_deviation is not None
+                else "",
+            ),
+            (4, value.unit.name if value.unit else ""),
+            (5, value.basis_component.name if value.basis_component else ""),
+            (
+                6,
+                value.analytical_method.name if value.analytical_method else "",
+            ),
+            (7, self._format_sources(sources)),
+            (8, getattr(value, "comment", "") or ""),
+        ]
+        for col, cell_value in cells_data:
+            ws.cell(row=row_num, column=col, value=cell_value)
+
+    def _set_property_column_widths(self, ws):
+        for col_num, width in enumerate(PROPERTY_COLUMN_WIDTHS, start=1):
+            ws.column_dimensions[get_column_letter(col_num)].width = width
+
+    def _write_properties_sheet(self, wb):
+        """Append a second worksheet listing sample-level properties.
+
+        Uses the same metadata header + data layout as the measurements
+        sheet so the two read as siblings rather than strangers.
+        """
+        property_values = list(self._iter_property_values())
+        ws = wb.create_sheet(title="Sample Properties")
+
+        # Reuse the metadata block so both sheets are self-contained.
+        row_num = self._write_metadata_section(ws)
+        row_num = self._write_property_header(ws, row_num)
+
+        for value in property_values:
+            self._write_property_row(ws, row_num, value)
+            row_num += 1
+
+        self._set_property_column_widths(ws)
+        return len(property_values)
+
     def render(self):
         """
         Render the sample measurements to an Excel workbook.
@@ -265,7 +362,7 @@ class SampleMeasurementsXLSXRenderer:
         # Create workbook
         wb = Workbook()
         ws = wb.active
-        ws.title = self.sample.name[:31]  # Excel sheet names max 31 chars
+        ws.title = "Measurements"[:31]
 
         # Write metadata section
         row_num = self._write_metadata_section(ws)
@@ -283,6 +380,10 @@ class SampleMeasurementsXLSXRenderer:
 
         # Adjust column widths
         self._set_column_widths(ws)
+
+        # Append a second worksheet for sample-level properties.
+        self._report_progress(total, total, "Writing sample properties...")
+        self._write_properties_sheet(wb)
 
         self._report_progress(total, total, "Saving file...")
 

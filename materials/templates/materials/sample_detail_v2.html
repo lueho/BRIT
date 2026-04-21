@@ -8,6 +8,8 @@
 {% block style_sheets %}
   <link href="{% static 'css/sample_detail_v2.css' %}" rel="stylesheet">
 {% endblock style_sheets %}
+{% block page_chrome %}
+{% endblock page_chrome %}
 {% block content %}
   <div class="sdv2"
        data-sample-id="{{ object.id }}"
@@ -51,9 +53,20 @@
           {% endif %}
         </div>
         <button class="sdv2-palette-trigger" type="button" data-sdv2-palette-open>
-          <span class="sdv2-kbd">⌘</span><span class="sdv2-kbd">K</span>
+          <span class="sdv2-kbd">Ctrl</span><span class="sdv2-kbd-plus">+</span><span class="sdv2-kbd">K</span>
           <span class="sdv2-palette-hint">Quick actions</span>
         </button>
+        {% if request.user.is_authenticated %}
+          <button type="button"
+                  class="sdv2-export-trigger"
+                  data-sdv2-export-sample
+                  data-export-url="{% url 'sample-export' object.pk %}"
+                  data-progress-template="{% url 'file-export-progress' 'TASK_ID' %}"
+                  title="Download the complete sample as an Excel workbook">
+            <i class="fas fa-file-excel" aria-hidden="true"></i>
+            <span class="sdv2-export-trigger-label">Excel</span>
+          </button>
+        {% endif %}
         <a class="sdv2-classic-link"
            href="{% url 'sample-detail' object.pk %}"
            title="Switch back to the classic detail view">Classic view</a>
@@ -105,28 +118,35 @@
             </li>
           {% endif %}
         </ul>
-        <div class="sdv2-hero-counts">
-          <span>
-            <strong>{{ sample_summary.component_measurement_count }}</strong> measurements
-          </span>
-          <span>
-            <strong>{{ sample_summary.component_measurement_group_count }}</strong> groups
-          </span>
-          <span>
-            <strong>{{ sample_summary.property_value_count }}</strong> properties
-          </span>
-          <span>
-            <strong>{{ sample_summary.sample_source_count }}</strong> sources
-          </span>
+        <div class="sdv2-hero-stats" role="list" aria-label="Sample statistics">
+          <div class="sdv2-stat" role="listitem">
+            <span class="sdv2-stat-value">{{ sample_summary.component_measurement_count }}</span>
+            <span class="sdv2-stat-label">measurements</span>
+          </div>
+          <div class="sdv2-stat" role="listitem">
+            <span class="sdv2-stat-value">{{ sample_summary.component_measurement_group_count }}</span>
+            <span class="sdv2-stat-label">groups</span>
+          </div>
+          <div class="sdv2-stat" role="listitem">
+            <span class="sdv2-stat-value">{{ sample_summary.property_value_count }}</span>
+            <span class="sdv2-stat-label">properties</span>
+          </div>
+          <div class="sdv2-stat" role="listitem">
+            <span class="sdv2-stat-value">{{ sample_summary.sample_source_count }}</span>
+            <span class="sdv2-stat-label">sources</span>
+          </div>
         </div>
       </div>
       <div class="sdv2-sparkband" aria-label="Composition groups at a glance">
         {% if group_sparklines %}
           {% for group in group_sparklines %}
-            <a class="sdv2-spark"
+            <a class="sdv2-spark {% if group.is_derived %}sdv2-spark-derived{% else %}sdv2-spark-saved{% endif %}"
                href="#group-{{ group.group_id }}"
                title="Jump to {{ group.name }}">
-              <span class="sdv2-spark-name">{{ group.name }}</span>
+              <div class="sdv2-spark-head">
+                <span class="sdv2-spark-name">{{ group.name }}</span>
+                <span class="sdv2-spark-count">{{ group.component_count }} comp · {{ group.measurement_count }} raw</span>
+              </div>
               <span class="sdv2-spark-bar"
                     role="img"
                     aria-label="{{ group.name }} composition">
@@ -140,7 +160,14 @@
                   <span class="sdv2-spark-empty"></span>
                 {% endif %}
               </span>
-              <span class="sdv2-spark-count">{{ group.measurement_count }} rows</span>
+              {% if group.dominant_label %}
+                <div class="sdv2-spark-dominant">
+                  <span class="sdv2-spark-dominant-label">{{ group.dominant_label }}</span>
+                  <span class="sdv2-spark-dominant-share">{{ group.dominant_share|floatformat:0 }}%</span>
+                </div>
+              {% else %}
+                <div class="sdv2-spark-dominant sdv2-spark-dominant-empty">no derived composition</div>
+              {% endif %}
             </a>
           {% endfor %}
         {% else %}
@@ -226,13 +253,13 @@
             <div class="sdv2-section-header">
               <h2 class="sdv2-section-title">Composition</h2>
               <span class="sdv2-section-hint">
-                {% with first=data.compositions|first %}
-                  {% if first.is_derived %}
-                    Derived from raw measurements; each group normalized to 100%.
-                  {% else %}
-                    Stored composition records for this sample.
-                  {% endif %}
-                {% endwith %}
+                {% if composition_mode == 'mixed' %}
+                  Raw measurements are authoritative where present; saved compositions remain as fallback for other groups.
+                {% elif composition_mode == 'derived' %}
+                  Derived from raw measurements; each group normalized to 100%.
+                {% else %}
+                  Stored composition records for this sample.
+                {% endif %}
               </span>
             </div>
             {% for composition in data.compositions %}
@@ -280,6 +307,13 @@
                       {% endif %}
                     </div>
                   </header>
+                  {% if composition.warnings %}
+                    <div class="sdv2-inline-warnings">
+                      {% for warning in composition.warnings %}
+                        <div class="alert alert-warning py-2 px-3 mb-2 small">{{ warning }}</div>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
                   <div class="sdv2-group-body">
                     <div class="sdv2-group-chart">
                       <div id="composition-chart-{{ composition.id }}"
@@ -289,8 +323,14 @@
                     </div>
                     <div class="sdv2-group-table-wrap">
                       <table class="sdv2-group-table">
+                        <colgroup>
+                          <col class="sdv2-col-swatch">
+                          <col>
+                          <col class="sdv2-col-share">
+                        </colgroup>
                         <thead>
                           <tr>
+                            <th scope="col" aria-label="Color"></th>
                             <th scope="col">Component</th>
                             <th scope="col" class="sdv2-num">Share</th>
                           </tr>
@@ -298,6 +338,9 @@
                         <tbody>
                           {% for share in composition.shares %}
                             <tr>
+                              <td class="sdv2-swatch-cell" aria-hidden="true">
+                                <span class="sdv2-swatch"></span>
+                              </td>
                               <td>
                                 <a href="{% url 'materialcomponent-detail-modal' share.component %}"
                                    class="modal-link">{{ share.component_name }}</a>
@@ -317,6 +360,15 @@
                       </summary>
                       <div class="sdv2-raws-body">
                         <table class="sdv2-raws-table">
+                          <colgroup>
+                            <col class="sdv2-col-component">
+                            <col class="sdv2-col-basis">
+                            <col class="sdv2-col-value">
+                            <col class="sdv2-col-n">
+                            <col class="sdv2-col-method">
+                            <col class="sdv2-col-sources">
+                            {% if edit_mode_enabled %}<col class="sdv2-col-edit">{% endif %}
+                          </colgroup>
                           <thead>
                             <tr>
                               <th scope="col">Component</th>
@@ -407,12 +459,6 @@
                               data-sdv2-group="{{ group_pk }}"
                               title="Copy this group as CSV">
                         <i class="fas fa-table"></i> CSV
-                      </button>
-                      <button type="button"
-                              class="sdv2-affordance sdv2-affordance-ghost"
-                              data-sdv2-permalink="#group-{{ group_pk }}"
-                              title="Copy permalink">
-                        <i class="fas fa-link"></i> Link
                       </button>
                     </div>
                   </footer>
@@ -677,6 +723,15 @@
               <a data-sdv2-palette-item href="{% url 'sample-duplicate' object.id %}">Duplicate sample</a>
             </li>
           {% endif %}
+          {% if request.user.is_authenticated %}
+            <li>
+              <a data-sdv2-palette-item
+                 href="#"
+                 data-sdv2-export-sample
+                 data-export-url="{% url 'sample-export' object.pk %}"
+                 data-progress-template="{% url 'file-export-progress' 'TASK_ID' %}">Export sample to Excel</a>
+            </li>
+          {% endif %}
           <li>
             <a data-sdv2-palette-item href="{% url 'sample-detail' object.pk %}">Open classic view</a>
           </li>
@@ -705,6 +760,22 @@
       const raw = document.getElementById("charts");
       if (!raw) return;
       const charts = JSON.parse(raw.textContent);
+
+      // Build a tooltip label callback that reports percentages instead of
+      // the raw dataset values (shares can be fractions 0..1 or already %,
+      // so we always normalize against the dataset total).
+      function tooltipLabel(ctx) {
+        const ds = ctx.dataset || (ctx.chart && ctx.chart.data.datasets[ctx.datasetIndex]) || {};
+        const values = ds.data || [];
+        const total = values.reduce((sum, v) => sum + (Number(v) || 0), 0);
+        const raw = ctx.parsed !== undefined && ctx.parsed !== null
+          ? (typeof ctx.parsed === "object" ? ctx.parsed.y || ctx.parsed.value || 0 : ctx.parsed)
+          : (ctx.raw !== undefined ? ctx.raw : values[ctx.dataIndex]);
+        const pct = total > 0 ? (Number(raw) / total) * 100 : 0;
+        const label = ctx.label || (ctx.chart && ctx.chart.data.labels && ctx.chart.data.labels[ctx.dataIndex]) || "";
+        return label + ": " + pct.toFixed(1) + " %";
+      }
+
       Object.keys(charts).forEach(key => {
         const container = document.getElementById(key);
         if (!container || container.dataset.rendered === "1") return;
@@ -712,11 +783,66 @@
         canvas.id = key + "-canvas";
         container.appendChild(canvas);
         container.dataset.rendered = "1";
+        // Deep-copy + normalize config for v2: square donut, no legend,
+        // cutout so it reads as a donut rather than a pie. The component
+        // table below the chart already labels every slice so the legend
+        // is pure noise; we paint the same colors onto the table rows.
+        const source = charts[key] || {};
+        const config = JSON.parse(JSON.stringify(source));
+        config.options = config.options || {};
+        config.options.responsive = true;
+        config.options.maintainAspectRatio = true;
+        config.options.aspectRatio = 1;
+        config.options.cutout = "62%";
+        config.options.layout = {padding: 4};
+        // Disable legend under both Chart.js v2 (top-level) and v3+ (plugins).
+        config.options.legend = {display: false};
+        // Tooltip percentage callback — register under both v2 (options.tooltips)
+        // and v3+ (options.plugins.tooltip) so it works regardless of version.
+        config.options.tooltips = Object.assign(
+          {},
+          config.options.tooltips,
+          {callbacks: Object.assign({}, (config.options.tooltips || {}).callbacks, {label: tooltipLabel})}
+        );
+        config.options.plugins = Object.assign({}, config.options.plugins, {
+          legend: {display: false},
+          tooltip: Object.assign(
+            {},
+            (config.options.plugins || {}).tooltip,
+            {
+              enabled: true,
+              callbacks: Object.assign(
+                {},
+                ((config.options.plugins || {}).tooltip || {}).callbacks,
+                {label: tooltipLabel}
+              ),
+            }
+          ),
+        });
+
         const ctx = canvas.getContext("2d");
         try {
-          new Chart(ctx, charts[key]);
+          new Chart(ctx, config);
         } catch (err) {
           console.warn("sdv2 chart render failed", key, err);
+          return;
+        }
+
+        // Paint the neighbouring composition table rows with the same colors
+        // Chart.js uses for slices, so the table doubles as the legend.
+        const body = container.closest(".sdv2-group-body");
+        const dataset = (config.data && config.data.datasets && config.data.datasets[0]) || {};
+        const borderColors = dataset.borderColor || [];
+        const backgroundColors = dataset.backgroundColor || [];
+        if (body && (borderColors.length || backgroundColors.length)) {
+          const rows = body.querySelectorAll(".sdv2-group-table tbody tr");
+          rows.forEach((row, idx) => {
+            const border = borderColors[idx % Math.max(borderColors.length, 1)] || "";
+            const fill = backgroundColors[idx % Math.max(backgroundColors.length, 1)] || "";
+            if (border) row.style.setProperty("--sdv2-swatch-border", border);
+            if (fill) row.style.setProperty("--sdv2-swatch-fill", fill);
+            row.classList.add("sdv2-has-swatch");
+          });
         }
       });
     })();

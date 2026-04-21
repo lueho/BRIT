@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.db.models.signals import post_save
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
@@ -10,6 +11,7 @@ from distributions.models import Timestep
 from utils.properties.models import Unit
 
 from ..models import (
+    ComponentMeasurement,
     Composition,
     Material,
     MaterialComponent,
@@ -85,18 +87,34 @@ class SampleSeriesModelSerializerTestCase(TestCase):
 class SampleSerializerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        material = Material.objects.create(name="Test Material")
-        series = SampleSeries.objects.create(name="Test Series", material=material)
+        cls.owner = get_user_model().objects.create_user(
+            username="sample-serializer-owner",
+            password="test123",
+        )
+        material = Material.objects.create(
+            name="Test Material",
+            owner=cls.owner,
+        )
+        series = SampleSeries.objects.create(
+            name="Test Series",
+            material=material,
+            owner=cls.owner,
+        )
         sample = Sample.objects.create(
             name="Test Sample",
             material=material,
             series=series,
             timestep=Timestep.objects.default(),
+            owner=cls.owner,
         )
         with mute_signals(post_save):
             source = Source.objects.create(title="Test Source")
         sample.sources.add(source)
-        property_obj = MaterialProperty.objects.create(name="Dry Matter", unit="%")
+        property_obj = MaterialProperty.objects.create(
+            name="Dry Matter",
+            unit="%",
+            owner=cls.owner,
+        )
         unit = Unit.objects.create(name="Percent")
         MaterialPropertyValue.objects.create(
             sample=sample,
@@ -104,6 +122,7 @@ class SampleSerializerTestCase(TestCase):
             unit=unit,
             average=Decimal("42.0"),
             standard_deviation=Decimal("1.5"),
+            owner=cls.owner,
         )
 
     def setUp(self):
@@ -139,6 +158,55 @@ class SampleSerializerTestCase(TestCase):
         self.assertEqual(
             data["properties"][0]["property_name"],
             "Dry Matter",
+        )
+
+    def test_serializer_uses_shared_normalized_compositions(self):
+        self.sample.compositions.all().delete()
+        unit = Unit.objects.filter(name="%").first()
+        if unit is None:
+            unit = Unit.objects.create(name="%", symbol="percent")
+        elif not unit.symbol:
+            unit.symbol = "percent"
+            unit.save(update_fields=["symbol"])
+
+        group = MaterialComponentGroup.objects.create(
+            name="Chemical Elements",
+            owner=self.owner,
+        )
+        carbon = MaterialComponent.objects.create(name="Carbon", owner=self.owner)
+        nitrogen = MaterialComponent.objects.create(
+            name="Nitrogen",
+            owner=self.owner,
+        )
+        ComponentMeasurement.objects.create(
+            sample=self.sample,
+            group=group,
+            component=carbon,
+            unit=unit,
+            average=Decimal("30"),
+            owner=self.owner,
+        )
+        ComponentMeasurement.objects.create(
+            sample=self.sample,
+            group=group,
+            component=nitrogen,
+            unit=unit,
+            average=Decimal("70"),
+            owner=self.owner,
+        )
+
+        request = RequestFactory().get(
+            reverse("sample-detail", kwargs={"pk": self.sample.id})
+        )
+        data = SampleModelSerializer(self.sample, context={"request": request}).data
+
+        self.assertEqual(len(data["compositions"]), 1)
+        composition = data["compositions"][0]
+        self.assertTrue(composition["is_derived"])
+        self.assertEqual(composition["origin"], "raw_derived")
+        self.assertEqual(
+            {share["as_percentage"] for share in composition["shares"]},
+            {"30.0%", "70.0%"},
         )
 
 

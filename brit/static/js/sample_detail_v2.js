@@ -251,6 +251,93 @@
     });
   });
 
+  /* ---------- Sample export (whole sample → XLSX) ---------- */
+  function setExportBusy(trigger, label) {
+    if (!trigger) return;
+    if (!trigger.dataset.originalHtml) {
+      trigger.dataset.originalHtml = trigger.innerHTML;
+    }
+    trigger.disabled = true;
+    trigger.setAttribute("aria-busy", "true");
+    trigger.innerHTML = `<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> <span class="sdv2-export-trigger-label">${label}</span>`;
+  }
+
+  function resetExportTrigger(trigger) {
+    if (!trigger) return;
+    if (trigger.dataset.originalHtml) {
+      trigger.innerHTML = trigger.dataset.originalHtml;
+      delete trigger.dataset.originalHtml;
+    }
+    trigger.disabled = false;
+    trigger.removeAttribute("aria-busy");
+  }
+
+  function pollExportProgress(taskId, progressTemplate, trigger) {
+    const url = progressTemplate.replace("TASK_ID", encodeURIComponent(taskId));
+    fetch(url, { credentials: "same-origin" })
+      .then((resp) => resp.json())
+      .then((data) => {
+        if (!data) throw new Error("empty response");
+        if (data.state === "SUCCESS") {
+          const details = data.details || {};
+          setExportBusy(trigger, "Done");
+          if (details.url) {
+            window.location.href = details.url;
+          }
+          setTimeout(() => resetExportTrigger(trigger), 2000);
+        } else if (data.state === "FAILURE") {
+          resetExportTrigger(trigger);
+          const msg = (data.details && data.details.error) || "Export failed";
+          alert(msg);
+        } else if (data.state === "PROGRESS") {
+          const pct = (data.details && data.details.percent) || 0;
+          setExportBusy(trigger, `${pct}%`);
+          setTimeout(() => pollExportProgress(taskId, progressTemplate, trigger), 600);
+        } else {
+          // PENDING / STARTED / unknown – keep polling.
+          setExportBusy(trigger, "Queued");
+          setTimeout(() => pollExportProgress(taskId, progressTemplate, trigger), 800);
+        }
+      })
+      .catch((err) => {
+        console.warn("sdv2 export progress failed", err);
+        resetExportTrigger(trigger);
+        alert("Export polling failed. See console for details.");
+      });
+  }
+
+  function startSampleExport(trigger) {
+    const exportUrl = trigger && trigger.dataset.exportUrl;
+    const progressTemplate = trigger && trigger.dataset.progressTemplate;
+    if (!exportUrl || !progressTemplate) return;
+    setExportBusy(trigger, "Starting…");
+    fetch(exportUrl, { credentials: "same-origin" })
+      .then((resp) => {
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        return resp.json();
+      })
+      .then((data) => {
+        if (!data || !data.task_id) throw new Error("No task_id in response");
+        pollExportProgress(data.task_id, progressTemplate, trigger);
+      })
+      .catch((err) => {
+        console.warn("sdv2 export start failed", err);
+        resetExportTrigger(trigger);
+        alert("Failed to start export. See console for details.");
+      });
+  }
+
+  document.querySelectorAll("[data-sdv2-export-sample]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      // Prefer the rail trigger as the visual target so the palette entry
+      // still shows progress somewhere visible after the palette closes.
+      const target =
+        document.querySelector(".sdv2-export-trigger[data-sdv2-export-sample]") || el;
+      startSampleExport(target);
+    });
+  });
+
   /* ---------- Smooth anchor focus highlight ---------- */
   const style = document.createElement("style");
   style.textContent = `
