@@ -284,6 +284,42 @@ class BreadcrumbNestedSourcesDomainTests(TestCase):
         # crumb is rendered as plain text (not linked) but still visible.
         self.assertContains(response, "Greenhouses")
 
+    def test_greenhouses_plugin_second_entity_list_renders_parent_crumb(self):
+        """A second entity type in the same plugin surfaces the same parent."""
+        response = self.client.get(reverse("greenhouse-list"), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'<a href="{reverse("sources-explorer")}">Sources</a>',
+            html=True,
+        )
+        self.assertContains(response, "Greenhouses")
+
+    def test_greenhouses_plugin_detail_renders_full_nested_path(self):
+        """Plugin-mounted detail pages surface the full Sources > <Plugin> path."""
+        from sources.greenhouses.models import Culture
+
+        culture = Culture.objects.create(
+            name="Phase5 Test Culture",
+            publication_status="published",
+        )
+        response = self.client.get(reverse("culture-detail", kwargs={"pk": culture.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'<a href="{reverse("sources-explorer")}">Sources</a>',
+            html=True,
+        )
+        self.assertContains(response, "Greenhouses")
+        self.assertContains(
+            response,
+            f'<li aria-current="page" class="breadcrumb-item active">'
+            f"{culture.get_breadcrumb_object_label()}</li>",
+            html=True,
+        )
+
     def test_collection_create_form_renders_nested_parent_crumb(self):
         """Create forms under a nested source-domain parent expose the full path."""
         from utils.object_management.models import User
@@ -353,6 +389,83 @@ class BreadcrumbNestedSourcesDomainTests(TestCase):
             '<li aria-current="page" class="breadcrumb-item active">Update</li>',
             html=True,
         )
+
+
+class SampleDetailV2BreadcrumbHarmonizationTests(TestCase):
+    """Regression tests for the Phase 3 closeout of ``sample_detail_v2.html``.
+
+    The custom sample-detail v2 experience used to suppress the shared
+    sticky breadcrumb rail and render its own ``sdv2-crumbs`` breadcrumb
+    trail. Phase 3 harmonizes it so the template now participates in the
+    shared breadcrumb contract: ``BRIT > Materials > Samples > <Sample>``
+    is rendered by the shared rail, and the custom rail keeps only the
+    sample-specific action controls.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from materials.models import Material, Sample
+
+        cls.material = Material.objects.create(
+            name="Phase 3 Close Out Material",
+            publication_status="published",
+        )
+        cls.sample = Sample.objects.create(
+            name="Phase 3 Close Out Sample",
+            material=cls.material,
+            publication_status="published",
+        )
+
+    def test_v2_renders_shared_breadcrumb_rail(self):
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}) + "?experience=v2"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        # Shared sticky rail is now present.
+        self.assertContains(response, 'class="page-breadcrumb-rail"')
+        # Module and section crumbs are linked through the contract.
+        self.assertContains(
+            response,
+            f'<a href="{reverse("materials-explorer")}">Materials</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            f'<a href="{reverse("sample-list")}">Samples</a>',
+            html=True,
+        )
+        # The sample itself is the active crumb.
+        self.assertContains(
+            response,
+            f'<li aria-current="page" class="breadcrumb-item active">'
+            f"{self.sample.get_breadcrumb_object_label()}</li>",
+            html=True,
+        )
+
+    def test_v2_drops_duplicate_sdv2_crumbs_block(self):
+        """The legacy custom breadcrumb trail must no longer render."""
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}) + "?experience=v2"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'class="sdv2-crumbs"')
+        self.assertNotContains(response, "sdv2-crumb-current")
+
+    def test_v2_preserves_sample_action_rail(self):
+        """The sample-specific action rail (status pill, mode toggle,
+        palette, classic-view link) must remain intact."""
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}) + "?experience=v2"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="sdv2-rail"')
+        self.assertContains(response, "sdv2-rail-actions")
+        self.assertContains(response, "sdv2-status-pill")
+        self.assertContains(response, "sdv2-mode-toggle")
+        self.assertContains(response, "sdv2-classic-link")
 
 
 class BreadcrumbContractFallbackPrecedenceTests(SimpleTestCase):

@@ -79,15 +79,12 @@ This section is the authoritative **current-state** reference for breadcrumb nav
 - **Explicit page overrides**
   - Module landing pages and static pages (about, learning, privacy policy) set explicit `breadcrumb_module_label`, `breadcrumb_section_label`, and/or `breadcrumb_page_title` via `BreadcrumbContextMixin`.
   - The home page and 403/404/500 error pages deliberately suppress the sticky breadcrumb rail by overriding `{% block page_chrome %}` as empty.
-  - `materials/templates/materials/sample_detail_v2.html` intentionally suppresses the shared base breadcrumb rail and keeps its own custom sticky sample-detail rail.
+  - `materials/templates/materials/sample_detail_v2.html` participates in the shared breadcrumb contract: the shared sticky rail renders `BRIT > Materials > Samples > <Sample>` through the contract, while the `sdv2-rail` stacks below the shared rail and holds only sample-specific actions (status pill, mode toggle, quick-actions palette, export, classic-view link).
 
 ### Current known limitations
 
-- **Custom sample-detail rail not yet harmonized**
-  - `materials/templates/materials/sample_detail_v2.html` still renders a bespoke sticky rail and does not participate in the shared contract.
-
 - **Fallback leakage on non-contract pages**
-  - Pages that do not use `BreadcrumbContextMixin` or the shared CRUD base classes may still fall back to `title` or route-name humanization, which can produce awkward labels.
+  - Pages that do not use `BreadcrumbContextMixin` or the shared CRUD base classes may still fall back to `title` or route-name humanization, which can produce awkward labels. The fallback chain in `base.html` is retained as a safety net and is regression-guarded by `BreadcrumbContractFallbackPrecedenceTests`.
 
 - **Greenhouses and Roadside Trees have no plugin dashboard**
   - Their nested module crumb renders as plain text (no link) because the plugins do not expose a dashboard URL; the parent crumb (`Sources`) still links back to the Sources explorer.

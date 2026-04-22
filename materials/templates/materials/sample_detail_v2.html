@@ -8,34 +8,18 @@
 {% block style_sheets %}
   <link href="{% static 'css/sample_detail_v2.css' %}" rel="stylesheet">
 {% endblock style_sheets %}
-{% block page_chrome %}
-{% endblock page_chrome %}
 {% block content %}
   <div class="sdv2"
        data-sample-id="{{ object.id }}"
        data-edit-enabled="{% if edit_mode_enabled %}1{% else %}0{% endif %}"
        data-can-edit="{% if sample_policy.can_edit or sample_policy.can_manage_samples or sample_policy.can_add_property %}1{% else %}0{% endif %}">
-    {# ─── Sticky rail: breadcrumb + mode toggle + palette hint ─── #}
-    <nav class="sdv2-rail" aria-label="Sample navigation">
-      <ol class="sdv2-crumbs" aria-label="Breadcrumb">
-        <li>
-          <a href="{% url 'materials-explorer' %}">Materials</a>
-        </li>
-        <li>
-          <a href="{% url 'sample-list' %}">Samples</a>
-        </li>
-        {% if object.material %}
-          <li>
-            <a href="{% url 'material-detail' object.material.pk %}">{{ object.material.name }}</a>
-          </li>
-        {% endif %}
-        {% if object.series %}
-          <li>
-            <a href="{% url 'sampleseries-detail' object.series.pk %}">{{ object.series.name }}</a>
-          </li>
-        {% endif %}
-        <li aria-current="page" class="sdv2-crumb-current">{{ object.name }}</li>
-      </ol>
+    {# ─── Sticky rail: sample-specific actions ─────────────────────── #}
+    {# The BRIT > Materials > Samples > <Sample> path is rendered by the #}
+    {# shared breadcrumb rail in base.html through the breadcrumb_*      #}
+    {# contract populated by UserCreatedObjectDetailView. This rail      #}
+    {# keeps only sample-specific actions (status pill, mode toggle,    #}
+    {# quick-actions palette, export, classic-view link).                #}
+    <nav class="sdv2-rail" aria-label="Sample actions">
       <div class="sdv2-rail-actions">
         <span class="sdv2-status-pill sdv2-status-{{ object.publication_status|default:'private' }}"
               title="Publication status">{{ object.get_publication_status_display }}</span>

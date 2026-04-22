@@ -1,6 +1,6 @@
 # Breadcrumb Navigation Target-State Plan
  
- - **Status**: Active roadmap; Phases 1, 2, and 4 are complete and Phase 3 nested-domain contract has landed on `feat/sticky-breadcrumbs`; Phase 5 regression hardening and the custom `sample_detail_v2` harmonization are the remaining slices
+ - **Status**: Complete on `feat/sticky-breadcrumbs`; all six phases (0, 1, 2, 3, 4, 5) have landed and the Definition of Done in section 10 is satisfied
  - **Date**: 2026-04-21
  - **Last updated**: 2026-04-22
  - **Scope**: shared breadcrumb/page-chrome behavior across `base.html`, shared CRUD templates, explorer/dashboard pages, nested source-domain pages, static/error pages, and supporting view/model metadata needed to make breadcrumbs logical and stable throughout BRIT
@@ -204,17 +204,18 @@ The safest sequence is:
 - **Selected pages already provide explicit breadcrumbs**
   - major explorer/dashboard pages and selected form pages already override `breadcrumbs` explicitly instead of relying only on the base fallback.
 
-- **Custom sample detail still uses its own rail intentionally**
-  - `materials/templates/materials/sample_detail_v2.html` keeps a custom sticky sample-detail rail and suppresses the shared base rail for that page.
+- **Custom sample detail now participates in the shared contract**
+  - `materials/templates/materials/sample_detail_v2.html` was harmonized: the shared sticky breadcrumb rail is restored and owns `BRIT > Materials > Samples > <Sample>`, while the `sdv2-rail` stacks below it and keeps only sample-specific actions (status pill, mode toggle, palette, export, classic-view link).
 
 ### 4.3 Remaining blockers before the target state
 
-- `materials/templates/materials/sample_detail_v2.html` keeps a bespoke sticky rail that does not participate in the shared contract; the page deliberately suppresses the shared rail until the custom rail is harmonized
-- focused regression coverage is still missing for several surfaces, notably:
-  - shared CRUD **create/update form** pages under a nested source-domain parent (for example `collection-create`, `collection-update`)
-  - detail and form pages for non-`name` objects whose breadcrumb label comes from `get_breadcrumb_object_label`
-  - representative non-waste-collection source-domain CRUD pages beyond the one greenhouses list already covered
-- the broader fallback chain in `base.html` still accepts weak inputs such as `title`; shared pages no longer rely on it, but no test currently guards non-contract pages from regressing back into it
+None. All blockers identified during the 2026-04-21 audit have been cleared by the Phase 1–5 rollout:
+
+- shared pages render module-first breadcrumbs via `BreadcrumbContextMixin` / `build_breadcrumb_context`
+- nested source-domain plugins (`waste_collection`, `greenhouses`, `roadside_trees`) surface `BRIT > Sources > <Plugin> > …` through `DEFAULT_BREADCRUMB_MODULES`
+- `sample_detail_v2` is harmonized with the shared contract
+- the shared `firstof`/`{% elif %}` fallback chain is guarded by `BreadcrumbContractFallbackPrecedenceTests`
+- the sticky sidebar/rail offset is driven by shared CSS custom properties and covered by `StickyFilterOffsetAssetTests`
 
 ### 4.4 Known layout regressions introduced by the sticky rail
 
@@ -230,9 +231,9 @@ The safest sequence is:
 | Phase 0 - information architecture and audit baseline | Complete | The target hierarchy has been documented and the as-is reference has been separated into `brit/README.md`. |
 | Phase 1 - shared breadcrumb data contract | Complete | `utils.views.build_breadcrumb_context` and `BreadcrumbContextMixin` provide the shared module/section/object/action contract; shared list/detail/form templates delegate to the base contract via `{% firstof %}`. |
 | Phase 2 - major module normalization | Complete | Bibliography, Inventories, Maps, Materials, Processes, Sources, Utilities, and Sources > Waste Collection landing views all render module-first breadcrumbs through the shared contract. |
-| Phase 3 - nested domains and custom detail experiences | Partial | Shared breadcrumb contract extended with an optional `breadcrumb_parent_module_label`/`breadcrumb_parent_module_url` slot so source-domain plugins render `BRIT > Sources > <Plugin> > <Entity> > <Object> > <Action>` through the shared list/detail/form context builders. `waste_collection`, `greenhouses`, and `roadside_trees` are configured as children of `Sources` in `DEFAULT_BREADCRUMB_MODULES`; the Waste Collection explorer now uses the parent slot instead of conflating module with section. Custom `materials/sample_detail_v2.html` deliberately retains its own sticky sample-detail rail and explicitly suppresses the shared rail — this is kept as an intentional exception until the custom rail is harmonized with the shared contract. |
+| Phase 3 - nested domains and custom detail experiences | Complete | Shared breadcrumb contract extended with an optional `breadcrumb_parent_module_label`/`breadcrumb_parent_module_url` slot so source-domain plugins render `BRIT > Sources > <Plugin> > <Entity> > <Object> > <Action>` through the shared list/detail/form context builders. `waste_collection`, `greenhouses`, and `roadside_trees` are configured as children of `Sources` in `DEFAULT_BREADCRUMB_MODULES`; the Waste Collection explorer uses the parent slot instead of conflating module with section. Custom `materials/templates/materials/sample_detail_v2.html` was harmonized: the shared sticky rail is restored and renders `BRIT > Materials > Samples > <Sample>`, the duplicated `sdv2-crumbs` trail was removed, and the `sdv2-rail` now stacks below the shared rail using the shared `--brit-topnav-height` / `--brit-breadcrumb-rail-height` custom properties while keeping sample-specific actions (status pill, mode toggle, palette, export, classic-view link). |
 | Phase 4 - static/review/error cleanup | Complete | Static pages (home, about, learning, privacy policy) and the content review dashboard render deliberate breadcrumbs. Home page and error pages (403/404/500) deliberately suppress the shared rail; home page displays "Bioresource Information Tool" as the card header to compensate for the missing rail context. |
-| Phase 5 - regression hardening and cleanup | Partial | Focused breadcrumb tests now cover shared list/detail/form, module landing pages, the nested Sources > Waste Collection contract across list/detail/create/update (`collection-list`, `collection-detail`, `collection-create`, `collection-update`), a representative Sources plugin list (greenhouses `culture-list`), non-`name` detail objects (`author-detail`), the precedence of contract slots over the legacy `object`/`header`/`title`/`breadcrumb_page_title` fallback chain in `base.html`, the review dashboard, static pages, error pages, and the sticky-offset CSS contract. Remaining gaps: non-waste-collection source-domain CRUD beyond the greenhouses list, and the `sample_detail_v2` harmonization decision. |
+| Phase 5 - regression hardening and cleanup | Complete | Focused breadcrumb tests cover shared list/detail/form, module landing pages, the nested Sources > Waste Collection contract across list/detail/create/update (`collection-list`, `collection-detail`, `collection-create`, `collection-update`), the greenhouses plugin across list/detail and a second entity type (`culture-list`, `culture-detail`, `greenhouse-list`), non-`name` detail objects (`author-detail`), the precedence of contract slots over the legacy `object`/`header`/`title`/`breadcrumb_page_title` fallback chain in `base.html`, the `sample_detail_v2` harmonization (shared rail present, duplicate trail removed, sample action rail preserved), the review dashboard, static pages, error pages, and the sticky-offset CSS contract. |
 
 ## 5. Gap Summary
 
@@ -504,15 +505,18 @@ Breadcrumb navigation can be considered materially aligned across BRIT when all 
 
 ## 11. Immediate Next Slice
 
-The core Phase 5 regression-hardening slice proposed on 2026-04-22 has landed:
+Nothing remains on the immediate critical path. The Definition of Done in section 10 is satisfied as of 2026-04-22:
 
-- `collection-create` and `collection-update` form-page breadcrumb regression tests confirm the nested Sources > Waste Collection parent crumb is threaded through `UserCreatedObjectCreateView` and `UserCreatedObjectUpdateView`.
-- `author-detail` regression test confirms shared detail breadcrumbs use `get_breadcrumb_object_label` (and therefore `__str__`) for models without a `name` field.
-- `BreadcrumbContractFallbackPrecedenceTests` confirms that once any contract slot is populated, the legacy `object`/`header`/`title`/`breadcrumb_page_title` fallback chain in `base.html` is skipped, while still rendering the legacy `title` safety net for non-contract pages.
+- shared list, detail, and create/update form pages use module-first breadcrumbs through `BreadcrumbContextMixin` and `build_breadcrumb_context`
+- source-domain plugins surface the nested `BRIT > Sources > <Plugin>` path
+- `sample_detail_v2` participates in the shared contract while keeping its sample-specific action rail
+- browser titles never render `None` (firstof chain guarded by tests)
+- representative breadcrumb behavior is covered by focused tests in `brit/tests/test_templates.py`
 
-The remaining focused work before the Phase 3 `sample_detail_v2` decision is:
+### Optional follow-ups (not on the critical path)
 
-1. Add one more source-domain CRUD regression beyond waste_collection — for example a published-scope CRUD page in `sources.roadside_trees` or an authenticated `greenhouse`/`culture` detail — to ensure all three plugins surface `BRIT > Sources > <Plugin>` consistently in CRUD pipelines.
-2. Decide how `materials/templates/materials/sample_detail_v2.html` should participate in the shared contract: either adopt the shared rail while preserving its sample-context summary (preferred), or keep the custom rail as an explicit, documented exception.
+- **Minified CSS parity**: `brit/static/css/sample_detail_v2.css` currently has no tracked minified sibling; if the project standardizes on committing `*.min.css` for this asset, add the generated output and its regression test.
+- **Mobile breadcrumb collapse**: on narrow viewports the nested source-domain paths can wrap across several lines. An accessible collapse-to-parent treatment could improve the mobile UX without changing the contract.
+- **Breadcrumb JSON-LD**: emitting structured-data breadcrumbs from the shared contract would be a natural SEO/assistive-tech extension now that the data is centralized.
 
-After step 2 lands, Phase 3 and Phase 5 can both flip to Complete and the roadmap reaches its Definition of Done.
+These are quality-of-life improvements and can be picked up independently as they become relevant; they are not required for the documented target state.

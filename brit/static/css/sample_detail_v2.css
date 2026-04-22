@@ -51,9 +51,12 @@
 }
 
 /* ── Sticky rail ───────────────────────────────────────────────────── */
+/* Sample-specific action rail; stacks directly below the shared BRIT
+   breadcrumb rail (see filtered-list.css for the shared custom
+   properties used to compute the offset). */
 .sdv2-rail {
   position: sticky;
-  top: 56px;
+  top: calc(var(--brit-topnav-height, 56px) + var(--brit-breadcrumb-rail-height, 3rem));
   z-index: 40;
   display: flex;
   align-items: center;
@@ -64,38 +67,6 @@
   backdrop-filter: saturate(1.2) blur(6px);
   border-bottom: 1px solid var(--sdv2-border);
   flex-wrap: wrap;
-}
-
-.sdv2-crumbs {
-  display: flex;
-  gap: 0.25rem;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  font-size: 13px;
-  color: var(--sdv2-text-muted);
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.sdv2-crumbs li {
-  display: inline-flex;
-  align-items: center;
-  max-width: 28ch;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.sdv2-crumbs li+li::before {
-  content: "›";
-  color: var(--sdv2-text-subtle);
-  margin: 0 0.5rem;
-}
-
-.sdv2-crumb-current {
-  color: var(--sdv2-text);
-  font-weight: 600;
 }
 
 .sdv2-rail-actions {
@@ -1239,12 +1210,15 @@ tr.sdv2-has-swatch:hover .sdv2-swatch {
 }
 
 /* ── Related aside ─────────────────────────────────────────────────── */
+/* Sticky below both the shared BRIT breadcrumb rail and the sdv2
+   action rail. Uses shared custom properties so the offset tracks
+   changes to the shared rail height. */
 .sdv2-related {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
   position: sticky;
-  top: calc(56px + 60px);
+  top: calc(var(--brit-topnav-height, 56px) + var(--brit-breadcrumb-rail-height, 3rem) + 60px);
   align-self: start;
   max-height: calc(100vh - 140px);
   overflow-y: auto;
