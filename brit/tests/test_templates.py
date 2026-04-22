@@ -355,6 +355,123 @@ class BreadcrumbNestedSourcesDomainTests(TestCase):
         )
 
 
+class BreadcrumbContractFallbackPrecedenceTests(SimpleTestCase):
+    """Regression tests for the precedence between contract slots and
+    the legacy ``object``/``header``/``title``/``breadcrumb_page_title``
+    fallback chain in ``base.html``.
+
+    The fallback chain is retained as a safety net for pages that do not
+    yet adopt the shared contract. Once any contract slot is populated,
+    the fallback chain must be skipped entirely so weak labels such as a
+    route-name-derived ``title`` cannot leak into the rail.
+    """
+
+    def _render_base_breadcrumbs(self, context):
+        from django.template import Context, Template
+
+        template = Template(
+            '{% extends "base.html" %}{% block content %}{% endblock %}'
+        )
+        return template.render(Context(context))
+
+    def _extract_breadcrumb_rail(self, html):
+        """Slice out the breadcrumb rail so negative assertions don't
+        accidentally catch the browser ``<title>`` or navbar labels."""
+        start_marker = '<ol class="breadcrumb page-breadcrumbs mb-0">'
+        end_marker = "</ol>"
+        start = html.index(start_marker)
+        end = html.index(end_marker, start) + len(end_marker)
+        return html[start:end]
+
+    def test_contract_module_label_wins_over_legacy_title_fallback(self):
+        rail = self._extract_breadcrumb_rail(
+            self._render_base_breadcrumbs({
+                "breadcrumb_module_label": "Bibliography",
+                "breadcrumb_module_url": "/bibliography/",
+                "title": "Should Not Appear In Breadcrumb",
+            })
+        )
+
+        self.assertInHTML(
+            '<li class="breadcrumb-item active" aria-current="page">Bibliography</li>',
+            rail,
+        )
+        self.assertNotIn("Should Not Appear In Breadcrumb", rail)
+
+    def test_contract_action_label_wins_over_legacy_header_fallback(self):
+        rail = self._extract_breadcrumb_rail(
+            self._render_base_breadcrumbs({
+                "breadcrumb_module_label": "Bibliography",
+                "breadcrumb_section_label": "Authors",
+                "breadcrumb_action_label": "Create",
+                "header": "Legacy Header Should Not Leak",
+                "title": "Legacy Title Should Not Leak",
+            })
+        )
+
+        self.assertInHTML(
+            '<li class="breadcrumb-item active" aria-current="page">Create</li>',
+            rail,
+        )
+        self.assertNotIn("Legacy Header Should Not Leak", rail)
+        self.assertNotIn("Legacy Title Should Not Leak", rail)
+
+    def test_legacy_title_fallback_still_works_without_contract(self):
+        """The safety-net fallback is intentionally preserved for pages
+        that have not yet adopted the shared contract."""
+        rail = self._extract_breadcrumb_rail(
+            self._render_base_breadcrumbs({"title": "Legacy Page"})
+        )
+
+        self.assertInHTML(
+            '<li class="breadcrumb-item active" aria-current="page">Legacy Page</li>',
+            rail,
+        )
+
+
+class BreadcrumbNonNameDetailObjectTests(TestCase):
+    """Regression tests for detail breadcrumbs on models without a `name` field.
+
+    Shared detail pages must render the current-item crumb via
+    ``object.get_breadcrumb_object_label()`` (which defaults to ``str(self)``
+    on ``CRUDUrlsMixin``) rather than assuming ``object.name`` exists. The
+    previous implementation coerced ``None`` into the breadcrumb for models
+    like ``Author`` and ``Source`` whose display field is not ``name``.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from bibliography.models import Author
+
+        cls.author = Author.objects.create(
+            first_names="Ada",
+            last_names="Lovelace",
+            publication_status="published",
+        )
+
+    def test_author_detail_uses_str_based_breadcrumb_label(self):
+        response = self.client.get(
+            reverse("author-detail", kwargs={"pk": self.author.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        expected_label = str(self.author)
+        self.assertContains(
+            response,
+            f'<li aria-current="page" class="breadcrumb-item active">'
+            f"{expected_label}</li>",
+            html=True,
+        )
+        # And the module crumb (Bibliography) is present and linked.
+        self.assertContains(
+            response,
+            f'<a href="{reverse("bibliography-explorer")}">Bibliography</a>',
+            html=True,
+        )
+        # The detail rail must not leak the raw class name or an empty crumb.
+        self.assertNotContains(response, "None</li>")
+
+
 class ErrorPageBreadcrumbTests(SimpleTestCase):
     """Error pages should deliberately suppress the sticky breadcrumb rail.
 
