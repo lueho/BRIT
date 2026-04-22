@@ -209,6 +209,82 @@ class BreadcrumbStaticPageTests(TestCase):
         )
 
 
+class BreadcrumbNestedSourcesDomainTests(TestCase):
+    """Regression tests for the nested Sources > Waste Collection breadcrumb path.
+
+    Ensures source-domain plugins surface ``BRIT > Sources > Waste Collection > ...``
+    instead of the flat ``BRIT > Waste Collection > ...``, so the nested hierarchy
+    stays consistent across landing, list, and detail pages.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from sources.waste_collection.models import Collection, CollectionCatchment
+
+        cls.collection = Collection.objects.create(
+            name="Phase 3 Test Collection",
+            catchment=CollectionCatchment.objects.create(name="Phase 3 Test Catchment"),
+            publication_status="published",
+        )
+
+    def test_collection_list_renders_nested_sources_crumb(self):
+        response = self.client.get(reverse("collection-list"), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'<a href="{reverse("sources-explorer")}">Sources</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            f'<a href="{reverse("wastecollection-explorer")}">Waste Collection</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">Collections</li>',
+            html=True,
+        )
+
+    def test_collection_detail_renders_full_nested_path(self):
+        response = self.client.get(
+            reverse("collection-detail", kwargs={"pk": self.collection.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'<a href="{reverse("sources-explorer")}">Sources</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            f'<a href="{reverse("wastecollection-explorer")}">Waste Collection</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            f'<li aria-current="page" class="breadcrumb-item active">'
+            f"{self.collection.get_breadcrumb_object_label()}</li>",
+            html=True,
+        )
+
+    def test_greenhouses_plugin_list_renders_sources_parent_crumb(self):
+        """Plugin-mounted source-domain lists also nest under Sources."""
+        response = self.client.get(reverse("culture-list"), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'<a href="{reverse("sources-explorer")}">Sources</a>',
+            html=True,
+        )
+        # No dashboard exists for the greenhouses plugin yet, so the module
+        # crumb is rendered as plain text (not linked) but still visible.
+        self.assertContains(response, "Greenhouses")
+
+
 class ErrorPageBreadcrumbTests(SimpleTestCase):
     """Error pages should deliberately suppress the sticky breadcrumb rail.
 

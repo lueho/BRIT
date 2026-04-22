@@ -12,6 +12,8 @@ from .models import Redirect
 
 def build_breadcrumb_context(
     *,
+    parent_module_label=None,
+    parent_module_url=None,
     module_label=None,
     module_url=None,
     section_label=None,
@@ -24,6 +26,8 @@ def build_breadcrumb_context(
     return {
         key: value
         for key, value in {
+            "breadcrumb_parent_module_label": parent_module_label,
+            "breadcrumb_parent_module_url": parent_module_url,
             "breadcrumb_module_label": module_label,
             "breadcrumb_module_url": module_url,
             "breadcrumb_section_label": section_label,
@@ -38,6 +42,8 @@ def build_breadcrumb_context(
 
 
 class BreadcrumbContextMixin:
+    breadcrumb_parent_module_label = None
+    breadcrumb_parent_module_url = None
     breadcrumb_module_label = None
     breadcrumb_module_url = None
     breadcrumb_section_label = None
@@ -46,6 +52,12 @@ class BreadcrumbContextMixin:
     breadcrumb_object_url = None
     breadcrumb_action_label = None
     breadcrumb_page_title = None
+
+    def get_breadcrumb_parent_module_label(self):
+        return self.breadcrumb_parent_module_label
+
+    def get_breadcrumb_parent_module_url(self):
+        return self.breadcrumb_parent_module_url
 
     def get_breadcrumb_module_label(self):
         return self.breadcrumb_module_label
@@ -73,6 +85,8 @@ class BreadcrumbContextMixin:
 
     def get_breadcrumb_context(self):
         return build_breadcrumb_context(
+            parent_module_label=self.get_breadcrumb_parent_module_label(),
+            parent_module_url=self.get_breadcrumb_parent_module_url(),
             module_label=self.get_breadcrumb_module_label(),
             module_url=self.get_breadcrumb_module_url(),
             section_label=self.get_breadcrumb_section_label(),

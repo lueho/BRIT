@@ -49,44 +49,48 @@ This section is the authoritative **current-state** reference for breadcrumb nav
 
 - **Base page chrome**
   - `brit/templates/base.html` provides the shared sticky breadcrumb rail through the `page_chrome` and `breadcrumbs` blocks.
-  - The default fallback path is currently:
-    - `BRIT`
-    - active label from `object.name`, `header`, `title`, or `request.resolver_match.url_name|title`
+  - The contract-driven rendering path is:
+    - `BRIT > <parent module> > <module> > <section> > <object> > <action>`
+  - Each slot is optional. The last populated slot is rendered as the active crumb. When none of the slots are set, the rail falls back to the active label from `object.get_breadcrumb_object_label`, `header`, `title`, or `breadcrumb_page_title`.
+
+- **Shared breadcrumb contract**
+  - `utils.views.build_breadcrumb_context` and `BreadcrumbContextMixin` expose the slots
+    `breadcrumb_parent_module_label/url`, `breadcrumb_module_label/url`,
+    `breadcrumb_section_label/url`, `breadcrumb_object_label/url`,
+    `breadcrumb_action_label`, and `breadcrumb_page_title`.
+  - Shared CRUD views (`utils/object_management/views.py`) inject sensible defaults from
+    `DEFAULT_BREADCRUMB_MODULES`, the model's plural label, and `object.get_breadcrumb_object_label`.
 
 - **Shared filtered lists**
-  - `brit/templates/filtered_list.html` provides the generic list breadcrumb path.
-  - When `dashboard_url` is present, the shared pattern is currently:
-    - `BRIT > Explorer > <current list label>`
-  - The current list label comes from `header` when available, otherwise from the model's plural label.
+  - `brit/templates/filtered_list.html` delegates its breadcrumb rendering to the base template through the shared contract.
+  - For a published list the shared pattern is:
+    - `BRIT > <module> > <entity plural>`
 
 - **Shared detail pages**
-  - `brit/templates/detail_with_options.html` provides the generic detail breadcrumb path.
-  - The shared pattern is currently:
-    - `BRIT > <object list label> > <current object>`
-  - The list label is derived from `object.list_url` and `object.get_verbose_name_plural`.
-  - The current object label is currently derived from `object.name`.
+  - `brit/templates/detail_with_options.html` delegates its breadcrumb rendering to the base template through the shared contract.
+  - For a detail page the shared pattern is:
+    - `BRIT > <module> > <entity plural> > <object>`
+
+- **Source-domain plugins (nested hierarchy)**
+  - `waste_collection`, `greenhouses`, and `roadside_trees` are configured as children of `Sources` in `DEFAULT_BREADCRUMB_MODULES`, so their CRUD pages render as:
+    - `BRIT > Sources > <Plugin> > <Entity plural> > <Object> > <Action>`
+  - The Waste Collection explorer landing page itself renders as `BRIT > Sources > Waste Collection` using the parent slot.
 
 - **Explicit page overrides**
-  - Many explorer and dashboard pages now define explicit `breadcrumbs` blocks so the sticky rail shows a human-chosen label instead of only the fallback path.
+  - Module landing pages and static pages (about, learning, privacy policy) set explicit `breadcrumb_module_label`, `breadcrumb_section_label`, and/or `breadcrumb_page_title` via `BreadcrumbContextMixin`.
+  - The home page and 403/404/500 error pages deliberately suppress the sticky breadcrumb rail by overriding `{% block page_chrome %}` as empty.
   - `materials/templates/materials/sample_detail_v2.html` intentionally suppresses the shared base breadcrumb rail and keeps its own custom sticky sample-detail rail.
 
 ### Current known limitations
 
-- **Generic module crumb**
-  - Shared filtered lists still use the generic label `Explorer` rather than a module-specific label such as `Materials`, `Maps`, or `Inventories`.
+- **Custom sample-detail rail not yet harmonized**
+  - `materials/templates/materials/sample_detail_v2.html` still renders a bespoke sticky rail and does not participate in the shared contract.
 
-- **Weak object-label assumption**
-  - Shared detail breadcrumbs assume the current object can always be rendered as `object.name`.
-  - This is not valid for every model.
+- **Fallback leakage on non-contract pages**
+  - Pages that do not use `BreadcrumbContextMixin` or the shared CRUD base classes may still fall back to `title` or route-name humanization, which can produce awkward labels.
 
-- **Fallback leakage**
-  - Static or exceptional pages can still fall back to `title` or route-name humanization, which can produce awkward labels.
-
-- **Page-title drift**
-  - Some shared title paths are still weak enough that pages can render `BRIT | None` if the expected title/header context is missing.
-
-- **Nested-domain inconsistency**
-  - Some source-domain and plugin-mounted pages expose only a local entity crumb, while others expose a higher-level parent path.
+- **Greenhouses and Roadside Trees have no plugin dashboard**
+  - Their nested module crumb renders as plain text (no link) because the plugins do not expose a dashboard URL; the parent crumb (`Sources`) still links back to the Sources explorer.
 
 ### Planned changes
 

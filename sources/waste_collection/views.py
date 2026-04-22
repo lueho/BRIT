@@ -162,9 +162,9 @@ def _frequency_display_context(frequency):
 
 class CollectionExplorerView(BreadcrumbContextMixin, TemplateView):
     template_name = "wastecollection_dashboard.html"
-    breadcrumb_module_label = "Sources"
-    breadcrumb_module_url = reverse_lazy("sources-explorer")
-    breadcrumb_section_label = "Waste Collection"
+    breadcrumb_parent_module_label = "Sources"
+    breadcrumb_parent_module_url = reverse_lazy("sources-explorer")
+    breadcrumb_module_label = "Waste Collection"
     breadcrumb_page_title = "Waste Collection"
 
     def get_context_data(self, **kwargs):

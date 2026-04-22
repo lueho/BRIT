@@ -65,15 +65,33 @@ logger = logging.getLogger(__name__)
 
 
 DEFAULT_BREADCRUMB_MODULES = {
-    "bibliography": ("Bibliography", "bibliography-explorer"),
-    "inventories": ("Inventories", "inventories-explorer"),
-    "maps": ("Maps", "maps-dashboard"),
-    "materials": ("Materials", "materials-explorer"),
-    "processes": ("Processes", "processes-dashboard"),
-    "properties": ("Properties", "properties-dashboard"),
-    "sources": ("Sources", "sources-explorer"),
-    "utils": ("Utilities", "utils-dashboard"),
-    "waste_collection": ("Waste Collection", "wastecollection-explorer"),
+    "bibliography": {"label": "Bibliography", "url_name": "bibliography-explorer"},
+    "inventories": {"label": "Inventories", "url_name": "inventories-explorer"},
+    "maps": {"label": "Maps", "url_name": "maps-dashboard"},
+    "materials": {"label": "Materials", "url_name": "materials-explorer"},
+    "processes": {"label": "Processes", "url_name": "processes-dashboard"},
+    "properties": {"label": "Properties", "url_name": "properties-dashboard"},
+    "sources": {"label": "Sources", "url_name": "sources-explorer"},
+    "utils": {"label": "Utilities", "url_name": "utils-dashboard"},
+    # Source-domain plugins render nested under the Sources explorer.
+    "waste_collection": {
+        "label": "Waste Collection",
+        "url_name": "wastecollection-explorer",
+        "parent_label": "Sources",
+        "parent_url_name": "sources-explorer",
+    },
+    "greenhouses": {
+        "label": "Greenhouses",
+        "url_name": None,
+        "parent_label": "Sources",
+        "parent_url_name": "sources-explorer",
+    },
+    "roadside_trees": {
+        "label": "Roadside Trees",
+        "url_name": None,
+        "parent_label": "Sources",
+        "parent_url_name": "sources-explorer",
+    },
 }
 
 
@@ -87,21 +105,43 @@ def _get_breadcrumb_model(view):
     return getattr(form_meta, "model", None)
 
 
-def _get_default_breadcrumb_module(model):
+def _get_default_breadcrumb_module_config(model):
     if model is None:
+        return None
+    return DEFAULT_BREADCRUMB_MODULES.get(model._meta.app_label)
+
+
+def _get_default_breadcrumb_module(model):
+    config = _get_default_breadcrumb_module_config(model)
+    if config is None:
         return None, None
-    return DEFAULT_BREADCRUMB_MODULES.get(model._meta.app_label, (None, None))
+    return config.get("label"), config.get("url_name")
 
 
-def _get_default_breadcrumb_module_url(model):
-    _, route_name = _get_default_breadcrumb_module(model)
+def _reverse_or_none(route_name):
     if not route_name:
         return None
-
     try:
         return reverse(route_name)
     except NoReverseMatch:
         return None
+
+
+def _get_default_breadcrumb_module_url(model):
+    _, route_name = _get_default_breadcrumb_module(model)
+    return _reverse_or_none(route_name)
+
+
+def _get_default_breadcrumb_parent_module(model):
+    config = _get_default_breadcrumb_module_config(model)
+    if config is None:
+        return None, None
+    return config.get("parent_label"), config.get("parent_url_name")
+
+
+def _get_default_breadcrumb_parent_module_url(model):
+    _, route_name = _get_default_breadcrumb_parent_module(model)
+    return _reverse_or_none(route_name)
 
 
 def _get_default_breadcrumb_section_label(model):
@@ -1144,6 +1184,8 @@ class UserCreatedObjectListMixin:
     header = None
     list_type = None
     dashboard_url = None
+    breadcrumb_parent_module_label = None
+    breadcrumb_parent_module_url = None
     breadcrumb_module_label = None
     breadcrumb_module_url = None
     breadcrumb_page_title = None
@@ -1219,6 +1261,9 @@ class UserCreatedObjectListMixin:
             self, "model", None
         )
         default_module_label, _ = _get_default_breadcrumb_module(breadcrumb_model)
+        default_parent_label, _ = _get_default_breadcrumb_parent_module(
+            breadcrumb_model
+        )
         breadcrumb_section_label = (
             self.breadcrumb_section_label
             or _get_default_breadcrumb_section_label(breadcrumb_model)
@@ -1235,6 +1280,13 @@ class UserCreatedObjectListMixin:
         })
         context.update(
             build_breadcrumb_context(
+                parent_module_label=(
+                    self.breadcrumb_parent_module_label or default_parent_label
+                ),
+                parent_module_url=(
+                    self.breadcrumb_parent_module_url
+                    or _get_default_breadcrumb_parent_module_url(breadcrumb_model)
+                ),
                 module_label=self.breadcrumb_module_label or default_module_label,
                 module_url=(
                     self.breadcrumb_module_url
@@ -1708,9 +1760,12 @@ class UserCreatedObjectCreateView(
             "submit_button_text": "Save",
         })
         default_module_label, _ = _get_default_breadcrumb_module(model)
+        default_parent_label, _ = _get_default_breadcrumb_parent_module(model)
         breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
         context.update(
             build_breadcrumb_context(
+                parent_module_label=default_parent_label,
+                parent_module_url=_get_default_breadcrumb_parent_module_url(model),
                 module_label=default_module_label,
                 module_url=_get_default_breadcrumb_module_url(model),
                 section_label=breadcrumb_section_label,
@@ -1816,6 +1871,7 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
         obj = self.object
         request = self.request
         default_module_label, _ = _get_default_breadcrumb_module(obj.__class__)
+        default_parent_label, _ = _get_default_breadcrumb_parent_module(obj.__class__)
         breadcrumb_section_label = _get_default_breadcrumb_section_label(obj.__class__)
         breadcrumb_object_label = _get_default_breadcrumb_object_label(obj)
         # Show review panel when explicitly requested via ?review=1
@@ -1834,6 +1890,10 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
         })
         context.update(
             build_breadcrumb_context(
+                parent_module_label=default_parent_label,
+                parent_module_url=_get_default_breadcrumb_parent_module_url(
+                    obj.__class__
+                ),
                 module_label=default_module_label,
                 module_url=_get_default_breadcrumb_module_url(obj.__class__),
                 section_label=breadcrumb_section_label,
@@ -2096,6 +2156,7 @@ class UserCreatedObjectUpdateView(
         context = super().get_context_data(**kwargs)
         model = self.object.__class__
         default_module_label, _ = _get_default_breadcrumb_module(model)
+        default_parent_label, _ = _get_default_breadcrumb_parent_module(model)
         breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
         breadcrumb_object_label = _get_default_breadcrumb_object_label(self.object)
         context.update({
@@ -2104,6 +2165,8 @@ class UserCreatedObjectUpdateView(
         })
         context.update(
             build_breadcrumb_context(
+                parent_module_label=default_parent_label,
+                parent_module_url=_get_default_breadcrumb_parent_module_url(model),
                 module_label=default_module_label,
                 module_url=_get_default_breadcrumb_module_url(model),
                 section_label=breadcrumb_section_label,
@@ -2151,9 +2214,12 @@ class UserCreatedObjectCreateWithInlinesView(
             "formset_helper": self.formset_helper_class(),
         })
         default_module_label, _ = _get_default_breadcrumb_module(model)
+        default_parent_label, _ = _get_default_breadcrumb_parent_module(model)
         breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
         context.update(
             build_breadcrumb_context(
+                parent_module_label=default_parent_label,
+                parent_module_url=_get_default_breadcrumb_parent_module_url(model),
                 module_label=default_module_label,
                 module_url=_get_default_breadcrumb_module_url(model),
                 section_label=breadcrumb_section_label,
@@ -2193,6 +2259,7 @@ class UserCreatedObjectUpdateWithInlinesView(
         context = super().get_context_data(**kwargs)
         model = self.object.__class__
         default_module_label, _ = _get_default_breadcrumb_module(model)
+        default_parent_label, _ = _get_default_breadcrumb_parent_module(model)
         breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
         breadcrumb_object_label = _get_default_breadcrumb_object_label(self.object)
         context.update({
@@ -2202,6 +2269,8 @@ class UserCreatedObjectUpdateWithInlinesView(
         })
         context.update(
             build_breadcrumb_context(
+                parent_module_label=default_parent_label,
+                parent_module_url=_get_default_breadcrumb_parent_module_url(model),
                 module_label=default_module_label,
                 module_url=_get_default_breadcrumb_module_url(model),
                 section_label=breadcrumb_section_label,

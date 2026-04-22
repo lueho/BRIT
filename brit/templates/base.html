@@ -62,7 +62,21 @@
                       <li class="breadcrumb-item">
                         <a href="{% url 'home' %}">BRIT</a>
                       </li>
-                      {% if breadcrumb_module_label or breadcrumb_section_label or breadcrumb_object_label or breadcrumb_action_label %}
+                      {% if breadcrumb_parent_module_label or breadcrumb_module_label or breadcrumb_section_label or breadcrumb_object_label or breadcrumb_action_label %}
+                        {% if breadcrumb_parent_module_label %}
+                          <li class="breadcrumb-item{% if not breadcrumb_module_label and not breadcrumb_section_label and not breadcrumb_object_label and not breadcrumb_action_label %} active{% endif %}"
+                              {% if not breadcrumb_module_label and not breadcrumb_section_label and not breadcrumb_object_label and not breadcrumb_action_label %}aria-current="page"{% endif %}>
+                            {% if breadcrumb_parent_module_url %}
+                              {% if breadcrumb_module_label or breadcrumb_section_label or breadcrumb_object_label or breadcrumb_action_label %}
+                                <a href="{{ breadcrumb_parent_module_url }}">{{ breadcrumb_parent_module_label }}</a>
+                              {% else %}
+                                {{ breadcrumb_parent_module_label }}
+                              {% endif %}
+                            {% else %}
+                              {{ breadcrumb_parent_module_label }}
+                            {% endif %}
+                          </li>
+                        {% endif %}
                         {% if breadcrumb_module_label %}
                           <li class="breadcrumb-item{% if not breadcrumb_section_label and not breadcrumb_object_label and not breadcrumb_action_label %} active{% endif %}"
                               {% if not breadcrumb_section_label and not breadcrumb_object_label and not breadcrumb_action_label %}aria-current="page"{% endif %}>
