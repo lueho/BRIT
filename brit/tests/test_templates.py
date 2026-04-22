@@ -147,6 +147,29 @@ class BreadcrumbStaticPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "BRIT | Bioresource Information Tool")
 
+    def test_home_page_suppresses_breadcrumb_rail(self):
+        """Home page deliberately suppresses the sticky breadcrumb rail."""
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "page-breadcrumb-rail")
+
+    def test_home_page_displays_full_name_in_intro_card(self):
+        """Introduction card header shows full name, not just 'Introduction'."""
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            '<h5 class="mb-0">Bioresource Information Tool</h5>',
+            html=True,
+        )
+        self.assertNotContains(
+            response,
+            '<h5 class="mb-0">Introduction</h5>',
+            html=True,
+        )
+
     def test_about_page_uses_breadcrumb_contract(self):
         response = self.client.get(reverse("about"))
 

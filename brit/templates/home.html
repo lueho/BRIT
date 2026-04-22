@@ -1,12 +1,14 @@
 {% extends "base.html" %}
 {% load static custom_tags %}
+{% block page_chrome %}
+{% endblock page_chrome %}
 {% block content %}
   {% user_in_group user "process-team" as can_view_processes %}
   <div class="row g-4 mb-4">
     <div class="col-12 col-md-6">
       <div class="card shadow h-100">
         <div class="card-header bg-light border-0 py-3">
-          <h5 class="mb-0">Introduction</h5>
+          <h5 class="mb-0">Bioresource Information Tool</h5>
         </div>
         <div class="card-body">
           <h3 class="card-text">

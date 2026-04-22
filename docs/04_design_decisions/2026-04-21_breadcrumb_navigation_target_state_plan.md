@@ -232,7 +232,7 @@ The safest sequence is:
 | Phase 1 - shared breadcrumb data contract | Complete | `utils.views.build_breadcrumb_context` and `BreadcrumbContextMixin` provide the shared module/section/object/action contract; shared list/detail/form templates delegate to the base contract via `{% firstof %}`. |
 | Phase 2 - major module normalization | Complete | Bibliography, Inventories, Maps, Materials, Processes, Sources, Utilities, and Sources > Waste Collection landing views all render module-first breadcrumbs through the shared contract. |
 | Phase 3 - nested domains and custom detail experiences | Not started | No canonical nested-domain breadcrumb contract beyond `Sources > Waste Collection` is implemented yet. |
-| Phase 4 - static/review/error cleanup | Complete | Static pages (home, about, learning, privacy policy) and the content review dashboard render deliberate breadcrumbs; 403/404/500 templates deliberately suppress the shared rail and keep their explicit titles. |
+| Phase 4 - static/review/error cleanup | Complete | Static pages (home, about, learning, privacy policy) and the content review dashboard render deliberate breadcrumbs. Home page and error pages (403/404/500) deliberately suppress the shared rail; home page displays "Bioresource Information Tool" as the card header to compensate for the missing rail context. |
 | Phase 5 - regression hardening and cleanup | Partial | Focused breadcrumb tests cover shared list/detail/form, module landing pages, the nested Sources > Waste Collection contract, the review dashboard, static pages, error pages, and the sticky-offset CSS contract; broader coverage remains to be added. |
 
 ## 5. Gap Summary
