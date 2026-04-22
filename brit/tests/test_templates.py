@@ -186,6 +186,37 @@ class BreadcrumbStaticPageTests(TestCase):
         )
 
 
+class ErrorPageBreadcrumbTests(SimpleTestCase):
+    """Error pages should deliberately suppress the sticky breadcrumb rail.
+
+    403/404/500 have their own centered error treatment and an in-content
+    "← Back to Home" link, so the shared sticky rail adds no UX value and
+    steals vertical space. Rendering any breadcrumb crumb on these pages
+    must be intentional; by default the rail is suppressed.
+    """
+
+    def _render_error_template(self, template_name):
+        return render_to_string(template_name)
+
+    def test_403_template_suppresses_breadcrumb_rail(self):
+        html = self._render_error_template("403.html")
+
+        self.assertIn("BRIT | 403 - Forbidden", html)
+        self.assertNotIn("page-breadcrumb-rail", html)
+
+    def test_404_template_suppresses_breadcrumb_rail(self):
+        html = self._render_error_template("404.html")
+
+        self.assertIn("BRIT | 404 - Page Not Found", html)
+        self.assertNotIn("page-breadcrumb-rail", html)
+
+    def test_500_template_suppresses_breadcrumb_rail(self):
+        html = self._render_error_template("500.html")
+
+        self.assertIn("BRIT | 500 - Server Error", html)
+        self.assertNotIn("page-breadcrumb-rail", html)
+
+
 class StickyFilterOffsetAssetTests(SimpleTestCase):
     """Asset-level regression tests for the sticky sidebar/breadcrumb rail offset.
 
