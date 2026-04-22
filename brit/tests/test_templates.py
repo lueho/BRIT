@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from cookie_consent.models import Cookie, CookieGroup
+from django.conf import settings
 from django.template.loader import render_to_string
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
@@ -181,3 +184,50 @@ class BreadcrumbStaticPageTests(TestCase):
             '<li aria-current="page" class="breadcrumb-item active">Privacypolicy</li>',
             html=True,
         )
+
+
+class StickyFilterOffsetAssetTests(SimpleTestCase):
+    """Asset-level regression tests for the sticky sidebar/breadcrumb rail offset.
+
+    Filter sidebars share the viewport with the sticky breadcrumb rail
+    (`.page-breadcrumb-rail`, top: 56px, min-height: 3rem). Their sticky
+    offset must account for both the topbar and the rail so they don't
+    slide underneath the rail when scrolling.
+    """
+
+    def _read_asset(self, relative_path):
+        base_dir = Path(settings.BASE_DIR) if hasattr(settings, "BASE_DIR") else None
+        if base_dir is None:
+            self.skipTest("settings.BASE_DIR is not configured")
+        asset_path = base_dir / "brit" / "static" / relative_path
+        self.assertTrue(
+            asset_path.exists(),
+            f"Expected static asset {asset_path} to exist",
+        )
+        return asset_path.read_text(encoding="utf-8")
+
+    def test_filtered_list_css_defines_shared_sticky_offset_variables(self):
+        css = self._read_asset("css/filtered-list.css")
+
+        self.assertIn("--brit-topnav-height: 56px", css)
+        self.assertIn("--brit-breadcrumb-rail-height: 3rem", css)
+        self.assertIn(
+            "--brit-sticky-offset: calc(var(--brit-topnav-height)"
+            " + var(--brit-breadcrumb-rail-height) + 1rem)",
+            css,
+        )
+
+    def test_filter_sticky_uses_shared_offset_and_not_topnav_alone(self):
+        css = self._read_asset("css/filtered-list.css")
+
+        self.assertIn("top: var(--brit-sticky-offset);", css)
+        self.assertNotIn("top: calc(56px + 1rem);", css)
+
+    def test_filtered_list_minified_css_mirrors_source(self):
+        minified = self._read_asset("css/filtered-list.min.css")
+
+        self.assertIn("--brit-sticky-offset:calc(var(--brit-topnav-height)", minified)
+        self.assertIn(
+            ".filter-sticky{position:sticky;top:var(--brit-sticky-offset)", minified
+        )
+        self.assertNotIn("top:calc(56px + 1rem)", minified)

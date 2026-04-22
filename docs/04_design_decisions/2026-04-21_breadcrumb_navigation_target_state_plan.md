@@ -214,8 +214,17 @@ The safest sequence is:
 - some pages still fall through to weak title or route-name labels
 - nested source-domain paths are still inconsistent
 - page-title behavior is still weak enough to produce `BRIT | None` on some pages
+- sticky sidebars (`.filter-sticky` on `filtered_list.html`, `detail_with_options.html`, and `simple_list_card.html`) still only offset for the 56px topbar and slide underneath the sticky breadcrumb rail when scrolling
 
-### 4.4 Phase status
+### 4.4 Known layout regressions introduced by the sticky rail
+
+- **Sticky sidebars slide under the breadcrumb rail**
+  - `.filter-sticky` uses `top: calc(56px + 1rem)` and does not account for the `.page-breadcrumb-rail` height (`min-height: 3rem`, sticky at `top: 56px`, `z-index: 1030`).
+  - When users scroll, the filter/options sidebar partially disappears under the breadcrumb rail.
+  - Fix direction: introduce shared CSS custom properties (`--brit-topnav-height`, `--brit-breadcrumb-rail-height`) and have every sticky sibling of the rail compute its offset from those variables. This keeps the rail height authoritative in one place and allows future sticky siblings to participate without re-deriving the offset.
+  - Scope: `brit/static/css/filtered-list.css` and its minified output. Custom detail pages that suppress the shared rail (for example `materials/sample_detail_v2.html`) intentionally remain out of scope.
+
+### 4.5 Phase status
 
 | Phase | Status | Notes |
 |---|---|---|

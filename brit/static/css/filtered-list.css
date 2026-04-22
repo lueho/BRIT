@@ -1,10 +1,26 @@
 /* Shared styles for right sidebar tabs and related visuals */
 
+/*
+ * Shared sticky-offset custom properties.
+ *
+ * Sticky siblings of the base breadcrumb rail (.page-breadcrumb-rail) must
+ * offset for both the fixed 56px topbar and the rail itself so they do not
+ * slide underneath the rail when scrolling. The rail is declared with
+ * `min-height: 3rem`, sticky at `top: 56px`, in brit-theme.css; the values
+ * below mirror that declaration in one place so every sticky sibling can
+ * derive a consistent offset.
+ */
+:root {
+  --brit-topnav-height: 56px;
+  --brit-breadcrumb-rail-height: 3rem;
+  --brit-sticky-offset: calc(var(--brit-topnav-height) + var(--brit-breadcrumb-rail-height) + 1rem);
+}
+
 /* Sticky right sidebar on large screens */
 @media (min-width: 992px) {
   .filter-sticky {
     position: sticky;
-    top: calc(56px + 1rem);
+    top: var(--brit-sticky-offset);
   }
 }
 
