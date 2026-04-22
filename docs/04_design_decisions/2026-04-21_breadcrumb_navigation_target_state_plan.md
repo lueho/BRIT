@@ -1,8 +1,8 @@
 # Breadcrumb Navigation Target-State Plan
  
- - **Status**: Active roadmap; Phases 1, 2, and 4 landed on `feat/sticky-breadcrumbs`; Phase 3 nested-domain and custom-page work is the next slice
+ - **Status**: Active roadmap; Phases 1, 2, and 4 are complete and Phase 3 nested-domain contract has landed on `feat/sticky-breadcrumbs`; Phase 5 regression hardening and the custom `sample_detail_v2` harmonization are the remaining slices
  - **Date**: 2026-04-21
- - **Last updated**: 2026-04-21
+ - **Last updated**: 2026-04-22
  - **Scope**: shared breadcrumb/page-chrome behavior across `base.html`, shared CRUD templates, explorer/dashboard pages, nested source-domain pages, static/error pages, and supporting view/model metadata needed to make breadcrumbs logical and stable throughout BRIT
  
  ## Documentation Boundary
@@ -209,20 +209,19 @@ The safest sequence is:
 
 ### 4.3 Remaining blockers before the target state
 
-- shared list pages still expose the generic `Explorer` crumb
-- shared detail pages still assume `object.name`
-- some pages still fall through to weak title or route-name labels
-- nested source-domain paths are still inconsistent
-- page-title behavior is still weak enough to produce `BRIT | None` on some pages
-- sticky sidebars (`.filter-sticky` on `filtered_list.html`, `detail_with_options.html`, and `simple_list_card.html`) still only offset for the 56px topbar and slide underneath the sticky breadcrumb rail when scrolling
+- `materials/templates/materials/sample_detail_v2.html` keeps a bespoke sticky rail that does not participate in the shared contract; the page deliberately suppresses the shared rail until the custom rail is harmonized
+- focused regression coverage is still missing for several surfaces, notably:
+  - shared CRUD **create/update form** pages under a nested source-domain parent (for example `collection-create`, `collection-update`)
+  - detail and form pages for non-`name` objects whose breadcrumb label comes from `get_breadcrumb_object_label`
+  - representative non-waste-collection source-domain CRUD pages beyond the one greenhouses list already covered
+- the broader fallback chain in `base.html` still accepts weak inputs such as `title`; shared pages no longer rely on it, but no test currently guards non-contract pages from regressing back into it
 
 ### 4.4 Known layout regressions introduced by the sticky rail
 
-- **Sticky sidebars slide under the breadcrumb rail**
-  - `.filter-sticky` uses `top: calc(56px + 1rem)` and does not account for the `.page-breadcrumb-rail` height (`min-height: 3rem`, sticky at `top: 56px`, `z-index: 1030`).
-  - When users scroll, the filter/options sidebar partially disappears under the breadcrumb rail.
-  - Fix direction: introduce shared CSS custom properties (`--brit-topnav-height`, `--brit-breadcrumb-rail-height`) and have every sticky sibling of the rail compute its offset from those variables. This keeps the rail height authoritative in one place and allows future sticky siblings to participate without re-deriving the offset.
-  - Scope: `brit/static/css/filtered-list.css` and its minified output. Custom detail pages that suppress the shared rail (for example `materials/sample_detail_v2.html`) intentionally remain out of scope.
+- **Sticky sidebars slide under the breadcrumb rail** — Fixed.
+  - Shared CSS custom properties (`--brit-topnav-height`, `--brit-breadcrumb-rail-height`, `--brit-sticky-offset`) now drive the sticky offset on `.filter-sticky` and its siblings, so filter sidebars no longer slide underneath the rail when scrolling.
+  - `brit/static/css/filtered-list.css` and its minified sibling are covered by `StickyFilterOffsetAssetTests` in `brit/tests/test_templates.py`.
+  - Custom detail pages that suppress the shared rail (for example `materials/sample_detail_v2.html`) intentionally remain out of scope.
 
 ### 4.5 Phase status
 
@@ -505,15 +504,14 @@ Breadcrumb navigation can be considered materially aligned across BRIT when all 
 
 ## 11. Immediate Next Slice
 
-If work should continue now, the best next implementation slice is:
+Phases 1, 2, and 4 are complete and the Phase 3 nested-domain contract has landed (`breadcrumb_parent_module_label/url` in the shared contract; `waste_collection`, `greenhouses`, and `roadside_trees` nested under `Sources`). The next implementation slice is **Phase 5 regression hardening** before touching the `sample_detail_v2` custom rail:
 
-1. define the explicit shared breadcrumb contract for module, section, object, and action labels
-2. refactor `filtered_list.html` and `detail_with_options.html` to use that contract instead of `Explorer` and `object.name`
-3. wire the contract into the main view mixins and fix the highest-signal label defects in one core module each from `materials`, `bibliography`, `maps`, and `inventories`
-4. add focused regression tests for:
-   - irregular plural labels
-   - non-`name` detail objects
-   - pages that previously rendered `BRIT | None`
-   - pages that previously fell through to raw route-name labels
+1. Add focused regression tests for the nested parent crumb on shared **CRUD form** pages under a source-domain parent, for example:
+   - `collection-create` renders `BRIT > Sources > Waste Collection > Collections > Create`
+   - `collection-update` renders `BRIT > Sources > Waste Collection > Collections > <Object> > Update`
+2. Add a detail-page regression test for a non-`name` object (for example `Source` or `Author`) to guarantee `get_breadcrumb_object_label` is used end-to-end by the shared detail template.
+3. Add a regression test that shared pages do not fall back to `title` or route-name humanization when the contract slots are populated.
 
-That slice is small enough to be implemented safely and large enough to validate the breadcrumb architecture before deeper nested-domain cleanup begins.
+That slice is small, exercises the full create/update/detail pipeline introduced in Phase 3, and locks down the nested hierarchy before the bigger `sample_detail_v2` harmonization is attempted.
+
+After Phase 5 regression hardening is complete, the remaining Phase 3 work is to decide how `materials/templates/materials/sample_detail_v2.html` should participate in the shared contract (either adopt the shared rail while preserving its sample-context summary, or keep the custom rail as an explicit, documented exception).

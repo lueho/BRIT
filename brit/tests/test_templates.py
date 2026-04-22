@@ -284,6 +284,76 @@ class BreadcrumbNestedSourcesDomainTests(TestCase):
         # crumb is rendered as plain text (not linked) but still visible.
         self.assertContains(response, "Greenhouses")
 
+    def test_collection_create_form_renders_nested_parent_crumb(self):
+        """Create forms under a nested source-domain parent expose the full path."""
+        from utils.object_management.models import User
+
+        staff = User.objects.create(username="phase5_staff", is_staff=True)
+        self.client.force_login(staff)
+
+        response = self.client.get(reverse("collection-create"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'<a href="{reverse("sources-explorer")}">Sources</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            f'<a href="{reverse("wastecollection-explorer")}">Waste Collection</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            f'<a href="{reverse("collection-list")}">Collections</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">Create</li>',
+            html=True,
+        )
+
+    def test_collection_update_form_renders_nested_parent_crumb(self):
+        """Update forms expose the full nested path down to the current object."""
+        from utils.object_management.models import User
+
+        staff = User.objects.create(username="phase5_staff_update", is_staff=True)
+        self.client.force_login(staff)
+
+        response = self.client.get(
+            reverse("collection-update", kwargs={"pk": self.collection.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'<a href="{reverse("sources-explorer")}">Sources</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            f'<a href="{reverse("wastecollection-explorer")}">Waste Collection</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            f'<a href="{reverse("collection-list")}">Collections</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            f'<a href="{self.collection.detail_url}">'
+            f"{self.collection.get_breadcrumb_object_label()}</a>",
+            html=True,
+        )
+        self.assertContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">Update</li>',
+            html=True,
+        )
+
 
 class ErrorPageBreadcrumbTests(SimpleTestCase):
     """Error pages should deliberately suppress the sticky breadcrumb rail.
