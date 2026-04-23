@@ -217,7 +217,7 @@ def _serialize_collection_update_context(user, obj):
             "collector",
             "frequency",
             "fee_system",
-            "sorting_method",
+            "bin_configuration",
             "allowed_materials",
             "forbidden_materials",
             "sources",

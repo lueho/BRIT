@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import (
     AggregatedCollectionPropertyValue,
+    BinConfiguration,
     Collection,
     CollectionFrequency,
     CollectionPropertyValue,
@@ -9,7 +10,6 @@ from .models import (
     CollectionSystem,
     Collector,
     FeeSystem,
-    SortingMethod,
     WasteCategory,
     WasteComponent,
     WasteFlyer,
@@ -32,8 +32,8 @@ class CollectionSystemAdmin(admin.ModelAdmin):
     ordering = ("name",)
 
 
-@admin.register(SortingMethod)
-class SortingMethodAdmin(admin.ModelAdmin):
+@admin.register(BinConfiguration)
+class BinConfigurationAdmin(admin.ModelAdmin):
     list_display = ("name", "owner", "publication_status")
     search_fields = ("name",)
     list_filter = ("publication_status",)
@@ -111,7 +111,7 @@ class CollectionAdmin(admin.ModelAdmin):
         "publication_status",
         "connection_type",
         "collection_system",
-        "sorting_method",
+        "bin_configuration",
     )
     ordering = ("name",)
     autocomplete_fields = ("sources",)

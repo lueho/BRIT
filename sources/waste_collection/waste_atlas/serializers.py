@@ -62,11 +62,11 @@ class CatchmentCollectionSystemSerializer(serializers.Serializer):
     collection_system = serializers.CharField()
 
 
-class CatchmentSortingMethodSerializer(serializers.Serializer):
+class CatchmentBinConfigurationSerializer(serializers.Serializer):
     """Flat JSON serializer for catchment sorting method."""
 
     catchment_id = serializers.IntegerField()
-    sorting_method = serializers.CharField()
+    bin_configuration = serializers.CharField()
 
 
 class CatchmentCollectionSystemCountSerializer(serializers.Serializer):

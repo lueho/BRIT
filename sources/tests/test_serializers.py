@@ -53,6 +53,8 @@ from sources.waste_collection.forms import (
     CONNECTION_TYPE_CHOICES,
     REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
     AggregatedCollectionPropertyValueModelForm,
+    BinConfigurationModalModelForm,
+    BinConfigurationModelForm,
     CollectionAddPredecessorForm,
     CollectionAddWasteSampleForm,
     CollectionFrequencyModalModelForm,
@@ -70,8 +72,6 @@ from sources.waste_collection.forms import (
     CollectorModelForm,
     FeeSystemModalModelForm,
     FeeSystemModelForm,
-    SortingMethodModalModelForm,
-    SortingMethodModelForm,
     WasteCategoryModalModelForm,
     WasteCategoryModelForm,
     WasteComponentModalModelForm,
@@ -333,7 +333,7 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
             FeeSystemModelForm.__module__, "sources.waste_collection.forms"
         )
         self.assertEqual(
-            SortingMethodModalModelForm.__module__,
+            BinConfigurationModalModelForm.__module__,
             "sources.waste_collection.forms",
         )
         self.assertEqual(WasteFlyerFormSet.__module__, "sources.waste_collection.forms")
@@ -363,7 +363,7 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
             WasteComponentModelForm.__module__, "sources.waste_collection.forms"
         )
         self.assertEqual(
-            SortingMethodModelForm.__module__,
+            BinConfigurationModelForm.__module__,
             "sources.waste_collection.forms",
         )
 

@@ -32,12 +32,10 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
         mappings_dir = root / "mappings"
         mappings_dir.mkdir()
         (mappings_dir / "fixture.csv").write_text(
-            "\n".join(
-                [
-                    "domain,source_term,source_language,target_scheme_uri,target_concept_uri,target_label,notes",
-                    *csv_rows,
-                ]
-            )
+            "\n".join([
+                "domain,source_term,source_language,target_scheme_uri,target_concept_uri,target_label,notes",
+                *csv_rows,
+            ])
             + "\n",
             encoding="utf-8",
         )
@@ -49,7 +47,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
         """Swedish raw terms should map to canonical controlled-vocabulary labels."""
         record = {
             "collection_system": "Ingen utsortering",
-            "sorting_method": "Optisk sortering",
+            "bin_configuration": "Optisk sortering",
             "connection_type": "Obl",
             "fee_system": "PAYT",
         }
@@ -57,7 +55,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
         mapped = apply_crosswalks_to_record(record)
 
         self.assertEqual(mapped["collection_system"], "No separate collection")
-        self.assertEqual(mapped["sorting_method"], "Optical bag sorting")
+        self.assertEqual(mapped["bin_configuration"], "Optical bag sorting")
         self.assertEqual(mapped["connection_type"], "mandatory")
         self.assertEqual(mapped["fee_system"], "Pay as you throw (PAYT)")
 
@@ -85,7 +83,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
         record = {
             "waste_category": "Restafval",
             "collection_system": "Kerbside collection",
-            "sorting_method": "Kildesortering",
+            "bin_configuration": "Kildesortering",
             "fee_system": "DIFTAR",
             "connection_type": "Obligatoire",
             "required_bin_capacity_reference": "Per indbygger",
@@ -95,7 +93,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
 
         self.assertEqual(mapped["waste_category"], "Residual waste")
         self.assertEqual(mapped["collection_system"], "Door to door")
-        self.assertEqual(mapped["sorting_method"], "Separate bins")
+        self.assertEqual(mapped["bin_configuration"], "Separate bins")
         self.assertEqual(mapped["fee_system"], "Pay as you throw (PAYT)")
         self.assertEqual(mapped["connection_type"], "mandatory")
         self.assertEqual(mapped["required_bin_capacity_reference"], "person")
@@ -143,13 +141,13 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
     def test_keeps_unknown_terms_unchanged(self):
         """Unknown terms should pass through unchanged for downstream handling."""
         record = {
-            "sorting_method": "Custom local method",
+            "bin_configuration": "Custom local method",
             "fee_system": "Other",
         }
 
         mapped = apply_crosswalks_to_record(record)
 
-        self.assertEqual(mapped["sorting_method"], "Custom local method")
+        self.assertEqual(mapped["bin_configuration"], "Custom local method")
         self.assertEqual(mapped["fee_system"], "Other")
 
     def test_controlled_vocabulary_validation_reports_unknown_values(self):
@@ -158,7 +156,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
             "collection_systems": ["Door to door"],
             "collection_frequencies": ["Fixed; 26 per year (1 per 2 weeks)"],
             "waste_categories": ["Food waste"],
-            "sorting_methods": ["Separate bins"],
+            "bin_configurations": ["Separate bins"],
             "fee_systems": ["Flat fee"],
             "materials": ["Food waste: Processed plant-based"],
             "connection_types": [{"label": "mandatory"}],
@@ -168,7 +166,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
             "collection_system": "Unknown",
             "frequency": "Seasonal special",
             "waste_category": "Food waste",
-            "sorting_method": "Other",
+            "bin_configuration": "Other",
             "fee_system": "Flat fee",
             "allowed_materials": ["Food waste: Processed plant-based", "Unknown item"],
             "connection_type": "VOLUNTARY",
@@ -181,7 +179,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
             any("collection_system" in warning for warning in warnings),
         )
         self.assertTrue(any("frequency" in warning for warning in warnings))
-        self.assertTrue(any("sorting_method" in warning for warning in warnings))
+        self.assertTrue(any("bin_configuration" in warning for warning in warnings))
         self.assertTrue(any("allowed_materials" in warning for warning in warnings))
         self.assertTrue(any("connection_type" in warning for warning in warnings))
         self.assertTrue(
@@ -194,7 +192,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
             "collection_systems": ["No separate collection"],
             "collection_frequencies": ["Fixed; 26 per year (1 per 2 weeks)"],
             "waste_categories": ["Residual waste"],
-            "sorting_methods": ["Optical bag sorting"],
+            "bin_configurations": ["Optical bag sorting"],
             "fee_systems": ["Pay as you throw (PAYT)"],
             "materials": ["Food waste: Processed plant-based"],
             "connection_types": [{"label": "mandatory"}],
@@ -204,7 +202,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
             "collection_system": "No separate collection",
             "frequency": "Fixed; 26 per year (1 per 2 weeks)",
             "waste_category": "Residual waste",
-            "sorting_method": "Optical bag sorting",
+            "bin_configuration": "Optical bag sorting",
             "fee_system": "Pay as you throw (PAYT)",
             "allowed_materials": ["Food waste: Processed plant-based"],
             "forbidden_materials": ["Food waste: Processed plant-based"],
@@ -262,21 +260,19 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
                 ),
             },
         }
-        ttl_body = "\n".join(
-            [
-                "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
-                "@prefix britvoc: <https://example.org/vocab/soilcom/> .",
-                "",
-                "britvoc:concept/waste-category/residual-waste a skos:Concept ;",
-                "    skos:inScheme britvoc:scheme/waste-category ;",
-                '    skos:prefLabel "Residual waste"@en .',
-                "",
-                "britvoc:concept/required-bin-capacity-reference/person a skos:Concept ;",
-                "    skos:inScheme britvoc:scheme/required-bin-capacity-reference ;",
-                '    skos:prefLabel "per person"@en ;',
-                '    skos:notation "person" .',
-            ]
-        )
+        ttl_body = "\n".join([
+            "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
+            "@prefix britvoc: <https://example.org/vocab/soilcom/> .",
+            "",
+            "britvoc:concept/waste-category/residual-waste a skos:Concept ;",
+            "    skos:inScheme britvoc:scheme/waste-category ;",
+            '    skos:prefLabel "Residual waste"@en .',
+            "",
+            "britvoc:concept/required-bin-capacity-reference/person a skos:Concept ;",
+            "    skos:inScheme britvoc:scheme/required-bin-capacity-reference ;",
+            '    skos:prefLabel "per person"@en ;',
+            '    skos:notation "person" .',
+        ])
 
         with tempfile.TemporaryDirectory() as temp_dir:
             mappings_dir, ttl_path = self._write_crosswalk_validation_fixture(
@@ -298,17 +294,15 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
 
     def test_get_concepts_by_uri_reads_canonical_scheme_and_label_metadata(self):
         """Vocabulary helper should expose canonical concept metadata keyed by URI."""
-        ttl_body = "\n".join(
-            [
-                "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
-                "@prefix britvoc: <https://brit.bioresource-tools.net/vocab/soilcom/> .",
-                "",
-                "britvoc:concept/required-bin-capacity-reference/person a skos:Concept ;",
-                "    skos:inScheme britvoc:scheme/required-bin-capacity-reference ;",
-                '    skos:prefLabel "per person"@en ;',
-                '    skos:notation "person" .',
-            ]
-        )
+        ttl_body = "\n".join([
+            "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
+            "@prefix britvoc: <https://brit.bioresource-tools.net/vocab/soilcom/> .",
+            "",
+            "britvoc:concept/required-bin-capacity-reference/person a skos:Concept ;",
+            "    skos:inScheme britvoc:scheme/required-bin-capacity-reference ;",
+            '    skos:prefLabel "per person"@en ;',
+            '    skos:notation "person" .',
+        ])
 
         with tempfile.TemporaryDirectory() as temp_dir:
             ttl_path = Path(temp_dir) / "vocabulary.ttl"
@@ -382,16 +376,14 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
                 ),
             },
         }
-        ttl_body = "\n".join(
-            [
-                "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
-                "@prefix britvoc: <https://example.org/vocab/soilcom/> .",
-                "",
-                "britvoc:concept/waste-category/residual-waste a skos:Concept ;",
-                "    skos:inScheme britvoc:scheme/waste-category ;",
-                '    skos:prefLabel "Residual waste"@en .',
-            ]
-        )
+        ttl_body = "\n".join([
+            "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
+            "@prefix britvoc: <https://example.org/vocab/soilcom/> .",
+            "",
+            "britvoc:concept/waste-category/residual-waste a skos:Concept ;",
+            "    skos:inScheme britvoc:scheme/waste-category ;",
+            '    skos:prefLabel "Residual waste"@en .',
+        ])
 
         with tempfile.TemporaryDirectory() as temp_dir:
             mappings_dir, ttl_path = self._write_crosswalk_validation_fixture(
@@ -421,20 +413,18 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
                 ),
             },
         }
-        ttl_body = "\n".join(
-            [
-                "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
-                "@prefix britvoc: <https://example.org/vocab/soilcom/> .",
-                "",
-                "britvoc:concept/waste-category/residual-waste a skos:Concept ;",
-                "    skos:inScheme britvoc:scheme/waste-category ;",
-                '    skos:prefLabel "Residual waste"@en .',
-                "",
-                "britvoc:concept/waste-category/biowaste a skos:Concept ;",
-                "    skos:inScheme britvoc:scheme/waste-category ;",
-                '    skos:prefLabel "Biowaste"@en .',
-            ]
-        )
+        ttl_body = "\n".join([
+            "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
+            "@prefix britvoc: <https://example.org/vocab/soilcom/> .",
+            "",
+            "britvoc:concept/waste-category/residual-waste a skos:Concept ;",
+            "    skos:inScheme britvoc:scheme/waste-category ;",
+            '    skos:prefLabel "Residual waste"@en .',
+            "",
+            "britvoc:concept/waste-category/biowaste a skos:Concept ;",
+            "    skos:inScheme britvoc:scheme/waste-category ;",
+            '    skos:prefLabel "Biowaste"@en .',
+        ])
 
         with tempfile.TemporaryDirectory() as temp_dir:
             mappings_dir, ttl_path = self._write_crosswalk_validation_fixture(

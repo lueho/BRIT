@@ -1,6 +1,7 @@
 from rest_framework import routers
 
 from .viewsets import (
+    BinConfigurationViewSet,
     BiowasteCollectionAmountViewSet,
     BiowasteCollectionCountViewSet,
     BiowasteFeeSystemViewSet,
@@ -29,7 +30,6 @@ from .viewsets import (
     ResidualFrequencyTypeViewSet,
     ResidualMinBinSizeViewSet,
     ResidualRequiredBinCapacityViewSet,
-    SortingMethodViewSet,
     WasteRatioViewSet,
 )
 
@@ -51,9 +51,9 @@ router.register(
     basename="api-waste-atlas-collection-system",
 )
 router.register(
-    "sorting-method",
-    SortingMethodViewSet,
-    basename="api-waste-atlas-sorting-method",
+    "bin-configuration",
+    BinConfigurationViewSet,
+    basename="api-waste-atlas-bin-configuration",
 )
 router.register(
     "green-waste-collection-system-count",

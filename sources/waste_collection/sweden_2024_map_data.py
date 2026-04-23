@@ -15,7 +15,7 @@ LEFT_MAP_LABELS = (
     "Tvådelade kärl",
 )
 RIGHT_MAP_LABELS = ("Bioplast", "ET", "Papper", "Plastpåse")
-LEFT_LABEL_TO_SORTING_METHOD = {
+LEFT_LABEL_TO_BIN_CONFIGURATION = {
     "Fyrfackskärl": "Four compartments bin",
     "Optisk sortering": "Optical bag sorting",
     "Separata kärl": "Separate bins",
@@ -38,7 +38,7 @@ CSV_FIELDNAMES = [
     "lau_id",
     "municipality_name",
     "sorting_label",
-    "sorting_method",
+    "bin_configuration",
     "sorting_confidence",
     "sorting_pixels",
     "bag_label",
@@ -382,10 +382,12 @@ def build_prepared_row(
         no_collection = _is_truthy(reviewed_fields.get("no_collection"))
     else:
         no_collection = detected_no_collection
-    detected_sorting_method = ""
+    detected_bin_configuration = ""
     detected_bag_material = ""
     if not detected_no_collection:
-        detected_sorting_method = LEFT_LABEL_TO_SORTING_METHOD.get(sorting_label, "")
+        detected_bin_configuration = LEFT_LABEL_TO_BIN_CONFIGURATION.get(
+            sorting_label, ""
+        )
         detected_bag_material = RIGHT_LABEL_TO_BAG_MATERIAL.get(bag_label, "")
     reasons: list[str] = []
     if detected_no_collection:
@@ -396,7 +398,7 @@ def build_prepared_row(
         if bag_label == "ET" and sorting_label not in ("", "ET", "Ingen utsortering"):
             reasons.append("bag ET disagrees with sorting map")
     else:
-        if not detected_sorting_method:
+        if not detected_bin_configuration:
             reasons.append("sorting method unresolved")
         if not detected_bag_material:
             reasons.append("bag material unresolved")
@@ -408,10 +410,10 @@ def build_prepared_row(
         reasons.append("sorting map unclassified")
     if not bag_assignment and not no_collection:
         reasons.append("bag map unclassified")
-    sorting_method = (
-        reviewed_fields.get("sorting_method", "").strip()
-        if "sorting_method" in reviewed_fields
-        else detected_sorting_method
+    bin_configuration = (
+        reviewed_fields.get("bin_configuration", "").strip()
+        if "bin_configuration" in reviewed_fields
+        else detected_bin_configuration
     )
     bag_material = (
         reviewed_fields.get("bag_material", "").strip()
@@ -437,7 +439,7 @@ def build_prepared_row(
         "lau_id": lau_id,
         "municipality_name": municipality_name,
         "sorting_label": sorting_label,
-        "sorting_method": sorting_method,
+        "bin_configuration": bin_configuration,
         "sorting_confidence": (
             f"{sorting_assignment.confidence:.3f}" if sorting_assignment else ""
         ),
@@ -658,20 +660,20 @@ def _prepared_rows_to_map_details(
         if _is_truthy(row.get("no_collection")):
             details[lau_id] = {
                 "no_collection": True,
-                "sorting_method": None,
+                "bin_configuration": None,
                 "bag_material": None,
             }
             if include_manual_review:
                 details[lau_id]["needs_manual_review"] = needs_manual_review
                 details[lau_id]["review_reasons"] = review_reasons
             continue
-        sorting_method = (row.get("sorting_method") or "").strip() or None
+        bin_configuration = (row.get("bin_configuration") or "").strip() or None
         bag_material = (row.get("bag_material") or "").strip() or None
-        if not (sorting_method or bag_material or include_manual_review):
+        if not (bin_configuration or bag_material or include_manual_review):
             continue
         details[lau_id] = {
             "no_collection": False,
-            "sorting_method": sorting_method,
+            "bin_configuration": bin_configuration,
             "bag_material": bag_material,
         }
         if include_manual_review:

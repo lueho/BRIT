@@ -4,10 +4,10 @@ from distributions.models import Period, TemporalDistribution, Timestep
 from utils.object_management.models import get_default_owner
 
 from .models import (
+    BinConfiguration,
     CollectionCountOptions,
     CollectionFrequency,
     CollectionSeason,
-    SortingMethod,
 )
 
 INITIALIZATION_DEPENDENCIES = ["distributions"]
@@ -51,6 +51,6 @@ def ensure_initial_data(stdout=None):
         "Four compartments bin",
         "Two compartments bin",
     ):
-        SortingMethod.objects.get_or_create(name=method_name)
+        BinConfiguration.objects.get_or_create(name=method_name)
     if stdout:
         print("Waste collection initial data ensured.", file=stdout)

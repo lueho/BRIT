@@ -42,7 +42,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
             ),
         )
 
-        self.assertEqual(row["sorting_method"], "Separate bins")
+        self.assertEqual(row["bin_configuration"], "Separate bins")
         self.assertEqual(row["bag_material"], "Collection Support Item: Paper bags")
         self.assertEqual(row["collection_system"], "Door to door")
         self.assertEqual(row["no_collection"], "0")
@@ -61,7 +61,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
         )
 
         self.assertEqual(row["collection_system"], "No separate collection")
-        self.assertEqual(row["sorting_method"], "")
+        self.assertEqual(row["bin_configuration"], "")
         self.assertEqual(row["bag_material"], "")
         self.assertEqual(row["no_collection"], "1")
         self.assertEqual(row["needs_manual_review"], "0")
@@ -103,7 +103,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
             "w", suffix=".csv", delete=False, encoding="utf-8"
         ) as handle:
             handle.write(
-                "lau_id,municipality_name,sorting_label,sorting_method,sorting_confidence,sorting_pixels,bag_label,bag_material,bag_confidence,bag_pixels,collection_system,no_collection,needs_manual_review,review_reasons\n"
+                "lau_id,municipality_name,sorting_label,bin_configuration,sorting_confidence,sorting_pixels,bag_label,bag_material,bag_confidence,bag_pixels,collection_system,no_collection,needs_manual_review,review_reasons\n"
             )
             handle.write(
                 "0180,Stockholm,Separata kärl,Separate bins,0.88,12,Papper,Collection Support Item: Paper bags,0.80,10,Door to door,0,0,\n"
@@ -121,7 +121,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
             {
                 "0180": {
                     "no_collection": False,
-                    "sorting_method": "Separate bins",
+                    "bin_configuration": "Separate bins",
                     "bag_material": "Collection Support Item: Paper bags",
                 }
             },
@@ -132,7 +132,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
             "w", suffix=".csv", delete=False, encoding="utf-8"
         ) as handle:
             handle.write(
-                "lau_id,municipality_name,sorting_label,sorting_method,sorting_confidence,sorting_pixels,bag_label,bag_material,bag_confidence,bag_pixels,collection_system,no_collection,needs_manual_review,review_reasons\n"
+                "lau_id,municipality_name,sorting_label,bin_configuration,sorting_confidence,sorting_pixels,bag_label,bag_material,bag_confidence,bag_pixels,collection_system,no_collection,needs_manual_review,review_reasons\n"
             )
             handle.write(
                 "0180,Stockholm,Separata kärl,Separate bins,0.88,12,Papper,Collection Support Item: Paper bags,0.80,10,Door to door,0,0,\n"
@@ -150,14 +150,14 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
             {
                 "0180": {
                     "no_collection": False,
-                    "sorting_method": "Separate bins",
+                    "bin_configuration": "Separate bins",
                     "bag_material": "Collection Support Item: Paper bags",
                     "needs_manual_review": False,
                     "review_reasons": [],
                 },
                 "0181": {
                     "no_collection": True,
-                    "sorting_method": None,
+                    "bin_configuration": None,
                     "bag_material": None,
                     "needs_manual_review": True,
                     "review_reasons": ["bag ET disagrees with sorting map"],
@@ -196,7 +196,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
                         "confidence": 0.80,
                     },
                     "sorting_label": "Separata kärl",
-                    "sorting_method": "Four compartments bin",
+                    "bin_configuration": "Four compartments bin",
                     "sorting_confidence": "0.880",
                     "sorting_pixels": "12",
                     "bag_label": "Papper",
@@ -224,7 +224,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
             {
                 "0180": {
                     "no_collection": False,
-                    "sorting_method": "Four compartments bin",
+                    "bin_configuration": "Four compartments bin",
                     "bag_material": "Collection Support Item: Plastic bags",
                 }
             },
@@ -235,7 +235,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
             "w", suffix=".csv", delete=False, encoding="utf-8"
         ) as handle:
             handle.write(
-                "lau_id,municipality_name,sorting_label,sorting_method,sorting_confidence,sorting_pixels,bag_label,bag_material,bag_confidence,bag_pixels,collection_system,no_collection,needs_manual_review,review_reasons\n"
+                "lau_id,municipality_name,sorting_label,bin_configuration,sorting_confidence,sorting_pixels,bag_label,bag_material,bag_confidence,bag_pixels,collection_system,no_collection,needs_manual_review,review_reasons\n"
             )
             handle.write(
                 "0180,Stockholm,Separata kärl,Separate bins,0.88,12,Papper,Collection Support Item: Paper bags,0.80,10,Door to door,0,0,\n"
@@ -253,7 +253,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
             {
                 "0180": {
                     "no_collection": False,
-                    "sorting_method": "Separate bins",
+                    "bin_configuration": "Separate bins",
                     "bag_material": "Collection Support Item: Paper bags",
                 }
             },
@@ -273,7 +273,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
                     ),
                     reviewed_fields={
                         "sorting_label": "Separata kärl",
-                        "sorting_method": "Separate bins",
+                        "bin_configuration": "Separate bins",
                         "sorting_confidence": "0.880",
                         "sorting_pixels": "12",
                         "bag_label": "Papper",
@@ -364,7 +364,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
             {
                 "0180": {
                     "no_collection": False,
-                    "sorting_method": "Separate bins",
+                    "bin_configuration": "Separate bins",
                     "bag_material": "Collection Support Item: Paper bags",
                 }
             },
@@ -417,7 +417,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
             {
                 "0180": {
                     "no_collection": False,
-                    "sorting_method": "Separate bins",
+                    "bin_configuration": "Separate bins",
                     "bag_material": "Collection Support Item: Paper bags",
                 }
             },
@@ -429,7 +429,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
                 "nuts_or_lau_id": "0180",
                 "waste_category": "Food waste",
                 "collection_system": "Door to door",
-                "sorting_method": "",
+                "bin_configuration": "",
                 "allowed_materials": "",
                 "property_values": [{"property_id": 1}],
             },
@@ -437,7 +437,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
                 "nuts_or_lau_id": "0180",
                 "waste_category": "Residual waste",
                 "collection_system": "Door to door",
-                "sorting_method": "",
+                "bin_configuration": "",
                 "allowed_materials": "",
                 "property_values": [{"property_id": 1}],
             },
@@ -448,19 +448,19 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
             {
                 "0180": {
                     "no_collection": False,
-                    "sorting_method": "Separate bins",
+                    "bin_configuration": "Separate bins",
                     "bag_material": "Collection Support Item: Paper bags",
                 }
             },
         )
 
-        self.assertEqual(updated[0]["sorting_method"], "Separate bins")
+        self.assertEqual(updated[0]["bin_configuration"], "Separate bins")
         self.assertEqual(
             updated[0]["allowed_materials"],
             "Collection Support Item: Paper bags",
         )
         self.assertEqual(updated[1]["waste_category"], "Residual waste")
-        self.assertEqual(updated[1]["sorting_method"], "")
+        self.assertEqual(updated[1]["bin_configuration"], "")
 
     def test_apply_2024_map_details_turns_food_record_into_no_collection(self):
         records = [
@@ -468,7 +468,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
                 "nuts_or_lau_id": "0180",
                 "waste_category": "Food waste",
                 "collection_system": "Door to door",
-                "sorting_method": "Separate bins",
+                "bin_configuration": "Separate bins",
                 "allowed_materials": "Collection Support Item: Paper bags",
                 "property_values": [{"property_id": 1}],
             }
@@ -479,14 +479,14 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
             {
                 "0180": {
                     "no_collection": True,
-                    "sorting_method": None,
+                    "bin_configuration": None,
                     "bag_material": None,
                 }
             },
         )
 
         self.assertEqual(updated[0]["collection_system"], "No separate collection")
-        self.assertEqual(updated[0]["sorting_method"], "")
+        self.assertEqual(updated[0]["bin_configuration"], "")
         self.assertEqual(updated[0]["allowed_materials"], "")
         self.assertEqual(updated[0]["property_values"], [])
 
@@ -496,7 +496,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
                 "nuts_or_lau_id": "0180",
                 "waste_category": "Food waste",
                 "collection_system": "Door to door",
-                "sorting_method": "Separate bins",
+                "bin_configuration": "Separate bins",
                 "allowed_materials": "Collection Support Item: Paper bags",
                 "property_values": [{"property_id": 1}],
             }
@@ -507,7 +507,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
             {
                 "0180": {
                     "no_collection": False,
-                    "sorting_method": "Separate bins",
+                    "bin_configuration": "Separate bins",
                     "bag_material": None,
                     "needs_manual_review": True,
                     "review_reasons": ["bag material unresolved; bag map unclassified"],
@@ -515,7 +515,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
             },
         )
 
-        self.assertEqual(updated[0]["sorting_method"], "Separate bins")
+        self.assertEqual(updated[0]["bin_configuration"], "Separate bins")
         self.assertEqual(updated[0]["allowed_materials"], "")
         self.assertIn("review_comment", updated[0])
         self.assertIn(
@@ -581,7 +581,7 @@ class Sweden2024MapDataHelpersTestCase(SimpleTestCase):
                             "confidence": 0.80,
                         },
                         "sorting_label": "Separata kärl",
-                        "sorting_method": "Separate bins",
+                        "bin_configuration": "Separate bins",
                         "sorting_confidence": "0.880",
                         "sorting_pixels": "12",
                         "bag_label": "Papper",

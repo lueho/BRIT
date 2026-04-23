@@ -84,23 +84,23 @@ britvoc:concept/collection-frequency/seasonal a skos:Concept ;
     skos:inScheme britvoc:scheme/collection-frequency ;
     skos:prefLabel "Seasonal"@en .
 
-britvoc:scheme/sorting-method a skos:ConceptScheme ;
-    skos:prefLabel "Sorting method"@en .
+britvoc:scheme/bin-configuration a skos:ConceptScheme ;
+    skos:prefLabel "Bin configuration"@en .
 
-britvoc:concept/sorting-method/four-compartments-bin a skos:Concept ;
-    skos:inScheme britvoc:scheme/sorting-method ;
+britvoc:concept/bin-configuration/four-compartments-bin a skos:Concept ;
+    skos:inScheme britvoc:scheme/bin-configuration ;
     skos:prefLabel "Four compartments bin"@en .
 
-britvoc:concept/sorting-method/optical-bag-sorting a skos:Concept ;
-    skos:inScheme britvoc:scheme/sorting-method ;
+britvoc:concept/bin-configuration/optical-bag-sorting a skos:Concept ;
+    skos:inScheme britvoc:scheme/bin-configuration ;
     skos:prefLabel "Optical bag sorting"@en .
 
-britvoc:concept/sorting-method/separate-bins a skos:Concept ;
-    skos:inScheme britvoc:scheme/sorting-method ;
+britvoc:concept/bin-configuration/separate-bins a skos:Concept ;
+    skos:inScheme britvoc:scheme/bin-configuration ;
     skos:prefLabel "Separate bins"@en .
 
-britvoc:concept/sorting-method/two-compartments-bin a skos:Concept ;
-    skos:inScheme britvoc:scheme/sorting-method ;
+britvoc:concept/bin-configuration/two-compartments-bin a skos:Concept ;
+    skos:inScheme britvoc:scheme/bin-configuration ;
     skos:prefLabel "Two compartments bin"@en .
 
 britvoc:scheme/fee-system a skos:ConceptScheme ;

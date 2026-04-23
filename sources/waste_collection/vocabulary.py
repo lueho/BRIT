@@ -12,12 +12,12 @@ from sources.waste_collection.crosswalk import (
 )
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
+    BinConfiguration,
     Collection,
     CollectionFrequency,
     CollectionPropertyValue,
     CollectionSystem,
     FeeSystem,
-    SortingMethod,
     WasteCategory,
 )
 
@@ -28,7 +28,7 @@ CONCEPT_SCHEME_URIS: Final[dict[str, str]] = {
     "waste_categories": f"{VOCABULARY_URI_BASE}/scheme/waste-category",
     "collection_systems": f"{VOCABULARY_URI_BASE}/scheme/collection-system",
     "collection_frequencies": f"{VOCABULARY_URI_BASE}/scheme/collection-frequency",
-    "sorting_methods": f"{VOCABULARY_URI_BASE}/scheme/sorting-method",
+    "bin_configurations": f"{VOCABULARY_URI_BASE}/scheme/bin-configuration",
     "fee_systems": f"{VOCABULARY_URI_BASE}/scheme/fee-system",
     "collection_properties": f"{VOCABULARY_URI_BASE}/scheme/collection-property",
     "materials": f"{VOCABULARY_URI_BASE}/scheme/material",
@@ -215,8 +215,8 @@ def get_waste_collection_controlled_vocabulary() -> dict[str, object]:
             CollectionSystem.objects.order_by("name").values_list("name", flat=True)
         ),
         "collection_frequencies": get_collection_frequency_names_for_collection_data(),
-        "sorting_methods": list(
-            SortingMethod.objects.order_by("name").values_list("name", flat=True)
+        "bin_configurations": list(
+            BinConfiguration.objects.order_by("name").values_list("name", flat=True)
         ),
         "fee_systems": list(
             FeeSystem.objects.order_by("name").values_list("name", flat=True)

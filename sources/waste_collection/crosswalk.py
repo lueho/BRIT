@@ -13,7 +13,7 @@ CONTROLLED_STRING_FIELDS: Final[dict[str, str]] = {
     "collection_system": "collection_systems",
     "frequency": "collection_frequencies",
     "waste_category": "waste_categories",
-    "sorting_method": "sorting_methods",
+    "bin_configuration": "bin_configurations",
     "fee_system": "fee_systems",
 }
 
@@ -38,7 +38,7 @@ DOMAIN_FIELD_MAP: Final[dict[str, str]] = {
     "collection_system": "collection_system",
     "frequency": "frequency",
     "waste_category": "waste_category",
-    "sorting_method": "sorting_method",
+    "bin_configuration": "bin_configuration",
     "fee_system": "fee_system",
     "connection_type": "connection_type",
     "required_bin_capacity_reference": "required_bin_capacity_reference",
@@ -48,7 +48,7 @@ DOMAIN_SNAPSHOT_KEY_MAP: Final[dict[str, str]] = {
     "collection_system": "collection_systems",
     "frequency": "collection_frequencies",
     "waste_category": "waste_categories",
-    "sorting_method": "sorting_methods",
+    "bin_configuration": "bin_configurations",
     "fee_system": "fee_systems",
     "connection_type": "connection_types",
     "required_bin_capacity_reference": "required_bin_capacity_references",
@@ -170,7 +170,7 @@ def _expand_ttl_identifier(value: str, uri_base: str) -> str:
     if compact.startswith("<") and compact.endswith(">"):
         return compact[1:-1]
     if compact.startswith("britvoc:"):
-        return f"{uri_base}/{compact.removeprefix('britvoc:')}"
+        return f"{uri_base}/{compact.removeprefix("britvoc:")}"
     return compact
 
 
@@ -212,12 +212,10 @@ def _load_ttl_concept_registry(
                 line,
             )
             if literal_match:
-                current_pref_labels.append(
-                    (
-                        literal_match.group("lang"),
-                        literal_match.group("label"),
-                    )
-                )
+                current_pref_labels.append((
+                    literal_match.group("lang"),
+                    literal_match.group("label"),
+                ))
         elif line.startswith("skos:notation "):
             literal_match = re.search(r'"(?P<notation>[^"]+)"', line)
             if literal_match:
@@ -372,7 +370,7 @@ def get_crosswalk_uri_validation_errors(
             errors.append(
                 f"{csv_file.name}:{line_number}: Conflicting mapping for domain '{domain}' "
                 f"and source_term '{source_term}' (previously defined at "
-                f"{seen_mapping['file']}:{seen_mapping['line']})."
+                f"{seen_mapping["file"]}:{seen_mapping["line"]})."
             )
         else:
             seen_sources[source_key] = current_mapping
@@ -565,12 +563,10 @@ def get_crosswalk_equivalences() -> dict[str, dict[str, dict[str, object]]]:
                 if term_key in concept_seen_terms:
                     continue
 
-                concept_entry["source_terms"].append(
-                    {
-                        "term": source_term,
-                        "language": source_language,
-                    }
-                )
+                concept_entry["source_terms"].append({
+                    "term": source_term,
+                    "language": source_language,
+                })
                 concept_seen_terms.add(term_key)
 
     for concept_map in equivalences.values():

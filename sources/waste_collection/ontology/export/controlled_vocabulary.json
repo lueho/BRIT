@@ -135,7 +135,7 @@
     "material_roles": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/material-role",
     "materials": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/material",
     "required_bin_capacity_references": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/required-bin-capacity-reference",
-    "sorting_methods": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/sorting-method",
+    "bin_configurations": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/bin-configuration",
     "units": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/unit",
     "waste_categories": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/waste-category"
   },
@@ -402,8 +402,8 @@
         "target_label": "person"
       }
     },
-    "sorting_method": {
-      "https://brit.bioresource-tools.net/vocab/soilcom/concept/sorting-method/four-compartments-bin": {
+    "bin_configuration": {
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/bin-configuration/four-compartments-bin": {
         "source_terms": [
           {
             "language": "sv",
@@ -412,7 +412,7 @@
         ],
         "target_label": "Four compartments bin"
       },
-      "https://brit.bioresource-tools.net/vocab/soilcom/concept/sorting-method/optical-bag-sorting": {
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/bin-configuration/optical-bag-sorting": {
         "source_terms": [
           {
             "language": "sv",
@@ -421,7 +421,7 @@
         ],
         "target_label": "Optical bag sorting"
       },
-      "https://brit.bioresource-tools.net/vocab/soilcom/concept/sorting-method/separate-bins": {
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/bin-configuration/separate-bins": {
         "source_terms": [
           {
             "language": "da",
@@ -446,7 +446,7 @@
         ],
         "target_label": "Separate bins"
       },
-      "https://brit.bioresource-tools.net/vocab/soilcom/concept/sorting-method/two-compartments-bin": {
+      "https://brit.bioresource-tools.net/vocab/soilcom/concept/bin-configuration/two-compartments-bin": {
         "source_terms": [
           {
             "language": "sv",
@@ -651,7 +651,7 @@
     },
     "equivalence_source_key": "crosswalk_equivalences"
   },
-  "sorting_methods": [
+  "bin_configurations": [
     "Four compartments bin",
     "Optical bag sorting",
     "Separate bins",

@@ -11,6 +11,7 @@ from django.db import transaction
 from bibliography.models import Source
 from materials.models import Material
 from sources.waste_collection.models import (
+    BinConfiguration,
     Collection,
     CollectionCatchment,
     CollectionCountOptions,
@@ -20,7 +21,6 @@ from sources.waste_collection.models import (
     CollectionSystem,
     Collector,
     FeeSystem,
-    SortingMethod,
     WasteCategory,
     WasteFlyer,
 )
@@ -245,8 +245,8 @@ class CollectionImporter:
         self._collection_systems: dict[str, CollectionSystem] = {
             o.name: o for o in CollectionSystem.objects.all()
         }
-        self._sorting_methods: dict[str, SortingMethod] = {
-            o.name: o for o in SortingMethod.objects.all()
+        self._bin_configurations: dict[str, BinConfiguration] = {
+            o.name: o for o in BinConfiguration.objects.all()
         }
         self._fee_systems: dict[str, FeeSystem] = {
             o.name: o for o in FeeSystem.objects.all()
@@ -363,7 +363,7 @@ class CollectionImporter:
         fee_system = self._resolve_fee_system(record, label, stats)
         frequency = self._resolve_frequency(record, label, stats)
         connection_type = self._resolve_connection_type(record, label, stats)
-        sorting_method = self._resolve_sorting_method(record, label, stats)
+        bin_configuration = self._resolve_bin_configuration(record, label, stats)
         established = record.get("established")
         bin_cap_ref = self._resolve_bin_capacity_reference(record)
 
@@ -439,15 +439,15 @@ class CollectionImporter:
                 collection.connection_type = connection_type
                 update_fields.append("connection_type")
 
-            # Update sorting_method if different
-            if sorting_method and collection.sorting_method_id != (
-                sorting_method.pk if sorting_method else None
+            # Update bin_configuration if different
+            if bin_configuration and collection.bin_configuration_id != (
+                bin_configuration.pk if bin_configuration else None
             ):
                 changes.append(
-                    f"sorting_method: {collection.sorting_method or "None"} → {sorting_method}"
+                    f"bin_configuration: {collection.bin_configuration or "None"} → {bin_configuration}"
                 )
-                collection.sorting_method = sorting_method
-                update_fields.append("sorting_method")
+                collection.bin_configuration = bin_configuration
+                update_fields.append("bin_configuration")
 
             # Update established if different
             if established is not None and collection.established != established:
@@ -587,7 +587,7 @@ class CollectionImporter:
                 valid_from=valid_from,
                 valid_until=valid_until,
                 connection_type=connection_type,
-                sorting_method=sorting_method,
+                bin_configuration=bin_configuration,
                 established=established,
                 description=description,
             )
@@ -944,16 +944,16 @@ class CollectionImporter:
             )
         return system
 
-    def _resolve_sorting_method(
+    def _resolve_bin_configuration(
         self, record: dict, label: str, stats: dict
-    ) -> SortingMethod | None:
-        name = record.get("sorting_method") or ""
+    ) -> BinConfiguration | None:
+        name = record.get("bin_configuration") or ""
         if not name:
             return None
-        method = self._sorting_methods.get(name)
+        method = self._bin_configurations.get(name)
         if method is None:
             stats["warnings"].append(
-                f"{label}: SortingMethod '{name}' not found — field left empty."
+                f"{label}: BinConfiguration '{name}' not found — field left empty."
             )
         return method
 

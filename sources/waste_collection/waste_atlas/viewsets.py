@@ -33,6 +33,7 @@ from sources.waste_collection.models import (
 
 from .serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
+    CatchmentBinConfigurationSerializer,
     CatchmentCollectionAmountSerializer,
     CatchmentCollectionCountSerializer,
     CatchmentCollectionSupportSerializer,
@@ -52,7 +53,6 @@ from .serializers import (
     CatchmentOrganicRatioSerializer,
     CatchmentPopulationSerializer,
     CatchmentRequiredBinCapacitySerializer,
-    CatchmentSortingMethodSerializer,
     CatchmentWasteRatioSerializer,
 )
 
@@ -205,19 +205,15 @@ def _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path=""):
 
     prefix_q = Q()
     for prefix in nuts_prefixes:
-        prefix_q |= Q(
-            **{f"{catchment_path}region__nutsregion__nuts_id__startswith": prefix}
-        )
-        prefix_q |= Q(
-            **{
-                f"{catchment_path}parent__region__nutsregion__nuts_id__startswith": prefix
-            }
-        )
-        prefix_q |= Q(
-            **{
-                f"{catchment_path}parent__parent__region__nutsregion__nuts_id__startswith": prefix
-            }
-        )
+        prefix_q |= Q(**{
+            f"{catchment_path}region__nutsregion__nuts_id__startswith": prefix
+        })
+        prefix_q |= Q(**{
+            f"{catchment_path}parent__region__nutsregion__nuts_id__startswith": prefix
+        })
+        prefix_q |= Q(**{
+            f"{catchment_path}parent__parent__region__nutsregion__nuts_id__startswith": prefix
+        })
     return qs.filter(prefix_q)
 
 
@@ -381,7 +377,7 @@ class CollectionSystemViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class SortingMethodViewSet(viewsets.ViewSet):
+class BinConfigurationViewSet(viewsets.ViewSet):
     """Return the primary sorting method for biowaste per catchment.
 
     For each catchment, selects the primary biowaste / food-waste collection via
@@ -391,7 +387,7 @@ class SortingMethodViewSet(viewsets.ViewSet):
     permission_classes = [permissions.AllowAny]
 
     def list(self, request):
-        """Return a JSON array of {catchment_id, sorting_method}."""
+        """Return a JSON array of {catchment_id, bin_configuration}."""
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
 
@@ -403,29 +399,29 @@ class SortingMethodViewSet(viewsets.ViewSet):
             ["Biowaste", "Food waste"],
         )
         qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
-        rows = qs.select_related("collection_system", "sorting_method").values_list(
+        rows = qs.select_related("collection_system", "bin_configuration").values_list(
             "catchment_id",
             "collection_system__name",
-            "sorting_method__name",
+            "bin_configuration__name",
         )
 
-        best = {}  # catchment_id -> (system, sorting_method, priority)
-        for cid, system, sorting_method in rows:
+        best = {}  # catchment_id -> (system, bin_configuration, priority)
+        for cid, system, bin_configuration in rows:
             p = _COLLECTION_SYSTEM_PRIORITY.get(system, 99)
             if cid not in best or p < best[cid][2]:
-                best[cid] = (system, sorting_method, p)
+                best[cid] = (system, bin_configuration, p)
 
         data = []
-        for cid, (system, sorting_method, _) in best.items():
+        for cid, (system, bin_configuration, _) in best.items():
             if system == "No separate collection":
                 value = "No separate collection"
-            elif sorting_method:
-                value = sorting_method
+            elif bin_configuration:
+                value = bin_configuration
             else:
                 value = "no_data"
-            data.append({"catchment_id": cid, "sorting_method": value})
+            data.append({"catchment_id": cid, "bin_configuration": value})
 
-        serializer = CatchmentSortingMethodSerializer(data, many=True)
+        serializer = CatchmentBinConfigurationSerializer(data, many=True)
         return Response(serializer.data)
 
 
@@ -574,13 +570,11 @@ def _get_collection_count(country, year, waste_categories, nuts_prefixes=()):
 
     data = []
     for cid, options in catchment_options.items():
-        data.append(
-            {
-                "catchment_id": cid,
-                "collection_count": sum(options),
-                "has_seasonal_variation": len(set(options)) > 1,
-            }
-        )
+        data.append({
+            "catchment_id": cid,
+            "collection_count": sum(options),
+            "has_seasonal_variation": len(set(options)) > 1,
+        })
     return data
 
 
@@ -666,13 +660,11 @@ class CombinedFrequencyTypeViewSet(viewsets.ViewSet):
         all_ids = set(bio) | set(res)
         data = []
         for cid in all_ids:
-            data.append(
-                {
-                    "catchment_id": cid,
-                    "bio_frequency": bio.get(cid, "no_data"),
-                    "residual_frequency": res.get(cid, "no_data"),
-                }
-            )
+            data.append({
+                "catchment_id": cid,
+                "bio_frequency": bio.get(cid, "no_data"),
+                "residual_frequency": res.get(cid, "no_data"),
+            })
         serializer = CatchmentCombinedFrequencySerializer(data, many=True)
         return Response(serializer.data)
 
@@ -758,13 +750,11 @@ class BiowasteCollectionCountViewSet(viewsets.ViewSet):
 
         for cid, (_system, _) in best_system.items():
             if cid not in d2d_ids:
-                door_to_door.append(
-                    {
-                        "catchment_id": cid,
-                        "collection_count": None,
-                        "has_seasonal_variation": False,
-                    }
-                )
+                door_to_door.append({
+                    "catchment_id": cid,
+                    "collection_count": None,
+                    "has_seasonal_variation": False,
+                })
 
         serializer = CatchmentCollectionCountSerializer(door_to_door, many=True)
         return Response(serializer.data)
@@ -1016,27 +1006,21 @@ def _get_collection_amount(
     for cid, (_col_id, system, _) in best.items():
         no_collection = system == "No separate collection"
         amount = None if no_collection else amounts.get(cid)
-        data.append(
-            {
-                "catchment_id": cid,
-                "amount": amount,
-                "no_collection": no_collection,
-                **(
-                    {"value_source": None if no_collection else value_sources.get(cid)}
-                    if include_value_source
-                    else {}
-                ),
-                **(
-                    {
-                        "acpv_group_key": None
-                        if no_collection
-                        else acpv_group_keys.get(cid)
-                    }
-                    if include_acpv_group_key
-                    else {}
-                ),
-            }
-        )
+        data.append({
+            "catchment_id": cid,
+            "amount": amount,
+            "no_collection": no_collection,
+            **(
+                {"value_source": None if no_collection else value_sources.get(cid)}
+                if include_value_source
+                else {}
+            ),
+            **(
+                {"acpv_group_key": None if no_collection else acpv_group_keys.get(cid)}
+                if include_acpv_group_key
+                else {}
+            ),
+        })
     return data
 
 
@@ -1236,16 +1220,14 @@ def _get_biowaste_acpv_outline_geojson(country, year, nuts_prefixes=()):
         for geom in geoms[1:]:
             dissolved_geom = dissolved_geom.union(geom)
         dissolved_geom.normalize()
-        features.append(
-            {
-                "type": "Feature",
-                "properties": {
-                    "acpv_group_key": group_key,
-                    "catchment_ids": group_catchment_ids,
-                },
-                "geometry": json.loads(dissolved_geom.geojson),
-            }
-        )
+        features.append({
+            "type": "Feature",
+            "properties": {
+                "acpv_group_key": group_key,
+                "catchment_ids": group_catchment_ids,
+            },
+            "geometry": json.loads(dissolved_geom.geojson),
+        })
 
     return _build_feature_collection(features)
 
@@ -1426,13 +1408,11 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=()):
     for cid, (_col_id, system, _priority) in best.items():
         no_collection = system == "No separate collection"
         amount = None if no_collection else amounts.get(cid)
-        data.append(
-            {
-                "catchment_id": cid,
-                "amount": amount,
-                "no_collection": no_collection,
-            }
-        )
+        data.append({
+            "catchment_id": cid,
+            "amount": amount,
+            "no_collection": no_collection,
+        })
     return data
 
 
@@ -1742,14 +1722,12 @@ class OrganicWasteRatioViewSet(viewsets.ViewSet):
                 ratio = o / (o + r)
             else:
                 ratio = None
-            data.append(
-                {
-                    "catchment_id": cid,
-                    "organic_amount": o,
-                    "residual_amount": r,
-                    "ratio": ratio,
-                }
-            )
+            data.append({
+                "catchment_id": cid,
+                "organic_amount": o,
+                "residual_amount": r,
+                "ratio": ratio,
+            })
         serializer = CatchmentOrganicRatioSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -1789,14 +1767,12 @@ class WasteRatioViewSet(viewsets.ViewSet):
                 ratio = b / (b + r)
             else:
                 ratio = None
-            data.append(
-                {
-                    "catchment_id": cid,
-                    "bio_amount": b,
-                    "residual_amount": r,
-                    "ratio": ratio,
-                }
-            )
+            data.append({
+                "catchment_id": cid,
+                "bio_amount": b,
+                "residual_amount": r,
+                "ratio": ratio,
+            })
         serializer = CatchmentWasteRatioSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -1875,13 +1851,11 @@ class CollectionSupportViewSet(viewsets.ViewSet):
             else:
                 paper = _status(collection_id, paper_allowed, paper_forbidden)
                 plastic = _status(collection_id, plastic_allowed, plastic_forbidden)
-            data.append(
-                {
-                    "catchment_id": cid,
-                    "paper_bags": paper,
-                    "plastic_bags": plastic,
-                }
-            )
+            data.append({
+                "catchment_id": cid,
+                "paper_bags": paper,
+                "plastic_bags": plastic,
+            })
 
         serializer = CatchmentCollectionSupportSerializer(data, many=True)
         return Response(serializer.data)
@@ -2064,13 +2038,11 @@ class ConnectionRateViewSet(viewsets.ViewSet):
         for cid, (col_id, system, _) in best.items():
             is_d2d = system == "Door to door"
             avg = rate_lookup.get(col_id)
-            data.append(
-                {
-                    "catchment_id": cid,
-                    "connection_rate": avg / 100.0 if avg is not None else None,
-                    "is_door_to_door": is_d2d,
-                }
-            )
+            data.append({
+                "catchment_id": cid,
+                "connection_rate": avg / 100.0 if avg is not None else None,
+                "is_door_to_door": is_d2d,
+            })
 
         serializer = CatchmentConnectionRateSerializer(data, many=True)
         return Response(serializer.data)

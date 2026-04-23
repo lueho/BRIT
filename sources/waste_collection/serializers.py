@@ -185,9 +185,9 @@ class CollectionSystemSerializer(OwnedObjectModelSerializer):
         model = models.CollectionSystem
 
 
-class SortingMethodSerializer(OwnedObjectModelSerializer):
+class BinConfigurationSerializer(OwnedObjectModelSerializer):
     class Meta(OwnedObjectModelSerializer.Meta):
-        model = models.SortingMethod
+        model = models.BinConfiguration
 
 
 class WasteComponentSerializer(OwnedObjectModelSerializer):
@@ -220,7 +220,7 @@ class CollectionModelSerializer(
     catchment = serializers.StringRelatedField()
     collector = serializers.StringRelatedField()
     collection_system = serializers.StringRelatedField()
-    sorting_method = serializers.StringRelatedField()
+    bin_configuration = serializers.StringRelatedField()
     waste_category = serializers.SerializerMethodField()
     publication_status = serializers.CharField()
     connection_type = serializers.CharField(required=False, allow_null=True)
@@ -261,7 +261,7 @@ class CollectionModelSerializer(
             "collector",
             "collection_system_id",
             "collection_system",
-            "sorting_method",
+            "bin_configuration",
             "established",
             "waste_category_id",
             "waste_category",
@@ -663,7 +663,7 @@ class CollectionImportRecordSerializer(serializers.Serializer):
     frequency           Exact name of the CollectionFrequency.
     connection_type     One of 'mandatory', 'mandatory with exception', 'voluntary',
                         'not specified'.
-    sorting_method      Exact name of the SortingMethod.
+    bin_configuration   Exact name of the BinConfiguration.
     established         Year (integer) the collection scheme was established.
     valid_until         ISO 8601 date string.
     min_bin_size        Decimal (litres).
@@ -699,7 +699,7 @@ class CollectionImportRecordSerializer(serializers.Serializer):
     connection_type = serializers.CharField(
         required=False, allow_null=True, allow_blank=True
     )
-    sorting_method = serializers.CharField(
+    bin_configuration = serializers.CharField(
         required=False, allow_null=True, allow_blank=True
     )
     established = serializers.IntegerField(
@@ -899,8 +899,8 @@ class CollectionMutationCreateSerializer(
     fee_system = serializers.PrimaryKeyRelatedField(
         queryset=models.FeeSystem.objects.all(), required=False, allow_null=True
     )
-    sorting_method = serializers.PrimaryKeyRelatedField(
-        queryset=models.SortingMethod.objects.all(), required=False, allow_null=True
+    bin_configuration = serializers.PrimaryKeyRelatedField(
+        queryset=models.BinConfiguration.objects.all(), required=False, allow_null=True
     )
     allowed_materials = serializers.PrimaryKeyRelatedField(
         queryset=Material.objects.all(), many=True, required=False, default=list
@@ -991,8 +991,8 @@ class CollectionMutationUpdateSerializer(
     fee_system = serializers.PrimaryKeyRelatedField(
         queryset=models.FeeSystem.objects.all(), required=False, allow_null=True
     )
-    sorting_method = serializers.PrimaryKeyRelatedField(
-        queryset=models.SortingMethod.objects.all(), required=False, allow_null=True
+    bin_configuration = serializers.PrimaryKeyRelatedField(
+        queryset=models.BinConfiguration.objects.all(), required=False, allow_null=True
     )
     allowed_materials = serializers.PrimaryKeyRelatedField(
         queryset=Material.objects.all(), many=True, required=False
@@ -1057,7 +1057,7 @@ class CollectionMutationUpdateSerializer(
             "collector",
             "frequency",
             "fee_system",
-            "sorting_method",
+            "bin_configuration",
             "allowed_materials",
             "forbidden_materials",
             "sources",
@@ -1101,8 +1101,8 @@ class CollectionMutationVersionSerializer(
     fee_system = serializers.PrimaryKeyRelatedField(
         queryset=models.FeeSystem.objects.all(), required=False, allow_null=True
     )
-    sorting_method = serializers.PrimaryKeyRelatedField(
-        queryset=models.SortingMethod.objects.all(), required=False, allow_null=True
+    bin_configuration = serializers.PrimaryKeyRelatedField(
+        queryset=models.BinConfiguration.objects.all(), required=False, allow_null=True
     )
     allowed_materials = serializers.PrimaryKeyRelatedField(
         queryset=Material.objects.all(), many=True, required=False
@@ -1196,7 +1196,7 @@ __all__ = [
     "GeoreferencedCollector",
     "GeoreferencedWasteCollection",
     "OwnedObjectModelSerializer",
-    "SortingMethodSerializer",
+    "BinConfigurationSerializer",
     "WasteCollectionGeometrySerializer",
     "WasteComponentSerializer",
     "WasteFlyerSerializer",

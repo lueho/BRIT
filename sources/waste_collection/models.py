@@ -81,11 +81,11 @@ class CollectionSystem(NamedUserCreatedObject):
         return self.name
 
 
-class SortingMethod(NamedUserCreatedObject):
+class BinConfiguration(NamedUserCreatedObject):
     """How waste fractions are separated at the household level (e.g. separate bins, optical sorting)."""
 
     class Meta(NamedUserCreatedObject.Meta):
-        verbose_name = "sorting method"
+        verbose_name = "bin configuration"
 
     def __str__(self):
         return self.name
@@ -427,13 +427,13 @@ class Collection(NamedUserCreatedObject):
         symmetrical=False,
         related_name="successors",
     )
-    sorting_method = models.ForeignKey(
-        SortingMethod,
+    bin_configuration = models.ForeignKey(
+        BinConfiguration,
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
         related_name="collections",
-        verbose_name="Sorting method",
+        verbose_name="Bin configuration",
         help_text="How waste fractions are separated at the household level.",
     )
     established = models.PositiveSmallIntegerField(
@@ -489,7 +489,7 @@ class Collection(NamedUserCreatedObject):
         "waste_category",
         "frequency",
         "fee_system",
-        "sorting_method",
+        "bin_configuration",
         "allowed_materials",
         "forbidden_materials",
         "sources",
@@ -681,12 +681,10 @@ class Collection(NamedUserCreatedObject):
     def clean(self):
         if self.valid_from and self.valid_until:
             if self.valid_from >= self.valid_until:
-                raise ValidationError(
-                    {
-                        "valid_from": "Valid from date must be before the valid until date.",
-                        "valid_until": "Valid until date must be after the valid from date.",
-                    }
-                )
+                raise ValidationError({
+                    "valid_from": "Valid from date must be before the valid until date.",
+                    "valid_until": "Valid until date must be after the valid from date.",
+                })
         super().clean()
 
     def review_readiness_errors(self):
@@ -700,20 +698,16 @@ class Collection(NamedUserCreatedObject):
                 "Attach at least one bibliography source or waste flyer before submitting this collection for review."
             )
 
-        invalid_source_urls = sorted(
-            {
-                source.url
-                for source in attached_sources
-                if source.url and source.url_checked and not source.url_valid
-            }
-        )
-        invalid_flyer_urls = sorted(
-            {
-                flyer.url
-                for flyer in attached_flyers
-                if flyer.url and flyer.url_checked and not flyer.url_valid
-            }
-        )
+        invalid_source_urls = sorted({
+            source.url
+            for source in attached_sources
+            if source.url and source.url_checked and not source.url_valid
+        })
+        invalid_flyer_urls = sorted({
+            flyer.url
+            for flyer in attached_flyers
+            if flyer.url and flyer.url_checked and not flyer.url_valid
+        })
         invalid_urls = invalid_source_urls + invalid_flyer_urls
         if invalid_urls:
             errors["sources"] = (
@@ -738,7 +732,7 @@ class Collection(NamedUserCreatedObject):
             "waste_category": self.waste_category_id,
             "frequency": self.frequency_id,
             "fee_system": self.fee_system_id,
-            "sorting_method": self.sorting_method_id,
+            "bin_configuration": self.bin_configuration_id,
             "established": self.established,
             "connection_type": self.connection_type,
             "min_bin_size": self.min_bin_size,

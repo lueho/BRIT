@@ -108,8 +108,8 @@ _CONNECTION_MAP = {
     "Friv": "VOLUNTARY",
 }
 
-# Swedish sorting system → BRIT SortingMethod name
-_SORTING_METHOD_MAP = {
+# Swedish sorting system → BRIT BinConfiguration name
+_BIN_CONFIGURATION_MAP = {
     "Separate bins": "Separate bins",
     "Separata kärl": "Separate bins",
     "Optical bag sorting": "Optical bag sorting",
@@ -584,7 +584,7 @@ def _resolve_catchment_key(city_name: str) -> dict:
 
 def _build_food_waste_record(
     city: str,
-    sorting_method_name: str | None,
+    bin_configuration_name: str | None,
     bag_material: str | None,
     fee_system: str | None,
     connection_type: str | None,
@@ -617,7 +617,7 @@ def _build_food_waste_record(
     return {
         **_resolve_catchment_key(city),
         "collection_system": _COLLECTION_SYSTEM_DOOR_TO_DOOR,
-        "sorting_method": sorting_method_name or "",
+        "bin_configuration": bin_configuration_name or "",
         "waste_category": _WASTE_CATEGORY_FOOD,
         "allowed_materials": ", ".join(allowed_materials),
         "forbidden_materials": "",
@@ -643,7 +643,7 @@ def _build_residual_waste_record(
     return {
         **_resolve_catchment_key(city),
         "collection_system": _COLLECTION_SYSTEM_DOOR_TO_DOOR,
-        "sorting_method": "",
+        "bin_configuration": "",
         "waste_category": _WASTE_CATEGORY_RESIDUAL,
         "allowed_materials": "",
         "forbidden_materials": "",
@@ -671,7 +671,7 @@ def _build_no_collection_record(city: str, data_year: int) -> dict:
     return {
         **_resolve_catchment_key(city),
         "collection_system": _COLLECTION_SYSTEM_NONE,
-        "sorting_method": "",
+        "bin_configuration": "",
         "waste_category": _WASTE_CATEGORY_FOOD,
         "allowed_materials": "",
         "forbidden_materials": "",
@@ -726,7 +726,9 @@ def _parse_excel_2021(path: Path) -> list[dict]:
         if system_raw in _NO_COLLECTION_SYSTEMS:
             records.append(_build_no_collection_record(city, 2021))
         else:
-            sorting_method = _SORTING_METHOD_MAP.get(system_raw, system_raw) or None
+            bin_configuration = (
+                _BIN_CONFIGURATION_MAP.get(system_raw, system_raw) or None
+            )
             description = (
                 "Bag type reported as 'Annan' (other) in 2021 Avfall Sverige source data."
                 if bag_raw == "Annan"
@@ -735,8 +737,8 @@ def _parse_excel_2021(path: Path) -> list[dict]:
             records.append(
                 _build_food_waste_record(
                     city=city,
-                    sorting_method_name=sorting_method
-                    if sorting_method not in ("-", "")
+                    bin_configuration_name=bin_configuration
+                    if bin_configuration not in ("-", "")
                     else None,
                     bag_material=bag_material,
                     fee_system=fee_system,
@@ -778,11 +780,11 @@ def _apply_2024_map_details(
         updated_record = dict(record)
         if details.get("no_collection"):
             updated_record["collection_system"] = _COLLECTION_SYSTEM_NONE
-            updated_record["sorting_method"] = ""
+            updated_record["bin_configuration"] = ""
             updated_record["allowed_materials"] = ""
             updated_record["property_values"] = []
         else:
-            updated_record["sorting_method"] = details.get("sorting_method") or ""
+            updated_record["bin_configuration"] = details.get("bin_configuration") or ""
             updated_record["allowed_materials"] = details.get("bag_material") or ""
         review_comment = _build_2024_manual_review_comment(details)
         if review_comment:
@@ -851,7 +853,7 @@ def _parse_pdf(path: Path, data_year: int) -> list[dict]:
             records.append(
                 _build_food_waste_record(
                     city=city,
-                    sorting_method_name=det.get("sorting_method"),
+                    bin_configuration_name=det.get("bin_configuration"),
                     bag_material=det.get("bag_material"),
                     fee_system=None,
                     connection_type=det.get("connection_type"),
@@ -1080,7 +1082,7 @@ def _extract_table5(pdf, data_year: int, details: dict) -> None:
                         if city:
                             details[city] = {
                                 "no_collection": True,
-                                "sorting_method": None,
+                                "bin_configuration": None,
                                 "bag_material": None,
                                 "connection_type": None,
                                 "established": None,
@@ -1142,7 +1144,7 @@ def _extract_table5(pdf, data_year: int, details: dict) -> None:
                 system_raw = "Fyrfackskärl"
             elif "Tvådelade" in system_raw:
                 system_raw = "Tvådelade kärl"
-            sorting_method = _SORTING_METHOD_MAP.get(system_raw)
+            bin_configuration = _BIN_CONFIGURATION_MAP.get(system_raw)
 
             # Connection rate: first numeric token after city
             conn_rate = None
@@ -1154,7 +1156,7 @@ def _extract_table5(pdf, data_year: int, details: dict) -> None:
 
             details[city] = {
                 "no_collection": False,
-                "sorting_method": sorting_method,
+                "bin_configuration": bin_configuration,
                 "bag_material": bag_material,
                 "connection_type": conn_type,
                 "established": established,

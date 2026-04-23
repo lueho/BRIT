@@ -27,9 +27,9 @@ soilcom:CollectionSystem a owl:Class ;
     rdfs:label "Collection system"@en ;
     rdfs:seeAlso <https://brit.bioresource-tools.net/vocab/soilcom/scheme/collection-system> .
 
-soilcom:SortingMethod a owl:Class ;
-    rdfs:label "Sorting method"@en ;
-    rdfs:seeAlso <https://brit.bioresource-tools.net/vocab/soilcom/scheme/sorting-method> .
+soilcom:BinConfiguration a owl:Class ;
+    rdfs:label "Bin configuration"@en ;
+    rdfs:seeAlso <https://brit.bioresource-tools.net/vocab/soilcom/scheme/bin-configuration> .
 
 soilcom:FeeSystem a owl:Class ;
     rdfs:label "Fee system"@en ;
@@ -62,10 +62,10 @@ soilcom:hasCollectionSystem a owl:ObjectProperty ;
     rdfs:domain soilcom:Collection ;
     rdfs:range soilcom:CollectionSystem .
 
-soilcom:hasSortingMethod a owl:ObjectProperty ;
-    rdfs:label "has sorting method"@en ;
+soilcom:hasBinConfiguration a owl:ObjectProperty ;
+    rdfs:label "has bin configuration"@en ;
     rdfs:domain soilcom:Collection ;
-    rdfs:range soilcom:SortingMethod .
+    rdfs:range soilcom:BinConfiguration .
 
 soilcom:hasFeeSystem a owl:ObjectProperty ;
     rdfs:label "has fee system"@en ;

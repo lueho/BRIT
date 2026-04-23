@@ -100,11 +100,11 @@ from ..forms import (
 )
 from ..models import (
     AggregatedCollectionPropertyValue,
+    BinConfiguration,
     CollectionCountOptions,
     CollectionFrequency,
     CollectionSeason,
     FeeSystem,
-    SortingMethod,
 )
 from ..tasks import cleanup_orphaned_waste_flyers
 
@@ -226,7 +226,7 @@ class CollectorDetailPermissionRegressionTest(ViewWithPermissionsTestCase):
 
         self.assertContains(
             response,
-            f"{reverse('collection-create')}?collector={self.collector.pk}",
+            f"{reverse("collection-create")}?collector={self.collector.pk}",
         )
 
     def test_detail_hides_create_collection_link_without_permission(self):
@@ -237,7 +237,7 @@ class CollectorDetailPermissionRegressionTest(ViewWithPermissionsTestCase):
 
         self.assertNotContains(
             response,
-            f"{reverse('collection-create')}?collector={self.collector.pk}",
+            f"{reverse("collection-create")}?collector={self.collector.pk}",
         )
 
 
@@ -338,7 +338,7 @@ class WasteComponentCRUDViewsTestCase(
     def create_published_object(cls):
         # This method is overridden to give another name to the published object because of the unique name constraint
         data = cls.create_object_data.copy()
-        data["name"] = f"{data['name']} (published)"
+        data["name"] = f"{data["name"]} (published)"
         data["publication_status"] = "published"
         data.update(cls.related_objects)
         return cls.model.objects.create(owner=cls.owner_user, **data)
@@ -668,14 +668,12 @@ class CollectionPropertyValueCRUDViewsTestCase(
     def related_objects_post_data(self):
         data = super().related_objects_post_data()
         # Add formset management data for WasteFlyerFormSet
-        data.update(
-            {
-                "form-TOTAL_FORMS": "0",
-                "form-INITIAL_FORMS": "0",
-                "form-MIN_NUM_FORMS": "0",
-                "form-MAX_NUM_FORMS": "1000",
-            }
-        )
+        data.update({
+            "form-TOTAL_FORMS": "0",
+            "form-INITIAL_FORMS": "0",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+        })
         return data
 
     def get_delete_success_url(self, publication_status=None):
@@ -834,23 +832,21 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(
 
     def related_objects_post_data(self):
         data = super().related_objects_post_data()
-        data.update(
-            {
-                "collections": [
-                    Collection.objects.create(
-                        name="Test Collection 3", publication_status="published"
-                    ).pk,
-                    Collection.objects.create(
-                        name="Test Collection 4", publication_status="published"
-                    ).pk,
-                ],
-                # Add formset management data for WasteFlyerFormSet
-                "form-TOTAL_FORMS": "0",
-                "form-INITIAL_FORMS": "0",
-                "form-MIN_NUM_FORMS": "0",
-                "form-MAX_NUM_FORMS": "1000",
-            }
-        )
+        data.update({
+            "collections": [
+                Collection.objects.create(
+                    name="Test Collection 3", publication_status="published"
+                ).pk,
+                Collection.objects.create(
+                    name="Test Collection 4", publication_status="published"
+                ).pk,
+            ],
+            # Add formset management data for WasteFlyerFormSet
+            "form-TOTAL_FORMS": "0",
+            "form-INITIAL_FORMS": "0",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+        })
         return data
 
     def get_delete_success_url(self, publication_status=None):
@@ -1053,18 +1049,22 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         cls.unpublished_object.flyers.add(cls.flyer2)
         cls.published_object.flyers.add(cls.flyer)
         cls.published_object.flyers.add(cls.flyer2)
-        cls.unpublished_object.allowed_materials.set(
-            [cls.allowed_material_1, cls.allowed_material_2]
-        )
-        cls.unpublished_object.forbidden_materials.set(
-            [cls.forbidden_material_1, cls.forbidden_material_2]
-        )
-        cls.published_object.allowed_materials.set(
-            [cls.allowed_material_1, cls.allowed_material_2]
-        )
-        cls.published_object.forbidden_materials.set(
-            [cls.forbidden_material_1, cls.forbidden_material_2]
-        )
+        cls.unpublished_object.allowed_materials.set([
+            cls.allowed_material_1,
+            cls.allowed_material_2,
+        ])
+        cls.unpublished_object.forbidden_materials.set([
+            cls.forbidden_material_1,
+            cls.forbidden_material_2,
+        ])
+        cls.published_object.allowed_materials.set([
+            cls.allowed_material_1,
+            cls.allowed_material_2,
+        ])
+        cls.published_object.forbidden_materials.set([
+            cls.forbidden_material_1,
+            cls.forbidden_material_2,
+        ])
 
     @classmethod
     def create_related_objects(cls):
@@ -1120,18 +1120,22 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             description="Predecessor Collection 2",
             publication_status="published",
         )
-        predecessor_1.allowed_materials.set(
-            [cls.allowed_material_1, cls.allowed_material_2]
-        )
-        predecessor_1.forbidden_materials.set(
-            [cls.forbidden_material_1, cls.forbidden_material_2]
-        )
-        predecessor_2.allowed_materials.set(
-            [cls.allowed_material_1, cls.allowed_material_2]
-        )
-        predecessor_2.forbidden_materials.set(
-            [cls.forbidden_material_1, cls.forbidden_material_2]
-        )
+        predecessor_1.allowed_materials.set([
+            cls.allowed_material_1,
+            cls.allowed_material_2,
+        ])
+        predecessor_1.forbidden_materials.set([
+            cls.forbidden_material_1,
+            cls.forbidden_material_2,
+        ])
+        predecessor_2.allowed_materials.set([
+            cls.allowed_material_1,
+            cls.allowed_material_2,
+        ])
+        predecessor_2.forbidden_materials.set([
+            cls.forbidden_material_1,
+            cls.forbidden_material_2,
+        ])
         # Create a bunch of unused outdated collections
         for i in range(12):
             collection = Collection.objects.create(
@@ -1145,12 +1149,14 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
                 description=f"Oudated Collection {i}",
                 publication_status="published",
             )
-            collection.allowed_materials.set(
-                [cls.allowed_material_1, cls.allowed_material_2]
-            )
-            collection.forbidden_materials.set(
-                [cls.forbidden_material_1, cls.forbidden_material_2]
-            )
+            collection.allowed_materials.set([
+                cls.allowed_material_1,
+                cls.allowed_material_2,
+            ])
+            collection.forbidden_materials.set([
+                cls.forbidden_material_1,
+                cls.forbidden_material_2,
+            ])
         return {
             "catchment": catchment,
             "collector": collector,
@@ -1172,14 +1178,12 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
     def related_objects_post_data(self):
         data = super().related_objects_post_data()
-        data.update(
-            {
-                "waste_category": WasteCategory.objects.get(name="Test category").pk,
-                "valid_from": date.today(),
-                "form-TOTAL_FORMS": 0,
-                "form-INITIAL_FORMS": 0,
-            }
-        )
+        data.update({
+            "waste_category": WasteCategory.objects.get(name="Test category").pk,
+            "valid_from": date.today(),
+            "form-TOTAL_FORMS": 0,
+            "form-INITIAL_FORMS": 0,
+        })
         return data
 
     def get_current_list_url(self, publication_status=None):
@@ -1626,12 +1630,14 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             description="This is a test case.",
             publication_status="published",
         )
-        cls.collection.allowed_materials.set(
-            [cls.allowed_material_1, cls.allowed_material_2]
-        )
-        cls.collection.forbidden_materials.set(
-            [cls.forbidden_material_1, cls.forbidden_material_2]
-        )
+        cls.collection.allowed_materials.set([
+            cls.allowed_material_1,
+            cls.allowed_material_2,
+        ])
+        cls.collection.forbidden_materials.set([
+            cls.forbidden_material_1,
+            cls.forbidden_material_2,
+        ])
         cls.collection.flyers.add(cls.flyer)
         cls.collection.flyers.add(cls.flyer2)
 
@@ -1998,12 +2004,14 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
             description="This is a test case.",
             publication_status="published",
         )
-        cls.collection.allowed_materials.set(
-            [cls.allowed_material_1, cls.allowed_material_2]
-        )
-        cls.collection.forbidden_materials.set(
-            [cls.forbidden_material_1, cls.forbidden_material_2]
-        )
+        cls.collection.allowed_materials.set([
+            cls.allowed_material_1,
+            cls.allowed_material_2,
+        ])
+        cls.collection.forbidden_materials.set([
+            cls.forbidden_material_1,
+            cls.forbidden_material_2,
+        ])
         cls.collection.flyers.add(cls.flyer)
         cls.collection.flyers.add(cls.flyer2)
         cls.private_collection = Collection.objects.create(
@@ -3499,7 +3507,7 @@ class CollectionReviewDetailPropertiesTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.staff = User.objects.create(username="moderator", is_staff=True)
-        cls.sorting_method = SortingMethod.objects.create(
+        cls.bin_configuration = BinConfiguration.objects.create(
             name="Optical sorting",
             owner=cls.staff,
             publication_status="published",
@@ -3512,7 +3520,7 @@ class CollectionReviewDetailPropertiesTestCase(TestCase):
             name="R",
             catchment=cls.catchment,
             collection_system=cls.system,
-            sorting_method=cls.sorting_method,
+            bin_configuration=cls.bin_configuration,
             waste_category=cls.category,
             publication_status="published",
         )
@@ -4009,9 +4017,9 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="DE" selected')
 
-    def test_sweden_sorting_method_map_defaults_to_se_2023_and_english_labels(self):
-        """Sweden sorting-method map defaults to country SE and year 2023."""
-        response = self.client.get(reverse("waste-atlas-sorting-method-sweden-map"))
+    def test_sweden_bin_configuration_map_defaults_to_se_2023_and_english_labels(self):
+        """Sweden bin-configuration map defaults to country SE and year 2023."""
+        response = self.client.get(reverse("waste-atlas-bin-configuration-sweden-map"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="SE" selected')
@@ -4088,26 +4096,28 @@ class WasteAtlasMapViewsTestCase(TestCase):
             response,
             "Map 30 — Administrative level of waste collection (Sweden, EN)",
         )
-        self.assertContains(response, reverse("waste-atlas-sorting-method-sweden-map"))
+        self.assertContains(
+            response, reverse("waste-atlas-bin-configuration-sweden-map")
+        )
         self.assertContains(
             response,
             "Map 34 — Sorting methods of waste fractions (Sweden, EN)",
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-collection-system-map')}?country=SE&amp;year=2023",
+            f"{reverse("waste-atlas-collection-system-map")}?country=SE&amp;year=2023",
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-connection-rate-map')}?country=SE&amp;year=2023",
+            f"{reverse("waste-atlas-connection-rate-map")}?country=SE&amp;year=2023",
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-biowaste-collection-amount-map')}?country=SE&amp;year=2023",
+            f"{reverse("waste-atlas-biowaste-collection-amount-map")}?country=SE&amp;year=2023",
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-organic-waste-ratio-map')}?country=SE&amp;year=2023",
+            f"{reverse("waste-atlas-organic-waste-ratio-map")}?country=SE&amp;year=2023",
         )
         self.assertContains(response, reverse("waste-atlas-orga-level-denmark-map"))
         self.assertContains(
@@ -4116,23 +4126,23 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-collection-system-map')}?country=DK&amp;year=2023",
+            f"{reverse("waste-atlas-collection-system-map")}?country=DK&amp;year=2023",
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-biowaste-frequency-map')}?country=DK&amp;year=2023",
+            f"{reverse("waste-atlas-biowaste-frequency-map")}?country=DK&amp;year=2023",
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-biowaste-collection-amount-map')}?country=DK&amp;year=2023",
+            f"{reverse("waste-atlas-biowaste-collection-amount-map")}?country=DK&amp;year=2023",
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-organic-collection-amount-map')}?country=DK&amp;year=2023",
+            f"{reverse("waste-atlas-organic-collection-amount-map")}?country=DK&amp;year=2023",
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-organic-waste-ratio-map')}?country=DK&amp;year=2023",
+            f"{reverse("waste-atlas-organic-waste-ratio-map")}?country=DK&amp;year=2023",
         )
         self.assertContains(
             response,
@@ -5183,12 +5193,14 @@ class CollectionCSVRendererTestCase(TestCase):
                 valid_from=date(2020, 1, 1),
                 description="This is a test case.",
             )
-            collection.allowed_materials.set(
-                [cls.allowed_material_1, cls.allowed_material_2]
-            )
-            collection.forbidden_materials.set(
-                [cls.forbidden_material_1, cls.forbidden_material_2]
-            )
+            collection.allowed_materials.set([
+                cls.allowed_material_1,
+                cls.allowed_material_2,
+            ])
+            collection.forbidden_materials.set([
+                cls.forbidden_material_1,
+                cls.forbidden_material_2,
+            ])
             collection.flyers.add(waste_flyer)
 
     def setUp(self):
@@ -5330,12 +5342,14 @@ class CollectionXLSXRendererTestCase(TestCase):
                 frequency=frequency,
                 description="This is a test case.",
             )
-            collection.allowed_materials.set(
-                [cls.allowed_material_1, cls.allowed_material_2]
-            )
-            collection.forbidden_materials.set(
-                [cls.forbidden_material_1, cls.forbidden_material_2]
-            )
+            collection.allowed_materials.set([
+                cls.allowed_material_1,
+                cls.allowed_material_2,
+            ])
+            collection.forbidden_materials.set([
+                cls.forbidden_material_1,
+                cls.forbidden_material_2,
+            ])
             collection.flyers.add(waste_flyer)
 
     def setUp(self):
@@ -6387,28 +6401,28 @@ class CollectionInlineWasteFieldsSaveTestCase(TestCase):
         )
 
 
-class SortingMethodModelTestCase(TestCase):
-    """Unit tests for the SortingMethod model."""
+class BinConfigurationModelTestCase(TestCase):
+    """Unit tests for the BinConfiguration model."""
 
     @classmethod
     def setUpTestData(cls):
         cls.owner = User.objects.create_user(username="sm-test-owner")
 
     def test_str_returns_name(self):
-        method = SortingMethod(name="Separate bins")
+        method = BinConfiguration(name="Separate bins")
         self.assertEqual(str(method), "Separate bins")
 
     def test_create_and_retrieve(self):
-        method = SortingMethod.objects.create(
+        method = BinConfiguration.objects.create(
             name="Optical bag sorting",
             owner=self.owner,
             publication_status="private",
         )
-        retrieved = SortingMethod.objects.get(pk=method.pk)
+        retrieved = BinConfiguration.objects.get(pk=method.pk)
         self.assertEqual(retrieved.name, "Optical bag sorting")
 
     def test_description_optional(self):
-        method = SortingMethod.objects.create(
+        method = BinConfiguration.objects.create(
             name="Two compartments bin",
             owner=self.owner,
             publication_status="private",
@@ -6416,44 +6430,44 @@ class SortingMethodModelTestCase(TestCase):
         self.assertIsNone(method.description)
 
 
-class CollectionSortingMethodFieldTestCase(TestCase):
-    """Tests for Collection.sorting_method FK behaviour."""
+class CollectionBinConfigurationFieldTestCase(TestCase):
+    """Tests for Collection.bin_configuration FK behaviour."""
 
     @classmethod
     def setUpTestData(cls):
         cls.owner = User.objects.create_user(username="col-sm-owner")
         cls.catchment = CollectionCatchment.objects.create(name="SM Field Catchment")
-        cls.sorting_method = SortingMethod.objects.create(
+        cls.bin_configuration = BinConfiguration.objects.create(
             name="Four compartments bin",
             owner=cls.owner,
             publication_status="private",
         )
 
-    def test_collection_stores_sorting_method(self):
+    def test_collection_stores_bin_configuration(self):
         col = Collection.objects.create(
             catchment=self.catchment,
-            sorting_method=self.sorting_method,
+            bin_configuration=self.bin_configuration,
         )
         col.refresh_from_db()
-        self.assertEqual(col.sorting_method_id, self.sorting_method.pk)
+        self.assertEqual(col.bin_configuration_id, self.bin_configuration.pk)
 
-    def test_sorting_method_null_by_default(self):
+    def test_bin_configuration_null_by_default(self):
         col = Collection.objects.create(catchment=self.catchment)
-        self.assertIsNone(col.sorting_method)
+        self.assertIsNone(col.bin_configuration)
 
-    def test_delete_sorting_method_sets_null_on_collection(self):
-        method = SortingMethod.objects.create(
+    def test_delete_bin_configuration_sets_null_on_collection(self):
+        method = BinConfiguration.objects.create(
             name="Temporary method",
             owner=self.owner,
             publication_status="private",
         )
         col = Collection.objects.create(
             catchment=self.catchment,
-            sorting_method=method,
+            bin_configuration=method,
         )
         method.delete()
         col.refresh_from_db()
-        self.assertIsNone(col.sorting_method)
+        self.assertIsNone(col.bin_configuration)
 
 
 class CollectionEstablishedFieldTestCase(TestCase):
@@ -6476,8 +6490,8 @@ class CollectionEstablishedFieldTestCase(TestCase):
         self.assertIsNone(col.established)
 
 
-class CollectionImporterSortingMethodTestCase(TestCase):
-    """Integration tests for sorting_method and established in CollectionImporter."""
+class CollectionImporterBinConfigurationTestCase(TestCase):
+    """Integration tests for bin_configuration and established in CollectionImporter."""
 
     @classmethod
     def setUpTestData(cls):
@@ -6487,7 +6501,7 @@ class CollectionImporterSortingMethodTestCase(TestCase):
             name="Door to door", owner=cls.owner
         )
         cls.waste_category = WasteCategory.objects.create(name="Food waste")
-        cls.sorting_method = SortingMethod.objects.create(
+        cls.bin_configuration = BinConfiguration.objects.create(
             name="Separate bins",
             owner=cls.owner,
             publication_status="private",
@@ -6500,7 +6514,7 @@ class CollectionImporterSortingMethodTestCase(TestCase):
             "catchment_name": self.catchment.name,
             "collection_system": self.collection_system.name,
             "waste_category": self.waste_category.name,
-            "sorting_method": self.sorting_method.name,
+            "bin_configuration": self.bin_configuration.name,
             "established": 2015,
             "valid_from": self.valid_from,
             "valid_until": None,
@@ -6520,8 +6534,8 @@ class CollectionImporterSortingMethodTestCase(TestCase):
         base.update(overrides)
         return base
 
-    def test_import_sets_sorting_method(self):
-        """Importer persists sorting_method on newly created collection."""
+    def test_import_sets_bin_configuration(self):
+        """Importer persists bin_configuration on newly created collection."""
         importer = CollectionImporter(owner=self.owner, publication_status="private")
         stats = importer.run([self._make_record()])
         self.assertEqual(stats["created"], 1)
@@ -6532,7 +6546,7 @@ class CollectionImporterSortingMethodTestCase(TestCase):
             valid_from=self.valid_from,
             collection_system=self.collection_system,
         )
-        self.assertEqual(col.sorting_method, self.sorting_method)
+        self.assertEqual(col.bin_configuration, self.bin_configuration)
         col.delete()
 
     def test_import_sets_established(self):
@@ -6549,17 +6563,19 @@ class CollectionImporterSortingMethodTestCase(TestCase):
         self.assertEqual(col.established, 2015)
         col.delete()
 
-    def test_unknown_sorting_method_adds_warning_and_leaves_field_empty(self):
-        """Unknown sorting_method name produces a warning and does not block import."""
+    def test_unknown_bin_configuration_adds_warning_and_leaves_field_empty(self):
+        """Unknown bin_configuration name produces a warning and does not block import."""
         importer = CollectionImporter(owner=self.owner, publication_status="private")
-        stats = importer.run([self._make_record(sorting_method="Nonexistent Method")])
+        stats = importer.run([
+            self._make_record(bin_configuration="Nonexistent Method")
+        ])
         self.assertEqual(stats["created"], 1)
         self.assertTrue(
             any(
-                "SortingMethod" in w and "Nonexistent Method" in w
+                "BinConfiguration" in w and "Nonexistent Method" in w
                 for w in stats["warnings"]
             ),
-            msg=f"Expected SortingMethod warning, got: {stats['warnings']}",
+            msg=f"Expected BinConfiguration warning, got: {stats["warnings"]}",
         )
 
         col = Collection.objects.get(
@@ -6567,17 +6583,17 @@ class CollectionImporterSortingMethodTestCase(TestCase):
             valid_from=self.valid_from,
             collection_system=self.collection_system,
         )
-        self.assertIsNone(col.sorting_method)
+        self.assertIsNone(col.bin_configuration)
         col.delete()
 
-    def test_empty_sorting_method_skips_resolution_silently(self):
-        """Empty sorting_method string does not produce a warning."""
+    def test_empty_bin_configuration_skips_resolution_silently(self):
+        """Empty bin_configuration string does not produce a warning."""
         importer = CollectionImporter(owner=self.owner, publication_status="private")
-        stats = importer.run([self._make_record(sorting_method="")])
+        stats = importer.run([self._make_record(bin_configuration="")])
         self.assertEqual(stats["created"], 1)
         self.assertFalse(
-            any("SortingMethod" in w for w in stats["warnings"]),
-            msg="Unexpected SortingMethod warning for empty value",
+            any("BinConfiguration" in w for w in stats["warnings"]),
+            msg="Unexpected BinConfiguration warning for empty value",
         )
 
         col = Collection.objects.get(
@@ -6585,26 +6601,26 @@ class CollectionImporterSortingMethodTestCase(TestCase):
             valid_from=self.valid_from,
             collection_system=self.collection_system,
         )
-        self.assertIsNone(col.sorting_method)
+        self.assertIsNone(col.bin_configuration)
         col.delete()
 
-    def test_import_updates_null_sorting_method_on_existing_collection(self):
-        """Re-importing updates sorting_method when it was previously null."""
+    def test_import_updates_null_bin_configuration_on_existing_collection(self):
+        """Re-importing updates bin_configuration when it was previously null."""
         valid_from = date(2021, 3, 1)
 
         importer = CollectionImporter(owner=self.owner, publication_status="private")
-        importer.run([self._make_record(sorting_method="", valid_from=valid_from)])
+        importer.run([self._make_record(bin_configuration="", valid_from=valid_from)])
         col = Collection.objects.get(
             owner=self.owner,
             valid_from=valid_from,
             collection_system=self.collection_system,
         )
-        self.assertIsNone(col.sorting_method)
+        self.assertIsNone(col.bin_configuration)
 
         importer2 = CollectionImporter(owner=self.owner, publication_status="private")
         importer2.run([self._make_record(valid_from=valid_from)])
         col.refresh_from_db()
-        self.assertEqual(col.sorting_method, self.sorting_method)
+        self.assertEqual(col.bin_configuration, self.bin_configuration)
         col.delete()
 
     def test_import_updates_null_established_on_existing_collection(self):

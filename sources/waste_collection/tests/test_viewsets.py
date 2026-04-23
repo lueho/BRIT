@@ -20,6 +20,7 @@ from sources.waste_collection.derived_values import clear_derived_value_config_c
 from sources.waste_collection.importers import CollectionImporter
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
+    BinConfiguration,
     Catchment,
     Collection,
     CollectionCatchment,
@@ -29,7 +30,6 @@ from sources.waste_collection.models import (
     CollectionSystem,
     Collector,
     FeeSystem,
-    SortingMethod,
     WasteCategory,
     WasteFlyer,
 )
@@ -935,7 +935,7 @@ class CollectionMutationApiTestCase(APITestCase):
         cls.collector = Collector.objects.create(name="Agent Collector")
         cls.frequency = CollectionFrequency.objects.create(name="Agent Frequency")
         cls.fee_system = FeeSystem.objects.create(name="Agent Fee")
-        cls.sorting_method = SortingMethod.objects.create(name="Agent Sorting")
+        cls.bin_configuration = BinConfiguration.objects.create(name="Agent Sorting")
         cls.allowed_material = Material.objects.create(
             name="Agent Allowed Material", owner=cls.owner
         )
@@ -969,7 +969,7 @@ class CollectionMutationApiTestCase(APITestCase):
             waste_category=cls.waste_category,
             frequency=cls.frequency,
             fee_system=cls.fee_system,
-            sorting_method=cls.sorting_method,
+            bin_configuration=cls.bin_configuration,
             valid_from=date(2024, 1, 1),
             description="predecessor",
         )
@@ -984,7 +984,7 @@ class CollectionMutationApiTestCase(APITestCase):
             waste_category=cls.waste_category,
             frequency=cls.frequency,
             fee_system=cls.fee_system,
-            sorting_method=cls.sorting_method,
+            bin_configuration=cls.bin_configuration,
             valid_from=date(2024, 6, 1),
             description="private predecessor",
         )
@@ -1049,7 +1049,7 @@ class CollectionMutationApiTestCase(APITestCase):
                 "collector": self.collector.pk,
                 "frequency": self.frequency.pk,
                 "fee_system": self.fee_system.pk,
-                "sorting_method": self.sorting_method.pk,
+                "bin_configuration": self.bin_configuration.pk,
                 "allowed_materials": [self.allowed_material.pk],
                 "forbidden_materials": [self.forbidden_material.pk],
                 "sources": [self.source.pk],
@@ -1619,7 +1619,7 @@ class CollectionMutationApiTestCase(APITestCase):
             waste_category=self.waste_category,
             frequency=self.frequency,
             fee_system=self.fee_system,
-            sorting_method=self.sorting_method,
+            bin_configuration=self.bin_configuration,
             valid_from=date(2024, 7, 1),
             description="own private predecessor",
         )
@@ -1794,10 +1794,10 @@ class GreenWasteCollectionSystemCountViewSetTests(APITestCase):
         self.assertEqual(len(count_by_catchment), 2)
 
 
-class SortingMethodViewSetTests(APITestCase):
-    """Tests for sorting-method atlas endpoint."""
+class BinConfigurationViewSetTests(APITestCase):
+    """Tests for bin-configuration atlas endpoint."""
 
-    endpoint = "/waste_collection/api/waste-atlas/sorting-method/"
+    endpoint = "/waste_collection/api/waste-atlas/bin-configuration/"
 
     @classmethod
     def setUpTestData(cls):
@@ -1827,46 +1827,48 @@ class SortingMethodViewSetTests(APITestCase):
             name="No separate collection"
         )
 
-        cls.separate_bins = SortingMethod.objects.create(name="Separate bins")
-        cls.optical_sorting = SortingMethod.objects.create(name="Optical bag sorting")
+        cls.separate_bins = BinConfiguration.objects.create(name="Separate bins")
+        cls.optical_sorting = BinConfiguration.objects.create(
+            name="Optical bag sorting"
+        )
 
         cls.food_category = WasteCategory.objects.create(name="Food waste")
 
         cls._create_collection(
             catchment=cls.catchment_a,
             collection_system=cls.d2d,
-            sorting_method=cls.separate_bins,
+            bin_configuration=cls.separate_bins,
             year=2023,
         )
         # Lower-priority system must not override the door-to-door sorting method.
         cls._create_collection(
             catchment=cls.catchment_a,
             collection_system=cls.bring_point,
-            sorting_method=cls.optical_sorting,
+            bin_configuration=cls.optical_sorting,
             year=2023,
         )
         cls._create_collection(
             catchment=cls.catchment_b,
             collection_system=cls.no_collection,
-            sorting_method=None,
+            bin_configuration=None,
             year=2023,
         )
         cls._create_collection(
             catchment=cls.catchment_c,
             collection_system=cls.d2d,
-            sorting_method=None,
+            bin_configuration=None,
             year=2023,
         )
         cls._create_collection(
             catchment=cls.catchment_other_country,
             collection_system=cls.d2d,
-            sorting_method=cls.optical_sorting,
+            bin_configuration=cls.optical_sorting,
             year=2023,
         )
         cls._create_collection(
             catchment=cls.catchment_a,
             collection_system=cls.d2d,
-            sorting_method=cls.optical_sorting,
+            bin_configuration=cls.optical_sorting,
             year=2024,
         )
 
@@ -1876,27 +1878,27 @@ class SortingMethodViewSetTests(APITestCase):
         *,
         catchment,
         collection_system,
-        sorting_method,
+        bin_configuration,
         year,
     ):
-        """Create a collection row for sorting-method endpoint tests."""
+        """Create a collection row for bin-configuration endpoint tests."""
         return Collection.objects.create(
             name=f"{catchment.name}-{collection_system.name}-{year}",
             catchment=catchment,
             waste_category=cls.food_category,
             collection_system=collection_system,
-            sorting_method=sorting_method,
+            bin_configuration=bin_configuration,
             valid_from=date(year, 1, 1),
         )
 
-    def test_returns_sorting_method_with_expected_fallbacks(self):
+    def test_returns_bin_configuration_with_expected_fallbacks(self):
         """Endpoint returns primary sorting method, no-collection and no-data fallbacks."""
         response = self.client.get(self.endpoint, {"country": "SE", "year": 2023})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         by_catchment = {
-            row["catchment_id"]: row["sorting_method"] for row in response.data
+            row["catchment_id"]: row["bin_configuration"] for row in response.data
         }
         self.assertEqual(by_catchment[self.catchment_a.id], "Separate bins")
         self.assertEqual(by_catchment[self.catchment_b.id], "No separate collection")

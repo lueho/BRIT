@@ -38,6 +38,7 @@ from sources.waste_collection.models import (
     CONNECTION_TYPE_CHOICES,
     REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
     AggregatedCollectionPropertyValue,
+    BinConfiguration,
     Collection,
     CollectionCountOptions,
     CollectionFrequency,
@@ -46,7 +47,6 @@ from sources.waste_collection.models import (
     CollectionSystem,
     Collector,
     FeeSystem,
-    SortingMethod,
     WasteCategory,
     WasteComponent,
     WasteFlyer,
@@ -99,14 +99,14 @@ class CollectionSystemModalModelForm(ModalModelFormMixin, CollectionSystemModelF
     pass
 
 
-class SortingMethodModelForm(SimpleModelForm):
+class BinConfigurationModelForm(SimpleModelForm):
     class Meta:
-        model = SortingMethod
+        model = BinConfiguration
         fields = ("name", "description")
         help_texts = {"description": MARKDOWN_HELP_TEXT}
 
 
-class SortingMethodModalModelForm(ModalModelFormMixin, SortingMethodModelForm):
+class BinConfigurationModalModelForm(ModalModelFormMixin, BinConfigurationModelForm):
     pass
 
 
@@ -519,7 +519,7 @@ class CollectionModelFormHelper(FormHelper):
             Field("catchment"),
             ForeignkeyField("collector"),
             ForeignkeyField("collection_system"),
-            Field("sorting_method"),
+            Field("bin_configuration"),
             ForeignkeyField("waste_category"),
             Field("connection_type"),
             Field("allowed_materials"),
@@ -671,8 +671,10 @@ class CollectionModelForm(
         label="Reference unit for minimum required specific bin capacity",
         help_text="Defines the unit (person, household, property) for which the required bin capacity applies. Leave blank if not specified.",
     )
-    sorting_method = ModelChoiceField(
-        queryset=SortingMethod.objects.all(), required=False, label="Sorting method"
+    bin_configuration = ModelChoiceField(
+        queryset=BinConfiguration.objects.all(),
+        required=False,
+        label="Bin configuration",
     )
     established = IntegerField(
         required=False,
@@ -688,7 +690,7 @@ class CollectionModelForm(
             "catchment",
             "collector",
             "collection_system",
-            "sorting_method",
+            "bin_configuration",
             "waste_category",
             "connection_type",
             "allowed_materials",
@@ -721,7 +723,7 @@ class CollectionModelForm(
         instance = super().save(commit=False)
         data = self.cleaned_data
         instance.name = (
-            f"{data['catchment']} {data['waste_category']} {data['collection_system']}"
+            f"{data["catchment"]} {data["waste_category"]} {data["collection_system"]}"
         )
         instance.waste_category = data["waste_category"]
         if commit:
@@ -837,8 +839,8 @@ __all__ = [
     "FeeSystemModalModelForm",
     "FeeSystemModelForm",
     "REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES",
-    "SortingMethodModalModelForm",
-    "SortingMethodModelForm",
+    "BinConfigurationModalModelForm",
+    "BinConfigurationModelForm",
     "WasteCategoryModalModelForm",
     "WasteCategoryModelForm",
     "WasteComponentModalModelForm",

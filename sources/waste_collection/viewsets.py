@@ -493,7 +493,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             "collector",
             "frequency",
             "fee_system",
-            "sorting_method",
+            "bin_configuration",
             "established",
             "connection_type",
             "min_bin_size",
@@ -744,12 +744,12 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             unit = importer._units.get(data["unit_name"])
             if prop is None:
                 return Response(
-                    {"detail": f"Property id={data['property_id']} not found."},
+                    {"detail": f"Property id={data["property_id"]} not found."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             if unit is None:
                 return Response(
-                    {"detail": f"Unit '{data['unit_name']}' not found."},
+                    {"detail": f"Unit '{data["unit_name"]}' not found."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -817,13 +817,11 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             detail_url_name="collectionpropertyvalue-detail",
         )
         response_payload.update(cpv_stats)
-        response_payload.update(
-            {
-                "collection_id": target_collection.pk,
-                "anchor_collection_id": anchor_collection.pk,
-                "is_derived": cpv.is_derived,
-            }
-        )
+        response_payload.update({
+            "collection_id": target_collection.pk,
+            "anchor_collection_id": anchor_collection.pk,
+            "is_derived": cpv.is_derived,
+        })
         return Response(response_payload, status=status.HTTP_201_CREATED)
 
     @action(
@@ -863,12 +861,12 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         unit = importer._units.get(data["unit_name"])
         if prop is None:
             return Response(
-                {"detail": f"Property id={data['property_id']} not found."},
+                {"detail": f"Property id={data["property_id"]} not found."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if unit is None:
             return Response(
-                {"detail": f"Unit '{data['unit_name']}' not found."},
+                {"detail": f"Unit '{data["unit_name"]}' not found."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -888,7 +886,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         with transaction.atomic():
             if existing_acpv is None:
                 acpv = AggregatedCollectionPropertyValue.objects.create(
-                    name=f"Aggregated {prop.name} {data['year']}",
+                    name=f"Aggregated {prop.name} {data["year"]}",
                     owner=actor,
                     publication_status="private",
                     property=prop,
@@ -919,13 +917,11 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             submitted,
             detail_url_name="aggregatedcollectionpropertyvalue-detail",
         )
-        response_payload.update(
-            {
-                "created": created,
-                "skipped": not created,
-                "collection_ids": requested_collection_ids,
-            }
-        )
+        response_payload.update({
+            "created": created,
+            "skipped": not created,
+            "collection_ids": requested_collection_ids,
+        })
         return Response(response_payload, status=status.HTTP_201_CREATED)
 
     @action(
@@ -955,7 +951,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 waste_category=data["waste_category"],
                 frequency=data.get("frequency"),
                 fee_system=data.get("fee_system"),
-                sorting_method=data.get("sorting_method"),
+                bin_configuration=data.get("bin_configuration"),
                 established=data.get("established"),
                 valid_from=data["valid_from"],
                 valid_until=data.get("valid_until"),
@@ -1011,7 +1007,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 "waste_category",
                 "frequency",
                 "fee_system",
-                "sorting_method",
+                "bin_configuration",
             )
             .prefetch_related(
                 "allowed_materials",
@@ -1064,7 +1060,9 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 waste_category=waste_category,
                 frequency=data.get("frequency", predecessor.frequency),
                 fee_system=data.get("fee_system", predecessor.fee_system),
-                sorting_method=data.get("sorting_method", predecessor.sorting_method),
+                bin_configuration=data.get(
+                    "bin_configuration", predecessor.bin_configuration
+                ),
                 established=data.get("established", predecessor.established),
                 valid_from=data["valid_from"],
                 valid_until=data.get("valid_until"),
@@ -1293,7 +1291,7 @@ class CollectorViewSet(CachedGeoJSONMixin, viewsets.ReadOnlyModelViewSet):
                 ids_sorted = sorted([str(int(x)) for x in id_list])
             except Exception:
                 ids_sorted = sorted([str(x) for x in id_list])
-            return f"collector_geojson:country:{country}:id:{','.join(ids_sorted)}"
+            return f"collector_geojson:country:{country}:id:{",".join(ids_sorted)}"
 
         return f"collector_geojson:country:{country}"
 

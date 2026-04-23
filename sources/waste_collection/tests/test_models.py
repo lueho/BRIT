@@ -14,6 +14,7 @@ from utils.properties.models import Property, Unit
 
 from ..models import (
     AggregatedCollectionPropertyValue,
+    BinConfiguration,
     Collection,
     CollectionCatchment,
     CollectionCountOptions,
@@ -21,15 +22,14 @@ from ..models import (
     CollectionPropertyValue,
     CollectionSeason,
     CollectionSystem,
-    SortingMethod,
     WasteCategory,
     WasteFlyer,
 )
 from ..utils import ensure_initial_data
 from .test_views import (  # noqa: F401
+    BinConfigurationModelTestCase,
+    CollectionBinConfigurationFieldTestCase,
     CollectionEstablishedFieldTestCase,
-    CollectionSortingMethodFieldTestCase,
-    SortingMethodModelTestCase,
 )
 
 
@@ -45,7 +45,7 @@ class InitialDataTestCase(TestCase):
             frequency__type="Fixed", season=season, standard=52
         )
 
-    def test_default_sorting_methods_exist(self):
+    def test_default_bin_configurations_exist(self):
         ensure_initial_data()
         expected_names = {
             "Separate bins",
@@ -54,7 +54,7 @@ class InitialDataTestCase(TestCase):
             "Two compartments bin",
         }
         existing_names = set(
-            SortingMethod.objects.filter(name__in=expected_names).values_list(
+            BinConfiguration.objects.filter(name__in=expected_names).values_list(
                 "name", flat=True
             )
         )
@@ -433,17 +433,21 @@ class CollectionMaterialMatchingQuerySetTestCase(TestCase):
         cls.collection_allowed_subset.allowed_materials.set([cls.allowed_1])
         cls.collection_allowed_subset.forbidden_materials.set([cls.forbidden_1])
 
-        cls.collection_allowed_superset.allowed_materials.set(
-            [cls.allowed_1, cls.allowed_2, cls.allowed_3]
-        )
-        cls.collection_allowed_superset.forbidden_materials.set(
-            [cls.forbidden_1, cls.forbidden_2]
-        )
+        cls.collection_allowed_superset.allowed_materials.set([
+            cls.allowed_1,
+            cls.allowed_2,
+            cls.allowed_3,
+        ])
+        cls.collection_allowed_superset.forbidden_materials.set([
+            cls.forbidden_1,
+            cls.forbidden_2,
+        ])
 
     def test_match_allowed_materials_requires_exact_set(self):
-        qs = Collection.objects.match_allowed_materials(
-            [self.allowed_2, self.allowed_1]
-        )
+        qs = Collection.objects.match_allowed_materials([
+            self.allowed_2,
+            self.allowed_1,
+        ])
         self.assertIn(self.collection_exact, qs)
         self.assertNotIn(self.collection_allowed_subset, qs)
         self.assertNotIn(self.collection_allowed_superset, qs)

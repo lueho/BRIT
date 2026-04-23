@@ -142,11 +142,11 @@
     <br>
     <a href="{{ object.collection_system.get_absolute_url }}">{{ object.collection_system.name }}</a>
   </p>
-  {% if object.sorting_method %}
+  {% if object.bin_configuration %}
     <p class="card-text">
-      <strong>Sorting method:</strong>
+      <strong>Bin configuration:</strong>
       <br>
-      {{ object.sorting_method.name }}
+      {{ object.bin_configuration.name }}
     </p>
   {% endif %}
   <p class="card-text">

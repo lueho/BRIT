@@ -1,7 +1,7 @@
 {% extends "waste_atlas/choropleth_map.html" %}
 
 {% block atlas_config %}
-<script>
+  <script>
   document.addEventListener('DOMContentLoaded', function () {
     WasteAtlasChoropleth.init({
       svgId:       'atlas-svg',
@@ -10,8 +10,8 @@
       country:     '{{ country }}',
       year:        parseInt('{{ year }}', 10) || 2023,
       title:       'Sorting methods of waste fractions',
-      dataUrl:     '/waste_collection/api/waste-atlas/sorting-method/',
-      dataField:   'sorting_method',
+      dataUrl:     '/waste_collection/api/waste-atlas/bin-configuration/',
+      dataField:   'bin_configuration',
       categories: [
         { value: 'Separate bins', label: 'Separate bins', color: '#4dbf8b' },
         { value: 'Optical bag sorting', label: 'Optical bag sorting', color: '#66a3ff' },
@@ -23,8 +23,8 @@
       noDataColor: '#e0e0e0',
       noDataLabel: 'No data',
       legendTitle: 'Sorting method',
-      fileBase:    'map34_sorting_method_sweden'
+      fileBase:    'map34_bin_configuration_sweden'
     });
   });
-</script>
+  </script>
 {% endblock atlas_config %}
