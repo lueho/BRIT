@@ -362,6 +362,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     )
     collector = serializers.StringRelatedField(label="Collector")
     collection_system = serializers.StringRelatedField(label="Collection System")
+    bin_configuration = serializers.StringRelatedField(label="Bin configuration")
     waste_category = serializers.SerializerMethodField(label="Waste Category")
     allowed_materials = serializers.SerializerMethodField(label="Allowed Materials")
     forbidden_materials = serializers.SerializerMethodField(label="Forbidden Materials")
@@ -401,6 +402,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
             "country",
             "collector",
             "collection_system",
+            "bin_configuration",
             "waste_category",
             "connection_type",
             "allowed_materials",
@@ -410,6 +412,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
             "min_bin_size",
             "required_bin_capacity",
             "required_bin_capacity_reference",
+            "established",
             "comments",
             "flyer_urls",
             "bibliography_sources",

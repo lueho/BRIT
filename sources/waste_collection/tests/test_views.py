@@ -3566,7 +3566,7 @@ class CollectionReviewDetailPropertiesTestCase(TestCase):
         self.assertIn("77", body)
         self.assertIn("ReviewUnit", body)
         self.assertIn("aggregated", body)
-        self.assertIn("Sorting method", body)
+        self.assertIn("Bin configuration", body)
         self.assertIn("Optical sorting", body)
 
 
@@ -4024,7 +4024,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="SE" selected')
         self.assertContains(response, 'value="2023" selected')
-        self.assertContains(response, "Sorting methods of waste fractions")
+        self.assertContains(response, "Bin configuration of waste fractions")
         self.assertContains(response, "Map overview")
         self.assertContains(response, "No data")
 
@@ -4101,7 +4101,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            "Map 34 — Sorting methods of waste fractions (Sweden, EN)",
+            "Map 34 — Bin configuration of waste fractions (Sweden, EN)",
         )
         self.assertContains(
             response,

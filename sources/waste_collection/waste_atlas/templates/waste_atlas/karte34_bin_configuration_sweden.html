@@ -9,7 +9,7 @@
       loadingId:   'loading-overlay',
       country:     '{{ country }}',
       year:        parseInt('{{ year }}', 10) || 2023,
-      title:       'Sorting methods of waste fractions',
+      title:       'Bin configuration of waste fractions',
       dataUrl:     '/waste_collection/api/waste-atlas/bin-configuration/',
       dataField:   'bin_configuration',
       categories: [
@@ -22,7 +22,7 @@
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'No data',
-      legendTitle: 'Sorting method',
+      legendTitle: 'Bin configuration',
       fileBase:    'map34_bin_configuration_sweden'
     });
   });
