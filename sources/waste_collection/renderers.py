@@ -1,3 +1,5 @@
+import re
+
 from utils.file_export.renderers import BaseCSVRenderer, BaseXLSXRenderer
 
 
@@ -10,7 +12,46 @@ def _discover_dynamic_columns(data, static_keys):
             if key not in seen:
                 dynamic.append(key)
                 seen.add(key)
+
+    # Sort year-based columns to ensure chronological order
+    dynamic = _sort_dynamic_columns(dynamic)
     return dynamic
+
+
+def _sort_dynamic_columns(columns):
+    """Sort dynamic columns, grouping year-based columns chronologically.
+
+    Columns like 'population_2020', 'population_2021' should be ordered by year.
+    The corresponding '_unit' columns are kept adjacent to their value columns.
+    """
+    # Pattern to match columns ending with a 4-digit year (and optional _unit suffix)
+    year_pattern = re.compile(r"^(\w+?_)(\d{4})(_unit)?$")
+
+    year_columns = {}  # base -> list of (year, is_unit, original_key)
+    non_year_columns = []
+
+    for col in columns:
+        match = year_pattern.match(col)
+        if match:
+            base = match.group(1)  # e.g., 'population_', 'specific_waste_collected_'
+            year = int(match.group(2))  # e.g., 2020, 2021
+            is_unit = match.group(3) == "_unit"
+            if base not in year_columns:
+                year_columns[base] = []
+            year_columns[base].append((year, is_unit, col))
+        else:
+            non_year_columns.append(col)
+
+    # Sort year-based columns: by base name, then by year, with value before unit
+    sorted_year_columns = []
+    for base in sorted(year_columns.keys()):
+        # Sort by year, then by is_unit (False before True, so value comes before unit)
+        sorted_group = sorted(year_columns[base], key=lambda x: (x[0], x[1]))
+        for _, _, col in sorted_group:
+            sorted_year_columns.append(col)
+
+    # Combine: non-year columns first (preserve original order), then sorted year columns
+    return non_year_columns + sorted_year_columns
 
 
 def _label_for_dynamic_key(key):
