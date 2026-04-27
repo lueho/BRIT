@@ -2597,6 +2597,17 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
             "Use raw composition data for new component observations.",
         )
 
+    def test_update_view_logs_legacy_normalized_composition_usage(self):
+        self.client.force_login(self.owner_user)
+
+        with self.assertLogs("materials.views", level="INFO") as logs:
+            self.client.get(self.get_update_url(self.unpublished_object.pk))
+
+        self.assertIn(
+            "Legacy normalized-composition compatibility editor opened",
+            logs.output[0],
+        )
+
     def test_deleted_forms_are_not_included_in_total_sum_validation(self):
         self.client.force_login(self.owner_user)
         url = self.get_update_url(self.unpublished_object.pk)
@@ -2734,6 +2745,19 @@ class AddComponentViewTestCase(ViewWithPermissionsTestCase):
             "Use raw composition data for new component observations.",
         )
 
+    def test_get_logs_legacy_normalized_composition_usage(self):
+        self.client.force_login(self.member)
+
+        with self.assertLogs("materials.views", level="INFO") as logs:
+            self.client.get(
+                reverse("composition-add-component", kwargs={"pk": self.composition.pk})
+            )
+
+        self.assertIn(
+            "Legacy normalized-composition compatibility share add form opened",
+            logs.output[0],
+        )
+
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(
@@ -2773,6 +2797,23 @@ class AddComponentViewTestCase(ViewWithPermissionsTestCase):
             data,
         )
         self.composition.shares.get(component=self.component)
+
+    def test_post_logs_legacy_normalized_composition_usage(self):
+        self.client.force_login(self.member)
+        data = {"component": self.component.pk}
+
+        with self.assertLogs("materials.views", level="INFO") as logs:
+            self.client.post(
+                reverse(
+                    "composition-add-component", kwargs={"pk": self.composition.pk}
+                ),
+                data,
+            )
+
+        self.assertIn(
+            "Legacy normalized-composition compatibility share created",
+            logs.output[0],
+        )
 
 
 class ComponentOrderUpViewTestCase(ViewWithPermissionsTestCase):

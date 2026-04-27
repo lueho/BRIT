@@ -1,4 +1,5 @@
 import json
+import logging
 from collections import defaultdict
 
 from crispy_forms.helper import FormHelper
@@ -109,6 +110,8 @@ from .serializers import (
     SampleModelSerializer,
     SampleSeriesModelSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class MaterialsExplorerView(TemplateView):
@@ -1418,6 +1421,18 @@ class CompositionUpdateView(UserCreatedObjectUpdateWithInlinesView):
         InlineWeightShare,
     ]
 
+    def get(self, request, *args, **kwargs):
+        response = super().get(request, *args, **kwargs)
+        logger.info(
+            "Legacy normalized-composition compatibility editor opened",
+            extra={
+                "composition_id": self.object.pk,
+                "sample_id": self.object.sample_id,
+                "user_id": request.user.pk,
+            },
+        )
+        return response
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         inline_helper = WeightShareUpdateFormSetHelper()
@@ -1457,6 +1472,18 @@ class AddComponentView(
     template_name = "modal_form.html"
     permission_required = "materials.add_weightshare"
 
+    def get(self, request, *args, **kwargs):
+        response = super().get(request, *args, **kwargs)
+        logger.info(
+            "Legacy normalized-composition compatibility share add form opened",
+            extra={
+                "composition_id": self.object.pk,
+                "sample_id": self.object.sample_id,
+                "user_id": request.user.pk,
+            },
+        )
+        return response
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(
@@ -1468,7 +1495,18 @@ class AddComponentView(
         return context
 
     def form_valid(self, form):
-        self.get_object().add_component(form.cleaned_data["component"])
+        composition = self.get_object()
+        component = form.cleaned_data["component"]
+        composition.add_component(component)
+        logger.info(
+            "Legacy normalized-composition compatibility share created",
+            extra={
+                "composition_id": composition.pk,
+                "sample_id": composition.sample_id,
+                "component_id": component.pk,
+                "user_id": self.request.user.pk,
+            },
+        )
         return HttpResponseRedirect(self.get_success_url())
 
 

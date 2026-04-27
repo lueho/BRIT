@@ -607,6 +607,7 @@ If work should continue now, the best next implementation slice is Phase 5 prepa
 
 1. decide whether compatibility-only serializers such as persisted doughnut/chart helpers should stay documented as legacy adapters or be retired once callers are gone
 2. add deprecation or usage telemetry around legacy normalized-composition write views before any destructive cleanup is planned
+   - started by adding usage logs when users open or submit the saved normalized-composition compatibility editor/add-share flow
 3. plan a backfill/import strategy so new component observations consistently enter through `ComponentMeasurement`
 4. only after that evidence exists, consider retiring or narrowing persisted `WeightShare` compatibility storage
 
