@@ -288,7 +288,21 @@ class WeightShareAPISerializer(ModelSerializer):
 class CompositionAPISerializer(ModelSerializer):
     group = StringRelatedField()
     fractions_of = StringRelatedField()
-    shares = WeightShareAPISerializer(many=True)
+    shares = SerializerMethodField()
+
+    def get_shares(self, obj):
+        for composition in get_sample_normalized_compositions(obj.sample):
+            if composition.get("settings_pk") != obj.pk:
+                continue
+            return [
+                {
+                    "component": share["component_name"],
+                    "average": share["average"],
+                    "standard_deviation": share["standard_deviation"],
+                }
+                for share in composition["shares"]
+            ]
+        return []
 
     class Meta:
         model = Composition

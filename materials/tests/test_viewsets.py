@@ -1,9 +1,21 @@
+from decimal import Decimal
+
 from django.urls import reverse
 from django.urls.exceptions import NoReverseMatch
 
+from utils.properties.models import Unit
 from utils.tests.testcases import ViewSetWithPermissionsTestCase
 
-from ..models import Composition, Material, MaterialComponentGroup, Sample, SampleSeries
+from ..models import (
+    ComponentMeasurement,
+    Composition,
+    Material,
+    MaterialComponent,
+    MaterialComponentGroup,
+    Sample,
+    SampleSeries,
+    WeightShare,
+)
 from ..serializers import (
     CompositionAPISerializer,
     MaterialAPISerializer,
@@ -285,6 +297,54 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         serializer = CompositionAPISerializer(self.composition)
         self.assertEqual(response.data, serializer.data)
+
+    def test_get_detail_uses_raw_derived_normalized_shares(self):
+        percent_unit = Unit.objects.filter(name="%").first()
+        if percent_unit is None:
+            percent_unit = Unit.objects.create(name="%", symbol="percent")
+        carbon = MaterialComponent.objects.create(name="Carbon")
+        nitrogen = MaterialComponent.objects.create(name="Nitrogen")
+        WeightShare.objects.create(
+            component=carbon,
+            composition=self.composition,
+            average=Decimal("0.9"),
+            standard_deviation=Decimal("0.1"),
+        )
+        ComponentMeasurement.objects.create(
+            sample=self.sample,
+            group=self.group,
+            component=carbon,
+            unit=percent_unit,
+            average=Decimal("40"),
+        )
+        ComponentMeasurement.objects.create(
+            sample=self.sample,
+            group=self.group,
+            component=nitrogen,
+            unit=percent_unit,
+            average=Decimal("60"),
+        )
+
+        self.client.force_login(self.outsider)
+        response = self.client.get(
+            reverse("api-composition-detail", kwargs={"pk": self.composition.pk})
+        )
+
+        self.assertEqual(
+            response.data["shares"],
+            [
+                {
+                    "component": "Nitrogen",
+                    "average": 0.6,
+                    "standard_deviation": None,
+                },
+                {
+                    "component": "Carbon",
+                    "average": 0.4,
+                    "standard_deviation": None,
+                },
+            ],
+        )
 
     def test_no_reverse_match_for_create_link(self):
         with self.assertRaises(NoReverseMatch):
