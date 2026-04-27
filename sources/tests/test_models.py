@@ -1,10 +1,14 @@
 import importlib
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 from django.apps import apps
 from django.test import SimpleTestCase
 
-from sources.contracts import SourceDomainExport
+from sources.contracts import (
+    SourceDomainDatasetRuntimeCompatibility,
+    SourceDomainExport,
+)
 from sources.greenhouses.models import (
     Culture,
     Greenhouse,
@@ -16,6 +20,8 @@ from sources.greenhouses.models import (
 from sources.registry import (
     _validate_source_domain_plugin,
     _validate_source_domain_plugins,
+    get_source_domain_dataset_runtime_compatibilities,
+    get_source_domain_dataset_runtime_compatibility,
     get_source_domain_plugin,
     get_source_domain_plugins,
 )
@@ -40,6 +46,41 @@ class SourceDomainPluginContractTestCase(SimpleTestCase):
                 "waste_collection",
             ),
         )
+
+    def test_dataset_runtime_compatibilities_are_collected_from_all_plugins(self):
+        roadside_tree_compatibility = SourceDomainDatasetRuntimeCompatibility(
+            runtime_model_name="HamburgRoadsideTrees",
+            model="sources.roadside_trees.models.HamburgRoadsideTrees",
+            filterset_class=(
+                "sources.roadside_trees.filters.HamburgRoadsideTreesFilterSet"
+            ),
+            template_name="hamburg_roadside_trees_map.html",
+            features_api_basename="api-hamburg-roadside-trees",
+            apply_user_visibility_filter=False,
+        )
+        greenhouses = get_source_domain_plugin("greenhouses")
+        roadside_trees = replace(
+            get_source_domain_plugin("roadside_trees"),
+            dataset_runtime_compatibilities=(roadside_tree_compatibility,),
+        )
+
+        with patch(
+            "sources.registry._SOURCE_DOMAIN_PLUGINS",
+            (greenhouses, roadside_trees),
+        ):
+            self.assertEqual(
+                tuple(
+                    compatibility.runtime_model_name
+                    for compatibility in (
+                        get_source_domain_dataset_runtime_compatibilities()
+                    )
+                ),
+                ("HamburgRoadsideTrees", "NantesGreenhouses"),
+            )
+            self.assertIs(
+                get_source_domain_dataset_runtime_compatibility("HamburgRoadsideTrees"),
+                roadside_tree_compatibility,
+            )
 
     def test_registered_source_domain_plugins_can_resolve_app_modules(self):
         self.assertEqual(
@@ -186,6 +227,28 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             ValueError, "Duplicate source-domain public mount_path"
         ):
             _validate_source_domain_plugins((greenhouses, waste_collection))
+
+    def test_validation_rejects_duplicate_dataset_runtime_model_names(self):
+        compatibility = SourceDomainDatasetRuntimeCompatibility(
+            runtime_model_name="DuplicateRuntimeModel",
+            model="sources.greenhouses.models.NantesGreenhouses",
+            filterset_class="sources.greenhouses.filters.NantesGreenhousesFilterSet",
+            template_name="greenhouses/nantes_greenhouses_map.html",
+            features_api_basename="api-nantes-greenhouses",
+        )
+        greenhouses = replace(
+            get_source_domain_plugin("greenhouses"),
+            dataset_runtime_compatibilities=(compatibility,),
+        )
+        roadside_trees = replace(
+            get_source_domain_plugin("roadside_trees"),
+            dataset_runtime_compatibilities=(compatibility,),
+        )
+
+        with self.assertRaisesMessage(
+            ValueError, "Duplicate source-domain dataset runtime compatibility"
+        ):
+            _validate_source_domain_plugins((greenhouses, roadside_trees))
 
     def test_validation_rejects_invalid_map_mount_metadata(self):
         plugin = get_source_domain_plugin("greenhouses")
