@@ -1,6 +1,6 @@
 # Dataset Registry and Federated Geodata Target-State Plan
 
-- **Status**: Active roadmap; Phase 0 complete, Phase 1 Task 1.1 complete, Task 1.2 in progress
+- **Status**: Active roadmap; Phase 0 complete, Phase 1 Task 1.1 complete, Task 1.2 in progress with the dataset-scoped detail and map routes landed
 - **Date**: 2026-04-16
 - **Scope**: `maps` dataset onboarding, standalone exploration, long-term federation of external geospatial data sources, and domain-level harmonized integration across incompatible datasets
 
@@ -49,15 +49,43 @@ This direction is already visible in the codebase, but only partially:
 - `maps.GeoDataset` already exists as user-managed metadata
 - `maps/README.md` now documents the current as-is `GeoDataset` workflow and points future registry work back to this roadmap
 - the `maps` list/gallery UX already treats `GeoDataset` as a primary user-facing object
-- the implementation still centers on `model_name` and hardcoded `GIS_SOURCE_MODELS`
-- the documented metadata fields for table/geometry/display/filter configuration are not yet reflected as the authoritative runtime path in the current `GeoDataset` model
-- the current generic dataset path is therefore more a design direction than a completed architecture
+- Phase 1 has introduced normalized runtime metadata via `GeoDatasetRuntimeConfiguration` and `GeoDatasetColumnPolicy`
+- dataset-scoped detail and map routes now exist, including `/maps/geodatasets/<pk>/map/`
+- the implementation still partly depends on `model_name`, compatibility runtime-model mappings, and hardcoded feature API basenames
+- the table/view-backed adapter path is not yet the authoritative runtime path for ordinary new datasets
+- the current generic dataset path is therefore an active migration path rather than a completed architecture
 
 There is an even higher-level product goal above dataset registration and harmonization: the resulting data should ultimately become jointly usable in the inventory app. That is the point where the overall workflow is completed.
 
 So this roadmap is not only about making datasets visible in `maps`. It is also about making them dependable downstream building blocks for cross-domain inventory evaluation.
 
 This document turns that direction into a concrete target-state roadmap.
+
+## Critical Review Refinements
+
+This roadmap is directionally sound, but the target state needs several guardrails so implementation does not turn into an over-broad geospatial platform.
+
+- **Do not conflate the registry with ingestion**
+  - The registry should expose, govern, and describe datasets.
+  - Importers, source connectors, and harmonization pipelines may create or refresh backing relations, but they should converge on the registry contract rather than becoming part of the baseline map/table runtime.
+
+- **Separate dataset identity, runtime binding, and version binding**
+  - `GeoDataset` should remain the stable user-facing identity.
+  - Runtime binding should describe where the current rows come from and how to query them.
+  - Version binding should describe whether the current runtime points at a moving relation or an immutable snapshot.
+  - The current one-to-one `GeoDatasetRuntimeConfiguration` is a valid Phase 1 stepping stone, but it should not become the final versioning model if BRIT needs multiple snapshots or runtime modes for the same logical dataset.
+
+- **Treat arbitrary SQL access as a privileged backend concern, not a UI feature**
+  - Generic exploration should never mean users can provide arbitrary SQL, join arbitrary tables, or request arbitrary derived expressions.
+  - The registry may point to approved tables, views, materialized views, or foreign tables, but those relations must be prepared and reviewed by trusted operators before publication.
+
+- **Keep the first production pilot intentionally boring**
+  - The first proof should be one local PostGIS table or view with a geometry column, scalar display fields, a primary key, and a small allowlisted filter set.
+  - Federation, refresh orchestration, harmonization, and inventory pinning should remain follow-up capabilities until this baseline is stable.
+
+- **Make deprecation measurable**
+  - `model_name` and hardcoded map routes should not merely be described as compatibility-only.
+  - Each compatibility path should eventually have an owner, a replacement path, a test proving the replacement, and a removal condition.
 
 ## 2. Target State to Reach
 
@@ -457,31 +485,36 @@ At that point, `maps` is no longer only a viewing surface. It becomes the govern
 
 - **User-facing dataset object exists**
   - `maps.GeoDataset` already exists and is treated as a first-class object in list/gallery views
+- **Runtime metadata is now normalized in the model layer**
+  - `GeoDatasetRuntimeConfiguration` stores backend/relation metadata for the current Phase 1 runtime path
+  - `GeoDatasetColumnPolicy` stores per-column exposure flags instead of relying only on parallel text allowlists
+- **Dataset-scoped navigation has started**
+  - dataset detail and map routes now resolve by dataset identity, including `geodataset-detail` and `geodataset-map`
 - **Maps UX already exposes datasets as a primary concept**
   - `maps_list`, `geodataset-gallery`, and owned list/gallery routes already exist
 - **Admin registration exists in early form**
   - `GeoDataset` is manageable in admin
-- **The codebase already documents a generic goal**
-  - `maps/README.md` describes a no-code onboarding workflow via `GeoDataset`
+- **The codebase documents the current boundary honestly**
+  - `maps/README.md` now describes current as-is behavior and points future registry work back to this roadmap
 - **Plugin-aware route composition exists elsewhere in the repo**
   - the `sources.registry` pattern shows BRIT can already move toward metadata/plugin contracts instead of hardcoded monolith coupling
 
 ### 5.2 Not yet aligned with the direction
 
-- **Hardcoded dataset identity still dominates runtime behavior**
-  - `GeoDataset.model_name` and `GIS_SOURCE_MODELS` still act as the main dataset selector
-- **The documented table-introspection metadata is not yet the authoritative implementation path**
-  - README describes table name / geometry field / display fields / filter fields, but the current model excerpt does not yet expose that as the completed runtime contract
-- **Generic filtered map routing is incomplete**
-  - generic filtered map classes exist, but the active flow still points heavily at model-bound behavior
-- **No clear backend abstraction exists yet**
-  - local Django models, raw tables, views, and foreign tables are not represented through one unified adapter contract
+- **Compatibility model lookup still participates in runtime behavior**
+  - `GeoDataset.model_name`, runtime-model compatibility mappings, and hardcoded feature API basenames still support existing map behavior
+- **The table/view-backed adapter path is not yet authoritative**
+  - runtime metadata exists, but ordinary local PostGIS tables or views are not yet fully introspected, queried, filtered, and serialized through one generic adapter
+- **The generic route family is incomplete**
+  - dataset-scoped detail and map routes exist, but the table/detail/feature drill-down path and map feature API still need to become fully dataset-backed
+- **The backend abstraction is not yet implemented as a reusable adapter layer**
+  - local Django models, raw tables, views, materialized views, and foreign tables are not yet represented through one unified runtime contract
 - **No federated-source governance layer exists yet**
   - there is not yet a first-class model for external connections, foreign servers, refresh policy, or query safety
 - **Versioning/freshness semantics are not yet standardized across generic datasets**
   - datasets do not yet uniformly express snapshot/live/cached behavior
 - **No first-class contract yet exists for domain-integrated views and coverage maps**
-  - the current direction documents harmonization ideas, but the registry roadmap did not yet explicitly define how source-domain apps own same-domain integration or how integrated coverage should be surfaced to users
+  - this roadmap now defines the target boundary, but there is not yet an implemented model/API contract for source-domain apps to publish integrated coverage status through the registry
 
 ## 6. Gap Summary
 
@@ -523,6 +556,13 @@ Recommended conceptual split:
   - last introspected timestamp
 
 The exact model names can change, but the separation of concerns should remain.
+
+The Phase 1 implementation has already started this split with `GeoDatasetRuntimeConfiguration` and `GeoDatasetColumnPolicy`. Treat those models as the current stepping stone, not as a frozen final schema:
+
+- `GeoDatasetRuntimeConfiguration` is acceptable while one dataset has one active runtime binding
+- `GeoDatasetColumnPolicy` is the right direction for exposure policy, but it should grow from introspection snapshots and explicit review rather than from free-form field lists alone
+- later versioning work should not overload the runtime configuration model with import-run or snapshot history
+- if a logical dataset eventually needs multiple runtime bindings, for example current live, cached materialized, and archived snapshot, introduce a version/runtime-binding layer rather than duplicating top-level `GeoDataset` identities
 
 ### 7.2 Introduce a small dataset adapter contract
 
@@ -566,6 +606,19 @@ Connector/ingestion modes that the architecture should remain open to include:
 - scheduled imports from Excel, CSV, GeoJSON, or similar source files
 
 Not every connector needs the same implementation style. Some may materialize into local tables, while others may remain live or semi-live. What matters is that they converge on the same registry contract once inside BRIT.
+
+The first runtime adapter should deliberately support fewer capabilities than the final contract:
+
+- local PostgreSQL relation or view only
+- one geometry column
+- one stable primary-key column
+- scalar fields only for table/detail display
+- simple allowlisted filters only
+- no arbitrary joins
+- no user-provided SQL
+- no computed expressions except those already materialized in a trusted view
+
+This narrower adapter is enough to prove the registry architecture while preserving a safe path to later federation.
 
 ### 7.3 Add an import-run and dataset-version contract
 
@@ -624,6 +677,16 @@ The registry should store, per dataset:
 
 This keeps introspection safe and reviewable.
 
+The operational workflow should be:
+
+- introspection discovers available columns and stores a snapshot
+- all discovered columns default to non-visible and non-exportable unless a trusted migration or admin action explicitly marks them otherwise
+- staff review promotes selected columns into `GeoDatasetColumnPolicy`
+- publication should fail or warn if the approved column policy references columns that no longer exist
+- drift detection should be able to compare the current relation against the last reviewed schema snapshot
+
+This avoids treating introspection as publication.
+
 ### 7.6 Treat live federation and immutable snapshots as different products
 
 BRIT should explicitly distinguish:
@@ -638,6 +701,8 @@ BRIT should explicitly distinguish:
   - frozen version for inventory reproducibility and publication
 
 The same logical dataset may expose more than one operational mode over time.
+
+This distinction should be visible in both UI and machine-readable metadata. A dataset used for inventory evaluation should never silently switch from immutable snapshot semantics to live federation semantics simply because the backing relation changed.
 
 ### 7.7 Preserve domain-specific harmonization as an overlay
 
@@ -887,32 +952,33 @@ Deliverables:
   - Legacy fields may remain visible where needed for existing rows, but they should be treated as migration-era compatibility inputs rather than the preferred setup path.
   - Phase 1 should favor explicit staff-editable metadata over hidden conventions or route-name inference.
 
-### Phase 0 baseline audit snapshot
+### Phase 0 baseline audit snapshot at phase start
 
-- **Current `GeoDataset` model contract is still model-bound**
-  - `maps/models.py` currently defines `GeoDataset` with `preview`, `publish`, `region`, `model_name`, `sources`, `data_content_type`, `data_object_id`, and `map_configuration`.
-  - `GeoDataset.get_absolute_url()` still resolves by `return reverse(f"{self.model_name}")`, so dataset navigation is still coupled directly to stored route/model identifiers rather than dataset identity.
-  - `GIS_SOURCE_MODELS` remains a hardcoded tuple containing values such as `HamburgRoadsideTrees`, `NantesGreenhouses`, `NutsRegion`, and `WasteCollection`.
+This snapshot records the code state that motivated the roadmap. Some entries have already moved forward during Phase 1; keep the snapshot as historical baseline evidence, and use the Phase 1 status checkpoint for current progress.
 
-- **Current create, filter, and admin surfaces still expose `model_name` as a first-class choice**
-  - `maps/forms.py` still defines `GeoDataSetModelForm.Meta.fields = ("name", "publish", "model_name", "sources", "description")`.
-  - `maps/filters.py` still exposes `model_name = ChoiceFilter(choices=GIS_SOURCE_MODELS, label="Dataset type")` in `GeoDataSetFilterSet`.
-  - `maps/admin.py` currently registers `GeoDataset` with only minimal admin customization (`autocomplete_fields = ["region"]`), which is far below the metadata review surface described by the target architecture.
+- **Initial `GeoDataset` model contract was still model-bound**
+  - `maps/models.py` defined `GeoDataset` with `preview`, `publish`, `region`, `model_name`, `sources`, `data_content_type`, `data_object_id`, and `map_configuration`.
+  - `GeoDataset.get_absolute_url()` resolved via `model_name`, so dataset navigation was coupled directly to stored route/model identifiers rather than dataset identity.
+  - `GIS_SOURCE_MODELS` was a hardcoded tuple containing values such as `HamburgRoadsideTrees`, `NantesGreenhouses`, `NutsRegion`, and `WasteCollection`.
 
-- **Current runtime map lookup is not dataset-scoped yet**
-  - `maps/views.py` still implements `FilteredMapMixin.get_dataset()` as `GeoDataset.objects.get(model_name=self.model_name)` and contains an explicit TODO indicating that lookup should move to `pk`.
-  - The generic-looking `GeoDataSetPublishedFilteredMapView`, `GeoDataSetReviewFilteredMapView`, and `GeoDataSetPrivateFilteredMapView` therefore still depend on a model-bound selector rather than a dataset-bound runtime contract.
-  - `maps/urls.py` currently provides list, gallery, create, update, delete, and autocomplete routes for `GeoDataset`, but it does not provide the dataset-scoped generic runtime route promised by the README (`/maps/geodatasets/<pk>/map/`).
+- **Initial create, filter, and admin surfaces still exposed `model_name` as a first-class choice**
+  - `maps/forms.py` exposed `model_name` in `GeoDataSetModelForm`.
+  - `maps/filters.py` exposed `model_name = ChoiceFilter(choices=GIS_SOURCE_MODELS, label="Dataset type")` in `GeoDataSetFilterSet`.
+  - `maps/admin.py` registered `GeoDataset` with only minimal admin customization, which was far below the metadata review surface described by the target architecture.
+
+- **Initial runtime map lookup was not dataset-scoped yet**
+  - `maps/views.py` implemented `FilteredMapMixin.get_dataset()` as `GeoDataset.objects.get(model_name=self.model_name)` and contained an explicit TODO indicating that lookup should move to `pk`.
+  - The generic-looking `GeoDataSetPublishedFilteredMapView`, `GeoDataSetReviewFilteredMapView`, and `GeoDataSetPrivateFilteredMapView` therefore depended on a model-bound selector rather than a dataset-bound runtime contract.
+  - `maps/urls.py` provided list, gallery, create, update, delete, and autocomplete routes for `GeoDataset`, but did not yet provide the dataset-scoped generic runtime route promised by the then-current README.
 
 - **Hardcoded compatibility map routes are still part of the active public surface**
   - `maps/urls.py` still defines `path("nutsregions/map/", NutsRegionPublishedMapView.as_view(), name="NutsRegion")`.
   - The same URL file also mounts additional source-domain map URLs through `sources.registry`, which means the compatibility surface is a combination of core hardcoded routes and plugin-provided routes rather than one registry-driven dataset routing scheme.
   - Existing tests still validate this model-bound behavior, for example `maps/tests/test_views.py` asserts `reverse("NutsRegion")` and constructs test datasets with `model_name="NutsRegion"`.
 
-- **The README currently over-promises relative to production code**
-  - `maps/README.md` states that a user can register a dataset using fields such as table name, geometry field, display fields, and filter fields.
-  - It also states that the feature is governed by `ENABLE_GENERIC_DATASET` and that the resulting runtime map view is available at `/maps/geodatasets/<pk>/map/`.
-  - Those fields and routes are not the authoritative runtime path in the current implementation, so the README currently documents an intended architecture rather than fully delivered behavior.
+- **The README initially over-promised relative to production code**
+  - Earlier README text stated that a user could register a dataset using fields such as table name, geometry field, display fields, and filter fields before that path was authoritative.
+  - The README has since been narrowed to document current implemented behavior only, while this roadmap remains the future-state source.
 
 - **Downstream inventory code already depends on `GeoDataset` as a stable selection object**
   - `inventories/models.py` uses `GeoDataset` foreign keys in both `InventoryAlgorithm` and `ScenarioInventoryConfiguration`.
@@ -1027,6 +1093,8 @@ Deliverables:
 - **Task 1.4 - Implement the first generic local backend/query path**
   - Deliver one backend path for local PostGIS tables or views that supports schema introspection, safe filtering derived from normalized dataset-column policy, geometry access, pagination, and single-feature lookup.
   - This first slice should validate the registry runtime without yet taking on federation, advanced import orchestration, or harmonization logic.
+  - The pilot should use a deliberately simple relation or view with one geometry column, one primary key, scalar visible fields, and a small allowlisted filter set.
+  - Any richer provider data should be prepared into a trusted view before registration rather than making the generic runtime support joins or user-defined expressions.
   - Primary file targets:
     - `maps/views.py`
     - `maps/viewsets.py`
@@ -1052,6 +1120,7 @@ Deliverables:
 - **Task 1.7 - Keep inventory coupling stable for now, but document the next boundary**
   - Continue letting inventories reference `GeoDataset` during the first local-registry slice, but document clearly that version-pinning and current-version selection are later-phase concerns.
   - The Phase 1 goal is to avoid breaking downstream dataset references while still moving the registry toward stable dataset identity.
+  - Do not make inventories depend on `GeoDatasetRuntimeConfiguration` directly; inventories should keep selecting the logical dataset until the version/current binding contract is introduced.
   - Primary file targets:
     - `inventories/models.py`
     - `inventories/views.py`
@@ -1061,6 +1130,7 @@ Deliverables:
 - **Task 1.8 - Add regression tests and one real pilot dataset demonstration**
   - Add tests that prove the new dataset path works end-to-end for a local PostGIS relation without relying on `model_name` lookup, and that field exposure obeys normalized per-column policy records.
   - The phase should end with one real pilot example that demonstrates the architecture rather than only a model refactor.
+  - Include negative tests for unexposed columns, missing runtime metadata, missing geometry column, and invalid primary-key configuration so the first adapter fails safely.
   - Primary file targets:
     - `maps/tests/test_views.py`
     - `maps/tests/test_filters.py`
@@ -1071,12 +1141,18 @@ Deliverables:
 - **Task 1.1 is complete**
   - `GeoDataset` now stores runtime metadata through normalized subordinate models rather than flat runtime fields or JSON-style allowlists.
   - `GeoDatasetRuntimeConfiguration` now holds backend and relation metadata, while `GeoDatasetColumnPolicy` stores one row per exposed dataset column.
-  - `maps/forms.py`, `maps/admin.py`, `maps/views.py`, and the pending `maps/migrations/0012_geodataset_runtime_metadata.py` have been updated to use that normalized contract.
+  - `maps/forms.py`, `maps/admin.py`, `maps/views.py`, and the runtime-metadata migration have been updated to use that normalized contract.
   - Focused Dockerized validation passed for `maps.tests.test_models`, `maps.tests.test_views`, `maps.tests.test_forms`, and `maps.tests.test_filters` using `brit.settings.testrunner`.
 
+- **Task 1.2 is partially complete**
+  - Dataset-scoped detail and map routes now exist, including `geodataset-detail` and `geodataset-map`.
+  - `GeoDataset.get_absolute_url()` and `GeoDataset.get_map_url()` now prefer dataset identity where the route is available.
+  - The current map route still resolves through compatibility runtime-model mappings and feature API basenames, so this is not yet the final generic table/view-backed runtime path.
+
 - **Current next step**
-  - Finish Task 1.2 by adding the dataset-scoped runtime route family beyond the already-landed canonical dataset detail route.
-  - Use that route family to continue Task 1.3 by proving map views can resolve at least one dataset by stable dataset identity rather than by a hardcoded route name.
+  - Finish the remaining Task 1.2 route family by adding the generic table and feature-detail surfaces or explicitly scoping them out of Phase 1 if the first production slice only needs map browsing.
+  - Continue Task 1.3 and Task 1.4 by replacing compatibility runtime-model resolution with one real local relation/view-backed adapter.
+  - Prove the path with a boring pilot dataset before expanding to federation, versioning, or domain harmonization.
 
 Success criteria:
 
@@ -1091,19 +1167,26 @@ Goal: make dynamic exploration safe enough for broad internal use.
 Deliverables:
 
 - column allowlist and geometry allowlist enforcement
+- safe publication checks that prevent exposing a dataset whose approved policy references missing or changed columns
 - dataset-level health check in admin
 - clear validation errors for missing relation, missing geometry field, invalid PK, unsupported types
 - audit-friendly metadata showing who changed exposure settings and when
+- schema drift status comparing the current relation to the last reviewed introspection snapshot
 - performance safeguards:
   - max page size
   - bounded filter operators
+  - bounded ordering and search fields
   - optional extent/count caching
+- database operational safeguards:
+  - expected indexes documented for primary key, geometry, and common filters
+  - query timeouts or defensive limits for dynamic endpoints
 - clear public/private/review behavior aligned with existing `UserCreatedObject` policy patterns where applicable
 
 Success criteria:
 
 - dynamic datasets fail safely and explain why
 - sensitive/internal columns cannot leak through introspection alone
+- publication cannot silently expose columns that were only discovered but never reviewed
 - large datasets remain usable without accidental full-table scans in common views
 
 ## Phase 3 - Introduce federated database backends
@@ -1317,19 +1400,27 @@ Mitigation direction:
 - allow continuously refreshed operational datasets to keep only selected snapshots where full retention is not justified
 - let high-value downstream workflows pin required versions before retention cleanup
 
-### 10.7 Open design question: model placement
+### 10.7 Future extraction question: cross-cutting data-access layer
 
-The current name `GeoDataset` is probably still appropriate for the user-facing registry object, but the backend/configuration models may need to live either in `maps` or in a more cross-cutting data-access module. The roadmap does not require that answer immediately, but Phase 0 should settle the boundary.
+Phase 0 settled that the first registry implementation should stay in `maps` because `GeoDataset`, map configuration, and the current UX already live there.
+
+The remaining question is whether a later phase should extract backend/runtime adapter infrastructure into a more cross-cutting data-access layer after the local registry path is proven.
+
+Mitigation direction:
+
+- keep `GeoDataset` as the stable user-facing object during Phase 1
+- avoid leaking `maps` implementation details into inventories or source-domain apps
+- revisit extraction only after there is at least one production-quality generic local backend and one clear non-maps consumer pressure
 
 ## 11. Recommended Next Slice
 
 The next practical implementation slice should be narrow and reality-based:
 
-- make the current `GeoDataset` contract honest
-- choose the authoritative metadata fields for local table-backed datasets
-- decouple URL/view lookup from `model_name`
-- deliver one real end-to-end example where a manually created PostGIS table is registered and explored without code changes
-- choose the first concrete versioning pattern for imported external datasets, with annual roadside-tree releases as the reference case
-- define the pilot domain contract for a first harmonized integrated view, with `roadside_trees` as the most natural candidate
+- finish the dataset-scoped route family for the first production slice, especially table and feature-detail surfaces if they remain in Phase 1 scope
+- implement one local relation/view-backed runtime adapter that does not depend on `model_name` compatibility mappings
+- add safe introspection with non-exposed defaults and explicit `GeoDatasetColumnPolicy` promotion
+- deliver one real end-to-end pilot where a deliberately simple PostGIS table or trusted view is registered and explored without code changes
+- add negative tests for missing runtime metadata, invalid geometry/primary-key configuration, and unexposed-column access
+- defer versioning, federation, and harmonized `roadside_trees` integration until the local adapter path is proven
 
 That slice is small enough to validate the architecture and large enough to prove the core promise.
