@@ -6,6 +6,12 @@ from utils.properties.units import UnitConversionError
 
 from .models import MaterialComponent
 
+WARNING_MULTIPLE_BASIS_COMPONENTS = "multiple_basis_components"
+WARNING_RAW_MEASUREMENTS_OMITTED = "raw_measurements_omitted"
+WARNING_REMAINING_FRACTION_ASSIGNED_TO_OTHER = "remaining_fraction_assigned_to_other"
+WARNING_RAW_PERSISTED_MISMATCH = "raw_persisted_mismatch"
+WARNING_RAW_UNNORMALIZABLE_FALLBACK = "raw_unnormalizable_fallback"
+
 
 def get_sample_composition_settings_by_group(sample):
     composition_settings_by_group = {}
@@ -115,6 +121,7 @@ def get_sample_normalized_compositions(
                 raw_composition["warnings"].append(
                     "Raw measurements differ from the saved normalized composition for this group."
                 )
+                raw_composition["warning_codes"].append(WARNING_RAW_PERSISTED_MISMATCH)
                 raw_composition["warning_count"] = len(raw_composition["warnings"])
             compositions.append(raw_composition)
             continue
@@ -127,6 +134,9 @@ def get_sample_normalized_compositions(
             if group_measurements:
                 fallback_composition["warnings"].append(
                     "Raw measurements exist for this group but could not be normalized; using the saved composition as fallback."
+                )
+                fallback_composition["warning_codes"].append(
+                    WARNING_RAW_UNNORMALIZABLE_FALLBACK
                 )
                 fallback_composition["warning_count"] = len(
                     fallback_composition["warnings"]
@@ -182,10 +192,12 @@ def _build_raw_derived_group_composition(
     display_unit = "% of DM" if is_dm_basis else "%"
 
     warnings = []
+    warning_codes = []
     if len({component.pk for component in basis_components}) > 1:
         warnings.append(
             "Multiple basis components were present; using the most common reference component."
         )
+        warning_codes.append(WARNING_MULTIPLE_BASIS_COMPONENTS)
 
     shares = []
     for component, component_measurements in grouped_components.items():
@@ -208,13 +220,15 @@ def _build_raw_derived_group_composition(
         if component_percent <= 0:
             continue
 
-        shares.append({
-            "component": component.pk,
-            "component_name": component.name,
-            "average": float(component_percent / Decimal("100")),
-            "standard_deviation": None,
-            "as_percentage": f"{round(component_percent, 1)}{display_unit}",
-        })
+        shares.append(
+            {
+                "component": component.pk,
+                "component_name": component.name,
+                "average": float(component_percent / Decimal("100")),
+                "standard_deviation": None,
+                "as_percentage": f"{round(component_percent, 1)}{display_unit}",
+            }
+        )
 
     if not shares:
         return None
@@ -223,6 +237,7 @@ def _build_raw_derived_group_composition(
         warnings.append(
             "Some raw measurements could not be converted to weight percent and were omitted from normalization."
         )
+        warning_codes.append(WARNING_RAW_MEASUREMENTS_OMITTED)
 
     total_percent = sum(
         (Decimal(str(share["average"])) * Decimal("100") for share in shares),
@@ -240,16 +255,19 @@ def _build_raw_derived_group_composition(
             other_share["average"] = float(updated_percent / Decimal("100"))
             other_share["as_percentage"] = f"{round(updated_percent, 1)}{display_unit}"
         else:
-            shares.append({
-                "component": other_component.pk,
-                "component_name": other_component.name,
-                "average": float(other_gap / Decimal("100")),
-                "standard_deviation": None,
-                "as_percentage": f"{round(other_gap, 1)}{display_unit}",
-            })
+            shares.append(
+                {
+                    "component": other_component.pk,
+                    "component_name": other_component.name,
+                    "average": float(other_gap / Decimal("100")),
+                    "standard_deviation": None,
+                    "as_percentage": f"{round(other_gap, 1)}{display_unit}",
+                }
+            )
         warnings.append(
             "Raw measurements did not sum to 100%; the remaining fraction was assigned to Other."
         )
+        warning_codes.append(WARNING_REMAINING_FRACTION_ASSIGNED_TO_OTHER)
 
     shares.sort(
         key=lambda share: (
@@ -270,6 +288,7 @@ def _build_raw_derived_group_composition(
         "is_derived": True,
         "origin": "raw_derived",
         "warnings": warnings,
+        "warning_codes": warning_codes,
         "warning_count": len(warnings),
         "settings_pk": composition_setting.pk
         if composition_setting is not None
@@ -307,6 +326,7 @@ def _serialize_persisted_composition(composition, *, sample):
         "is_derived": False,
         "origin": "persisted_fallback",
         "warnings": [],
+        "warning_codes": [],
         "warning_count": 0,
         "settings_pk": composition.pk,
     }
