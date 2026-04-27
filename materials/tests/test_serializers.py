@@ -249,6 +249,26 @@ class CompositionSerializerTestCase(TestCase):
             data["shares"][-1]["component"], MaterialComponent.objects.other().pk
         )
 
+    def test_serializer_remains_persisted_weightshare_compatibility_adapter(self):
+        raw_component = MaterialComponent.objects.create(
+            name="Raw Composition Component"
+        )
+        unit = Unit.objects.create(name="Raw composition percent")
+        ComponentMeasurement.objects.create(
+            sample=self.composition.sample,
+            group=self.composition.group,
+            component=raw_component,
+            unit=unit,
+            average=Decimal("100"),
+        )
+
+        data = CompositionModelSerializer(self.composition).data
+
+        self.assertNotIn(
+            raw_component.pk,
+            [share["component"] for share in data["shares"]],
+        )
+
 
 class WeightShareModelSerializerTestCase(TestCase):
     @classmethod
@@ -326,3 +346,18 @@ class CompositionDoughnutChartSerializerTestCase(TestCase):
             data["data"][0]["data"],
             [Decimal("0.2000000000"), Decimal("0.1000000000"), Decimal("0.7000000000")],
         )
+
+    def test_serializer_remains_persisted_weightshare_compatibility_adapter(self):
+        raw_component = MaterialComponent.objects.create(name="Raw Chart Component")
+        unit = Unit.objects.create(name="Raw chart percent")
+        ComponentMeasurement.objects.create(
+            sample=self.composition.sample,
+            group=self.composition.group,
+            component=raw_component,
+            unit=unit,
+            average=Decimal("100"),
+        )
+
+        data = CompositionDoughnutChartSerializer(self.composition).data
+
+        self.assertNotIn(raw_component.name, data["labels"])

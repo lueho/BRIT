@@ -605,7 +605,8 @@ The materials module can be considered aligned with the report once all of the f
 
 If work should continue now, the best next implementation slice is Phase 5 preparation:
 
-1. decide whether compatibility-only serializers such as persisted doughnut/chart helpers should stay documented as legacy adapters or be retired once callers are gone
+1. keep compatibility-only serializers such as persisted composition model/doughnut/chart helpers as legacy adapters until their callers are retired
+   - covered by tests that verify they continue to read persisted `WeightShare` compatibility rows rather than raw `ComponentMeasurement` observations
 2. add deprecation or usage telemetry around legacy normalized-composition write views before any destructive cleanup is planned
    - started by adding usage logs when users open or submit the saved normalized-composition compatibility editor/add-share flow
 3. plan a backfill/import strategy so new component observations consistently enter through `ComponentMeasurement`
