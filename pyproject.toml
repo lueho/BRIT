@@ -51,7 +51,7 @@ dev = [
     "factory-boy>=3.3.3",
 
     # Code quality
-    "ruff>=0.15.10",
+    "ruff==0.15.10",
     "pre-commit>=4.5.1",
     "djlint>=1.36.4",
 
@@ -129,7 +129,7 @@ known-first-party = ["brit"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
-preview = true
+preview = false
 
 
 [tool.djlint]
