@@ -148,11 +148,11 @@ class SourceDomainHubRoutingTestCase(SimpleTestCase):
     def test_registry_exposes_plugin_declared_dataset_runtime_compatibilities(self):
         compatibilities = get_source_domain_dataset_runtime_compatibilities()
 
-        self.assertIn(
-            "NantesGreenhouses",
+        self.assertEqual(
             tuple(
                 compatibility.runtime_model_name for compatibility in compatibilities
             ),
+            ("HamburgRoadsideTrees", "NantesGreenhouses", "WasteCollection"),
         )
 
     def test_registry_keeps_plugins_discoverable_by_slug(self):
@@ -207,6 +207,18 @@ class RoadsideTreesPluginIntegrationTestCase(SimpleTestCase):
             plugin.geojson_cache_warmer,
             "sources.roadside_trees.tasks.warm_roadside_tree_geojson_cache",
         )
+
+    def test_roadside_trees_plugin_exposes_dataset_runtime_compatibility(self):
+        plugin = get_source_domain_plugin("roadside_trees")
+
+        self.assertEqual(len(plugin.dataset_runtime_compatibilities), 1)
+        compatibility = plugin.dataset_runtime_compatibilities[0]
+        self.assertEqual(compatibility.runtime_model_name, "HamburgRoadsideTrees")
+        self.assertEqual(
+            compatibility.features_api_basename,
+            "api-hamburg-roadside-trees",
+        )
+        self.assertFalse(compatibility.apply_user_visibility_filter)
 
     def test_roadside_tree_templates_resolve_from_sources(self):
         self.assertIn(
@@ -386,6 +398,18 @@ class WasteCollectionPluginIntegrationTestCase(SimpleTestCase):
             plugin.geojson_cache_warmer,
             "sources.waste_collection.tasks.warm_collection_geojson_cache",
         )
+
+    def test_waste_collection_plugin_exposes_dataset_runtime_compatibility(self):
+        plugin = get_source_domain_plugin("waste_collection")
+
+        self.assertEqual(len(plugin.dataset_runtime_compatibilities), 1)
+        compatibility = plugin.dataset_runtime_compatibilities[0]
+        self.assertEqual(compatibility.runtime_model_name, "WasteCollection")
+        self.assertEqual(
+            compatibility.features_api_basename,
+            "api-waste-collection",
+        )
+        self.assertTrue(compatibility.apply_user_visibility_filter)
 
 
 class SourceDomainExplorerCardRegistryTestCase(SimpleTestCase):

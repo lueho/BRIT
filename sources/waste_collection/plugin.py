@@ -1,4 +1,5 @@
 from sources.contracts import (
+    SourceDomainDatasetRuntimeCompatibility,
     SourceDomainExplorerCard,
     SourceDomainPlugin,
     SourceDomainPublicMount,
@@ -22,6 +23,15 @@ plugin = SourceDomainPlugin(
     public_mount=SourceDomainPublicMount(
         mount_path="waste_collection/",
         urlconf="sources.waste_collection.urls",
+    ),
+    dataset_runtime_compatibilities=(
+        SourceDomainDatasetRuntimeCompatibility(
+            runtime_model_name="WasteCollection",
+            model="sources.waste_collection.models.Collection",
+            filterset_class="sources.waste_collection.filters.CollectionFilterSet",
+            template_name="waste_collection_map.html",
+            features_api_basename="api-waste-collection",
+        ),
     ),
     sitemap_items=(
         "/waste_collection/",

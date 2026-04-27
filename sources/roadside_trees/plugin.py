@@ -1,4 +1,5 @@
 from sources.contracts import (
+    SourceDomainDatasetRuntimeCompatibility,
     SourceDomainLegacyRedirects,
     SourceDomainMapMount,
     SourceDomainPlugin,
@@ -26,6 +27,18 @@ plugin = SourceDomainPlugin(
     legacy_redirects=SourceDomainLegacyRedirects(
         mount_path="case_studies/hamburg/",
         urlconf="sources.roadside_trees.legacy_urls",
+    ),
+    dataset_runtime_compatibilities=(
+        SourceDomainDatasetRuntimeCompatibility(
+            runtime_model_name="HamburgRoadsideTrees",
+            model="sources.roadside_trees.models.HamburgRoadsideTrees",
+            filterset_class=(
+                "sources.roadside_trees.filters.HamburgRoadsideTreesFilterSet"
+            ),
+            template_name="hamburg_roadside_trees_map.html",
+            features_api_basename="api-hamburg-roadside-trees",
+            apply_user_visibility_filter=False,
+        ),
     ),
     sitemap_items=(
         "/maps/hamburg/roadside_trees/data/",

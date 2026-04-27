@@ -4,6 +4,7 @@ from django.urls import reverse
 from maps.models import (
     Catchment,
     GeoDataset,
+    GeoDatasetRuntimeConfiguration,
     GeoPolygon,
     MapConfiguration,
     MapLayerConfiguration,
@@ -72,6 +73,26 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
             response["Location"],
             "/sources/roadside_trees/map/?stem_circumference_min=10",
         )
+
+    def test_dataset_map_route_uses_roadside_trees_plugin_runtime_compatibility(self):
+        dataset = GeoDataset.objects.create(
+            name="Hamburg Roadside Trees Runtime Dataset",
+            owner=self.owner,
+            publication_status="published",
+            region=Region.objects.create(name="Hamburg Runtime", country="Germany"),
+            map_configuration=self.dataset.map_configuration,
+        )
+        GeoDatasetRuntimeConfiguration.objects.create(
+            dataset=dataset,
+            backend_type="django_model",
+            runtime_model_name="HamburgRoadsideTrees",
+        )
+
+        response = self.client.get(reverse("geodataset-map", kwargs={"pk": dataset.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, dataset.name)
+        self.assertContains(response, reverse("api-hamburg-roadside-trees-geojson"))
 
 
 class HamburgRoadsideTreeCatchmentAutocompleteViewTests(ViewWithPermissionsTestCase):
