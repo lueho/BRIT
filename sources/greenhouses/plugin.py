@@ -1,4 +1,5 @@
 from sources.contracts import (
+    SourceDomainDatasetRuntimeCompatibility,
     SourceDomainExplorerCard,
     SourceDomainMapMount,
     SourceDomainPlugin,
@@ -39,6 +40,16 @@ plugin = SourceDomainPlugin(
         "/case_studies/nantes/greenhouses/",
         "/case_studies/nantes/greenhouses/create/",
         "/case_studies/nantes/growthcycles/create_inline/",
+    ),
+    dataset_runtime_compatibilities=(
+        SourceDomainDatasetRuntimeCompatibility(
+            runtime_model_name="NantesGreenhouses",
+            model="sources.greenhouses.models.NantesGreenhouses",
+            filterset_class="sources.greenhouses.filters.NantesGreenhousesFilterSet",
+            template_name="greenhouses/nantes_greenhouses_map.html",
+            features_api_basename="api-nantes-greenhouses",
+            apply_user_visibility_filter=False,
+        ),
     ),
     explorer_card=SourceDomainExplorerCard(
         title="Greenhouses",

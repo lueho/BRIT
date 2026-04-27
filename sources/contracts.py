@@ -41,6 +41,24 @@ class SourceDomainPublicMount:
 
 
 @dataclass(frozen=True)
+class SourceDomainDatasetRuntimeCompatibility:
+    runtime_model_name: str
+    model: str
+    filterset_class: str
+    template_name: str
+    features_api_basename: str
+    apply_user_visibility_filter: bool = True
+
+    def resolve_model(self):
+        module_path, attr_name = self.model.rsplit(".", 1)
+        return getattr(import_module(module_path), attr_name)
+
+    def resolve_filterset_class(self):
+        module_path, attr_name = self.filterset_class.rsplit(".", 1)
+        return getattr(import_module(module_path), attr_name)
+
+
+@dataclass(frozen=True)
 class SourceDomainPlugin:
     slug: str
     verbose_name: str
@@ -56,6 +74,9 @@ class SourceDomainPlugin:
     public_mount: SourceDomainPublicMount | None = None
     sitemap_items: tuple[str, ...] = ()
     geojson_cache_warmer: str | None = None
+    dataset_runtime_compatibilities: tuple[
+        SourceDomainDatasetRuntimeCompatibility, ...
+    ] = ()
 
     def get_published_count(self) -> int | None:
         if not self.published_count_getter:

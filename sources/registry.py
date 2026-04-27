@@ -3,6 +3,7 @@ from importlib import import_module
 from django.apps import apps
 
 from sources.contracts import (
+    SourceDomainDatasetRuntimeCompatibility,
     SourceDomainExplorerCard,
     SourceDomainLegacyRedirects,
     SourceDomainMapMount,
@@ -94,6 +95,16 @@ def _validate_source_domain_plugin(
             f"dotted task path string"
         )
 
+    if not isinstance(plugin.dataset_runtime_compatibilities, tuple) or not all(
+        isinstance(item, SourceDomainDatasetRuntimeCompatibility)
+        for item in plugin.dataset_runtime_compatibilities
+    ):
+        raise TypeError(
+            f"{discovered_app_name}.plugin.plugin "
+            f"dataset_runtime_compatibilities must be a tuple of "
+            f"SourceDomainDatasetRuntimeCompatibility instances"
+        )
+
     if "exports" in plugin.capabilities:
         module_name = f"{plugin.get_app_module()}.exports"
         if not _optional_module_exists(module_name):
@@ -107,6 +118,7 @@ def _validate_source_domain_plugins(plugins: tuple[SourceDomainPlugin, ...]) -> 
     seen_slugs: dict[str, str] = {}
     seen_mount_paths: dict[str, str] = {}
     seen_public_mount_paths: dict[str, str] = {}
+    seen_runtime_model_names: dict[str, str] = {}
 
     for plugin in plugins:
         existing_slug_owner = seen_slugs.get(plugin.slug)
@@ -116,6 +128,20 @@ def _validate_source_domain_plugins(plugins: tuple[SourceDomainPlugin, ...]) -> 
                 f"{existing_slug_owner} and {plugin.get_app_module()}"
             )
         seen_slugs[plugin.slug] = plugin.get_app_module()
+
+        for compatibility in plugin.dataset_runtime_compatibilities:
+            existing_runtime_owner = seen_runtime_model_names.get(
+                compatibility.runtime_model_name
+            )
+            if existing_runtime_owner is not None:
+                raise ValueError(
+                    f"Duplicate source-domain dataset runtime compatibility "
+                    f"'{compatibility.runtime_model_name}' declared by "
+                    f"{existing_runtime_owner} and {plugin.get_app_module()}"
+                )
+            seen_runtime_model_names[compatibility.runtime_model_name] = (
+                plugin.get_app_module()
+            )
 
         if plugin.public_mount is not None:
             existing_public_mount_owner = seen_public_mount_paths.get(
@@ -282,3 +308,28 @@ def get_source_domain_geojson_cache_warmers() -> tuple[tuple[str, object], ...]:
         warmers.append((plugin.slug, warmer))
 
     return tuple(warmers)
+
+
+def get_source_domain_dataset_runtime_compatibilities() -> (
+    tuple[SourceDomainDatasetRuntimeCompatibility, ...]
+):
+    compatibilities: list[SourceDomainDatasetRuntimeCompatibility] = []
+
+    for plugin in _SOURCE_DOMAIN_PLUGINS:
+        compatibilities.extend(plugin.dataset_runtime_compatibilities)
+
+    return tuple(
+        sorted(
+            compatibilities,
+            key=lambda compatibility: compatibility.runtime_model_name,
+        )
+    )
+
+
+def get_source_domain_dataset_runtime_compatibility(
+    runtime_model_name: str,
+) -> SourceDomainDatasetRuntimeCompatibility | None:
+    for compatibility in get_source_domain_dataset_runtime_compatibilities():
+        if compatibility.runtime_model_name == runtime_model_name:
+            return compatibility
+    return None

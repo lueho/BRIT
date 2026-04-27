@@ -7,6 +7,7 @@ from django.urls import resolve, reverse
 
 from sources.registry import (
     get_hub_source_domain_plugins,
+    get_source_domain_dataset_runtime_compatibilities,
     get_source_domain_explorer_cards,
     get_source_domain_geojson_cache_warmers,
     get_source_domain_legacy_redirects,
@@ -142,6 +143,16 @@ class SourceDomainHubRoutingTestCase(SimpleTestCase):
         self.assertEqual(
             tuple(slug for slug, _warmer in warmers),
             ("roadside_trees", "waste_collection"),
+        )
+
+    def test_registry_exposes_plugin_declared_dataset_runtime_compatibilities(self):
+        compatibilities = get_source_domain_dataset_runtime_compatibilities()
+
+        self.assertIn(
+            "NantesGreenhouses",
+            tuple(
+                compatibility.runtime_model_name for compatibility in compatibilities
+            ),
         )
 
     def test_registry_keeps_plugins_discoverable_by_slug(self):
@@ -315,6 +326,18 @@ class GreenhousesPluginIntegrationTestCase(SimpleTestCase):
         self.assertIn("/maps/nantes/greenhouses/export/", plugin.sitemap_items)
         self.assertIn("/case_studies/nantes/greenhouses/export/", plugin.sitemap_items)
         self.assertNotIn("/maps/nantes/roadside_trees/export/", plugin.sitemap_items)
+
+    def test_greenhouses_plugin_exposes_dataset_runtime_compatibility(self):
+        plugin = get_source_domain_plugin("greenhouses")
+
+        self.assertEqual(len(plugin.dataset_runtime_compatibilities), 1)
+        compatibility = plugin.dataset_runtime_compatibilities[0]
+        self.assertEqual(compatibility.runtime_model_name, "NantesGreenhouses")
+        self.assertEqual(
+            compatibility.features_api_basename,
+            "api-nantes-greenhouses",
+        )
+        self.assertFalse(compatibility.apply_user_visibility_filter)
 
     def test_greenhouses_plugin_exposes_public_mount_metadata(self):
         plugin = get_source_domain_plugin("greenhouses")

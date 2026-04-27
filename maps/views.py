@@ -23,6 +23,7 @@ from maps.serializers import (
     NutsRegionSummarySerializer,
     RegionGeoFeatureModelSerializer,
 )
+from sources.registry import get_source_domain_dataset_runtime_compatibility
 from utils.forms import TomSelectFormsetHelper
 from utils.object_management.permissions import (
     filter_queryset_for_user,
@@ -334,12 +335,14 @@ class MapMixin:
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update({
-            "map_title": self.get_map_title(),
-            "map_config": self.post_process_map_config(
-                self.get_map_config_serialized()
-            ),
-        })
+        context.update(
+            {
+                "map_title": self.get_map_title(),
+                "map_config": self.post_process_map_config(
+                    self.get_map_config_serialized()
+                ),
+            }
+        )
         return context
 
 
@@ -394,14 +397,16 @@ class GeoDataSetRepresentationMixin:
         gallery_urls = self.get_gallery_context_urls()
         context.update(gallery_urls)
         if getattr(self, "representation_mode", "list") == "gallery":
-            context.update({
-                "representation_mode": "gallery",
-                "public_representation_url": gallery_urls["public_gallery_url"]
-                or context.get("public_url"),
-                "private_representation_url": gallery_urls["private_gallery_url"]
-                or context.get("private_url"),
-                "review_representation_url": context.get("review_url"),
-            })
+            context.update(
+                {
+                    "representation_mode": "gallery",
+                    "public_representation_url": gallery_urls["public_gallery_url"]
+                    or context.get("public_url"),
+                    "private_representation_url": gallery_urls["private_gallery_url"]
+                    or context.get("private_url"),
+                    "review_representation_url": context.get("review_url"),
+                }
+            )
         return context
 
 
@@ -437,9 +442,11 @@ class GeoDataSetFormMixin(FormMixin):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update({
-            "form": self.get_form(),
-        })
+        context.update(
+            {
+                "form": self.get_form(),
+            }
+        )
         return context
 
     def get_form(self, form_class=None):
@@ -503,8 +510,16 @@ LEGACY_DATASET_RUNTIME_COMPATIBILITY = {
         "filterset_class": NutsRegionFilterSet,
         "template_name": "nuts_region_map.html",
         "features_api_basename": "api-nuts-region",
+        "apply_user_visibility_filter": True,
     }
 }
+
+
+def get_dataset_runtime_compatibility(runtime_model_name):
+    compatibility = LEGACY_DATASET_RUNTIME_COMPATIBILITY.get(runtime_model_name)
+    if compatibility is not None:
+        return compatibility
+    return get_source_domain_dataset_runtime_compatibility(runtime_model_name)
 
 
 class FilteredMapMixin(MapMixin):
@@ -559,9 +574,11 @@ class FilteredMapMixin(MapMixin):
             total_count = self.object_list.count()
         except Exception:
             total_count = None
-        context.update({
-            "total_count": total_count,
-        })
+        context.update(
+            {
+                "total_count": total_count,
+            }
+        )
         return context
 
 
@@ -572,19 +589,31 @@ class GeoDataSetRuntimeMapView(UserPassesTestMixin, FilteredMapMixin, FilterView
         super().setup(request, *args, **kwargs)
         dataset = self.get_dataset()
         runtime_model_name = dataset.get_runtime_model_name()
-        compatibility = LEGACY_DATASET_RUNTIME_COMPATIBILITY.get(runtime_model_name)
+        compatibility = get_dataset_runtime_compatibility(runtime_model_name)
         if compatibility is None:
             raise ImproperlyConfigured(
                 f"No dataset runtime compatibility registered for {runtime_model_name}."
             )
         self.object = dataset
-        self.model = compatibility["model"]
-        self.filterset_class = compatibility["filterset_class"]
-        self.template_name = compatibility["template_name"]
+        if isinstance(compatibility, dict):
+            self.model = compatibility["model"]
+            self.filterset_class = compatibility["filterset_class"]
+            self.template_name = compatibility["template_name"]
+            self.apply_user_visibility_filter = compatibility[
+                "apply_user_visibility_filter"
+            ]
+            features_api_basename = compatibility["features_api_basename"]
+        else:
+            self.model = compatibility.resolve_model()
+            self.filterset_class = compatibility.resolve_filterset_class()
+            self.template_name = compatibility.template_name
+            self.apply_user_visibility_filter = (
+                compatibility.apply_user_visibility_filter
+            )
+            features_api_basename = compatibility.features_api_basename
         self.model_name = runtime_model_name
         self.features_layer_api_basename = (
-            dataset.get_features_api_basename()
-            or compatibility["features_api_basename"]
+            dataset.get_features_api_basename() or features_api_basename
         )
         self.map_title = dataset.name
         self.dashboard_url = dataset.get_absolute_url()
@@ -605,19 +634,23 @@ class GeoDataSetRuntimeMapView(UserPassesTestMixin, FilteredMapMixin, FilterView
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        if not self.apply_user_visibility_filter:
+            return queryset
         return filter_queryset_for_user(queryset, self.request.user)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         dataset = self.get_dataset()
-        context.update({
-            "object": dataset,
-            "dataset": dataset,
-            "dashboard_url": dataset.get_absolute_url(),
-            "public_map_url": dataset.get_map_url(),
-            "private_map_url": dataset.get_map_url(),
-            "review_map_url": dataset.get_map_url(),
-        })
+        context.update(
+            {
+                "object": dataset,
+                "dataset": dataset,
+                "dashboard_url": dataset.get_absolute_url(),
+                "public_map_url": dataset.get_map_url(),
+                "private_map_url": dataset.get_map_url(),
+                "review_map_url": dataset.get_map_url(),
+            }
+        )
         return context
 
 
@@ -1352,7 +1385,9 @@ class ClearGeojsonCacheView(UserPassesTestMixin, View):
     def get(self, request, *args, **kwargs):
         pattern = request.GET.get("pattern", "*")
         clear_geojson_cache_pattern(pattern)
-        return JsonResponse({
-            "status": "success",
-            "message": f"Cache cleared with pattern: {pattern}",
-        })
+        return JsonResponse(
+            {
+                "status": "success",
+                "message": f"Cache cleared with pattern: {pattern}",
+            }
+        )
