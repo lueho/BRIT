@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from importlib import import_module
 
+from django.utils.module_loading import import_string
+
 
 @dataclass(frozen=True)
 class SourceDomainExport:
@@ -50,12 +52,10 @@ class SourceDomainDatasetRuntimeCompatibility:
     apply_user_visibility_filter: bool = True
 
     def resolve_model(self):
-        module_path, attr_name = self.model.rsplit(".", 1)
-        return getattr(import_module(module_path), attr_name)
+        return import_string(self.model)
 
     def resolve_filterset_class(self):
-        module_path, attr_name = self.filterset_class.rsplit(".", 1)
-        return getattr(import_module(module_path), attr_name)
+        return import_string(self.filterset_class)
 
 
 @dataclass(frozen=True)

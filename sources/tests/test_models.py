@@ -82,6 +82,20 @@ class SourceDomainPluginContractTestCase(SimpleTestCase):
                 roadside_tree_compatibility,
             )
 
+    def test_dataset_runtime_compatibility_resolves_model_and_filterset_class(self):
+        from sources.greenhouses.filters import NantesGreenhousesFilterSet
+
+        compatibility = get_source_domain_dataset_runtime_compatibility(
+            "NantesGreenhouses"
+        )
+
+        self.assertIsNotNone(compatibility)
+        self.assertIs(compatibility.resolve_model(), NantesGreenhouses)
+        self.assertIs(
+            compatibility.resolve_filterset_class(),
+            NantesGreenhousesFilterSet,
+        )
+
     def test_registered_source_domain_plugins_can_resolve_app_modules(self):
         self.assertEqual(
             get_source_domain_plugin("greenhouses").get_app_module(),
@@ -249,6 +263,64 @@ class SourceDomainPluginValidationTestCase(SimpleTestCase):
             ValueError, "Duplicate source-domain dataset runtime compatibility"
         ):
             _validate_source_domain_plugins((greenhouses, roadside_trees))
+
+    def test_validation_rejects_invalid_dataset_runtime_import_path_metadata(self):
+        plugin = get_source_domain_plugin("greenhouses")
+        compatibility = SourceDomainDatasetRuntimeCompatibility(
+            runtime_model_name="NantesGreenhouses",
+            model="NantesGreenhouses",
+            filterset_class="sources.greenhouses.filters.NantesGreenhousesFilterSet",
+            template_name="greenhouses/nantes_greenhouses_map.html",
+            features_api_basename="api-nantes-greenhouses",
+        )
+        plugin = replace(plugin, dataset_runtime_compatibilities=(compatibility,))
+
+        with self.assertRaisesMessage(
+            TypeError,
+            "dataset_runtime_compatibilities model must be a dotted import path string",
+        ):
+            _validate_source_domain_plugin(
+                plugin, discovered_app_name="sources.greenhouses"
+            )
+
+    def test_validation_rejects_empty_dataset_runtime_display_metadata(self):
+        plugin = get_source_domain_plugin("greenhouses")
+        compatibility = SourceDomainDatasetRuntimeCompatibility(
+            runtime_model_name="NantesGreenhouses",
+            model="sources.greenhouses.models.NantesGreenhouses",
+            filterset_class="sources.greenhouses.filters.NantesGreenhousesFilterSet",
+            template_name="",
+            features_api_basename="api-nantes-greenhouses",
+        )
+        plugin = replace(plugin, dataset_runtime_compatibilities=(compatibility,))
+
+        with self.assertRaisesMessage(
+            TypeError,
+            "dataset_runtime_compatibilities template_name must be a non-empty string",
+        ):
+            _validate_source_domain_plugin(
+                plugin, discovered_app_name="sources.greenhouses"
+            )
+
+    def test_validation_rejects_invalid_dataset_runtime_visibility_flag(self):
+        plugin = get_source_domain_plugin("greenhouses")
+        compatibility = SourceDomainDatasetRuntimeCompatibility(
+            runtime_model_name="NantesGreenhouses",
+            model="sources.greenhouses.models.NantesGreenhouses",
+            filterset_class="sources.greenhouses.filters.NantesGreenhousesFilterSet",
+            template_name="greenhouses/nantes_greenhouses_map.html",
+            features_api_basename="api-nantes-greenhouses",
+            apply_user_visibility_filter="no",
+        )
+        plugin = replace(plugin, dataset_runtime_compatibilities=(compatibility,))
+
+        with self.assertRaisesMessage(
+            TypeError,
+            "dataset_runtime_compatibilities apply_user_visibility_filter must be a boolean",
+        ):
+            _validate_source_domain_plugin(
+                plugin, discovered_app_name="sources.greenhouses"
+            )
 
     def test_validation_rejects_invalid_map_mount_metadata(self):
         plugin = get_source_domain_plugin("greenhouses")

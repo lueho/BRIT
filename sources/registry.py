@@ -11,6 +11,8 @@ from sources.contracts import (
     SourceDomainPublicMount,
 )
 
+DatasetRuntimeCompatibilities = tuple[SourceDomainDatasetRuntimeCompatibility, ...]
+
 
 def _optional_module_exists(module_name: str) -> bool:
     try:
@@ -104,6 +106,36 @@ def _validate_source_domain_plugin(
             f"dataset_runtime_compatibilities must be a tuple of "
             f"SourceDomainDatasetRuntimeCompatibility instances"
         )
+
+    for compatibility in plugin.dataset_runtime_compatibilities:
+        if not compatibility.runtime_model_name:
+            raise ValueError(
+                f"{discovered_app_name}.plugin.plugin "
+                f"dataset_runtime_compatibilities must define non-empty "
+                f"runtime_model_name values"
+            )
+        for field_name in ("model", "filterset_class"):
+            dotted_path = getattr(compatibility, field_name)
+            if not isinstance(dotted_path, str) or "." not in dotted_path:
+                raise TypeError(
+                    f"{discovered_app_name}.plugin.plugin "
+                    f"dataset_runtime_compatibilities {field_name} must be a "
+                    f"dotted import path string"
+                )
+        for field_name in ("template_name", "features_api_basename"):
+            value = getattr(compatibility, field_name)
+            if not isinstance(value, str) or not value:
+                raise TypeError(
+                    f"{discovered_app_name}.plugin.plugin "
+                    f"dataset_runtime_compatibilities {field_name} must be a "
+                    f"non-empty string"
+                )
+        if not isinstance(compatibility.apply_user_visibility_filter, bool):
+            raise TypeError(
+                f"{discovered_app_name}.plugin.plugin "
+                f"dataset_runtime_compatibilities apply_user_visibility_filter "
+                f"must be a boolean"
+            )
 
     if "exports" in plugin.capabilities:
         module_name = f"{plugin.get_app_module()}.exports"
@@ -311,7 +343,7 @@ def get_source_domain_geojson_cache_warmers() -> tuple[tuple[str, object], ...]:
 
 
 def get_source_domain_dataset_runtime_compatibilities() -> (
-    tuple[SourceDomainDatasetRuntimeCompatibility, ...]
+    DatasetRuntimeCompatibilities
 ):
     compatibilities: list[SourceDomainDatasetRuntimeCompatibility] = []
 
