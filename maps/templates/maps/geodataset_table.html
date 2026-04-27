@@ -1,0 +1,52 @@
+{% extends "filtered_list.html" %}
+{% block title %}
+  BRIT | {{ dataset.name }} table
+{% endblock title %}
+{% block list_intro %}
+  <div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start"
+       role="region"
+       aria-label="Dataset table introduction">
+    <div class="flex-grow-1">
+      <strong><i class="fas fa-table me-1"></i> {{ dataset.name }}</strong>
+      <p class="mb-0 small text-muted">Browse the dataset features through the registry table route.</p>
+    </div>
+  </div>
+{% endblock list_intro %}
+{% block list_card_header %}
+  {{ dataset.name }} features
+{% endblock list_card_header %}
+{% block list_table %}
+  <div class="table-responsive">
+    <table class="table modern-table">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          {% for column in table_columns %}<th>{{ column.label }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in table_rows %}
+          <tr tabindex="0"
+              role="link"
+              onclick="window.location='{{ row.detail_url }}'"
+              onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.location='{{ row.detail_url }}'}">
+            <td data-label="Feature" class="ps-3">
+              <a href="{{ row.detail_url }}" class="text-decoration-none">
+                <strong class="d-block">{{ row.object }}</strong>
+              </a>
+            </td>
+            {% for value in row.values %}<td>{{ value }}</td>{% endfor %}
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="{{ table_columns|length|add:1 }}"
+                class="text-muted text-center py-4">No features match your current filters.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock list_table %}
+{% block learning_pane_body %}
+  {% include "maps/includes/learning_materials.html" %}
+{% endblock learning_pane_body %}

@@ -1,0 +1,40 @@
+{% extends "detail_with_options.html" %}
+{% block title %}
+  BRIT | {{ dataset.name }} feature
+{% endblock title %}
+{% block detail_header %}
+  {{ feature }}
+{% endblock detail_header %}
+{% block detail_body %}
+  <p class="text-muted small mb-3">Feature from {{ dataset.name }}</p>
+  <div class="table-responsive">
+    <table class="table modern-table">
+      <tbody>
+        {% for field in field_values %}
+          <tr>
+            <th scope="row">{{ field.label }}</th>
+            <td>{{ field.value }}</td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td class="text-muted">No visible columns are configured for this dataset.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock detail_body %}
+{% block options_secondary_actions %}
+  {{ block.super }}
+  <a class="btn btn-outline-primary w-100 mb-2"
+     href="{% url 'geodataset-table' pk=dataset.pk %}">
+    <i class="fas fa-table"></i> Back to dataset table
+  </a>
+  <a class="btn btn-outline-secondary w-100 mb-2"
+     href="{{ dataset.get_map_url }}">
+    <i class="fas fa-map"></i> Open filtered map
+  </a>
+{% endblock options_secondary_actions %}
+{% block learning_content %}
+  {% include "maps/includes/learning_materials.html" %}
+{% endblock learning_content %}

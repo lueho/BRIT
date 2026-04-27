@@ -7,7 +7,7 @@ from django.forms import formset_factory
 from django.http import JsonResponse
 from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.views import View
-from django.views.generic import TemplateView
+from django.views.generic import DetailView, TemplateView
 from django.views.generic.edit import FormMixin
 from django_filters.views import FilterView
 from rest_framework.exceptions import NotFound, ParseError
@@ -522,6 +522,96 @@ def get_dataset_runtime_compatibility(runtime_model_name):
     return get_source_domain_dataset_runtime_compatibility(runtime_model_name)
 
 
+def configure_dataset_runtime_view(view, dataset):
+    runtime_model_name = dataset.get_runtime_model_name()
+    compatibility = get_dataset_runtime_compatibility(runtime_model_name)
+    if compatibility is None:
+        raise ImproperlyConfigured(
+            f"No dataset runtime compatibility registered for {runtime_model_name}."
+        )
+    if isinstance(compatibility, dict):
+        view.model = compatibility["model"]
+        view.filterset_class = compatibility["filterset_class"]
+        view.template_name = compatibility["template_name"]
+        view.apply_user_visibility_filter = compatibility[
+            "apply_user_visibility_filter"
+        ]
+        features_api_basename = compatibility["features_api_basename"]
+    else:
+        view.model = compatibility.resolve_model()
+        view.filterset_class = compatibility.resolve_filterset_class()
+        view.template_name = compatibility.template_name
+        view.apply_user_visibility_filter = compatibility.apply_user_visibility_filter
+        features_api_basename = compatibility.features_api_basename
+    view.model_name = runtime_model_name
+    view.features_layer_api_basename = (
+        dataset.get_features_api_basename() or features_api_basename
+    )
+
+
+class GeoDataSetRuntimePermissionMixin:
+    _dataset = None
+    apply_user_visibility_filter = True
+
+    def get_dataset(self):
+        if self._dataset is not None:
+            return self._dataset
+        dataset_pk = self.kwargs.get("pk")
+        try:
+            self._dataset = (
+                GeoDataset.objects.select_related(
+                    "region", "map_configuration", "runtime_configuration"
+                )
+                .prefetch_related("sources", "column_policies")
+                .get(pk=dataset_pk)
+            )
+        except GeoDataset.DoesNotExist as err:
+            raise ImproperlyConfigured(
+                f"No GeoDataset with pk {dataset_pk} found."
+            ) from err
+        return self._dataset
+
+    def test_func(self):
+        policy = get_object_policy(
+            self.request.user,
+            self.get_dataset(),
+            request=self.request,
+        )
+        return (
+            policy["is_published"]
+            or policy["is_archived"]
+            or policy["is_owner"]
+            or policy["is_staff"]
+            or (policy["is_in_review"] and policy["is_moderator"])
+        )
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if not self.apply_user_visibility_filter:
+            return queryset
+        return filter_queryset_for_user(queryset, self.request.user)
+
+    def get_visible_column_policies(self):
+        return list(
+            self.get_dataset()
+            .column_policies.filter(is_visible=True)
+            .order_by("column_name")
+        )
+
+    @staticmethod
+    def get_policy_label(policy):
+        return policy.display_label or policy.column_name.replace("_", " ").title()
+
+    @staticmethod
+    def get_column_value(obj, column_name):
+        value = obj
+        for attr in column_name.split("__"):
+            value = getattr(value, attr, None)
+            if value is None:
+                return ""
+        return value
+
+
 class FilteredMapMixin(MapMixin):
     model_name = None  # TODO: Remove this for pk
     template_name = "filtered_map.html"
@@ -588,33 +678,8 @@ class GeoDataSetRuntimeMapView(UserPassesTestMixin, FilteredMapMixin, FilterView
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
         dataset = self.get_dataset()
-        runtime_model_name = dataset.get_runtime_model_name()
-        compatibility = get_dataset_runtime_compatibility(runtime_model_name)
-        if compatibility is None:
-            raise ImproperlyConfigured(
-                f"No dataset runtime compatibility registered for {runtime_model_name}."
-            )
+        configure_dataset_runtime_view(self, dataset)
         self.object = dataset
-        if isinstance(compatibility, dict):
-            self.model = compatibility["model"]
-            self.filterset_class = compatibility["filterset_class"]
-            self.template_name = compatibility["template_name"]
-            self.apply_user_visibility_filter = compatibility[
-                "apply_user_visibility_filter"
-            ]
-            features_api_basename = compatibility["features_api_basename"]
-        else:
-            self.model = compatibility.resolve_model()
-            self.filterset_class = compatibility.resolve_filterset_class()
-            self.template_name = compatibility.template_name
-            self.apply_user_visibility_filter = (
-                compatibility.apply_user_visibility_filter
-            )
-            features_api_basename = compatibility.features_api_basename
-        self.model_name = runtime_model_name
-        self.features_layer_api_basename = (
-            dataset.get_features_api_basename() or features_api_basename
-        )
         self.map_title = dataset.name
         self.dashboard_url = dataset.get_absolute_url()
 
@@ -649,6 +714,104 @@ class GeoDataSetRuntimeMapView(UserPassesTestMixin, FilteredMapMixin, FilterView
                 "public_map_url": dataset.get_map_url(),
                 "private_map_url": dataset.get_map_url(),
                 "review_map_url": dataset.get_map_url(),
+            }
+        )
+        return context
+
+
+class GeoDataSetRuntimeTableView(
+    GeoDataSetRuntimePermissionMixin, UserPassesTestMixin, FilterView
+):
+    template_name = "maps/geodataset_table.html"
+    paginate_by = 50
+
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        dataset = self.get_dataset()
+        configure_dataset_runtime_view(self, dataset)
+        self.template_name = "maps/geodataset_table.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        dataset = self.get_dataset()
+        column_policies = self.get_visible_column_policies()
+        context.update(
+            {
+                "dataset": dataset,
+                "column_policies": column_policies,
+                "table_columns": [
+                    {
+                        "name": policy.column_name,
+                        "label": self.get_policy_label(policy),
+                    }
+                    for policy in column_policies
+                ],
+                "table_rows": [
+                    {
+                        "object": obj,
+                        "detail_url": reverse(
+                            "geodataset-feature-detail",
+                            kwargs={"pk": dataset.pk, "feature_pk": obj.pk},
+                        ),
+                        "values": [
+                            self.get_column_value(obj, policy.column_name)
+                            for policy in column_policies
+                        ],
+                    }
+                    for obj in context["object_list"]
+                ],
+                "dashboard_url": dataset.get_absolute_url(),
+                "public_map_url": dataset.get_map_url(),
+                "private_map_url": dataset.get_map_url(),
+                "review_map_url": dataset.get_map_url(),
+                "breadcrumb_module_label": "Maps",
+                "breadcrumb_module_url": reverse("maps-dashboard"),
+                "breadcrumb_section_label": "GeoDatasets",
+                "breadcrumb_section_url": reverse("geodataset-list"),
+                "breadcrumb_object_label": dataset.name,
+                "breadcrumb_object_url": dataset.get_absolute_url(),
+                "breadcrumb_action_label": "Table",
+                "breadcrumb_page_title": f"{dataset.name} table",
+            }
+        )
+        return context
+
+
+class GeoDataSetRuntimeFeatureDetailView(
+    GeoDataSetRuntimePermissionMixin, UserPassesTestMixin, DetailView
+):
+    template_name = "maps/geodataset_feature_detail.html"
+    pk_url_kwarg = "feature_pk"
+
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        dataset = self.get_dataset()
+        configure_dataset_runtime_view(self, dataset)
+        self.template_name = "maps/geodataset_feature_detail.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        dataset = self.get_dataset()
+        column_policies = self.get_visible_column_policies()
+        context.update(
+            {
+                "dataset": dataset,
+                "feature": self.object,
+                "field_values": [
+                    {
+                        "label": self.get_policy_label(policy),
+                        "value": self.get_column_value(self.object, policy.column_name),
+                    }
+                    for policy in column_policies
+                ],
+                "breadcrumb_module_label": "Maps",
+                "breadcrumb_module_url": reverse("maps-dashboard"),
+                "breadcrumb_section_label": "GeoDatasets",
+                "breadcrumb_section_url": reverse("geodataset-list"),
+                "breadcrumb_object_label": dataset.name,
+                "breadcrumb_object_url": dataset.get_absolute_url(),
+                "breadcrumb_action_label": str(self.object),
+                "breadcrumb_page_title": f"{dataset.name} feature",
             }
         )
         return context

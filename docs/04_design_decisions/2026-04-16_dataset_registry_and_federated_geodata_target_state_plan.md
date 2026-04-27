@@ -1,6 +1,6 @@
 # Dataset Registry and Federated Geodata Target-State Plan
 
-- **Status**: Active roadmap; Phase 0 complete, Phase 1 Task 1.1 complete, Task 1.2 in progress with the dataset-scoped detail and map routes landed
+- **Status**: Active roadmap; Phase 0 complete, Phase 1 Task 1.1 complete, Task 1.2 route family complete on the compatibility-backed runtime path
 - **Date**: 2026-04-16
 - **Scope**: `maps` dataset onboarding, standalone exploration, long-term federation of external geospatial data sources, and domain-level harmonized integration across incompatible datasets
 
@@ -50,7 +50,7 @@ This direction is already visible in the codebase, but only partially:
 - `maps/README.md` now documents the current as-is `GeoDataset` workflow and points future registry work back to this roadmap
 - the `maps` list/gallery UX already treats `GeoDataset` as a primary user-facing object
 - Phase 1 has introduced normalized runtime metadata via `GeoDatasetRuntimeConfiguration` and `GeoDatasetColumnPolicy`
-- dataset-scoped detail and map routes now exist, including `/maps/geodatasets/<pk>/map/`
+- dataset-scoped detail, map, table, and feature-detail routes now exist, including `/maps/geodatasets/<pk>/map/` and `/maps/geodatasets/<pk>/table/`
 - the implementation still partly depends on `model_name`, compatibility runtime-model mappings, and hardcoded feature API basenames
 - the table/view-backed adapter path is not yet the authoritative runtime path for ordinary new datasets
 - the current generic dataset path is therefore an active migration path rather than a completed architecture
@@ -1144,13 +1144,13 @@ Deliverables:
   - `maps/forms.py`, `maps/admin.py`, `maps/views.py`, and the runtime-metadata migration have been updated to use that normalized contract.
   - Focused Dockerized validation passed for `maps.tests.test_models`, `maps.tests.test_views`, `maps.tests.test_forms`, and `maps.tests.test_filters` using `brit.settings.testrunner`.
 
-- **Task 1.2 is partially complete**
-  - Dataset-scoped detail and map routes now exist, including `geodataset-detail` and `geodataset-map`.
+- **Task 1.2 route family is complete on the current compatibility-backed runtime path**
+  - Dataset-scoped detail, map, table, and feature-detail routes now exist, including `geodataset-detail`, `geodataset-map`, `geodataset-table`, and `geodataset-feature-detail`.
   - `GeoDataset.get_absolute_url()` and `GeoDataset.get_map_url()` now prefer dataset identity where the route is available.
-  - The current map route still resolves through compatibility runtime-model mappings and feature API basenames, so this is not yet the final generic table/view-backed runtime path.
+  - The current map/table/detail route family still resolves through compatibility runtime-model mappings and feature API basenames, so this is not yet the final generic table/view-backed runtime path.
+  - The first table/detail slice uses `GeoDatasetColumnPolicy` visibility records for displayed fields and keeps feature navigation scoped by stable dataset identity.
 
 - **Current next step**
-  - Finish the remaining Task 1.2 route family by adding the generic table and feature-detail surfaces or explicitly scoping them out of Phase 1 if the first production slice only needs map browsing.
   - Continue Task 1.3 and Task 1.4 by replacing compatibility runtime-model resolution with one real local relation/view-backed adapter.
   - Prove the path with a boring pilot dataset before expanding to federation, versioning, or domain harmonization.
 
