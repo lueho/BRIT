@@ -515,6 +515,10 @@ class AddComponentModalForm(ModalModelForm):
         self.fields["component"].queryset = MaterialComponent.objects.exclude(
             id__in=self.instance.blocked_component_ids
         )
+        self.fields["component"].help_text = (
+            "Adds a saved normalized-composition compatibility share. "
+            "Use raw composition data for new component observations."
+        )
 
 
 class AddLiteratureSourceForm(ModalForm):

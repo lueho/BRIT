@@ -8,9 +8,12 @@
         <div class="col col-lg-12 col-xl-7">
             <div class="card shadow">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0">Update weight shares</h5>
+                    <h5 class="mb-0">{{ form_title }}</h5>
                 </div>
                 <div class="card-body">
+                    {% if legacy_normalized_composition_notice %}
+                        <div class="alert alert-warning" role="alert">{{ legacy_normalized_composition_notice }}</div>
+                    {% endif %}
                     <div id="form-container" class="justify-content-center">
                         <!-- Corrected ID and class -->
                         <form method="post">
