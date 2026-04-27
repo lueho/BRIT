@@ -359,15 +359,18 @@ class SampleSeries(NamedUserCreatedObject):
         """
         Queryset of all components that have been assigned to this group.
         """
+        component_ids = set(
+            WeightShare.objects.filter(composition__sample__series=self)
+            .values_list("component", flat=True)
+            .distinct()
+        )
+        component_ids.update(
+            ComponentMeasurement.objects.filter(sample__series=self)
+            .values_list("component", flat=True)
+            .distinct()
+        )
         return MaterialComponent.objects.filter(
-            id__in=[
-                share["component"]
-                for share in WeightShare.objects.filter(
-                    composition__sample__series=self
-                )
-                .values("component")
-                .distinct()
-            ]
+            id__in=component_ids,
         )
 
     @property
@@ -675,13 +678,16 @@ class Sample(NamedUserCreatedObject):
         """
         Queryset of all components that have been assigned to this group.
         """
+        component_ids = set(
+            WeightShare.objects.filter(composition__sample=self)
+            .values_list("component", flat=True)
+            .distinct()
+        )
+        component_ids.update(
+            self.component_measurements.values_list("component", flat=True).distinct()
+        )
         return MaterialComponent.objects.filter(
-            id__in=[
-                share["component"]
-                for share in WeightShare.objects.filter(composition__sample=self)
-                .values("component")
-                .distinct()
-            ]
+            id__in=component_ids,
         )
 
     @property

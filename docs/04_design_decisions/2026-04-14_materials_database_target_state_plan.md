@@ -470,7 +470,7 @@ Success criteria:
 
 Goal: shift the primary truth from normalized `WeightShare` storage to raw component measurements.
 
-Phase status: Phase 4a is complete enough for current read-side adoption. The shared helper exists in `materials.composition_normalization`, has focused regression tests, and is used by sample detail plus sample serializers. Phase 4b has started: warning codes are now part of the normalized composition read output, `report_composition_normalization_mismatches` can compare raw-derived output with saved normalized `WeightShare` rows before cleanup, the legacy normalized-composition edit/add views are explicitly labelled as compatibility workflows, the read-only composition API serializer now resolves shares through the shared raw-first helper, and SimuCF input-material component reads now use the shared raw-first helper. Phase 4b remains open because direct normalized-value writes, settings behavior, and remaining compatibility consumers still need a complete inventory.
+Phase status: Phase 4a is complete enough for current read-side adoption. Phase 4b is complete for the current migration wave: warning codes are part of normalized composition read output, `report_composition_normalization_mismatches` can compare raw-derived output with saved normalized `WeightShare` rows before cleanup, legacy normalized-composition edit/add views are explicitly labelled as compatibility workflows, the read-only composition API serializer resolves shares through the shared raw-first helper, SimuCF input-material component reads use the shared raw-first helper, and sample/sample-series component lists include raw `ComponentMeasurement` components. Remaining direct `Composition` and `WeightShare` references are classified below as settings, compatibility, or legacy write surfaces rather than unbounded primary read paths.
 
 Recommended direction:
 
@@ -498,9 +498,16 @@ Implementation steps:
   - persisted normalized-value read use
   - persisted normalized-value write use
   - compatibility API use
+  - completed for the current migration wave:
+    - `Composition` remains valid settings infrastructure for group order and `fractions_of`
+    - `get_sample_normalized_compositions()` owns persisted `WeightShare` fallback and mismatch comparison
+    - `WeightShareModelSerializer`, `CompositionModelSerializer`, `CompositionDoughnutChartSerializer`, and `WeightShareAPISerializer` are retained as legacy compatibility adapters
+    - legacy normalized-composition edit/add/delete views remain explicit compatibility write surfaces
+    - SimuCF still uses persisted biochemical `WeightShare` rows only as a compatibility queryset gate
 - Phase 4b - migrate remaining primary read surfaces to `get_sample_normalized_compositions()` where feasible
   - the read-only `CompositionAPISerializer` now uses this helper for its `shares` payload while retaining the legacy compact API shape
   - SimuCF input-material component properties now use this helper while its queryset filter remains a compatibility gate for persisted biochemical `WeightShare` rows
+  - sample and sample-series component lists now include raw `ComponentMeasurement` components alongside persisted compatibility shares
 - Phase 4b - define the write contract for component-level observations:
   - new observation writes should target `ComponentMeasurement`
   - `WeightShare` writes should be limited to explicit compatibility/edit-legacy workflows
@@ -561,7 +568,7 @@ Notes on ordering:
 - Phase 1 and Phase 2 can be swapped if a concrete dataset urgently needs semantic mapping before hierarchical decomposition.
 - Phase 3 has now been completed and should be treated as a prerequisite already satisfied for later materials work.
 - Phase 4a is complete enough for Phase 4b to proceed.
-- Phase 4b has started with mismatch reporting, explicit compatibility labels on legacy normalized-composition write views, raw-first composition API read output, and raw-first SimuCF component reads; the next work should continue the usage inventory because direct `Composition` and `WeightShare` references still include legitimate settings behavior, legacy normalized-value behavior, and compatibility API behavior.
+- Phase 4b is complete for the current migration wave. Remaining direct `Composition` and `WeightShare` references are classified as settings/helper behavior, persisted fallback inside the shared normalization helper, explicit legacy normalized-composition write surfaces, or compatibility adapters.
 
 ## 9. Non-Goals
 
@@ -596,11 +603,11 @@ The materials module can be considered aligned with the report once all of the f
 
 ## 11. Immediate Next Step
 
-If work should continue now, the best next implementation slice is:
+If work should continue now, the best next implementation slice is Phase 5 preparation:
 
-1. continue the Phase 4b inventory of remaining `Composition` and `WeightShare` consumers, classified by settings, read, write, import/export, and compatibility API behavior
-2. migrate any remaining primary read surfaces to `get_sample_normalized_compositions()` where they still use direct persisted normalized values
-3. define and enforce the write-side boundary so new component observations use `ComponentMeasurement` while `WeightShare` writes are limited to explicit legacy compatibility workflows
-4. decide whether compatibility-only serializers such as persisted doughnut/chart helpers should stay documented as legacy adapters or be retired once callers are gone
+1. decide whether compatibility-only serializers such as persisted doughnut/chart helpers should stay documented as legacy adapters or be retired once callers are gone
+2. add deprecation or usage telemetry around legacy normalized-composition write views before any destructive cleanup is planned
+3. plan a backfill/import strategy so new component observations consistently enter through `ComponentMeasurement`
+4. only after that evidence exists, consider retiring or narrowing persisted `WeightShare` compatibility storage
 
-That slice is now the smallest high-value step because mismatch reporting, write-surface compatibility labels, and initial API/integration read migrations exist and can support later cleanup decisions. The largest remaining architectural mismatch with the report is the remaining unclassified dependence on persisted normalized `WeightShare` rows.
+That slice is now the smallest high-value step because Phase 4b has bounded the remaining direct `WeightShare` dependence without prematurely deleting compatibility data.

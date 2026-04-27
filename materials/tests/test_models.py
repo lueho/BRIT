@@ -242,6 +242,24 @@ class SampleSeriesTestCase(TestCase):
                         composition=composition, component=self.custom_component
                     )
 
+    def test_components_include_raw_component_measurements(self):
+        raw_component = MaterialComponent.objects.create(name="Raw Series Component")
+        unit = Unit.objects.create(name="Series component percent")
+        sample = Sample.objects.create(
+            material=self.material1,
+            series=self.sample_series,
+            timestep=Timestep.objects.default(),
+        )
+        ComponentMeasurement.objects.create(
+            sample=sample,
+            group=self.custom_group,
+            component=raw_component,
+            unit=unit,
+            average=Decimal("42.0"),
+        )
+
+        self.assertIn(raw_component, self.sample_series.components)
+
     def test_duplicate_creates_new_instance_with_identical_field_values(self):
         creator = User.objects.create(username="creator")
         duplicate = self.sample_series.duplicate(creator)
@@ -435,6 +453,19 @@ class SampleTestCase(TestCase):
                 average=prop.average,
                 standard_deviation=prop.standard_deviation,
             )
+
+    def test_components_include_raw_component_measurements(self):
+        raw_component = MaterialComponent.objects.create(name="Raw Sample Component")
+        unit = Unit.objects.create(name="Sample component percent")
+        ComponentMeasurement.objects.create(
+            sample=self.sample,
+            group=self.default_group,
+            component=raw_component,
+            unit=unit,
+            average=Decimal("42.0"),
+        )
+
+        self.assertIn(raw_component, self.sample.components)
 
 
 class CompositionTestCase(TestCase):
