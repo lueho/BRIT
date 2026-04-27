@@ -4,6 +4,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 
 from materials.models import (
+    ComponentMeasurement,
     Composition,
     Material,
     MaterialComponent,
@@ -12,6 +13,7 @@ from materials.models import (
     SampleSeries,
     WeightShare,
 )
+from utils.properties.models import Unit
 
 from ..models import InputMaterial
 
@@ -105,6 +107,30 @@ class InputMaterialTestCase(TestCase):
 
     def test_property_carbohydrates_returns_valid_value(self):
         self.assertEqual(self.input.carbohydrates, Decimal("0.7000000000"))
+
+    def test_property_carbohydrates_uses_raw_derived_share(self):
+        percent_unit = Unit.objects.filter(name="%").first()
+        if percent_unit is None:
+            percent_unit = Unit.objects.create(name="%", symbol="percent")
+        composition = Composition.objects.get(group__name="Biochemical Composition")
+        carbohydrates = MaterialComponent.objects.get(name="Carbohydrates")
+        amino_acids = MaterialComponent.objects.get(name="Amino Acids")
+        ComponentMeasurement.objects.create(
+            sample=self.input,
+            group=composition.group,
+            component=carbohydrates,
+            unit=percent_unit,
+            average=Decimal("40"),
+        )
+        ComponentMeasurement.objects.create(
+            sample=self.input,
+            group=composition.group,
+            component=amino_acids,
+            unit=percent_unit,
+            average=Decimal("60"),
+        )
+
+        self.assertEqual(self.input.carbohydrates, Decimal("0.4"))
 
     def test_property_amino_acids_handles_missing_weightshare(self):
         WeightShare.objects.get(name="Amino Acids").delete()
