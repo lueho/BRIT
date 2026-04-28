@@ -1,29 +1,6 @@
 networks:
   full:
 
-x-app-source-volumes: &app-source-volumes
-  - ./bibliography:/app/bibliography
-  - ./brit:/app/brit
-  - ./case_studies:/app/case_studies
-  - ./distributions:/app/distributions
-  - ./docs:/app/docs
-  - ./interfaces:/app/interfaces
-  - ./inventories:/app/inventories
-  - ./layer_manager:/app/layer_manager
-  - ./maps:/app/maps
-  - ./materials:/app/materials
-  - ./processes:/app/processes
-  - ./raw_data:/app/raw_data
-  - ./sources:/app/sources
-  - ./staticfiles:/app/staticfiles
-  - ./users:/app/users
-  - ./utils:/app/utils
-  - ./manage.py:/app/manage.py
-  - ./mkdocs.yml:/app/mkdocs.yml
-  - ./pyproject.toml:/app/pyproject.toml
-  - ./requirements.txt:/app/requirements.txt
-  - ./uv.lock:/app/uv.lock
-
 services:
   db:
     image: "postgis/postgis:15-3.4"
@@ -45,7 +22,8 @@ services:
     image: brit-web
     restart: unless-stopped
     command: python manage.py runserver 0.0.0.0:8000
-    volumes: *app-source-volumes
+    volumes: 
+      - ./:/app
     depends_on:
       - db
       - redis
@@ -59,7 +37,8 @@ services:
 
   celery:
     image: brit-web
-    volumes: *app-source-volumes
+    volumes: 
+      - ./:/app
     command: celery --app=brit worker --loglevel=info --pool=solo --concurrency=1 --without-gossip --without-mingle -E
     stop_grace_period: 5s
     env_file:
