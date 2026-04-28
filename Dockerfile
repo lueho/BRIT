@@ -6,7 +6,8 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 # uv environment configuration
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    UV_PYTHON_DOWNLOADS=0
+    UV_PYTHON_DOWNLOADS=0 \
+    UV_PROJECT_ENVIRONMENT=/opt/venv
 
 # Optional build-time flag: set to "true" to include dev dependencies
 ARG INSTALL_DEV=false
@@ -78,10 +79,11 @@ RUN useradd --system --uid 1000 --create-home --shell /bin/bash standard_user \
     && install -d -o standard_user -g standard_user /app/staticfiles
 
 # Virtual environment first on PATH
-ENV VIRTUAL_ENV=/app/.venv
+ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Copy the virtual environment and project metadata from builder with proper ownership
+COPY --from=builder --chown=standard_user:standard_user /opt/venv /opt/venv
 COPY --from=builder --chown=standard_user:standard_user /app /app
 
 WORKDIR /app
