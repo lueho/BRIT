@@ -1158,7 +1158,8 @@ Deliverables:
   - `maps.runtime_adapters.LocalRelationDatasetRuntimeAdapter` can now read a configured local PostGIS relation/table through validated runtime metadata.
   - The first slice supports quoted schema/table/column identifiers, required metadata validation, selected visible columns, exact-match filters for explicitly filterable columns, bounded table reads, single-feature lookup, and dataset-scoped GeoJSON output from the configured geometry column.
   - Dataset-scoped table, feature-detail, map, and `geodataset-features-geojson` routes can render records from this adapter without a bespoke Django model or `model_name` lookup.
-  - This is still a deliberately small local-relation slice; richer schema introspection, summaries, exports, and production pilot hardening remain follow-up work.
+  - The adapter exposes safe relation-column introspection metadata with policy flags, without automatically exposing discovered columns.
+  - This is still a deliberately small local-relation slice; summaries, exports, and production pilot hardening remain follow-up work.
 
 - **Current next step**
   - Continue Task 1.4 and Task 1.5 by hardening local-relation map configuration and proving the path with a boring pilot dataset.

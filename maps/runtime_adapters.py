@@ -147,6 +147,50 @@ class LocalRelationDatasetRuntimeAdapter:
             )
         )
 
+    def get_relation_columns(self):
+        policies = {
+            policy.column_name: policy for policy in self.dataset.column_policies.all()
+        }
+        return [
+            {
+                "name": column["column_name"],
+                "data_type": column["data_type"],
+                "udt_name": column["udt_name"],
+                "is_geometry": (
+                    column["column_name"] == self.runtime_configuration.geometry_column
+                ),
+                "is_primary_key": (
+                    column["column_name"]
+                    == self.runtime_configuration.primary_key_column
+                ),
+                "is_label": (
+                    column["column_name"] == self.runtime_configuration.label_field
+                ),
+                "is_configured": column["column_name"] in policies,
+                "is_visible": (
+                    policies[column["column_name"]].is_visible
+                    if column["column_name"] in policies
+                    else False
+                ),
+                "is_filterable": (
+                    policies[column["column_name"]].is_filterable
+                    if column["column_name"] in policies
+                    else False
+                ),
+                "is_searchable": (
+                    policies[column["column_name"]].is_searchable
+                    if column["column_name"] in policies
+                    else False
+                ),
+                "is_exportable": (
+                    policies[column["column_name"]].is_exportable
+                    if column["column_name"] in policies
+                    else False
+                ),
+            }
+            for column in self._get_existing_columns()
+        ]
+
     @staticmethod
     def get_policy_label(policy):
         return policy.display_label or policy.column_name.replace("_", " ").title()
@@ -258,7 +302,9 @@ class LocalRelationDatasetRuntimeAdapter:
         return record
 
     def _validate_configured_columns(self):
-        existing_columns = self._get_existing_column_names()
+        existing_columns = {
+            column["column_name"] for column in self._get_existing_columns()
+        }
         configured_columns = {
             self.runtime_configuration.primary_key_column,
             self.runtime_configuration.geometry_column,
@@ -273,27 +319,35 @@ class LocalRelationDatasetRuntimeAdapter:
                 f"{', '.join(missing_columns)}."
             )
 
-    def _get_existing_column_names(self):
+    def _get_existing_columns(self):
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT column_name
+                SELECT column_name, data_type, udt_name
                 FROM information_schema.columns
                 WHERE table_schema = %s AND table_name = %s
+                ORDER BY ordinal_position
                 """,
                 [
                     self.runtime_configuration.schema_name,
                     self.runtime_configuration.relation_name,
                 ],
             )
-            column_names = {row[0] for row in cursor.fetchall()}
-        if not column_names:
+            columns = [
+                {
+                    "column_name": row[0],
+                    "data_type": row[1],
+                    "udt_name": row[2],
+                }
+                for row in cursor.fetchall()
+            ]
+        if not columns:
             raise ImproperlyConfigured(
                 "Local relation dataset runtime relation was not found: "
                 f"{self.runtime_configuration.schema_name}."
                 f"{self.runtime_configuration.relation_name}."
             )
-        return column_names
+        return columns
 
 
 def get_dataset_runtime_compatibility(runtime_model_name):

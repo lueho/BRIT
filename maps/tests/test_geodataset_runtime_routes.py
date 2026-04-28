@@ -198,6 +198,36 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
             '"public"."dataset_runtime_test_features"',
         )
 
+    def test_local_relation_adapter_introspects_columns_without_exposing_them(self):
+        adapter = get_dataset_runtime_adapter(self.dataset)
+
+        columns = {column["name"]: column for column in adapter.get_relation_columns()}
+
+        self.assertTrue(columns["feature_id"]["is_primary_key"])
+        self.assertTrue(columns["name"]["is_label"])
+        self.assertTrue(columns["geom"]["is_geometry"])
+        self.assertTrue(columns["nuts_id"]["is_configured"])
+        self.assertTrue(columns["nuts_id"]["is_visible"])
+        self.assertTrue(columns["nuts_id"]["is_filterable"])
+        self.assertTrue(columns["hidden_code"]["is_configured"])
+        self.assertFalse(columns["hidden_code"]["is_visible"])
+        self.assertFalse(columns["name"]["is_configured"])
+
+    def test_local_relation_adapter_reports_missing_configured_columns(self):
+        GeoDatasetColumnPolicy.objects.create(
+            dataset=self.dataset,
+            column_name="missing_column",
+            display_label="Missing column",
+            is_visible=True,
+        )
+        adapter = get_dataset_runtime_adapter(self.dataset)
+
+        with self.assertRaisesMessage(
+            ImproperlyConfigured,
+            "Local relation dataset references missing columns: missing_column.",
+        ):
+            adapter.get_records()
+
     def test_local_relation_table_route_renders_visible_columns(self):
         response = self.client.get(
             reverse("geodataset-table", kwargs={"pk": self.dataset.pk})
