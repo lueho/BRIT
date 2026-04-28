@@ -4,7 +4,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.db.models import Subquery
 from django.forms import formset_factory
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.views import View
 from django.views.generic import DetailView, TemplateView
@@ -532,6 +532,23 @@ class GeoDataSetRuntimePermissionMixin:
             ) from err
         return self._dataset
 
+    def get_features_geometries_url(self):
+        adapter = self.get_runtime_adapter()
+        if getattr(adapter, "uses_local_relation", False):
+            return reverse(
+                "geodataset-features-geojson", kwargs={"pk": self.get_dataset().pk}
+            )
+        return super().get_features_geometries_url()
+
+    def get_features_layer_details_url_template(self):
+        adapter = self.get_runtime_adapter()
+        if getattr(adapter, "uses_local_relation", False):
+            return reverse(
+                "geodataset-feature-detail",
+                kwargs={"pk": self.get_dataset().pk, "feature_pk": 0},
+            ).replace("/0/", "/")
+        return super().get_features_layer_details_url_template()
+
     def test_func(self):
         policy = get_object_policy(
             self.request.user,
@@ -547,6 +564,9 @@ class GeoDataSetRuntimePermissionMixin:
         )
 
     def get_queryset(self):
+        adapter = self.get_runtime_adapter()
+        if getattr(adapter, "uses_local_relation", False):
+            return adapter.get_records(query_params=self.request.GET)
         queryset = super().get_queryset()
         if not self.apply_user_visibility_filter:
             return queryset
@@ -634,6 +654,14 @@ class GeoDataSetRuntimeMapView(
         self.object = dataset
         self.map_title = dataset.name
         self.dashboard_url = dataset.get_absolute_url()
+
+    def get(self, request, *args, **kwargs):
+        adapter = self.get_runtime_adapter()
+        if not getattr(adapter, "uses_local_relation", False):
+            return super().get(request, *args, **kwargs)
+        self.object_list = adapter.get_records(query_params=request.GET)
+        context = self.get_context_data(object_list=self.object_list)
+        return self.render_to_response(context)
 
     def test_func(self):
         policy = get_object_policy(
@@ -782,6 +810,21 @@ class GeoDataSetRuntimeFeatureDetailView(
             }
         )
         return context
+
+
+class GeoDataSetRuntimeFeatureGeoJSONView(
+    GeoDataSetRuntimePermissionMixin, UserPassesTestMixin, APIView
+):
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request, *args, **kwargs):
+        adapter = self.get_runtime_adapter()
+        if not getattr(adapter, "uses_local_relation", False):
+            raise Http404("Dataset does not use a local relation runtime.")
+        return Response(
+            adapter.get_geojson_feature_collection(query_params=request.GET)
+        )
 
 
 class GeoDataSetPublishedFilteredMapView(FilteredMapMixin, PublishedObjectFilterView):

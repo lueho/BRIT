@@ -1,6 +1,6 @@
 # Dataset Registry and Federated Geodata Target-State Plan
 
-- **Status**: Active roadmap; Phase 0 complete, Phase 1 Task 1.1 complete, Task 1.2 route family complete on the compatibility-backed runtime path
+- **Status**: Active roadmap; Phase 0 complete, Phase 1 Tasks 1.1-1.3 complete enough for the current compatibility-backed route path, Task 1.4 local-relation table/detail/map API slice in progress
 - **Date**: 2026-04-16
 - **Scope**: `maps` dataset onboarding, standalone exploration, long-term federation of external geospatial data sources, and domain-level harmonized integration across incompatible datasets
 
@@ -1154,15 +1154,15 @@ Deliverables:
   - Dataset-scoped runtime views now resolve through a `maps.runtime_adapters.DatasetRuntimeAdapter` boundary instead of owning compatibility mapping logic directly in `maps.views`.
   - Compatibility-backed Django model datasets still use the existing model/filterset route behavior behind that boundary.
 
-- **Task 1.4 has started with a local relation table/detail query path**
+- **Task 1.4 has started with a local relation table/detail/map API query path**
   - `maps.runtime_adapters.LocalRelationDatasetRuntimeAdapter` can now read a configured local PostGIS relation/table through validated runtime metadata.
-  - The first slice supports quoted schema/table/column identifiers, required metadata validation, selected visible columns, exact-match filters for explicitly filterable columns, bounded table reads, and single-feature lookup.
-  - Dataset-scoped table and feature-detail routes can render records from this adapter without a bespoke Django model or `model_name` lookup.
-  - The map/API path for local relations remains intentionally incomplete and should be the next runtime integration step.
+  - The first slice supports quoted schema/table/column identifiers, required metadata validation, selected visible columns, exact-match filters for explicitly filterable columns, bounded table reads, single-feature lookup, and dataset-scoped GeoJSON output from the configured geometry column.
+  - Dataset-scoped table, feature-detail, map, and `geodataset-features-geojson` routes can render records from this adapter without a bespoke Django model or `model_name` lookup.
+  - This is still a deliberately small local-relation slice; richer schema introspection, summaries, exports, and production pilot hardening remain follow-up work.
 
 - **Current next step**
-  - Continue Task 1.4 and Task 1.5 by wiring the local relation adapter into the map/features API surface and map-configuration flow.
-  - Prove the path with a boring pilot dataset before expanding to federation, versioning, or domain harmonization.
+  - Continue Task 1.4 and Task 1.5 by hardening local-relation map configuration and proving the path with a boring pilot dataset.
+  - Avoid expanding to federation, versioning, or domain harmonization until the local pilot is validated.
 
 Success criteria:
 

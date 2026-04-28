@@ -1,3 +1,4 @@
+import json
 import re
 from dataclasses import dataclass
 
@@ -127,13 +128,9 @@ class LocalRelationDatasetRuntimeAdapter:
         return self.runtime_configuration.features_api_basename
 
     def configure_view(self, view, *, template_name=None):
-        if template_name is None:
-            raise ImproperlyConfigured(
-                "Local relation dataset map querying is not implemented yet."
-            )
         view.model = None
         view.filterset_class = None
-        view.template_name = template_name
+        view.template_name = template_name or "filtered_map.html"
         view.apply_user_visibility_filter = self.apply_user_visibility_filter
         view.model_name = ""
         view.features_layer_api_basename = self.features_api_basename
@@ -167,13 +164,34 @@ class LocalRelationDatasetRuntimeAdapter:
             raise Http404("No feature found for this dataset.")
         return records[0]
 
-    def _fetch_records(self, query_params=None, pk=None):
+    def get_geojson_feature_collection(self, query_params=None):
+        records = self._fetch_records(query_params=query_params, include_geometry=True)
+        return {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "id": record.pk,
+                    "geometry": record.geometry,
+                    "properties": record.properties,
+                }
+                for record in records
+            ],
+        }
+
+    def _fetch_records(self, query_params=None, pk=None, include_geometry=False):
         self._validate_configured_columns()
         selected_columns = self._get_selected_columns()
         select_sql = [
             f"{connection.ops.quote_name(column)} AS {connection.ops.quote_name(column)}"
             for column in selected_columns
         ]
+        if include_geometry:
+            select_sql.append(
+                "ST_AsGeoJSON("
+                f"{connection.ops.quote_name(self.runtime_configuration.geometry_column)}"
+                ") AS __geometry_geojson"
+            )
         where_sql = []
         params = []
         if pk is not None:
@@ -198,7 +216,10 @@ class LocalRelationDatasetRuntimeAdapter:
         with connection.cursor() as cursor:
             cursor.execute(sql, params)
             rows = cursor.fetchall()
-        return [self._build_record(row, selected_columns) for row in rows]
+        return [
+            self._build_record(row, selected_columns, include_geometry=include_geometry)
+            for row in rows
+        ]
 
     def _get_selected_columns(self):
         columns = [
@@ -216,15 +237,25 @@ class LocalRelationDatasetRuntimeAdapter:
             columns.append(self.runtime_configuration.label_field)
         return columns
 
-    def _build_record(self, row, selected_columns):
-        values = dict(zip(selected_columns, row, strict=True))
+    def _build_record(self, row, selected_columns, *, include_geometry=False):
+        value_count = len(selected_columns)
+        values = dict(zip(selected_columns, row[:value_count], strict=True))
         pk = values[self.runtime_configuration.primary_key_column]
         label = (
             values.get(self.runtime_configuration.label_field)
             if self.runtime_configuration.label_field
             else pk
         )
-        return LocalRelationRecord(pk=pk, label=label, values=values)
+        record = LocalRelationRecord(pk=pk, label=label, values=values)
+        if include_geometry:
+            geometry_json = row[value_count]
+            record.geometry = json.loads(geometry_json) if geometry_json else None
+            record.properties = {
+                column: value
+                for column, value in values.items()
+                if column != self.runtime_configuration.primary_key_column
+            }
+        return record
 
     def _validate_configured_columns(self):
         existing_columns = self._get_existing_column_names()

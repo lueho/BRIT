@@ -179,8 +179,8 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
                 INSERT INTO public.{self.relation_name}
                     (feature_id, name, nuts_id, hidden_code, geom)
                 VALUES
-                    (1, 'Local feature A', 'DE-A', 'hidden-a', NULL),
-                    (2, 'Local feature B', 'DE-B', 'hidden-b', NULL)
+                    (1, 'Local feature A', 'DE-A', 'hidden-a', ST_SetSRID(ST_Point(10, 53), 4326)),
+                    (2, 'Local feature B', 'DE-B', 'hidden-b', ST_SetSRID(ST_Point(11, 54), 4326))
                 """
             )
 
@@ -234,6 +234,38 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertContains(response, "NUTS ID")
         self.assertContains(response, "DE-A")
         self.assertNotContains(response, "Hidden code")
+
+    def test_local_relation_geojson_route_returns_feature_collection(self):
+        response = self.client.get(
+            reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["type"], "FeatureCollection")
+        self.assertEqual(len(response.json()["features"]), 2)
+        self.assertEqual(response.json()["features"][0]["geometry"]["type"], "Point")
+        self.assertEqual(
+            response.json()["features"][0]["properties"]["nuts_id"], "DE-A"
+        )
+        self.assertNotIn("hidden_code", response.json()["features"][0]["properties"])
+
+    def test_local_relation_map_route_uses_dataset_scoped_geojson_url(self):
+        response = self.client.get(
+            reverse("geodataset-map", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context["map_config"]["featuresLayerGeometriesUrl"],
+            reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk}),
+        )
+        self.assertEqual(
+            response.context["map_config"]["featuresLayerDetailsUrlTemplate"],
+            reverse(
+                "geodataset-feature-detail",
+                kwargs={"pk": self.dataset.pk, "feature_pk": 0},
+            ).replace("/0/", "/"),
+        )
 
     def test_local_relation_adapter_rejects_invalid_identifier(self):
         runtime_configuration = self.dataset.runtime_configuration
