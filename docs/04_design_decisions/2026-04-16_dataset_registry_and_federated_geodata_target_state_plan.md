@@ -1150,6 +1150,10 @@ Deliverables:
   - The current map/table/detail route family still resolves through compatibility runtime-model mappings and feature API basenames, so this is not yet the final generic table/view-backed runtime path.
   - The first table/detail slice uses `GeoDatasetColumnPolicy` visibility records for displayed fields and keeps feature navigation scoped by stable dataset identity.
 
+- **Task 1.3 has started with an adapter boundary**
+  - Dataset-scoped runtime views now resolve through a `maps.runtime_adapters.DatasetRuntimeAdapter` boundary instead of owning compatibility mapping logic directly in `maps.views`.
+  - The current adapter is still compatibility-backed by Django model mappings; it is a stepping stone toward the local relation/view-backed adapter required by Task 1.4.
+
 - **Current next step**
   - Continue Task 1.3 and Task 1.4 by replacing compatibility runtime-model resolution with one real local relation/view-backed adapter.
   - Prove the path with a boring pilot dataset before expanding to federation, versioning, or domain harmonization.

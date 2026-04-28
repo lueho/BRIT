@@ -9,6 +9,7 @@ from maps.models import (
     NutsRegion,
     Region,
 )
+from maps.runtime_adapters import get_dataset_runtime_adapter
 
 
 class GeoDataSetRuntimeRouteTestCase(TestCase):
@@ -84,6 +85,17 @@ class GeoDataSetRuntimeRouteTestCase(TestCase):
                 "geodataset-feature-detail",
                 kwargs={"pk": self.dataset.pk, "feature_pk": self.feature.pk},
             ),
+        )
+
+    def test_runtime_adapter_resolves_compatibility_runtime(self):
+        adapter = get_dataset_runtime_adapter(self.dataset)
+
+        self.assertEqual(adapter.runtime_model_name, "NutsRegion")
+        self.assertIs(adapter.model, NutsRegion)
+        self.assertEqual(adapter.features_api_basename, "api-nuts-region")
+        self.assertEqual(
+            [policy.column_name for policy in adapter.get_visible_column_policies()],
+            ["nuts_id"],
         )
 
     def test_dataset_feature_detail_route_renders_visible_columns(self):

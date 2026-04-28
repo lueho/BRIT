@@ -13,6 +13,7 @@ from django_filters.views import FilterView
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.views import APIView, Response
 
+from maps.runtime_adapters import get_dataset_runtime_adapter
 from maps.serializers import (
     CatchmentGeoFeatureModelSerializer,
     LauRegionOptionSerializer,
@@ -23,7 +24,6 @@ from maps.serializers import (
     NutsRegionSummarySerializer,
     RegionGeoFeatureModelSerializer,
 )
-from sources.registry import get_source_domain_dataset_runtime_compatibility
 from utils.forms import TomSelectFormsetHelper
 from utils.object_management.permissions import (
     filter_queryset_for_user,
@@ -504,54 +504,15 @@ class GeoDataSetDetailView(MapMixin, UserCreatedObjectDetailView):
         return self._cached_map_configuration
 
 
-LEGACY_DATASET_RUNTIME_COMPATIBILITY = {
-    "NutsRegion": {
-        "model": NutsRegion,
-        "filterset_class": NutsRegionFilterSet,
-        "template_name": "nuts_region_map.html",
-        "features_api_basename": "api-nuts-region",
-        "apply_user_visibility_filter": True,
-    }
-}
-
-
-def get_dataset_runtime_compatibility(runtime_model_name):
-    compatibility = LEGACY_DATASET_RUNTIME_COMPATIBILITY.get(runtime_model_name)
-    if compatibility is not None:
-        return compatibility
-    return get_source_domain_dataset_runtime_compatibility(runtime_model_name)
-
-
-def configure_dataset_runtime_view(view, dataset):
-    runtime_model_name = dataset.get_runtime_model_name()
-    compatibility = get_dataset_runtime_compatibility(runtime_model_name)
-    if compatibility is None:
-        raise ImproperlyConfigured(
-            f"No dataset runtime compatibility registered for {runtime_model_name}."
-        )
-    if isinstance(compatibility, dict):
-        view.model = compatibility["model"]
-        view.filterset_class = compatibility["filterset_class"]
-        view.template_name = compatibility["template_name"]
-        view.apply_user_visibility_filter = compatibility[
-            "apply_user_visibility_filter"
-        ]
-        features_api_basename = compatibility["features_api_basename"]
-    else:
-        view.model = compatibility.resolve_model()
-        view.filterset_class = compatibility.resolve_filterset_class()
-        view.template_name = compatibility.template_name
-        view.apply_user_visibility_filter = compatibility.apply_user_visibility_filter
-        features_api_basename = compatibility.features_api_basename
-    view.model_name = runtime_model_name
-    view.features_layer_api_basename = (
-        dataset.get_features_api_basename() or features_api_basename
-    )
-
-
 class GeoDataSetRuntimePermissionMixin:
     _dataset = None
+    _runtime_adapter = None
     apply_user_visibility_filter = True
+
+    def get_runtime_adapter(self):
+        if self._runtime_adapter is None:
+            self._runtime_adapter = get_dataset_runtime_adapter(self.get_dataset())
+        return self._runtime_adapter
 
     def get_dataset(self):
         if self._dataset is not None:
@@ -592,24 +553,13 @@ class GeoDataSetRuntimePermissionMixin:
         return filter_queryset_for_user(queryset, self.request.user)
 
     def get_visible_column_policies(self):
-        return list(
-            self.get_dataset()
-            .column_policies.filter(is_visible=True)
-            .order_by("column_name")
-        )
+        return self.get_runtime_adapter().get_visible_column_policies()
 
-    @staticmethod
-    def get_policy_label(policy):
-        return policy.display_label or policy.column_name.replace("_", " ").title()
+    def get_policy_label(self, policy):
+        return self.get_runtime_adapter().get_policy_label(policy)
 
-    @staticmethod
-    def get_column_value(obj, column_name):
-        value = obj
-        for attr in column_name.split("__"):
-            value = getattr(value, attr, None)
-            if value is None:
-                return ""
-        return value
+    def get_column_value(self, obj, column_name):
+        return self.get_runtime_adapter().get_column_value(obj, column_name)
 
 
 class FilteredMapMixin(MapMixin):
@@ -672,13 +622,15 @@ class FilteredMapMixin(MapMixin):
         return context
 
 
-class GeoDataSetRuntimeMapView(UserPassesTestMixin, FilteredMapMixin, FilterView):
+class GeoDataSetRuntimeMapView(
+    GeoDataSetRuntimePermissionMixin, UserPassesTestMixin, FilteredMapMixin, FilterView
+):
     paginate_by = None
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
         dataset = self.get_dataset()
-        configure_dataset_runtime_view(self, dataset)
+        self.get_runtime_adapter().configure_view(self)
         self.object = dataset
         self.map_title = dataset.name
         self.dashboard_url = dataset.get_absolute_url()
@@ -727,9 +679,9 @@ class GeoDataSetRuntimeTableView(
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-        dataset = self.get_dataset()
-        configure_dataset_runtime_view(self, dataset)
-        self.template_name = "maps/geodataset_table.html"
+        self.get_runtime_adapter().configure_view(
+            self, template_name="maps/geodataset_table.html"
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -785,9 +737,9 @@ class GeoDataSetRuntimeFeatureDetailView(
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-        dataset = self.get_dataset()
-        configure_dataset_runtime_view(self, dataset)
-        self.template_name = "maps/geodataset_feature_detail.html"
+        self.get_runtime_adapter().configure_view(
+            self, template_name="maps/geodataset_feature_detail.html"
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
