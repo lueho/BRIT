@@ -226,7 +226,7 @@ class CollectorDetailPermissionRegressionTest(ViewWithPermissionsTestCase):
 
         self.assertContains(
             response,
-            f"{reverse("collection-create")}?collector={self.collector.pk}",
+            f"{reverse('collection-create')}?collector={self.collector.pk}",
         )
 
     def test_detail_hides_create_collection_link_without_permission(self):
@@ -237,7 +237,7 @@ class CollectorDetailPermissionRegressionTest(ViewWithPermissionsTestCase):
 
         self.assertNotContains(
             response,
-            f"{reverse("collection-create")}?collector={self.collector.pk}",
+            f"{reverse('collection-create')}?collector={self.collector.pk}",
         )
 
 
@@ -338,7 +338,7 @@ class WasteComponentCRUDViewsTestCase(
     def create_published_object(cls):
         # This method is overridden to give another name to the published object because of the unique name constraint
         data = cls.create_object_data.copy()
-        data["name"] = f"{data["name"]} (published)"
+        data["name"] = f"{data['name']} (published)"
         data["publication_status"] = "published"
         data.update(cls.related_objects)
         return cls.model.objects.create(owner=cls.owner_user, **data)
@@ -668,12 +668,14 @@ class CollectionPropertyValueCRUDViewsTestCase(
     def related_objects_post_data(self):
         data = super().related_objects_post_data()
         # Add formset management data for WasteFlyerFormSet
-        data.update({
-            "form-TOTAL_FORMS": "0",
-            "form-INITIAL_FORMS": "0",
-            "form-MIN_NUM_FORMS": "0",
-            "form-MAX_NUM_FORMS": "1000",
-        })
+        data.update(
+            {
+                "form-TOTAL_FORMS": "0",
+                "form-INITIAL_FORMS": "0",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+            }
+        )
         return data
 
     def get_delete_success_url(self, publication_status=None):
@@ -832,21 +834,23 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(
 
     def related_objects_post_data(self):
         data = super().related_objects_post_data()
-        data.update({
-            "collections": [
-                Collection.objects.create(
-                    name="Test Collection 3", publication_status="published"
-                ).pk,
-                Collection.objects.create(
-                    name="Test Collection 4", publication_status="published"
-                ).pk,
-            ],
-            # Add formset management data for WasteFlyerFormSet
-            "form-TOTAL_FORMS": "0",
-            "form-INITIAL_FORMS": "0",
-            "form-MIN_NUM_FORMS": "0",
-            "form-MAX_NUM_FORMS": "1000",
-        })
+        data.update(
+            {
+                "collections": [
+                    Collection.objects.create(
+                        name="Test Collection 3", publication_status="published"
+                    ).pk,
+                    Collection.objects.create(
+                        name="Test Collection 4", publication_status="published"
+                    ).pk,
+                ],
+                # Add formset management data for WasteFlyerFormSet
+                "form-TOTAL_FORMS": "0",
+                "form-INITIAL_FORMS": "0",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+            }
+        )
         return data
 
     def get_delete_success_url(self, publication_status=None):
@@ -1049,22 +1053,30 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         cls.unpublished_object.flyers.add(cls.flyer2)
         cls.published_object.flyers.add(cls.flyer)
         cls.published_object.flyers.add(cls.flyer2)
-        cls.unpublished_object.allowed_materials.set([
-            cls.allowed_material_1,
-            cls.allowed_material_2,
-        ])
-        cls.unpublished_object.forbidden_materials.set([
-            cls.forbidden_material_1,
-            cls.forbidden_material_2,
-        ])
-        cls.published_object.allowed_materials.set([
-            cls.allowed_material_1,
-            cls.allowed_material_2,
-        ])
-        cls.published_object.forbidden_materials.set([
-            cls.forbidden_material_1,
-            cls.forbidden_material_2,
-        ])
+        cls.unpublished_object.allowed_materials.set(
+            [
+                cls.allowed_material_1,
+                cls.allowed_material_2,
+            ]
+        )
+        cls.unpublished_object.forbidden_materials.set(
+            [
+                cls.forbidden_material_1,
+                cls.forbidden_material_2,
+            ]
+        )
+        cls.published_object.allowed_materials.set(
+            [
+                cls.allowed_material_1,
+                cls.allowed_material_2,
+            ]
+        )
+        cls.published_object.forbidden_materials.set(
+            [
+                cls.forbidden_material_1,
+                cls.forbidden_material_2,
+            ]
+        )
 
     @classmethod
     def create_related_objects(cls):
@@ -1120,22 +1132,30 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             description="Predecessor Collection 2",
             publication_status="published",
         )
-        predecessor_1.allowed_materials.set([
-            cls.allowed_material_1,
-            cls.allowed_material_2,
-        ])
-        predecessor_1.forbidden_materials.set([
-            cls.forbidden_material_1,
-            cls.forbidden_material_2,
-        ])
-        predecessor_2.allowed_materials.set([
-            cls.allowed_material_1,
-            cls.allowed_material_2,
-        ])
-        predecessor_2.forbidden_materials.set([
-            cls.forbidden_material_1,
-            cls.forbidden_material_2,
-        ])
+        predecessor_1.allowed_materials.set(
+            [
+                cls.allowed_material_1,
+                cls.allowed_material_2,
+            ]
+        )
+        predecessor_1.forbidden_materials.set(
+            [
+                cls.forbidden_material_1,
+                cls.forbidden_material_2,
+            ]
+        )
+        predecessor_2.allowed_materials.set(
+            [
+                cls.allowed_material_1,
+                cls.allowed_material_2,
+            ]
+        )
+        predecessor_2.forbidden_materials.set(
+            [
+                cls.forbidden_material_1,
+                cls.forbidden_material_2,
+            ]
+        )
         # Create a bunch of unused outdated collections
         for i in range(12):
             collection = Collection.objects.create(
@@ -1149,14 +1169,18 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
                 description=f"Oudated Collection {i}",
                 publication_status="published",
             )
-            collection.allowed_materials.set([
-                cls.allowed_material_1,
-                cls.allowed_material_2,
-            ])
-            collection.forbidden_materials.set([
-                cls.forbidden_material_1,
-                cls.forbidden_material_2,
-            ])
+            collection.allowed_materials.set(
+                [
+                    cls.allowed_material_1,
+                    cls.allowed_material_2,
+                ]
+            )
+            collection.forbidden_materials.set(
+                [
+                    cls.forbidden_material_1,
+                    cls.forbidden_material_2,
+                ]
+            )
         return {
             "catchment": catchment,
             "collector": collector,
@@ -1178,12 +1202,14 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
     def related_objects_post_data(self):
         data = super().related_objects_post_data()
-        data.update({
-            "waste_category": WasteCategory.objects.get(name="Test category").pk,
-            "valid_from": date.today(),
-            "form-TOTAL_FORMS": 0,
-            "form-INITIAL_FORMS": 0,
-        })
+        data.update(
+            {
+                "waste_category": WasteCategory.objects.get(name="Test category").pk,
+                "valid_from": date.today(),
+                "form-TOTAL_FORMS": 0,
+                "form-INITIAL_FORMS": 0,
+            }
+        )
         return data
 
     def get_current_list_url(self, publication_status=None):
@@ -1630,14 +1656,18 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             description="This is a test case.",
             publication_status="published",
         )
-        cls.collection.allowed_materials.set([
-            cls.allowed_material_1,
-            cls.allowed_material_2,
-        ])
-        cls.collection.forbidden_materials.set([
-            cls.forbidden_material_1,
-            cls.forbidden_material_2,
-        ])
+        cls.collection.allowed_materials.set(
+            [
+                cls.allowed_material_1,
+                cls.allowed_material_2,
+            ]
+        )
+        cls.collection.forbidden_materials.set(
+            [
+                cls.forbidden_material_1,
+                cls.forbidden_material_2,
+            ]
+        )
         cls.collection.flyers.add(cls.flyer)
         cls.collection.flyers.add(cls.flyer2)
 
@@ -1754,6 +1784,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             "frequency": self.frequency.id,
             "valid_from": date(2022, 1, 1),
             "description": "This is a test case that should pass!",
+            "reviewed_predecessor_evidence": "on",
             "form-INITIAL_FORMS": "0",
             "form-TOTAL_FORMS": "0",
         }
@@ -2004,14 +2035,18 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
             description="This is a test case.",
             publication_status="published",
         )
-        cls.collection.allowed_materials.set([
-            cls.allowed_material_1,
-            cls.allowed_material_2,
-        ])
-        cls.collection.forbidden_materials.set([
-            cls.forbidden_material_1,
-            cls.forbidden_material_2,
-        ])
+        cls.collection.allowed_materials.set(
+            [
+                cls.allowed_material_1,
+                cls.allowed_material_2,
+            ]
+        )
+        cls.collection.forbidden_materials.set(
+            [
+                cls.forbidden_material_1,
+                cls.forbidden_material_2,
+            ]
+        )
         cls.collection.flyers.add(cls.flyer)
         cls.collection.flyers.add(cls.flyer2)
         cls.private_collection = Collection.objects.create(
@@ -2106,6 +2141,7 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
             "frequency": self.frequency.id,
             "valid_from": date(2022, 1, 1),
             "description": "This is a test case that should pass!",
+            "reviewed_predecessor_evidence": "on",
             "form-INITIAL_FORMS": "0",
             "form-TOTAL_FORMS": "0",
         }
@@ -4105,19 +4141,19 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            f"{reverse("waste-atlas-collection-system-map")}?country=SE&amp;year=2023",
+            f"{reverse('waste-atlas-collection-system-map')}?country=SE&amp;year=2023",
         )
         self.assertContains(
             response,
-            f"{reverse("waste-atlas-connection-rate-map")}?country=SE&amp;year=2023",
+            f"{reverse('waste-atlas-connection-rate-map')}?country=SE&amp;year=2023",
         )
         self.assertContains(
             response,
-            f"{reverse("waste-atlas-biowaste-collection-amount-map")}?country=SE&amp;year=2023",
+            f"{reverse('waste-atlas-biowaste-collection-amount-map')}?country=SE&amp;year=2023",
         )
         self.assertContains(
             response,
-            f"{reverse("waste-atlas-organic-waste-ratio-map")}?country=SE&amp;year=2023",
+            f"{reverse('waste-atlas-organic-waste-ratio-map')}?country=SE&amp;year=2023",
         )
         self.assertContains(response, reverse("waste-atlas-orga-level-denmark-map"))
         self.assertContains(
@@ -4126,23 +4162,23 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            f"{reverse("waste-atlas-collection-system-map")}?country=DK&amp;year=2023",
+            f"{reverse('waste-atlas-collection-system-map')}?country=DK&amp;year=2023",
         )
         self.assertContains(
             response,
-            f"{reverse("waste-atlas-biowaste-frequency-map")}?country=DK&amp;year=2023",
+            f"{reverse('waste-atlas-biowaste-frequency-map')}?country=DK&amp;year=2023",
         )
         self.assertContains(
             response,
-            f"{reverse("waste-atlas-biowaste-collection-amount-map")}?country=DK&amp;year=2023",
+            f"{reverse('waste-atlas-biowaste-collection-amount-map')}?country=DK&amp;year=2023",
         )
         self.assertContains(
             response,
-            f"{reverse("waste-atlas-organic-collection-amount-map")}?country=DK&amp;year=2023",
+            f"{reverse('waste-atlas-organic-collection-amount-map')}?country=DK&amp;year=2023",
         )
         self.assertContains(
             response,
-            f"{reverse("waste-atlas-organic-waste-ratio-map")}?country=DK&amp;year=2023",
+            f"{reverse('waste-atlas-organic-waste-ratio-map')}?country=DK&amp;year=2023",
         )
         self.assertContains(
             response,
@@ -5193,14 +5229,18 @@ class CollectionCSVRendererTestCase(TestCase):
                 valid_from=date(2020, 1, 1),
                 description="This is a test case.",
             )
-            collection.allowed_materials.set([
-                cls.allowed_material_1,
-                cls.allowed_material_2,
-            ])
-            collection.forbidden_materials.set([
-                cls.forbidden_material_1,
-                cls.forbidden_material_2,
-            ])
+            collection.allowed_materials.set(
+                [
+                    cls.allowed_material_1,
+                    cls.allowed_material_2,
+                ]
+            )
+            collection.forbidden_materials.set(
+                [
+                    cls.forbidden_material_1,
+                    cls.forbidden_material_2,
+                ]
+            )
             collection.flyers.add(waste_flyer)
 
     def setUp(self):
@@ -5342,14 +5382,18 @@ class CollectionXLSXRendererTestCase(TestCase):
                 frequency=frequency,
                 description="This is a test case.",
             )
-            collection.allowed_materials.set([
-                cls.allowed_material_1,
-                cls.allowed_material_2,
-            ])
-            collection.forbidden_materials.set([
-                cls.forbidden_material_1,
-                cls.forbidden_material_2,
-            ])
+            collection.allowed_materials.set(
+                [
+                    cls.allowed_material_1,
+                    cls.allowed_material_2,
+                ]
+            )
+            collection.forbidden_materials.set(
+                [
+                    cls.forbidden_material_1,
+                    cls.forbidden_material_2,
+                ]
+            )
             collection.flyers.add(waste_flyer)
 
     def setUp(self):
@@ -6566,16 +6610,16 @@ class CollectionImporterBinConfigurationTestCase(TestCase):
     def test_unknown_bin_configuration_adds_warning_and_leaves_field_empty(self):
         """Unknown bin_configuration name produces a warning and does not block import."""
         importer = CollectionImporter(owner=self.owner, publication_status="private")
-        stats = importer.run([
-            self._make_record(bin_configuration="Nonexistent Method")
-        ])
+        stats = importer.run(
+            [self._make_record(bin_configuration="Nonexistent Method")]
+        )
         self.assertEqual(stats["created"], 1)
         self.assertTrue(
             any(
                 "BinConfiguration" in w and "Nonexistent Method" in w
                 for w in stats["warnings"]
             ),
-            msg=f"Expected BinConfiguration warning, got: {stats["warnings"]}",
+            msg=f"Expected BinConfiguration warning, got: {stats['warnings']}",
         )
 
         col = Collection.objects.get(

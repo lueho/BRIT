@@ -163,7 +163,7 @@ def _parse_whole_year_fixed_flexible_frequency(value: str) -> dict | None:
     return {
         "canonical_name": (
             f"Fixed-Flexible; Standard: {fragments[0]}; Optional: "
-            f"{", ".join(fragments[1:])}"
+            f"{', '.join(fragments[1:])}"
         ),
         "signature": (counts[0], tuple(sorted(option_counts))),
         "standard_count": counts[0],
@@ -406,7 +406,7 @@ class CollectionImporter:
                 collector.pk if collector else None
             ):
                 changes.append(
-                    f"collector: {collection.collector or "None"} → {collector}"
+                    f"collector: {collection.collector or 'None'} → {collector}"
                 )
                 collection.collector = collector
                 update_fields.append("collector")
@@ -416,7 +416,7 @@ class CollectionImporter:
                 fee_system.pk if fee_system else None
             ):
                 changes.append(
-                    f"fee_system: {collection.fee_system or "None"} → {fee_system}"
+                    f"fee_system: {collection.fee_system or 'None'} → {fee_system}"
                 )
                 collection.fee_system = fee_system
                 update_fields.append("fee_system")
@@ -426,7 +426,7 @@ class CollectionImporter:
                 frequency.pk if frequency else None
             ):
                 changes.append(
-                    f"frequency: {collection.frequency or "None"} → {frequency}"
+                    f"frequency: {collection.frequency or 'None'} → {frequency}"
                 )
                 collection.frequency = frequency
                 update_fields.append("frequency")
@@ -434,7 +434,7 @@ class CollectionImporter:
             # Update connection_type if different
             if connection_type and collection.connection_type != connection_type:
                 changes.append(
-                    f"connection_type: {collection.connection_type or "None"} → {connection_type}"
+                    f"connection_type: {collection.connection_type or 'None'} → {connection_type}"
                 )
                 collection.connection_type = connection_type
                 update_fields.append("connection_type")
@@ -444,7 +444,7 @@ class CollectionImporter:
                 bin_configuration.pk if bin_configuration else None
             ):
                 changes.append(
-                    f"bin_configuration: {collection.bin_configuration or "None"} → {bin_configuration}"
+                    f"bin_configuration: {collection.bin_configuration or 'None'} → {bin_configuration}"
                 )
                 collection.bin_configuration = bin_configuration
                 update_fields.append("bin_configuration")
@@ -479,7 +479,7 @@ class CollectionImporter:
                 and collection.required_bin_capacity_reference != bin_cap_ref
             ):
                 changes.append(
-                    f"required_bin_capacity_reference: {collection.required_bin_capacity_reference or "None"} → {bin_cap_ref}"
+                    f"required_bin_capacity_reference: {collection.required_bin_capacity_reference or 'None'} → {bin_cap_ref}"
                 )
                 collection.required_bin_capacity_reference = bin_cap_ref
                 update_fields.append("required_bin_capacity_reference")
@@ -499,7 +499,7 @@ class CollectionImporter:
             # Ensure inline waste fields stay in sync with imported payload.
             if collection.waste_category_id != waste_category.id:
                 changes.append(
-                    f"waste_category: {collection.effective_waste_category or "None"} → {waste_category}"
+                    f"waste_category: {collection.effective_waste_category or 'None'} → {waste_category}"
                 )
                 collection.waste_category = waste_category
                 update_fields.append("waste_category")
@@ -545,7 +545,7 @@ class CollectionImporter:
             ):
                 stats["updated"] = stats.get("updated", 0) + 1
                 stats["changes"] = stats.get("changes", [])
-                stats["changes"].append(f"{label}: {", ".join(changes)}")
+                stats["changes"].append(f"{label}: {', '.join(changes)}")
             else:
                 stats["unchanged"] += 1
 
@@ -619,7 +619,6 @@ class CollectionImporter:
                 [*source_urls, *(record.get("flyer_urls") or [])],
                 stats,
             )
-
             if self.publication_status == "review":
                 self._submit_for_review(collection)
 
@@ -746,13 +745,13 @@ class CollectionImporter:
         if prop is None:
             stats["cpv_skipped"] += 1
             stats["warnings"].append(
-                f"Property id={pv["property_id"]} not found — CPV skipped."
+                f"Property id={pv['property_id']} not found — CPV skipped."
             )
             return
         if unit is None:
             stats["cpv_skipped"] += 1
             stats["warnings"].append(
-                f"Unit '{pv["unit_name"]}' not found — CPV skipped."
+                f"Unit '{pv['unit_name']}' not found — CPV skipped."
             )
             return
 
