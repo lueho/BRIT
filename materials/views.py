@@ -1617,6 +1617,34 @@ class DerivedCompositionOrderDownView(_DerivedCompositionOrderView):
 class WeightShareModalDeleteView(UserCreatedObjectModalDeleteView):
     model = WeightShare
 
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        logger.info(
+            "Legacy normalized-composition compatibility share delete form opened",
+            extra={
+                "weightshare_id": self.object.pk,
+                "composition_id": self.object.composition_id,
+                "sample_id": self.object.composition.sample_id,
+                "component_id": self.object.component_id,
+                "user_id": request.user.pk,
+            },
+        )
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        logger.info(
+            "Legacy normalized-composition compatibility share deleted",
+            extra={
+                "weightshare_id": self.object.pk,
+                "composition_id": self.object.composition_id,
+                "sample_id": self.object.composition.sample_id,
+                "component_id": self.object.component_id,
+                "user_id": request.user.pk,
+            },
+        )
+        return super().post(request, *args, **kwargs)
+
     def get_success_url(self):
         return reverse(
             "sample-detail", kwargs={"pk": self.object.composition.sample.pk}

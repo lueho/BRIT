@@ -2681,6 +2681,36 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
                 id=self.m2m_objects["weight_shares"]["unpublished_weight_share_1"].pk
             )
 
+    def test_weightshare_delete_view_logs_legacy_normalized_composition_usage(self):
+        self.client.force_login(self.owner_user)
+        weight_share = self.m2m_objects["weight_shares"]["unpublished_weight_share_1"]
+        weight_share.owner = self.owner_user
+        weight_share.save(update_fields=["owner"])
+        url = reverse("weightshare-delete-modal", kwargs={"pk": weight_share.pk})
+
+        with self.assertLogs("materials.views", level="INFO") as logs:
+            self.client.get(url)
+
+        self.assertIn(
+            "Legacy normalized-composition compatibility share delete form opened",
+            logs.output[0],
+        )
+
+    def test_weightshare_delete_post_logs_legacy_normalized_composition_usage(self):
+        self.client.force_login(self.owner_user)
+        weight_share = self.m2m_objects["weight_shares"]["unpublished_weight_share_1"]
+        weight_share.owner = self.owner_user
+        weight_share.save(update_fields=["owner"])
+        url = reverse("weightshare-delete-modal", kwargs={"pk": weight_share.pk})
+
+        with self.assertLogs("materials.views", level="INFO") as logs:
+            self.client.post(url)
+
+        self.assertIn(
+            "Legacy normalized-composition compatibility share deleted",
+            logs.output[0],
+        )
+
 
 # ----------- Composition utilities ------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------

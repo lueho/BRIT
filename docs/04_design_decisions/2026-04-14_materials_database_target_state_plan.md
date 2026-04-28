@@ -608,7 +608,7 @@ If work should continue now, the best next implementation slice is Phase 5 prepa
 1. keep compatibility-only serializers such as persisted composition model/doughnut/chart helpers as legacy adapters until their callers are retired
    - covered by tests that verify they continue to read persisted `WeightShare` compatibility rows rather than raw `ComponentMeasurement` observations
 2. add deprecation or usage telemetry around legacy normalized-composition write views before any destructive cleanup is planned
-   - started by adding usage logs when users open or submit the saved normalized-composition compatibility editor/add-share flow
+   - started by adding usage logs when users open or submit the saved normalized-composition compatibility editor/add-share/delete-share flow
 3. plan a backfill/import strategy so new component observations consistently enter through `ComponentMeasurement`
    - started by extending `report_weightshare_backfill_candidates` into a dry-run-first operational command that can create missing `ComponentMeasurement` rows from saved normalized `WeightShare` compatibility rows for groups without raw measurements when explicitly run with `--apply`
 4. only after that evidence exists, consider retiring or narrowing persisted `WeightShare` compatibility storage
