@@ -683,6 +683,14 @@ class GeoDataSetRuntimeTableView(
             self, template_name="maps/geodataset_table.html"
         )
 
+    def get(self, request, *args, **kwargs):
+        adapter = self.get_runtime_adapter()
+        if not getattr(adapter, "uses_local_relation", False):
+            return super().get(request, *args, **kwargs)
+        self.object_list = adapter.get_records(query_params=request.GET)
+        context = self.get_context_data(object_list=self.object_list)
+        return self.render_to_response(context)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         dataset = self.get_dataset()
@@ -741,12 +749,19 @@ class GeoDataSetRuntimeFeatureDetailView(
             self, template_name="maps/geodataset_feature_detail.html"
         )
 
+    def get_object(self, queryset=None):
+        adapter = self.get_runtime_adapter()
+        if not getattr(adapter, "uses_local_relation", False):
+            return super().get_object(queryset=queryset)
+        return adapter.get_record(self.kwargs[self.pk_url_kwarg])
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         dataset = self.get_dataset()
         column_policies = self.get_visible_column_policies()
         context.update(
             {
+                "object": dataset,
                 "dataset": dataset,
                 "feature": self.object,
                 "field_values": [

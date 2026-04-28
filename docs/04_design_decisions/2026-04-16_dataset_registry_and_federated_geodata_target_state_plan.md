@@ -1152,10 +1152,16 @@ Deliverables:
 
 - **Task 1.3 has started with an adapter boundary**
   - Dataset-scoped runtime views now resolve through a `maps.runtime_adapters.DatasetRuntimeAdapter` boundary instead of owning compatibility mapping logic directly in `maps.views`.
-  - The current adapter is still compatibility-backed by Django model mappings; it is a stepping stone toward the local relation/view-backed adapter required by Task 1.4.
+  - Compatibility-backed Django model datasets still use the existing model/filterset route behavior behind that boundary.
+
+- **Task 1.4 has started with a local relation table/detail query path**
+  - `maps.runtime_adapters.LocalRelationDatasetRuntimeAdapter` can now read a configured local PostGIS relation/table through validated runtime metadata.
+  - The first slice supports quoted schema/table/column identifiers, required metadata validation, selected visible columns, exact-match filters for explicitly filterable columns, bounded table reads, and single-feature lookup.
+  - Dataset-scoped table and feature-detail routes can render records from this adapter without a bespoke Django model or `model_name` lookup.
+  - The map/API path for local relations remains intentionally incomplete and should be the next runtime integration step.
 
 - **Current next step**
-  - Continue Task 1.3 and Task 1.4 by replacing compatibility runtime-model resolution with one real local relation/view-backed adapter.
+  - Continue Task 1.4 and Task 1.5 by wiring the local relation adapter into the map/features API surface and map-configuration flow.
   - Prove the path with a boring pilot dataset before expanding to federation, versioning, or domain harmonization.
 
 Success criteria:

@@ -1,3 +1,5 @@
+from django.core.exceptions import ImproperlyConfigured
+from django.db import connection
 from django.test import TestCase
 from django.urls import reverse
 
@@ -9,7 +11,10 @@ from maps.models import (
     NutsRegion,
     Region,
 )
-from maps.runtime_adapters import get_dataset_runtime_adapter
+from maps.runtime_adapters import (
+    LocalRelationDatasetRuntimeAdapter,
+    get_dataset_runtime_adapter,
+)
 
 
 class GeoDataSetRuntimeRouteTestCase(TestCase):
@@ -115,3 +120,130 @@ class GeoDataSetRuntimeRouteTestCase(TestCase):
             response,
             reverse("geodataset-table", kwargs={"pk": self.dataset.pk}),
         )
+
+
+class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
+    relation_name = "dataset_runtime_test_features"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region.objects.create(
+            name="Local relation runtime region",
+            country="DE",
+            publication_status="published",
+        )
+        cls.dataset = GeoDataset.objects.create(
+            name="Local relation dataset",
+            publication_status="published",
+            region=cls.region,
+        )
+        GeoDatasetRuntimeConfiguration.objects.create(
+            dataset=cls.dataset,
+            backend_type="local_relation",
+            schema_name="public",
+            relation_name=cls.relation_name,
+            geometry_column="geom",
+            primary_key_column="feature_id",
+            label_field="name",
+        )
+        GeoDatasetColumnPolicy.objects.create(
+            dataset=cls.dataset,
+            column_name="nuts_id",
+            display_label="NUTS ID",
+            is_visible=True,
+            is_filterable=True,
+        )
+        GeoDatasetColumnPolicy.objects.create(
+            dataset=cls.dataset,
+            column_name="hidden_code",
+            display_label="Hidden code",
+            is_visible=False,
+        )
+
+    def setUp(self):
+        with connection.cursor() as cursor:
+            cursor.execute(f"DROP TABLE IF EXISTS public.{self.relation_name}")
+            cursor.execute(
+                f"""
+                CREATE TABLE public.{self.relation_name} (
+                    feature_id integer PRIMARY KEY,
+                    name varchar(100),
+                    nuts_id varchar(20),
+                    hidden_code varchar(20),
+                    geom geometry(Point, 4326)
+                )
+                """
+            )
+            cursor.execute(
+                f"""
+                INSERT INTO public.{self.relation_name}
+                    (feature_id, name, nuts_id, hidden_code, geom)
+                VALUES
+                    (1, 'Local feature A', 'DE-A', 'hidden-a', NULL),
+                    (2, 'Local feature B', 'DE-B', 'hidden-b', NULL)
+                """
+            )
+
+    def tearDown(self):
+        with connection.cursor() as cursor:
+            cursor.execute(f"DROP TABLE IF EXISTS public.{self.relation_name}")
+
+    def test_runtime_adapter_resolves_local_relation_runtime(self):
+        adapter = get_dataset_runtime_adapter(self.dataset)
+
+        self.assertIsInstance(adapter, LocalRelationDatasetRuntimeAdapter)
+        self.assertTrue(adapter.uses_local_relation)
+        self.assertEqual(
+            adapter.relation_identifier,
+            '"public"."dataset_runtime_test_features"',
+        )
+
+    def test_local_relation_table_route_renders_visible_columns(self):
+        response = self.client.get(
+            reverse("geodataset-table", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Local relation dataset features")
+        self.assertContains(response, "NUTS ID")
+        self.assertContains(response, "DE-A")
+        self.assertContains(response, "DE-B")
+        self.assertNotContains(response, "Hidden code")
+        self.assertNotContains(response, "hidden-a")
+
+    def test_local_relation_table_route_applies_filterable_column(self):
+        response = self.client.get(
+            reverse("geodataset-table", kwargs={"pk": self.dataset.pk}),
+            {"nuts_id": "DE-B"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "DE-B")
+        self.assertNotContains(response, "DE-A")
+
+    def test_local_relation_feature_detail_route_renders_visible_columns(self):
+        response = self.client.get(
+            reverse(
+                "geodataset-feature-detail",
+                kwargs={"pk": self.dataset.pk, "feature_pk": 1},
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Local feature A")
+        self.assertContains(response, "NUTS ID")
+        self.assertContains(response, "DE-A")
+        self.assertNotContains(response, "Hidden code")
+
+    def test_local_relation_adapter_rejects_invalid_identifier(self):
+        runtime_configuration = self.dataset.runtime_configuration
+        runtime_configuration.relation_name = "unsafe;table"
+
+        with self.assertRaisesMessage(
+            ImproperlyConfigured,
+            "Invalid local relation identifier: unsafe;table.",
+        ):
+            LocalRelationDatasetRuntimeAdapter(
+                dataset=self.dataset,
+                runtime_configuration=runtime_configuration,
+            )
