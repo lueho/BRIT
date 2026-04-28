@@ -228,6 +228,30 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         ):
             adapter.get_records()
 
+    def test_local_relation_adapter_reports_missing_required_metadata(self):
+        runtime_configuration = self.dataset.runtime_configuration
+        runtime_configuration.primary_key_column = ""
+        runtime_configuration.save(update_fields=["primary_key_column"])
+
+        with self.assertRaisesMessage(
+            ImproperlyConfigured,
+            "Local relation dataset runtime configuration is missing: "
+            "primary_key_column.",
+        ):
+            get_dataset_runtime_adapter(self.dataset)
+
+    def test_local_relation_adapter_reports_missing_primary_key_column(self):
+        runtime_configuration = self.dataset.runtime_configuration
+        runtime_configuration.primary_key_column = "missing_pk"
+        runtime_configuration.save(update_fields=["primary_key_column"])
+        adapter = get_dataset_runtime_adapter(self.dataset)
+
+        with self.assertRaisesMessage(
+            ImproperlyConfigured,
+            "Local relation dataset references missing columns: missing_pk.",
+        ):
+            adapter.get_records()
+
     def test_local_relation_adapter_rejects_invalid_policy_identifier(self):
         GeoDatasetColumnPolicy.objects.create(
             dataset=self.dataset,
