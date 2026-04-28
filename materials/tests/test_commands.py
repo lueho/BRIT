@@ -321,6 +321,21 @@ class WeightShareBackfillCandidateReportCommandTests(TestCase):
         self.assertIn("groups_with_backfill_candidates: 0", output)
         self.assertNotIn(f"sample #{candidate_sample.pk} Limited Candidate", output)
 
+    def test_command_can_fail_on_candidates(self):
+        sample = self._create_sample_with_saved_shares(sample_name="Failing Candidate")
+
+        out = io.StringIO()
+        with self.assertRaisesMessage(
+            CommandError,
+            "1 composition groups need raw measurement backfill.",
+        ):
+            call_command(
+                "report_weightshare_backfill_candidates",
+                sample_id=[sample.pk],
+                fail_on_candidates=True,
+                stdout=out,
+            )
+
     def _create_sample_with_saved_shares(
         self,
         *,

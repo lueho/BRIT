@@ -31,12 +31,18 @@ class Command(BaseCommand):
             default="%",
             help="Unit name to use for created component measurements.",
         )
+        parser.add_argument(
+            "--fail-on-candidates",
+            action="store_true",
+            help="Raise a command error when backfill candidates exist.",
+        )
 
     def handle(self, *args, **options):
         sample_ids = options["sample_id"]
         summary_only = options["summary_only"]
         apply_changes = options["apply"]
         unit_name = options["unit_name"]
+        fail_on_candidates = options["fail_on_candidates"]
         unit = Unit.objects.filter(name=unit_name).first()
         if unit is None:
             raise CommandError(f'Unit "{unit_name}" does not exist.')
@@ -113,6 +119,11 @@ class Command(BaseCommand):
         if not summary_only:
             self._write_rows(
                 "Saved normalized groups without raw measurements:", candidate_rows
+            )
+
+        if fail_on_candidates and stats["groups_with_backfill_candidates"]:
+            raise CommandError(
+                f"{stats['groups_with_backfill_candidates']} composition groups need raw measurement backfill."
             )
 
     def _build_row(self, *, sample, composition, share_count):

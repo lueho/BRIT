@@ -78,30 +78,34 @@ Still not aligned:
 
 These are the missing steps before the raw-first component-measurement transition can be considered complete.
 
-1. **Run and review data reports**
-   - Run `report_composition_normalization_mismatches` on real data.
-   - Run `report_weightshare_backfill_candidates` in dry-run mode.
-   - Record candidate counts, mismatch counts, and any groups requiring manual review.
+1. **Manual data-operation handoff**
+   - Run the following reports in the target environment and save the outputs:
+     - `python manage.py report_composition_normalization_mismatches --summary-only --settings=brit.settings.testrunner`
+     - `python manage.py report_composition_normalization_mismatches --settings=brit.settings.testrunner`
+     - `python manage.py report_weightshare_backfill_candidates --summary-only --settings=brit.settings.testrunner`
+     - `python manage.py report_weightshare_backfill_candidates --settings=brit.settings.testrunner`
+   - Review all listed samples/groups before applying any backfill.
+   - If the dry-run output is acceptable, run `report_weightshare_backfill_candidates --apply` in the same environment.
+   - Spot-check created `ComponentMeasurement` rows for unit, basis component, owner, and values.
+   - Re-run both reports after backfill. The backfill report should return zero candidates; mismatch rows are manual-review items, not automatic fixes.
+   - Optional CI/manual gate commands:
+     - `python manage.py report_composition_normalization_mismatches --fail-on-mismatch --settings=brit.settings.testrunner`
+     - `python manage.py report_weightshare_backfill_candidates --fail-on-candidates --settings=brit.settings.testrunner`
 
-2. **Backfill legacy normalized rows where safe**
-   - Use `report_weightshare_backfill_candidates --apply` only for groups with saved `WeightShare` data and no raw `ComponentMeasurement` rows.
-   - Spot-check created `ComponentMeasurement` rows for units, basis component, owner, and values.
-   - Keep manual review for ambiguous or conflicting groups.
-
-3. **Lock down new write paths**
+2. **Lock down new write paths**
    - Ensure primary UI/API/import workflows for new component observations create `ComponentMeasurement`, not `WeightShare`.
    - Keep `WeightShare` writes only in explicitly labelled compatibility flows.
    - Consider permissions, feature flags, or deprecation warnings before narrowing compatibility edits.
 
-4. **Finish import/export evidence**
+3. **Finish import/export evidence**
    - Confirm all material import paths write sample-owned `MaterialPropertyValue` and raw `ComponentMeasurement` rows.
    - Keep the Excel export path raw-first and extend tests if additional export modes are added.
 
-5. **Decide the compatibility model boundary**
+4. **Decide the compatibility model boundary**
    - Decide whether `Composition` remains as a settings model for group order and `fractions_of`.
    - Decide whether `WeightShare` should become read-only, hidden behind permissions, archived, or eventually removed.
 
-6. **Perform cleanup only after evidence exists**
+5. **Perform cleanup only after evidence exists**
    - Retire or narrow compatibility views/API serializers only after backfill and spot checks.
    - Remove code paths only in small PRs with regression tests.
 
