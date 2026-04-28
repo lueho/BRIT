@@ -1079,11 +1079,19 @@ Done:
 Left to finish Phase 1:
 
 - **Pilot dataset**: register one deliberately simple real local PostGIS table or trusted view as a `GeoDataset` and verify the table, map, detail, filtering, and GeoJSON flow without code changes.
-- **Navigation polish**: ensure list/gallery/detail cards consistently lead users into the dataset-scoped runtime table/map/detail paths instead of legacy model-name paths.
-- **Map configuration hardening**: confirm default and per-dataset map configurations behave correctly for local-relation datasets, including no legacy API basename dependency.
+- **Navigation polish**: confirm list/gallery/detail cards consistently lead users into the dataset-scoped runtime table/map/detail paths instead of legacy model-name paths.
 - **Admin/operator workflow**: make the introspection and `GeoDatasetColumnPolicy` promotion path usable enough for a trusted operator to review columns before publication.
-- **README alignment**: update or narrow `maps/README.md` so the documented onboarding flow matches what the code actually supports.
 - **Compatibility cleanup plan**: document which `model_name`, `GIS_SOURCE_MODELS`, and dataset-specific route paths remain compatibility-only and what proves they can be removed.
+
+Compatibility-only paths after Phase 1:
+
+| Path | Keep for now because | Removal condition |
+|---|---|---|
+| `GeoDataset.model_name` | Existing filters/forms and legacy datasets still display and search by it | All ordinary user-facing datasets use runtime configuration and filtering no longer depends on `model_name` |
+| `GeoDatasetRuntimeConfiguration.runtime_model_name` | Django-model datasets still need compatibility adapter resolution | Existing model-backed datasets are migrated to local-relation or explicitly custom adapters |
+| `features_api_basename` | Existing model-backed map layers still expose their own GeoJSON/detail/summary APIs | Dataset-scoped GeoJSON/detail endpoints cover the dataset or the dataset is intentionally custom |
+| `ModelMapConfiguration` | Existing model map views still select map configs by Django model | Dataset-level or runtime-level map configuration covers the same cases |
+| Source-domain map URLs | Some domain apps still provide custom maps beyond generic exploration | A domain has either migrated to generic registry routes or documented why custom behavior remains required |
 
 Success criteria:
 
@@ -1221,10 +1229,10 @@ Use this section to evaluate whether the roadmap is actually moving forward.
 |---|---|
 | Local table-backed dataset registration with no code changes | Partial: runtime path exists; real pilot still needed |
 | Local view-backed dataset registration with no code changes | Partial: adapter should work for simple views; pilot still needed |
-| Generic map/table/detail surfaces driven by metadata | Partial: implemented for local relations; needs pilot and UX polish |
+| Generic map/table/detail surfaces driven by metadata | Partial: implemented for local relations; needs pilot validation |
 | `GeoDataset` independent from hardcoded `model_name` routing | Partial: generic routes use dataset identity; compatibility paths remain |
 | Column exposure allowlists enforced | Done for current local-relation table/detail/GeoJSON path |
-| Safe relation-column introspection | Partial: metadata and policy flags exist; admin workflow still needed |
+| Safe relation-column introspection | Partial: metadata and policy flags exist; operator workflow still needs pilot validation |
 | Federated read-only foreign table support | Not started |
 | Dataset freshness/version semantics visible in UI | Not started |
 | Imported datasets have import-run/current-version contracts | Not started |

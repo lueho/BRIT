@@ -83,46 +83,59 @@ This module is used throughout BRIT to:
 - Attach spatial attributes to geographic entities
 - Provide the foundation for spatial analysis and visualization
 
-## Current GeoDataset Workflow
+## Current GeoDataset Registry Workflow
 
-### What `GeoDataset` currently does
-The current implementation uses `GeoDataset` primarily as a metadata record for datasets that are already backed by existing map views and routes.
+`GeoDataset` is the stable user-facing record for geographic datasets. It now supports both legacy model-backed datasets and local PostGIS table/view-backed datasets through normalized runtime metadata.
 
-Today, a `GeoDataset` can:
-- appear in the maps list and gallery views
-- store descriptive metadata such as name, description, preview image, region, sources, and map configuration
-- link to an existing map experience through `model_name`
-- be managed through the existing create, update, delete, autocomplete, and admin workflows
+### Supported local-relation onboarding flow
 
-### What `GeoDataset` does not yet do
-The current implementation does **not** yet provide a fully metadata-driven registry for arbitrary geospatial tables or views.
+#### 1. Prepare a trusted local relation
+- Use a plain PostGIS table or trusted database view.
+- The relation must have a stable primary-key column and a PostGIS geometry column.
+- Prepare joins, transformations, or sensitive-field removal outside the generic runtime, usually in a reviewed view.
 
-In particular, it does **not** currently support:
-- registering an arbitrary PostGIS table or view purely through metadata
-- storing runtime fields such as table name, geometry column, display fields, or filter fields on `GeoDataset`
-- automatically creating a dataset-scoped map route such as `/maps/geodatasets/<pk>/map/`
-- replacing hardcoded or plugin-provided map routes with one generic registry-backed runtime path
+#### 2. Register the dataset
+- Create a `GeoDataset` with normal metadata such as name, description, region, sources, preview image, and optional map configuration.
+- Create or edit its `GeoDatasetRuntimeConfiguration` with:
+  - `backend_type=local_relation`
+  - schema and relation name
+  - geometry column
+  - primary-key column
+  - optional label field
 
-### Current user-facing workflow
+#### 3. Review and promote columns
+- Use runtime introspection to inspect available relation columns.
+- Add `GeoDatasetColumnPolicy` rows only for columns that should be exposed.
+- Visibility, filtering, search, and export settings are explicit policy decisions; discovered columns are not exposed automatically.
 
-#### 1. Create or edit a `GeoDataset` metadata record
-- Use the existing maps forms or Django admin to create and maintain `GeoDataset` records.
-- These records are used to organize and describe datasets that BRIT already knows how to display.
+#### 4. Explore through dataset-scoped routes
+- Metadata/detail: `/maps/geodatasets/<pk>/`
+- Map: `/maps/geodatasets/<pk>/map/`
+- Table: `/maps/geodatasets/<pk>/table/`
+- Feature detail: `/maps/geodatasets/<pk>/features/<feature_pk>/`
+- GeoJSON: `/maps/geodatasets/<pk>/features.geojson`
 
-#### 2. Browse dataset metadata
-- Published datasets are available through the maps list and gallery views.
-- Private datasets are available through the corresponding owner-scoped views.
+The local-relation runtime supports visible-column table/detail output, exact filtering on explicitly filterable columns, bounded reads, single-feature lookup by configured primary key, and GeoJSON from the configured geometry column.
 
-#### 3. Open an existing dataset map/view
-- Opening a `GeoDataset` currently depends on its `model_name`.
-- `GeoDataset.get_absolute_url()` resolves to an existing named route rather than a dataset-scoped generic map page.
-- Those routes currently come either from hardcoded core map views or from source-domain plugin map mounts.
+### Compatibility paths
 
-#### 4. Adjust associated styling and references
-- `GeoDataset` records can still be associated with sources and map configurations.
-- Styling remains driven by the existing `MapConfiguration` and `MapLayerConfiguration` models.
+Some existing datasets still use model-backed compatibility metadata:
+
+- `model_name`
+- `runtime_model_name`
+- `features_api_basename`
+- `ModelMapConfiguration`
+- model-specific GeoJSON/detail/summary API routes
+
+These paths remain for existing Django-model datasets and source-domain maps. New ordinary local table/view onboarding should prefer the `local_relation` runtime path unless custom domain behavior is genuinely required.
+
+### Current limits
+
+- Federation, refresh/version metadata, exports, summaries, schema-drift checks, and inventory version pinning are later roadmap phases.
+- The generic runtime does not accept arbitrary SQL or user-defined expressions.
+- A production pilot should still validate the full operator workflow before broad use.
 
 ### Notes for developers
-- This README documents the **current implemented behavior** only.
-- The future metadata-driven dataset registry is tracked in `docs/04_design_decisions/2026-04-16_dataset_registry_and_federated_geodata_target_state_plan.md`.
-- If you are planning new dataset-registry work, use the planning document as the authoritative roadmap instead of treating this README as a future-state specification.
+
+- The authoritative roadmap is `docs/04_design_decisions/2026-04-16_dataset_registry_and_federated_geodata_target_state_plan.md`.
+- Keep ingestion, transformation, and harmonization logic outside the generic registry runtime unless the roadmap explicitly moves that boundary.
