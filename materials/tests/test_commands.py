@@ -189,3 +189,149 @@ class CompositionNormalizationMismatchReportCommandTests(TestCase):
             owner=self.owner,
         )
         return sample
+
+
+class WeightShareBackfillCandidateReportCommandTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create_user(
+            username="weightshare-backfill-owner",
+            password="test123",
+        )
+        cls.material = Material.objects.create(
+            name="Backfill Material",
+            type="material",
+            owner=cls.owner,
+        )
+        cls.series = SampleSeries.objects.create(
+            name="Backfill Series",
+            material=cls.material,
+            owner=cls.owner,
+        )
+        cls.percent_unit = Unit.objects.filter(name="%").first()
+        if cls.percent_unit is None:
+            cls.percent_unit = Unit.objects.create(name="%", symbol="percent")
+        elif not cls.percent_unit.symbol:
+            cls.percent_unit.symbol = "percent"
+            cls.percent_unit.save(update_fields=["symbol"])
+
+    def test_command_reports_saved_groups_without_raw_measurements(self):
+        candidate_sample = self._create_sample_with_saved_shares(
+            sample_name="Candidate Sample",
+        )
+        raw_sample = self._create_sample_with_saved_shares(
+            sample_name="Raw Covered Sample",
+            add_raw_measurements=True,
+        )
+
+        out = io.StringIO()
+        call_command(
+            "report_weightshare_backfill_candidates",
+            sample_id=[candidate_sample.pk, raw_sample.pk],
+            stdout=out,
+        )
+
+        output = out.getvalue()
+        self.assertIn("samples_examined: 2", output)
+        self.assertIn("samples_with_backfill_candidates: 1", output)
+        self.assertIn("groups_with_backfill_candidates: 1", output)
+        self.assertIn("saved_weightshares_to_backfill: 2", output)
+        self.assertIn("Saved normalized groups without raw measurements:", output)
+        self.assertIn(f"sample #{candidate_sample.pk} Candidate Sample", output)
+        self.assertNotIn(f"sample #{raw_sample.pk} Raw Covered Sample", output)
+
+    def test_command_summary_only_omits_detail_rows(self):
+        sample = self._create_sample_with_saved_shares(sample_name="Summary Candidate")
+
+        out = io.StringIO()
+        call_command(
+            "report_weightshare_backfill_candidates",
+            sample_id=[sample.pk],
+            summary_only=True,
+            stdout=out,
+        )
+
+        output = out.getvalue()
+        self.assertIn("groups_with_backfill_candidates: 1", output)
+        self.assertNotIn(f"sample #{sample.pk} Summary Candidate", output)
+
+    def test_command_can_limit_to_sample_id(self):
+        candidate_sample = self._create_sample_with_saved_shares(
+            sample_name="Limited Candidate",
+        )
+        raw_sample = self._create_sample_with_saved_shares(
+            sample_name="Limited Raw Covered",
+            add_raw_measurements=True,
+        )
+
+        out = io.StringIO()
+        call_command(
+            "report_weightshare_backfill_candidates",
+            sample_id=[raw_sample.pk],
+            stdout=out,
+        )
+
+        output = out.getvalue()
+        self.assertIn("samples_examined: 1", output)
+        self.assertIn("groups_with_backfill_candidates: 0", output)
+        self.assertNotIn(f"sample #{candidate_sample.pk} Limited Candidate", output)
+
+    def _create_sample_with_saved_shares(
+        self,
+        *,
+        sample_name,
+        add_raw_measurements=False,
+    ):
+        sample = Sample.objects.create(
+            name=sample_name,
+            material=self.material,
+            series=self.series,
+            publication_status="published",
+            owner=self.owner,
+        )
+        sample.compositions.all().delete()
+        group = MaterialComponentGroup.objects.create(
+            name=f"{sample_name} Group",
+            publication_status="published",
+            owner=self.owner,
+        )
+        first_component = MaterialComponent.objects.create(
+            name=f"{sample_name} First Component",
+            publication_status="published",
+            owner=self.owner,
+        )
+        second_component = MaterialComponent.objects.create(
+            name=f"{sample_name} Second Component",
+            publication_status="published",
+            owner=self.owner,
+        )
+        composition = Composition.objects.create(
+            sample=sample,
+            group=group,
+            fractions_of=MaterialComponent.objects.default(),
+            owner=self.owner,
+        )
+        WeightShare.objects.create(
+            composition=composition,
+            component=first_component,
+            average=Decimal("0.7"),
+            standard_deviation=Decimal("0.0"),
+            owner=self.owner,
+        )
+        WeightShare.objects.create(
+            composition=composition,
+            component=second_component,
+            average=Decimal("0.3"),
+            standard_deviation=Decimal("0.0"),
+            owner=self.owner,
+        )
+        if add_raw_measurements:
+            ComponentMeasurement.objects.create(
+                sample=sample,
+                group=group,
+                component=first_component,
+                unit=self.percent_unit,
+                average=Decimal("70"),
+                owner=self.owner,
+            )
+        return sample
