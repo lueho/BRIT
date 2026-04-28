@@ -372,6 +372,7 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
                 kwargs={"pk": self.dataset.pk, "feature_pk": 0},
             ).replace("/0/", "/"),
         )
+        self.assertFalse(response.context["map_config"]["featuresLayerSummariesUrl"])
 
     def test_local_relation_adapter_rejects_invalid_identifier(self):
         runtime_configuration = self.dataset.runtime_configuration

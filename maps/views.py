@@ -549,6 +549,12 @@ class GeoDataSetRuntimePermissionMixin:
             ).replace("/0/", "/")
         return super().get_features_layer_details_url_template()
 
+    def get_features_layer_summary_url(self):
+        adapter = self.get_runtime_adapter()
+        if getattr(adapter, "uses_local_relation", False):
+            return None
+        return super().get_features_layer_summary_url()
+
     def test_func(self):
         policy = get_object_policy(
             self.request.user,
