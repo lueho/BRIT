@@ -149,6 +149,7 @@ dev = [
     { name = "mkdocs-material" },
     { name = "pre-commit" },
     { name = "ruff" },
+    { name = "tblib" },
 ]
 pdf-parsing = [
     { name = "ocrmypdf" },
@@ -164,7 +165,7 @@ requires-dist = [
     { name = "celery", specifier = ">=5.6.3" },
     { name = "crispy-bootstrap5", specifier = ">=2026.3" },
     { name = "dj-database-url", specifier = ">=3.1.2" },
-    { name = "django", specifier = ">=5.2.13" },
+    { name = "django", specifier = ">=6.0.4" },
     { name = "django-cookie-consent", specifier = ">=1.0.0" },
     { name = "django-crispy-forms", specifier = ">=2.6" },
     { name = "django-extra-views", specifier = ">=0.16.0" },
@@ -197,7 +198,8 @@ dev = [
     { name = "mkdocs", specifier = ">=1.6.1" },
     { name = "mkdocs-material", specifier = ">=9.7.6" },
     { name = "pre-commit", specifier = ">=4.5.1" },
-    { name = "ruff", specifier = ">=0.15.10" },
+    { name = "ruff", specifier = "==0.15.10" },
+    { name = "tblib", specifier = ">=3.2.2" },
 ]
 pdf-parsing = [
     { name = "ocrmypdf", specifier = ">=17.4.1" },
@@ -552,16 +554,16 @@ wheels = [
 
 [[package]]
 name = "django"
-version = "6.0.3"
+version = "6.0.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asgiref" },
     { name = "sqlparse" },
     { name = "tzdata", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/80/e1/894115c6bd70e2c8b66b0c40a3c367d83a5a48c034a4d904d31b62f7c53a/django-6.0.3.tar.gz", hash = "sha256:90be765ee756af8a6cbd6693e56452404b5ad15294f4d5e40c0a55a0f4870fe1", size = 10872701, upload-time = "2026-03-03T13:55:15.026Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/60/b9/4155091ad1788b38563bd77a7258c0834e8c12a7f56f6975deaf54f8b61d/django-6.0.4.tar.gz", hash = "sha256:8cfa2572b3f2768b2e84983cf3c4811877a01edb64e817986ec5d60751c113ac", size = 10907407, upload-time = "2026-04-07T13:55:44.961Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/72/b1/23f2556967c45e34d3d3cf032eb1bd3ef925ee458667fb99052a0b3ea3a6/django-6.0.3-py3-none-any.whl", hash = "sha256:2e5974441491ddb34c3f13d5e7a9f97b07ba03bf70234c0a9c68b79bbb235bc3", size = 8358527, upload-time = "2026-03-03T13:55:10.552Z" },
+    { url = "https://files.pythonhosted.org/packages/e9/47/3d61d611609764aa71a37f7037b870e7bfb22937366974c4fd46cada7bab/django-6.0.4-py3-none-any.whl", hash = "sha256:14359c809fc16e8f81fd2b59d7d348e4d2d799da6840b10522b6edf7b8afc1da", size = 8368342, upload-time = "2026-04-07T13:55:37.999Z" },
 ]
 
 [[package]]
@@ -2083,6 +2085,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/90/76/437d71068094df0726366574cf3432a4ed754217b436eb7429415cf2d480/sqlparse-0.5.5.tar.gz", hash = "sha256:e20d4a9b0b8585fdf63b10d30066c7c94c5d7a7ec47c889a2d83a3caa93ff28e", size = 120815, upload-time = "2025-12-19T07:17:45.073Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/49/4b/359f28a903c13438ef59ebeee215fb25da53066db67b305c125f1c6d2a25/sqlparse-0.5.5-py3-none-any.whl", hash = "sha256:12a08b3bf3eec877c519589833aed092e2444e68240a3577e8e26148acc7b1ba", size = 46138, upload-time = "2025-12-19T07:17:46.573Z" },
+]
+
+[[package]]
+name = "tblib"
+version = "3.2.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f4/8a/14c15ae154895cc131174f858c707790d416c444fc69f93918adfd8c4c0b/tblib-3.2.2.tar.gz", hash = "sha256:e9a652692d91bf4f743d4a15bc174c0b76afc750fe8c7b6d195cc1c1d6d2ccec", size = 35046, upload-time = "2025-11-12T12:21:16.572Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/02/be/5d2d47b1fb58943194fb59dcf222f7c4e35122ec0ffe8c36e18b5d728f0b/tblib-3.2.2-py3-none-any.whl", hash = "sha256:26bdccf339bcce6a88b2b5432c988b266ebbe63a4e593f6b578b1d2e723d2b76", size = 12893, upload-time = "2025-11-12T12:21:14.407Z" },
 ]
 
 [[package]]
