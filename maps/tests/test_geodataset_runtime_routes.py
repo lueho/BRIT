@@ -1,9 +1,11 @@
+from django.contrib.admin.sites import AdminSite
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
 from django.test import TestCase
 from django.urls import reverse
 
 from bibliography.models import Source
+from maps.admin import GeoDatasetModelAdmin
 from maps.models import (
     GeoDataset,
     GeoDatasetColumnPolicy,
@@ -212,6 +214,21 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertTrue(columns["hidden_code"]["is_configured"])
         self.assertFalse(columns["hidden_code"]["is_visible"])
         self.assertFalse(columns["name"]["is_configured"])
+
+    def test_local_relation_admin_review_shows_introspection_flags(self):
+        model_admin = GeoDatasetModelAdmin(GeoDataset, AdminSite())
+
+        review = str(model_admin.relation_column_review(self.dataset))
+
+        self.assertIn("feature_id", review)
+        self.assertIn("primary key", review)
+        self.assertIn("geom", review)
+        self.assertIn("geometry", review)
+        self.assertIn("nuts_id", review)
+        self.assertIn("visible", review)
+        self.assertIn("filterable", review)
+        self.assertIn("hidden_code", review)
+        self.assertNotIn("hidden-a", review)
 
     def test_local_relation_adapter_reports_missing_configured_columns(self):
         GeoDatasetColumnPolicy.objects.create(

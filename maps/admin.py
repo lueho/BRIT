@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.html import format_html, format_html_join
 
 from .models import (
     Attribute,
@@ -17,6 +18,7 @@ from .models import (
     RegionAttributeValue,
     RegionProperty,
 )
+from .runtime_adapters import get_dataset_runtime_adapter
 
 
 class GeoDatasetRuntimeConfigurationInline(admin.StackedInline):
@@ -55,8 +57,56 @@ class CatchmentModelAdmin(admin.ModelAdmin):
 class GeoDatasetModelAdmin(admin.ModelAdmin):
     autocomplete_fields = ["region"]
     list_display = ["name", "model_name", "region"]
+    readonly_fields = ["relation_column_review"]
     search_fields = ["name", "model_name", "region__name"]
     inlines = [GeoDatasetRuntimeConfigurationInline, GeoDatasetColumnPolicyInline]
+
+    @admin.display(description="Local relation column review")
+    def relation_column_review(self, obj):
+        if not obj or not obj.pk:
+            return "-"
+        runtime_configuration = obj.get_runtime_configuration()
+        if (
+            not runtime_configuration
+            or runtime_configuration.backend_type != "local_relation"
+        ):
+            return "Only available for local relation datasets."
+        try:
+            columns = get_dataset_runtime_adapter(obj).get_relation_columns()
+        except Exception as exc:
+            return format_html("Introspection failed: {}", exc)
+        if not columns:
+            return "No columns found."
+        return format_html(
+            "<table><thead><tr><th>Column</th><th>Type</th><th>Flags</th></tr></thead>"
+            "<tbody>{}</tbody></table>",
+            format_html_join(
+                "",
+                "<tr><td>{}</td><td>{}</td><td>{}</td></tr>",
+                (
+                    (
+                        column["name"],
+                        column["data_type"],
+                        ", ".join(
+                            flag
+                            for flag, enabled in [
+                                ("primary key", column["is_primary_key"]),
+                                ("geometry", column["is_geometry"]),
+                                ("label", column["is_label"]),
+                                ("configured", column["is_configured"]),
+                                ("visible", column["is_visible"]),
+                                ("filterable", column["is_filterable"]),
+                                ("searchable", column["is_searchable"]),
+                                ("exportable", column["is_exportable"]),
+                            ]
+                            if enabled
+                        )
+                        or "-",
+                    )
+                    for column in columns
+                ),
+            ),
+        )
 
 
 @admin.register(GeoDatasetRuntimeConfiguration)
