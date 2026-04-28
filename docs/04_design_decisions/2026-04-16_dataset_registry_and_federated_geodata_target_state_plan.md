@@ -1075,13 +1075,15 @@ Done:
 - The local-relation adapter can query approved local PostGIS tables/views by validated schema, relation, geometry, primary-key, label, and column-policy metadata.
 - The adapter supports visible-column table/detail output, exact filtering on explicitly filterable columns, bounded reads, single-feature lookup, GeoJSON output, and safe relation-column introspection.
 - Regression tests cover table/detail/map/GeoJSON rendering, hidden-column non-exposure, hidden filter parameters, missing metadata, missing columns, invalid identifiers, invalid primary key, and non-geometry geometry configuration.
+- User-facing list/gallery navigation exposes dataset-scoped map and table actions.
+- Local-relation map configuration uses dataset-scoped GeoJSON/detail endpoints and does not inherit legacy feature summary endpoints.
+- The `GeoDataset` admin shows a local-relation column-review table with discovered type and policy flags.
+- `maps/README.md` describes the implemented local-relation onboarding flow and compatibility boundaries.
 
 Left to finish Phase 1:
 
 - **Pilot dataset**: register one deliberately simple real local PostGIS table or trusted view as a `GeoDataset` and verify the table, map, detail, filtering, and GeoJSON flow without code changes.
-- **Navigation polish**: confirm list/gallery/detail cards consistently lead users into the dataset-scoped runtime table/map/detail paths instead of legacy model-name paths.
-- **Admin/operator workflow**: make the introspection and `GeoDatasetColumnPolicy` promotion path usable enough for a trusted operator to review columns before publication.
-- **Compatibility cleanup plan**: document which `model_name`, `GIS_SOURCE_MODELS`, and dataset-specific route paths remain compatibility-only and what proves they can be removed.
+- **Pilot sign-off**: use the admin column-review output to promote only approved `GeoDatasetColumnPolicy` rows, then record whether the current operator workflow is sufficient or needs Phase 2 polish.
 
 Compatibility-only paths after Phase 1:
 
@@ -1227,12 +1229,12 @@ Use this section to evaluate whether the roadmap is actually moving forward.
 
 | Capability | Status |
 |---|---|
-| Local table-backed dataset registration with no code changes | Partial: runtime path exists; real pilot still needed |
-| Local view-backed dataset registration with no code changes | Partial: adapter should work for simple views; pilot still needed |
-| Generic map/table/detail surfaces driven by metadata | Partial: implemented for local relations; needs pilot validation |
+| Local table-backed dataset registration with no code changes | Partial: implementation exists; real pilot still needed |
+| Local view-backed dataset registration with no code changes | Partial: implementation should support simple views; real pilot still needed |
+| Generic map/table/detail surfaces driven by metadata | Partial: implementation exists for local relations; pilot validation remains |
 | `GeoDataset` independent from hardcoded `model_name` routing | Partial: generic routes use dataset identity; compatibility paths remain |
 | Column exposure allowlists enforced | Done for current local-relation table/detail/GeoJSON path |
-| Safe relation-column introspection | Partial: metadata and policy flags exist; operator workflow still needs pilot validation |
+| Safe relation-column introspection | Partial: metadata, policy flags, and admin review exist; pilot validation remains |
 | Federated read-only foreign table support | Not started |
 | Dataset freshness/version semantics visible in UI | Not started |
 | Imported datasets have import-run/current-version contracts | Not started |
