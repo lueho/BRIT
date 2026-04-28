@@ -280,6 +280,14 @@ class GeoDataSetRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, "Maps gallery")
         self.assertContains(response, reverse("geodataset-list"))
         self.assertContains(response, self.dataset.name)
+        self.assertContains(
+            response,
+            reverse("geodataset-map", kwargs={"pk": self.dataset.pk}),
+        )
+        self.assertContains(
+            response,
+            reverse("geodataset-table", kwargs={"pk": self.dataset.pk}),
+        )
 
     def test_public_list_renders_analytical_table(self):
         response = self.client.get(reverse("geodataset-list"), {"scope": "published"})
@@ -288,6 +296,14 @@ class GeoDataSetRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, "Dataset")
         self.assertContains(response, reverse("geodataset-gallery"))
         self.assertContains(response, self.region.name)
+        self.assertContains(
+            response,
+            reverse("geodataset-map", kwargs={"pk": self.dataset.pk}),
+        )
+        self.assertContains(
+            response,
+            reverse("geodataset-table", kwargs={"pk": self.dataset.pk}),
+        )
 
     def test_owned_gallery_requires_login(self):
         response = self.client.get(

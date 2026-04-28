@@ -42,6 +42,14 @@
                 <strong class="d-block">{{ object.name }}</strong>
                 {% if object.description %}<span class="text-muted small">{{ object.description|truncatewords:18 }}</span>{% endif %}
             </a>
+            <div class="d-flex gap-2 mt-2">
+                <a class="btn btn-sm btn-outline-secondary"
+                   onclick="event.stopPropagation()"
+                   href="{{ object.get_map_url }}">Map</a>
+                <a class="btn btn-sm btn-outline-secondary"
+                   onclick="event.stopPropagation()"
+                   href="{% url 'geodataset-table' pk=object.pk %}">Table</a>
+            </div>
         </td>
         <td data-label="Region">
             {% if object.region %}

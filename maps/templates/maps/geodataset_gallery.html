@@ -66,6 +66,10 @@
                         <div class="mt-auto d-flex align-items-center justify-content-between gap-2">
                             <a class="btn btn-sm btn-outline-primary"
                                href="{% detail_or_review_url object use_back=True %}">Open dataset</a>
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="{{ object.get_map_url }}">Map</a>
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="{% url 'geodataset-table' pk=object.pk %}">Table</a>
                             {% if object.update_url and list_type == 'private' %}
                                 <a class="btn btn-sm btn-outline-secondary"
                                    href="{{ object.update_url }}">Edit metadata</a>
