@@ -228,6 +228,33 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         ):
             adapter.get_records()
 
+    def test_local_relation_adapter_rejects_invalid_policy_identifier(self):
+        GeoDatasetColumnPolicy.objects.create(
+            dataset=self.dataset,
+            column_name="unsafe;column",
+            display_label="Unsafe column",
+            is_visible=True,
+        )
+        adapter = get_dataset_runtime_adapter(self.dataset)
+
+        with self.assertRaisesMessage(
+            ImproperlyConfigured,
+            "Invalid local relation identifier: unsafe;column.",
+        ):
+            adapter.get_records()
+
+    def test_local_relation_adapter_reports_non_geometry_column(self):
+        runtime_configuration = self.dataset.runtime_configuration
+        runtime_configuration.geometry_column = "nuts_id"
+        runtime_configuration.save(update_fields=["geometry_column"])
+        adapter = get_dataset_runtime_adapter(self.dataset)
+
+        with self.assertRaisesMessage(
+            ImproperlyConfigured,
+            "Local relation dataset geometry column is not a geometry column: nuts_id.",
+        ):
+            adapter.get_records()
+
     def test_local_relation_table_route_renders_visible_columns(self):
         response = self.client.get(
             reverse("geodataset-table", kwargs={"pk": self.dataset.pk})

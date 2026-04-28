@@ -236,9 +236,54 @@ class WeightShareBackfillCandidateReportCommandTests(TestCase):
         self.assertIn("samples_with_backfill_candidates: 1", output)
         self.assertIn("groups_with_backfill_candidates: 1", output)
         self.assertIn("saved_weightshares_to_backfill: 2", output)
+        self.assertIn("component_measurements_created: 0", output)
         self.assertIn("Saved normalized groups without raw measurements:", output)
         self.assertIn(f"sample #{candidate_sample.pk} Candidate Sample", output)
         self.assertNotIn(f"sample #{raw_sample.pk} Raw Covered Sample", output)
+        self.assertEqual(candidate_sample.component_measurements.count(), 0)
+
+    def test_command_apply_creates_component_measurements_from_saved_shares(self):
+        sample = self._create_sample_with_saved_shares(sample_name="Apply Candidate")
+
+        out = io.StringIO()
+        call_command(
+            "report_weightshare_backfill_candidates",
+            sample_id=[sample.pk],
+            apply=True,
+            stdout=out,
+        )
+
+        output = out.getvalue()
+        self.assertIn("component_measurements_created: 2", output)
+        measurements = sample.component_measurements.order_by("component__name")
+        self.assertEqual(measurements.count(), 2)
+        self.assertEqual(measurements[0].average, Decimal("70.0000000000"))
+        self.assertEqual(measurements[0].standard_deviation, Decimal("0E-10"))
+        self.assertEqual(measurements[0].unit, self.percent_unit)
+        self.assertEqual(
+            measurements[0].basis_component,
+            MaterialComponent.objects.default(),
+        )
+        self.assertEqual(measurements[0].owner, self.owner)
+        self.assertEqual(measurements[1].average, Decimal("30.0000000000"))
+
+    def test_command_apply_skips_groups_that_already_have_raw_measurements(self):
+        sample = self._create_sample_with_saved_shares(
+            sample_name="Apply Raw Covered",
+            add_raw_measurements=True,
+        )
+
+        out = io.StringIO()
+        call_command(
+            "report_weightshare_backfill_candidates",
+            sample_id=[sample.pk],
+            apply=True,
+            stdout=out,
+        )
+
+        output = out.getvalue()
+        self.assertIn("component_measurements_created: 0", output)
+        self.assertEqual(sample.component_measurements.count(), 1)
 
     def test_command_summary_only_omits_detail_rows(self):
         sample = self._create_sample_with_saved_shares(sample_name="Summary Candidate")

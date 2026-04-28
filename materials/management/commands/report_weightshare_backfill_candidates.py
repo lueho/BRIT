@@ -1,6 +1,8 @@
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
 
-from materials.models import Sample
+from materials.models import ComponentMeasurement, Sample
+from utils.properties.models import Unit
 
 
 class Command(BaseCommand):
@@ -19,10 +21,25 @@ class Command(BaseCommand):
             action="store_true",
             help="Only print summary counters.",
         )
+        parser.add_argument(
+            "--apply",
+            action="store_true",
+            help="Create missing raw component measurements. Defaults to dry-run.",
+        )
+        parser.add_argument(
+            "--unit-name",
+            default="%",
+            help="Unit name to use for created component measurements.",
+        )
 
     def handle(self, *args, **options):
         sample_ids = options["sample_id"]
         summary_only = options["summary_only"]
+        apply_changes = options["apply"]
+        unit_name = options["unit_name"]
+        unit = Unit.objects.filter(name=unit_name).first()
+        if unit is None:
+            raise CommandError(f'Unit "{unit_name}" does not exist.')
 
         samples = (
             Sample.objects.filter(compositions__shares__isnull=False)
@@ -38,42 +55,58 @@ class Command(BaseCommand):
             "samples_with_backfill_candidates": 0,
             "groups_with_backfill_candidates": 0,
             "saved_weightshares_to_backfill": 0,
+            "component_measurements_created": 0,
         }
         candidate_rows = []
 
-        for sample in samples.iterator():
-            stats["samples_examined"] += 1
-            raw_group_ids = set(
-                sample.component_measurements.values_list("group_id", flat=True)
-            )
-            compositions = (
-                sample.compositions.filter(shares__isnull=False)
-                .exclude(group_id__in=raw_group_ids)
-                .select_related("group")
-                .distinct()
-                .order_by("order", "pk")
-            )
-            sample_has_candidates = False
-            for composition in compositions:
-                sample_has_candidates = True
-                share_count = composition.shares.count()
-                stats["groups_with_backfill_candidates"] += 1
-                stats["saved_weightshares_to_backfill"] += share_count
-                candidate_rows.append(
-                    self._build_row(
-                        sample=sample,
-                        composition=composition,
-                        share_count=share_count,
-                    )
+        with transaction.atomic():
+            for sample in samples.iterator():
+                stats["samples_examined"] += 1
+                raw_group_ids = set(
+                    sample.component_measurements.values_list("group_id", flat=True)
                 )
-            if sample_has_candidates:
-                stats["samples_with_backfill_candidates"] += 1
+                compositions = (
+                    sample.compositions.filter(shares__isnull=False)
+                    .exclude(group_id__in=raw_group_ids)
+                    .select_related("group")
+                    .prefetch_related("shares")
+                    .distinct()
+                    .order_by("order", "pk")
+                )
+                sample_has_candidates = False
+                for composition in compositions:
+                    sample_has_candidates = True
+                    shares = list(composition.shares.select_related("component"))
+                    share_count = len(shares)
+                    stats["groups_with_backfill_candidates"] += 1
+                    stats["saved_weightshares_to_backfill"] += share_count
+                    candidate_rows.append(
+                        self._build_row(
+                            sample=sample,
+                            composition=composition,
+                            share_count=share_count,
+                        )
+                    )
+                    if apply_changes:
+                        stats["component_measurements_created"] += (
+                            self._create_component_measurements(
+                                composition=composition,
+                                shares=shares,
+                                unit=unit,
+                            )
+                        )
+                if sample_has_candidates:
+                    stats["samples_with_backfill_candidates"] += 1
+
+            if not apply_changes:
+                transaction.set_rollback(True)
 
         for key in (
             "samples_examined",
             "samples_with_backfill_candidates",
             "groups_with_backfill_candidates",
             "saved_weightshares_to_backfill",
+            "component_measurements_created",
         ):
             self.stdout.write(f"{key}: {stats[key]}")
 
@@ -88,6 +121,22 @@ class Command(BaseCommand):
             f"group #{composition.group_id} {composition.group.name}; "
             f"settings #{composition.pk}; saved shares {share_count}"
         )
+
+    def _create_component_measurements(self, *, composition, shares, unit):
+        created_count = 0
+        for share in shares:
+            ComponentMeasurement.objects.create(
+                owner=share.owner or composition.owner,
+                sample=composition.sample,
+                group=composition.group,
+                component=share.component,
+                basis_component=composition.fractions_of,
+                unit=unit,
+                average=share.average * 100,
+                standard_deviation=share.standard_deviation * 100,
+            )
+            created_count += 1
+        return created_count
 
     def _write_rows(self, title, rows):
         if not rows:

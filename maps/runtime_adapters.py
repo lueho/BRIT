@@ -302,9 +302,14 @@ class LocalRelationDatasetRuntimeAdapter:
         return record
 
     def _validate_configured_columns(self):
+        existing_column_metadata = self._get_existing_columns()
         existing_columns = {
-            column["column_name"] for column in self._get_existing_columns()
+            column["column_name"] for column in existing_column_metadata
         }
+        for column_name in self.dataset.column_policies.values_list(
+            "column_name", flat=True
+        ):
+            self._validate_identifier(column_name)
         configured_columns = {
             self.runtime_configuration.primary_key_column,
             self.runtime_configuration.geometry_column,
@@ -317,6 +322,16 @@ class LocalRelationDatasetRuntimeAdapter:
             raise ImproperlyConfigured(
                 "Local relation dataset references missing columns: "
                 f"{', '.join(missing_columns)}."
+            )
+        geometry_column = next(
+            column
+            for column in existing_column_metadata
+            if column["column_name"] == self.runtime_configuration.geometry_column
+        )
+        if geometry_column["udt_name"] != "geometry":
+            raise ImproperlyConfigured(
+                "Local relation dataset geometry column is not a geometry column: "
+                f"{self.runtime_configuration.geometry_column}."
             )
 
     def _get_existing_columns(self):
