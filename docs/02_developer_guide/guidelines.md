@@ -24,6 +24,9 @@ This page is the canonical source for day-to-day development workflow in BRIT.
 - **Keep secrets out of the repository**
   Use `.env` for local development only and never commit it.
 
+- **Keep agent context compact**
+  Durable implementation context belongs in repository documentation, not long always-injected memories. See [Context Retention](context_retention.md).
+
 ## Local Development
 
 ### Start the stack
@@ -117,4 +120,4 @@ docker compose exec web python manage.py test utils.tests.test_example.ExampleTe
 - **Where deployment instructions live**
   See [Operations](../03_operations/operations.md) for canonical deployment and runtime guidance.
 
-_Last updated: 2026-03-06_
+_Last updated: 2026-04-28_

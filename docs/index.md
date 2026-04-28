@@ -8,7 +8,7 @@ This index is the entry point for project documentation. Each topic has a clear 
   Start with [How-Tos](01_user_guide/howtos.md).
 
 - **Development workflow and day-to-day commands**
-  Use the [Developer Guide](02_developer_guide/README.md), especially [Guidelines](02_developer_guide/guidelines.md).
+  Use the [Developer Guide](02_developer_guide/README.md), especially [Guidelines](02_developer_guide/guidelines.md). For agent memory offloading and context hygiene, use [Context Retention](02_developer_guide/context_retention.md).
 
 - **Deployment and operations**
   Use [Operations](03_operations/operations.md) as the canonical source for deployment, runtime operations, logs, and backups.
@@ -30,4 +30,4 @@ This index is the entry point for project documentation. Each topic has a clear 
 - **Reference docs should link, not duplicate**
   Overview pages should point to canonical instructions instead of repeating them.
 
-_Last updated: 2026-03-06_
+_Last updated: 2026-04-28_

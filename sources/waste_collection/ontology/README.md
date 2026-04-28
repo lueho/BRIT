@@ -79,6 +79,34 @@ object with:
 - Crosswalk rows should map each raw source term to the same canonical
   `target_concept_uri` so research agents can treat all variants as equivalent.
 
+## Agent interpretation rules
+
+Recurring interpretation rules that affect collection research, imports, or review
+should be promoted here instead of remaining only in chat memory.
+
+- **Biowaste with home-composter exception**
+  If an official source states that biowaste participation is obligatory except
+  for households that compost at home, map the collection to
+  `Collection.connection_type = MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION`.
+
+- **Opt-in biowaste service**
+  If an official source frames the biowaste bin as an orderable or requestable
+  service and does not also state a mandatory participation rule, map the
+  collection to `Collection.connection_type = VOLUNTARY`.
+
+- **Combined food-waste and green-waste path**
+  If one source-supported collection path jointly accepts food waste and green
+  waste, represent it as the parent `Biowaste` collection with
+  `allowed_materials`, `forbidden_materials`, and description evidence. Create
+  separate `Food waste` or `Green waste` records only when sources establish a
+  genuinely distinct path, such as a different collection system, access route,
+  participation rule, fee logic, frequency, or validity period.
+
+- **Residual waste material lists**
+  For ordinary `Residual waste` collections, `allowed_materials` and
+  `forbidden_materials` may be omitted unless source evidence shows a special
+  inclusion or exclusion scope that must be modeled explicitly.
+
 ## Next planned steps
 
 1. Add SHACL-enforced URI integrity checks for crosswalk `target_concept_uri` values.

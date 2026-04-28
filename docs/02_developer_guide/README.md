@@ -19,6 +19,9 @@ This section contains developer-facing documentation for BRIT. Workflow instruct
 - **API details**
   Read [API Reference](api.md).
 
+- **Context retention and memory offloading**
+  Read [Context Retention](context_retention.md) when moving durable agent memories into repository documentation.
+
 ## Documentation Ownership
 
 - **Workflow commands**
@@ -33,4 +36,7 @@ This section contains developer-facing documentation for BRIT. Workflow instruct
 - **App-specific behavior**
   Keep in the respective app `README.md` files.
 
-_Last updated: 2026-03-06_
+- **Agent memories and context pointers**
+  Keep durable project knowledge in repository docs and keep agent memories short, selective, and pointer-oriented. See [Context Retention](context_retention.md).
+
+_Last updated: 2026-04-28_
