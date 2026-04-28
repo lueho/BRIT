@@ -302,6 +302,20 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertContains(response, "DE-B")
         self.assertNotContains(response, "DE-A")
 
+    def test_local_relation_table_route_ignores_hidden_column_filter(self):
+        response = self.client.get(
+            reverse("geodataset-table", kwargs={"pk": self.dataset.pk}),
+            {"hidden_code": "hidden-b"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "DE-A")
+        self.assertContains(response, "DE-B")
+        self.assertEqual(len(response.context["table_rows"]), 2)
+        for row in response.context["table_rows"]:
+            self.assertNotIn("hidden-a", row["values"])
+            self.assertNotIn("hidden-b", row["values"])
+
     def test_local_relation_feature_detail_route_renders_visible_columns(self):
         response = self.client.get(
             reverse(
@@ -329,6 +343,17 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
             response.json()["features"][0]["properties"]["nuts_id"], "DE-A"
         )
         self.assertNotIn("hidden_code", response.json()["features"][0]["properties"])
+
+    def test_local_relation_geojson_route_ignores_hidden_column_filter(self):
+        response = self.client.get(
+            reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk}),
+            {"hidden_code": "hidden-b"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()["features"]), 2)
+        for feature in response.json()["features"]:
+            self.assertNotIn("hidden_code", feature["properties"])
 
     def test_local_relation_map_route_uses_dataset_scoped_geojson_url(self):
         response = self.client.get(
