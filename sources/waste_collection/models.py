@@ -690,33 +690,7 @@ class Collection(NamedUserCreatedObject):
         super().clean()
 
     def review_readiness_errors(self):
-        errors = {}
-
-        attached_sources = list(self.sources.all()) if self.pk else []
-        attached_flyers = list(self.flyers.all()) if self.pk else []
-
-        invalid_source_urls = sorted(
-            {
-                source.url
-                for source in attached_sources
-                if source.url and source.url_checked and not source.url_valid
-            }
-        )
-        invalid_flyer_urls = sorted(
-            {
-                flyer.url
-                for flyer in attached_flyers
-                if flyer.url and flyer.url_checked and not flyer.url_valid
-            }
-        )
-        invalid_urls = invalid_source_urls + invalid_flyer_urls
-        if invalid_urls:
-            errors["sources"] = (
-                "Resolve checked-invalid source URLs before review submission: "
-                + "; ".join(invalid_urls)
-            )
-
-        return errors
+        return {}
 
     def validate_review_readiness(self):
         errors = self.review_readiness_errors()

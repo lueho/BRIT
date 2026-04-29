@@ -1129,7 +1129,7 @@ class CollectionMutationApiTestCase(APITestCase):
         self.assertFalse(collection.sources.exists())
         self.assertFalse(collection.flyers.exists())
 
-    def test_create_endpoint_rejects_submit_with_checked_invalid_source(self):
+    def test_create_endpoint_submits_with_checked_invalid_source(self):
         self.client.force_login(self.owner)
         invalid_source = Source.objects.create(
             owner=self.owner,
@@ -1152,8 +1152,11 @@ class CollectionMutationApiTestCase(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("sources", response.data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        collection = Collection.objects.get(pk=response.data["id"])
+        self.assertEqual(collection.publication_status, "review")
+        self.assertIsNotNone(collection.submitted_at)
+        self.assertTrue(collection.sources.filter(pk=invalid_source.pk).exists())
 
     def test_create_endpoint_validates_dates(self):
         self.client.force_login(self.owner)
