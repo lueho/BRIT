@@ -46,8 +46,8 @@ Still not aligned:
 - `BaseMaterial` has aliases but no recursive decomposition relation.
 - There is no dedicated semantic definition/reference-mapping layer for materials/components.
 - `Composition` still exists as mixed settings/compatibility infrastructure.
-- `WeightShare` still exists as persisted normalized compatibility storage and can still be edited through explicitly labelled legacy workflows.
-- Existing datasets still need backfill/spot-check evidence before destructive cleanup.
+- `WeightShare` still exists as persisted normalized compatibility storage, but UI write surfaces are read-only compatibility views after the production backfill.
+- Existing datasets have been backfilled on dev and production; post-backfill reports and spot checks should be retained as cleanup evidence.
 
 ## 3. Implementation Status by Phase
 
@@ -56,8 +56,8 @@ Still not aligned:
 | Phase 0 - Baseline and safety | Complete enough | Existing tests and regression coverage protect the migration path. |
 | Phase 3 - Measurement ownership | Complete | `MaterialPropertyValue.sample` is authoritative; legacy `Sample.properties` was removed. |
 | Phase 4a - Shared normalization | Complete enough | Shared helper derives normalized composition output from raw `ComponentMeasurement` rows with structured warning codes and compatibility fallback. |
-| Phase 4b - Consumer migration/write constraints | Complete for current wave | Primary read surfaces use the helper where feasible; legacy write surfaces are labelled and logged as compatibility. |
-| Phase 5 - Compatibility cleanup prep | In progress | Backfill candidate/apply command, mismatch report, telemetry, and export-boundary tests exist. Data execution and cleanup decisions remain. |
+| Phase 4b - Consumer migration/write constraints | Complete for current wave | Primary read surfaces use the helper where feasible; legacy normalized-composition write surfaces are blocked as read-only compatibility. |
+| Phase 5 - Compatibility cleanup prep | In progress | Backfill candidate/apply command, mismatch report, telemetry, export-boundary tests, prod backfill execution, and read-only compatibility writes exist. Cleanup boundary decisions remain. |
 | Phase 1 - Recursive hierarchy | Not started | Should be additive and source-facing first. |
 | Phase 2 - Semantic definition layer | Not started | Should wait for a concrete consumer and governance rules. |
 
@@ -80,22 +80,24 @@ These are the missing steps before the raw-first component-measurement transitio
 
 1. **Manual data-operation handoff**
    - Run the following reports in the target environment and save the outputs:
-     - `python manage.py report_composition_normalization_mismatches --summary-only --settings=brit.settings.testrunner`
-     - `python manage.py report_composition_normalization_mismatches --settings=brit.settings.testrunner`
-     - `python manage.py report_weightshare_backfill_candidates --summary-only --settings=brit.settings.testrunner`
-     - `python manage.py report_weightshare_backfill_candidates --settings=brit.settings.testrunner`
-   - Review all listed samples/groups before applying any backfill.
-   - If the dry-run output is acceptable, run `report_weightshare_backfill_candidates --apply` in the same environment.
-   - Spot-check created `ComponentMeasurement` rows for unit, basis component, owner, and values.
+     - `python manage.py report_composition_normalization_mismatches --summary-only`
+     - `python manage.py report_composition_normalization_mismatches`
+     - `python manage.py report_weightshare_backfill_candidates --summary-only`
+     - `python manage.py report_weightshare_backfill_candidates`
+   - 2026-04-28 dev snapshot summary:
+     - normalization mismatches: 0 examined samples, 0 mismatched groups
+     - backfill candidates: 31 samples, 87 groups, 223 saved `WeightShare` rows
+   - Backfill was successfully tested on dev and then run on production.
+   - Retain the detailed report output and spot-check notes as cleanup evidence.
    - Re-run both reports after backfill. The backfill report should return zero candidates; mismatch rows are manual-review items, not automatic fixes.
    - Optional CI/manual gate commands:
-     - `python manage.py report_composition_normalization_mismatches --fail-on-mismatch --settings=brit.settings.testrunner`
-     - `python manage.py report_weightshare_backfill_candidates --fail-on-candidates --settings=brit.settings.testrunner`
+     - `python manage.py report_composition_normalization_mismatches --fail-on-mismatch`
+     - `python manage.py report_weightshare_backfill_candidates --fail-on-candidates`
 
 2. **Lock down new write paths**
    - Ensure primary UI/API/import workflows for new component observations create `ComponentMeasurement`, not `WeightShare`.
-   - Keep `WeightShare` writes only in explicitly labelled compatibility flows.
-   - Consider permissions, feature flags, or deprecation warnings before narrowing compatibility edits.
+   - Keep `WeightShare` read access only for explicitly bounded compatibility adapters.
+   - Legacy normalized-composition UI write surfaces now return read-only responses instead of creating, editing, or deleting `WeightShare` rows.
 
 3. **Finish import/export evidence**
    - Confirm all material import paths write sample-owned `MaterialPropertyValue` and raw `ComponentMeasurement` rows.

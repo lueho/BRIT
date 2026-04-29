@@ -2583,6 +2583,21 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
 
+    def test_update_view_post_published_as_staff_user(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.post(self.get_update_url(self.published_object.pk))
+        self.assertEqual(response.status_code, 403)
+
+    def test_update_view_post_unpublished_as_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.post(self.get_update_url(self.unpublished_object.pk))
+        self.assertEqual(response.status_code, 403)
+
+    def test_update_view_post_unpublished_as_staff_user(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.post(self.get_update_url(self.unpublished_object.pk))
+        self.assertEqual(response.status_code, 403)
+
     def test_update_view_marks_saved_normalized_composition_as_compatibility(self):
         self.client.force_login(self.owner_user)
         response = self.client.get(self.get_update_url(self.unpublished_object.pk))
@@ -2608,78 +2623,64 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
             logs.output[0],
         )
 
-    def test_deleted_forms_are_not_included_in_total_sum_validation(self):
+    def test_update_post_blocks_saved_normalized_composition_writes(self):
         self.client.force_login(self.owner_user)
         url = self.get_update_url(self.unpublished_object.pk)
-        new_component = MaterialComponent.objects.create(name="New Component")
+        weight_share = self.m2m_objects["weight_shares"]["unpublished_weight_share_1"]
+        original_average = Decimal(str(weight_share.average))
         data = {
             "name": "Updated Test Composition",
             "sample": self.related_objects["unpublished_sample"].pk,
             "group": self.related_objects["group"].pk,
-            "fractions_of": self.m2m_objects["components"][
-                "component_1"
-            ].pk,  # Use valid component
-            "shares-INITIAL_FORMS": "2",
-            "shares-TOTAL_FORMS": "3",
-            "shares-0-id": self.m2m_objects["weight_shares"][
-                "unpublished_weight_share_1"
-            ].pk,
+            "fractions_of": self.m2m_objects["components"]["component_1"].pk,
+            "shares-INITIAL_FORMS": "1",
+            "shares-TOTAL_FORMS": "1",
+            "shares-0-id": weight_share.pk,
             "shares-0-owner": self.owner_user.pk,
             "shares-0-component": self.m2m_objects["components"]["component_1"].pk,
             "shares-0-average": "45.5",
             "shares-0-standard_deviation": "1.5",
-            "shares-1-id": self.m2m_objects["weight_shares"][
-                "unpublished_weight_share_2"
-            ].pk,
-            "shares-1-owner": self.owner_user.pk,
-            "shares-1-component": self.m2m_objects["components"]["component_2"].pk,
-            "shares-1-average": "54.5",
-            "shares-1-standard_deviation": "1.5",
-            "shares-1-DELETE": True,
-            "shares-2-id": "",
-            "shares-2-owner": self.owner_user.pk,
-            "shares-2-component": new_component.pk,
-            "shares-2-average": "54.5",
-            "shares-2-standard_deviation": "1.5",
         }
-        response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 302)
 
-    def test_deleted_forms_delete_correct_weight_share_record(self):
+        with self.assertLogs("materials.views", level="INFO") as logs:
+            response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(
+            response,
+            "Saved normalized-composition compatibility data is read-only.",
+            status_code=403,
+        )
+        self.assertIn(
+            "Legacy normalized-composition compatibility editor write blocked",
+            logs.output[0],
+        )
+        weight_share.refresh_from_db()
+        self.assertEqual(weight_share.average, original_average)
+
+    def test_update_post_does_not_delete_weight_share_records(self):
         self.client.force_login(self.owner_user)
         url = self.get_update_url(self.unpublished_object.pk)
+        weight_share = self.m2m_objects["weight_shares"]["unpublished_weight_share_1"]
         data = {
             "name": "Updated Test Composition",
             "sample": self.related_objects["unpublished_sample"].pk,
             "group": self.related_objects["group"].pk,
-            "fractions_of": self.m2m_objects["components"][
-                "component_1"
-            ].pk,  # Use valid component
+            "fractions_of": self.m2m_objects["components"]["component_1"].pk,
             "shares-INITIAL_FORMS": "1",
-            "shares-TOTAL_FORMS": "2",
-            "shares-0-id": self.m2m_objects["weight_shares"][
-                "unpublished_weight_share_1"
-            ].pk,
+            "shares-TOTAL_FORMS": "1",
+            "shares-0-id": weight_share.pk,
             "shares-0-owner": self.owner_user.pk,
             "shares-0-component": self.m2m_objects["components"]["component_1"].pk,
             "shares-0-average": "45.5",
             "shares-0-standard_deviation": "1.5",
             "shares-0-DELETE": True,
-            "shares-1-id": self.m2m_objects["weight_shares"][
-                "unpublished_weight_share_2"
-            ].pk,
-            "shares-1-owner": self.owner_user.pk,
-            "shares-1-component": self.m2m_objects["components"]["component_2"].pk,
-            "shares-1-average": "100.0",
-            "shares-1-standard_deviation": "1.5",
-            "shares-1-DELETE": False,
         }
+
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 302)
-        with self.assertRaises(WeightShare.DoesNotExist):
-            WeightShare.objects.get(
-                id=self.m2m_objects["weight_shares"]["unpublished_weight_share_1"].pk
-            )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(WeightShare.objects.filter(pk=weight_share.pk).exists())
 
     def test_weightshare_delete_view_logs_legacy_normalized_composition_usage(self):
         self.client.force_login(self.owner_user)
@@ -2696,7 +2697,7 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
             logs.output[0],
         )
 
-    def test_weightshare_delete_post_logs_legacy_normalized_composition_usage(self):
+    def test_weightshare_delete_post_blocks_legacy_normalized_composition_write(self):
         self.client.force_login(self.owner_user)
         weight_share = self.m2m_objects["weight_shares"]["unpublished_weight_share_1"]
         weight_share.owner = self.owner_user
@@ -2704,12 +2705,14 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
         url = reverse("weightshare-delete-modal", kwargs={"pk": weight_share.pk})
 
         with self.assertLogs("materials.views", level="INFO") as logs:
-            self.client.post(url)
+            response = self.client.post(url)
 
+        self.assertEqual(response.status_code, 403)
         self.assertIn(
-            "Legacy normalized-composition compatibility share deleted",
+            "Legacy normalized-composition compatibility share deletion blocked",
             logs.output[0],
         )
+        self.assertTrue(WeightShare.objects.filter(pk=weight_share.pk).exists())
 
 
 # ----------- Composition utilities ------------------------------------------------------------------------------------
@@ -2807,42 +2810,25 @@ class AddComponentViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 403)
 
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {"component": self.component.pk}
-        response = self.client.post(
-            reverse("composition-add-component", kwargs={"pk": self.composition.pk}),
-            data,
-        )
-        self.assertRedirects(
-            response,
-            reverse("sample-detail", kwargs={"pk": self.composition.sample.pk}),
-        )
-
-    def test_post_adds_component(self):
-        self.client.force_login(self.member)
-        data = {"component": self.component.pk}
-        self.client.post(
-            reverse("composition-add-component", kwargs={"pk": self.composition.pk}),
-            data,
-        )
-        self.composition.shares.get(component=self.component)
-
-    def test_post_logs_legacy_normalized_composition_usage(self):
+    def test_post_blocks_legacy_normalized_composition_share_creation(self):
         self.client.force_login(self.member)
         data = {"component": self.component.pk}
 
         with self.assertLogs("materials.views", level="INFO") as logs:
-            self.client.post(
+            response = self.client.post(
                 reverse(
                     "composition-add-component", kwargs={"pk": self.composition.pk}
                 ),
                 data,
             )
 
+        self.assertEqual(response.status_code, 403)
         self.assertIn(
-            "Legacy normalized-composition compatibility share created",
+            "Legacy normalized-composition compatibility share creation blocked",
             logs.output[0],
+        )
+        self.assertFalse(
+            self.composition.shares.filter(component=self.component).exists()
         )
 
 

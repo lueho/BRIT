@@ -9,7 +9,12 @@ from django.contrib.auth.mixins import (
     UserPassesTestMixin,
 )
 from django.db.models import Q
-from django.http import Http404, HttpResponseRedirect, JsonResponse
+from django.http import (
+    Http404,
+    HttpResponseForbidden,
+    HttpResponseRedirect,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404
 from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.views.generic import RedirectView, TemplateView, View
@@ -1433,6 +1438,21 @@ class CompositionUpdateView(UserCreatedObjectUpdateWithInlinesView):
         )
         return response
 
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        logger.info(
+            "Legacy normalized-composition compatibility editor write blocked",
+            extra={
+                "composition_id": self.object.pk,
+                "sample_id": self.object.sample_id,
+                "user_id": request.user.pk,
+            },
+        )
+        return HttpResponseForbidden(
+            "Saved normalized-composition compatibility data is read-only. "
+            "Use raw component measurements for component observations."
+        )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         inline_helper = WeightShareUpdateFormSetHelper()
@@ -1497,9 +1517,8 @@ class AddComponentView(
     def form_valid(self, form):
         composition = self.get_object()
         component = form.cleaned_data["component"]
-        composition.add_component(component)
         logger.info(
-            "Legacy normalized-composition compatibility share created",
+            "Legacy normalized-composition compatibility share creation blocked",
             extra={
                 "composition_id": composition.pk,
                 "sample_id": composition.sample_id,
@@ -1507,7 +1526,10 @@ class AddComponentView(
                 "user_id": self.request.user.pk,
             },
         )
-        return HttpResponseRedirect(self.get_success_url())
+        return HttpResponseForbidden(
+            "Saved normalized-composition compatibility data is read-only. "
+            "Use raw component measurements for component observations."
+        )
 
 
 class CompositionOrderUpView(UserOwnsObjectMixin, SingleObjectMixin, RedirectView):
@@ -1634,7 +1656,7 @@ class WeightShareModalDeleteView(UserCreatedObjectModalDeleteView):
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         logger.info(
-            "Legacy normalized-composition compatibility share deleted",
+            "Legacy normalized-composition compatibility share deletion blocked",
             extra={
                 "weightshare_id": self.object.pk,
                 "composition_id": self.object.composition_id,
@@ -1643,7 +1665,10 @@ class WeightShareModalDeleteView(UserCreatedObjectModalDeleteView):
                 "user_id": request.user.pk,
             },
         )
-        return super().post(request, *args, **kwargs)
+        return HttpResponseForbidden(
+            "Saved normalized-composition compatibility data is read-only. "
+            "Use raw component measurements for component observations."
+        )
 
     def get_success_url(self):
         return reverse(
