@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.db.models import signals
 from django.test import TestCase
 from factory.django import mute_signals
@@ -268,6 +269,80 @@ class SampleSeriesTestCase(TestCase):
                     duplicate.temporal_distributions.all().order_by("id"),
                     self.sample_series.temporal_distributions.all().order_by("id"),
                 )
+
+    def test_clean_prevents_publishing_empty_series(self):
+        """Test that clean() raises ValidationError when trying to publish an empty series."""
+        # Temporarily disconnect the auto-creation signal to create a truly empty series
+        with mute_signals(signals.post_save):
+            empty_series = SampleSeries.objects.create(material=self.material1)
+
+        empty_series.publication_status = SampleSeries.STATUS_PUBLISHED
+
+        with self.assertRaises(ValidationError) as context:
+            empty_series.clean()
+
+        self.assertIn(
+            "Cannot publish a sample series that contains no samples",
+            str(context.exception),
+        )
+
+    def test_clean_allows_publishing_series_with_samples(self):
+        """Test that clean() allows publishing when series has samples."""
+        series_with_sample = SampleSeries.objects.create(material=self.material1)
+        Sample.objects.create(
+            material=self.material1,
+            series=series_with_sample,
+            timestep=Timestep.objects.default(),
+        )
+        series_with_sample.publication_status = SampleSeries.STATUS_PUBLISHED
+
+        # Should not raise any exception
+        try:
+            series_with_sample.clean()
+        except ValidationError:
+            self.fail(
+                "clean() raised ValidationError unexpectedly for series with samples"
+            )
+
+    def test_approve_blocks_empty_series(self):
+        """Test that approve() raises ValidationError when trying to approve an empty series."""
+        # Temporarily disconnect the auto-creation signal to create a truly empty series
+        with mute_signals(signals.post_save):
+            empty_series = SampleSeries.objects.create(material=self.material1)
+
+        empty_series.publication_status = SampleSeries.STATUS_REVIEW
+
+        with self.assertRaises(ValidationError) as context:
+            empty_series.approve()
+
+        self.assertIn(
+            "Cannot approve a sample series that contains no samples",
+            str(context.exception),
+        )
+        # Series should remain in review status
+        self.assertEqual(empty_series.publication_status, SampleSeries.STATUS_REVIEW)
+
+    def test_approve_allows_series_with_samples(self):
+        """Test that approve() works when series has samples."""
+        series_with_sample = SampleSeries.objects.create(material=self.material1)
+        series_with_sample.publication_status = SampleSeries.STATUS_REVIEW
+        Sample.objects.create(
+            material=self.material1,
+            series=series_with_sample,
+            timestep=Timestep.objects.default(),
+        )
+
+        # Should not raise any exception and should approve the series
+        try:
+            series_with_sample.approve()
+        except ValidationError:
+            self.fail(
+                "approve() raised ValidationError unexpectedly for series with samples"
+            )
+
+        self.assertEqual(
+            series_with_sample.publication_status, SampleSeries.STATUS_PUBLISHED
+        )
 
 
 class MaterialPropertyValueTestCase(TestCase):

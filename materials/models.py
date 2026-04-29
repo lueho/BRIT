@@ -2,6 +2,7 @@ from builtins import property as builtin_property
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Max
 from django.db.models.signals import post_save, pre_save
@@ -413,6 +414,30 @@ class SampleSeries(NamedUserCreatedObject):
         return Composition.objects.filter(sample__series=self).exclude(
             group=MaterialComponentGroup.objects.default()
         )
+
+    def clean(self):
+        super().clean()
+        # Prevent publishing empty sample series
+        if (
+            self.publication_status == self.STATUS_PUBLISHED
+            and self.samples.count() == 0
+        ):
+            raise ValidationError(
+                "Cannot publish a sample series that contains no samples. "
+                "Add samples to the series before publishing."
+            )
+
+    def approve(self, user=None):
+        """
+        Approve this sample series, transitioning from review to published.
+        Validates that the series has samples before approving.
+        """
+        if self.samples.count() == 0:
+            raise ValidationError(
+                "Cannot approve a sample series that contains no samples. "
+                "Add samples to the series before approving."
+            )
+        return super().approve(user=user)
 
 
 @receiver(post_save, sender=SampleSeries)
