@@ -17,6 +17,7 @@ from inventories.tasks import run_inventory_algorithm
 from layer_manager.models import Layer
 from maps.models import Catchment, GeoDataset, Region
 from materials.models import (
+    ComponentMeasurement,
     Composition,
     Material,
     MaterialComponent,
@@ -33,6 +34,7 @@ from sources.greenhouses.models import (
 )
 from sources.roadside_trees.models import HamburgRoadsideTrees
 from sources.urban_green_spaces.models import HamburgGreenAreas
+from utils.properties.models import Unit
 
 
 @override_settings(
@@ -103,6 +105,17 @@ class InventoryExecutionIntegrationTests(TestCase):
             MaterialComponentGroup.objects.create(
                 owner=self.default_owner,
                 name="Total Material",
+                publication_status="published",
+            )
+
+        if not Unit.objects.filter(
+            owner=self.default_owner,
+            name="No unit",
+        ).exists():
+            Unit.objects.create(
+                owner=self.default_owner,
+                name="No unit",
+                symbol="-",
                 publication_status="published",
             )
 
@@ -287,13 +300,16 @@ class InventoryExecutionIntegrationTests(TestCase):
         for sample in feedstock.samples.filter(
             timestep__distribution=seasonal_distribution
         ):
-            composition = Composition.objects.create(
+            Composition.objects.create(
                 owner=self.default_owner,
                 group=macro_components,
                 sample=sample,
             )
-            composition.add_component(
-                biomass,
+            ComponentMeasurement.objects.create(
+                owner=self.default_owner,
+                sample=sample,
+                group=macro_components,
+                component=biomass,
                 average=summer_values[sample.timestep.id],
                 standard_deviation=0.0,
             )
@@ -355,18 +371,24 @@ class InventoryExecutionIntegrationTests(TestCase):
         )
 
         average_sample = feedstock.samples.get(timestep=average_timestep)
-        composition = Composition.objects.create(
+        Composition.objects.create(
             owner=self.default_owner,
             group=macro_components,
             sample=average_sample,
         )
-        composition.add_component(
-            wood_chips,
+        ComponentMeasurement.objects.create(
+            owner=self.default_owner,
+            sample=average_sample,
+            group=macro_components,
+            component=wood_chips,
             average=0.75,
             standard_deviation=0.0,
         )
-        composition.add_component(
-            leaves,
+        ComponentMeasurement.objects.create(
+            owner=self.default_owner,
+            sample=average_sample,
+            group=macro_components,
+            component=leaves,
             average=0.25,
             standard_deviation=0.0,
         )

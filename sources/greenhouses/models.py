@@ -165,7 +165,7 @@ class GreenhouseGrowthCycle(UserCreatedObject):
         ts_set = GrowthTimeStepSet.objects.create(
             owner=self.owner, timestep=timestep, growth_cycle=self
         )
-        for component in self.group_settings.components:
+        for component in self.group_settings.sample.components:
             ts_set.add_component(component)
 
     @property
@@ -195,7 +195,7 @@ class GreenhouseGrowthCycle(UserCreatedObject):
     @property
     def table_data(self):
         table_data = []
-        components = self.group_settings.components
+        components = self.group_settings.sample.components
         for component in components:
             table_row = {"Component": component.name}
             shares = GrowthShare.objects.filter(
