@@ -4,6 +4,7 @@ from urllib.parse import urlencode
 
 from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.messages import get_messages
 from django.db.models.signals import post_save, pre_save
 from django.http import HttpResponseRedirect
 from django.test import RequestFactory, TestCase
@@ -144,6 +145,10 @@ class ReviewWorkflowViewTests(TestCase):
             self.private_collection.publication_status,
             UserCreatedObject.STATUS_REVIEW,
         )
+        self.assertIn(
+            "Collection has been submitted for review.",
+            [str(message) for message in get_messages(response.wsgi_request)],
+        )
 
     def test_submit_for_review_without_source_or_flyer_succeeds(self):
         with mute_signals(post_save, pre_save):
@@ -177,6 +182,10 @@ class ReviewWorkflowViewTests(TestCase):
         self.assertEqual(
             collection.publication_status,
             UserCreatedObject.STATUS_REVIEW,
+        )
+        self.assertIn(
+            "Collection has been submitted for review.",
+            [str(message) for message in get_messages(response.wsgi_request)],
         )
 
     def test_submit_for_review_view_ajax_preflight_returns_204_without_state_change(

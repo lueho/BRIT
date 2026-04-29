@@ -909,7 +909,17 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
 
     def get_success_message(self, obj, previous_status=None) -> str:
         """Hook to customize the success message after the action."""
-        return f"{obj._meta.verbose_name} has been updated."
+        action_messages = {
+            ReviewAction.ACTION_SUBMITTED: "submitted for review",
+            ReviewAction.ACTION_APPROVED: "approved",
+            ReviewAction.ACTION_REJECTED: "rejected",
+            ReviewAction.ACTION_WITHDRAWN: "withdrawn from review",
+        }
+        action_message = action_messages.get(self.review_action)
+        object_name = capfirst(obj._meta.verbose_name)
+        if action_message:
+            return f"{object_name} has been {action_message}."
+        return f"{object_name} has been updated."
 
     def handle_review_action_post(self, request, *args, **kwargs):
         """Shared POST flow for all review actions."""
