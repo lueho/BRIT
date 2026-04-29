@@ -30,4 +30,4 @@ This index is the entry point for project documentation. Each topic has a clear 
 - **Reference docs should link, not duplicate**
   Overview pages should point to canonical instructions instead of repeating them.
 
-_Last updated: 2026-04-28_
+_Last updated: 2026-04-29_

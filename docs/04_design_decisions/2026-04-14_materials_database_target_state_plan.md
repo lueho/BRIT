@@ -1,113 +1,92 @@
 # Materials Database Target-State Plan
 
-- **Status**: In progress
+- **Status**: Phase 5 complete (raw-first transition done)
 - **Date**: 2026-04-14
-- **Last updated**: 2026-04-28
+- **Last updated**: 2026-04-29
 - **Source**: `Target report 1.2_R1_Database structure_TUHH.docx`
-- **Scope**: `materials` app database structure and immediate cross-app dependencies
+- **Scope**: `materials` app database structure
 
-## Documentation Boundary
-
-This document is the single authoritative roadmap for the materials module target state. Use it for sequencing, remaining gaps, and completion criteria.
-
-Related records remain supporting constraints, not parallel materials roadmaps:
-
-- [Property unification current state and remaining work](2026-03-25_property_unification_current_state_and_remaining_work.md)
-- [Unified unit handling](2025-02-06_unified_unit_handling.md)
+Related context: [Property unification](2026-03-25_property_unification_current_state_and_remaining_work.md), [Unified unit handling](2025-02-06_unified_unit_handling.md)
 
 ## 1. Target State
 
-The materials module should support the report's five core capabilities:
+Five core capabilities from the source report:
 
-- **Recursive material structure**
-  Materials can be decomposed into sub-materials without forcing every dataset into one fixed granularity.
-- **Separate semantic definitions**
-  Stored source-facing material/component terms can link to curated definitions and external references without rewriting source labels.
-- **Sample-owned measurements**
-  Component and property measurements belong directly to a concrete sample and carry unit, basis, method, and provenance where available.
-- **Property definitions separate from values**
-  `MaterialProperty` defines meaning and allowed units; value rows store actual observations.
-- **Raw-first component observations**
-  `ComponentMeasurement` is the canonical stored representation for new component data. Normalized compositions are derived on demand, with persisted normalized rows kept only as bounded compatibility storage.
+| Capability | Status |
+|-----------|--------|
+| Recursive material structure | ⏸️ Not started (Phase 1) |
+| Separate semantic definitions | ⏸️ Not started (Phase 2) |
+| Sample-owned measurements | ✅ Complete |
+| Property definitions separate from values | ✅ Complete |
+| Raw-first component observations | ✅ Complete |
 
 ## 2. Current State
 
-Already aligned:
+✅ **Complete:**
+- `MaterialProperty(PropertyBase)` with domain-owned property architecture
+- `MaterialPropertyValue` with per-value unit, basis, method, sources
+- `ComponentMeasurement` as canonical raw component storage
+- `materials.composition_normalization` derives normalized shares from raw measurements only
+- All read surfaces use raw-first normalization path
+- Excel export as raw measurement boundary
 
-- `MaterialProperty(PropertyBase)` follows BRIT's domain-owned property architecture.
-- `MaterialPropertyValue` stores unit, basis, analytical method, sources, and now belongs directly to `Sample`.
-- `ComponentMeasurement` stores raw component measurements per sample.
-- `materials.composition_normalization` derives normalized composition output from raw `ComponentMeasurement` rows only.
-- `SampleDetailView`, `SampleModelSerializer`, `SampleAPISerializer`, `CompositionAPISerializer`, SimuCF reads, and sample/sample-series component lists use the shared raw-first normalization path where currently feasible.
-- Excel sample measurement export is covered by tests as a raw `ComponentMeasurement` export boundary.
+⏸️ **Not started:**
+- Recursive material decomposition (Phase 1)
+- Semantic definition/reference-mapping layer (Phase 2)
 
-Still not aligned:
+🗑️ **Removed:**
+- `WeightShare` model, admin, forms, views, serializers, tests, and database table
+- Legacy backfill and mismatch report commands
 
-- `BaseMaterial` has aliases but no recursive decomposition relation.
-- There is no dedicated semantic definition/reference-mapping layer for materials/components.
-- `Composition` still exists as mixed settings/compatibility infrastructure.
-- Existing datasets have been backfilled on dev and production; post-backfill reports and spot checks should be retained as cleanup evidence.
+🔧 **Retained as settings:**
+- `Composition` for group order and `fractions_of` configuration
 
-## 3. Implementation Status by Phase
+## 3. Phase Status
 
-| Phase | Status | Notes |
+| Phase | Status | Description |
 |---|---|---|
-| Phase 0 - Baseline and safety | Complete enough | Existing tests and regression coverage protect the migration path. |
-| Phase 3 - Measurement ownership | Complete | `MaterialPropertyValue.sample` is authoritative; legacy `Sample.properties` was removed. |
-| Phase 4a - Shared normalization | Complete enough | Shared helper derives normalized composition output from raw `ComponentMeasurement` rows with structured warning codes. |
-| Phase 4b - Consumer migration/write constraints | Complete | Primary read surfaces use the shared raw-first helper; legacy normalized-composition write surfaces were removed. |
-| Phase 5 - Compatibility cleanup | Complete for `WeightShare` | Production backfill was completed; `WeightShare` runtime code, commands, forms, serializers, views, tests, and database table removal migration were removed. |
-| Phase 1 - Recursive hierarchy | Not started | Should be additive and source-facing first. |
-| Phase 2 - Semantic definition layer | Not started | Should wait for a concrete consumer and governance rules. |
+| 0 - Baseline | Complete | Test coverage protects migration path |
+| 3 - Measurement ownership | Complete | `MaterialPropertyValue.sample` authoritative |
+| 4a - Shared normalization | Complete | Normalization helper uses raw `ComponentMeasurement` |
+| 4b - Consumer migration | Complete | All read surfaces raw-first; legacy write surfaces removed |
+| 5 - Compatibility cleanup | Complete | `WeightShare` fully removed; `Composition` retained as settings |
+| 1 - Recursive hierarchy | Not started | Future work |
+| 2 - Semantic definitions | Not started | Future work |
 
-## 4. Decisions and Guardrails
+## 4. Guardrails
 
-- **Keep raw source labels intact**
-  Do not rewrite imported material/component/property labels into canonical terms. Use links/mappings instead.
-- **Do not introduce a universal measurement table**
-  Materials-specific semantics such as `basis_component` and `analytical_method` should remain explicit.
-- **Treat `Composition` as settings infrastructure**
-  `Composition` remains for group order and `fractions_of`; normalized values are derived from raw measurements.
-- **Add hierarchy and semantic definitions only additively**
-  Neither should block completion of the raw-first measurement path.
+- Keep raw source labels intact (use mappings, not rewrites)
+- Keep materials-specific semantics explicit (`basis_component`, `analytical_method`)
+- `Composition` is settings infrastructure only (group order, `fractions_of`)
+- Add hierarchy/semantics additively without blocking raw-first path
 
-## 5. Current Raw-First Implementation Status
+## 5. Raw-First Transition Summary
 
-The raw-first component-measurement transition is complete for `WeightShare` removal:
+✅ **Complete (2026-04-29):**
+- Legacy backfill completed on dev and production
+- `ComponentMeasurement` is the only runtime source for normalized shares
+- `WeightShare` model, admin, forms, views, serializers, tests, commands removed
+- Migration `0016_delete_weightshare.py` drops the table
+- `Composition` retained for group order and `fractions_of`
 
-- The legacy backfill was tested on dev and run on production.
-- `ComponentMeasurement` is the only runtime source for normalized component shares.
-- `WeightShare` compatibility commands, forms, views, serializers, admin registration, and tests were removed.
-- A migration drops the `WeightShare` table.
-- `Composition` remains as settings infrastructure for group order and `fractions_of`.
+Remaining work: Phase 1 (recursive hierarchy) and Phase 2 (semantic definitions) when concrete consumers exist.
 
-Remaining work belongs to later target-state phases rather than `WeightShare` compatibility cleanup.
+## 6. Future Work
 
-## 6. Later Target-State Work
-
-After the raw-first path is stable:
-
-1. **Recursive hierarchy**
-   - Add a relation model rather than a single parent FK.
-   - Prevent cycles and duplicate sibling relations.
-   - Keep it attached to source-facing material records first.
-
-2. **Semantic definitions and references**
-   - Define ownership, review permissions, merge/split behavior, and reference vocabulary rules.
-   - Add definition/reference models without deleting existing comparable aliases.
-   - Backfill comparable chains only after the model has proven useful.
-
-3. **MaterialProperty unit cleanup**
-   - Review whether `MaterialProperty.unit` should remain only as a compatibility label while `allowed_units` and value-level `unit` stay authoritative.
+1. **Recursive hierarchy** - Relation model for material decomposition
+2. **Semantic definitions** - Reference-mapping layer with governance rules
+3. **Unit cleanup** - Review `MaterialProperty.unit` vs `allowed_units` + value-level `unit`
 
 ## 7. Definition of Done
 
-The materials module is aligned with the report when:
+| Criterion | Status |
+|-----------|--------|
+| Hierarchical material representation | ⏸️ Pending Phase 1 |
+| Semantic definition nodes and references | ⏸️ Pending Phase 2 |
+| Property measurements belong to sample | ✅ Complete |
+| Raw component measurements canonical | ✅ Complete |
+| Normalized compositions derived on demand | ✅ Complete |
+| Workflows use raw measurement paths | ✅ Complete |
+| `Composition` as settings infrastructure | ✅ Complete |
 
-- materials can be represented hierarchically at multiple levels of detail
-- stored material records can point to separate semantic definition nodes and external references
-- each material property measurement belongs directly to one sample
-- raw component measurements are the canonical stored representation for new component observation data
-- normalized compositions are derived on demand rather than manually curated as primary truth
-- UI/API/import/export workflows use canonical raw measurement paths
-- `Composition` is documented and implemented as settings/helper infrastructure
+_Complete for raw-first transition; remaining work tracked in Phase 1-2._

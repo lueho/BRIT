@@ -41,4 +41,4 @@ _What becomes easier or harder as a result?_
 
 *Add new ADRs or design records as needed. For rationale behind major decisions, use the template above.*
 
-_Last updated: 2026-04-22_
+_Last updated: 2026-04-29_

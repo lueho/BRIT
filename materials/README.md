@@ -21,7 +21,7 @@ The `materials` app manages the current BRIT implementation for bioresource defi
   Sample series and individual samples, including temporal context.
 
 - **Composition layer**
-  Component groups, persisted compositions, and weight shares.
+  Component groups, composition settings, and normalized compositions derived from raw measurements.
 
 - **Measurement layer**
   Materials-specific properties, property values, raw component measurements, and analytical methods.
@@ -56,10 +56,7 @@ The `materials` app manages the current BRIT implementation for bioresource defi
   Groups components into a composition domain.
 
 - **`Composition`**
-  Stores composition settings for a sample and group.
-
-- **`WeightShare`**
-  Stores composition values for components within a composition.
+  Stores composition settings (group order, `fractions_of`) for a sample and group.
 
 ### Measurements and methods
 
@@ -80,17 +77,14 @@ The `materials` app manages the current BRIT implementation for bioresource defi
 
 ## Current Composition Handling
 
-- **Persisted composition path**
-  `Composition` and `WeightShare` remain active persisted structures in the current app.
+- **Raw measurement path (canonical)**
+  `ComponentMeasurement` stores raw per-sample component measurements with unit, basis, and provenance context. Normalized compositions are derived on demand from raw measurements via `materials.composition_normalization`.
 
-- **Raw measurement path**
-  `ComponentMeasurement` stores raw per-sample component measurements with unit, basis, and provenance context.
+- **Composition settings**
+  `Composition` configures group order and `fractions_of` for display purposes. Normalized values are not persisted; they are computed from `ComponentMeasurement` rows.
 
-- **Derived read behavior already exists**
-  Some current read paths derive composition displays from raw component measurements when persisted composition rows are absent.
-
-- **Roadmap is separate**
-  Any future shift in canonical storage or normalization strategy is tracked in the materials target-state plan rather than in this README.
+- **Roadmap**
+  See [Materials database target-state plan](../docs/04_design_decisions/2026-04-14_materials_database_target_state_plan.md) for remaining work (recursive hierarchy, semantic definitions).
 
 ## App Boundaries
 
@@ -122,4 +116,4 @@ The `materials` app manages the current BRIT implementation for bioresource defi
 - **Architecture context**
   See [Architecture Overview](../docs/02_developer_guide/architecture.md).
 
-_Last updated: 2026-04-14_
+_Last updated: 2026-04-29_
