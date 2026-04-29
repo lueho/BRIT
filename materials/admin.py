@@ -12,7 +12,6 @@ from .models import (
     MaterialPropertyValue,
     Sample,
     SampleSeries,
-    WeightShare,
 )
 
 
@@ -178,20 +177,6 @@ class CompositionAdmin(admin.ModelAdmin):
     search_fields = ("sample__name", "group__name")
     list_filter = ("publication_status",)
     ordering = ("sample", "order")
-
-
-@admin.register(WeightShare)
-class WeightShareAdmin(admin.ModelAdmin):
-    list_display = (
-        "__str__",
-        "component",
-        "composition",
-        "average",
-        "standard_deviation",
-        "owner",
-    )
-    search_fields = ("component__name",)
-    ordering = ("-average",)
 
 
 @admin.register(ComponentMeasurement)

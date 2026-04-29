@@ -1,14 +1,17 @@
+from decimal import Decimal
+
 from django.urls import reverse
 
 from materials.models import (
+    ComponentMeasurement,
     Composition,
     Material,
     MaterialComponent,
     MaterialComponentGroup,
     Sample,
     SampleSeries,
-    WeightShare,
 )
+from utils.properties.models import Unit
 from utils.tests.testcases import ViewWithPermissionsTestCase
 
 from ..models import InputMaterial
@@ -23,6 +26,7 @@ class SimuCFModelFormViewTestCase(ViewWithPermissionsTestCase):
         sample = Sample.objects.create(
             name="Test Sample", material=material, series=series
         )
+        cls.sample_pk = sample.pk
         group = MaterialComponentGroup.objects.create(name="Biochemical Composition")
         composition = Composition.objects.create(group=group, sample=sample)
         component_names = [
@@ -36,13 +40,20 @@ class SimuCFModelFormViewTestCase(ViewWithPermissionsTestCase):
             "Cellulose",
             "Lignin",
         ]
+        percent_unit = Unit.objects.filter(name="%").first() or Unit.objects.create(
+            name="%", symbol="percent"
+        )
         for name in component_names:
             component = MaterialComponent.objects.create(name=name)
-            WeightShare.objects.create(
-                name=name, composition=composition, component=component, average=0.7
+            ComponentMeasurement.objects.create(
+                sample=composition.sample,
+                group=composition.group,
+                component=component,
+                unit=percent_unit,
+                average=Decimal("70"),
             )
 
-        cls.input_material = InputMaterial.objects.get(name="Test Sample")
+        cls.input_material = InputMaterial.objects.get(pk=cls.sample_pk)
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse("simucf-form"))

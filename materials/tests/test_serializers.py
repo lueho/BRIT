@@ -20,7 +20,6 @@ from ..models import (
     MaterialPropertyValue,
     Sample,
     SampleSeries,
-    WeightShare,
 )
 from ..serializers import (
     CompositionDoughnutChartSerializer,
@@ -28,7 +27,6 @@ from ..serializers import (
     MaterialPropertyValueModelSerializer,
     SampleModelSerializer,
     SampleSeriesModelSerializer,
-    WeightShareModelSerializer,
 )
 
 
@@ -222,16 +220,18 @@ class CompositionSerializerTestCase(TestCase):
             timestep=Timestep.objects.default(),
         )
         group = MaterialComponentGroup.objects.create(name="Test Group")
-        composition = Composition.objects.create(
+        cls.composition = Composition.objects.create(
             group=group, sample=sample, fractions_of=MaterialComponent.objects.default()
         )
-        composition.add_component(
-            MaterialComponent.objects.other(), average=0.5, standard_deviation=0.1337
+        unit = Unit.objects.filter(name="%").first() or Unit.objects.create(
+            name="%", symbol="percent"
         )
-
-    def setUp(self):
-        self.composition = Composition.objects.get(
-            group__name="Test Group", sample__name="Test Sample"
+        ComponentMeasurement.objects.create(
+            sample=sample,
+            group=group,
+            component=MaterialComponent.objects.other(),
+            unit=unit,
+            average=Decimal("50"),
         )
 
     def test_serializer_construction(self):
@@ -243,67 +243,13 @@ class CompositionSerializerTestCase(TestCase):
         self.assertIn("fractions_of_name", data)
         self.assertIn("shares", data)
 
-    def test_other_component_is_last_in_the_shares_list(self):
+    def test_serializer_uses_raw_normalized_composition(self):
         data = CompositionModelSerializer(self.composition).data
+
         self.assertEqual(
             data["shares"][-1]["component"], MaterialComponent.objects.other().pk
         )
-
-    def test_serializer_remains_persisted_weightshare_compatibility_adapter(self):
-        raw_component = MaterialComponent.objects.create(
-            name="Raw Composition Component"
-        )
-        unit = Unit.objects.create(name="Raw composition percent")
-        ComponentMeasurement.objects.create(
-            sample=self.composition.sample,
-            group=self.composition.group,
-            component=raw_component,
-            unit=unit,
-            average=Decimal("100"),
-        )
-
-        data = CompositionModelSerializer(self.composition).data
-
-        self.assertNotIn(
-            raw_component.pk,
-            [share["component"] for share in data["shares"]],
-        )
-
-
-class WeightShareModelSerializerTestCase(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        material = Material.objects.create(name="Test Material")
-        series = SampleSeries.objects.create(name="Test Series", material=material)
-        sample = Sample.objects.create(
-            name="Test Sample",
-            material=material,
-            series=series,
-            timestep=Timestep.objects.default(),
-        )
-        group = MaterialComponentGroup.objects.create(name="Test Group")
-        composition = Composition.objects.create(
-            name="Test Composition",
-            group=group,
-            sample=sample,
-            fractions_of=MaterialComponent.objects.default(),
-        )
-        WeightShare.objects.create(
-            component=MaterialComponent.objects.default(),
-            composition=composition,
-            average=0.9,
-            standard_deviation=0.1337,
-        )
-
-    def setUp(self):
-        self.share = WeightShare.objects.get(standard_deviation=0.1337)
-
-    def test_serializer_construction(self):
-        data = WeightShareModelSerializer(self.share).data
-        self.assertIn("component", data)
-        self.assertIn("component_name", data)
-        self.assertIn("average", data)
-        self.assertIn("standard_deviation", data)
+        self.assertEqual(data["shares"][-1]["as_percentage"], "100.0%")
 
 
 class CompositionDoughnutChartSerializerTestCase(TestCase):
@@ -315,19 +261,35 @@ class CompositionDoughnutChartSerializerTestCase(TestCase):
             name="Test Sample", material=material, series=series
         )
         group = MaterialComponentGroup.objects.create(name="Test Group")
-        composition = Composition.objects.create(
+        cls.composition = Composition.objects.create(
             sample=sample, group=group, fractions_of=MaterialComponent.objects.default()
         )
         component1 = MaterialComponent.objects.create(name="Test Component 1")
         component2 = MaterialComponent.objects.create(name="Test Component 2")
-        composition.add_component(
-            MaterialComponent.objects.other(), average=0.7, standard_deviation=0.1337
+        unit = Unit.objects.filter(name="%").first() or Unit.objects.create(
+            name="%", symbol="percent"
         )
-        composition.add_component(component1, average=0.1, standard_deviation=0.1337)
-        composition.add_component(component2, average=0.2, standard_deviation=0.1337)
-
-    def setUp(self):
-        self.composition = Composition.objects.get(group__name="Test Group")
+        ComponentMeasurement.objects.create(
+            sample=sample,
+            group=group,
+            component=MaterialComponent.objects.other(),
+            unit=unit,
+            average=Decimal("70"),
+        )
+        ComponentMeasurement.objects.create(
+            sample=sample,
+            group=group,
+            component=component1,
+            unit=unit,
+            average=Decimal("10"),
+        )
+        ComponentMeasurement.objects.create(
+            sample=sample,
+            group=group,
+            component=component2,
+            unit=unit,
+            average=Decimal("20"),
+        )
 
     def test_serializer_returns_correct_data(self):
         data = CompositionDoughnutChartSerializer(self.composition).data
@@ -342,22 +304,4 @@ class CompositionDoughnutChartSerializerTestCase(TestCase):
         self.assertIn("data", data)
         self.assertIsInstance(data["data"], list)
         self.assertIsInstance(data["data"][0]["data"], list)
-        self.assertListEqual(
-            data["data"][0]["data"],
-            [Decimal("0.2000000000"), Decimal("0.1000000000"), Decimal("0.7000000000")],
-        )
-
-    def test_serializer_remains_persisted_weightshare_compatibility_adapter(self):
-        raw_component = MaterialComponent.objects.create(name="Raw Chart Component")
-        unit = Unit.objects.create(name="Raw chart percent")
-        ComponentMeasurement.objects.create(
-            sample=self.composition.sample,
-            group=self.composition.group,
-            component=raw_component,
-            unit=unit,
-            average=Decimal("100"),
-        )
-
-        data = CompositionDoughnutChartSerializer(self.composition).data
-
-        self.assertNotIn(raw_component.name, data["labels"])
+        self.assertListEqual(data["data"][0]["data"], [0.2, 0.1, 0.7])

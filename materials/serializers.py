@@ -14,51 +14,22 @@ from .composition_normalization import get_sample_normalized_compositions
 from .models import (
     Composition,
     Material,
-    MaterialComponent,
     MaterialPropertyValue,
     Sample,
     SampleSeries,
-    WeightShare,
 )
 
 
-class WeightShareModelSerializer(ModelSerializer):
-    component_name = StringRelatedField(source="component")
-    as_percentage = ReadOnlyField()
-
-    class Meta:
-        model = WeightShare
-        fields = (
-            "component",
-            "component_name",
-            "average",
-            "standard_deviation",
-            "as_percentage",
-        )
-
-
 class CompositionModelSerializer(ModelSerializer):
-    group_name = StringRelatedField(source="group")
-    fractions_of_name = StringRelatedField(source="fractions_of")
+    group_name = ReadOnlyField(source="group.name")
+    fractions_of_name = ReadOnlyField(source="fractions_of.name")
     shares = SerializerMethodField()
 
-    def get_shares(salf, obj):
-        """
-        Gets the weight shares of the given composition in default order but takes cares that the "Other" element
-        is last in the list, regardless of the previous order.
-        """
-        other = MaterialComponent.objects.other()
-        shares = WeightShareModelSerializer(
-            obj.shares.exclude(component=other), many=True
-        ).data
-        other_qs = obj.shares.filter(component=other)
-        if other_qs.exists():
-            shares.append(
-                WeightShareModelSerializer(
-                    obj.shares.filter(component=other), many=True
-                ).data[0]
-            )
-        return shares
+    def get_shares(self, obj):
+        for composition in get_sample_normalized_compositions(obj.sample):
+            if composition.get("settings_pk") == obj.pk:
+                return composition["shares"]
+        return []
 
     class Meta:
         model = Composition
@@ -74,13 +45,6 @@ class CompositionModelSerializer(ModelSerializer):
 
 
 class CompositionDoughnutChartSerializer(ModelSerializer):
-    """Legacy doughnut chart payload for persisted ``Composition`` rows.
-
-    Kept for compatibility only. The canonical chart payload is now built from
-    :func:`materials.composition_normalization.get_sample_normalized_compositions`
-    output in ``SampleDetailView._build_composition_charts``.
-    """
-
     id = SerializerMethodField()
     title = ReadOnlyField(default="Composition")
     unit = ReadOnlyField(default="%")
@@ -95,42 +59,22 @@ class CompositionDoughnutChartSerializer(ModelSerializer):
         return f"materialCompositionChart-{obj.id}"
 
     def get_shares(self, obj):
-        other = MaterialComponent.objects.other()
-        shares = WeightShareModelSerializer(
-            obj.shares.exclude(component=other), many=True
-        ).data
-        other_qs = obj.shares.filter(component=other)
-        if other_qs.exists():
-            shares.append(
-                WeightShareModelSerializer(
-                    obj.shares.filter(component=other), many=True
-                ).data[0]
-            )
-        return shares
+        for composition in get_sample_normalized_compositions(obj.sample):
+            if composition.get("settings_pk") == obj.pk:
+                return composition["shares"]
+        return []
 
     def get_labels(self, obj):
-        other = MaterialComponent.objects.other()
-        labels = [share.component.name for share in obj.shares.exclude(component=other)]
-        other_qs = obj.shares.filter(component=other)
-        if other_qs.exists():
-            labels.append("Other")
-        return labels
+        return [share["component_name"] for share in self.get_shares(obj)]
 
     def get_data(self, obj):
-        other = MaterialComponent.objects.other()
-        data = [
+        return [
             {
                 "label": "Fraction",
                 "unit": "%",
-                "data": [
-                    share.average for share in obj.shares.exclude(component=other)
-                ],
+                "data": [share["average"] for share in self.get_shares(obj)],
             }
         ]
-        other_qs = obj.shares.filter(component=other)
-        if other_qs.exists():
-            data[0]["data"].append(other_qs.first().average)
-        return data
 
 
 class MaterialPropertyValueModelSerializer(
@@ -275,14 +219,6 @@ class MaterialPropertyAPISerializer(
     NumericMeasurementSerializerMixin, BaseMaterialPropertyAPISerializer
 ):
     pass
-
-
-class WeightShareAPISerializer(ModelSerializer):
-    component = StringRelatedField()
-
-    class Meta:
-        model = WeightShare
-        fields = ("component", "average", "standard_deviation")
 
 
 class CompositionAPISerializer(ModelSerializer):

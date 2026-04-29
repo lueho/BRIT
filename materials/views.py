@@ -2,7 +2,6 @@ import json
 import logging
 from collections import defaultdict
 
-from crispy_forms.helper import FormHelper
 from django.contrib.auth.mixins import (
     LoginRequiredMixin,
     PermissionRequiredMixin,
@@ -11,7 +10,6 @@ from django.contrib.auth.mixins import (
 from django.db.models import Q
 from django.http import (
     Http404,
-    HttpResponseForbidden,
     HttpResponseRedirect,
     JsonResponse,
 )
@@ -43,7 +41,6 @@ from utils.object_management.views import (
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectReadAccessMixin,
     UserCreatedObjectUpdateView,
-    UserCreatedObjectUpdateWithInlinesView,
     UserOwnsObjectMixin,
 )
 from utils.views import NextOrSuccessUrlMixin
@@ -66,7 +63,6 @@ from .filters import (
     UserOwnedSampleFilter,
 )
 from .forms import (
-    AddComponentModalForm,
     AddCompositionModalForm,
     AddLiteratureSourceForm,
     AddSeasonalVariationForm,
@@ -80,7 +76,6 @@ from .forms import (
     Composition,
     CompositionModalModelForm,
     CompositionModelForm,
-    InlineWeightShare,
     MaterialCategoryModalModelForm,
     MaterialCategoryModelForm,
     MaterialModalModelForm,
@@ -95,7 +90,6 @@ from .forms import (
     SampleSeriesAddTemporalDistributionModalModelForm,
     SampleSeriesModalModelForm,
     SampleSeriesModelForm,
-    WeightShareUpdateFormSetHelper,
 )
 from .models import (
     AnalyticalMethod,
@@ -108,7 +102,6 @@ from .models import (
     MaterialPropertyValue,
     Sample,
     SampleSeries,
-    WeightShare,
     get_or_create_sample_substrate_category,
 )
 from .serializers import (
@@ -1419,58 +1412,12 @@ class CompositionModalDetailView(UserCreatedObjectModalDetailView):
     model = Composition
 
 
-class CompositionUpdateView(UserCreatedObjectUpdateWithInlinesView):
+class CompositionUpdateView(UserCreatedObjectUpdateView):
     model = Composition
     form_class = CompositionModelForm
-    inlines = [
-        InlineWeightShare,
-    ]
 
-    def get(self, request, *args, **kwargs):
-        response = super().get(request, *args, **kwargs)
-        logger.info(
-            "Legacy normalized-composition compatibility editor opened",
-            extra={
-                "composition_id": self.object.pk,
-                "sample_id": self.object.sample_id,
-                "user_id": request.user.pk,
-            },
-        )
-        return response
-
-    def post(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        logger.info(
-            "Legacy normalized-composition compatibility editor write blocked",
-            extra={
-                "composition_id": self.object.pk,
-                "sample_id": self.object.sample_id,
-                "user_id": request.user.pk,
-            },
-        )
-        return HttpResponseForbidden(
-            "Saved normalized-composition compatibility data is read-only. "
-            "Use raw component measurements for component observations."
-        )
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        inline_helper = WeightShareUpdateFormSetHelper()
-        inline_helper.form_tag = False
-        form_helper = FormHelper()
-        form_helper.form_tag = False
-        context.update(
-            {
-                "form_title": "Edit saved normalized composition",
-                "inline_helper": inline_helper,
-                "form_helper": form_helper,
-                "legacy_normalized_composition_notice": (
-                    "This editor changes saved normalized WeightShare compatibility data. "
-                    "Use raw composition data for new component observations."
-                ),
-            }
-        )
-        return context
+    def get_success_url(self):
+        return reverse("sample-detail", kwargs={"pk": self.object.sample.pk})
 
 
 class CompositionModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -1482,54 +1429,6 @@ class CompositionModalDeleteView(UserCreatedObjectModalDeleteView):
 
 # ----------- Composition utilities ------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-class AddComponentView(
-    PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalUpdateView
-):
-    model = Composition
-    form_class = AddComponentModalForm
-    template_name = "modal_form.html"
-    permission_required = "materials.add_weightshare"
-
-    def get(self, request, *args, **kwargs):
-        response = super().get(request, *args, **kwargs)
-        logger.info(
-            "Legacy normalized-composition compatibility share add form opened",
-            extra={
-                "composition_id": self.object.pk,
-                "sample_id": self.object.sample_id,
-                "user_id": request.user.pk,
-            },
-        )
-        return response
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "modal_title": "Add saved normalized component share",
-                "submit_button_text": "Add compatibility share",
-            }
-        )
-        return context
-
-    def form_valid(self, form):
-        composition = self.get_object()
-        component = form.cleaned_data["component"]
-        logger.info(
-            "Legacy normalized-composition compatibility share creation blocked",
-            extra={
-                "composition_id": composition.pk,
-                "sample_id": composition.sample_id,
-                "component_id": component.pk,
-                "user_id": self.request.user.pk,
-            },
-        )
-        return HttpResponseForbidden(
-            "Saved normalized-composition compatibility data is read-only. "
-            "Use raw component measurements for component observations."
-        )
 
 
 class CompositionOrderUpView(UserOwnsObjectMixin, SingleObjectMixin, RedirectView):
@@ -1632,50 +1531,6 @@ class DerivedCompositionOrderDownView(_DerivedCompositionOrderView):
         return super().get(request, *args, **kwargs)
 
 
-# ----------- Weight Share CRUD ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class WeightShareModalDeleteView(UserCreatedObjectModalDeleteView):
-    model = WeightShare
-
-    def get(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        logger.info(
-            "Legacy normalized-composition compatibility share delete form opened",
-            extra={
-                "weightshare_id": self.object.pk,
-                "composition_id": self.object.composition_id,
-                "sample_id": self.object.composition.sample_id,
-                "component_id": self.object.component_id,
-                "user_id": request.user.pk,
-            },
-        )
-        return super().get(request, *args, **kwargs)
-
-    def post(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        logger.info(
-            "Legacy normalized-composition compatibility share deletion blocked",
-            extra={
-                "weightshare_id": self.object.pk,
-                "composition_id": self.object.composition_id,
-                "sample_id": self.object.composition.sample_id,
-                "component_id": self.object.component_id,
-                "user_id": request.user.pk,
-            },
-        )
-        return HttpResponseForbidden(
-            "Saved normalized-composition compatibility data is read-only. "
-            "Use raw component measurements for component observations."
-        )
-
-    def get_success_url(self):
-        return reverse(
-            "sample-detail", kwargs={"pk": self.object.composition.sample.pk}
-        )
-
-
 # ----------- Materials/Components/Groups Relation -----------------------------------------------------------------
 
 
@@ -1685,7 +1540,7 @@ class AddCompositionView(
     model = SampleSeries
     form_class = AddCompositionModalForm
     template_name = "modal_form.html"
-    permission_required = ("materials.add_composition", "materials.add_weightshare")
+    permission_required = "materials.add_composition"
     success_message = "Composition successfully added."
 
     def get_context_data(self, **kwargs):

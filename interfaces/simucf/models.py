@@ -4,7 +4,12 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager
 
 from materials.composition_normalization import get_sample_normalized_compositions
-from materials.models import Composition, MaterialComponent, Sample
+from materials.models import (
+    ComponentMeasurement,
+    Composition,
+    MaterialComponent,
+    Sample,
+)
 
 
 class InputMaterialManager(Manager):
@@ -20,20 +25,17 @@ class InputMaterialManager(Manager):
             "Cellulose",
             "Lignin",
         ]
+        compatible_measurements = ComponentMeasurement.objects.filter(
+            group__name="Biochemical Composition",
+            component__name__in=component_names,
+        ).exclude(
+            component__in=MaterialComponent.objects.exclude(name__in=component_names)
+        )
         return (
             super()
             .get_queryset()
-            .filter(
-                compositions__in=Composition.objects.filter(
-                    group__name="Biochemical Composition"
-                )
-                .exclude(
-                    shares__component__in=MaterialComponent.objects.exclude(
-                        name__in=component_names
-                    )
-                )
-                .filter(shares__component__name__in=component_names)
-            )
+            .filter(component_measurements__in=compatible_measurements)
+            .distinct()
         )
 
 

@@ -14,7 +14,6 @@ from ..models import (
     MaterialComponentGroup,
     Sample,
     SampleSeries,
-    WeightShare,
 )
 from ..serializers import (
     CompositionAPISerializer,
@@ -304,12 +303,6 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
             percent_unit = Unit.objects.create(name="%", symbol="percent")
         carbon = MaterialComponent.objects.create(name="Carbon")
         nitrogen = MaterialComponent.objects.create(name="Nitrogen")
-        WeightShare.objects.create(
-            component=carbon,
-            composition=self.composition,
-            average=Decimal("0.9"),
-            standard_deviation=Decimal("0.1"),
-        )
         ComponentMeasurement.objects.create(
             sample=self.sample,
             group=self.group,

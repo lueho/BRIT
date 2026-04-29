@@ -1,16 +1,18 @@
 import re
+from decimal import Decimal
 
 from django.test import TestCase
 
 from materials.models import (
+    ComponentMeasurement,
     Composition,
     Material,
     MaterialComponent,
     MaterialComponentGroup,
     Sample,
     SampleSeries,
-    WeightShare,
 )
+from utils.properties.models import Unit
 
 from ..input_file_template import template_string
 from ..models import InputMaterial
@@ -25,6 +27,7 @@ class MaterialSerializerTestCase(TestCase):
         sample = Sample.objects.create(
             name="Test Sample", material=material, series=series
         )
+        cls.sample_pk = sample.pk
         group = MaterialComponentGroup.objects.create(name="Biochemical Composition")
         composition = Composition.objects.create(group=group, sample=sample)
         component_names = [
@@ -38,14 +41,21 @@ class MaterialSerializerTestCase(TestCase):
             "Cellulose",
             "Lignin",
         ]
+        percent_unit = Unit.objects.filter(name="%").first() or Unit.objects.create(
+            name="%", symbol="percent"
+        )
         for name in component_names:
             component = MaterialComponent.objects.create(name=name)
-            WeightShare.objects.create(
-                name=name, composition=composition, component=component, average=0.7
+            ComponentMeasurement.objects.create(
+                sample=composition.sample,
+                group=composition.group,
+                component=component,
+                unit=percent_unit,
+                average=Decimal("70"),
             )
 
     def setUp(self):
-        self.input_material = InputMaterial.objects.get(name="Test Sample")
+        self.input_material = InputMaterial.objects.get(pk=self.sample_pk)
 
     def test_serializer_fields_match_template_placeholders_exactly(self):
         simucf = SimuCF(

@@ -14,7 +14,6 @@ from ..models import (
     MaterialComponentGroup,
     Sample,
     SampleSeries,
-    WeightShare,
 )
 
 
@@ -42,7 +41,7 @@ class SampleCompositionNormalizationTestCase(TestCase):
             cls.percent_unit.symbol = "percent"
             cls.percent_unit.save(update_fields=["symbol"])
 
-    def test_prefers_raw_measurements_per_group_and_warns_on_mismatch(self):
+    def test_prefers_raw_measurements_per_group(self):
         sample = Sample.objects.create(
             name="Mixed Raw Group",
             material=self.material,
@@ -70,20 +69,6 @@ class SampleCompositionNormalizationTestCase(TestCase):
             sample=sample,
             group=group,
             fractions_of=MaterialComponent.objects.default(),
-            owner=self.owner,
-        )
-        WeightShare.objects.create(
-            composition=persisted,
-            component=phosphorus,
-            average=Decimal("0.2"),
-            standard_deviation=Decimal("0.0"),
-            owner=self.owner,
-        )
-        WeightShare.objects.create(
-            composition=persisted,
-            component=potassium,
-            average=Decimal("0.8"),
-            standard_deviation=Decimal("0.0"),
             owner=self.owner,
         )
         ComponentMeasurement.objects.create(
@@ -114,52 +99,9 @@ class SampleCompositionNormalizationTestCase(TestCase):
             {"70.0%", "30.0%"},
         )
         self.assertEqual(composition["settings_pk"], persisted.pk)
-        self.assertEqual(composition["warning_count"], 1)
-        self.assertIn("saved normalized composition", composition["warnings"][0])
-
-    def test_uses_persisted_fallback_for_groups_without_raw_measurements(self):
-        sample = Sample.objects.create(
-            name="Persisted Fallback Group",
-            material=self.material,
-            series=self.series,
-            publication_status="published",
-            owner=self.owner,
-        )
-        sample.compositions.all().delete()
-        group = MaterialComponentGroup.objects.create(
-            name="Fallback Group",
-            publication_status="published",
-            owner=self.owner,
-        )
-        protein = MaterialComponent.objects.create(
-            name="Protein",
-            publication_status="published",
-            owner=self.owner,
-        )
-        persisted = Composition.objects.create(
-            sample=sample,
-            group=group,
-            fractions_of=MaterialComponent.objects.default(),
-            owner=self.owner,
-        )
-        WeightShare.objects.create(
-            composition=persisted,
-            component=protein,
-            average=Decimal("1.0"),
-            standard_deviation=Decimal("0.0"),
-            owner=self.owner,
-        )
-
-        compositions = get_sample_normalized_compositions(sample)
-
-        self.assertEqual(len(compositions), 1)
-        composition = compositions[0]
-        self.assertFalse(composition["is_derived"])
-        self.assertEqual(composition["origin"], "persisted_fallback")
         self.assertEqual(composition["warning_count"], 0)
-        self.assertEqual(composition["shares"][0]["as_percentage"], "100.0 ± 0.0%")
 
-    def test_resolves_mixed_state_per_group_with_settings_order(self):
+    def test_resolves_raw_groups_with_settings_order(self):
         sample = Sample.objects.create(
             name="Mixed-State Sample",
             material=self.material,
@@ -168,13 +110,13 @@ class SampleCompositionNormalizationTestCase(TestCase):
             owner=self.owner,
         )
         sample.compositions.all().delete()
-        persisted_group = MaterialComponentGroup.objects.create(
-            name="Persisted Group",
+        first_group = MaterialComponentGroup.objects.create(
+            name="First Raw Group",
             publication_status="published",
             owner=self.owner,
         )
-        raw_group = MaterialComponentGroup.objects.create(
-            name="Raw Group",
+        second_group = MaterialComponentGroup.objects.create(
+            name="Second Raw Group",
             publication_status="published",
             owner=self.owner,
         )
@@ -190,25 +132,29 @@ class SampleCompositionNormalizationTestCase(TestCase):
         )
         Composition.objects.create(
             sample=sample,
-            group=persisted_group,
+            group=first_group,
             fractions_of=MaterialComponent.objects.default(),
             order=100,
             owner=self.owner,
-        ).add_component(
-            protein,
-            average=Decimal("1.0"),
-            standard_deviation=Decimal("0.0"),
         )
         Composition.objects.create(
             sample=sample,
-            group=raw_group,
+            group=second_group,
             fractions_of=MaterialComponent.objects.default(),
             order=110,
             owner=self.owner,
         )
         ComponentMeasurement.objects.create(
             sample=sample,
-            group=raw_group,
+            group=first_group,
+            component=protein,
+            unit=self.percent_unit,
+            average=Decimal("100"),
+            owner=self.owner,
+        )
+        ComponentMeasurement.objects.create(
+            sample=sample,
+            group=second_group,
             component=carbon,
             unit=self.percent_unit,
             average=Decimal("100"),
@@ -220,11 +166,11 @@ class SampleCompositionNormalizationTestCase(TestCase):
         self.assertEqual(
             [composition["group_name"] for composition in compositions],
             [
-                "Persisted Group",
-                "Raw Group",
+                "First Raw Group",
+                "Second Raw Group",
             ],
         )
         self.assertEqual(
             [composition["origin"] for composition in compositions],
-            ["persisted_fallback", "raw_derived"],
+            ["raw_derived", "raw_derived"],
         )

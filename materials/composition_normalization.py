@@ -9,15 +9,11 @@ from .models import MaterialComponent
 WARNING_MULTIPLE_BASIS_COMPONENTS = "multiple_basis_components"
 WARNING_RAW_MEASUREMENTS_OMITTED = "raw_measurements_omitted"
 WARNING_REMAINING_FRACTION_ASSIGNED_TO_OTHER = "remaining_fraction_assigned_to_other"
-WARNING_RAW_PERSISTED_MISMATCH = "raw_persisted_mismatch"
-WARNING_RAW_UNNORMALIZABLE_FALLBACK = "raw_unnormalizable_fallback"
 
 
 def get_sample_composition_settings_by_group(sample):
     composition_settings_by_group = {}
-    queryset = sample.compositions.select_related(
-        "group", "fractions_of"
-    ).prefetch_related("shares__component")
+    queryset = sample.compositions.select_related("group", "fractions_of")
     for composition in queryset.order_by("order", "id"):
         composition_settings_by_group.setdefault(composition.group_id, composition)
     return composition_settings_by_group
@@ -103,10 +99,6 @@ def get_sample_normalized_compositions(
         group = groups[group_id]
         composition_setting = composition_settings_by_group.get(group_id)
         group_measurements = measurements_by_group.get(group_id, [])
-        persisted_composition = None
-        if composition_setting is not None and composition_setting.shares.exists():
-            persisted_composition = composition_setting
-
         raw_composition = _build_raw_derived_group_composition(
             sample=sample,
             group=group,
@@ -114,34 +106,7 @@ def get_sample_normalized_compositions(
             composition_setting=composition_setting,
         )
         if raw_composition is not None:
-            if persisted_composition is not None and _compositions_differ(
-                raw_composition,
-                persisted_composition,
-            ):
-                raw_composition["warnings"].append(
-                    "Raw measurements differ from the saved normalized composition for this group."
-                )
-                raw_composition["warning_codes"].append(WARNING_RAW_PERSISTED_MISMATCH)
-                raw_composition["warning_count"] = len(raw_composition["warnings"])
             compositions.append(raw_composition)
-            continue
-
-        if persisted_composition is not None:
-            fallback_composition = _serialize_persisted_composition(
-                persisted_composition,
-                sample=sample,
-            )
-            if group_measurements:
-                fallback_composition["warnings"].append(
-                    "Raw measurements exist for this group but could not be normalized; using the saved composition as fallback."
-                )
-                fallback_composition["warning_codes"].append(
-                    WARNING_RAW_UNNORMALIZABLE_FALLBACK
-                )
-                fallback_composition["warning_count"] = len(
-                    fallback_composition["warnings"]
-                )
-            compositions.append(fallback_composition)
 
     return compositions
 
@@ -294,63 +259,6 @@ def _build_raw_derived_group_composition(
         if composition_setting is not None
         else None,
     }
-
-
-def _serialize_persisted_composition(composition, *, sample):
-    other_component = MaterialComponent.objects.other()
-    ordered_shares = list(composition.shares.exclude(component=other_component))
-    other_share = composition.shares.filter(component=other_component).first()
-    if other_share is not None:
-        ordered_shares.append(other_share)
-    return {
-        "id": composition.pk,
-        "group": composition.group.pk,
-        "group_name": composition.group.name,
-        "sample": sample.pk,
-        "fractions_of": composition.fractions_of.pk
-        if composition.fractions_of_id
-        else None,
-        "fractions_of_name": composition.fractions_of.name
-        if composition.fractions_of_id
-        else "",
-        "shares": [
-            {
-                "component": share.component.pk,
-                "component_name": share.component.name,
-                "average": share.average,
-                "standard_deviation": share.standard_deviation,
-                "as_percentage": share.as_percentage,
-            }
-            for share in ordered_shares
-        ],
-        "is_derived": False,
-        "origin": "persisted_fallback",
-        "warnings": [],
-        "warning_codes": [],
-        "warning_count": 0,
-        "settings_pk": composition.pk,
-    }
-
-
-def _compositions_differ(raw_composition, persisted_composition):
-    raw_fractions_of = raw_composition.get("fractions_of")
-    persisted_fractions_of = (
-        persisted_composition.fractions_of.pk
-        if persisted_composition.fractions_of_id
-        else None
-    )
-    if raw_fractions_of != persisted_fractions_of:
-        return True
-
-    raw_shares = {
-        share["component"]: Decimal(str(share["average"])).quantize(Decimal("0.000001"))
-        for share in raw_composition["shares"]
-    }
-    persisted_shares = {
-        share.component_id: share.average.quantize(Decimal("0.000001"))
-        for share in persisted_composition.shares.all()
-    }
-    return raw_shares != persisted_shares
 
 
 def _normalize_unit_name(unit):

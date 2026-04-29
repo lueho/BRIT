@@ -3,7 +3,6 @@ from decimal import Decimal
 from django.contrib.auth.models import User
 from django.db.models import signals
 from django.test import TestCase
-from django.urls import reverse
 from factory.django import mute_signals
 
 from distributions.models import TemporalDistribution, Timestep
@@ -18,7 +17,6 @@ from materials.models import (
     MaterialPropertyValue,
     Sample,
     SampleSeries,
-    WeightShare,
 )
 from utils.properties.models import Unit
 
@@ -217,30 +215,6 @@ class SampleSeriesTestCase(TestCase):
         for sample in self.sample_series.samples.all():
             with self.assertRaises(Composition.DoesNotExist):
                 Composition.objects.get(sample=sample, group=self.custom_group)
-
-    def test_add_component(self):
-        self.sample_series.add_component_group(self.custom_group)
-        self.sample_series.add_temporal_distribution(self.custom_distribution)
-        self.sample_series.add_component(self.custom_component, self.custom_group)
-
-        for sample in self.sample_series.samples.all():
-            for composition in sample.compositions.filter(group=self.custom_group):
-                WeightShare.objects.get(
-                    composition=composition, component=self.custom_component
-                )
-
-    def test_remove_component(self):
-        self.sample_series.add_component_group(self.custom_group)
-        self.sample_series.add_component(self.custom_component, self.custom_group)
-        self.sample_series.add_temporal_distribution(self.custom_distribution)
-        self.sample_series.remove_component(self.custom_component, self.custom_group)
-
-        for sample in self.sample_series.samples.all():
-            for composition in sample.compositions.filter(group=self.custom_group):
-                with self.assertRaises(WeightShare.DoesNotExist):
-                    WeightShare.objects.get(
-                        composition=composition, component=self.custom_component
-                    )
 
     def test_components_include_raw_component_measurements(self):
         raw_component = MaterialComponent.objects.create(name="Raw Series Component")
@@ -525,53 +499,12 @@ class CompositionTestCase(TestCase):
             fractions_of=self.default_component,
         )
 
-    def test_add_component(self):
-        self.composition.add_temporal_distribution(self.default_distribution)
-        self.composition.add_component(self.custom_component)
-
-        WeightShare.objects.get(
-            composition=self.composition, component=self.custom_component
-        )
-        self.assertEqual(self.composition.shares.count(), 1)
-
     def test_composition_create_with_signal(self):
         self.assertEqual(self.composition.timestep, Timestep.objects.default())
         self.assertEqual(self.composition.owner, self.user)
 
-        self.composition.add_component(self.default_component)
-        self.assertEqual(self.composition.components.count(), 1)
-        self.assertEqual(self.composition.components.first(), self.default_component)
-
-    def test_group_settings_add_component_on_distribution(self):
-        self.composition.add_component(self.default_component)
-        self.composition.add_temporal_distribution(self.custom_distribution)
-        self.composition.add_component(self.custom_component)
-
-        self.assertEqual(
-            self.composition.sample.series.temporal_distributions.all().count(), 1
-        )
-        self.assertEqual(self.composition.components.count(), 2)
-        self.assertEqual(WeightShare.objects.all().count(), 4)
-
-    def test_group_settings_add_distribution_on_component(self):
-        self.composition.add_component(self.default_component)
-        self.composition.add_component(self.custom_component)
-        self.composition.add_temporal_distribution(self.custom_distribution)
-
-        self.assertEqual(
-            self.composition.sample.series.temporal_distributions.all().count(), 1
-        )
-        self.assertEqual(self.composition.components.count(), 2)
-        self.assertEqual(WeightShare.objects.all().count(), 4)
-
     def test_duplicate_creates_new_instance_with_identical_field_values(self):
         creator = User.objects.create(username="creator")
-        WeightShare.objects.create(
-            component=self.custom_component,
-            composition=self.composition,
-            average=0.9,
-            standard_deviation=0.1337,
-        )
         duplicate = self.composition.duplicate(creator)
         self.assertIsInstance(duplicate, Composition)
         self.assertNotEqual(self.composition, duplicate)
@@ -587,16 +520,6 @@ class CompositionTestCase(TestCase):
                     getattr(duplicate, field.name),
                     getattr(self.composition, field.name),
                 )
-            elif field.name == "shares":
-                self.assertTrue(self.composition.shares.exists())
-                self.assertTrue(duplicate.shares.exists())
-                for share in self.composition.shares.all():
-                    duplicate.shares.get(
-                        owner=creator,
-                        component=share.component,
-                        average=share.average,
-                        standard_deviation=share.standard_deviation,
-                    )
 
     def test_add_next_order_value(self):
         self.assertEqual(self.composition.order, 100)
@@ -647,56 +570,3 @@ class CompositionTestCase(TestCase):
         self.composition.order_down()
         self.composition.refresh_from_db()
         self.assertEqual(self.composition.order, 100)
-
-
-class WeightShareTestCase(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        material = Material.objects.create(name="Test Material")
-        sample_series = SampleSeries.objects.create(
-            material=material, name="Test Series"
-        )
-        sample = Sample.objects.create(material=material, series=sample_series)
-        component_group = MaterialComponentGroup.objects.create(name="Test Group")
-        composition = Composition.objects.create(sample=sample, group=component_group)
-        component = MaterialComponent.objects.create(name="Test Component")
-        WeightShare.objects.create(
-            composition=composition,
-            component=component,
-            average=1.0,
-            standard_deviation=0.123,
-        )
-
-    def setUp(self):
-        self.share = WeightShare.objects.get(standard_deviation=0.123)
-        self.sample_series = SampleSeries.objects.get(name="Test Series")
-
-    def test_property_material(self):
-        self.assertEqual(self.share.material.name, "Test Material")
-
-    def test_property_group(self):
-        self.assertEqual(self.share.group.name, "Test Group")
-
-    def test_get_absolute_url(self):
-        self.assertEqual(
-            self.share.get_absolute_url(),
-            reverse("sampleseries-detail", kwargs={"pk": self.sample_series.pk}),
-        )
-
-    def test_str(self):
-        self.assertEqual(
-            self.share.__str__(),
-            "Component share of material: Test Material, component: Test Component",
-        )
-
-    def test_duplicate_creates_new_instance_with_identical_field_values(self):
-        creator = User.objects.create(username="creator")
-        duplicate = self.share.duplicate(creator)
-        self.assertIsInstance(duplicate, WeightShare)
-        self.assertNotEqual(self.share, duplicate)
-        self.assertEqual(duplicate.owner, creator)
-        for field in self.share._meta.get_fields():
-            if field.name not in ["id", "owner", "created_at", "lastmodified_at"]:
-                self.assertEqual(
-                    getattr(duplicate, field.name), getattr(self.share, field.name)
-                )

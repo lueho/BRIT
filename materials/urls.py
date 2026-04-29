@@ -568,11 +568,6 @@ urlpatterns = [
         name="composition-delete-modal",
     ),
     path(
-        "compositions/<int:pk>/add_component/",
-        views.AddComponentView.as_view(),
-        name="composition-add-component",
-    ),
-    path(
         "compositions/<int:pk>/order_up/",
         views.CompositionOrderUpView.as_view(),
         name="composition-order-up",
@@ -606,11 +601,6 @@ urlpatterns = [
         "materialcomponentgroups/settings/<int:pk>/remove_seasonal_variation/<int:distribution_pk>/",
         views.RemoveSeasonalVariationView.as_view(),
         name="remove_seasonal_variation",
-    ),
-    path(
-        "weightshares/<int:pk>/delete/",
-        views.WeightShareModalDeleteView.as_view(),
-        name="weightshare-delete-modal",
     ),
     path("api/", include(router.urls)),
 ]

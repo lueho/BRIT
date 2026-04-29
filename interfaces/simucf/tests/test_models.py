@@ -11,7 +11,6 @@ from materials.models import (
     MaterialComponentGroup,
     Sample,
     SampleSeries,
-    WeightShare,
 )
 from utils.properties.models import Unit
 
@@ -46,10 +45,17 @@ class InputMaterialManagerTestCase(TestCase):
             "Cellulose",
             "Lignin",
         ]
+        percent_unit = Unit.objects.filter(name="%").first() or Unit.objects.create(
+            name="%", symbol="percent"
+        )
         for name in component_names:
             component = MaterialComponent.objects.create(name=name)
-            WeightShare.objects.create(
-                name=name, composition=composition, component=component, average=0.7
+            ComponentMeasurement.objects.create(
+                sample=composition.sample,
+                group=composition.group,
+                component=component,
+                unit=percent_unit,
+                average=Decimal("70"),
             )
 
     def test_filter_returns_only_suitable_samples(self):
@@ -67,6 +73,7 @@ class InputMaterialTestCase(TestCase):
         sample = Sample.objects.create(
             name="Test Sample", material=material, series=series
         )
+        cls.sample_pk = sample.pk
         group = MaterialComponentGroup.objects.create(name="Biochemical Composition")
         composition = Composition.objects.create(group=group, sample=sample)
         component_names = [
@@ -80,14 +87,21 @@ class InputMaterialTestCase(TestCase):
             "Cellulose",
             "Lignin",
         ]
+        percent_unit = Unit.objects.filter(name="%").first() or Unit.objects.create(
+            name="%", symbol="percent"
+        )
         for name in component_names:
             component = MaterialComponent.objects.create(name=name)
-            WeightShare.objects.create(
-                name=name, composition=composition, component=component, average=0.7
+            ComponentMeasurement.objects.create(
+                sample=composition.sample,
+                group=composition.group,
+                component=component,
+                unit=percent_unit,
+                average=Decimal("70"),
             )
 
     def setUp(self):
-        self.input = InputMaterial.objects.get(name="Test Sample")
+        self.input = InputMaterial.objects.get(pk=self.sample_pk)
 
     def test_property_composition_throws_improperly_configured_error_when_composition_is_not_setup(
         self,
@@ -101,20 +115,21 @@ class InputMaterialTestCase(TestCase):
     def test_property_composition_returns_correct_composition(self):
         self.assertEqual(self.input.composition.group.name, "Biochemical Composition")
 
-    def test_property_carbohydrates_handles_missing_weightshare(self):
-        WeightShare.objects.get(name="Carbohydrates").delete()
-        self.assertEqual(self.input.carbohydrates, Decimal("0.0000000000"))
-
     def test_property_carbohydrates_returns_valid_value(self):
         self.assertEqual(self.input.carbohydrates, Decimal("0.7000000000"))
 
-    def test_property_carbohydrates_uses_raw_derived_share(self):
-        percent_unit = Unit.objects.filter(name="%").first()
-        if percent_unit is None:
-            percent_unit = Unit.objects.create(name="%", symbol="percent")
+    def test_property_carbohydrates_uses_raw_derived_share_with_updated_measurements(
+        self,
+    ):
+        percent_unit = Unit.objects.filter(name="%").first() or Unit.objects.create(
+            name="%", symbol="percent"
+        )
         composition = Composition.objects.get(group__name="Biochemical Composition")
         carbohydrates = MaterialComponent.objects.get(name="Carbohydrates")
         amino_acids = MaterialComponent.objects.get(name="Amino Acids")
+        ComponentMeasurement.objects.filter(
+            sample=self.input, group=composition.group
+        ).delete()
         ComponentMeasurement.objects.create(
             sample=self.input,
             group=composition.group,
@@ -132,58 +147,26 @@ class InputMaterialTestCase(TestCase):
 
         self.assertEqual(self.input.carbohydrates, Decimal("0.4"))
 
-    def test_property_amino_acids_handles_missing_weightshare(self):
-        WeightShare.objects.get(name="Amino Acids").delete()
-        self.assertEqual(self.input.amino_acids, Decimal("0.0000000000"))
-
     def test_property_amino_acids_returns_valid_value(self):
         self.assertEqual(self.input.amino_acids, Decimal("0.7000000000"))
-
-    def test_property_starch_handles_missing_weightshare(self):
-        WeightShare.objects.get(name="Starches").delete()
-        self.assertEqual(self.input.starch, Decimal("0.0000000000"))
 
     def test_property_starch_returns_valid_value(self):
         self.assertEqual(self.input.starch, Decimal("0.7000000000"))
 
-    def test_property_hemicellulose_handles_missing_weightshare(self):
-        WeightShare.objects.get(name="Hemicellulose").delete()
-        self.assertEqual(self.input.hemicellulose, Decimal("0.0000000000"))
-
     def test_property_hemicellulose_returns_valid_value(self):
         self.assertEqual(self.input.hemicellulose, Decimal("0.7000000000"))
-
-    def test_property_fats_handles_missing_weightshare(self):
-        WeightShare.objects.get(name="Fats").delete()
-        self.assertEqual(self.input.fats, Decimal("0.0000000000"))
 
     def test_property_fats_returns_valid_value(self):
         self.assertEqual(self.input.fats, Decimal("0.7000000000"))
 
-    def test_property_waxs_handles_missing_weightshare(self):
-        WeightShare.objects.get(name="Waxes").delete()
-        self.assertEqual(self.input.waxs, Decimal("0.0000000000"))
-
     def test_property_waxs_returns_valid_value(self):
         self.assertEqual(self.input.waxs, Decimal("0.7000000000"))
-
-    def test_property_proteins_handles_missing_weightshare(self):
-        WeightShare.objects.get(name="Proteins").delete()
-        self.assertEqual(self.input.proteins, Decimal("0.0000000000"))
 
     def test_property_proteins_returns_valid_value(self):
         self.assertEqual(self.input.proteins, Decimal("0.7000000000"))
 
-    def test_property_cellulose_handles_missing_weightshare(self):
-        WeightShare.objects.get(name="Cellulose").delete()
-        self.assertEqual(self.input.cellulose, Decimal("0.0000000000"))
-
     def test_property_cellulose_returns_valid_value(self):
         self.assertEqual(self.input.cellulose, Decimal("0.7000000000"))
-
-    def test_property_lignin_handles_missing_weightshare(self):
-        WeightShare.objects.get(name="Lignin").delete()
-        self.assertEqual(self.input.lignin, Decimal("0.0000000000"))
 
     def test_property_lignin_returns_valid_value(self):
         self.assertEqual(self.input.lignin, Decimal("0.7000000000"))

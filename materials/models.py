@@ -6,7 +6,6 @@ from django.db import models
 from django.db.models import Max
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-from django.urls import reverse
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
@@ -318,18 +317,6 @@ class SampleSeries(NamedUserCreatedObject):
         for sample in self.samples.all():
             Composition.objects.filter(sample=sample, group=group).delete()
 
-    def add_component(self, component, group):
-        """Creates WeightShare objects for a new component for all samples of a SampleSeries at once."""
-        for sample in self.samples.all():
-            for composition in sample.compositions.filter(group=group):
-                composition.add_component(component)
-
-    def remove_component(self, component, group):
-        """Removes all WeightShare objects of a given component and component group"""
-        for sample in self.samples.all():
-            for composition in sample.compositions.filter(group=group):
-                composition.remove_component(component)
-
     def add_temporal_distribution(self, distribution):
         """
         Adds the temporal distribution to the m2m field and also creates shares for all timesteps of the distribution
@@ -359,16 +346,9 @@ class SampleSeries(NamedUserCreatedObject):
         """
         Queryset of all components that have been assigned to this group.
         """
-        component_ids = set(
-            WeightShare.objects.filter(composition__sample__series=self)
-            .values_list("component", flat=True)
-            .distinct()
-        )
-        component_ids.update(
-            ComponentMeasurement.objects.filter(sample__series=self)
-            .values_list("component", flat=True)
-            .distinct()
-        )
+        component_ids = ComponentMeasurement.objects.filter(
+            sample__series=self
+        ).values_list("component", flat=True)
         return MaterialComponent.objects.filter(
             id__in=component_ids,
         )
@@ -403,10 +383,6 @@ class SampleSeries(NamedUserCreatedObject):
         Returns a list of group ids that cannot be added to the material because they are already assigned.
         """
         return self.group_ids
-
-    @property
-    def shares(self):
-        return WeightShare.objects.filter(composition__sample__series=self)
 
     def duplicate(self, creator, **kwargs):
         post_save.disconnect(add_default_temporal_distribution, sender=SampleSeries)
@@ -678,14 +654,9 @@ class Sample(NamedUserCreatedObject):
         """
         Queryset of all components that have been assigned to this group.
         """
-        component_ids = set(
-            WeightShare.objects.filter(composition__sample=self)
-            .values_list("component", flat=True)
-            .distinct()
-        )
-        component_ids.update(
-            self.component_measurements.values_list("component", flat=True).distinct()
-        )
+        component_ids = self.component_measurements.values_list(
+            "component", flat=True
+        ).distinct()
         return MaterialComponent.objects.filter(
             id__in=component_ids,
         )
@@ -745,13 +716,12 @@ class Sample(NamedUserCreatedObject):
 @receiver(post_save, sender=Sample)
 def add_default_composition(sender, instance, created, **kwargs):
     if created:
-        composition = Composition.objects.create(
+        Composition.objects.create(
             owner=instance.owner,
             group=MaterialComponentGroup.objects.default(),
             sample=instance,
             fractions_of=MaterialComponent.objects.default(),
         )
-        composition.add_component(MaterialComponent.objects.default(), average=1.0)
 
 
 class Composition(NamedUserCreatedObject):
@@ -794,53 +764,8 @@ class Composition(NamedUserCreatedObject):
         return self.sample.timestep
 
     @property
-    def component_ids(self):
-        """
-        Ids of all material components that have been assigned to this group.
-        """
-        return [
-            share["component"] for share in self.shares.values("component").distinct()
-        ]
-
-    @property
-    def components(self):
-        """
-        Queryset of all components that have been assigned to this group.
-        """
-        return MaterialComponent.objects.filter(id__in=self.component_ids)
-
-    @property
-    def blocked_component_ids(self):
-        """
-        Returns a list of ids that cannot be added to the group because they are either already assigned to the group
-        or would create a circular reference.
-        """
-        ids = self.component_ids
-        ids.append(self.fractions_of.id)
-        ids.append(self.material.id)
-        return ids
-
-    @property
     def blocked_distribution_ids(self):
         return [dist.id for dist in self.sample.series.temporal_distributions.all()]
-
-    def add_component(self, component, **kwargs):
-        """
-        Convenience method to create a correct WeightShare object with correct for this model.
-        """
-        return WeightShare.objects.create(
-            owner=self.owner,
-            component=component,
-            composition=self,
-            average=kwargs.setdefault("average", 0.0),
-            standard_deviation=kwargs.setdefault("standard_deviation", 0.0),
-        )
-
-    def remove_component(self, component):
-        """
-        Removes the component from all compositions in which it appears.
-        """
-        self.shares.filter(component=component).delete()
 
     def add_temporal_distribution(self, distribution):
         """
@@ -891,11 +816,6 @@ class Composition(NamedUserCreatedObject):
             order=self.order,
         )
         post_save.connect(add_next_order_value, sender=Composition)
-        for share in self.shares.all():
-            duplicate_share = share.duplicate(creator)
-            duplicate_share.composition = duplicate
-            duplicate_share.save()
-
         return duplicate
 
     def get_absolute_url(self):
@@ -1015,68 +935,3 @@ def add_next_order_value(sender, instance, created, **kwargs):
         compositions = Composition.objects.filter(sample=instance.sample)
         instance.order = compositions.aggregate(Max("order"))["order__max"] + 10
         instance.save()
-
-
-class WeightShare(NamedUserCreatedObject):
-    """
-    Holds the actual values of weight fractions that are part of any material composition. This model is not edited
-    directly to maintain consistency within compositions. Use API of Composition instead.
-    """
-
-    component = models.ForeignKey(
-        MaterialComponent, related_name="shares", on_delete=models.CASCADE
-    )
-    composition = models.ForeignKey(
-        Composition, related_name="shares", on_delete=models.CASCADE
-    )
-    average = models.DecimalField(
-        max_digits=11, decimal_places=10, default=Decimal("0.0"), null=False
-    )
-    standard_deviation = models.DecimalField(
-        max_digits=11, decimal_places=10, default=Decimal("0.0"), null=False
-    )
-
-    class Meta:
-        ordering = ["-average"]
-
-    @property
-    def as_percentage(self):
-        return f"{round(self.average * 100, 1)} ± {round(self.standard_deviation * 100, 1)}%"
-
-    @property
-    def material(self):
-        return self.composition.sample.material
-
-    @property
-    def material_settings(self):
-        return self.composition.sample.series
-
-    @property
-    def group(self):
-        return self.composition.group
-
-    @property
-    def group_settings(self):
-        return self.composition
-
-    @property
-    def timestep(self):
-        return self.composition.sample.timestep
-
-    def get_absolute_url(self):
-        return reverse(
-            "sampleseries-detail", kwargs={"pk": self.composition.sample.series.id}
-        )
-
-    def duplicate(self, creator):
-        duplicate = WeightShare.objects.create(
-            owner=creator,
-            component=self.component,
-            composition=self.composition,
-            average=self.average,
-            standard_deviation=self.standard_deviation,
-        )
-        return duplicate
-
-    def __str__(self):
-        return f"Component share of material: {self.material.name}, component: {self.component.name}"
