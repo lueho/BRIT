@@ -847,13 +847,11 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
     def _format_action_error(self, error):
         if isinstance(error, ValidationError):
             if hasattr(error, "message_dict"):
-                messages_by_field = []
-                for field, field_messages in error.message_dict.items():
-                    field_message = "; ".join(
-                        str(message) for message in field_messages
-                    )
-                    messages_by_field.append(f"{field}: {field_message}")
-                return " ".join(messages_by_field)
+                return " ".join(
+                    str(message)
+                    for field_messages in error.message_dict.values()
+                    for message in field_messages
+                )
             if hasattr(error, "messages"):
                 return " ".join(str(message) for message in error.messages)
 
@@ -981,9 +979,7 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
             self.post_action_hook(request, previous_status)
 
         except Exception as e:
-            messages.error(
-                request, f"Error performing action: {self._format_action_error(e)}"
-            )
+            messages.error(request, self._format_action_error(e))
             return HttpResponseRedirect(self.get_failure_url())
 
         return HttpResponseRedirect(self.get_success_url())
@@ -1291,7 +1287,7 @@ class UserCreatedObjectListMixin:
 
     def get_create_permission(self):
         if self.model:
-            return f"{self.model.__module__.split(".")[-2]}.add_{self.model.__name__.lower()}"
+            return f"{self.model.__module__.split('.')[-2]}.add_{self.model.__name__.lower()}"
         return None
 
     def get_list_type(self):
@@ -1641,7 +1637,7 @@ class PublishedObjectListView(PublishedObjectListMixin, ListView):
                 "header": self.model._meta.verbose_name_plural.capitalize(),
                 "create_url": self.model.create_url,
                 "create_url_text": f"New {self.model._meta.verbose_name}",
-                "create_permission": f"{self.model.__module__.split(".")[-2]}.add_{self.model.__name__.lower()}",
+                "create_permission": f"{self.model.__module__.split('.')[-2]}.add_{self.model.__name__.lower()}",
             }
         )
         return context

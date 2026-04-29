@@ -145,7 +145,7 @@ class ReviewWorkflowViewTests(TestCase):
             UserCreatedObject.STATUS_REVIEW,
         )
 
-    def test_submit_for_review_failure_redirects_to_object_detail(self):
+    def test_submit_for_review_without_source_or_flyer_succeeds(self):
         with mute_signals(post_save, pre_save):
             collection = Collection.objects.create(
                 name="Collection Without Evidence",
@@ -169,18 +169,14 @@ class ReviewWorkflowViewTests(TestCase):
 
         self.client.force_login(self.owner)
         with mute_signals(post_save, pre_save):
-            response = self.client.post(url, {"next": next_url}, follow=True)
+            response = self.client.post(url, {"next": next_url})
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.redirect_chain[-1][0], collection.get_absolute_url())
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, next_url)
         collection.refresh_from_db()
         self.assertEqual(
             collection.publication_status,
-            UserCreatedObject.STATUS_PRIVATE,
-        )
-        self.assertContains(
-            response,
-            "Attach at least one bibliography source",
+            UserCreatedObject.STATUS_REVIEW,
         )
 
     def test_submit_for_review_view_ajax_preflight_returns_204_without_state_change(

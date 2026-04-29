@@ -681,10 +681,12 @@ class Collection(NamedUserCreatedObject):
     def clean(self):
         if self.valid_from and self.valid_until:
             if self.valid_from >= self.valid_until:
-                raise ValidationError({
-                    "valid_from": "Valid from date must be before the valid until date.",
-                    "valid_until": "Valid until date must be after the valid from date.",
-                })
+                raise ValidationError(
+                    {
+                        "valid_from": "Valid from date must be before the valid until date.",
+                        "valid_until": "Valid until date must be after the valid from date.",
+                    }
+                )
         super().clean()
 
     def review_readiness_errors(self):
@@ -693,21 +695,20 @@ class Collection(NamedUserCreatedObject):
         attached_sources = list(self.sources.all()) if self.pk else []
         attached_flyers = list(self.flyers.all()) if self.pk else []
 
-        if not attached_sources and not attached_flyers:
-            errors["sources"] = (
-                "Attach at least one bibliography source or waste flyer before submitting this collection for review."
-            )
-
-        invalid_source_urls = sorted({
-            source.url
-            for source in attached_sources
-            if source.url and source.url_checked and not source.url_valid
-        })
-        invalid_flyer_urls = sorted({
-            flyer.url
-            for flyer in attached_flyers
-            if flyer.url and flyer.url_checked and not flyer.url_valid
-        })
+        invalid_source_urls = sorted(
+            {
+                source.url
+                for source in attached_sources
+                if source.url and source.url_checked and not source.url_valid
+            }
+        )
+        invalid_flyer_urls = sorted(
+            {
+                flyer.url
+                for flyer in attached_flyers
+                if flyer.url and flyer.url_checked and not flyer.url_valid
+            }
+        )
         invalid_urls = invalid_source_urls + invalid_flyer_urls
         if invalid_urls:
             errors["sources"] = (

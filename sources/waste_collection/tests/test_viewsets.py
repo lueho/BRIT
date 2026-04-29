@@ -470,14 +470,18 @@ class CollectionViewSetTestCase(APITestCase):
         )
 
         filtered_without_scope = self._get_collection_cache_key({"collector": "1"})
-        filtered_with_scope = self._get_collection_cache_key({
-            "collector": "1",
-            "scope": "published",
-        })
-        filtered_other = self._get_collection_cache_key({
-            "collector": "2",
-            "scope": "published",
-        })
+        filtered_with_scope = self._get_collection_cache_key(
+            {
+                "collector": "1",
+                "scope": "published",
+            }
+        )
+        filtered_other = self._get_collection_cache_key(
+            {
+                "collector": "2",
+                "scope": "published",
+            }
+        )
         self.assertEqual(
             filtered_without_scope,
             filtered_with_scope,
@@ -585,7 +589,7 @@ class CollectionReviewActionApiTestCase(APITestCase):
             owner=owner,
             title=f"{name} Source",
             abbreviation=f"{name}-source",
-            url=f"https://example.com/{name.lower().replace(" ", "-")}",
+            url=f"https://example.com/{name.lower().replace(' ', '-')}",
         )
         collection.sources.add(source)
         return collection
@@ -783,10 +787,12 @@ class CollectionImporterWorkflowTestCase(APITestCase):
 
     def test_import_review_comment_creates_comment_review_action(self):
         importer = CollectionImporter(owner=self.owner, publication_status="private")
-        stats = importer.run([
-            self._make_record()
-            | {"review_comment": "Please verify unresolved bag map interpretation."}
-        ])
+        stats = importer.run(
+            [
+                self._make_record()
+                | {"review_comment": "Please verify unresolved bag map interpretation."}
+            ]
+        )
         self.assertEqual(stats["created"], 1)
         self.assertEqual(stats["review_comments_created"], 1)
 
@@ -1102,7 +1108,7 @@ class CollectionMutationApiTestCase(APITestCase):
             .exists()
         )
 
-    def test_create_endpoint_rejects_submit_without_any_evidence(self):
+    def test_create_endpoint_submits_without_source_or_flyer(self):
         self.client.force_login(self.owner)
 
         response = self.client.post(
@@ -1116,8 +1122,12 @@ class CollectionMutationApiTestCase(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("sources", response.data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        collection = Collection.objects.get(pk=response.data["id"])
+        self.assertEqual(collection.publication_status, "review")
+        self.assertIsNotNone(collection.submitted_at)
+        self.assertFalse(collection.sources.exists())
+        self.assertFalse(collection.flyers.exists())
 
     def test_create_endpoint_rejects_submit_with_checked_invalid_source(self):
         self.client.force_login(self.owner)
