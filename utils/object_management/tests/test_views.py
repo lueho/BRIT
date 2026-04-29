@@ -117,6 +117,72 @@ class ReviewWorkflowViewTests(TestCase):
             self.private_collection.publication_status, UserCreatedObject.STATUS_PRIVATE
         )
 
+    def test_submit_for_review_success_redirects_to_review_detail_next(self):
+        url = reverse(
+            "object_management:submit_for_review",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.private_collection.id,
+            },
+        )
+        next_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.private_collection.id,
+            },
+        )
+
+        self.client.force_login(self.owner)
+        with mute_signals(post_save, pre_save):
+            response = self.client.post(url, {"next": next_url})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, next_url)
+        self.private_collection.refresh_from_db()
+        self.assertEqual(
+            self.private_collection.publication_status,
+            UserCreatedObject.STATUS_REVIEW,
+        )
+
+    def test_submit_for_review_failure_redirects_to_object_detail(self):
+        with mute_signals(post_save, pre_save):
+            collection = Collection.objects.create(
+                name="Collection Without Evidence",
+                owner=self.owner,
+                publication_status=UserCreatedObject.STATUS_PRIVATE,
+            )
+        url = reverse(
+            "object_management:submit_for_review",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": collection.id,
+            },
+        )
+        next_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": collection.id,
+            },
+        )
+
+        self.client.force_login(self.owner)
+        with mute_signals(post_save, pre_save):
+            response = self.client.post(url, {"next": next_url}, follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.redirect_chain[-1][0], collection.get_absolute_url())
+        collection.refresh_from_db()
+        self.assertEqual(
+            collection.publication_status,
+            UserCreatedObject.STATUS_PRIVATE,
+        )
+        self.assertContains(
+            response,
+            "Attach at least one bibliography source",
+        )
+
     def test_submit_for_review_view_ajax_preflight_returns_204_without_state_change(
         self,
     ):

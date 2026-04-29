@@ -16,6 +16,7 @@ from django.core.exceptions import (
     ImproperlyConfigured,
     ObjectDoesNotExist,
     PermissionDenied,
+    ValidationError,
 )
 from django.db.models import Q
 from django.http import Http404, HttpResponse, HttpResponseRedirect
@@ -536,11 +537,13 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             model_class._meta.model_name == "collection"
             and model_class._meta.app_label == "waste_collection"
         ):
-            search_filters.extend([
-                Q(catchment__name__icontains=search),
-                Q(waste_category__name__icontains=search),
-                Q(collection_system__name__icontains=search),
-            ])
+            search_filters.extend(
+                [
+                    Q(catchment__name__icontains=search),
+                    Q(waste_category__name__icontains=search),
+                    Q(collection_system__name__icontains=search),
+                ]
+            )
 
         if not search_filters:
             return queryset.none()
@@ -751,16 +754,18 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         page_number = self.request.GET.get("page")
         page_obj = paginator.get_page(page_number)
 
-        context.update({
-            "title": "Content Review Dashboard",
-            "list_type": "review",
-            "header": "Content Review Dashboard",
-            "review_items": page_obj.object_list,
-            "object_list": page_obj.object_list,  # For template compatibility
-            "page_obj": page_obj,
-            "paginator": paginator,
-            "is_paginated": page_obj.has_other_pages(),
-        })
+        context.update(
+            {
+                "title": "Content Review Dashboard",
+                "list_type": "review",
+                "header": "Content Review Dashboard",
+                "review_items": page_obj.object_list,
+                "object_list": page_obj.object_list,  # For template compatibility
+                "page_obj": page_obj,
+                "paginator": paginator,
+                "is_paginated": page_obj.has_other_pages(),
+            }
+        )
         context.update(
             build_breadcrumb_context(
                 module_label=self.breadcrumb_module_label,
@@ -813,6 +818,46 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
         return resolver.resolve_action_redirect(
             self.review_action, next_url, default_url
         )
+
+    def get_failure_url(self):
+        obj = self.get_object()
+        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+        default_url = obj.get_absolute_url()
+
+        if next_url and self._is_review_detail_url(next_url, obj):
+            return default_url
+
+        return next_url or default_url
+
+    def _is_review_detail_url(self, url, obj):
+        try:
+            review_path = reverse(
+                "object_management:review_item_detail",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(
+                        obj.__class__
+                    ).pk,
+                    "object_id": obj.pk,
+                },
+            )
+            return urlparse(url).path == review_path
+        except Exception:
+            return False
+
+    def _format_action_error(self, error):
+        if isinstance(error, ValidationError):
+            if hasattr(error, "message_dict"):
+                messages_by_field = []
+                for field, field_messages in error.message_dict.items():
+                    field_message = "; ".join(
+                        str(message) for message in field_messages
+                    )
+                    messages_by_field.append(f"{field}: {field_message}")
+                return " ".join(messages_by_field)
+            if hasattr(error, "messages"):
+                return " ".join(str(message) for message in error.messages)
+
+        return str(error)
 
     def get_action_redirect_handlers(self):
         return dict(self.redirect_handlers)
@@ -936,7 +981,10 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
             self.post_action_hook(request, previous_status)
 
         except Exception as e:
-            messages.error(request, f"Error performing action: {str(e)}")
+            messages.error(
+                request, f"Error performing action: {self._format_action_error(e)}"
+            )
+            return HttpResponseRedirect(self.get_failure_url())
 
         return HttpResponseRedirect(self.get_success_url())
 
@@ -1269,15 +1317,17 @@ class UserCreatedObjectListMixin:
             or _get_default_breadcrumb_section_label(breadcrumb_model)
         )
         # Base context
-        context.update({
-            "header": self.get_header(),
-            "create_url": self.get_create_url(),
-            "create_url_text": self.get_create_url_text(),
-            "create_permission": self.get_create_permission(),
-            "list_type": self.get_list_type(),
-            "private_list_owner": self.get_private_list_owner(),
-            "dashboard_url": self.get_dashboard_url(),
-        })
+        context.update(
+            {
+                "header": self.get_header(),
+                "create_url": self.get_create_url(),
+                "create_url_text": self.get_create_url_text(),
+                "create_permission": self.get_create_permission(),
+                "list_type": self.get_list_type(),
+                "private_list_owner": self.get_private_list_owner(),
+                "dashboard_url": self.get_dashboard_url(),
+            }
+        )
         context.update(
             build_breadcrumb_context(
                 parent_module_label=(
@@ -1444,26 +1494,28 @@ class UserCreatedObjectListMixin:
         # Active scope from list_type (public/private/review)
         active_scope = self.get_list_type()
 
-        context.update({
-            "active_scope": active_scope,
-            "public_url": public_url,
-            "private_url": private_url,
-            "review_url": review_url,
-            "public_representation_url": public_url,
-            "private_representation_url": private_url,
-            "review_representation_url": review_url,
-            "public_count": public_count,
-            "private_count": private_count,
-            "review_count": review_count,
-            "representation_mode": "list",
-            "public_gallery_url": None,
-            "private_gallery_url": None,
-            "review_gallery_url": None,
-            # Map URLs for header view toggle (may be None if model has no map views)
-            "public_map_url": public_map_url,
-            "private_map_url": private_map_url,
-            "review_map_url": review_map_url,
-        })
+        context.update(
+            {
+                "active_scope": active_scope,
+                "public_url": public_url,
+                "private_url": private_url,
+                "review_url": review_url,
+                "public_representation_url": public_url,
+                "private_representation_url": private_url,
+                "review_representation_url": review_url,
+                "public_count": public_count,
+                "private_count": private_count,
+                "review_count": review_count,
+                "representation_mode": "list",
+                "public_gallery_url": None,
+                "private_gallery_url": None,
+                "review_gallery_url": None,
+                # Map URLs for header view toggle (may be None if model has no map views)
+                "public_map_url": public_map_url,
+                "private_map_url": private_map_url,
+                "review_map_url": review_map_url,
+            }
+        )
         return context
 
 
@@ -1584,12 +1636,14 @@ class PrivateObjectFilterView(PrivateObjectListMixin, FilterDefaultsMixin, Filte
 class PublishedObjectListView(PublishedObjectListMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update({
-            "header": self.model._meta.verbose_name_plural.capitalize(),
-            "create_url": self.model.create_url,
-            "create_url_text": f"New {self.model._meta.verbose_name}",
-            "create_permission": f"{self.model.__module__.split(".")[-2]}.add_{self.model.__name__.lower()}",
-        })
+        context.update(
+            {
+                "header": self.model._meta.verbose_name_plural.capitalize(),
+                "create_url": self.model.create_url,
+                "create_url_text": f"New {self.model._meta.verbose_name}",
+                "create_permission": f"{self.model.__module__.split(".")[-2]}.add_{self.model.__name__.lower()}",
+            }
+        )
         return context
 
     def get_template_names(self):
@@ -1755,10 +1809,12 @@ class UserCreatedObjectCreateView(
             if callable(getter):
                 model_name = capfirst(str(getter()))
 
-        context.update({
-            "form_title": f"Create New {model_name}",
-            "submit_button_text": "Save",
-        })
+        context.update(
+            {
+                "form_title": f"Create New {model_name}",
+                "submit_button_text": "Save",
+            }
+        )
         default_module_label, _ = _get_default_breadcrumb_module(model)
         default_parent_label, _ = _get_default_breadcrumb_parent_module(model)
         breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
@@ -1826,10 +1882,12 @@ class UserCreatedObjectModalCreateView(PermissionRequiredMixin, BSModalCreateVie
         if model and hasattr(model._meta, "verbose_name"):
             model_name = model._meta.verbose_name.capitalize()
 
-        context.update({
-            "modal_title": f"Create New {model_name}",
-            "submit_button_text": "Save",
-        })
+        context.update(
+            {
+                "modal_title": f"Create New {model_name}",
+                "submit_button_text": "Save",
+            }
+        )
         return context
 
     def get_success_message(self):
@@ -1884,10 +1942,12 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
             except Exception:
                 logs = []
 
-        context.update({
-            "show_review_panel": show_panel,
-            "review_logs": logs,
-        })
+        context.update(
+            {
+                "show_review_panel": show_panel,
+                "review_logs": logs,
+            }
+        )
         context.update(
             build_breadcrumb_context(
                 parent_module_label=default_parent_label,
@@ -2122,9 +2182,11 @@ class UserCreatedObjectModalDetailView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update({
-            "modal_title": f"Details of {self.object._meta.verbose_name}",
-        })
+        context.update(
+            {
+                "modal_title": f"Details of {self.object._meta.verbose_name}",
+            }
+        )
         return context
 
     def get_template_names(self):
@@ -2159,10 +2221,12 @@ class UserCreatedObjectUpdateView(
         default_parent_label, _ = _get_default_breadcrumb_parent_module(model)
         breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
         breadcrumb_object_label = _get_default_breadcrumb_object_label(self.object)
-        context.update({
-            "form_title": f"Update {self.object._meta.verbose_name}",
-            "submit_button_text": "Save",
-        })
+        context.update(
+            {
+                "form_title": f"Update {self.object._meta.verbose_name}",
+                "submit_button_text": "Save",
+            }
+        )
         context.update(
             build_breadcrumb_context(
                 parent_module_label=default_parent_label,
@@ -2208,11 +2272,13 @@ class UserCreatedObjectCreateWithInlinesView(
         context = super().get_context_data(**kwargs)
         model = _get_breadcrumb_model(self)
         model_name = capfirst(str(model.get_breadcrumb_singular_label()))
-        context.update({
-            "form_title": f"Create New {model_name}",
-            "submit_button_text": "Save",
-            "formset_helper": self.formset_helper_class(),
-        })
+        context.update(
+            {
+                "form_title": f"Create New {model_name}",
+                "submit_button_text": "Save",
+                "formset_helper": self.formset_helper_class(),
+            }
+        )
         default_module_label, _ = _get_default_breadcrumb_module(model)
         default_parent_label, _ = _get_default_breadcrumb_parent_module(model)
         breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
@@ -2262,11 +2328,13 @@ class UserCreatedObjectUpdateWithInlinesView(
         default_parent_label, _ = _get_default_breadcrumb_parent_module(model)
         breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
         breadcrumb_object_label = _get_default_breadcrumb_object_label(self.object)
-        context.update({
-            "form_title": f"Update {self.object._meta.verbose_name}",
-            "submit_button_text": "Save",
-            "formset_helper": self.formset_helper_class(),
-        })
+        context.update(
+            {
+                "form_title": f"Update {self.object._meta.verbose_name}",
+                "submit_button_text": "Save",
+                "formset_helper": self.formset_helper_class(),
+            }
+        )
         context.update(
             build_breadcrumb_context(
                 parent_module_label=default_parent_label,
@@ -2311,10 +2379,12 @@ class UserCreatedObjectModalUpdateView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update({
-            "modal_title": f"Update {self.object._meta.verbose_name}",
-            "submit_button_text": "Save",
-        })
+        context.update(
+            {
+                "modal_title": f"Update {self.object._meta.verbose_name}",
+                "submit_button_text": "Save",
+            }
+        )
         return context
 
 
@@ -2342,10 +2412,12 @@ class UserCreatedObjectModalArchiveView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update({
-            "modal_title": f"Archive {self.object._meta.verbose_name}",
-            "submit_button_text": "Archive",
-        })
+        context.update(
+            {
+                "modal_title": f"Archive {self.object._meta.verbose_name}",
+                "submit_button_text": "Archive",
+            }
+        )
         return context
 
     def get_success_url(self):
@@ -2365,10 +2437,12 @@ class UserCreatedObjectModalDeleteView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update({
-            "form_title": f"Delete {self.object._meta.verbose_name}",
-            "submit_button_text": "Delete",
-        })
+        context.update(
+            {
+                "form_title": f"Delete {self.object._meta.verbose_name}",
+                "submit_button_text": "Delete",
+            }
+        )
         return context
 
     def get_success_url(self):
