@@ -26,3 +26,6 @@ brit/static/scss/*.css.map
 /site/
 .windsurf
 .vscode
+
+AGENTS.md
+/.devin/
