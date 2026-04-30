@@ -170,6 +170,19 @@ class SampleSubstrateMaterialQuickCreateViewTestCase(ViewWithPermissionsTestCase
         existing.refresh_from_db()
         self.assertIn(self.substrate_category, existing.categories.all())
 
+    def test_post_blocks_name_matching_published_material(self):
+        Material.objects.create(name="Wood", publication_status="published")
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("sample-substrate-material-quick-create"),
+            data=json.dumps({"name": "wood"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("published material", response.json()["error"])
+
 
 class AnalyticalMethodReviewCascadeTest(TestCase):
     """Ensure analytical method review actions cascade to linked sources."""

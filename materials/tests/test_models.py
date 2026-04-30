@@ -1,7 +1,9 @@
 from decimal import Decimal
+from uuid import uuid4
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.db.models import signals
 from django.test import TestCase
 from factory.django import mute_signals
@@ -137,6 +139,69 @@ class MaterialTestCase(TestCase):
         self.user = User.objects.get(username="standard_user")
         self.default_group = MaterialComponentGroup.objects.default()
         self.default_component = MaterialComponent.objects.default()
+
+
+class BaseMaterialUniquenessTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="material_owner")
+        cls.other_owner = User.objects.create_user(username="other_material_owner")
+
+    def test_private_duplicate_names_are_allowed_for_different_owners(self):
+        Material.objects.create(owner=self.owner, name="Straw")
+        duplicate = Material(owner=self.other_owner, name="Straw")
+
+        duplicate.full_clean()
+        duplicate.save()
+
+        self.assertEqual(Material.objects.filter(name="Straw").count(), 2)
+
+    def test_private_name_matching_published_material_fails_validation(self):
+        published = Material.objects.create(
+            owner=self.owner,
+            name="Wood",
+            publication_status=Material.STATUS_PUBLISHED,
+        )
+        private = Material(owner=self.other_owner, name="wood")
+
+        with self.assertRaises(ValidationError) as ctx:
+            private.full_clean()
+
+        self.assertIn("name", ctx.exception.message_dict)
+        self.assertIn(str(published.pk), ctx.exception.message_dict["name"][0])
+
+    def test_submit_for_review_blocks_published_name_collision(self):
+        Material.objects.create(
+            owner=self.owner,
+            name="Bark",
+            publication_status=Material.STATUS_PUBLISHED,
+        )
+        private = Material.objects.create(owner=self.other_owner, name="bark")
+
+        with self.assertRaises(ValidationError):
+            private.submit_for_review()
+
+        private.refresh_from_db()
+        self.assertEqual(private.publication_status, Material.STATUS_PRIVATE)
+
+    def test_database_blocks_duplicate_published_name_and_type_case_insensitive(self):
+        suffix = uuid4().hex
+        owner = User.objects.create_user(username=f"published_owner_{suffix}")
+        other_owner = User.objects.create_user(username=f"other_published_{suffix}")
+        name = f"Constraint Total Potassium {suffix}"
+        Material.objects.create(
+            owner=owner,
+            name=name,
+            publication_status=Material.STATUS_PUBLISHED,
+        )
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Material.objects.create(
+                    owner=other_owner,
+                    name=name.lower(),
+                    publication_status=Material.STATUS_PUBLISHED,
+                )
 
 
 class SampleSeriesTestCase(TestCase):

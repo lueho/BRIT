@@ -4,7 +4,8 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Max
+from django.db.models import Max, Q
+from django.db.models.functions import Lower
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
@@ -100,6 +101,53 @@ class BaseMaterial(NamedUserCreatedObject):
     class Meta:
         verbose_name = "Material"
         unique_together = [["name", "owner"]]
+        constraints = [
+            models.UniqueConstraint(
+                Lower("name"),
+                "type",
+                condition=Q(publication_status=UserCreatedObject.STATUS_PUBLISHED),
+                name="materials_basematerial_unique_published_name_type",
+            )
+        ]
+
+    def _published_name_conflict(self):
+        if not self.name:
+            return None
+        return (
+            BaseMaterial.objects.filter(
+                name__iexact=self.name,
+                type=self.type,
+                publication_status=self.STATUS_PUBLISHED,
+            )
+            .exclude(pk=self.pk)
+            .first()
+        )
+
+    def _published_name_conflict_error(self, conflict):
+        return (
+            f'A published {self.type} named "{conflict.name}" already exists '
+            f"(id={conflict.pk}). Use the existing published record instead."
+        )
+
+    def _validate_no_published_name_conflict(self):
+        conflict = self._published_name_conflict()
+        if conflict:
+            raise ValidationError(
+                {"name": self._published_name_conflict_error(conflict)}
+            )
+
+    def validate_unique(self, exclude=None):
+        super().validate_unique(exclude=exclude)
+        if self.publication_status != self.STATUS_PUBLISHED:
+            self._validate_no_published_name_conflict()
+
+    def submit_for_review(self):
+        self._validate_no_published_name_conflict()
+        return super().submit_for_review()
+
+    def approve(self, user=None):
+        self._validate_no_published_name_conflict()
+        return super().approve(user=user)
 
 
 class Material(BaseMaterial):

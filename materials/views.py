@@ -207,10 +207,6 @@ class MaterialCategoryAutocompleteView(UserCreatedObjectAutocompleteView):
     model = MaterialCategory
 
 
-# ----------- Material CRUD --------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
 class MaterialPublishedListView(PublishedObjectFilterView):
     model = Material
     queryset = Material.objects.filter(type="material")
@@ -308,6 +304,24 @@ class SampleSubstrateMaterialQuickCreateView(
             )
 
         substrate_category, _ = get_or_create_sample_substrate_category()
+        published_material = Material.objects.filter(
+            name__iexact=name,
+            type="material",
+            publication_status=Material.STATUS_PUBLISHED,
+        ).first()
+        if published_material is not None:
+            return JsonResponse(
+                {
+                    "error": (
+                        "A published material with this name already exists. "
+                        "Use the existing published record."
+                    ),
+                    "id": published_material.pk,
+                    "name": published_material.name,
+                },
+                status=400,
+            )
+
         material = Material.objects.filter(
             owner=request.user,
             name__iexact=name,
