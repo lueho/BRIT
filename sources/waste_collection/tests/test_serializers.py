@@ -67,14 +67,18 @@ class CollectionModelSerializerTestCase(TestCase):
             valid_from=date(2020, 1, 1),
             description="This is a test case.",
         )
-        cls.collection.allowed_materials.set([
-            cls.allowed_material_1,
-            cls.allowed_material_2,
-        ])
-        cls.collection.forbidden_materials.set([
-            cls.forbidden_material_1,
-            cls.forbidden_material_2,
-        ])
+        cls.collection.allowed_materials.set(
+            [
+                cls.allowed_material_1,
+                cls.allowed_material_2,
+            ]
+        )
+        cls.collection.forbidden_materials.set(
+            [
+                cls.forbidden_material_1,
+                cls.forbidden_material_2,
+            ]
+        )
         cls.collection.flyers.add(waste_flyer_1)
         cls.collection.flyers.add(waste_flyer_2)
 
@@ -269,14 +273,18 @@ class CollectionFlatSerializerTestCase(TestCase):
             valid_from=date(2020, 1, 1),
             description="This is a test case.",
         )
-        cls.collection_nuts.allowed_materials.set([
-            cls.allowed_material_1,
-            cls.allowed_material_2,
-        ])
-        cls.collection_nuts.forbidden_materials.set([
-            cls.forbidden_material_1,
-            cls.forbidden_material_2,
-        ])
+        cls.collection_nuts.allowed_materials.set(
+            [
+                cls.allowed_material_1,
+                cls.allowed_material_2,
+            ]
+        )
+        cls.collection_nuts.forbidden_materials.set(
+            [
+                cls.forbidden_material_1,
+                cls.forbidden_material_2,
+            ]
+        )
         cls.collection_nuts.flyers.add(waste_flyer_1)
         cls.collection_nuts.flyers.add(waste_flyer_2)
 
@@ -298,14 +306,18 @@ class CollectionFlatSerializerTestCase(TestCase):
             frequency=frequency,
             description="This is a test case.",
         )
-        cls.collection_lau.allowed_materials.set([
-            cls.allowed_material_1,
-            cls.allowed_material_2,
-        ])
-        cls.collection_lau.forbidden_materials.set([
-            cls.forbidden_material_1,
-            cls.forbidden_material_2,
-        ])
+        cls.collection_lau.allowed_materials.set(
+            [
+                cls.allowed_material_1,
+                cls.allowed_material_2,
+            ]
+        )
+        cls.collection_lau.forbidden_materials.set(
+            [
+                cls.forbidden_material_1,
+                cls.forbidden_material_2,
+            ]
+        )
         cls.collection_lau.flyers.add(waste_flyer_1)
         cls.collection_lau.flyers.add(waste_flyer_2)
 
@@ -451,6 +463,137 @@ class CollectionImportRecordSerializerTestCase(TestCase):
         self.assertIn("allowed_materials", serializer.fields)
         self.assertIn("forbidden_materials", serializer.fields)
         self.assertIn("review_comment", serializer.fields)
+
+
+class CollectionFlatSerializerNutsHierarchyTestCase(TestCase):
+    """
+    Tests that CollectionFlatSerializer exports the full NUTS hierarchy (levels 0-3)
+    as individual columns in the export output.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        # Build a NUTS 0 → 1 → 2 → 3 parent chain
+        cls.nuts0 = NutsRegion.objects.create(
+            name="Germany", country="DE", nuts_id="DE", levl_code=0, cntr_code="DE"
+        )
+        cls.nuts1 = NutsRegion.objects.create(
+            name="Bayern",
+            country="DE",
+            nuts_id="DE2",
+            levl_code=1,
+            cntr_code="DE",
+            parent=cls.nuts0,
+        )
+        cls.nuts2 = NutsRegion.objects.create(
+            name="Oberbayern",
+            country="DE",
+            nuts_id="DE21",
+            levl_code=2,
+            cntr_code="DE",
+            parent=cls.nuts1,
+        )
+        cls.nuts3 = NutsRegion.objects.create(
+            name="München, Landkreis",
+            country="DE",
+            nuts_id="DE212",
+            levl_code=3,
+            cntr_code="DE",
+            parent=cls.nuts2,
+        )
+
+        system = CollectionSystem.objects.create(name="Flat Nuts Test System")
+        category = WasteCategory.objects.create(name="Flat Nuts Test Category")
+
+        catchment3 = CollectionCatchment.objects.create(
+            name="Catchment NUTS3", region=cls.nuts3.region_ptr
+        )
+        cls.collection_nuts3 = Collection.objects.create(
+            name="Collection NUTS3",
+            catchment=catchment3,
+            collection_system=system,
+            waste_category=category,
+            valid_from=date(2020, 1, 1),
+        )
+
+        catchment2 = CollectionCatchment.objects.create(
+            name="Catchment NUTS2", region=cls.nuts2.region_ptr
+        )
+        cls.collection_nuts2 = Collection.objects.create(
+            name="Collection NUTS2",
+            catchment=catchment2,
+            collection_system=system,
+            waste_category=category,
+            valid_from=date(2020, 1, 1),
+        )
+
+        # LAU region with a NUTS3 parent
+        cls.lau = LauRegion.objects.create(
+            name="München Stadt",
+            country="DE",
+            lau_id="09162000",
+            nuts_parent=cls.nuts3,
+        )
+        catchment_lau = CollectionCatchment.objects.create(
+            name="Catchment LAU", region=cls.lau.region_ptr
+        )
+        cls.collection_lau = Collection.objects.create(
+            name="Collection LAU",
+            catchment=catchment_lau,
+            collection_system=system,
+            waste_category=category,
+            valid_from=date(2020, 1, 1),
+        )
+
+    def test_nuts3_collection_exports_all_four_nuts_levels(self):
+        data = CollectionFlatSerializer(self.collection_nuts3).data
+        self.assertEqual(data["nuts_0_id"], "DE")
+        self.assertEqual(data["nuts_0_name"], "Germany")
+        self.assertEqual(data["nuts_1_id"], "DE2")
+        self.assertEqual(data["nuts_1_name"], "Bayern")
+        self.assertEqual(data["nuts_2_id"], "DE21")
+        self.assertEqual(data["nuts_2_name"], "Oberbayern")
+        self.assertEqual(data["nuts_3_id"], "DE212")
+        self.assertEqual(data["nuts_3_name"], "München, Landkreis")
+
+    def test_nuts2_collection_exports_nuts_0_to_2_only(self):
+        data = CollectionFlatSerializer(self.collection_nuts2).data
+        self.assertEqual(data["nuts_0_id"], "DE")
+        self.assertEqual(data["nuts_1_id"], "DE2")
+        self.assertEqual(data["nuts_2_id"], "DE21")
+        self.assertIsNone(data.get("nuts_3_id"))
+        self.assertIsNone(data.get("nuts_3_name"))
+
+    def test_lau_collection_exports_nuts_hierarchy_via_nuts_parent(self):
+        data = CollectionFlatSerializer(self.collection_lau).data
+        self.assertEqual(data["nuts_0_id"], "DE")
+        self.assertEqual(data["nuts_1_id"], "DE2")
+        self.assertEqual(data["nuts_2_id"], "DE21")
+        self.assertEqual(data["nuts_3_id"], "DE212")
+        self.assertEqual(data["nuts_3_name"], "München, Landkreis")
+
+    def test_nuts_columns_appear_after_nuts_or_lau_id(self):
+        data = CollectionFlatSerializer(self.collection_nuts3).data
+        keys = list(data.keys())
+        lau_idx = keys.index("nuts_or_lau_id")
+        nuts0_idx = keys.index("nuts_0_id")
+        self.assertGreater(nuts0_idx, lau_idx)
+
+    def test_collection_without_nuts_region_has_no_nuts_hierarchy_columns(self):
+        # Catchment with no region at all
+        system = CollectionSystem.objects.create(name="No-Region System")
+        category = WasteCategory.objects.create(name="No-Region Category")
+        bare_catchment = CollectionCatchment.objects.create(name="Bare Catchment")
+        bare_collection = Collection.objects.create(
+            name="Bare Collection",
+            catchment=bare_catchment,
+            collection_system=system,
+            waste_category=category,
+            valid_from=date(2020, 1, 1),
+        )
+        data = CollectionFlatSerializer(bare_collection).data
+        self.assertNotIn("nuts_0_id", data)
+        self.assertNotIn("nuts_3_id", data)
 
 
 class CollectionFrequencyMutationSerializerTestCase(TestCase):

@@ -348,6 +348,48 @@ class CollectionModelSerializer(
             return {}
 
 
+def _get_nuts_hierarchy(region):
+    """
+    Return an OrderedDict of NUTS level → (nuts_id, nuts_name) for all ancestor NUTS
+    levels reachable from *region*.
+
+    Works for both NutsRegion and LauRegion inputs:
+    - NutsRegion: walks `parent` links from the region's own level up to level 0.
+    - LauRegion:  starts at `nuts_parent` (a NutsRegion) and walks up from there.
+
+    Returns an empty dict when the region has no NUTS affiliation.
+    """
+    nuts_node = None
+
+    try:
+        nuts_node = region.nutsregion
+    except Exception:
+        pass
+
+    if nuts_node is None:
+        try:
+            lau = region.lauregion
+            nuts_node = lau.nuts_parent
+        except Exception:
+            pass
+
+    if nuts_node is None:
+        return {}
+
+    # Walk up the parent chain collecting (id, name) per level.
+    hierarchy = {}
+    node = nuts_node
+    while node is not None:
+        if node.levl_code is not None:
+            hierarchy[node.levl_code] = (node.nuts_id, node.nuts_name or node.name)
+        try:
+            node = node.parent
+        except Exception:
+            break
+
+    return hierarchy
+
+
 class CollectionFlatSerializer(serializers.ModelSerializer):
     """
     Creates a flat, human-readable representation of Collections, suitable for file exports.
@@ -470,6 +512,19 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
 
         for field in self.Meta.fields:
             ordered_representation[field] = representation.get(field, None)
+            if field == "nuts_or_lau_id":
+                # Inject NUTS hierarchy columns (nuts_0_id/name … nuts_3_id/name)
+                # immediately after the NUTS/LAU id column.
+                try:
+                    region = instance.catchment.region
+                except AttributeError:
+                    region = None
+                if region is not None:
+                    nuts_hierarchy = _get_nuts_hierarchy(region)
+                    for level in sorted(nuts_hierarchy):
+                        nuts_id, nuts_name = nuts_hierarchy[level]
+                        ordered_representation[f"nuts_{level}_id"] = nuts_id
+                        ordered_representation[f"nuts_{level}_name"] = nuts_name
 
         region_attributes = ["Population", "Population density"]
         try:
@@ -802,18 +857,20 @@ class CollectionFrequencyScheduleRowMutationSerializer(serializers.Serializer):
     def validate(self, attrs):
         distribution = attrs["distribution"]
         if distribution.name != "Months of the year":
-            raise serializers.ValidationError({
-                "distribution": "Only 'Months of the year' is currently supported."
-            })
+            raise serializers.ValidationError(
+                {"distribution": "Only 'Months of the year' is currently supported."}
+            )
 
         for field_name in ("first_timestep", "last_timestep"):
             timestep = attrs[field_name]
             if timestep.distribution_id != distribution.id:
-                raise serializers.ValidationError({
-                    field_name: (
-                        "Selected timestep must belong to the supplied temporal distribution."
-                    )
-                })
+                raise serializers.ValidationError(
+                    {
+                        field_name: (
+                            "Selected timestep must belong to the supplied temporal distribution."
+                        )
+                    }
+                )
 
         attrs = CollectionFrequencyScheduleService.populate_counts_from_cadences(attrs)
         for field_name in ("standard", "option_1", "option_2", "option_3"):
@@ -822,18 +879,22 @@ class CollectionFrequencyScheduleRowMutationSerializer(serializers.Serializer):
                 None,
                 "",
             ):
-                raise serializers.ValidationError({
-                    field_name: (
-                        "Enter a custom annual total or choose a cadence preset."
-                    )
-                })
+                raise serializers.ValidationError(
+                    {
+                        field_name: (
+                            "Enter a custom annual total or choose a cadence preset."
+                        )
+                    }
+                )
 
         if attrs.get("standard") in (None, ""):
-            raise serializers.ValidationError({
-                "standard": (
-                    "A standard service level is required for each schedule row."
-                )
-            })
+            raise serializers.ValidationError(
+                {
+                    "standard": (
+                        "A standard service level is required for each schedule row."
+                    )
+                }
+            )
         return attrs
 
 
@@ -957,9 +1018,9 @@ class CollectionMutationCreateSerializer(
         valid_from = attrs.get("valid_from")
         valid_until = attrs.get("valid_until")
         if valid_from and valid_until and valid_from >= valid_until:
-            raise serializers.ValidationError({
-                "valid_until": ("Valid until date must be after the valid from date.")
-            })
+            raise serializers.ValidationError(
+                {"valid_until": ("Valid until date must be after the valid from date.")}
+            )
         return attrs
 
 
@@ -1162,20 +1223,22 @@ class CollectionMutationVersionSerializer(
         valid_until = attrs.get("valid_until")
 
         if valid_from and valid_until and valid_from >= valid_until:
-            raise serializers.ValidationError({
-                "valid_until": ("Valid until date must be after the valid from date.")
-            })
+            raise serializers.ValidationError(
+                {"valid_until": ("Valid until date must be after the valid from date.")}
+            )
 
         if (
             valid_from
             and predecessor.valid_from
             and valid_from <= predecessor.valid_from
         ):
-            raise serializers.ValidationError({
-                "valid_from": (
-                    "valid_from must be later than the predecessor valid_from date."
-                )
-            })
+            raise serializers.ValidationError(
+                {
+                    "valid_from": (
+                        "valid_from must be later than the predecessor valid_from date."
+                    )
+                }
+            )
 
         return attrs
 
