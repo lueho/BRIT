@@ -235,6 +235,11 @@ urlpatterns = [
         views.SampleReviewListView.as_view(),
         name="sample-list-review",
     ),
+    path(
+        "samples/export/",
+        views.SampleListFileExportView.as_view(),
+        name="sample-list-export",
+    ),
     path("samples/create/", views.SampleCreateView.as_view(), name="sample-create"),
     path(
         "samples/create/modal/",

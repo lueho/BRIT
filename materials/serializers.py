@@ -194,6 +194,29 @@ class SampleModelSerializer(ModelSerializer):
         )
 
 
+class SampleFlatSerializer(ModelSerializer):
+    material = StringRelatedField()
+    series = StringRelatedField()
+    timestep = StringRelatedField()
+    owner = StringRelatedField()
+
+    class Meta:
+        model = Sample
+        fields = (
+            "id",
+            "name",
+            "material",
+            "series",
+            "timestep",
+            "datetime",
+            "standalone",
+            "publication_status",
+            "owner",
+            "created_at",
+            "description",
+        )
+
+
 # ----------- API ------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 

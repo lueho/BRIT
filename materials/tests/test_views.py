@@ -1773,6 +1773,13 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, reverse("sample-gallery"))
         self.assertContains(response, self.sample.name)
 
+    def test_public_list_includes_export_button(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("sample-list"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "export-modal-sample-list-export")
+        self.assertContains(response, "Export data")
+
     def test_public_gallery_renders_and_links_back_to_list(self):
         response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
         self.assertEqual(response.status_code, 200)

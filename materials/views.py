@@ -20,7 +20,10 @@ from django.views.generic.detail import SingleObjectMixin
 
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
-from utils.file_export.views import SingleObjectFileExportView
+from utils.file_export.views import (
+    GenericUserCreatedObjectExportView,
+    SingleObjectFileExportView,
+)
 from utils.modal import BSModalFormView, BSModalUpdateView
 from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import (
@@ -884,6 +887,10 @@ class SampleReviewListView(SampleRepresentationMixin, ReviewObjectFilterView):
     model = Sample
     filterset_class = SampleFilter
     dashboard_url = reverse_lazy("materials-explorer")
+
+
+class SampleListFileExportView(GenericUserCreatedObjectExportView):
+    model_label = "materials.Sample"
 
 
 class SampleCreateView(UserCreatedObjectCreateView):

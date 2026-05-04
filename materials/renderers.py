@@ -6,6 +6,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
+from utils.file_export.renderers import BaseCSVRenderer, BaseXLSXRenderer
+
 # Excel column headers matching the import format (order matches input files)
 MEASUREMENT_HEADERS = [
     "Parameter",
@@ -53,6 +55,28 @@ STYLE_HEADER_FILL = PatternFill(
 )
 STYLE_HEADER_BORDER = Border(bottom=Side(style="medium"))
 STYLE_LEFT_ALIGN = Alignment(horizontal="left")
+
+
+class SampleCSVRenderer(BaseCSVRenderer):
+    labels = {
+        "id": "ID",
+        "name": "Sample",
+        "material": "Material",
+        "series": "Series",
+        "timestep": "Timestep",
+        "datetime": "Date/time",
+        "standalone": "Standalone",
+        "publication_status": "Publication status",
+        "owner": "Owner",
+        "created_at": "Created at",
+        "description": "Description",
+    }
+    header = labels
+
+
+class SampleXLSXRenderer(BaseXLSXRenderer):
+    labels = SampleCSVRenderer.labels
+
 
 # Parameter group colors (approximating Excel theme colors with tints)
 # Based on analysis of input Excel files

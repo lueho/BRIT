@@ -4,6 +4,8 @@ from sources.contracts import SourceDomainExport
 from sources.registry import get_source_domain_plugins
 from utils.file_export.export_registry import register_export
 
+import_module("materials.exports")
+
 
 def _discover_source_domain_exports() -> tuple[SourceDomainExport, ...]:
     exports: list[SourceDomainExport] = []
