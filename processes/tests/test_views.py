@@ -5,9 +5,10 @@ Comprehensive tests for all CRUD views following BRIT testing patterns.
 
 from django.urls import reverse
 
+from bibliography.models import Source
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
-from ..models import Process, ProcessCategory
+from ..models import Process, ProcessCategory, ProcessReference
 
 
 class ProcessDashboardViewTestCase(ViewWithPermissionsTestCase):
@@ -194,6 +195,28 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, process.name)
+
+    def test_detail_view_links_bibliography_references_to_modal(self):
+        source = Source.objects.create(
+            title="Reference Title",
+            abbreviation="Ref01",
+            owner=self.owner_user,
+            publication_status="published",
+        )
+        ProcessReference.objects.create(process=self.published_object, source=source)
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": self.published_object.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse("source-detail-modal", kwargs={"pk": source.pk}),
+        )
+        self.assertContains(response, "modal-link")
+        self.assertContains(response, "Ref01")
 
 
 class ProcessAutocompleteViewTestCase(ViewWithPermissionsTestCase):

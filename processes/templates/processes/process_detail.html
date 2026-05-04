@@ -195,7 +195,9 @@
                         {% for ref in object.references.all %}
                         <li>
                             {% if ref.source %}
-                            {{ ref.source }}
+                            <a href="{% url 'source-detail-modal' ref.source.pk %}"
+                               class="modal-link"
+                               title="{{ ref.source.title|default:ref.source.abbreviation }}">{{ ref.source.abbreviation|default:ref.source.title|default:"Source" }}</a>
                             {% else %}
                             {{ ref.title }}
                             {% endif %}
