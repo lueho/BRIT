@@ -66,13 +66,13 @@
                             <h5>Materials (Inputs & Outputs)</h5>
                         </div>
                         <div class="card-body">
-                            {{ inlines.0.formset.management_form }}
+                            {{ inlines.0.management_form }}
                             <div id="materials-formset">
-                                {% for form in inlines.0.formset %}<div class="formset-form border p-3 mb-3">{{ form.as_p }}</div>{% endfor %}
+                                {% for form in inlines.0 %}<div class="formset-form border p-3 mb-3">{{ form.as_p }}</div>{% endfor %}
                             </div>
                             <button type="button"
                                     class="btn btn-sm btn-secondary"
-                                    onclick="addForm('materials')">
+                                    onclick="addForm('materials', 'process_materials')">
                                 <i class="bi bi-plus"></i> Add Material
                             </button>
                         </div>
@@ -88,13 +88,13 @@
                             <h5>Operating Parameters</h5>
                         </div>
                         <div class="card-body">
-                            {{ inlines.1.formset.management_form }}
+                            {{ inlines.1.management_form }}
                             <div id="parameters-formset">
-                                {% for form in inlines.1.formset %}<div class="formset-form border p-3 mb-3">{{ form.as_p }}</div>{% endfor %}
+                                {% for form in inlines.1 %}<div class="formset-form border p-3 mb-3">{{ form.as_p }}</div>{% endfor %}
                             </div>
                             <button type="button"
                                     class="btn btn-sm btn-secondary"
-                                    onclick="addForm('parameters')">
+                                    onclick="addForm('parameters', 'operating_parameters')">
                                 <i class="bi bi-plus"></i> Add Parameter
                             </button>
                         </div>
@@ -110,13 +110,13 @@
                             <h5>Links</h5>
                         </div>
                         <div class="card-body">
-                            {{ inlines.2.formset.management_form }}
+                            {{ inlines.2.management_form }}
                             <div id="links-formset">
-                                {% for form in inlines.2.formset %}<div class="formset-form border p-3 mb-3">{{ form.as_p }}</div>{% endfor %}
+                                {% for form in inlines.2 %}<div class="formset-form border p-3 mb-3">{{ form.as_p }}</div>{% endfor %}
                             </div>
                             <button type="button"
                                     class="btn btn-sm btn-secondary"
-                                    onclick="addForm('links')">
+                                    onclick="addForm('links', 'links')">
                                 <i class="bi bi-plus"></i> Add Link
                             </button>
                         </div>
@@ -132,13 +132,13 @@
                             <h5>Information Resources</h5>
                         </div>
                         <div class="card-body">
-                            {{ inlines.3.formset.management_form }}
+                            {{ inlines.3.management_form }}
                             <div id="resources-formset">
-                                {% for form in inlines.3.formset %}<div class="formset-form border p-3 mb-3">{{ form.as_p }}</div>{% endfor %}
+                                {% for form in inlines.3 %}<div class="formset-form border p-3 mb-3">{{ form.as_p }}</div>{% endfor %}
                             </div>
                             <button type="button"
                                     class="btn btn-sm btn-secondary"
-                                    onclick="addForm('resources')">
+                                    onclick="addForm('resources', 'info_resources')">
                                 <i class="bi bi-plus"></i> Add Resource
                             </button>
                         </div>
@@ -154,13 +154,13 @@
                             <h5>References</h5>
                         </div>
                         <div class="card-body">
-                            {{ inlines.4.formset.management_form }}
+                            {{ inlines.4.management_form }}
                             <div id="references-formset">
-                                {% for form in inlines.4.formset %}<div class="formset-form border p-3 mb-3">{{ form.as_p }}</div>{% endfor %}
+                                {% for form in inlines.4 %}<div class="formset-form border p-3 mb-3">{{ form.as_p }}</div>{% endfor %}
                             </div>
                             <button type="button"
                                     class="btn btn-sm btn-secondary"
-                                    onclick="addForm('references')">
+                                    onclick="addForm('references', 'references')">
                                 <i class="bi bi-plus"></i> Add Reference
                             </button>
                         </div>
@@ -183,9 +183,9 @@
 
     <script>
 // Simple inline formset add functionality
-function addForm(prefix) {
+function addForm(prefix, formsetPrefix) {
     const formsetDiv = document.getElementById(prefix + '-formset');
-    const totalForms = document.querySelector(`#id_${prefix}-TOTAL_FORMS`);
+    const totalForms = document.querySelector(`#id_${formsetPrefix}-TOTAL_FORMS`);
     const formCount = parseInt(totalForms.value);
     
     // Clone the first form
@@ -193,8 +193,8 @@ function addForm(prefix) {
     const newForm = firstForm.cloneNode(true);
     
     // Update form index in field names and IDs
-    const formRegex = new RegExp(`${prefix}-(\\d+)-`, 'g');
-    newForm.innerHTML = newForm.innerHTML.replace(formRegex, `${prefix}-${formCount}-`);
+    const formRegex = new RegExp(`${formsetPrefix}-(\\d+)-`, 'g');
+    newForm.innerHTML = newForm.innerHTML.replace(formRegex, `${formsetPrefix}-${formCount}-`);
     
     // Clear values
     newForm.querySelectorAll('input, select, textarea').forEach(field => {

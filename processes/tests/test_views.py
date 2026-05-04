@@ -6,9 +6,10 @@ Comprehensive tests for all CRUD views following BRIT testing patterns.
 from django.urls import reverse
 
 from bibliography.models import Source
+from materials.models import Material
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
-from ..models import Process, ProcessCategory, ProcessReference
+from ..models import Process, ProcessCategory, ProcessMaterial, ProcessReference
 
 
 class ProcessDashboardViewTestCase(ViewWithPermissionsTestCase):
@@ -217,6 +218,27 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         )
         self.assertContains(response, "modal-link")
         self.assertContains(response, "Ref01")
+
+    def test_update_view_prefills_inline_select_values(self):
+        material = Material.objects.create(
+            name="Existing Material",
+            owner=self.owner_user,
+            publication_status="published",
+        )
+        ProcessMaterial.objects.create(
+            process=self.unpublished_object,
+            material=material,
+            role=ProcessMaterial.Role.INPUT,
+        )
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(
+            reverse(self.view_update_name, kwargs={"pk": self.unpublished_object.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="process_materials-0-material"')
+        self.assertContains(response, "Existing Material")
 
 
 class ProcessAutocompleteViewTestCase(ViewWithPermissionsTestCase):
