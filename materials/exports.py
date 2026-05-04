@@ -8,7 +8,7 @@ register_export(
     SampleFilter,
     SampleFlatSerializer,
     {
-        "csv": SampleCSVRenderer(),
-        "xlsx": SampleXLSXRenderer(),
+        "csv": SampleCSVRenderer,
+        "xlsx": SampleXLSXRenderer,
     },
 )

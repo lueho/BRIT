@@ -45,6 +45,15 @@ class ExportRegistryTestCase(SimpleTestCase):
         self.assertIs(spec.serializer, serializer)
         self.assertEqual(spec.renderers, renderers)
 
+    def test_material_sample_export_registers_renderer_classes(self):
+        import materials.exports  # noqa: F401
+        from materials.renderers import SampleCSVRenderer, SampleXLSXRenderer
+
+        spec = get_export_spec("materials.Sample")
+
+        self.assertIs(spec.renderers["csv"], SampleCSVRenderer)
+        self.assertIs(spec.renderers["xlsx"], SampleXLSXRenderer)
+
     def test_get_unknown_label_raises_key_error(self):
         """Requesting an unregistered label should raise KeyError."""
         with self.assertRaises(KeyError):
