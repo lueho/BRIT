@@ -222,12 +222,12 @@ class ProcessReferenceInlineForm(forms.ModelForm):
             url="source-autocomplete",
             label_field="label",
         ),
-        label="Reference",
+        label="Source",
     )
 
     class Meta:
         model = ProcessReference
-        fields = ("source", "title", "url", "reference_type", "order")
+        fields = ("source", "title", "url", "reference_type")
 
 
 class ProcessReferenceInline(InlineFormSetFactory):

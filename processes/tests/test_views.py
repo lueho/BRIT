@@ -219,6 +219,44 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.assertContains(response, "modal-link")
         self.assertContains(response, "Ref01")
 
+    def test_detail_view_sorts_bibliography_alphabetically(self):
+        zebra_source = Source.objects.create(
+            title="Zebra Source",
+            abbreviation="Zebra",
+            owner=self.owner_user,
+            publication_status="published",
+        )
+        alpha_source = Source.objects.create(
+            title="Alpha Source",
+            abbreviation="Alpha",
+            owner=self.owner_user,
+            publication_status="published",
+        )
+        ProcessReference.objects.create(
+            process=self.published_object,
+            source=zebra_source,
+            order=1,
+        )
+        ProcessReference.objects.create(
+            process=self.published_object,
+            source=alpha_source,
+            order=2,
+        )
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": self.published_object.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bibliography")
+        self.assertNotContains(response, "<ol>")
+        self.assertContains(response, '<ul class="list-unstyled">')
+        self.assertLess(
+            response.content.decode().index("Alpha"),
+            response.content.decode().index("Zebra"),
+        )
+
     def test_update_view_prefills_inline_select_values(self):
         material = Material.objects.create(
             name="Existing Material",

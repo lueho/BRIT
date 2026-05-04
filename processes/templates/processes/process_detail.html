@@ -188,11 +188,11 @@
                     </ul>
     {% endif %}
 
-    <!-- References -->
-    {% if object.references.all %}
-    <h6 class="mb-3 mt-4">References</h6>
-                    <ol>
-                        {% for ref in object.references.all %}
+    <!-- Bibliography -->
+    {% if bibliography_references %}
+    <h6 class="mb-3 mt-4">Bibliography</h6>
+                    <ul class="list-unstyled">
+                        {% for ref in bibliography_references %}
                         <li>
                             {% if ref.source %}
                             <a href="{% url 'source-detail-modal' ref.source.pk %}"
@@ -206,6 +206,6 @@
                             {% endif %}
                         </li>
                         {% endfor %}
-                    </ol>
+                    </ul>
     {% endif %}
 {% endblock %}

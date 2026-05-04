@@ -78,10 +78,12 @@ class ReviewObjectListView(ReviewObjectListMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update({
-            "list_type": self.list_type,
-            "scope": "review",
-        })
+        context.update(
+            {
+                "list_type": self.list_type,
+                "scope": "review",
+            }
+        )
         return context
 
     def get_template_names(self):
@@ -402,6 +404,14 @@ class ProcessDetailView(UserCreatedObjectDetailView):
                 params_by_type[param_type] = []
             params_by_type[param_type].append(param)
         context["parameters_by_type"] = params_by_type
+        context["bibliography_references"] = sorted(
+            self.object.references.all(),
+            key=lambda ref: (
+                (ref.source.abbreviation or ref.source.title)
+                if ref.source
+                else ref.title
+            ).casefold(),
+        )
 
         return context
 
