@@ -44,7 +44,14 @@
     {% if input_materials %}
     <h6 class="mb-3">Input Materials</h6>
                     <div class="table-responsive">
-                        <table class="table table-sm">
+                        <table class="table table-sm table-fixed">
+                            <colgroup>
+                                <col style="width: 35%;">
+                                <col style="width: 20%;">
+                                <col style="width: 20%;">
+                                <col style="width: 15%;">
+                                <col style="width: 10%;">
+                            </colgroup>
                             <thead>
                                 <tr>
                                     <th>Material</th>
@@ -63,7 +70,7 @@
                                     <td>{{ pm.stream_label|default:"-" }}</td>
                                     <td>
                                         {% if pm.quantity_value %}
-                                        {{ pm.quantity_value }} {{ pm.quantity_unit.name }}
+                                        {{ pm.get_quantity_value_display }} {{ pm.quantity_unit.name }}
                                         {% else %}
                                         -
                                         {% endif %}
@@ -81,7 +88,13 @@
     {% if output_materials %}
     <h6 class="mb-3 mt-4">Output Materials</h6>
                     <div class="table-responsive">
-                        <table class="table table-sm">
+                        <table class="table table-sm table-fixed">
+                            <colgroup>
+                                <col style="width: 40%;">
+                                <col style="width: 20%;">
+                                <col style="width: 20%;">
+                                <col style="width: 20%;">
+                            </colgroup>
                             <thead>
                                 <tr>
                                     <th>Material</th>
@@ -99,7 +112,7 @@
                                     <td>{{ pm.stream_label|default:"-" }}</td>
                                     <td>
                                         {% if pm.quantity_value %}
-                                        {{ pm.quantity_value }} {{ pm.quantity_unit.name }}
+                                        {{ pm.get_quantity_value_display }} {{ pm.quantity_unit.name }}
                                         {% else %}
                                         -
                                         {% endif %}
@@ -118,7 +131,15 @@
                     {% for param_type, params in parameters_by_type.items %}
                     <h6>{{ param_type }}</h6>
                     <div class="table-responsive mb-3">
-                        <table class="table table-sm">
+                        <table class="table table-sm table-fixed">
+                            <colgroup>
+                                <col style="width: 30%;">
+                                <col style="width: 12%;">
+                                <col style="width: 12%;">
+                                <col style="width: 12%;">
+                                <col style="width: 14%;">
+                                <col style="width: 20%;">
+                            </colgroup>
                             <thead>
                                 <tr>
                                     <th>Name</th>
@@ -133,9 +154,9 @@
                                 {% for param in params %}
                                 <tr>
                                     <td>{{ param.name|default:param.get_parameter_display }}</td>
-                                    <td>{{ param.value_min|default:"-" }}</td>
-                                    <td>{{ param.nominal_value|default:"-" }}</td>
-                                    <td>{{ param.value_max|default:"-" }}</td>
+                                    <td>{{ param.get_value_min_display|default:"-" }}</td>
+                                    <td>{{ param.get_nominal_value_display|default:"-" }}</td>
+                                    <td>{{ param.get_value_max_display|default:"-" }}</td>
                                     <td>{{ param.unit.name|default:"-" }}</td>
                                     <td>{{ param.basis|default:"-" }}</td>
                                 </tr>

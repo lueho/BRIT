@@ -23,6 +23,7 @@ with the rest of BRIT.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from urllib.parse import urlparse
 
 from django.core.exceptions import ValidationError
@@ -33,6 +34,15 @@ from bibliography.models import Source
 from materials.models import Material
 from utils.object_management.models import NamedUserCreatedObject
 from utils.properties.models import Unit
+
+
+def format_decimal_for_display(value):
+    if value is None:
+        return ""
+    normalized = value.normalize()
+    if normalized == normalized.to_integral():
+        return str(normalized.quantize(Decimal("1")))
+    return format(normalized, "f")
 
 
 def validate_internal_or_external_url(value: str) -> None:
@@ -235,6 +245,9 @@ class ProcessMaterial(models.Model):
     def __str__(self):
         return f"{self.material} ({self.get_role_display()})"
 
+    def get_quantity_value_display(self):
+        return format_decimal_for_display(self.quantity_value)
+
     def clean(self):
         super().clean()
         if self.quantity_value is not None and self.quantity_unit is None:
@@ -324,6 +337,15 @@ class ProcessOperatingParameter(models.Model):
     def __str__(self):
         label = self.name or self.get_parameter_display()
         return f"{label} ({self.process})"
+
+    def get_value_min_display(self):
+        return format_decimal_for_display(self.value_min)
+
+    def get_value_max_display(self):
+        return format_decimal_for_display(self.value_max)
+
+    def get_nominal_value_display(self):
+        return format_decimal_for_display(self.nominal_value)
 
     def clean(self):
         super().clean()

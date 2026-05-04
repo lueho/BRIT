@@ -182,6 +182,18 @@ class ProcessModelTestCase(TestCase):
         with self.assertRaises(ValidationError):
             material_link_without_value.full_clean()
 
+    def test_process_material_quantity_display_strips_trailing_zeros(self):
+        process = Process.objects.create(name="Display Quantity", owner=self.owner)
+        material_link = ProcessMaterial.objects.create(
+            process=process,
+            material=self.material_in,
+            role=ProcessMaterial.Role.INPUT,
+            quantity_value=Decimal("2.5000"),
+            quantity_unit=self.unit_tonne,
+        )
+
+        self.assertEqual(material_link.get_quantity_value_display(), "2.5")
+
     def test_process_material_allows_parallel_streams(self):
         process = Process.objects.create(name="Steam Explosion", owner=self.owner)
         ProcessMaterial.objects.create(
@@ -453,6 +465,21 @@ class ProcessModelTestCase(TestCase):
             basis="dry basis",
         )
         self.assertEqual(parameter.basis, "dry basis")
+
+    def test_operating_parameter_value_displays_strip_trailing_zeros(self):
+        process = Process.objects.create(name="Precise Display", owner=self.owner)
+        parameter = ProcessOperatingParameter.objects.create(
+            process=process,
+            parameter=ProcessOperatingParameter.Parameter.TEMPERATURE,
+            value_min=Decimal("20.0000"),
+            nominal_value=Decimal("25.2500"),
+            value_max=Decimal("30.1234"),
+            unit=self.unit_celsius,
+        )
+
+        self.assertEqual(parameter.get_value_min_display(), "20")
+        self.assertEqual(parameter.get_nominal_value_display(), "25.25")
+        self.assertEqual(parameter.get_value_max_display(), "30.1234")
 
     def test_operating_parameter_custom_type_with_name(self):
         """Test that custom parameters display their custom name."""
