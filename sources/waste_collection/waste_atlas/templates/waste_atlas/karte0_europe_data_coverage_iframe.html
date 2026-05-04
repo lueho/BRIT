@@ -100,7 +100,7 @@
             <li>Sweden</li>
             <li>Flanders + Brussels</li>
             <li>The Netherlands</li>
-            <li>Italy</li>
+            <li>Südtirol</li>
             <li>Catalonia</li>
           </ul>
         </div>
@@ -117,8 +117,8 @@
       var svgEl = document.getElementById('europe-coverage-svg');
       var mapContainer = document.getElementById('map-container');
       var loadingEl = document.getElementById('loading-overlay');
-      var highlightedCountries = new Set(['DE', 'DK', 'SE', 'NL', 'IT']);
-      var highlightedRegions = new Set(['BE1', 'BE2', 'ES51']);
+      var highlightedCountries = new Set(['DE', 'DK', 'SE', 'NL']);
+      var highlightedRegions = new Set(['BE1', 'BE2', 'ES51', 'ITH1']);
       var highlightFill = '#6dbb5a';
       var neutralFill = '#eceff3';
       var neutralStroke = '#7a8694';
@@ -386,12 +386,14 @@
       Promise.all([
         fetchJson('/maps/api/nuts_region/geojson/?levl_code=0'),
         fetchJson('/maps/api/nuts_region/geojson/?levl_code=1&cntr_code=BE'),
-        fetchJson('/maps/api/nuts_region/geojson/?levl_code=2&cntr_code=ES')
+        fetchJson('/maps/api/nuts_region/geojson/?levl_code=2&cntr_code=ES'),
+        fetchJson('/maps/api/nuts_region/geojson/?levl_code=2&cntr_code=IT')
       ]).then(function (results) {
         var countries = trimFeatureCollectionToExtent(results[0]);
         var belgiumRegions = trimFeatureCollectionToExtent(results[1]);
         var spainRegions = trimFeatureCollectionToExtent(results[2]);
-        var highlightedRegionFeatures = (belgiumRegions.features || []).concat(spainRegions.features || [])
+        var italyRegions = trimFeatureCollectionToExtent(results[3]);
+        var highlightedRegionFeatures = (belgiumRegions.features || []).concat(spainRegions.features || []).concat(italyRegions.features || [])
           .filter(function (feature) {
             var nutsId = feature.properties && feature.properties.nuts_id;
             return highlightedRegions.has(nutsId);
@@ -456,7 +458,7 @@
           .attr('font-family', "'Nunito', sans-serif")
           .attr('font-size', 13)
           .attr('fill', '#5c6670')
-          .text('Germany, Denmark, Sweden, Flanders + Brussels, the Netherlands, Italy, and Catalonia');
+          .text('Germany, Denmark, Sweden, Flanders + Brussels, the Netherlands, Südtirol, and Catalonia');
 
         drawLegend(svg, width, height);
         loadingEl.style.display = 'none';
