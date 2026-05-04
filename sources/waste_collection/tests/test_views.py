@@ -3991,7 +3991,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.client.force_login(self.user)
 
     def test_italy_orga_level_map_defaults_to_it_and_english_labels(self):
-        """Südtirol orga-level map defaults to country IT and English text."""
+        """South Tyrol orga-level map defaults to country IT and English text."""
         response = self.client.get(reverse("waste-atlas-orga-level-italy-map"))
 
         self.assertEqual(response.status_code, 200)
@@ -4127,7 +4127,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, reverse("waste-atlas-orga-level-italy-map"))
         self.assertContains(
             response,
-            "Map 29 — Administrative level of waste collection (Südtirol, EN)",
+            "Map 29 — Administrative level of waste collection (South Tyrol, EN)",
         )
         self.assertContains(response, reverse("waste-atlas-orga-level-sweden-map"))
         self.assertContains(
