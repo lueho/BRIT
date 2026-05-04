@@ -237,6 +237,9 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="process-form"')
+        self.assertContains(response, 'name="process_materials-TOTAL_FORMS"')
+        self.assertContains(response, 'form="process-form"')
         self.assertContains(response, 'name="process_materials-0-material"')
         self.assertContains(response, "Existing Material")
 

@@ -43,7 +43,7 @@
             </div>
         </div>
 
-        <form method="post" enctype="multipart/form-data">
+        <form id="process-form" method="post" enctype="multipart/form-data">
             {% csrf_token %}
 
             <!-- Main Process Information -->
@@ -66,7 +66,7 @@
                             <h5>Materials (Inputs & Outputs)</h5>
                         </div>
                         <div class="card-body">
-                            {% include "bootstrap5/formset_base.html" with formset=inlines.0 layout="div" form_id="materials" %}
+                            {% include "bootstrap5/formset_base.html" with formset=inlines.0 layout="div" form_id="materials" owner_form_id="process-form" %}
                         </div>
                     </div>
                 </div>
@@ -80,7 +80,7 @@
                             <h5>Operating Parameters</h5>
                         </div>
                         <div class="card-body">
-                            {% include "bootstrap5/formset_base.html" with formset=inlines.1 layout="div" form_id="parameters" %}
+                            {% include "bootstrap5/formset_base.html" with formset=inlines.1 layout="div" form_id="parameters" owner_form_id="process-form" %}
                         </div>
                     </div>
                 </div>
@@ -94,7 +94,7 @@
                             <h5>Links</h5>
                         </div>
                         <div class="card-body">
-                            {% include "bootstrap5/formset_base.html" with formset=inlines.2 layout="div" form_id="links" %}
+                            {% include "bootstrap5/formset_base.html" with formset=inlines.2 layout="div" form_id="links" owner_form_id="process-form" %}
                         </div>
                     </div>
                 </div>
@@ -108,7 +108,7 @@
                             <h5>Information Resources</h5>
                         </div>
                         <div class="card-body">
-                            {% include "bootstrap5/formset_base.html" with formset=inlines.3 layout="div" form_id="resources" %}
+                            {% include "bootstrap5/formset_base.html" with formset=inlines.3 layout="div" form_id="resources" owner_form_id="process-form" %}
                         </div>
                     </div>
                 </div>
@@ -122,7 +122,7 @@
                             <h5>References</h5>
                         </div>
                         <div class="card-body">
-                            {% include "bootstrap5/formset_base.html" with formset=inlines.4 layout="div" form_id="references" %}
+                            {% include "bootstrap5/formset_base.html" with formset=inlines.4 layout="div" form_id="references" owner_form_id="process-form" %}
                         </div>
                     </div>
                 </div>
