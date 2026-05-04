@@ -66,15 +66,7 @@
                             <h5>Materials (Inputs & Outputs)</h5>
                         </div>
                         <div class="card-body">
-                            {{ inlines.0.management_form }}
-                            <div id="materials-formset">
-                                {% for form in inlines.0 %}<div class="formset-form border p-3 mb-3">{{ form.as_p }}</div>{% endfor %}
-                            </div>
-                            <button type="button"
-                                    class="btn btn-sm btn-secondary"
-                                    onclick="addForm('materials', 'process_materials')">
-                                <i class="bi bi-plus"></i> Add Material
-                            </button>
+                            {% include "bootstrap5/formset_base.html" with formset=inlines.0 layout="div" form_id="materials" %}
                         </div>
                     </div>
                 </div>
@@ -88,15 +80,7 @@
                             <h5>Operating Parameters</h5>
                         </div>
                         <div class="card-body">
-                            {{ inlines.1.management_form }}
-                            <div id="parameters-formset">
-                                {% for form in inlines.1 %}<div class="formset-form border p-3 mb-3">{{ form.as_p }}</div>{% endfor %}
-                            </div>
-                            <button type="button"
-                                    class="btn btn-sm btn-secondary"
-                                    onclick="addForm('parameters', 'operating_parameters')">
-                                <i class="bi bi-plus"></i> Add Parameter
-                            </button>
+                            {% include "bootstrap5/formset_base.html" with formset=inlines.1 layout="div" form_id="parameters" %}
                         </div>
                     </div>
                 </div>
@@ -110,15 +94,7 @@
                             <h5>Links</h5>
                         </div>
                         <div class="card-body">
-                            {{ inlines.2.management_form }}
-                            <div id="links-formset">
-                                {% for form in inlines.2 %}<div class="formset-form border p-3 mb-3">{{ form.as_p }}</div>{% endfor %}
-                            </div>
-                            <button type="button"
-                                    class="btn btn-sm btn-secondary"
-                                    onclick="addForm('links', 'links')">
-                                <i class="bi bi-plus"></i> Add Link
-                            </button>
+                            {% include "bootstrap5/formset_base.html" with formset=inlines.2 layout="div" form_id="links" %}
                         </div>
                     </div>
                 </div>
@@ -132,15 +108,7 @@
                             <h5>Information Resources</h5>
                         </div>
                         <div class="card-body">
-                            {{ inlines.3.management_form }}
-                            <div id="resources-formset">
-                                {% for form in inlines.3 %}<div class="formset-form border p-3 mb-3">{{ form.as_p }}</div>{% endfor %}
-                            </div>
-                            <button type="button"
-                                    class="btn btn-sm btn-secondary"
-                                    onclick="addForm('resources', 'info_resources')">
-                                <i class="bi bi-plus"></i> Add Resource
-                            </button>
+                            {% include "bootstrap5/formset_base.html" with formset=inlines.3 layout="div" form_id="resources" %}
                         </div>
                     </div>
                 </div>
@@ -154,15 +122,7 @@
                             <h5>References</h5>
                         </div>
                         <div class="card-body">
-                            {{ inlines.4.management_form }}
-                            <div id="references-formset">
-                                {% for form in inlines.4 %}<div class="formset-form border p-3 mb-3">{{ form.as_p }}</div>{% endfor %}
-                            </div>
-                            <button type="button"
-                                    class="btn btn-sm btn-secondary"
-                                    onclick="addForm('references', 'references')">
-                                <i class="bi bi-plus"></i> Add Reference
-                            </button>
+                            {% include "bootstrap5/formset_base.html" with formset=inlines.4 layout="div" form_id="references" %}
                         </div>
                     </div>
                 </div>
@@ -180,33 +140,4 @@
             </div>
         </form>
     </div>
-
-    <script>
-// Simple inline formset add functionality
-function addForm(prefix, formsetPrefix) {
-    const formsetDiv = document.getElementById(prefix + '-formset');
-    const totalForms = document.querySelector(`#id_${formsetPrefix}-TOTAL_FORMS`);
-    const formCount = parseInt(totalForms.value);
-    
-    // Clone the first form
-    const firstForm = formsetDiv.querySelector('.formset-form');
-    const newForm = firstForm.cloneNode(true);
-    
-    // Update form index in field names and IDs
-    const formRegex = new RegExp(`${formsetPrefix}-(\\d+)-`, 'g');
-    newForm.innerHTML = newForm.innerHTML.replace(formRegex, `${formsetPrefix}-${formCount}-`);
-    
-    // Clear values
-    newForm.querySelectorAll('input, select, textarea').forEach(field => {
-        if (field.type !== 'checkbox' && field.type !== 'radio') {
-            field.value = '';
-        } else {
-            field.checked = false;
-        }
-    });
-    
-    formsetDiv.appendChild(newForm);
-    totalForms.value = formCount + 1;
-}
-    </script>
 {% endblock content %}

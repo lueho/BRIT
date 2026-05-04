@@ -240,6 +240,70 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.assertContains(response, 'name="process_materials-0-material"')
         self.assertContains(response, "Existing Material")
 
+    def test_update_view_posts_inline_management_forms(self):
+        material = Material.objects.create(
+            name="Existing POST Material",
+            owner=self.owner_user,
+            publication_status="published",
+        )
+        ProcessMaterial.objects.create(
+            process=self.unpublished_object,
+            material=material,
+            role=ProcessMaterial.Role.INPUT,
+        )
+        self.client.force_login(self.owner_user)
+
+        response = self.client.post(
+            reverse(self.view_update_name, kwargs={"pk": self.unpublished_object.pk}),
+            {
+                "name": self.unpublished_object.name,
+                "short_description": self.unpublished_object.short_description,
+                "mechanism": self.unpublished_object.mechanism,
+                "description": self.unpublished_object.description,
+                "categories": [self.test_category.pk],
+                "process_materials-TOTAL_FORMS": "1",
+                "process_materials-INITIAL_FORMS": "1",
+                "process_materials-MIN_NUM_FORMS": "0",
+                "process_materials-MAX_NUM_FORMS": "1000",
+                "process_materials-0-material": material.pk,
+                "process_materials-0-role": ProcessMaterial.Role.OUTPUT,
+                "process_materials-0-order": "0",
+                "process_materials-0-stage": "",
+                "process_materials-0-stream_label": "",
+                "process_materials-0-quantity_value": "",
+                "process_materials-0-quantity_unit": "",
+                "process_materials-0-notes": "",
+                "process_materials-0-id": self.unpublished_object.process_materials.get().pk,
+                "process_materials-0-process": self.unpublished_object.pk,
+                "operating_parameters-TOTAL_FORMS": "0",
+                "operating_parameters-INITIAL_FORMS": "0",
+                "operating_parameters-MIN_NUM_FORMS": "0",
+                "operating_parameters-MAX_NUM_FORMS": "1000",
+                "links-TOTAL_FORMS": "0",
+                "links-INITIAL_FORMS": "0",
+                "links-MIN_NUM_FORMS": "0",
+                "links-MAX_NUM_FORMS": "1000",
+                "info_resources-TOTAL_FORMS": "0",
+                "info_resources-INITIAL_FORMS": "0",
+                "info_resources-MIN_NUM_FORMS": "0",
+                "info_resources-MAX_NUM_FORMS": "1000",
+                "references-TOTAL_FORMS": "0",
+                "references-INITIAL_FORMS": "0",
+                "references-MIN_NUM_FORMS": "0",
+                "references-MAX_NUM_FORMS": "1000",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse(self.view_detail_name, kwargs={"pk": self.unpublished_object.pk}),
+        )
+        self.unpublished_object.refresh_from_db()
+        self.assertEqual(
+            self.unpublished_object.process_materials.get().role,
+            ProcessMaterial.Role.OUTPUT,
+        )
+
 
 class ProcessAutocompleteViewTestCase(ViewWithPermissionsTestCase):
     """Test Process autocomplete view."""
