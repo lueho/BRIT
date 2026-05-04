@@ -199,6 +199,7 @@ class SampleFlatSerializer(ModelSerializer):
     series = StringRelatedField()
     timestep = StringRelatedField()
     owner = StringRelatedField()
+    detail_url = SerializerMethodField()
 
     class Meta:
         model = Sample
@@ -214,7 +215,11 @@ class SampleFlatSerializer(ModelSerializer):
             "owner",
             "created_at",
             "description",
+            "detail_url",
         )
+
+    def get_detail_url(self, obj):
+        return obj.get_absolute_url()
 
 
 # ----------- API ------------------------------------------------------------------------------------------------------

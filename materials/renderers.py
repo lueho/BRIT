@@ -70,6 +70,7 @@ class SampleCSVRenderer(BaseCSVRenderer):
         "owner": "Owner",
         "created_at": "Created at",
         "description": "Description",
+        "detail_url": "Detail URL",
     }
     header = labels
 
