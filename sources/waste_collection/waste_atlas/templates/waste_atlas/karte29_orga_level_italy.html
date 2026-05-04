@@ -1,7 +1,7 @@
 {% extends "waste_atlas/choropleth_map.html" %}
 
 {% block atlas_config %}
-<script>
+  <script>
   document.addEventListener('DOMContentLoaded', function () {
     WasteAtlasChoropleth.init({
       svgId:       'atlas-svg',
@@ -9,6 +9,8 @@
       loadingId:   'loading-overlay',
       country:     '{{ country }}',
       year:        parseInt('{{ year }}', 10) || 2024,
+      nutsPrefix:  'ITH1',
+      nutsLevel:   2,
       title:       'Administrative level of waste collection',
       dataUrl:     '/waste_collection/api/waste-atlas/orga-level/',
       dataField:   'orga_level',
@@ -23,5 +25,5 @@
       fileBase:    'map29_orga_level_italy'
     });
   });
-</script>
+  </script>
 {% endblock atlas_config %}

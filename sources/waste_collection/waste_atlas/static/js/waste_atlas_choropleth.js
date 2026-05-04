@@ -98,7 +98,8 @@ var WasteAtlasChoropleth = (function () {
     var catchUrl = base + 'catchment/geojson/?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix;
     var allCatchUrl = base + 'catchment/geojson/?country=' + cfg.country + '&year=2022' + nutsSuffix;
     var nuts0Url = '/maps/api/nuts_region/geojson/?levl_code=0&cntr_code=' + cfg.country;
-    var nuts1Url = '/maps/api/nuts_region/geojson/?levl_code=1&cntr_code=' + cfg.country;
+    var nutsLevel = cfg.nutsLevel || 1;
+    var nutsRegionUrl = '/maps/api/nuts_region/geojson/?levl_code=' + nutsLevel + '&cntr_code=' + cfg.country;
     var dataUrl = cfg.dataUrl + '?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix;
     var outlineUrl = cfg.outlineGeoJsonUrl
       ? cfg.outlineGeoJsonUrl + '?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix
@@ -107,7 +108,7 @@ var WasteAtlasChoropleth = (function () {
       _fetchJSON(catchUrl),
       _fetchJSON(dataUrl),
       _fetchJSON(nuts0Url),
-      _fetchJSON(nuts1Url),
+      _fetchJSON(nutsRegionUrl),
       _fetchJSON(allCatchUrl)
     ];
     if (outlineUrl) requests.push(_fetchJSON(outlineUrl));
