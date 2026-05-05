@@ -1,6 +1,6 @@
-from storages.backends.s3boto3 import S3Boto3Storage
+from storages.backends.s3boto3 import S3ManifestStaticStorage
 
 
-class StaticStorage(S3Boto3Storage):
-    location = 'static'
+class StaticStorage(S3ManifestStaticStorage):
+    location = "static"
     file_overwrite = True
