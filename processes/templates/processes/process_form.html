@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% load crispy_forms_tags %}
 
 {% block title %}
@@ -141,3 +142,8 @@
         </form>
     </div>
 {% endblock content %}
+
+{% block javascript %}
+    {{ block.super }}
+    <script src="{% static 'js/formset.js' %}"></script>
+{% endblock javascript %}
