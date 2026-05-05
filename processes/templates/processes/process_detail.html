@@ -102,88 +102,50 @@
 
     {% if input_materials %}
         <h6 class="mb-3 text-uppercase">Input</h6>
-        <div class="table-responsive">
-            <table class="table table-sm table-fixed">
-                <colgroup>
-                    <col style="width: 30%;">
-                    <col style="width: 15%;">
-                    <col style="width: 15%;">
-                    <col style="width: 15%;">
-                    <col style="width: 25%;">
-                </colgroup>
-                <thead>
-                    <tr>
-                        <th>Material</th>
-                        <th>Stage</th>
-                        <th>Stream</th>
-                        <th>Quantity</th>
-                        <th>Notes</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for pm in input_materials %}
-                        <tr>
-                            <td>
-                                <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
-                            </td>
-                            <td>{{ pm.stage|default:"-" }}</td>
-                            <td>{{ pm.stream_label|default:"-" }}</td>
-                            <td>
-                                {% if pm.quantity_value %}
-                                    {{ pm.get_quantity_value_display }} {{ pm.quantity_unit.name }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                            <td>{{ pm.notes|default:"-" }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        <ul class="list-unstyled mb-0">
+            {% for pm in input_materials %}
+                <li class="mb-2">
+                    <strong>
+                        <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
+                    </strong>
+                    {% if pm.quantity_value %}— {{ pm.get_quantity_value_display }} {{ pm.quantity_unit.name }}{% endif %}
+                    {% if pm.stage or pm.stream_label %}
+                        <span class="text-muted">
+                            (
+                            {% if pm.stage %}{{ pm.stage }}{% endif %}
+                            {% if pm.stage and pm.stream_label %},{% endif %}
+                            {% if pm.stream_label %}{{ pm.stream_label }}{% endif %}
+                            )
+                        </span>
+                    {% endif %}
+                    {% if pm.notes %}<div class="text-muted">{{ pm.notes }}</div>{% endif %}
+                </li>
+            {% endfor %}
+        </ul>
     {% endif %}
 
     {% if output_materials %}
         <h6 class="mb-3 mt-4 text-uppercase">Output</h6>
-        <div class="table-responsive">
-            <table class="table table-sm table-fixed">
-                <colgroup>
-                    <col style="width: 30%;">
-                    <col style="width: 15%;">
-                    <col style="width: 15%;">
-                    <col style="width: 15%;">
-                    <col style="width: 25%;">
-                </colgroup>
-                <thead>
-                    <tr>
-                        <th>Material</th>
-                        <th>Stage</th>
-                        <th>Stream</th>
-                        <th>Quantity</th>
-                        <th>Notes</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for pm in output_materials %}
-                        <tr>
-                            <td>
-                                <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
-                            </td>
-                            <td>{{ pm.stage|default:"-" }}</td>
-                            <td>{{ pm.stream_label|default:"-" }}</td>
-                            <td>
-                                {% if pm.quantity_value %}
-                                    {{ pm.get_quantity_value_display }} {{ pm.quantity_unit.name }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                            <td>{{ pm.notes|default:"-" }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        <ul class="list-unstyled mb-0">
+            {% for pm in output_materials %}
+                <li class="mb-2">
+                    <strong>
+                        <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
+                    </strong>
+                    {% if pm.quantity_value %}— {{ pm.get_quantity_value_display }} {{ pm.quantity_unit.name }}{% endif %}
+                    {% if pm.stage or pm.stream_label %}
+                        <span class="text-muted">
+                            (
+                            {% if pm.stage %}{{ pm.stage }}{% endif %}
+                            {% if pm.stage and pm.stream_label %},{% endif %}
+                            {% if pm.stream_label %}{{ pm.stream_label }}{% endif %}
+                            )
+                        </span>
+                    {% endif %}
+                    {% if pm.notes %}<div class="text-muted">{{ pm.notes }}</div>{% endif %}
+                </li>
+            {% endfor %}
+        </ul>
     {% endif %}
 
     {% if object.description %}
