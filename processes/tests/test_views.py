@@ -5,6 +5,7 @@ Comprehensive tests for all CRUD views following BRIT testing patterns.
 
 from decimal import Decimal
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 
 from bibliography.models import Source
@@ -235,6 +236,24 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Additional Resources")
+
+    def test_detail_view_shows_pdf_download_button(self):
+        self.published_object.supplementary_document = SimpleUploadedFile(
+            "process-details.pdf",
+            b"%PDF-1.4\n",
+            content_type="application/pdf",
+        )
+        self.published_object.save()
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": self.published_object.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Download PDF version")
+        self.assertContains(response, "process-details")
+        self.assertContains(response, "download")
 
     def test_detail_view_does_not_show_additional_resources_for_info_resource(self):
         ProcessInfoResource.objects.create(
