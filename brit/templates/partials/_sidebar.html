@@ -50,7 +50,7 @@
       </a>
       {% if can_view_processes %}
         <a class="nav-link {% if '/processes/' in request.path %}active{% endif %}"
-           href="{% url 'processes:dashboard' %}">
+           href="{% url 'processes:process-list' %}">
           <div class="sb-nav-link-icon">
             <i class="fas fa-flask"></i>
           </div>
