@@ -3,35 +3,90 @@
 {% load user_created_object_tags %}
 {% load moderation_tags %}
 
-{% block title %}BRIT | Processes{% endblock %}
+{% block title %}
+    BRIT | Processes
+{% endblock title %}
 
-{% block list_table_head %}
-<thead>
-    <tr>
-        <th>Name</th>
-        <th>Categories</th>
-        <th>Mechanism</th>
-        <th>Description</th>
-        {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
-    </tr>
-</thead>
-{% endblock %}
+{% block list_intro %}
+    <div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start"
+         role="region"
+         aria-label="Module introduction">
+        <div class="flex-grow-1">
+            <strong><i class="fas fa-industry me-1"></i> Processes</strong>
+            <p class="mb-0 small text-muted">
+                Explore conversion and treatment processes for bioresources.
+                Filter by category, mechanism, parent process, or material flows.
+            </p>
+        </div>
+        <button type="button"
+                class="btn-close ms-3"
+                data-bs-dismiss="alert"
+                aria-label="Dismiss"></button>
+    </div>
+{% endblock list_intro %}
 
-{% block list_table_row %}
-<tr>
-    <td>
-        <a href="{% detail_or_review_url object %}"
-           aria-label="View details of {{ object.name }}">{{ object.name }}</a>
-    </td>
-    <td>
-        {% for category in object.categories.all %}
-            <span class="badge bg-secondary">{{ category.name }}</span>
-        {% endfor %}
-    </td>
-    <td>{{ object.mechanism|default:"—" }}</td>
-    <td>{{ object.short_description|truncatewords:15 }}</td>
-    {% if object_list.model|is_user_created %}
-        <td class="actions-column mobile-no-label">{% include 'object_management/status_actions_cell.html' %}</td>
+{% block list_card_header %}
+    <strong>Processes</strong>
+{% endblock list_card_header %}
+
+{% block list_table %}
+    <div class="collection-list-min-height">
+        <div class="table-responsive">
+            <table class="table modern-table">
+                <thead>
+                    <tr>
+                        <th>Process</th>
+                        {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for object in object_list %}
+                        <tr>
+                            <td data-label="Process" class="ps-3">
+                                <a href="{% detail_or_review_url object use_back=True %}"
+                                   class="text-decoration-none"
+                                   aria-label="View details of {{ object.name }}">
+                                    <strong class="d-block">{{ object.name }}</strong>
+                                    <span class="text-muted small">
+                                        {% for category in object.categories.all %}
+                                            {{ category.name }}
+                                            {% if not forloop.last %},{% endif %}
+                                        {% empty %}
+                                            Uncategorized
+                                        {% endfor %}
+                                        {% if object.mechanism %}· {{ object.mechanism }}{% endif %}
+                                        {% if object.parent %}· Variant of {{ object.parent.name }}{% endif %}
+                                    </span>
+                                    {% if object.short_description %}
+                                        <span class="text-muted small d-block">{{ object.short_description|truncatewords:18 }}</span>
+                                    {% endif %}
+                                </a>
+                            </td>
+                            {% if object_list.model|is_user_created %}
+                                <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
+                            {% endif %}
+                        </tr>
+                    {% empty %}
+                        {% if not user.is_authenticated %}
+                            {% include "includes/list_empty_state.html" with hint="Log in to create new processes." %}
+                        {% elif create_permission in perms or user.is_staff %}
+                            {% include "includes/list_empty_state.html" with hint="Create your first process to get started." %}
+                        {% else %}
+                            {% include "includes/list_empty_state.html" %}
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock list_table %}
+
+{% block options_pane_body %}
+    {% if create_permission in perms or user.is_staff %}
+        <a class="btn btn-success w-100 mb-2"
+           href="{{ object_list.model.create_url }}"
+           aria-label="Create new {{ object_list.model.get_verbose_name }}">
+            <i class="fas fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
+        </a>
     {% endif %}
-</tr>
-{% endblock %}
+{% endblock options_pane_body %}
