@@ -3,230 +3,220 @@
 {% block title %}BRIT | Process: {{ object.name }}{% endblock %}
 
 {% block detail_body %}
-                    {% if object.image %}
-                    <img src="{{ object.image.url }}" class="img-fluid mb-3" alt="{{ object.name }}">
-                    {% endif %}
+    {% if object.image %}
+        <img src="{{ object.image.url }}"
+             class="img-fluid mb-3"
+             alt="{{ object.name }}">
+    {% endif %}
 
-                    <dl class="row">
-                        {% if object.parent %}
-                        <dt class="col-sm-3">Parent Process</dt>
-                        <dd class="col-sm-9">
-                            <a href="{% url 'processes:process-detail' object.parent.pk %}">{{ object.parent.name }}</a>
-                        </dd>
-                        {% endif %}
+    <section class="mb-4">
+        <h5 class="text-uppercase mb-3">{{ object.name }}</h5>
+        <p class="lead mb-3">{{ object.short_description|default:"No description" }}</p>
 
-                        <dt class="col-sm-3">Categories</dt>
-                        <dd class="col-sm-9">
-                            {% for category in object.categories.all %}
-                            <a href="{% url 'processes:processcategory-detail' category.pk %}" class="badge bg-secondary">{{ category.name }}</a>
-                            {% empty %}
-                            <span class="text-muted">No categories</span>
-                            {% endfor %}
-                        </dd>
+        <dl class="row mb-0">
+            {% if object.parent %}
+                <dt class="col-sm-3">Parent Process</dt>
+                <dd class="col-sm-9">
+                    <a href="{% url 'processes:process-detail' object.parent.pk %}">{{ object.parent.name }}</a>
+                </dd>
+            {% endif %}
 
-                        {% if object.mechanism %}
-                        <dt class="col-sm-3">Mechanism</dt>
-                        <dd class="col-sm-9">{{ object.mechanism }}</dd>
-                        {% endif %}
+            <dt class="col-sm-3">Categories</dt>
+            <dd class="col-sm-9">
+                {% for category in object.categories.all %}
+                    <a href="{% url 'processes:processcategory-detail' category.pk %}"
+                       class="badge bg-secondary">{{ category.name }}</a>
+                {% empty %}
+                    <span class="text-muted">No categories</span>
+                {% endfor %}
+            </dd>
+        </dl>
+    </section>
 
-                        <dt class="col-sm-3">Short Description</dt>
-                        <dd class="col-sm-9">{{ object.short_description|default:"No description" }}</dd>
-                    </dl>
-
-                    {% if object.description %}
-                    <h6 class="mt-4">Detailed Description</h6>
-                    <p>{{ object.description|linebreaks }}</p>
-                    {% endif %}
-
-    <hr class="my-4">
+    <section class="mb-4">
+        <div class="row g-3">
+            {% if object.mechanism %}
+                <div class="col-md-6 col-xl-4">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-uppercase text-muted small">Mechanism</div>
+                        <div>{{ object.mechanism }}</div>
+                    </div>
+                </div>
+            {% endif %}
+            {% for param in object.operating_parameters.all %}
+                <div class="col-md-6 col-xl-4">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-uppercase text-muted small">{{ param.name|default:param.get_parameter_display }}</div>
+                        <div>
+                            {% if param.nominal_value %}
+                                {{ param.get_nominal_value_display }}
+                            {% elif param.value_min or param.value_max %}
+                                {{ param.get_value_min_display|default:"-" }} – {{ param.get_value_max_display|default:"-" }}
+                            {% else %}
+                                -
+                            {% endif %}
+                            {% if param.unit %}{{ param.unit.name }}{% endif %}
+                        </div>
+                        {% if param.basis %}<div class="text-muted small">{{ param.basis }}</div>{% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
 
     <!-- Input Materials -->
     {% if input_materials %}
-    <h6 class="mb-3">Input Materials</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-fixed">
-                            <colgroup>
-                                <col style="width: 35%;">
-                                <col style="width: 20%;">
-                                <col style="width: 20%;">
-                                <col style="width: 15%;">
-                                <col style="width: 10%;">
-                            </colgroup>
-                            <thead>
-                                <tr>
-                                    <th>Material</th>
-                                    <th>Stage</th>
-                                    <th>Stream</th>
-                                    <th>Quantity</th>
-                                    <th>Optional</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for pm in object.process_materials.all %}
-                                {% if pm.role == 'input' %}
-                                <tr>
-                                    <td><a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a></td>
-                                    <td>{{ pm.stage|default:"-" }}</td>
-                                    <td>{{ pm.stream_label|default:"-" }}</td>
-                                    <td>
-                                        {% if pm.quantity_value %}
-                                        {{ pm.get_quantity_value_display }} {{ pm.quantity_unit.name }}
-                                        {% else %}
-                                        -
-                                        {% endif %}
-                                    </td>
-                                    <td>{% if pm.optional %}✓{% else %}-{% endif %}</td>
-                                </tr>
+        <h6 class="mb-3">Input</h6>
+        <div class="table-responsive">
+            <table class="table table-sm table-fixed">
+                <colgroup>
+                    <col style="width: 30%;">
+                    <col style="width: 15%;">
+                    <col style="width: 15%;">
+                    <col style="width: 15%;">
+                    <col style="width: 25%;">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Material</th>
+                        <th>Stage</th>
+                        <th>Stream</th>
+                        <th>Quantity</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pm in input_materials %}
+                        <tr>
+                            <td>
+                                <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
+                            </td>
+                            <td>{{ pm.stage|default:"-" }}</td>
+                            <td>{{ pm.stream_label|default:"-" }}</td>
+                            <td>
+                                {% if pm.quantity_value %}
+                                    {{ pm.get_quantity_value_display }} {{ pm.quantity_unit.name }}
+                                {% else %}
+                                    -
                                 {% endif %}
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                            </td>
+                            <td>{{ pm.notes|default:"-" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     {% endif %}
 
     <!-- Output Materials -->
     {% if output_materials %}
-    <h6 class="mb-3 mt-4">Output Materials</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-fixed">
-                            <colgroup>
-                                <col style="width: 40%;">
-                                <col style="width: 20%;">
-                                <col style="width: 20%;">
-                                <col style="width: 20%;">
-                            </colgroup>
-                            <thead>
-                                <tr>
-                                    <th>Material</th>
-                                    <th>Stage</th>
-                                    <th>Stream</th>
-                                    <th>Quantity</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for pm in object.process_materials.all %}
-                                {% if pm.role == 'output' %}
-                                <tr>
-                                    <td><a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a></td>
-                                    <td>{{ pm.stage|default:"-" }}</td>
-                                    <td>{{ pm.stream_label|default:"-" }}</td>
-                                    <td>
-                                        {% if pm.quantity_value %}
-                                        {{ pm.get_quantity_value_display }} {{ pm.quantity_unit.name }}
-                                        {% else %}
-                                        -
-                                        {% endif %}
-                                    </td>
-                                </tr>
+        <h6 class="mb-3 mt-4">Output</h6>
+        <div class="table-responsive">
+            <table class="table table-sm table-fixed">
+                <colgroup>
+                    <col style="width: 30%;">
+                    <col style="width: 15%;">
+                    <col style="width: 15%;">
+                    <col style="width: 15%;">
+                    <col style="width: 25%;">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Material</th>
+                        <th>Stage</th>
+                        <th>Stream</th>
+                        <th>Quantity</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pm in output_materials %}
+                        <tr>
+                            <td>
+                                <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
+                            </td>
+                            <td>{{ pm.stage|default:"-" }}</td>
+                            <td>{{ pm.stream_label|default:"-" }}</td>
+                            <td>
+                                {% if pm.quantity_value %}
+                                    {{ pm.get_quantity_value_display }} {{ pm.quantity_unit.name }}
+                                {% else %}
+                                    -
                                 {% endif %}
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                            </td>
+                            <td>{{ pm.notes|default:"-" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     {% endif %}
 
-    <!-- Operating Parameters -->
-    {% if parameters_by_type %}
-    <h6 class="mb-3 mt-4">Operating Parameters</h6>
-                    {% for param_type, params in parameters_by_type.items %}
-                    <h6>{{ param_type }}</h6>
-                    <div class="table-responsive mb-3">
-                        <table class="table table-sm table-fixed">
-                            <colgroup>
-                                <col style="width: 30%;">
-                                <col style="width: 12%;">
-                                <col style="width: 12%;">
-                                <col style="width: 12%;">
-                                <col style="width: 14%;">
-                                <col style="width: 20%;">
-                            </colgroup>
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Min</th>
-                                    <th>Nominal</th>
-                                    <th>Max</th>
-                                    <th>Unit</th>
-                                    <th>Basis</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for param in params %}
-                                <tr>
-                                    <td>{{ param.name|default:param.get_parameter_display }}</td>
-                                    <td>{{ param.get_value_min_display|default:"-" }}</td>
-                                    <td>{{ param.get_nominal_value_display|default:"-" }}</td>
-                                    <td>{{ param.get_value_max_display|default:"-" }}</td>
-                                    <td>{{ param.unit.name|default:"-" }}</td>
-                                    <td>{{ param.basis|default:"-" }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% endfor %}
+    {% if object.description %}
+        <h6 class="mt-4">Description</h6>
+        <div>{{ object.description|linebreaks }}</div>
     {% endif %}
 
     <!-- Links and Resources -->
     {% if object.links.all or object.info_resources.all %}
-    <h6 class="mb-3 mt-4">Additional Resources</h6>
-                    {% if object.links.all %}
-                    <h6>Links</h6>
-                    <ul class="list-group mb-3">
-                        {% for link in object.links.all %}
-                        <li class="list-group-item">
-                            <a href="{{ link.url }}" {% if link.open_in_new_tab %}target="_blank"{% endif %}>
-                                {{ link.label }} {% if link.open_in_new_tab %}<i class="bi bi-box-arrow-up-right"></i>{% endif %}
-                            </a>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                    {% endif %}
+        <h6 class="mb-3 mt-4">Additional Resources</h6>
+        {% if object.links.all %}
+            <h6>Links</h6>
+            <ul class="list-group mb-3">
+                {% for link in object.links.all %}
+                    <li class="list-group-item">
+                        <a href="{{ link.url }}"
+                           {% if link.open_in_new_tab %}target="_blank"{% endif %}>
+                            {{ link.label }}
+                            {% if link.open_in_new_tab %}<i class="bi bi-box-arrow-up-right"></i>{% endif %}
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
 
-                    {% if object.info_resources.all %}
-                    <h6>Information Resources</h6>
-                    <ul class="list-group">
-                        {% for resource in object.info_resources.all %}
-                        <li class="list-group-item">
-                            <strong>{{ resource.title }}</strong> ({{ resource.get_resource_type_display }})
-                            {% if resource.description %}<p class="mb-0">{{ resource.description }}</p>{% endif %}
-                            <a href="{{ resource.target_url }}">View Resource</a>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                    {% endif %}
+        {% if object.info_resources.all %}
+            <h6>Information Resources</h6>
+            <ul class="list-group">
+                {% for resource in object.info_resources.all %}
+                    <li class="list-group-item">
+                        <strong>{{ resource.title }}</strong> ({{ resource.get_resource_type_display }})
+                        {% if resource.description %}<p class="mb-0">{{ resource.description }}</p>{% endif %}
+                        <a href="{{ resource.target_url }}">View Resource</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
     {% endif %}
 
     <!-- Variants (Child Processes) -->
     {% if object.variants.all %}
-    <h6 class="mb-3 mt-4">Process Variants</h6>
-                    <ul class="list-group">
-                        {% for variant in object.variants.all %}
-                        <li class="list-group-item">
-                            <a href="{% url 'processes:process-detail' variant.pk %}">{{ variant.name }}</a>
-                        </li>
-                        {% endfor %}
-                    </ul>
+        <h6 class="mb-3 mt-4">Process Variants</h6>
+        <ul class="list-group">
+            {% for variant in object.variants.all %}
+                <li class="list-group-item">
+                    <a href="{% url 'processes:process-detail' variant.pk %}">{{ variant.name }}</a>
+                </li>
+            {% endfor %}
+        </ul>
     {% endif %}
 
     <!-- Bibliography -->
     {% if bibliography_references %}
-    <h6 class="mb-3 mt-4">Bibliography</h6>
-                    <ul class="list-unstyled">
-                        {% for ref in bibliography_references %}
-                        <li>
-                            {% if ref.source %}
-                            <a href="{% url 'source-detail-modal' ref.source.pk %}"
-                               class="modal-link"
-                               title="{{ ref.source.title|default:ref.source.abbreviation }}">{{ ref.source.abbreviation|default:ref.source.title|default:"Source" }}</a>
-                            {% else %}
-                            {{ ref.title }}
-                            {% endif %}
-                            {% if ref.url %}
-                            <a href="{{ ref.url }}" target="_blank"><i class="bi bi-link-45deg"></i></a>
-                            {% endif %}
-                        </li>
-                        {% endfor %}
-                    </ul>
+        <h6 class="mb-3 mt-4">Bibliography</h6>
+        <ul class="list-unstyled">
+            {% for ref in bibliography_references %}
+                <li>
+                    {% if ref.source %}
+                        <a href="{% url 'source-detail-modal' ref.source.pk %}"
+                           class="modal-link"
+                           title="{{ ref.source.title|default:ref.source.abbreviation }}">{{ ref.source.abbreviation|default:ref.source.title|default:"Source" }}</a>
+                    {% else %}
+                        {{ ref.title }}
+                    {% endif %}
+                    {% if ref.url %}<a href="{{ ref.url }}" target="_blank"><i class="bi bi-link-45deg"></i></a>{% endif %}
+                </li>
+            {% endfor %}
+        </ul>
     {% endif %}
 {% endblock %}
