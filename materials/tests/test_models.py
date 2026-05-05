@@ -476,13 +476,57 @@ class MaterialPropertyValueTestCase(TestCase):
         self.assertEqual(value.related_sample, sample)
 
 
+class MaterialPropertyValueCleanTestCase(TestCase):
+    """Regression tests for MaterialPropertyValue.clean() unit validation (issue #100)."""
+
+    def setUp(self):
+        self.allowed_unit = Unit.objects.create(name="g/kg test")
+        self.other_unit = Unit.objects.create(name="mg/kg test")
+        self.prop_with_allowed = MaterialProperty.objects.create(
+            name="Nitrogen test", unit="g/kg test"
+        )
+        self.prop_with_allowed.allowed_units.add(self.allowed_unit)
+        self.prop_no_allowed = MaterialProperty.objects.create(
+            name="Free property test", unit="%"
+        )
+
+    def test_clean_raises_when_unit_not_in_allowed_units(self):
+        value = MaterialPropertyValue(
+            property=self.prop_with_allowed,
+            unit=self.other_unit,
+            average=Decimal("1.0"),
+        )
+        with self.assertRaises(ValidationError) as ctx:
+            value.clean()
+        self.assertIn("unit", ctx.exception.message_dict)
+
+    def test_clean_passes_when_unit_is_in_allowed_units(self):
+        value = MaterialPropertyValue(
+            property=self.prop_with_allowed,
+            unit=self.allowed_unit,
+            average=Decimal("1.0"),
+        )
+        # Should not raise
+        value.clean()
+
+    def test_clean_passes_when_property_has_no_allowed_units(self):
+        """If no allowed_units are configured, any unit is accepted."""
+        value = MaterialPropertyValue(
+            property=self.prop_no_allowed,
+            unit=self.other_unit,
+            average=Decimal("1.0"),
+        )
+        # Should not raise
+        value.clean()
+
+
 class ComponentMeasurementTestCase(TestCase):
     def test_display_standard_deviation_is_none_when_missing(self):
         material = Material.objects.create(name="Digestate")
         sample = Sample.objects.create(name="Sample", material=material)
         group = MaterialComponentGroup.objects.create(name="Chemical elements")
         component = MaterialComponent.objects.create(name="Carbon")
-        unit = Unit.objects.create(name="%")
+        unit, _ = Unit.objects.get_or_create(name="%")
         measurement = ComponentMeasurement.objects.create(
             sample=sample,
             group=group,

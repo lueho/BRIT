@@ -614,6 +614,21 @@ class MaterialPropertyValue(NumericMeasurementMixin, UserCreatedObject):
         blank=True,
     )
 
+    def clean(self):
+        super().clean()
+        if self.property_id and self.unit_id:
+            allowed = self.property.allowed_units.all()
+            if allowed.exists() and not allowed.filter(pk=self.unit_id).exists():
+                raise ValidationError(
+                    {
+                        "unit": (
+                            f"Unit '{self.unit}' is not allowed for property "
+                            f"'{self.property}'. "
+                            f"Allowed units: {', '.join(str(u) for u in allowed)}."
+                        )
+                    }
+                )
+
     def duplicate(self, creator, sample=None):
         duplicate = MaterialPropertyValue.objects.create(
             owner=creator,
