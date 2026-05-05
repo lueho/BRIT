@@ -221,6 +221,15 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.assertContains(response, "2.5 kg")
         self.assertContains(response, "Visible input note")
 
+    def test_detail_view_hides_additional_resources_without_links(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": self.published_object.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Additional Resources")
+
     def test_detail_view_links_bibliography_references_to_modal(self):
         source = Source.objects.create(
             title="Reference Title",

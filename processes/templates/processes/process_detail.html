@@ -150,9 +150,9 @@
     {% endif %}
 
     <!-- Links and Resources -->
-    {% if object.links.all or object.info_resources.all %}
+    {% if object.links.exists or object.info_resources.exists %}
         <h6 class="mb-3 mt-4">Additional Resources</h6>
-        {% if object.links.all %}
+        {% if object.links.exists %}
             <h6>Links</h6>
             <ul class="list-group mb-3">
                 {% for link in object.links.all %}
@@ -167,7 +167,7 @@
             </ul>
         {% endif %}
 
-        {% if object.info_resources.all %}
+        {% if object.info_resources.exists %}
             <h6>Information Resources</h6>
             <ul class="list-group">
                 {% for resource in object.info_resources.all %}
