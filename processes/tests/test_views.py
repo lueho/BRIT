@@ -78,6 +78,46 @@ class ProcessCategoryCRUDViewsTestCase(
         published_category.save()
         return published_category
 
+    def test_detail_shows_related_categories(self):
+        """Detail page should show categories connected through shared processes."""
+        process = Process.objects.create(
+            name="Shared process",
+            owner=self.owner_user,
+            publication_status="published",
+        )
+        related_category = ProcessCategory.objects.create(
+            name="Related Category",
+            owner=self.owner_user,
+            publication_status="published",
+        )
+        process.categories.add(self.published_object, related_category)
+
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": self.published_object.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Related Category")
+        self.assertContains(response, "Shared process")
+        self.assertIn(related_category, response.context["related_categories"])
+
+    def test_detail_shows_supplementary_pdf_download(self):
+        """Detail page should link the category supplementary PDF when present."""
+        self.published_object.supplementary_document = SimpleUploadedFile(
+            "category-summary.pdf",
+            b"%PDF-1.4 category summary",
+            content_type="application/pdf",
+        )
+        self.published_object.save()
+
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": self.published_object.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Download combined process information")
+        self.assertContains(response, "category-summary")
+
 
 class ProcessCategoryAutocompleteViewTestCase(ViewWithPermissionsTestCase):
     """Test ProcessCategory autocomplete view."""

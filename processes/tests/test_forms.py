@@ -36,6 +36,11 @@ class ProcessCategoryFormTestCase(TestCase):
         )
         self.assertTrue(form.is_valid())
 
+    def test_category_form_includes_supplementary_document(self):
+        """Category form should expose the supplementary PDF upload field."""
+        form = ProcessCategoryModelForm()
+        self.assertIn("supplementary_document", form.fields)
+
     def test_invalid_empty_name(self):
         """Empty name should be invalid."""
         form = ProcessCategoryModelForm(data={"name": "", "description": "Test"})

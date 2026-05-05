@@ -212,11 +212,19 @@ class ProcessCategoryDetailView(UserCreatedObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Get processes in this category
-        context["processes"] = (
+        processes = (
             self.object.processes.filter(publication_status="published")
             .select_related("owner")
             .prefetch_related("categories")
+        )
+        context["processes"] = processes
+        context["related_categories"] = (
+            ProcessCategory.objects.filter(processes__in=processes)
+            .exclude(pk=self.object.pk)
+            .filter(publication_status="published")
+            .distinct()
+            .annotate(process_count=Count("processes"))
+            .order_by("name")
         )
         return context
 

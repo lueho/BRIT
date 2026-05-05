@@ -37,7 +37,7 @@ from .models import (
 class ProcessCategoryModelForm(SimpleModelForm):
     class Meta:
         model = ProcessCategory
-        fields = ("name", "description")
+        fields = ("name", "description", "supplementary_document")
 
 
 class ProcessCategoryModalModelForm(ModalModelFormMixin, ProcessCategoryModelForm):

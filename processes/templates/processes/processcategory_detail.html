@@ -1,33 +1,73 @@
 {% extends "detail_with_options.html" %}
 
-{% block title %}BRIT | Process Category: {{ object.name }}{% endblock %}
+{% block title %}
+    BRIT | Process Category: {{ object.name }}
+{% endblock title %}
 
 {% block detail_body %}
     <dl class="row">
         <dt class="col-sm-3">Name</dt>
-        <dd class="col-sm-9">{{ object.name }}</dd>
+        <dd class="col-sm-9">
+            {{ object.name }}
+        </dd>
 
         <dt class="col-sm-3">Description</dt>
-        <dd class="col-sm-9">{{ object.description|default:"No description provided" }}</dd>
+        <dd class="col-sm-9">
+            {{ object.description|default:"No description provided" }}
+        </dd>
+
+        <dt class="col-sm-3">Supplementary PDF</dt>
+        <dd class="col-sm-9">
+            {% if object.supplementary_document %}
+                <a href="{{ object.supplementary_document.url }}"
+                   class="btn btn-outline-primary btn-sm"
+                   download>
+                    <i class="bi bi-file-earmark-pdf"></i> Download combined process information
+                </a>
+            {% else %}
+                <span class="text-muted">No supplementary PDF provided</span>
+            {% endif %}
+        </dd>
     </dl>
+
+    <hr class="my-4">
+
+    <h6 class="mb-3">Related Categories ({{ related_categories.count }})</h6>
+    {% if related_categories %}
+        <div class="list-group mb-4">
+            {% for category in related_categories %}
+                <a href="{% url 'processes:processcategory-detail' category.pk %}"
+                   class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">{{ category.name }}</h6>
+                        <small>{{ category.process_count }} process{{ category.process_count|pluralize:"es" }}</small>
+                    </div>
+                    <p class="mb-1">{{ category.description|default:"No description provided"|truncatewords:15 }}</p>
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-muted">No related categories found.</p>
+    {% endif %}
 
     <hr class="my-4">
 
     <h6 class="mb-3">Processes in This Category ({{ processes.count }})</h6>
     {% if processes %}
-    <div class="list-group">
-        {% for process in processes %}
-        <a href="{% url 'processes:process-detail' process.pk %}" class="list-group-item list-group-item-action">
-            <div class="d-flex w-100 justify-content-between">
-                <h6 class="mb-1">{{ process.name }}</h6>
-                <small>{{ process.mechanism }}</small>
-            </div>
-            <p class="mb-1">{{ process.short_description|truncatewords:15 }}</p>
-            <small class="text-muted">By {{ process.owner.username }}</small>
-        </a>
-        {% endfor %}
-    </div>
+        <div class="list-group">
+            {% for process in processes %}
+                <a href="{% url 'processes:process-detail' process.pk %}"
+                   class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">{{ process.name }}</h6>
+                        <small>{{ process.mechanism }}</small>
+                    </div>
+                    <p class="mb-1">{{ process.short_description|truncatewords:15 }}</p>
+                    <small class="text-muted">By {{ process.owner.username }}</small>
+                </a>
+            {% endfor %}
+        </div>
     {% else %}
-    <p class="text-muted">No processes in this category yet.</p>
+        <p class="text-muted">No processes in this category yet.</p>
     {% endif %}
-{% endblock %}
+{% endblock detail_body %}

@@ -78,6 +78,13 @@ class ProcessCategory(NamedUserCreatedObject):
     """High level grouping for processes (e.g. *Thermochemical*)."""
 
     url_format = "processes:{name_lower}-{action}{suffix}"
+    supplementary_document = models.FileField(
+        upload_to="processes/category_supplementary_documents/",
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(allowed_extensions=["pdf"])],
+        help_text="Optional supplementary PDF document with combined information for related processes.",
+    )
 
     class Meta:
         verbose_name = "Process category"
