@@ -88,6 +88,7 @@ class ProcessModelForm(SimpleModelForm):
             "description",
             "process_technology",
             "image",
+            "supplementary_document",
         )
         widgets = {
             "short_description": forms.Textarea(attrs={"rows": 2}),

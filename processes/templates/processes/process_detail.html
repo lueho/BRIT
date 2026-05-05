@@ -46,6 +46,16 @@
         </dl>
     </section>
 
+    {% if object.supplementary_document %}
+        <section class="mb-4">
+            <a href="{{ object.supplementary_document.url }}"
+               class="btn btn-outline-secondary"
+               download>
+                <i class="fas fa-file-pdf me-1"></i> Download supplementary document
+            </a>
+        </section>
+    {% endif %}
+
     <section class="mb-4">
         <dl class="row mb-0">
             {% if object.mechanism %}

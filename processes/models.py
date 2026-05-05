@@ -27,6 +27,7 @@ from decimal import Decimal
 from urllib.parse import urlparse
 
 from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -147,6 +148,13 @@ class Process(NamedUserCreatedObject):
         blank=True,
         null=True,
         help_text="Optional illustrative image for cards or detail views.",
+    )
+    supplementary_document = models.FileField(
+        upload_to="processes/supplementary_documents/",
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(allowed_extensions=["pdf"])],
+        help_text="Optional supplementary PDF document, such as a process flow sheet.",
     )
 
     class Meta:
