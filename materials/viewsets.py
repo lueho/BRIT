@@ -1,10 +1,4 @@
-from django.shortcuts import get_object_or_404
-from rest_framework.viewsets import ReadOnlyModelViewSet
-
-from utils.object_management.permissions import (
-    UserCreatedObjectPermission,
-    filter_queryset_for_user,
-)
+from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 from .filters import (
     CompositionFilterSet,
@@ -12,61 +6,89 @@ from .filters import (
     SampleFilterSet,
     SampleSeriesFilterSet,
 )
-from .models import Composition, Material, Sample, SampleSeries
+from .models import (
+    ComponentMeasurement,
+    Composition,
+    Material,
+    MaterialPropertyValue,
+    Sample,
+    SampleSeries,
+)
 from .serializers import (
+    ComponentMeasurementReadSerializer,
+    ComponentMeasurementWriteSerializer,
     CompositionAPISerializer,
+    CompositionWriteSerializer,
     MaterialAPISerializer,
+    MaterialPropertyValueReadSerializer,
+    MaterialPropertyValueWriteSerializer,
+    MaterialWriteSerializer,
     SampleAPISerializer,
     SampleSeriesAPISerializer,
+    SampleSeriesWriteSerializer,
+    SampleWriteSerializer,
 )
 
 
-class UserCreatedObjectReadOnlyViewSet(ReadOnlyModelViewSet):
-    """Read-only base viewset that enforces UserCreatedObject visibility rules.
-
-    list/retrieve are open to all users (including anonymous); the queryset
-    filter restricts what each user can actually see:
-    - staff: everything
-    - anonymous: published only
-    - authenticated: own objects + published
-    - authenticated moderator: own + published + review
-
-    Detail lookups fetch from the unfiltered base queryset and then enforce
-    object-level permissions, consistent with UserCreatedObjectViewSet.
-    """
-
-    permission_classes = [UserCreatedObjectPermission]
-
-    def get_queryset(self):
-        return filter_queryset_for_user(self.queryset, self.request.user)
-
-    def get_object(self):
-        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
-        lookup_value = self.kwargs.get(lookup_url_kwarg)
-        obj = get_object_or_404(self.queryset, **{self.lookup_field: lookup_value})
-        self.check_object_permissions(self.request, obj)
-        return obj
-
-
-class MaterialViewSet(UserCreatedObjectReadOnlyViewSet):
+class MaterialViewSet(UserCreatedObjectViewSet):
     queryset = Material.objects.all()
     serializer_class = MaterialAPISerializer
     filterset_class = MaterialFilterSet
 
+    def get_serializer_class(self):
+        if self.action in ("create", "update", "partial_update"):
+            return MaterialWriteSerializer
+        return MaterialAPISerializer
 
-class CompositionViewSet(UserCreatedObjectReadOnlyViewSet):
-    queryset = Composition.objects.all()
-    serializer_class = CompositionAPISerializer
-    filterset_class = CompositionFilterSet
+
+class SampleSeriesViewSet(UserCreatedObjectViewSet):
+    queryset = SampleSeries.objects.all()
+    serializer_class = SampleSeriesAPISerializer
+    filterset_class = SampleSeriesFilterSet
+
+    def get_serializer_class(self):
+        if self.action in ("create", "update", "partial_update"):
+            return SampleSeriesWriteSerializer
+        return SampleSeriesAPISerializer
 
 
-class SampleViewSet(UserCreatedObjectReadOnlyViewSet):
+class SampleViewSet(UserCreatedObjectViewSet):
     queryset = Sample.objects.all()
     serializer_class = SampleAPISerializer
     filterset_class = SampleFilterSet
 
+    def get_serializer_class(self):
+        if self.action in ("create", "update", "partial_update"):
+            return SampleWriteSerializer
+        return SampleAPISerializer
 
-class SampleSeriesViewSet(UserCreatedObjectReadOnlyViewSet):
-    queryset = SampleSeries.objects.all()
-    serializer_class = SampleSeriesAPISerializer
-    filterset_class = SampleSeriesFilterSet
+
+class CompositionViewSet(UserCreatedObjectViewSet):
+    queryset = Composition.objects.all()
+    serializer_class = CompositionAPISerializer
+    filterset_class = CompositionFilterSet
+
+    def get_serializer_class(self):
+        if self.action in ("create", "update", "partial_update"):
+            return CompositionWriteSerializer
+        return CompositionAPISerializer
+
+
+class ComponentMeasurementViewSet(UserCreatedObjectViewSet):
+    queryset = ComponentMeasurement.objects.all()
+    serializer_class = ComponentMeasurementReadSerializer
+
+    def get_serializer_class(self):
+        if self.action in ("create", "update", "partial_update"):
+            return ComponentMeasurementWriteSerializer
+        return ComponentMeasurementReadSerializer
+
+
+class MaterialPropertyValueViewSet(UserCreatedObjectViewSet):
+    queryset = MaterialPropertyValue.objects.all()
+    serializer_class = MaterialPropertyValueReadSerializer
+
+    def get_serializer_class(self):
+        if self.action in ("create", "update", "partial_update"):
+            return MaterialPropertyValueWriteSerializer
+        return MaterialPropertyValueReadSerializer

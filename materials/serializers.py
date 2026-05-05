@@ -1,17 +1,20 @@
 from rest_framework.serializers import (
     HyperlinkedRelatedField,
     ModelSerializer,
+    PrimaryKeyRelatedField,
     ReadOnlyField,
     SerializerMethodField,
     StringRelatedField,
 )
 
+from bibliography.models import Source
 from bibliography.serializers import SourceAbbreviationSerializer
 from distributions.models import TemporalDistribution
 from utils.properties.serializers import NumericMeasurementSerializerMixin
 
 from .composition_normalization import get_sample_normalized_compositions
 from .models import (
+    ComponentMeasurement,
     Composition,
     Material,
     MaterialPropertyValue,
@@ -303,3 +306,158 @@ class SampleSeriesAPISerializer(ModelSerializer):
     class Meta:
         model = SampleSeries
         fields = ("material", "samples")
+
+
+# ----------- Write (mutation) serializers -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class MaterialWriteSerializer(ModelSerializer):
+    class Meta:
+        model = Material
+        fields = (
+            "id",
+            "name",
+            "abbreviation",
+            "categories",
+            "description",
+        )
+
+
+class SampleSeriesWriteSerializer(ModelSerializer):
+    class Meta:
+        model = SampleSeries
+        fields = (
+            "id",
+            "name",
+            "material",
+            "description",
+            "image",
+            "publish",
+            "standard",
+        )
+
+
+class SampleWriteSerializer(ModelSerializer):
+    # sources is a M2M field without blank=True on the model; make it optional
+    # in the API so callers can add sources later.
+    sources = PrimaryKeyRelatedField(
+        many=True,
+        queryset=Source.objects.all(),
+        required=False,
+    )
+
+    class Meta:
+        model = Sample
+        fields = (
+            "id",
+            "name",
+            "material",
+            "series",
+            "standalone",
+            "timestep",
+            "datetime",
+            "location",
+            "analysis_date",
+            "analysis_laboratory",
+            "lab_accreditation",
+            "analysis_objective",
+            "sources",
+            "description",
+            "image",
+        )
+
+
+class CompositionWriteSerializer(ModelSerializer):
+    class Meta:
+        model = Composition
+        fields = (
+            "id",
+            "sample",
+            "group",
+            "fractions_of",
+            "order",
+        )
+
+
+class ComponentMeasurementReadSerializer(ModelSerializer):
+    component = StringRelatedField()
+    group = StringRelatedField()
+    basis_component = StringRelatedField()
+    analytical_method = StringRelatedField()
+    unit = StringRelatedField()
+    sources = SourceAbbreviationSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ComponentMeasurement
+        fields = (
+            "id",
+            "sample",
+            "group",
+            "component",
+            "basis_component",
+            "analytical_method",
+            "sources",
+            "unit",
+            "average",
+            "standard_deviation",
+            "sample_size",
+            "comment",
+        )
+
+
+class ComponentMeasurementWriteSerializer(ModelSerializer):
+    class Meta:
+        model = ComponentMeasurement
+        fields = (
+            "id",
+            "sample",
+            "group",
+            "component",
+            "basis_component",
+            "analytical_method",
+            "sources",
+            "unit",
+            "average",
+            "standard_deviation",
+            "sample_size",
+            "comment",
+        )
+
+
+class MaterialPropertyValueReadSerializer(ModelSerializer):
+    property = StringRelatedField()
+    basis_component = StringRelatedField()
+    analytical_method = StringRelatedField()
+    unit = StringRelatedField()
+    sources = SourceAbbreviationSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = MaterialPropertyValue
+        fields = (
+            "id",
+            "sample",
+            "property",
+            "basis_component",
+            "analytical_method",
+            "sources",
+            "unit",
+            "average",
+            "standard_deviation",
+        )
+
+
+class MaterialPropertyValueWriteSerializer(ModelSerializer):
+    class Meta:
+        model = MaterialPropertyValue
+        fields = (
+            "id",
+            "sample",
+            "property",
+            "basis_component",
+            "analytical_method",
+            "sources",
+            "unit",
+            "average",
+            "standard_deviation",
+        )
