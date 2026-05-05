@@ -9,12 +9,10 @@
 {% endblock detail_header %}
 {% block detail_top_image %}
   {% if object.image %}
-    <div class="card-img-top">
-      <img class="w-100 m-0"
+    <div class="card-img-top detail-uploaded-image-frame">
+      <img class="detail-uploaded-image"
            src="{{ object.image.url }}"
-           alt="Image of {{ object.material.name }}"
-           width="1200"
-           height="300">
+           alt="Image of {{ object.material.name }}">
     </div>
   {% endif %}
 {% endblock detail_top_image %}
