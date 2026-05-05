@@ -133,6 +133,7 @@ class Process(NamedUserCreatedObject):
         permissions = [
             ("can_moderate_process", "Can moderate processes"),
         ]
+        verbose_name_plural = "Processes"
 
     @property
     def sources(self):
