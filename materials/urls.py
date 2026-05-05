@@ -593,11 +593,6 @@ urlpatterns = [
         name="derived-composition-order-down",
     ),
     path(
-        "materialcomponentgroups/settings/<int:pk>/add_source/",
-        views.AddSourceView.as_view(),
-        name="add_source",
-    ),
-    path(
         "materialcomponentgroups/settings/<int:pk>/add_seasonal_variation/",
         views.AddSeasonalVariationView.as_view(),
         name="add_seasonal_variation",

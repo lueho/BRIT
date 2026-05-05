@@ -2923,6 +2923,95 @@ class AddCompositionViewTestCase(ViewWithPermissionsTestCase):
             Composition.objects.get(sample=sample, group=self.component_group)
 
 
+class SampleAddCompositionViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = "add_composition"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        material = Material.objects.create(name="Test Material for Sample Composition")
+        cls.component_group = MaterialComponentGroup.objects.create(
+            name="Test Group for Sample Composition"
+        )
+        series = SampleSeries.objects.create(
+            owner=cls.member, name="Test Series", material=material
+        )
+        cls.sample = Sample.objects.create(
+            owner=cls.member, series=series, material=material
+        )
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse("sample-add-composition", kwargs={"pk": self.sample.pk})
+        response = self.client.get(url)
+        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(
+            reverse("sample-add-composition", kwargs={"pk": self.sample.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("sample-add-composition", kwargs={"pk": self.sample.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_does_not_crash_when_get_sample_called_multiple_times(self):
+        # Regression test for #102: get_sample() was non-idempotent and returned
+        # None on the second call (from get_initial()), causing the form to crash.
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("sample-add-composition", kwargs={"pk": self.sample.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'type="submit"')
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse("sample-add-composition", kwargs={"pk": self.sample.pk})
+        response = self.client.post(url)
+        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(
+            reverse("sample-add-composition", kwargs={"pk": self.sample.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_success_and_http_302_redirect_for_members(self):
+        self.client.force_login(self.member)
+        data = {
+            "sample": self.sample.pk,
+            "group": self.component_group.pk,
+            "fractions_of": MaterialComponent.objects.default().pk,
+        }
+        response = self.client.post(
+            reverse("sample-add-composition", kwargs={"pk": self.sample.pk}), data
+        )
+        self.assertRedirects(
+            response, reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+    def test_post_creates_composition_for_sample(self):
+        self.client.force_login(self.member)
+        data = {
+            "sample": self.sample.pk,
+            "group": self.component_group.pk,
+            "fractions_of": MaterialComponent.objects.default().pk,
+        }
+        self.client.post(
+            reverse("sample-add-composition", kwargs={"pk": self.sample.pk}), data
+        )
+        self.assertTrue(
+            Composition.objects.filter(
+                sample=self.sample, group=self.component_group
+            ).exists()
+        )
+
+
 class EmptyStateViewsTestCase(TestCase):
     """Test empty state messaging and CTAs across Materials views."""
 

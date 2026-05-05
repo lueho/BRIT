@@ -9,7 +9,6 @@ from django_tomselect.forms import (
     TomSelectModelChoiceField,
 )
 
-from bibliography.models import Source
 from distributions.models import TemporalDistribution
 from utils.forms import (
     CreateEnabledTomSelectModelChoiceField,
@@ -500,13 +499,6 @@ class AddCompositionModalForm(ModalModelForm):
             ]
         )
         self.fields["fractions_of"].empty_label = None
-
-
-class AddLiteratureSourceForm(ModalForm):
-    source = ModelChoiceField(queryset=Source.objects.all(), label="Reference")
-
-    class Meta:
-        fields = ("source",)
 
 
 class AddSeasonalVariationForm(ModalForm):

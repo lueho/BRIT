@@ -67,7 +67,6 @@ from .filters import (
 )
 from .forms import (
     AddCompositionModalForm,
-    AddLiteratureSourceForm,
     AddSeasonalVariationForm,
     AnalyticalMethodModelForm,
     ComponentGroupModalModelForm,
@@ -1312,6 +1311,7 @@ class UserOwnedSampleAutoCompleteView(SampleAutocompleteView):
 class SampleAddCompositionView(UserCreatedObjectCreateView):
     sample = None
     form_class = SampleAddCompositionForm
+    permission_required = "materials.add_composition"
 
     def get_initial(self):
         self.sample = self.get_sample()
@@ -1326,8 +1326,7 @@ class SampleAddCompositionView(UserCreatedObjectCreateView):
     def get_sample(self):
         if not self.sample:
             self.sample = Sample.objects.get(pk=self.kwargs.get("pk"))
-            return self.sample
-        return None
+        return self.sample
 
     def get_success_url(self):
         return reverse("sample-detail", kwargs={"pk": self.kwargs.get("pk")})
@@ -1582,33 +1581,6 @@ class AddCompositionView(
 
 
 # For removal of component groups use CompositionModalDeleteView
-
-
-class AddSourceView(
-    LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalFormView
-):
-    form_class = AddLiteratureSourceForm
-    template_name = "modal_form.html"
-
-    def get_object(self):
-        return Composition.objects.get(id=self.kwargs.get("pk"))
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "form_title": "Select a reference to add",
-                "submit_button_text": "Add",
-            }
-        )
-        return context
-
-    def form_valid(self, form):
-        self.get_object().sources.add(form.cleaned_data["source"])
-        return HttpResponseRedirect(self.get_success_url())
-
-    def get_success_url(self):
-        return self.get_object().get_absolute_url()
 
 
 class AddSeasonalVariationView(
