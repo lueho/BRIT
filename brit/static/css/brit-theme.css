@@ -8712,8 +8712,7 @@ body {
 .detail-uploaded-image-frame {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
   background-color: var(--bs-tertiary-bg);
 }
 
@@ -8723,8 +8722,6 @@ body {
   max-height: min(45vh, 28rem);
   width: auto;
   height: auto;
-  margin-right: auto;
-  margin-left: auto;
   object-fit: contain;
 }
 
