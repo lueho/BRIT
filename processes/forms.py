@@ -3,14 +3,14 @@
 import types
 
 from django import forms
+from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.forms import (
-    TomSelectConfig,
     TomSelectModelChoiceField,
     TomSelectModelMultipleChoiceField,
 )
 from extra_views import InlineFormSetFactory
 
-from bibliography.models import Source
+from bibliography.models import Author, Source
 from materials.models import Material
 from utils.forms import (
     DynamicTableInlineFormSetHelper,
@@ -64,6 +64,15 @@ class ProcessModelForm(SimpleModelForm):
         config=TomSelectConfig(url="processes:processcategory-autocomplete"),
         label="Categories",
     )
+    author = TomSelectModelChoiceField(
+        queryset=Author.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="author-autocomplete",
+            label_field="label",
+        ),
+        label="Author",
+    )
 
     class Meta:
         model = Process
@@ -71,7 +80,7 @@ class ProcessModelForm(SimpleModelForm):
             "name",
             "parent",
             "categories",
-            "author_name",
+            "author",
             "author_institution",
             "contact_email",
             "short_description",
@@ -90,7 +99,7 @@ class ProcessModelForm(SimpleModelForm):
         super().__init__(*args, **kwargs)
         # Override TomSelect field validation to use queryset instead of URL endpoint
         # This fixes form validation in tests while maintaining autocomplete in production
-        for field_name in ["parent", "categories"]:
+        for field_name in ["parent", "categories", "author"]:
             field = self.fields[field_name]
 
             # Override validation methods to use queryset

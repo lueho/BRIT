@@ -30,7 +30,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from bibliography.models import Source
+from bibliography.models import Author, Source
 from materials.models import Material
 from utils.object_management.models import NamedUserCreatedObject
 from utils.properties.models import Unit
@@ -110,10 +110,13 @@ class Process(NamedUserCreatedObject):
         blank=True,
         help_text="One sentence summary used in cards and list views.",
     )
-    author_name = models.CharField(
-        max_length=255,
+    author = models.ForeignKey(
+        Author,
+        on_delete=models.PROTECT,
         blank=True,
-        help_text="Author or contributor name shown on the process detail page.",
+        null=True,
+        related_name="processes",
+        help_text="Author or contributor shown on the process detail page.",
     )
     author_institution = models.CharField(
         max_length=255,

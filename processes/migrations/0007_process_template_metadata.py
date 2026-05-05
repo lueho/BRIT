@@ -1,8 +1,10 @@
+import django.db.models.deletion
 from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
     dependencies = [
+        ("bibliography", "0009_rename_source_bibtex_fields"),
         ("processes", "0006_alter_process_publication_status_and_more"),
     ]
 
@@ -28,11 +30,14 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name="process",
-            name="author_name",
-            field=models.CharField(
+            name="author",
+            field=models.ForeignKey(
                 blank=True,
-                help_text="Author or contributor name shown on the process detail page.",
-                max_length=255,
+                help_text="Author or contributor shown on the process detail page.",
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name="processes",
+                to="bibliography.author",
             ),
         ),
         migrations.AddField(

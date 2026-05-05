@@ -12,9 +12,9 @@
     <section class="mb-4">
         <h5 class="text-uppercase mb-2">{{ object.name }}</h5>
 
-        {% if object.author_name or object.author_institution or object.contact_email %}
+        {% if object.author or object.author_institution or object.contact_email %}
             <div class="text-muted mb-3">
-                {% if object.author_name %}<div>{{ object.author_name }}</div>{% endif %}
+                {% if object.author %}<div>{{ object.author }}</div>{% endif %}
                 {% if object.author_institution %}<div>{{ object.author_institution }}</div>{% endif %}
                 {% if object.contact_email %}
                     <div>

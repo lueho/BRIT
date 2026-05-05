@@ -38,11 +38,12 @@ class ProcessReferenceInline(admin.TabularInline):
 
 @admin.register(Process)
 class ProcessAdmin(admin.ModelAdmin):
-    list_display = ("name", "author_name", "owner", "parent", "publication_status")
+    list_display = ("name", "author", "owner", "parent", "publication_status")
     list_filter = ("categories", "publication_status")
     search_fields = (
         "name",
-        "author_name",
+        "author__first_names",
+        "author__last_names",
         "author_institution",
         "contact_email",
         "short_description",
