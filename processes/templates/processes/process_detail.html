@@ -96,6 +96,10 @@
                                 <strong>
                                     <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
                                 </strong>
+                                {% if pm.quantity_value %}
+                                    <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
+                                {% endif %}
+                                {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes }}</p>{% endif %}
                             </li>
                         {% endfor %}
                     </ul>
@@ -111,6 +115,10 @@
                                 <strong>
                                     <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
                                 </strong>
+                                {% if pm.quantity_value %}
+                                    <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
+                                {% endif %}
+                                {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes }}</p>{% endif %}
                             </li>
                         {% endfor %}
                     </ul>

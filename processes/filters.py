@@ -42,16 +42,11 @@ class ProcessCategoryFilter(django_filters.FilterSet):
 class ProcessFilter(UserCreatedObjectScopedFilterSet):
     """Filter for Process list views with comprehensive search options."""
 
-    name = django_filters.ModelChoiceFilter(
-        queryset=Process.objects.none(),
-        field_name="name",
+    name = django_filters.CharFilter(
+        lookup_expr="icontains",
         label="Process Name",
-        empty_label="All",
-        widget=TomSelectModelWidget(
-            config=TomSelectConfig(
-                url="processes:process-autocomplete",
-                filter_by=("scope", "name"),
-            )
+        widget=forms.TextInput(
+            attrs={"class": "form-control", "placeholder": "Search by name..."}
         ),
     )
 
@@ -156,9 +151,16 @@ class ProcessFilter(UserCreatedObjectScopedFilterSet):
                 category_queryset, scope_value, user=getattr(request, "user", None)
             )
 
-        self.filters["name"].queryset = queryset
-        self.filters["parent"].queryset = queryset.filter(parent__isnull=True)
+        parent_qs = queryset.filter(parent__isnull=True)
+        self.filters["parent"].queryset = parent_qs
         self.filters["categories"].queryset = category_queryset
+
+        # The form may already be instantiated (e.g. by _apply_shared_field_visibility
+        # accessing self.form). Sync ModelChoiceFilter querysets to the form fields so
+        # validation uses the correct queryset regardless of instantiation order.
+        if "_form" in self.__dict__ and self._form is not None:
+            self._form.fields["parent"].queryset = parent_qs
+            self._form.fields["categories"].queryset = category_queryset
 
     def filter_by_input_material(self, queryset, name, value):
         """Filter processes that have a specific material as input."""

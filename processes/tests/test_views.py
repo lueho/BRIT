@@ -99,6 +99,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
     modal_detail_view = True
     modal_create_view = True
+    add_scope_query_param_to_list_urls = True
 
     model = Process
 
