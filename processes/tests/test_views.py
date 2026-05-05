@@ -12,7 +12,13 @@ from materials.models import Material
 from utils.properties.models import Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
-from ..models import Process, ProcessCategory, ProcessMaterial, ProcessReference
+from ..models import (
+    Process,
+    ProcessCategory,
+    ProcessInfoResource,
+    ProcessMaterial,
+    ProcessReference,
+)
 
 
 class ProcessDashboardViewTestCase(ViewWithPermissionsTestCase):
@@ -229,6 +235,23 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Additional Resources")
+
+    def test_detail_view_does_not_show_additional_resources_for_info_resource(self):
+        ProcessInfoResource.objects.create(
+            process=self.published_object,
+            title="Process flow chart",
+            resource_type=ProcessInfoResource.ResourceType.EXTERNAL,
+            url="https://example.com/process-flow-chart.pdf",
+        )
+        self.client.force_login(self.owner_user)
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": self.published_object.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Additional Resources")
+        self.assertContains(response, "Information Resources")
+        self.assertContains(response, "Process flow chart")
 
     def test_detail_view_links_bibliography_references_to_modal(self):
         source = Source.objects.create(

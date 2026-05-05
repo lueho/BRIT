@@ -150,35 +150,32 @@
     {% endif %}
 
     <!-- Links and Resources -->
-    {% if process_links or process_info_resources %}
-        <h6 class="mb-3 mt-4">Additional Resources</h6>
-        {% if process_links %}
-            <h6>Links</h6>
-            <ul class="list-group mb-3">
-                {% for link in process_links %}
-                    <li class="list-group-item">
-                        <a href="{{ link.url }}"
-                           {% if link.open_in_new_tab %}target="_blank"{% endif %}>
-                            {{ link.label }}
-                            {% if link.open_in_new_tab %}<i class="bi bi-box-arrow-up-right"></i>{% endif %}
-                        </a>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% endif %}
+    {% if process_links %}
+        <h6 class="mb-3 mt-4">Links</h6>
+        <ul class="list-group mb-3">
+            {% for link in process_links %}
+                <li class="list-group-item">
+                    <a href="{{ link.url }}"
+                       {% if link.open_in_new_tab %}target="_blank"{% endif %}>
+                        {{ link.label }}
+                        {% if link.open_in_new_tab %}<i class="bi bi-box-arrow-up-right"></i>{% endif %}
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
 
-        {% if process_info_resources %}
-            <h6>Information Resources</h6>
-            <ul class="list-group">
-                {% for resource in process_info_resources %}
-                    <li class="list-group-item">
-                        <strong>{{ resource.title }}</strong> ({{ resource.get_resource_type_display }})
-                        {% if resource.description %}<p class="mb-0">{{ resource.description }}</p>{% endif %}
-                        <a href="{{ resource.target_url }}">View Resource</a>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% endif %}
+    {% if process_info_resources %}
+        <h6 class="mb-3 mt-4">Information Resources</h6>
+        <ul class="list-group">
+            {% for resource in process_info_resources %}
+                <li class="list-group-item">
+                    <strong>{{ resource.title }}</strong> ({{ resource.get_resource_type_display }})
+                    {% if resource.description %}<p class="mb-0">{{ resource.description }}</p>{% endif %}
+                    <a href="{{ resource.target_url }}">View Resource</a>
+                </li>
+            {% endfor %}
+        </ul>
     {% endif %}
 
     <!-- Variants (Child Processes) -->
