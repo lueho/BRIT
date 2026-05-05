@@ -3,10 +3,13 @@
 Comprehensive tests for all CRUD views following BRIT testing patterns.
 """
 
+from decimal import Decimal
+
 from django.urls import reverse
 
 from bibliography.models import Source
 from materials.models import Material
+from utils.properties.models import Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
 from ..models import Process, ProcessCategory, ProcessMaterial, ProcessReference
@@ -189,6 +192,24 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
             self.skipTest("Detail view is not enabled for this test case.")
 
         process = self.published_object
+        material = Material.objects.create(
+            name="Display Feedstock",
+            owner=self.owner_user,
+            publication_status="published",
+        )
+        unit = Unit.objects.create(
+            name="kg",
+            owner=self.owner_user,
+            publication_status="published",
+        )
+        ProcessMaterial.objects.create(
+            process=process,
+            material=material,
+            role=ProcessMaterial.Role.INPUT,
+            quantity_value=Decimal("2.5000"),
+            quantity_unit=unit,
+            notes="Visible input note",
+        )
         self.client.force_login(self.owner_user)
         response = self.client.get(
             reverse(self.view_detail_name, kwargs={"pk": process.pk})
@@ -196,6 +217,9 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, process.name)
+        self.assertContains(response, "Display Feedstock")
+        self.assertContains(response, "2.5 kg")
+        self.assertContains(response, "Visible input note")
 
     def test_detail_view_links_bibliography_references_to_modal(self):
         source = Source.objects.create(

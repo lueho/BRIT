@@ -393,8 +393,12 @@ class ProcessDetailView(UserCreatedObjectDetailView):
         context = super().get_context_data(**kwargs)
 
         # Organize materials by role
-        context["input_materials"] = self.object.input_materials
-        context["output_materials"] = self.object.output_materials
+        context["input_materials"] = self.object._material_links_for_role(
+            ProcessMaterial.Role.INPUT
+        )
+        context["output_materials"] = self.object._material_links_for_role(
+            ProcessMaterial.Role.OUTPUT
+        )
 
         # Group parameters by type
         params_by_type = {}
