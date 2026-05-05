@@ -110,10 +110,28 @@ class Process(NamedUserCreatedObject):
         blank=True,
         help_text="One sentence summary used in cards and list views.",
     )
+    author_name = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Author or contributor name shown on the process detail page.",
+    )
+    author_institution = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Institutional affiliation for the process author.",
+    )
+    contact_email = models.EmailField(
+        blank=True,
+        help_text="Contact email address for the process author.",
+    )
     mechanism = models.CharField(
         max_length=255,
         blank=True,
         help_text="Dominant conversion mechanism (e.g. fermentation, pyrolysis).",
+    )
+    process_technology = models.TextField(
+        blank=True,
+        help_text="Technology description, equipment, and process conditions.",
     )
     materials = models.ManyToManyField(
         Material,

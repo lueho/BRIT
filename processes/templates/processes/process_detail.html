@@ -10,8 +10,21 @@
     {% endif %}
 
     <section class="mb-4">
-        <h5 class="text-uppercase mb-3">{{ object.name }}</h5>
-        <p class="lead mb-3">{{ object.short_description|default:"No description" }}</p>
+        <h5 class="text-uppercase mb-2">{{ object.name }}</h5>
+
+        {% if object.author_name or object.author_institution or object.contact_email %}
+            <div class="text-muted mb-3">
+                {% if object.author_name %}<div>{{ object.author_name }}</div>{% endif %}
+                {% if object.author_institution %}<div>{{ object.author_institution }}</div>{% endif %}
+                {% if object.contact_email %}
+                    <div>
+                        <a href="mailto:{{ object.contact_email }}">{{ object.contact_email }}</a>
+                    </div>
+                {% endif %}
+            </div>
+        {% endif %}
+
+        <p class="lead mb-3">{{ object.short_description|default:"No short description" }}</p>
 
         <dl class="row mb-0">
             {% if object.parent %}
@@ -34,39 +47,61 @@
     </section>
 
     <section class="mb-4">
-        <div class="row g-3">
+        <dl class="row mb-0">
             {% if object.mechanism %}
-                <div class="col-md-6 col-xl-4">
-                    <div class="border rounded p-3 h-100">
-                        <div class="text-uppercase text-muted small">Mechanism</div>
-                        <div>{{ object.mechanism }}</div>
-                    </div>
-                </div>
+                <dt class="col-sm-3 text-uppercase">Mechanism</dt>
+                <dd class="col-sm-9">
+                    {{ object.mechanism }}
+                </dd>
             {% endif %}
-            {% for param in object.operating_parameters.all %}
-                <div class="col-md-6 col-xl-4">
-                    <div class="border rounded p-3 h-100">
-                        <div class="text-uppercase text-muted small">{{ param.name|default:param.get_parameter_display }}</div>
-                        <div>
-                            {% if param.nominal_value %}
-                                {{ param.get_nominal_value_display }}
-                            {% elif param.value_min or param.value_max %}
-                                {{ param.get_value_min_display|default:"-" }} – {{ param.get_value_max_display|default:"-" }}
-                            {% else %}
-                                -
-                            {% endif %}
-                            {% if param.unit %}{{ param.unit.name }}{% endif %}
-                        </div>
-                        {% if param.basis %}<div class="text-muted small">{{ param.basis }}</div>{% endif %}
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
+
+            {% if operating_parameters %}
+                <dt class="col-sm-3 text-uppercase">Operating parameters</dt>
+                <dd class="col-sm-9">
+                    <ul class="list-unstyled mb-0">
+                        {% for param in operating_parameters %}
+                            <li>
+                                <strong>{{ param.name|default:param.get_parameter_display }}:</strong>
+                                {% if param.nominal_value %}
+                                    {{ param.get_nominal_value_display }}
+                                {% elif param.value_min or param.value_max %}
+                                    {{ param.get_value_min_display|default:"-" }} – {{ param.get_value_max_display|default:"-" }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                                {% if param.unit %}{{ param.unit.name }}{% endif %}
+                                {% if param.basis %}<span class="text-muted">({{ param.basis }})</span>{% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </dd>
+            {% endif %}
+
+            {% if parameters_by_type.Yield %}
+                <dt class="col-sm-3 text-uppercase">Yield</dt>
+                <dd class="col-sm-9">
+                    <ul class="list-unstyled mb-0">
+                        {% for param in parameters_by_type.Yield %}
+                            <li>
+                                {% if param.nominal_value %}
+                                    {{ param.get_nominal_value_display }}
+                                {% elif param.value_min or param.value_max %}
+                                    {{ param.get_value_min_display|default:"-" }} – {{ param.get_value_max_display|default:"-" }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                                {% if param.unit %}{{ param.unit.name }}{% endif %}
+                                {% if param.notes %}<span class="text-muted">— {{ param.notes }}</span>{% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </dd>
+            {% endif %}
+        </dl>
     </section>
 
-    <!-- Input Materials -->
     {% if input_materials %}
-        <h6 class="mb-3">Input</h6>
+        <h6 class="mb-3 text-uppercase">Input</h6>
         <div class="table-responsive">
             <table class="table table-sm table-fixed">
                 <colgroup>
@@ -108,9 +143,8 @@
         </div>
     {% endif %}
 
-    <!-- Output Materials -->
     {% if output_materials %}
-        <h6 class="mb-3 mt-4">Output</h6>
+        <h6 class="mb-3 mt-4 text-uppercase">Output</h6>
         <div class="table-responsive">
             <table class="table table-sm table-fixed">
                 <colgroup>
@@ -155,6 +189,11 @@
     {% if object.description %}
         <h6 class="mt-4">Description</h6>
         <div>{{ object.description|linebreaks }}</div>
+    {% endif %}
+
+    {% if object.process_technology %}
+        <h6 class="mt-4 text-uppercase">Process Technology</h6>
+        <div>{{ object.process_technology|linebreaks }}</div>
     {% endif %}
 
     <!-- Links and Resources -->

@@ -71,14 +71,19 @@ class ProcessModelForm(SimpleModelForm):
             "name",
             "parent",
             "categories",
+            "author_name",
+            "author_institution",
+            "contact_email",
             "short_description",
             "mechanism",
             "description",
+            "process_technology",
             "image",
         )
         widgets = {
             "short_description": forms.Textarea(attrs={"rows": 2}),
             "description": forms.Textarea(attrs={"rows": 6}),
+            "process_technology": forms.Textarea(attrs={"rows": 6}),
         }
 
     def __init__(self, *args, **kwargs):
