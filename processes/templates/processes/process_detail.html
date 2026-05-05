@@ -150,12 +150,12 @@
     {% endif %}
 
     <!-- Links and Resources -->
-    {% if object.links.exists or object.info_resources.exists %}
+    {% if process_links or process_info_resources %}
         <h6 class="mb-3 mt-4">Additional Resources</h6>
-        {% if object.links.exists %}
+        {% if process_links %}
             <h6>Links</h6>
             <ul class="list-group mb-3">
-                {% for link in object.links.all %}
+                {% for link in process_links %}
                     <li class="list-group-item">
                         <a href="{{ link.url }}"
                            {% if link.open_in_new_tab %}target="_blank"{% endif %}>
@@ -167,10 +167,10 @@
             </ul>
         {% endif %}
 
-        {% if object.info_resources.exists %}
+        {% if process_info_resources %}
             <h6>Information Resources</h6>
             <ul class="list-group">
-                {% for resource in object.info_resources.all %}
+                {% for resource in process_info_resources %}
                     <li class="list-group-item">
                         <strong>{{ resource.title }}</strong> ({{ resource.get_resource_type_display }})
                         {% if resource.description %}<p class="mb-0">{{ resource.description }}</p>{% endif %}
@@ -182,10 +182,10 @@
     {% endif %}
 
     <!-- Variants (Child Processes) -->
-    {% if object.variants.all %}
+    {% if process_variants %}
         <h6 class="mb-3 mt-4">Process Variants</h6>
         <ul class="list-group">
-            {% for variant in object.variants.all %}
+            {% for variant in process_variants %}
                 <li class="list-group-item">
                     <a href="{% url 'processes:process-detail' variant.pk %}">{{ variant.name }}</a>
                 </li>

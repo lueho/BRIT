@@ -413,6 +413,9 @@ class ProcessDetailView(UserCreatedObjectDetailView):
             for param in self.object.operating_parameters.all()
             if param.parameter != ProcessOperatingParameter.Parameter.YIELD
         ]
+        context["process_links"] = list(self.object.links.all())
+        context["process_info_resources"] = list(self.object.info_resources.all())
+        context["process_variants"] = list(self.object.variants.all())
         context["bibliography_references"] = sorted(
             self.object.references.all(),
             key=lambda ref: (
