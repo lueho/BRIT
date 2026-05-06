@@ -415,6 +415,18 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
                 error_message="Could not create substrate.",
             )
 
+    def clean(self):
+        cleaned_data = super().clean()
+        standalone = cleaned_data.get("standalone", False)
+        series = cleaned_data.get("series")
+        if not standalone and series is None:
+            self.add_error(
+                "series",
+                "A series is required when the sample is not standalone. "
+                "Either assign a series or check 'Standalone'.",
+            )
+        return cleaned_data
+
     class Meta:
         model = Sample
         fields = (
@@ -424,6 +436,7 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             "datetime",
             "location",
             "description",
+            "standalone",
             "series",
             "timestep",
             "sources",

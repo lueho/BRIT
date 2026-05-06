@@ -625,6 +625,26 @@ class SampleTestCase(TestCase):
 
         self.assertIn(raw_component, self.sample.components)
 
+    def test_clean_raises_when_not_standalone_and_no_series(self):
+        material = Material.objects.get(name="Test Material")
+        sample = Sample(material=material, standalone=False, series=None)
+        with self.assertRaises(ValidationError) as ctx:
+            sample.clean()
+        self.assertIn("series", ctx.exception.message_dict)
+
+    def test_clean_passes_when_not_standalone_and_series_provided(self):
+        material = Material.objects.get(name="Test Material")
+        series = SampleSeries.objects.get(name="Test Series")
+        sample = Sample(material=material, standalone=False, series=series)
+        # Should not raise
+        sample.clean()
+
+    def test_clean_passes_when_standalone_and_no_series(self):
+        material = Material.objects.get(name="Test Material")
+        sample = Sample(material=material, standalone=True, series=None)
+        # Should not raise
+        sample.clean()
+
 
 class CompositionTestCase(TestCase):
     @classmethod

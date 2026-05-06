@@ -1856,8 +1856,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     allow_create_for_any_authenticated_user = True
     add_scope_query_param_to_list_urls = True
 
-    create_object_data = {"name": "Test Sample"}
-    update_object_data = {"name": "Updated Test Sample"}
+    create_object_data = {"name": "Test Sample", "standalone": True}
+    update_object_data = {"name": "Updated Test Sample", "standalone": True}
 
     @classmethod
     def create_related_objects(cls):

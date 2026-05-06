@@ -769,6 +769,18 @@ class Sample(NamedUserCreatedObject):
             return "series"
         return None
 
+    def clean(self):
+        super().clean()
+        if not self.standalone and self.series_id is None:
+            raise ValidationError(
+                {
+                    "series": (
+                        "A series is required when the sample is not standalone. "
+                        "Either assign a series or mark the sample as standalone."
+                    )
+                }
+            )
+
     def duplicate(self, creator, **kwargs):
         post_save.disconnect(add_default_composition, sender=Sample)
         duplicate = Sample.objects.create(
