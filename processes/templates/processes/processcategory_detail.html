@@ -54,17 +54,33 @@
 
     <h6 class="mb-3">Processes in This Category ({{ processes.count }})</h6>
     {% if processes %}
-        <div class="list-group">
+        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
             {% for process in processes %}
-                <a href="{% url 'processes:process-detail' process.pk %}"
-                   class="list-group-item list-group-item-action">
-                    <div class="d-flex w-100 justify-content-between">
-                        <h6 class="mb-1">{{ process.name }}</h6>
-                        <small>{{ process.mechanism }}</small>
-                    </div>
-                    <p class="mb-1">{{ process.short_description|truncatewords:15 }}</p>
-                    <small class="text-muted">By {{ process.owner.username }}</small>
-                </a>
+                <div class="col">
+                    <a href="{% url 'processes:process-detail' process.pk %}"
+                       class="card h-100 text-decoration-none text-reset">
+                        {% if process.image %}
+                            <img src="{{ process.image.url }}"
+                                 class="card-img-top"
+                                 alt="{{ process.name }}"
+                                 style="height: 12rem;
+                                        object-fit: cover">
+                        {% else %}
+                            <div class="card-img-top bg-light d-flex align-items-center justify-content-center text-muted"
+                                 style="height: 12rem">
+                                <i class="fas fa-industry fa-3x"></i>
+                            </div>
+                        {% endif %}
+                        <div class="card-body">
+                            <div class="d-flex w-100 justify-content-between gap-2">
+                                <h6 class="card-title mb-1">{{ process.name }}</h6>
+                                {% if process.mechanism %}<small class="text-muted">{{ process.mechanism }}</small>{% endif %}
+                            </div>
+                            <p class="card-text text-muted mb-2">{{ process.short_description|truncatewords:15 }}</p>
+                            <small class="text-muted">By {{ process.owner.username }}</small>
+                        </div>
+                    </a>
+                </div>
             {% endfor %}
         </div>
     {% else %}

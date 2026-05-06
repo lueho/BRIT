@@ -118,6 +118,30 @@ class ProcessCategoryCRUDViewsTestCase(
         self.assertContains(response, "Download combined process information")
         self.assertContains(response, "category-summary")
 
+    def test_detail_shows_process_gallery_with_images(self):
+        """Detail page should display category processes as image cards."""
+        process = Process.objects.create(
+            name="Illustrated process",
+            owner=self.owner_user,
+            publication_status="published",
+            image=SimpleUploadedFile(
+                "process-image.jpg",
+                b"image content",
+                content_type="image/jpeg",
+            ),
+        )
+        process.categories.add(self.published_object)
+
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": self.published_object.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "row-cols-md-2")
+        self.assertContains(response, "card-img-top")
+        self.assertContains(response, "process-image")
+        self.assertContains(response, 'alt="Illustrated process"')
+
 
 class ProcessCategoryAutocompleteViewTestCase(ViewWithPermissionsTestCase):
     """Test ProcessCategory autocomplete view."""
