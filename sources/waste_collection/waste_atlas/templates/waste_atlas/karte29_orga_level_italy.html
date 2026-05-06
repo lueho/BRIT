@@ -9,8 +9,8 @@
       loadingId:   'loading-overlay',
       country:     '{{ country }}',
       year:        parseInt('{{ year }}', 10) || 2024,
-      nutsPrefix:  'ITH1',
-      nutsLevel:   2,
+      {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
+      {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
       title:       'Administrative level of waste collection',
       dataUrl:     '/waste_collection/api/waste-atlas/orga-level/',
       dataField:   'orga_level',

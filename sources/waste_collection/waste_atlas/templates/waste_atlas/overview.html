@@ -187,38 +187,78 @@
       <div class="col-md-6 col-lg-4">
         <div class="card mb-3">
           <div class="card-header">
+            <strong>Italy</strong>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-orga-level-italy-map' %}">Map 29 — Administrative level of waste collection (Italy, EN)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-italy-collection-system-map' %}">Karte 2 — Küchenabfall-Sammelsysteme (Italy, 2024)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-italy-green-waste-collection-system-count-map' %}">Karte 21 — Anzahl Grüngut-Sammelsysteme (Italy, 2024)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-italy-residual-frequency-map' %}">Karte 8 — Sammelrhythmus Restmüll (Italy, 2024)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-italy-biowaste-frequency-map' %}">Karte 9 — Sammelrhythmus Bioabfall (Italy, 2024)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-italy-residual-collection-amount-map' %}">Karte 17 — Restmüll-Sammelmengen (Italy, 2024)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-italy-biowaste-collection-amount-map' %}">Karte 18 — Bioabfall-Sammelmengen (Italy, 2024)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-italy-green-waste-collection-amount-map' %}">Karte 22 — Grüngut-Sammelmengen (Italy, 2024)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-italy-organic-collection-amount-map' %}">Karte 27 — Aggregierte organische Sammelmenge (Italy, 2024)</a>
+            </li>
+            <li class="list-group-item">
+              <a href="{% url 'waste-atlas-italy-organic-waste-ratio-map' %}">Karte 28 — Anteil organischer Fraktionen (Italy, 2024)</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="card mb-3">
+          <div class="card-header">
             <strong>South Tyrol</strong>
           </div>
           <ul class="list-group list-group-flush">
             <li class="list-group-item">
-              <a href="{% url 'waste-atlas-orga-level-italy-map' %}">Map 29 — Administrative level of waste collection (South Tyrol, EN)</a>
+              <a href="{% url 'waste-atlas-south-tyrol-orga-level-map' %}">Map 29a — Administrative level of waste collection (South Tyrol, EN)</a>
             </li>
             <li class="list-group-item">
-              <a href="{% url 'waste-atlas-collection-system-map' %}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10">Karte 2 — Küchenabfall-Sammelsysteme (Südtirol, 2024)</a>
+              <a href="{% url 'waste-atlas-south-tyrol-collection-system-map' %}">Karte 2a — Küchenabfall-Sammelsysteme (Südtirol, 2024)</a>
             </li>
             <li class="list-group-item">
-              <a href="{% url 'waste-atlas-green-waste-collection-system-count-map' %}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10">Karte 21 — Anzahl Grüngut-Sammelsysteme (Südtirol, 2024)</a>
+              <a href="{% url 'waste-atlas-south-tyrol-green-waste-collection-system-count-map' %}">Karte 21a — Anzahl Grüngut-Sammelsysteme (Südtirol, 2024)</a>
             </li>
             <li class="list-group-item">
-              <a href="{% url 'waste-atlas-residual-frequency-map' %}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10">Karte 8 — Sammelrhythmus Restmüll (Südtirol, 2024)</a>
+              <a href="{% url 'waste-atlas-south-tyrol-residual-frequency-map' %}">Karte 8a — Sammelrhythmus Restmüll (Südtirol, 2024)</a>
             </li>
             <li class="list-group-item">
-              <a href="{% url 'waste-atlas-biowaste-frequency-map' %}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10">Karte 9 — Sammelrhythmus Bioabfall (Südtirol, 2024)</a>
+              <a href="{% url 'waste-atlas-south-tyrol-biowaste-frequency-map' %}">Karte 9a — Sammelrhythmus Bioabfall (Südtirol, 2024)</a>
             </li>
             <li class="list-group-item">
-              <a href="{% url 'waste-atlas-residual-collection-amount-map' %}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10">Karte 17 — Restmüll-Sammelmengen (Südtirol, 2024)</a>
+              <a href="{% url 'waste-atlas-south-tyrol-residual-collection-amount-map' %}">Karte 17a — Restmüll-Sammelmengen (Südtirol, 2024)</a>
             </li>
             <li class="list-group-item">
-              <a href="{% url 'waste-atlas-biowaste-collection-amount-map' %}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10">Karte 18 — Bioabfall-Sammelmengen (Südtirol, 2024)</a>
+              <a href="{% url 'waste-atlas-south-tyrol-biowaste-collection-amount-map' %}">Karte 18a — Bioabfall-Sammelmengen (Südtirol, 2024)</a>
             </li>
             <li class="list-group-item">
-              <a href="{% url 'waste-atlas-green-waste-collection-amount-map' %}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10">Karte 22 — Grüngut-Sammelmengen (Südtirol, 2024)</a>
+              <a href="{% url 'waste-atlas-south-tyrol-green-waste-collection-amount-map' %}">Karte 22a — Grüngut-Sammelmengen (Südtirol, 2024)</a>
             </li>
             <li class="list-group-item">
-              <a href="{% url 'waste-atlas-organic-collection-amount-map' %}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10">Karte 27 — Aggregierte organische Sammelmenge (Südtirol, 2024)</a>
+              <a href="{% url 'waste-atlas-south-tyrol-organic-collection-amount-map' %}">Karte 27a — Aggregierte organische Sammelmenge (Südtirol, 2024)</a>
             </li>
             <li class="list-group-item">
-              <a href="{% url 'waste-atlas-organic-waste-ratio-map' %}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10">Karte 28 — Anteil organischer Fraktionen (Südtirol, 2024)</a>
+              <a href="{% url 'waste-atlas-south-tyrol-organic-waste-ratio-map' %}">Karte 28a — Anteil organischer Fraktionen (Südtirol, 2024)</a>
             </li>
           </ul>
         </div>

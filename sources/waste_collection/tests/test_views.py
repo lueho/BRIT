@@ -3991,7 +3991,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.client.force_login(self.user)
 
     def test_italy_orga_level_map_defaults_to_it_and_english_labels(self):
-        """South Tyrol orga-level map defaults to country IT and English text."""
         response = self.client.get(reverse("waste-atlas-orga-level-italy-map"))
 
         self.assertEqual(response.status_code, 200)
@@ -3999,13 +3998,25 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "Administrative level of waste collection")
         self.assertContains(response, "Map overview")
         self.assertContains(response, "No data")
-        self.assertContains(response, "nutsPrefix:  'ITH1'")
-        self.assertContains(response, "nutsLevel:   2")
+        self.assertNotContains(response, "nutsPrefix:")
+        self.assertNotContains(response, "nutsLevel:")
+
+    def test_south_tyrol_orga_level_map_uses_regional_border(self):
+        response = self.client.get(reverse("waste-atlas-south-tyrol-orga-level-map"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="IT" selected')
+        self.assertContains(response, 'value="2024" selected')
+        self.assertContains(response, "Administrative level of waste collection")
+        self.assertContains(response, "Map overview")
+        self.assertContains(response, "nutsPrefix: 'ITH10'")
+        self.assertContains(response, "nutsLevel: parseInt('2', 10)")
 
     def test_country_specific_orga_level_maps_default_to_expected_country(self):
         """Country-specific orga-level maps default to expected country and year."""
         map_defaults = {
             "waste-atlas-orga-level-italy-map": ("IT", "2024"),
+            "waste-atlas-south-tyrol-orga-level-map": ("IT", "2024"),
             "waste-atlas-orga-level-sweden-map": ("SE", "2024"),
             "waste-atlas-orga-level-denmark-map": ("DK", "2023"),
             "waste-atlas-orga-level-netherlands-map": ("NL", "2024"),
@@ -4045,6 +4056,29 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertContains(response, expected_title)
                 self.assertContains(response, "Map overview")
 
+    def test_italy_bundle_maps_default_to_it_without_regional_filter(self):
+        map_names = [
+            "waste-atlas-italy-collection-system-map",
+            "waste-atlas-italy-green-waste-collection-system-count-map",
+            "waste-atlas-italy-residual-frequency-map",
+            "waste-atlas-italy-biowaste-frequency-map",
+            "waste-atlas-italy-residual-collection-amount-map",
+            "waste-atlas-italy-biowaste-collection-amount-map",
+            "waste-atlas-italy-green-waste-collection-amount-map",
+            "waste-atlas-italy-organic-collection-amount-map",
+            "waste-atlas-italy-organic-waste-ratio-map",
+        ]
+
+        for url_name in map_names:
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name))
+
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'value="IT" selected')
+                self.assertContains(response, 'value="2024" selected')
+                self.assertNotContains(response, "nutsPrefix:")
+                self.assertContains(response, "Map overview")
+
     def test_italy_orga_level_map_allows_country_override(self):
         """Italy orga-level map still allows overriding country via query param."""
         response = self.client.get(
@@ -4065,6 +4099,29 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, 'value="IT" selected')
         self.assertContains(response, 'value="2024" selected')
         self.assertContains(response, "nutsPrefix: 'ITH10'")
+
+    def test_south_tyrol_bundle_maps_default_to_regional_filter(self):
+        map_names = [
+            "waste-atlas-south-tyrol-collection-system-map",
+            "waste-atlas-south-tyrol-green-waste-collection-system-count-map",
+            "waste-atlas-south-tyrol-residual-frequency-map",
+            "waste-atlas-south-tyrol-biowaste-frequency-map",
+            "waste-atlas-south-tyrol-residual-collection-amount-map",
+            "waste-atlas-south-tyrol-biowaste-collection-amount-map",
+            "waste-atlas-south-tyrol-green-waste-collection-amount-map",
+            "waste-atlas-south-tyrol-organic-collection-amount-map",
+            "waste-atlas-south-tyrol-organic-waste-ratio-map",
+        ]
+
+        for url_name in map_names:
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name))
+
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'value="IT" selected')
+                self.assertContains(response, 'value="2024" selected')
+                self.assertContains(response, "nutsPrefix: 'ITH10'")
+                self.assertContains(response, "Map overview")
 
     def test_sweden_bin_configuration_map_defaults_to_se_2023_and_english_labels(self):
         """Sweden bin-configuration map defaults to country SE and year 2023."""
@@ -4138,27 +4195,51 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, reverse("waste-atlas-orga-level-italy-map"))
         self.assertContains(
             response,
-            "Map 29 — Administrative level of waste collection (South Tyrol, EN)",
+            "Map 29 — Administrative level of waste collection (Italy, EN)",
+        )
+        self.assertContains(
+            response, reverse("waste-atlas-italy-collection-system-map")
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-collection-system-map')}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10",
+            reverse("waste-atlas-italy-green-waste-collection-system-count-map"),
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-green-waste-collection-system-count-map')}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10",
+            reverse("waste-atlas-italy-biowaste-collection-amount-map"),
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-biowaste-collection-amount-map')}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10",
+            reverse("waste-atlas-italy-green-waste-collection-amount-map"),
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-green-waste-collection-amount-map')}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10",
+            reverse("waste-atlas-italy-organic-waste-ratio-map"),
+        )
+        self.assertContains(response, reverse("waste-atlas-south-tyrol-orga-level-map"))
+        self.assertContains(
+            response,
+            "Map 29a — Administrative level of waste collection (South Tyrol, EN)",
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-organic-waste-ratio-map')}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10",
+            reverse("waste-atlas-south-tyrol-collection-system-map"),
+        )
+        self.assertContains(
+            response,
+            reverse("waste-atlas-south-tyrol-green-waste-collection-system-count-map"),
+        )
+        self.assertContains(
+            response,
+            reverse("waste-atlas-south-tyrol-biowaste-collection-amount-map"),
+        )
+        self.assertContains(
+            response,
+            reverse("waste-atlas-south-tyrol-green-waste-collection-amount-map"),
+        )
+        self.assertContains(
+            response,
+            reverse("waste-atlas-south-tyrol-organic-waste-ratio-map"),
         )
         self.assertContains(response, reverse("waste-atlas-orga-level-sweden-map"))
         self.assertContains(
