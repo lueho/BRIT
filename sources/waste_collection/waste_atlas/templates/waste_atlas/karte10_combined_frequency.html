@@ -10,6 +10,7 @@
       country:     '{{ country }}',
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
+      {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
       title:       'Sammelrhythmus in Kombination (Bio × Rest)',
       dataUrl:     '/waste_collection/api/waste-atlas/combined-frequency-type/',
       dataField:   '_classified',

@@ -175,7 +175,7 @@ class SouthTyrolAtlasMapView(AtlasMapView):
     default_country = "IT"
     default_year = "2024"
     default_nuts_prefix = "ITH10"
-    default_nuts_level = "2"
+    default_nuts_level = "3"
     map_overview_label = "Map overview"
 
 

@@ -10,6 +10,7 @@
       country:     '{{ country }}',
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
+      {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
       title:       'Anzahl Grüngut-Sammelsysteme pro Einzugsgebiet',
       dataUrl:     '/waste_collection/api/waste-atlas/green-waste-collection-system-count/',
       dataField:   'collection_system_count',

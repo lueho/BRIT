@@ -4010,7 +4010,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "Administrative level of waste collection")
         self.assertContains(response, "Map overview")
         self.assertContains(response, "nutsPrefix: 'ITH10'")
-        self.assertContains(response, "nutsLevel: parseInt('2', 10)")
+        self.assertContains(response, "nutsLevel: parseInt('3', 10)")
 
     def test_country_specific_orga_level_maps_default_to_expected_country(self):
         """Country-specific orga-level maps default to expected country and year."""
@@ -4077,6 +4077,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertContains(response, 'value="IT" selected')
                 self.assertContains(response, 'value="2024" selected')
                 self.assertNotContains(response, "nutsPrefix:")
+                self.assertNotContains(response, "nutsLevel:")
                 self.assertContains(response, "Map overview")
 
     def test_italy_orga_level_map_allows_country_override(self):
@@ -4121,6 +4122,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertContains(response, 'value="IT" selected')
                 self.assertContains(response, 'value="2024" selected')
                 self.assertContains(response, "nutsPrefix: 'ITH10'")
+                self.assertContains(response, "nutsLevel: parseInt('3', 10)")
                 self.assertContains(response, "Map overview")
 
     def test_sweden_bin_configuration_map_defaults_to_se_2023_and_english_labels(self):
