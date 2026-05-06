@@ -6,12 +6,14 @@
         <br>
         {{ object.name }}
     </p>
-    {% if object.unit %}
-        <p class="card-text">
-            <strong>Unit:</strong>
-            {{ object.unit }}
-        </p>
-    {% endif %}
+    {% with units=object.allowed_units.all %}
+        {% if units %}
+            <p class="card-text">
+                <strong>Unit:</strong>
+                {% for unit in units %}{{ unit.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+            </p>
+        {% endif %}
+    {% endwith %}
     {% if object.description %}
         <p class="card-text">
             <strong>Description:</strong>

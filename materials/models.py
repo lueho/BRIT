@@ -558,7 +558,11 @@ class MaterialProperty(PropertyBase):
         return property_obj
 
     def __str__(self):
-        return f"{self.name} [{self.unit}]"
+        units = self.allowed_units.all()
+        unit_labels = ", ".join(u.name for u in units) if units else ""
+        if unit_labels:
+            return f"{self.name} [{unit_labels}]"
+        return self.name
 
 
 class MaterialPropertyGroup(NamedUserCreatedObject):

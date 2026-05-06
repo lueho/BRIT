@@ -23,11 +23,13 @@ class NumericMeasurementMixin:
     @staticmethod
     def _should_round_to_one_decimal(property_name):
         normalized = (property_name or "").strip().lower()
-        return normalized.startswith((
-            "connection rate",
-            "specific waste collected",
-            "total waste collected",
-        ))
+        return normalized.startswith(
+            (
+                "connection rate",
+                "specific waste collected",
+                "total waste collected",
+            )
+        )
 
     def get_measurement_property(self):
         return getattr(self, self.measurement_property_field, None)
@@ -94,7 +96,7 @@ class PropertyBase(NamedUserCreatedObject):
     ownership model, naming contract, and measurement helpers centralized.
     """
 
-    unit = models.CharField(max_length=63)
+    unit = models.CharField(max_length=63, blank=True, default="")
 
     class Meta:
         abstract = True
