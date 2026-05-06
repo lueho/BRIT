@@ -9,6 +9,7 @@
       loadingId:   'loading-overlay',
       country:     '{{ country }}',
       year:        parseInt('{{ year }}', 10) || 2024,
+      {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       title:       'Sammelrhythmus-Arten der Entsorger zur Restmüllabholung',
       dataUrl:     '/waste_collection/api/waste-atlas/residual-frequency-type/',
       dataField:   'frequency_type',

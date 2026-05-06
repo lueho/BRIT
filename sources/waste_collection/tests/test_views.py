@@ -4055,6 +4055,17 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="DE" selected')
 
+    def test_generic_map_forwards_nuts_prefix_to_atlas_loader(self):
+        response = self.client.get(
+            reverse("waste-atlas-green-waste-collection-system-count-map"),
+            {"country": "IT", "year": "2024", "nuts_prefix": "ITH10"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="IT" selected')
+        self.assertContains(response, 'value="2024" selected')
+        self.assertContains(response, "nutsPrefix: 'ITH10'")
+
     def test_sweden_bin_configuration_map_defaults_to_se_2023_and_english_labels(self):
         """Sweden bin-configuration map defaults to country SE and year 2023."""
         response = self.client.get(reverse("waste-atlas-bin-configuration-sweden-map"))
@@ -4128,6 +4139,26 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(
             response,
             "Map 29 — Administrative level of waste collection (South Tyrol, EN)",
+        )
+        self.assertContains(
+            response,
+            f"{reverse('waste-atlas-collection-system-map')}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10",
+        )
+        self.assertContains(
+            response,
+            f"{reverse('waste-atlas-green-waste-collection-system-count-map')}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10",
+        )
+        self.assertContains(
+            response,
+            f"{reverse('waste-atlas-biowaste-collection-amount-map')}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10",
+        )
+        self.assertContains(
+            response,
+            f"{reverse('waste-atlas-green-waste-collection-amount-map')}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10",
+        )
+        self.assertContains(
+            response,
+            f"{reverse('waste-atlas-organic-waste-ratio-map')}?country=IT&amp;year=2024&amp;nuts_prefix=ITH10",
         )
         self.assertContains(response, reverse("waste-atlas-orga-level-sweden-map"))
         self.assertContains(

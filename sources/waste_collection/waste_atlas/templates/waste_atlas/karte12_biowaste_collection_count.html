@@ -9,6 +9,7 @@
       loadingId:   'loading-overlay',
       country:     '{{ country }}',
       year:        parseInt('{{ year }}', 10) || 2024,
+      {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       title:       'Sammelhäufigkeit der Bioabfallabholungen',
       dataUrl:     '/waste_collection/api/waste-atlas/biowaste-collection-count/',
       dataField:   '_classified',

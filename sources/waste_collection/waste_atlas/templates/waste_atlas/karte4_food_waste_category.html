@@ -9,6 +9,7 @@
       loadingId:   'loading-overlay',
       country:     '{{ country }}',
       year:        parseInt('{{ year }}', 10) || 2024,
+      {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       title:       'Erlaubte Lebensmittelabfälle im Bioabfall',
       dataUrl:     '/waste_collection/api/waste-atlas/food-waste-category/',
       dataField:   'food_waste_category',

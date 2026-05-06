@@ -9,6 +9,7 @@
       loadingId:   'loading-overlay',
       country:     '{{ country }}',
       year:        parseInt('{{ year }}', 10) || 2023,
+      {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       title:       'Bin configuration of waste fractions',
       dataUrl:     '/waste_collection/api/waste-atlas/bin-configuration/',
       dataField:   'bin_configuration',
