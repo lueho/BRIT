@@ -498,11 +498,13 @@ class BreadcrumbContractFallbackPrecedenceTests(SimpleTestCase):
 
     def test_contract_module_label_wins_over_legacy_title_fallback(self):
         rail = self._extract_breadcrumb_rail(
-            self._render_base_breadcrumbs({
-                "breadcrumb_module_label": "Bibliography",
-                "breadcrumb_module_url": "/bibliography/",
-                "title": "Should Not Appear In Breadcrumb",
-            })
+            self._render_base_breadcrumbs(
+                {
+                    "breadcrumb_module_label": "Bibliography",
+                    "breadcrumb_module_url": "/bibliography/",
+                    "title": "Should Not Appear In Breadcrumb",
+                }
+            )
         )
 
         self.assertInHTML(
@@ -513,13 +515,15 @@ class BreadcrumbContractFallbackPrecedenceTests(SimpleTestCase):
 
     def test_contract_action_label_wins_over_legacy_header_fallback(self):
         rail = self._extract_breadcrumb_rail(
-            self._render_base_breadcrumbs({
-                "breadcrumb_module_label": "Bibliography",
-                "breadcrumb_section_label": "Authors",
-                "breadcrumb_action_label": "Create",
-                "header": "Legacy Header Should Not Leak",
-                "title": "Legacy Title Should Not Leak",
-            })
+            self._render_base_breadcrumbs(
+                {
+                    "breadcrumb_module_label": "Bibliography",
+                    "breadcrumb_section_label": "Authors",
+                    "breadcrumb_action_label": "Create",
+                    "header": "Legacy Header Should Not Leak",
+                    "title": "Legacy Title Should Not Leak",
+                }
+            )
         )
 
         self.assertInHTML(
@@ -614,6 +618,14 @@ class ErrorPageBreadcrumbTests(SimpleTestCase):
 
         self.assertIn("BRIT | 500 - Server Error", html)
         self.assertNotIn("page-breadcrumb-rail", html)
+
+    def test_production_settings_do_not_propagate_500_exceptions(self):
+        settings_path = Path(settings.BASE_DIR) / "brit" / "settings" / "heroku.py"
+
+        self.assertNotIn(
+            "DEBUG_PROPAGATE_EXCEPTIONS = True",
+            settings_path.read_text(encoding="utf-8"),
+        )
 
 
 class StickyFilterOffsetAssetTests(SimpleTestCase):
