@@ -3,7 +3,7 @@
 Provides RESTful API endpoints for all process-related models.
 """
 
-from django.db.models import Count, Prefetch
+from django.db.models import Prefetch
 from rest_framework import filters, permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -14,6 +14,7 @@ from .models import (
     ProcessMaterial,
     ProcessOperatingParameter,
 )
+from .querysets import with_published_process_count
 from .serializers import (
     ProcessCategorySerializer,
     ProcessDetailSerializer,
@@ -36,7 +37,7 @@ class ProcessCategoryViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Annotate with process counts."""
         queryset = super().get_queryset()
-        return queryset.annotate(process_count=Count("processes"))
+        return with_published_process_count(queryset)
 
     @action(detail=True, methods=["get"])
     def processes(self, request, pk=None):

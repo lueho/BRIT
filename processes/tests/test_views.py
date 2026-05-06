@@ -142,6 +142,27 @@ class ProcessCategoryCRUDViewsTestCase(
         self.assertContains(response, "process-image")
         self.assertContains(response, 'alt="Illustrated process"')
 
+    def test_list_shows_published_process_count(self):
+        """Category list should count published processes assigned to the category."""
+        published_process = Process.objects.create(
+            name="Published category process",
+            owner=self.owner_user,
+            publication_status="published",
+        )
+        private_process = Process.objects.create(
+            name="Private category process",
+            owner=self.owner_user,
+            publication_status="private",
+        )
+        published_process.categories.add(self.published_object)
+        private_process.categories.add(self.published_object)
+
+        response = self.client.get(reverse(self.view_published_list_name))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Published Test Category")
+        self.assertContains(response, "1 process")
+
 
 class ProcessCategoryAutocompleteViewTestCase(ViewWithPermissionsTestCase):
     """Test ProcessCategory autocomplete view."""

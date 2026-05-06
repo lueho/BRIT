@@ -5,7 +5,7 @@ BRIT conventions and patterns from utils.object_management.views.
 """
 
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Count, Prefetch
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, TemplateView
@@ -53,6 +53,7 @@ from .models import (
     ProcessOperatingParameter,
     ProcessReference,
 )
+from .querysets import with_published_process_count
 
 # Temporary mock data for backward compatibility with closecycle module
 # TODO: Remove when closecycle is updated to use real Process model
@@ -123,11 +124,9 @@ class ProcessDashboardView(BreadcrumbContextMixin, TemplateView):
         )
 
         # Categories with process counts
-        context["categories_with_counts"] = (
+        context["categories_with_counts"] = with_published_process_count(
             ProcessCategory.objects.filter(publication_status="published")
-            .annotate(process_count=Count("processes"))
-            .order_by("-process_count")[:10]
-        )
+        ).order_by("-process_count")[:10]
 
         # User's private processes if authenticated
         if self.request.user.is_authenticated:
@@ -175,7 +174,7 @@ class ProcessCategoryPublishedListView(PublishedObjectListView):
     paginate_by = 20
 
     def get_queryset(self):
-        return super().get_queryset().annotate(process_count=Count("processes"))
+        return with_published_process_count(super().get_queryset())
 
 
 class ProcessCategoryPrivateListView(PrivateObjectListView):
@@ -188,7 +187,7 @@ class ProcessCategoryPrivateListView(PrivateObjectListView):
     paginate_by = 20
 
     def get_queryset(self):
-        return super().get_queryset().annotate(process_count=Count("processes"))
+        return with_published_process_count(super().get_queryset())
 
 
 class ProcessCategoryReviewListView(ReviewObjectListView):
@@ -201,7 +200,7 @@ class ProcessCategoryReviewListView(ReviewObjectListView):
     paginate_by = 20
 
     def get_queryset(self):
-        return super().get_queryset().annotate(process_count=Count("processes"))
+        return with_published_process_count(super().get_queryset())
 
 
 class ProcessCategoryDetailView(UserCreatedObjectDetailView):
@@ -218,14 +217,12 @@ class ProcessCategoryDetailView(UserCreatedObjectDetailView):
             .prefetch_related("categories")
         )
         context["processes"] = processes
-        context["related_categories"] = (
+        context["related_categories"] = with_published_process_count(
             ProcessCategory.objects.filter(processes__in=processes)
             .exclude(pk=self.object.pk)
             .filter(publication_status="published")
             .distinct()
-            .annotate(process_count=Count("processes"))
-            .order_by("name")
-        )
+        ).order_by("name")
         return context
 
 
