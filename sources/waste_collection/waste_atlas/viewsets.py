@@ -10,6 +10,7 @@ from django.db.models import (
     F,
     FloatField,
     OuterRef,
+    Q,
     Subquery,
     Value,
     When,
@@ -187,6 +188,15 @@ def _parse_nuts_prefixes(request):
     return [p.strip() for p in raw.split(",") if p.strip()]
 
 
+def _country_filter_q(catchment_path, country):
+    prefix = catchment_path
+    return (
+        Q(**{f"{prefix}region__country": country})
+        | Q(**{f"{prefix}parent__region__country": country})
+        | Q(**{f"{prefix}parent__parent__region__country": country})
+    )
+
+
 def _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path=""):
     """Narrow a queryset to catchments whose NUTS ancestry matches any prefix.
 
@@ -201,19 +211,21 @@ def _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path=""):
     if not nuts_prefixes:
         return qs
 
-    from django.db.models import Q
-
     prefix_q = Q()
     for prefix in nuts_prefixes:
-        prefix_q |= Q(**{
-            f"{catchment_path}region__nutsregion__nuts_id__startswith": prefix
-        })
-        prefix_q |= Q(**{
-            f"{catchment_path}parent__region__nutsregion__nuts_id__startswith": prefix
-        })
-        prefix_q |= Q(**{
-            f"{catchment_path}parent__parent__region__nutsregion__nuts_id__startswith": prefix
-        })
+        prefix_q |= Q(
+            **{f"{catchment_path}region__nutsregion__nuts_id__startswith": prefix}
+        )
+        prefix_q |= Q(
+            **{
+                f"{catchment_path}parent__region__nutsregion__nuts_id__startswith": prefix
+            }
+        )
+        prefix_q |= Q(
+            **{
+                f"{catchment_path}parent__parent__region__nutsregion__nuts_id__startswith": prefix
+            }
+        )
     return qs.filter(prefix_q)
 
 
@@ -248,8 +260,8 @@ class CatchmentViewSet(viewsets.ReadOnlyModelViewSet):
         nuts_prefixes = _parse_nuts_prefixes(self.request)
         qs = (
             CollectionCatchment.objects.filter(
+                _country_filter_q("", country),
                 collections__valid_from__year=year,
-                region__country=country,
                 region__borders__isnull=False,
             )
             .distinct()
@@ -304,8 +316,8 @@ class OrgaLevelViewSet(viewsets.ViewSet):
 
         qs = (
             CollectionCatchment.objects.filter(
+                _country_filter_q("", country),
                 collections__valid_from__year=year,
-                region__country=country,
             )
             .distinct()
             .annotate(
@@ -353,8 +365,8 @@ class CollectionSystemViewSet(viewsets.ViewSet):
 
         qs = _filter_by_waste_categories(
             Collection.objects.filter(
+                _country_filter_q("catchment__", country),
                 valid_from__year=year,
-                catchment__region__country=country,
             ),
             ["Biowaste", "Food waste"],
         )
@@ -393,8 +405,8 @@ class BinConfigurationViewSet(viewsets.ViewSet):
 
         qs = _filter_by_waste_categories(
             Collection.objects.filter(
+                _country_filter_q("catchment__", country),
                 valid_from__year=year,
-                catchment__region__country=country,
             ),
             ["Biowaste", "Food waste"],
         )
@@ -444,8 +456,8 @@ class GreenWasteCollectionSystemCountViewSet(viewsets.ViewSet):
         nuts_prefixes = _parse_nuts_prefixes(request)
         qs = _filter_by_waste_categories(
             Collection.objects.filter(
+                _country_filter_q("catchment__", country),
                 valid_from__year=year,
-                catchment__region__country=country,
             ),
             _GREEN_WASTE_CATEGORY_NAMES,
         )
@@ -492,8 +504,8 @@ def _get_material_status(country, year, material_id, nuts_prefixes=()):
     # Step 1: pick primary bio/food waste collection per catchment
     qs = _filter_by_waste_categories(
         Collection.objects.filter(
+            _country_filter_q("catchment__", country),
             valid_from__year=year,
-            catchment__region__country=country,
         ),
         ["Biowaste", "Food waste"],
     )
@@ -548,8 +560,8 @@ def _get_collection_count(country, year, waste_categories, nuts_prefixes=()):
     """
     qs = _filter_by_waste_categories(
         Collection.objects.filter(
+            _country_filter_q("catchment__", country),
             valid_from__year=year,
-            catchment__region__country=country,
             collection_system__name="Door to door",
             frequency__isnull=False,
         ),
@@ -570,11 +582,13 @@ def _get_collection_count(country, year, waste_categories, nuts_prefixes=()):
 
     data = []
     for cid, options in catchment_options.items():
-        data.append({
-            "catchment_id": cid,
-            "collection_count": sum(options),
-            "has_seasonal_variation": len(set(options)) > 1,
-        })
+        data.append(
+            {
+                "catchment_id": cid,
+                "collection_count": sum(options),
+                "has_seasonal_variation": len(set(options)) > 1,
+            }
+        )
     return data
 
 
@@ -586,8 +600,8 @@ def _get_frequency_type(country, year, waste_categories, nuts_prefixes=()):
     """
     qs = _filter_by_waste_categories(
         Collection.objects.filter(
+            _country_filter_q("catchment__", country),
             valid_from__year=year,
-            catchment__region__country=country,
         ),
         waste_categories,
     )
@@ -660,11 +674,13 @@ class CombinedFrequencyTypeViewSet(viewsets.ViewSet):
         all_ids = set(bio) | set(res)
         data = []
         for cid in all_ids:
-            data.append({
-                "catchment_id": cid,
-                "bio_frequency": bio.get(cid, "no_data"),
-                "residual_frequency": res.get(cid, "no_data"),
-            })
+            data.append(
+                {
+                    "catchment_id": cid,
+                    "bio_frequency": bio.get(cid, "no_data"),
+                    "residual_frequency": res.get(cid, "no_data"),
+                }
+            )
         serializer = CatchmentCombinedFrequencySerializer(data, many=True)
         return Response(serializer.data)
 
@@ -733,8 +749,8 @@ class BiowasteCollectionCountViewSet(viewsets.ViewSet):
         # Include non-door-to-door biowaste catchments.
         all_bio_qs = _filter_by_waste_categories(
             Collection.objects.filter(
+                _country_filter_q("catchment__", country),
                 valid_from__year=year,
-                catchment__region__country=country,
             ),
             ["Biowaste", "Food waste"],
         )
@@ -750,11 +766,13 @@ class BiowasteCollectionCountViewSet(viewsets.ViewSet):
 
         for cid, (_system, _) in best_system.items():
             if cid not in d2d_ids:
-                door_to_door.append({
-                    "catchment_id": cid,
-                    "collection_count": None,
-                    "has_seasonal_variation": False,
-                })
+                door_to_door.append(
+                    {
+                        "catchment_id": cid,
+                        "collection_count": None,
+                        "has_seasonal_variation": False,
+                    }
+                )
 
         serializer = CatchmentCollectionCountSerializer(door_to_door, many=True)
         return Response(serializer.data)
@@ -807,8 +825,8 @@ def _get_fee_system(country, year, waste_categories, nuts_prefixes=()):
     """
     qs = _filter_by_waste_categories(
         Collection.objects.filter(
+            _country_filter_q("catchment__", country),
             valid_from__year=year,
-            catchment__region__country=country,
         ),
         waste_categories,
     )
@@ -944,8 +962,8 @@ def _get_collection_amount(
     # ------------------------------------------------------------------
     qs = _filter_by_waste_categories(
         Collection.objects.filter(
+            _country_filter_q("catchment__", country),
             valid_from__year=year,
-            catchment__region__country=country,
         ),
         waste_categories,
     )
@@ -1006,21 +1024,27 @@ def _get_collection_amount(
     for cid, (_col_id, system, _) in best.items():
         no_collection = system == "No separate collection"
         amount = None if no_collection else amounts.get(cid)
-        data.append({
-            "catchment_id": cid,
-            "amount": amount,
-            "no_collection": no_collection,
-            **(
-                {"value_source": None if no_collection else value_sources.get(cid)}
-                if include_value_source
-                else {}
-            ),
-            **(
-                {"acpv_group_key": None if no_collection else acpv_group_keys.get(cid)}
-                if include_acpv_group_key
-                else {}
-            ),
-        })
+        data.append(
+            {
+                "catchment_id": cid,
+                "amount": amount,
+                "no_collection": no_collection,
+                **(
+                    {"value_source": None if no_collection else value_sources.get(cid)}
+                    if include_value_source
+                    else {}
+                ),
+                **(
+                    {
+                        "acpv_group_key": None
+                        if no_collection
+                        else acpv_group_keys.get(cid)
+                    }
+                    if include_acpv_group_key
+                    else {}
+                ),
+            }
+        )
     return data
 
 
@@ -1220,14 +1244,16 @@ def _get_biowaste_acpv_outline_geojson(country, year, nuts_prefixes=()):
         for geom in geoms[1:]:
             dissolved_geom = dissolved_geom.union(geom)
         dissolved_geom.normalize()
-        features.append({
-            "type": "Feature",
-            "properties": {
-                "acpv_group_key": group_key,
-                "catchment_ids": group_catchment_ids,
-            },
-            "geometry": json.loads(dissolved_geom.geojson),
-        })
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "acpv_group_key": group_key,
+                    "catchment_ids": group_catchment_ids,
+                },
+                "geometry": json.loads(dissolved_geom.geojson),
+            }
+        )
 
     return _build_feature_collection(features)
 
@@ -1243,8 +1269,8 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=()):
     """
     qs = _filter_by_waste_categories(
         Collection.objects.filter(
+            _country_filter_q("catchment__", country),
             valid_from__year=year,
-            catchment__region__country=country,
         ),
         _GREEN_WASTE_CATEGORY_NAMES,
     )
@@ -1408,11 +1434,13 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=()):
     for cid, (_col_id, system, _priority) in best.items():
         no_collection = system == "No separate collection"
         amount = None if no_collection else amounts.get(cid)
-        data.append({
-            "catchment_id": cid,
-            "amount": amount,
-            "no_collection": no_collection,
-        })
+        data.append(
+            {
+                "catchment_id": cid,
+                "amount": amount,
+                "no_collection": no_collection,
+            }
+        )
     return data
 
 
@@ -1497,8 +1525,8 @@ def _get_min_bin_size(country, year, waste_categories, nuts_prefixes=()):
     """
     qs = _filter_by_waste_categories(
         Collection.objects.filter(
+            _country_filter_q("catchment__", country),
             valid_from__year=year,
-            catchment__region__country=country,
             collection_system__name="Door to door",
         ),
         waste_categories,
@@ -1523,8 +1551,8 @@ def _get_required_bin_capacity(country, year, waste_categories, nuts_prefixes=()
     """
     qs = _filter_by_waste_categories(
         Collection.objects.filter(
+            _country_filter_q("catchment__", country),
             valid_from__year=year,
-            catchment__region__country=country,
             collection_system__name="Door to door",
         ),
         waste_categories,
@@ -1722,12 +1750,14 @@ class OrganicWasteRatioViewSet(viewsets.ViewSet):
                 ratio = o / (o + r)
             else:
                 ratio = None
-            data.append({
-                "catchment_id": cid,
-                "organic_amount": o,
-                "residual_amount": r,
-                "ratio": ratio,
-            })
+            data.append(
+                {
+                    "catchment_id": cid,
+                    "organic_amount": o,
+                    "residual_amount": r,
+                    "ratio": ratio,
+                }
+            )
         serializer = CatchmentOrganicRatioSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -1767,12 +1797,14 @@ class WasteRatioViewSet(viewsets.ViewSet):
                 ratio = b / (b + r)
             else:
                 ratio = None
-            data.append({
-                "catchment_id": cid,
-                "bio_amount": b,
-                "residual_amount": r,
-                "ratio": ratio,
-            })
+            data.append(
+                {
+                    "catchment_id": cid,
+                    "bio_amount": b,
+                    "residual_amount": r,
+                    "ratio": ratio,
+                }
+            )
         serializer = CatchmentWasteRatioSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -1798,8 +1830,8 @@ class CollectionSupportViewSet(viewsets.ViewSet):
         # Step 1: pick primary bio/food waste collection per catchment
         qs = _filter_by_waste_categories(
             Collection.objects.filter(
+                _country_filter_q("catchment__", country),
                 valid_from__year=year,
-                catchment__region__country=country,
             ),
             ["Biowaste", "Food waste"],
         )
@@ -1851,11 +1883,13 @@ class CollectionSupportViewSet(viewsets.ViewSet):
             else:
                 paper = _status(collection_id, paper_allowed, paper_forbidden)
                 plastic = _status(collection_id, plastic_allowed, plastic_forbidden)
-            data.append({
-                "catchment_id": cid,
-                "paper_bags": paper,
-                "plastic_bags": plastic,
-            })
+            data.append(
+                {
+                    "catchment_id": cid,
+                    "paper_bags": paper,
+                    "plastic_bags": plastic,
+                }
+            )
 
         serializer = CatchmentCollectionSupportSerializer(data, many=True)
         return Response(serializer.data)
@@ -1935,8 +1969,8 @@ class FoodWasteCategoryViewSet(viewsets.ViewSet):
         # Step 1: pick primary bio/food waste collection per catchment
         qs = _filter_by_waste_categories(
             Collection.objects.filter(
+                _country_filter_q("catchment__", country),
                 valid_from__year=year,
-                catchment__region__country=country,
             ),
             ["Biowaste", "Food waste"],
         )
@@ -2004,8 +2038,8 @@ class ConnectionRateViewSet(viewsets.ViewSet):
         # Step 1: pick primary bio/food waste collection per catchment
         qs = _filter_by_waste_categories(
             Collection.objects.filter(
+                _country_filter_q("catchment__", country),
                 valid_from__year=year,
-                catchment__region__country=country,
             ),
             ["Biowaste", "Food waste"],
         )
@@ -2038,11 +2072,13 @@ class ConnectionRateViewSet(viewsets.ViewSet):
         for cid, (col_id, system, _) in best.items():
             is_d2d = system == "Door to door"
             avg = rate_lookup.get(col_id)
-            data.append({
-                "catchment_id": cid,
-                "connection_rate": avg / 100.0 if avg is not None else None,
-                "is_door_to_door": is_d2d,
-            })
+            data.append(
+                {
+                    "catchment_id": cid,
+                    "connection_rate": avg / 100.0 if avg is not None else None,
+                    "is_door_to_door": is_d2d,
+                }
+            )
 
         serializer = CatchmentConnectionRateSerializer(data, many=True)
         return Response(serializer.data)
@@ -2072,8 +2108,8 @@ class CatchmentPopulationViewSet(viewsets.ViewSet):
 
         qs = (
             CollectionCatchment.objects.filter(
+                _country_filter_q("", country),
                 collections__valid_from__year=year,
-                region__country=country,
             )
             .distinct()
             .values_list("id", flat=False)
@@ -2094,8 +2130,8 @@ class CatchmentPopulationViewSet(viewsets.ViewSet):
 
         qs = (
             CollectionCatchment.objects.filter(
+                _country_filter_q("", country),
                 collections__valid_from__year=year,
-                region__country=country,
             )
             .distinct()
             .annotate(

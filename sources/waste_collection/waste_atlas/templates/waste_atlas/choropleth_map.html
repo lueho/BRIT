@@ -60,7 +60,10 @@
       <label for="sel-country">Country</label>
       <select id="sel-country">
         <option value="DE" {% if country == "DE" %}selected{% endif %}>Germany (DE)</option>
-        <option value="IT" {% if country == "IT" %}selected{% endif %}>Italy (IT)</option>
+        <option value="IT"
+                {% if country == "IT" and nuts_prefix != "ITH10" %}selected{% endif %}>Italy (IT)</option>
+        <option value="IT-ST"
+                {% if country == "IT" and nuts_prefix == "ITH10" %}selected{% endif %}>South Tyrol (ITH10)</option>
         <option value="SE" {% if country == "SE" %}selected{% endif %}>Sweden (SE)</option>
         <option value="DK" {% if country == "DK" %}selected{% endif %}>Denmark (DK)</option>
         <option value="NL" {% if country == "NL" %}selected{% endif %}>The Netherlands (NL)</option>

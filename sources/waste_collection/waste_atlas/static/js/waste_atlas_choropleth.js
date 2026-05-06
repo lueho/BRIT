@@ -138,6 +138,22 @@ var WasteAtlasChoropleth = (function () {
     });
   }
 
+  function _configForSelection(cfg, country, year) {
+    if (country === 'IT-ST') {
+      return Object.assign({}, cfg, {
+        country: 'IT',
+        year: year,
+        nutsPrefix: 'ITH10',
+        nutsLevel: 3
+      });
+    }
+
+    var loadCfg = Object.assign({}, cfg, { country: country, year: year });
+    delete loadCfg.nutsPrefix;
+    delete loadCfg.nutsLevel;
+    return loadCfg;
+  }
+
   // ---- rendering ------------------------------------------------------------
 
   function _render(data, cfg) {
@@ -432,7 +448,7 @@ var WasteAtlasChoropleth = (function () {
       if (btnSVG) btnSVG.disabled = true;
       if (btnPNG) btnPNG.disabled = true;
 
-      var loadCfg = Object.assign({}, cfg, { country: country, year: year });
+      var loadCfg = _configForSelection(cfg, country, year);
 
       _fetchAll(loadCfg)
         .then(function (data) {
