@@ -723,7 +723,7 @@ class CollectionModelForm(
         instance = super().save(commit=False)
         data = self.cleaned_data
         instance.name = (
-            f"{data["catchment"]} {data["waste_category"]} {data["collection_system"]}"
+            f"{data['catchment']} {data['waste_category']} {data['collection_system']}"
         )
         instance.waste_category = data["waste_category"]
         if commit:
@@ -738,7 +738,7 @@ class CollectionModelForm(
             return instance
 
 
-class CollectionAddWasteSampleForm(SimpleModelForm):
+class CollectionAddWasteSampleForm(SimpleForm):
     sample = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="sample-autocomplete",
@@ -748,12 +748,8 @@ class CollectionAddWasteSampleForm(SimpleModelForm):
         help_text="Add a sample directly to this collection.",
     )
 
-    class Meta:
-        model = Sample
-        fields = ("sample",)
-
     def __init__(self, *args, **kwargs):
-        collection = kwargs.get("instance")
+        collection = kwargs.pop("instance", None)
         super().__init__(*args, **kwargs)
 
         queryset = Sample.objects.order_by("name")

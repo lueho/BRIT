@@ -170,11 +170,11 @@ class ProcessCategoryCRUDViewsTestCase(
             owner=self.owner_user,
             publication_status="private",
         )
-        private_process.categories.add(self.private_object)
+        private_process.categories.add(self.unpublished_object)
 
         self.client.force_login(self.owner_user)
         response = self.client.get(
-            reverse(self.view_detail_name, kwargs={"pk": self.private_object.pk})
+            reverse(self.view_detail_name, kwargs={"pk": self.unpublished_object.pk})
         )
 
         self.assertEqual(response.status_code, 200)

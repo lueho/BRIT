@@ -1194,10 +1194,16 @@ class ComponentMeasurementUpdateViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         cls.unit = Unit.objects.filter(name="%").first()
         if cls.unit is None:
-            cls.unit = Unit.objects.create(name="%", symbol="percent", owner=cls.owner)
-        elif not cls.unit.symbol:
+            cls.unit = Unit.objects.create(
+                name="%",
+                symbol="percent",
+                owner=cls.owner,
+                publication_status="published",
+            )
+        elif not cls.unit.symbol or cls.unit.publication_status != "published":
             cls.unit.symbol = "percent"
-            cls.unit.save(update_fields=["symbol"])
+            cls.unit.publication_status = "published"
+            cls.unit.save(update_fields=["symbol", "publication_status"])
 
         cls.group = MaterialComponentGroup.objects.create(
             owner=cls.owner,
@@ -1328,10 +1334,16 @@ class ComponentMeasurementCreateAndDetailViewTestCase(ViewWithPermissionsTestCas
         super().setUpTestData()
         cls.unit = Unit.objects.filter(name="%").first()
         if cls.unit is None:
-            cls.unit = Unit.objects.create(name="%", symbol="percent", owner=cls.member)
-        elif not cls.unit.symbol:
+            cls.unit = Unit.objects.create(
+                name="%",
+                symbol="percent",
+                owner=cls.member,
+                publication_status="published",
+            )
+        elif not cls.unit.symbol or cls.unit.publication_status != "published":
             cls.unit.symbol = "percent"
-            cls.unit.save(update_fields=["symbol"])
+            cls.unit.publication_status = "published"
+            cls.unit.save(update_fields=["symbol", "publication_status"])
 
         cls.group = MaterialComponentGroup.objects.create(
             owner=cls.member,
