@@ -331,6 +331,8 @@ class MapMixin:
             map_config["loadCatchment"] = False
         if not map_config.get("featuresLayerGeometriesUrl"):
             map_config["loadFeatures"] = False
+        if not map_config.get("featuresLayerSummariesUrl"):
+            map_config["loadFeaturesLayerSummary"] = False
         return map_config
 
     def get_context_data(self, **kwargs):
@@ -554,6 +556,14 @@ class GeoDataSetRuntimePermissionMixin:
         if getattr(adapter, "uses_local_relation", False):
             return None
         return super().get_features_layer_summary_url()
+
+    def get_override_params(self):
+        params = super().get_override_params()
+        adapter = self.get_runtime_adapter()
+        if getattr(adapter, "uses_local_relation", False):
+            params.pop("features_feature_id", None)
+            params["features_layer_summary_url"] = ""
+        return params
 
     def test_func(self):
         policy = get_object_policy(

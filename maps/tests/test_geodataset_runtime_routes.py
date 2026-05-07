@@ -382,6 +382,7 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
             response.context["map_config"]["featuresLayerGeometriesUrl"],
             reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk}),
         )
+        self.assertFalse(response.context["map_config"]["featuresId"])
         self.assertEqual(
             response.context["map_config"]["featuresLayerDetailsUrlTemplate"],
             reverse(
@@ -390,6 +391,7 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
             ).replace("/0/", "/"),
         )
         self.assertFalse(response.context["map_config"]["featuresLayerSummariesUrl"])
+        self.assertFalse(response.context["map_config"]["loadFeaturesLayerSummary"])
 
     def test_local_relation_adapter_rejects_invalid_identifier(self):
         runtime_configuration = self.dataset.runtime_configuration
