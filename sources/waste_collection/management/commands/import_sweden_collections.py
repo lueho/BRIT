@@ -549,6 +549,10 @@ def _valid_from_year(year: int) -> date:
     return date(year, 1, 1)
 
 
+def _valid_until_year(year: int) -> date:
+    return date(year, 12, 31)
+
+
 def _clean_city(raw: str) -> str | None:
     """Return canonical city name, or None if the row should be dropped."""
     raw = raw.strip()
@@ -599,21 +603,25 @@ def _build_food_waste_record(
     source_urls = [u for u in [_SOURCE_URLS.get(data_year)] if u]
     pvs = []
     if food_kg is not None:
-        pvs.append({
-            "property_id": _PROP_SPECIFIC,
-            "unit_name": _UNIT_KG,
-            "year": data_year,
-            "average": food_kg,
-            "flyer_urls": source_urls,
-        })
+        pvs.append(
+            {
+                "property_id": _PROP_SPECIFIC,
+                "unit_name": _UNIT_KG,
+                "year": data_year,
+                "average": food_kg,
+                "flyer_urls": source_urls,
+            }
+        )
     if conn_rate is not None:
-        pvs.append({
-            "property_id": _PROP_CONN_RATE,
-            "unit_name": _UNIT_PCT_HH,
-            "year": data_year,
-            "average": conn_rate,
-            "flyer_urls": source_urls,
-        })
+        pvs.append(
+            {
+                "property_id": _PROP_CONN_RATE,
+                "unit_name": _UNIT_PCT_HH,
+                "year": data_year,
+                "average": conn_rate,
+                "flyer_urls": source_urls,
+            }
+        )
     return {
         **_resolve_catchment_key(city),
         "collection_system": _COLLECTION_SYSTEM_DOOR_TO_DOOR,
@@ -625,7 +633,7 @@ def _build_food_waste_record(
         "connection_type": connection_type or "",
         "established": established,
         "valid_from": _valid_from_year(data_year),
-        "valid_until": None,
+        "valid_until": _valid_until_year(data_year),
         "description": description,
         "flyer_urls": source_urls,
         "property_values": pvs,
@@ -651,7 +659,7 @@ def _build_residual_waste_record(
         "connection_type": "",
         "established": None,
         "valid_from": _valid_from_year(data_year),
-        "valid_until": None,
+        "valid_until": _valid_until_year(data_year),
         "description": "",
         "flyer_urls": source_urls,
         "property_values": [
@@ -679,7 +687,7 @@ def _build_no_collection_record(city: str, data_year: int) -> dict:
         "connection_type": "",
         "established": None,
         "valid_from": _valid_from_year(data_year),
-        "valid_until": None,
+        "valid_until": _valid_until_year(data_year),
         "description": "",
         "flyer_urls": [],
         "property_values": [],
@@ -814,7 +822,7 @@ def _build_2024_manual_review_comment(details: dict[str, object]) -> str:
     return (
         f"{_SWEDEN_2024_REVIEW_NOTE_PREFIX}: imported from the reviewed Sweden "
         f"2024 map artifact with unresolved issues. Please verify and resolve: "
-        f"{"; ".join(review_reasons)}."
+        f"{'; '.join(review_reasons)}."
     )
 
 
@@ -1311,7 +1319,7 @@ class Command(BaseCommand):
     def _get_token(self, api_url: str, username: str, password: str) -> str:
         """Obtain a DRF token via the token-auth endpoint."""
         try:
-            url = f"{api_url.rstrip("/")}/api-token-auth/"
+            url = f"{api_url.rstrip('/')}/api-token-auth/"
             payload = json.dumps({"username": username, "password": password}).encode()
             req = Request(
                 url,
@@ -1340,12 +1348,14 @@ class Command(BaseCommand):
     ) -> dict:
         """POST one batch of records to the import endpoint; return stats dict."""
         try:
-            url = f"{api_url.rstrip("/")}/waste_collection/api/collection/import/"
-            payload = json.dumps({
-                "records": records,
-                "publication_status": publication_status,
-                "dry_run": dry_run,
-            }).encode()
+            url = f"{api_url.rstrip('/')}/waste_collection/api/collection/import/"
+            payload = json.dumps(
+                {
+                    "records": records,
+                    "publication_status": publication_status,
+                    "dry_run": dry_run,
+                }
+            ).encode()
             req = Request(
                 url,
                 data=payload,
@@ -1480,35 +1490,35 @@ class Command(BaseCommand):
                 stats = result.get("stats", {})
                 self._merge_stats(totals, stats)
                 self.stdout.write(
-                    f" created={stats.get("created", 0)}"
-                    f" updated={stats.get("updated", 0)}"
-                    f" skipped={stats.get("skipped", 0)}\n"
+                    f" created={stats.get('created', 0)}"
+                    f" updated={stats.get('updated', 0)}"
+                    f" skipped={stats.get('skipped', 0)}\n"
                 )
 
         self.stdout.write("\n=== Import Summary ===\n")
-        self.stdout.write(f"  Collections created:  {totals["created"]}\n")
-        self.stdout.write(f"  Collections updated:  {totals["updated"]}\n")
-        self.stdout.write(f"  Collections skipped:  {totals["skipped"]}\n")
-        self.stdout.write(f"  Predecessor links:    {totals["predecessor_links"]}\n")
-        self.stdout.write(f"  CPVs created:         {totals["cpv_created"]}\n")
-        self.stdout.write(f"  CPVs skipped:         {totals["cpv_skipped"]}\n")
-        self.stdout.write(f"  Flyers created:       {totals["flyers_created"]}\n")
+        self.stdout.write(f"  Collections created:  {totals['created']}\n")
+        self.stdout.write(f"  Collections updated:  {totals['updated']}\n")
+        self.stdout.write(f"  Collections skipped:  {totals['skipped']}\n")
+        self.stdout.write(f"  Predecessor links:    {totals['predecessor_links']}\n")
+        self.stdout.write(f"  CPVs created:         {totals['cpv_created']}\n")
+        self.stdout.write(f"  CPVs skipped:         {totals['cpv_skipped']}\n")
+        self.stdout.write(f"  Flyers created:       {totals['flyers_created']}\n")
         self.stdout.write(
-            f"  Review comments:      {totals["review_comments_created"]}\n"
+            f"  Review comments:      {totals['review_comments_created']}\n"
         )
-        self.stdout.write(f"  Collectors created:   {totals["collectors_created"]}\n")
+        self.stdout.write(f"  Collectors created:   {totals['collectors_created']}\n")
         if totals["warnings"]:
-            self.stdout.write(f"\n  Warnings ({len(totals["warnings"])}):\n")
+            self.stdout.write(f"\n  Warnings ({len(totals['warnings'])}):\n")
             for w in totals["warnings"]:
                 self.stdout.write(f"    {w}\n")
         if totals["changes"] and dry_run:
             self.stdout.write(
-                f"\n  Changes that would be made ({len(totals["changes"])}):\n"
+                f"\n  Changes that would be made ({len(totals['changes'])}):\n"
             )
             for change in totals["changes"][:20]:  # Show first 20 changes
                 self.stdout.write(f"    {change}\n")
             if len(totals["changes"]) > 20:
-                self.stdout.write(f"    ... and {len(totals["changes"]) - 20} more\n")
+                self.stdout.write(f"    ... and {len(totals['changes']) - 20} more\n")
 
     @staticmethod
     def _merge_stats(totals: dict, stats: dict) -> None:

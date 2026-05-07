@@ -546,7 +546,11 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
                     unit = rav.measurement_unit_label
                     ordered_representation[f"{col}_unit"] = unit if unit else ""
 
-        additional_properties = ["specific waste collected", "Connection rate"]
+        additional_properties = [
+            "specific waste collected",
+            "total waste collected",
+            "Connection rate",
+        ]
         user = (
             getattr(self.context.get("request"), "user", None) if self.context else None
         )
@@ -574,7 +578,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
                 is_aggregated = False
 
             for value in values:
-                column_name = f"{property_name.lower().replace(" ", "_")}_{value.year}"
+                column_name = f"{property_name.lower().replace(' ', '_')}_{value.year}"
                 ordered_representation[column_name] = value.average
                 ordered_representation[f"{column_name}_unit"] = (
                     str(value.unit) if value.unit else ""
