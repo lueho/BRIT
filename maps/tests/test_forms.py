@@ -1,16 +1,55 @@
 from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.forms import formset_factory
+from django.http import QueryDict
 from django.test import TestCase
 
 from utils.properties.models import Unit
 
 from ..forms import (
+    GeoDataSetModelForm,
     RegionAttributeValueModelForm,
     RegionMergeForm,
     RegionMergeFormSet,
     RegionModelForm,
 )
-from ..models import LauRegion, Region, RegionProperty
+from ..models import GeoDataset, LauRegion, Region, RegionProperty
+
+
+class GeoDataSetModelFormTestCase(TestCase):
+    def test_form_includes_required_region_field(self):
+        form = GeoDataSetModelForm()
+
+        self.assertIn("region", form.fields)
+
+    def test_form_saves_region_for_local_relation_dataset(self):
+        region = Region.objects.create(name="Berlin", country="DE")
+        data = QueryDict("", mutable=True)
+        data.update(
+            {
+                "name": "Baumkataster Berlin 2024",
+                "region": str(region.pk),
+                "backend_type": "local_relation",
+                "schema_name": "raw_data",
+                "relation_name": "baumkataster_berlin_2024",
+                "geometry_column": "geom",
+                "primary_key_column": "objectid",
+                "label_field": "baum_id",
+            }
+        )
+
+        form = GeoDataSetModelForm(data=data)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        dataset = form.save()
+
+        self.assertEqual(dataset.region, region)
+        self.assertEqual(dataset.runtime_configuration.backend_type, "local_relation")
+        self.assertEqual(dataset.runtime_configuration.schema_name, "raw_data")
+        self.assertEqual(
+            dataset.runtime_configuration.relation_name,
+            "baumkataster_berlin_2024",
+        )
+        self.assertTrue(GeoDataset.objects.filter(pk=dataset.pk).exists())
 
 
 class RegionModelFormTestCase(TestCase):

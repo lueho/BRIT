@@ -71,6 +71,7 @@ class GeoDataSetModelForm(
             "name",
             "publish",
             "model_name",
+            "region",
             "sources",
             "description",
         )
@@ -479,22 +480,22 @@ class NutsRegionQueryForm(SimpleForm):
         helper.layout = Layout(
             Field(
                 "level_0",
-                data_optionsapi=f"{reverse("data.nuts_region_options")}",
+                data_optionsapi=f"{reverse('data.nuts_region_options')}",
                 data_lvl=0,
             ),
             Field(
                 "level_1",
-                data_optionsapi=f"{reverse("data.nuts_region_options")}",
+                data_optionsapi=f"{reverse('data.nuts_region_options')}",
                 data_lvl=1,
             ),
             Field(
                 "level_2",
-                data_optionsapi=f"{reverse("data.nuts_region_options")}",
+                data_optionsapi=f"{reverse('data.nuts_region_options')}",
                 data_lvl=2,
             ),
             Field(
                 "level_3",
-                data_optionsapi=f"{reverse("data.nuts_region_options")}",
+                data_optionsapi=f"{reverse('data.nuts_region_options')}",
                 data_lvl=3,
             ),
         )
@@ -534,22 +535,22 @@ class NutsAndLauCatchmentQueryForm(SimpleForm):
         helper.layout = Layout(
             Field(
                 "level_0",
-                data_optionsapi=f"{reverse("data.nuts_lau_catchment_options")}",
+                data_optionsapi=f"{reverse('data.nuts_lau_catchment_options')}",
                 data_lvl=0,
             ),
             Field(
                 "level_1",
-                data_optionsapi=f"{reverse("data.nuts_lau_catchment_options")}",
+                data_optionsapi=f"{reverse('data.nuts_lau_catchment_options')}",
                 data_lvl=1,
             ),
             Field(
                 "level_2",
-                data_optionsapi=f"{reverse("data.nuts_lau_catchment_options")}",
+                data_optionsapi=f"{reverse('data.nuts_lau_catchment_options')}",
                 data_lvl=2,
             ),
             Field(
                 "level_3",
-                data_optionsapi=f"{reverse("data.nuts_lau_catchment_options")}",
+                data_optionsapi=f"{reverse('data.nuts_lau_catchment_options')}",
                 data_lvl=3,
             ),
             Field("level_4", data_lvl=4),
