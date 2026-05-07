@@ -1,3 +1,6 @@
+from types import SimpleNamespace
+
+from django import forms
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.gis.geos import MultiPolygon
 from django.core.exceptions import ImproperlyConfigured
@@ -84,6 +87,19 @@ from .models import (
     RegionProperty,
 )
 from .signals import clear_geojson_cache_pattern
+
+
+def build_local_relation_filter_form(column_policies, data=None):
+    fields = {
+        policy.column_name: forms.CharField(
+            label=policy.display_label or policy.column_name,
+            required=False,
+        )
+        for policy in column_policies
+        if policy.is_filterable
+    }
+    form_class = type("LocalRelationFilterForm", (forms.Form,), fields)
+    return form_class(data=data)
 
 
 class MapMixin:
@@ -739,9 +755,14 @@ class GeoDataSetRuntimeTableView(
         context = super().get_context_data(**kwargs)
         dataset = self.get_dataset()
         column_policies = self.get_visible_column_policies()
+        filter_form = build_local_relation_filter_form(
+            column_policies,
+            data=self.request.GET or None,
+        )
         context.update(
             {
                 "dataset": dataset,
+                "filter": SimpleNamespace(form=filter_form),
                 "column_policies": column_policies,
                 "table_columns": [
                     {
