@@ -156,6 +156,10 @@ var WasteAtlasChoropleth = (function () {
     return loadCfg;
   }
 
+  function _isCurrentPath(path) {
+    return window.location.pathname.replace(/\/$/, '') === path.replace(/\/$/, '');
+  }
+
   // ---- rendering ------------------------------------------------------------
 
   function _render(data, cfg) {
@@ -472,13 +476,27 @@ var WasteAtlasChoropleth = (function () {
     load(cfg.country, cfg.year, true);
 
     if (btnLoad) {
-      btnLoad.addEventListener('click', function () {
-        var countrySelect = document.getElementById('sel-country');
+      var countrySelect = document.getElementById('sel-country');
+      function selectedRouteUrl() {
         var selectedOption = countrySelect.options[countrySelect.selectedIndex];
+        return selectedOption ? selectedOption.getAttribute('data-url') : null;
+      }
+      function selectedYear() {
+        return parseInt(document.getElementById('sel-year').value, 10) || 2022;
+      }
+
+      countrySelect.addEventListener('change', function () {
+        var url = selectedRouteUrl();
+        if (url && !_isCurrentPath(url)) {
+          window.location.href = url + '?year=' + encodeURIComponent(selectedYear());
+        }
+      });
+
+      btnLoad.addEventListener('click', function () {
         var country = countrySelect.value;
-        var year = parseInt(document.getElementById('sel-year').value, 10) || 2022;
-        var url = selectedOption ? selectedOption.getAttribute('data-url') : null;
-        if (url && window.location.pathname !== url) {
+        var year = selectedYear();
+        var url = selectedRouteUrl();
+        if (url && !_isCurrentPath(url)) {
           window.location.href = url + '?year=' + encodeURIComponent(year);
           return;
         }
