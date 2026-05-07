@@ -1076,7 +1076,9 @@ function loadLayers(params) {
 
     if (mapConfig.loadFeatures === true) {
         promises.push(fetchFeatureGeometries(filterParameters));
-        promises.push(fetchFeaturesLayerSummary(filterParameters));
+        if (mapConfig.loadFeaturesLayerSummary === true && mapConfig.featuresLayerSummariesUrl) {
+            promises.push(fetchFeaturesLayerSummary(filterParameters));
+        }
     } else {
         try {
             showMapOverlay();
