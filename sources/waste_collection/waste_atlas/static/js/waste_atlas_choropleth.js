@@ -96,7 +96,7 @@ var WasteAtlasChoropleth = (function () {
     var base = '/waste_collection/api/waste-atlas/';
     var nutsSuffix = cfg.nutsPrefix ? '&nuts_prefix=' + encodeURIComponent(cfg.nutsPrefix) : '';
     var catchUrl = base + 'catchment/geojson/?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix;
-    var allCatchUrl = base + 'catchment/geojson/?country=' + cfg.country + '&year=2022' + nutsSuffix;
+    var allCatchUrl = base + 'catchment/geojson/?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix;
     var nuts0Url = '/maps/api/nuts_region/geojson/?levl_code=0&cntr_code=' + cfg.country;
     var nutsLevel = cfg.nutsLevel || 1;
     var nutsRegionUrl = '/maps/api/nuts_region/geojson/?levl_code=' + nutsLevel + '&cntr_code=' + cfg.country;
@@ -138,19 +138,21 @@ var WasteAtlasChoropleth = (function () {
     });
   }
 
-  function _configForSelection(cfg, country, year) {
+  function _configForSelection(cfg, country, year, preserveScope) {
+    var loadCfg = Object.assign({}, cfg, { country: country, year: year });
+
     if (country === 'IT-ST') {
-      return Object.assign({}, cfg, {
+      return Object.assign(loadCfg, {
         country: 'IT',
-        year: year,
         nutsPrefix: 'ITH10',
         nutsLevel: 3
       });
     }
 
-    var loadCfg = Object.assign({}, cfg, { country: country, year: year });
-    delete loadCfg.nutsPrefix;
-    delete loadCfg.nutsLevel;
+    if (!preserveScope) {
+      delete loadCfg.nutsPrefix;
+      delete loadCfg.nutsLevel;
+    }
     return loadCfg;
   }
 
@@ -443,12 +445,12 @@ var WasteAtlasChoropleth = (function () {
     var btnLoad = document.getElementById('btn-load');
     var fileBase = cfg.fileBase || 'waste_atlas_map';
 
-    function load(country, year) {
+    function load(country, year, preserveScope) {
       _show(loadingEl);
       if (btnSVG) btnSVG.disabled = true;
       if (btnPNG) btnPNG.disabled = true;
 
-      var loadCfg = _configForSelection(cfg, country, year);
+      var loadCfg = _configForSelection(cfg, country, year, preserveScope);
 
       _fetchAll(loadCfg)
         .then(function (data) {
@@ -467,13 +469,20 @@ var WasteAtlasChoropleth = (function () {
         });
     }
 
-    load(cfg.country, cfg.year);
+    load(cfg.country, cfg.year, true);
 
     if (btnLoad) {
       btnLoad.addEventListener('click', function () {
-        var country = document.getElementById('sel-country').value;
+        var countrySelect = document.getElementById('sel-country');
+        var selectedOption = countrySelect.options[countrySelect.selectedIndex];
+        var country = countrySelect.value;
         var year = parseInt(document.getElementById('sel-year').value, 10) || 2022;
-        load(country, year);
+        var url = selectedOption ? selectedOption.getAttribute('data-url') : null;
+        if (url && window.location.pathname !== url) {
+          window.location.href = url + '?year=' + encodeURIComponent(year);
+          return;
+        }
+        load(country, year, false);
       });
     }
 

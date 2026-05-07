@@ -3995,8 +3995,13 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="IT"')
+        self.assertContains(
+            response,
+            f'data-url="{reverse("waste-atlas-south-tyrol-orga-level-map")}"',
+        )
         self.assertContains(response, "Administrative level of waste collection")
         self.assertContains(response, "Map overview")
+        self.assertContains(response, "Map set")
         self.assertContains(response, "No data")
         self.assertNotContains(response, "nutsPrefix:")
         self.assertNotContains(response, "nutsLevel:")
@@ -4006,9 +4011,14 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="IT-ST"')
+        self.assertContains(
+            response,
+            f'data-url="{reverse("waste-atlas-orga-level-italy-map")}"',
+        )
         self.assertContains(response, 'value="2024" selected')
         self.assertContains(response, "Administrative level of waste collection")
         self.assertContains(response, "Map overview")
+        self.assertContains(response, "Map set")
         self.assertContains(response, "nutsPrefix: 'ITH10'")
         self.assertContains(response, "nutsLevel: parseInt('3', 10)")
 
@@ -4079,15 +4089,28 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertNotContains(response, "nutsLevel:")
                 self.assertContains(response, "Map overview")
 
-    def test_italy_orga_level_map_allows_country_override(self):
-        """Italy orga-level map still allows overriding country via query param."""
+    def test_italy_orga_level_map_ignores_country_and_nuts_query_overrides(self):
         response = self.client.get(
             reverse("waste-atlas-orga-level-italy-map"),
-            {"country": "DE"},
+            {"country": "DE", "nuts_prefix": "ITH10", "nuts_level": "3"},
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="DE" selected')
+        self.assertContains(response, 'value="IT"')
+        self.assertNotContains(response, 'value="DE"')
+        self.assertNotContains(response, "nutsPrefix:")
+        self.assertNotContains(response, "nutsLevel:")
+
+    def test_south_tyrol_orga_level_map_ignores_country_and_nuts_query_overrides(self):
+        response = self.client.get(
+            reverse("waste-atlas-south-tyrol-orga-level-map"),
+            {"country": "IT", "nuts_prefix": "", "nuts_level": ""},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="IT-ST"')
+        self.assertContains(response, "nutsPrefix: 'ITH10'")
+        self.assertContains(response, "nutsLevel: parseInt('3', 10)")
 
     def test_generic_map_forwards_nuts_prefix_to_atlas_loader(self):
         response = self.client.get(

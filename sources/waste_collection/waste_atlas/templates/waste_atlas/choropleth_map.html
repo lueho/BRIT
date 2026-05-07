@@ -57,17 +57,25 @@
 
   <div id="atlas-controls">
     <div>
-      <label for="sel-country">Country</label>
+      <label for="sel-country">{{ map_set_selector_label }}</label>
       <select id="sel-country">
-        <option value="DE" {% if country == "DE" %}selected{% endif %}>Germany (DE)</option>
-        <option value="IT"
-                {% if country == "IT" and nuts_prefix != "ITH10" %}selected{% endif %}>Italy (IT)</option>
-        <option value="IT-ST"
-                {% if country == "IT" and nuts_prefix == "ITH10" %}selected{% endif %}>South Tyrol (ITH10)</option>
-        <option value="SE" {% if country == "SE" %}selected{% endif %}>Sweden (SE)</option>
-        <option value="DK" {% if country == "DK" %}selected{% endif %}>Denmark (DK)</option>
-        <option value="NL" {% if country == "NL" %}selected{% endif %}>The Netherlands (NL)</option>
-        <option value="BE" {% if country == "BE" %}selected{% endif %}>Belgium (BE)</option>
+        {% if map_set_options %}
+          {% for option in map_set_options %}
+            <option value="{{ option.value }}"
+                    data-url="{{ option.url }}"
+                    {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        {% else %}
+          <option value="DE" {% if country == "DE" %}selected{% endif %}>Germany (DE)</option>
+          <option value="IT"
+                  {% if country == "IT" and nuts_prefix != "ITH10" %}selected{% endif %}>Italy (IT)</option>
+          <option value="IT-ST"
+                  {% if country == "IT" and nuts_prefix == "ITH10" %}selected{% endif %}>South Tyrol (ITH10)</option>
+          <option value="SE" {% if country == "SE" %}selected{% endif %}>Sweden (SE)</option>
+          <option value="DK" {% if country == "DK" %}selected{% endif %}>Denmark (DK)</option>
+          <option value="NL" {% if country == "NL" %}selected{% endif %}>The Netherlands (NL)</option>
+          <option value="BE" {% if country == "BE" %}selected{% endif %}>Belgium (BE)</option>
+        {% endif %}
       </select>
     </div>
     <div>

@@ -1,9 +1,58 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
 WASTE_ATLAS_GROUP_NAME = "waste_atlas"
+
+ITALY_SOUTH_TYROL_MAP_ROUTES = {
+    "orga_level": {
+        "IT": "waste-atlas-orga-level-italy-map",
+        "IT-ST": "waste-atlas-south-tyrol-orga-level-map",
+    },
+    "collection_system": {
+        "IT": "waste-atlas-italy-collection-system-map",
+        "IT-ST": "waste-atlas-south-tyrol-collection-system-map",
+    },
+    "green_waste_collection_system_count": {
+        "IT": "waste-atlas-italy-green-waste-collection-system-count-map",
+        "IT-ST": "waste-atlas-south-tyrol-green-waste-collection-system-count-map",
+    },
+    "residual_frequency": {
+        "IT": "waste-atlas-italy-residual-frequency-map",
+        "IT-ST": "waste-atlas-south-tyrol-residual-frequency-map",
+    },
+    "biowaste_frequency": {
+        "IT": "waste-atlas-italy-biowaste-frequency-map",
+        "IT-ST": "waste-atlas-south-tyrol-biowaste-frequency-map",
+    },
+    "residual_collection_amount": {
+        "IT": "waste-atlas-italy-residual-collection-amount-map",
+        "IT-ST": "waste-atlas-south-tyrol-residual-collection-amount-map",
+    },
+    "biowaste_collection_amount": {
+        "IT": "waste-atlas-italy-biowaste-collection-amount-map",
+        "IT-ST": "waste-atlas-south-tyrol-biowaste-collection-amount-map",
+    },
+    "green_waste_collection_amount": {
+        "IT": "waste-atlas-italy-green-waste-collection-amount-map",
+        "IT-ST": "waste-atlas-south-tyrol-green-waste-collection-amount-map",
+    },
+    "organic_collection_amount": {
+        "IT": "waste-atlas-italy-organic-collection-amount-map",
+        "IT-ST": "waste-atlas-south-tyrol-organic-collection-amount-map",
+    },
+    "organic_waste_ratio": {
+        "IT": "waste-atlas-italy-organic-waste-ratio-map",
+        "IT-ST": "waste-atlas-south-tyrol-organic-waste-ratio-map",
+    },
+}
+
+ITALY_SOUTH_TYROL_MAP_LABELS = {
+    "IT": "Italy (IT)",
+    "IT-ST": "South Tyrol (ITH10)",
+}
 
 
 class WasteAtlasGroupMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -28,18 +77,50 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
     default_nuts_prefix = ""
     default_nuts_level = ""
     map_overview_label = "Kartenübersicht"
+    allow_country_override = True
+    allow_nuts_override = True
+    map_set = ""
+    map_route_key = ""
+    map_set_selector_label = "Country"
+
+    def get_country(self):
+        if self.allow_country_override:
+            return self.request.GET.get("country", self.default_country)
+        return self.default_country
+
+    def get_nuts_prefix(self):
+        if self.allow_nuts_override:
+            return self.request.GET.get("nuts_prefix", self.default_nuts_prefix)
+        return self.default_nuts_prefix
+
+    def get_nuts_level(self):
+        if self.allow_nuts_override:
+            return self.request.GET.get("nuts_level", self.default_nuts_level)
+        return self.default_nuts_level
+
+    def get_map_set_options(self):
+        routes = ITALY_SOUTH_TYROL_MAP_ROUTES.get(self.map_route_key, {})
+        return [
+            {
+                "value": value,
+                "label": ITALY_SOUTH_TYROL_MAP_LABELS[value],
+                "url": reverse(route_name),
+                "selected": value == self.map_set,
+            }
+            for value, route_name in routes.items()
+        ]
 
     def get_context_data(self, **kwargs):
         """Pass country, year, nuts_prefix, and map_title to the template."""
         ctx = super().get_context_data(**kwargs)
-        ctx["country"] = self.request.GET.get("country", self.default_country)
+        ctx["country"] = self.get_country()
         ctx["year"] = self.request.GET.get("year", self.default_year)
-        ctx["nuts_prefix"] = self.request.GET.get(
-            "nuts_prefix", self.default_nuts_prefix
-        )
-        ctx["nuts_level"] = self.request.GET.get("nuts_level", self.default_nuts_level)
+        ctx["nuts_prefix"] = self.get_nuts_prefix()
+        ctx["nuts_level"] = self.get_nuts_level()
         ctx["map_title"] = self.map_title
         ctx["map_overview_label"] = self.map_overview_label
+        ctx["map_set_options"] = self.get_map_set_options()
+        ctx["map_set_selector_label"] = self.map_set_selector_label
         return ctx
 
 
@@ -119,56 +200,70 @@ class OrgaLevelMapView(AtlasMapView):
 class ItalyAtlasMapView(AtlasMapView):
     default_country = "IT"
     map_overview_label = "Map overview"
+    allow_country_override = False
+    allow_nuts_override = False
+    map_set = "IT"
+    map_set_selector_label = "Map set"
 
 
 class ItalyOrgaLevelMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte29_orga_level_italy.html"
     map_title = "Administrative level of waste collection"
+    map_route_key = "orga_level"
 
 
 class ItalyCollectionSystemMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte2_collection_system.html"
     map_title = "Primary collection system for kitchen waste"
+    map_route_key = "collection_system"
 
 
 class ItalyGreenWasteCollectionSystemCountMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte21_green_waste_collection_system_count.html"
     map_title = "Number of green-waste collection systems per catchment"
+    map_route_key = "green_waste_collection_system_count"
 
 
 class ItalyResidualFrequencyMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte8_residual_frequency.html"
     map_title = "Collection frequency types for residual waste"
+    map_route_key = "residual_frequency"
 
 
 class ItalyBiowasteFrequencyMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte9_biowaste_frequency.html"
     map_title = "Collection frequency types for biowaste"
+    map_route_key = "biowaste_frequency"
 
 
 class ItalyResidualCollectionAmountMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte17_residual_collection_amount.html"
     map_title = "Specifically collected amount of residual waste"
+    map_route_key = "residual_collection_amount"
 
 
 class ItalyBiowasteCollectionAmountMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte18_biowaste_collection_amount.html"
     map_title = "Specifically collected amount of biowaste"
+    map_route_key = "biowaste_collection_amount"
 
 
 class ItalyGreenWasteCollectionAmountMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte22_green_waste_collection_amount.html"
     map_title = "Specifically collected amount of green waste"
+    map_route_key = "green_waste_collection_amount"
 
 
 class ItalyOrganicCollectionAmountMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte27_organic_collection_amount.html"
     map_title = "Aggregated collected amount of organic fractions"
+    map_route_key = "organic_collection_amount"
 
 
 class ItalyOrganicWasteRatioMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte28_organic_waste_ratio.html"
     map_title = "Share of organic fractions in total waste"
+    map_route_key = "organic_waste_ratio"
 
 
 class SouthTyrolAtlasMapView(AtlasMapView):
@@ -177,56 +272,70 @@ class SouthTyrolAtlasMapView(AtlasMapView):
     default_nuts_prefix = "ITH10"
     default_nuts_level = "3"
     map_overview_label = "Map overview"
+    allow_country_override = False
+    allow_nuts_override = False
+    map_set = "IT-ST"
+    map_set_selector_label = "Map set"
 
 
 class SouthTyrolOrgaLevelMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte29_orga_level_italy.html"
     map_title = "Administrative level of waste collection"
+    map_route_key = "orga_level"
 
 
 class SouthTyrolCollectionSystemMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte2_collection_system.html"
     map_title = "Primary collection system for kitchen waste"
+    map_route_key = "collection_system"
 
 
 class SouthTyrolGreenWasteCollectionSystemCountMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte21_green_waste_collection_system_count.html"
     map_title = "Number of green-waste collection systems per catchment"
+    map_route_key = "green_waste_collection_system_count"
 
 
 class SouthTyrolResidualFrequencyMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte8_residual_frequency.html"
     map_title = "Collection frequency types for residual waste"
+    map_route_key = "residual_frequency"
 
 
 class SouthTyrolBiowasteFrequencyMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte9_biowaste_frequency.html"
     map_title = "Collection frequency types for biowaste"
+    map_route_key = "biowaste_frequency"
 
 
 class SouthTyrolResidualCollectionAmountMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte17_residual_collection_amount.html"
     map_title = "Specifically collected amount of residual waste"
+    map_route_key = "residual_collection_amount"
 
 
 class SouthTyrolBiowasteCollectionAmountMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte18_biowaste_collection_amount.html"
     map_title = "Specifically collected amount of biowaste"
+    map_route_key = "biowaste_collection_amount"
 
 
 class SouthTyrolGreenWasteCollectionAmountMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte22_green_waste_collection_amount.html"
     map_title = "Specifically collected amount of green waste"
+    map_route_key = "green_waste_collection_amount"
 
 
 class SouthTyrolOrganicCollectionAmountMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte27_organic_collection_amount.html"
     map_title = "Aggregated collected amount of organic fractions"
+    map_route_key = "organic_collection_amount"
 
 
 class SouthTyrolOrganicWasteRatioMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte28_organic_waste_ratio.html"
     map_title = "Share of organic fractions in total waste"
+    map_route_key = "organic_waste_ratio"
 
 
 class SwedenOrgaLevelMapView(AtlasMapView):
