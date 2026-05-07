@@ -38,6 +38,13 @@
                                             <i class="fas fa-table-cells-large"></i> Explorer
                                         </a>
                                     {% endif %}
+                                    {% if table_url %}
+                                        <a class="btn btn-sm btn-outline-secondary"
+                                           href="{{ table_url }}"
+                                           title="Open feature table">
+                                            <i class="fas fa-table"></i> Table
+                                        </a>
+                                    {% endif %}
                                 {% endblock map_card_header_actions %}
                             </div>
                         </div>
@@ -63,18 +70,22 @@
 
         <div class="col-md-3">
             {% block user_actions %}
-                <div class="card shadow">
-                    <div class="card-header bg-body-tertiary border-bottom-0">
-                        <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                <div class="card shadow filter-sticky">
+                    <div class="card-header p-0 border-0 bg-body-tertiary">
+                        <ul class="nav nav-pills sidebar-tabs px-3 pt-3 pb-2"
+                            id="sidebarTabs"
+                            role="tablist">
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link active"
-                                        id="filter-tab"
+                                        id="filters-tab"
                                         data-bs-toggle="tab"
-                                        data-bs-target="#filter-pane"
+                                        data-bs-target="#filters-pane"
                                         type="button"
                                         role="tab"
-                                        aria-controls="filter-pane"
-                                        aria-selected="true">Filter</button>
+                                        aria-controls="filters-pane"
+                                        aria-selected="true">
+                                    <i class="fas fa-filter"></i> Filters
+                                </button>
                             </li>
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link"
@@ -84,7 +95,9 @@
                                         type="button"
                                         role="tab"
                                         aria-controls="summary-pane"
-                                        aria-selected="false">Summary</button>
+                                        aria-selected="false">
+                                    <i class="fas fa-chart-bar"></i> Summary
+                                </button>
                             </li>
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link"
@@ -94,67 +107,74 @@
                                         type="button"
                                         role="tab"
                                         aria-controls="options-pane"
-                                        aria-selected="false">Options</button>
+                                        aria-selected="false">
+                                    <i class="fas fa-gear"></i> Options
+                                </button>
                             </li>
                         </ul>
                     </div>
-                    <div class="card-body tab-content">
-                        <div class="tab-pane fade show active"
-                             id="filter-pane"
-                             role="tabpanel"
-                             aria-labelledby="filter-tab">
-                            {% block filter_form_card %}
-                                {% block filter_form %}
-                                    <form method="get">
-                                        {% crispy filter.form %}
-                                        {% block filter_form_buttons %}
-                                            <div class="d-flex justify-content-end gap-2 mt-2">
-                                                <button class="btn btn-sm btn-primary submit-filter"
-                                                        id="filter-button"
-                                                        type="button"
-                                                        onclick="clickedFilterButton()">Filter</button>
-                                                <a class="btn btn-sm btn-outline-secondary"
-                                                   href="{% if private_list_owner %}{{ object_list.model.private_map_url }}?scope=private{% else %}{{ object_list.model.public_map_url }}?scope=published{% endif %}"
-                                                   aria-label="Reset filters">Reset</a>
-                                            </div>
-                                        {% endblock filter_form_buttons %}
-                                    </form>
-                                {% endblock filter_form %}
-                            {% endblock filter_form_card %}
-                        </div>
-                        <div class="tab-pane fade"
-                             id="summary-pane"
-                             role="tabpanel"
-                             aria-labelledby="summary-tab">
-                            {% block filter_result_card %}
-                                <div id="summary-container">
-                                    <p class="card-text">No data selected, yet.</p>
-                                </div>
-                                {% if object.sources.first %}
-                                    <p class="card-text mt-3">
-                                        <strong>Sources:</strong>
-                                        <br>
-                                        {% for source in object.sources.all %}
-                                            <a href="{% url 'source-detail-modal' source.id %}" class="modal-link">
-                                                {{ source.abbreviation }}
-                                                {% if not forloop.last %},{% endif %}
-                                            </a>
-                                        {% endfor %}
-                                    </p>
-                                {% endif %}
-                            {% endblock filter_result_card %}
-                        </div>
-                        <div class="tab-pane fade"
-                             id="options-pane"
-                             role="tabpanel"
-                             aria-labelledby="options-tab">
-                            {% block options_card %}
-                                {# Export actions placeholder – override per map to add export buttons #}
-                                {% block map_export_actions %}
-                                {% endblock map_export_actions %}
-                            {% endblock options_card %}
-                            {% block extra_cards %}
-                            {% endblock extra_cards %}
+                    <div class="card-body">
+                        <div class="tab-content">
+                            <div class="tab-pane fade show active"
+                                 id="filters-pane"
+                                 role="tabpanel"
+                                 aria-labelledby="filters-tab"
+                                 tabindex="0">
+                                {% block filter_form_card %}
+                                    {% block filter_form %}
+                                        <form method="get">
+                                            {% crispy filter.form %}
+                                            {% block filter_form_buttons %}
+                                                <div class="d-flex justify-content-end gap-2 mt-2">
+                                                    <button class="btn btn-sm btn-primary submit-filter"
+                                                            id="filter-button"
+                                                            type="button"
+                                                            onclick="clickedFilterButton()">Filter</button>
+                                                    <a class="btn btn-sm btn-outline-secondary"
+                                                       href="{% if private_list_owner %}{{ object_list.model.private_map_url }}?scope=private{% else %}{{ object_list.model.public_map_url }}?scope=published{% endif %}"
+                                                       aria-label="Reset filters">Reset</a>
+                                                </div>
+                                            {% endblock filter_form_buttons %}
+                                        </form>
+                                    {% endblock filter_form %}
+                                {% endblock filter_form_card %}
+                            </div>
+                            <div class="tab-pane fade"
+                                 id="summary-pane"
+                                 role="tabpanel"
+                                 aria-labelledby="summary-tab"
+                                 tabindex="0">
+                                {% block filter_result_card %}
+                                    <div id="summary-container">
+                                        <p class="card-text">No data selected, yet.</p>
+                                    </div>
+                                    {% if object.sources.first %}
+                                        <p class="card-text mt-3">
+                                            <strong>Sources:</strong>
+                                            <br>
+                                            {% for source in object.sources.all %}
+                                                <a href="{% url 'source-detail-modal' source.id %}" class="modal-link">
+                                                    {{ source.abbreviation }}
+                                                    {% if not forloop.last %},{% endif %}
+                                                </a>
+                                            {% endfor %}
+                                        </p>
+                                    {% endif %}
+                                {% endblock filter_result_card %}
+                            </div>
+                            <div class="tab-pane fade"
+                                 id="options-pane"
+                                 role="tabpanel"
+                                 aria-labelledby="options-tab"
+                                 tabindex="0">
+                                {% block options_card %}
+                                    {# Export actions placeholder – override per map to add export buttons #}
+                                    {% block map_export_actions %}
+                                    {% endblock map_export_actions %}
+                                {% endblock options_card %}
+                                {% block extra_cards %}
+                                {% endblock extra_cards %}
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -722,16 +722,24 @@ class GeoDataSetRuntimeMapView(
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         dataset = self.get_dataset()
-        context.update(
-            {
-                "object": dataset,
-                "dataset": dataset,
-                "dashboard_url": dataset.get_absolute_url(),
-                "public_map_url": dataset.get_map_url(),
-                "private_map_url": dataset.get_map_url(),
-                "review_map_url": dataset.get_map_url(),
-            }
-        )
+        adapter = self.get_runtime_adapter()
+        is_local_relation = getattr(adapter, "uses_local_relation", False)
+        context_update = {
+            "object": dataset,
+            "dataset": dataset,
+            "dashboard_url": dataset.get_absolute_url(),
+            "public_map_url": dataset.get_map_url(),
+            "private_map_url": dataset.get_map_url(),
+            "review_map_url": dataset.get_map_url(),
+            "table_url": reverse("geodataset-table", kwargs={"pk": dataset.pk}),
+        }
+        if is_local_relation:
+            filter_form = build_local_relation_filter_form(
+                self.get_visible_column_policies(),
+                data=self.request.GET or None,
+            )
+            context_update["filter"] = SimpleNamespace(form=filter_form)
+        context.update(context_update)
         return context
 
 

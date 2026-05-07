@@ -394,6 +394,13 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
             response.context["map_config"]["featuresLayerGeometriesUrl"],
             reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk}),
         )
+        self.assertIn("nuts_id", response.context["filter"].form.fields)
+        self.assertNotIn("hidden_code", response.context["filter"].form.fields)
+        self.assertContains(response, 'name="nuts_id"')
+        self.assertContains(
+            response, reverse("geodataset-table", kwargs={"pk": self.dataset.pk})
+        )
+        self.assertContains(response, "nav nav-pills sidebar-tabs")
         self.assertFalse(response.context["map_config"]["featuresId"])
         self.assertEqual(
             response.context["map_config"]["featuresLayerDetailsUrlTemplate"],
