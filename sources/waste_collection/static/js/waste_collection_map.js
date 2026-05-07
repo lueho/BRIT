@@ -382,10 +382,6 @@ function scrollToSummaries() {
             bootstrap.Tab.getOrCreateInstance(summaryTab).show();
         }
     } catch (_) { /* ignore */ }
-    const importantInfoElement = document.getElementById("filter_result_card");
-    if (importantInfoElement) {
-        importantInfoElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
 }
 
 function updateUrls(feature_id) {
