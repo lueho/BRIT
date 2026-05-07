@@ -310,7 +310,9 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertNotContains(response, "hidden-a")
         self.assertIn("nuts_id", response.context["filter"].form.fields)
         self.assertNotIn("hidden_code", response.context["filter"].form.fields)
+        self.assertFalse(response.context["filter"].form.helper.form_tag)
         self.assertContains(response, 'name="nuts_id"')
+        self.assertContains(response, 'type="submit"')
 
     def test_local_relation_table_route_applies_filterable_column(self):
         response = self.client.get(

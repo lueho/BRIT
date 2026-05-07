@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+from crispy_forms.helper import FormHelper
 from django import forms
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.gis.geos import MultiPolygon
@@ -99,7 +100,10 @@ def build_local_relation_filter_form(column_policies, data=None):
         if policy.is_filterable
     }
     form_class = type("LocalRelationFilterForm", (forms.Form,), fields)
-    return form_class(data=data)
+    form = form_class(data=data)
+    form.helper = FormHelper()
+    form.helper.form_tag = False
+    return form
 
 
 class MapMixin:
