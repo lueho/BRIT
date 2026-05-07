@@ -53,7 +53,7 @@ from .models import (
     ProcessOperatingParameter,
     ProcessReference,
 )
-from .querysets import with_published_process_count
+from .querysets import with_process_count, with_published_process_count
 
 # Temporary mock data for backward compatibility with closecycle module
 # TODO: Remove when closecycle is updated to use real Process model
@@ -187,7 +187,7 @@ class ProcessCategoryPrivateListView(PrivateObjectListView):
     paginate_by = 20
 
     def get_queryset(self):
-        return with_published_process_count(super().get_queryset())
+        return with_process_count(super().get_queryset())
 
 
 class ProcessCategoryReviewListView(ReviewObjectListView):
@@ -200,7 +200,7 @@ class ProcessCategoryReviewListView(ReviewObjectListView):
     paginate_by = 20
 
     def get_queryset(self):
-        return with_published_process_count(super().get_queryset())
+        return with_process_count(super().get_queryset())
 
 
 class ProcessCategoryDetailView(UserCreatedObjectDetailView):
@@ -211,17 +211,22 @@ class ProcessCategoryDetailView(UserCreatedObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        processes = (
-            self.object.processes.filter(publication_status="published")
-            .select_related("owner")
-            .prefetch_related("categories")
+        process_queryset = self.object.processes.all()
+        category_queryset = ProcessCategory.objects.filter(
+            processes__in=process_queryset
+        )
+        process_count_status = None
+        if self.object.publication_status == "published":
+            process_queryset = process_queryset.filter(publication_status="published")
+            category_queryset = category_queryset.filter(publication_status="published")
+            process_count_status = "published"
+        processes = process_queryset.select_related("owner").prefetch_related(
+            "categories"
         )
         context["processes"] = processes
-        context["related_categories"] = with_published_process_count(
-            ProcessCategory.objects.filter(processes__in=processes)
-            .exclude(pk=self.object.pk)
-            .filter(publication_status="published")
-            .distinct()
+        context["related_categories"] = with_process_count(
+            category_queryset.exclude(pk=self.object.pk).distinct(),
+            publication_status=process_count_status,
         ).order_by("name")
         return context
 

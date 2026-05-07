@@ -163,6 +163,24 @@ class ProcessCategoryCRUDViewsTestCase(
         self.assertContains(response, "Published Test Category")
         self.assertContains(response, "1 process")
 
+    def test_private_detail_shows_private_processes(self):
+        """Private category detail should show associated private processes."""
+        private_process = Process.objects.create(
+            name="Private category process",
+            owner=self.owner_user,
+            publication_status="private",
+        )
+        private_process.categories.add(self.private_object)
+
+        self.client.force_login(self.owner_user)
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": self.private_object.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Processes in This Category (1)")
+        self.assertContains(response, "Private category process")
+
 
 class ProcessCategoryAutocompleteViewTestCase(ViewWithPermissionsTestCase):
     """Test ProcessCategory autocomplete view."""
