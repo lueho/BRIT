@@ -64,6 +64,13 @@ class GeoDataSetModelForm(
     filterable_columns = CharField(required=False, widget=Textarea)
     searchable_columns = CharField(required=False, widget=Textarea)
     exportable_columns = CharField(required=False, widget=Textarea)
+    region = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="region-autocomplete",
+            label_field="name",
+        ),
+        label="Region",
+    )
 
     class Meta:
         model = GeoDataset
@@ -78,6 +85,8 @@ class GeoDataSetModelForm(
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["region"].queryset = Region.objects.all()
+        self.fields["region"].widget.model = Region
         runtime_configuration = None
         if self.instance and self.instance.pk:
             runtime_configuration = self.instance.get_runtime_configuration()
