@@ -63,19 +63,47 @@
 
         <div class="col-md-3">
             {% block user_actions %}
-                <div class="accordion">
-                    {% block filter_form_card %}
-                        <div class="card shadow">
-                            <div class="card-header bg-body-tertiary border-bottom-0 py-3"
-                                 role="button"
-                                 data-bs-toggle="collapse"
-                                 href="#filter-card-body"
-                                 aria-expanded="true"
-                                 aria-controls="filter-card-body">
-                                <h5 class="mb-0">Filter</h5>
-                            </div>
-                            <div class="card-body collapse show" id="filter-card-body">
-
+                <div class="card shadow">
+                    <div class="card-header bg-body-tertiary border-bottom-0">
+                        <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active"
+                                        id="filter-tab"
+                                        data-bs-toggle="tab"
+                                        data-bs-target="#filter-pane"
+                                        type="button"
+                                        role="tab"
+                                        aria-controls="filter-pane"
+                                        aria-selected="true">Filter</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link"
+                                        id="summary-tab"
+                                        data-bs-toggle="tab"
+                                        data-bs-target="#summary-pane"
+                                        type="button"
+                                        role="tab"
+                                        aria-controls="summary-pane"
+                                        aria-selected="false">Summary</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link"
+                                        id="options-tab"
+                                        data-bs-toggle="tab"
+                                        data-bs-target="#options-pane"
+                                        type="button"
+                                        role="tab"
+                                        aria-controls="options-pane"
+                                        aria-selected="false">Options</button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body tab-content">
+                        <div class="tab-pane fade show active"
+                             id="filter-pane"
+                             role="tabpanel"
+                             aria-labelledby="filter-tab">
+                            {% block filter_form_card %}
                                 {% block filter_form %}
                                     <form method="get">
                                         {% crispy filter.form %}
@@ -92,22 +120,13 @@
                                         {% endblock filter_form_buttons %}
                                     </form>
                                 {% endblock filter_form %}
-
-                            </div>
+                            {% endblock filter_form_card %}
                         </div>
-                    {% endblock filter_form_card %}
-
-                    {% block filter_result_card %}
-                        <div class="card shadow">
-                            <div class="card-header bg-body-tertiary border-bottom-0 py-3"
-                                 role="button"
-                                 data-bs-toggle="collapse"
-                                 href="#info-card-body"
-                                 aria-expanded="true"
-                                 aria-controls="info-card-body">
-                                <h5 class="mb-0">Summary</h5>
-                            </div>
-                            <div class="card-body collapse" id="info-card-body">
+                        <div class="tab-pane fade"
+                             id="summary-pane"
+                             role="tabpanel"
+                             aria-labelledby="summary-tab">
+                            {% block filter_result_card %}
                                 <div id="summary-container">
                                     <p class="card-text">No data selected, yet.</p>
                                 </div>
@@ -123,23 +142,21 @@
                                         {% endfor %}
                                     </p>
                                 {% endif %}
-                            </div>
+                            {% endblock filter_result_card %}
                         </div>
-                    {% endblock filter_result_card %}
-                    {% block options_card %}
-                        <div class="card shadow">
-                            <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                                <h5 class="mb-0">Options</h5>
-                            </div>
-                            <div class="card-body">
+                        <div class="tab-pane fade"
+                             id="options-pane"
+                             role="tabpanel"
+                             aria-labelledby="options-tab">
+                            {% block options_card %}
                                 {# Export actions placeholder – override per map to add export buttons #}
                                 {% block map_export_actions %}
                                 {% endblock map_export_actions %}
-                            </div>
+                            {% endblock options_card %}
+                            {% block extra_cards %}
+                            {% endblock extra_cards %}
                         </div>
-                    {% endblock options_card %}
-                    {% block extra_cards %}
-                    {% endblock extra_cards %}
+                    </div>
                 </div>
             {% endblock user_actions %}
         </div>
