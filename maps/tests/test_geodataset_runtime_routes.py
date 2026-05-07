@@ -308,6 +308,9 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertContains(response, "DE-B")
         self.assertNotContains(response, "Hidden code")
         self.assertNotContains(response, "hidden-a")
+        self.assertEqual(response.context["result_count"], 2)
+        self.assertEqual(response.context["displayed_result_count"], 2)
+        self.assertContains(response, "Showing 2 of 2 matching features")
         self.assertIn("nuts_id", response.context["filter"].form.fields)
         self.assertNotIn("hidden_code", response.context["filter"].form.fields)
         self.assertFalse(response.context["filter"].form.helper.form_tag)
@@ -323,6 +326,9 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "DE-B")
         self.assertNotContains(response, "DE-A")
+        self.assertEqual(response.context["result_count"], 1)
+        self.assertEqual(response.context["displayed_result_count"], 1)
+        self.assertContains(response, "Showing 1 of 1 matching features")
         self.assertEqual(response.context["filter"].form["nuts_id"].value(), "DE-B")
 
     def test_local_relation_table_route_ignores_hidden_column_filter(self):

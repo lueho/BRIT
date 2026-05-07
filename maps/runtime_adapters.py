@@ -205,8 +205,11 @@ class LocalRelationDatasetRuntimeAdapter:
     def get_record(self, pk):
         records = self._fetch_records(pk=pk)
         if not records:
-            raise Http404("No feature found for this dataset.")
+            raise Http404("Feature not found.")
         return records[0]
+
+    def get_record_count(self, query_params=None):
+        return self._fetch_record_count(query_params=query_params)
 
     def get_geojson_feature_collection(self, query_params=None):
         records = self._fetch_records(query_params=query_params, include_geometry=True)
@@ -236,20 +239,15 @@ class LocalRelationDatasetRuntimeAdapter:
                 f"{connection.ops.quote_name(self.runtime_configuration.geometry_column)}"
                 ") AS __geometry_geojson"
             )
-        where_sql = []
-        params = []
         if pk is not None:
-            where_sql.append(
+            where_sql = [
                 f"{connection.ops.quote_name(self.runtime_configuration.primary_key_column)} = %s"
+            ]
+            params = [pk]
+        else:
+            where_sql, params = self._build_filter_where_clause(
+                query_params=query_params
             )
-            params.append(pk)
-        elif query_params:
-            filterable_columns = self.get_filterable_column_names()
-            for column in sorted(filterable_columns):
-                if column in query_params and query_params.get(column) != "":
-                    self._validate_identifier(column)
-                    where_sql.append(f"{connection.ops.quote_name(column)} = %s")
-                    params.append(query_params.get(column))
         sql = (
             f"SELECT {', '.join(select_sql)} FROM {self.relation_identifier}"
             f"{' WHERE ' + ' AND '.join(where_sql) if where_sql else ''}"
@@ -264,6 +262,29 @@ class LocalRelationDatasetRuntimeAdapter:
             self._build_record(row, selected_columns, include_geometry=include_geometry)
             for row in rows
         ]
+
+    def _fetch_record_count(self, query_params=None):
+        self._validate_configured_columns()
+        where_sql, params = self._build_filter_where_clause(query_params=query_params)
+        sql = (
+            f"SELECT COUNT(*) FROM {self.relation_identifier}"
+            f"{' WHERE ' + ' AND '.join(where_sql) if where_sql else ''}"
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(sql, params)
+            return cursor.fetchone()[0]
+
+    def _build_filter_where_clause(self, query_params=None):
+        where_sql = []
+        params = []
+        if query_params:
+            filterable_columns = self.get_filterable_column_names()
+            for column in sorted(filterable_columns):
+                if column in query_params and query_params.get(column) != "":
+                    self._validate_identifier(column)
+                    where_sql.append(f"{connection.ops.quote_name(column)} = %s")
+                    params.append(query_params.get(column))
+        return where_sql, params
 
     def _get_selected_columns(self):
         columns = [

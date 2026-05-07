@@ -758,51 +758,61 @@ class GeoDataSetRuntimeTableView(
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         dataset = self.get_dataset()
+        adapter = self.get_runtime_adapter()
+        is_local_relation = getattr(adapter, "uses_local_relation", False)
         column_policies = self.get_visible_column_policies()
         filter_form = build_local_relation_filter_form(
             column_policies,
             data=self.request.GET or None,
         )
-        context.update(
-            {
-                "dataset": dataset,
-                "filter": SimpleNamespace(form=filter_form),
-                "column_policies": column_policies,
-                "table_columns": [
-                    {
-                        "name": policy.column_name,
-                        "label": self.get_policy_label(policy),
-                    }
-                    for policy in column_policies
-                ],
-                "table_rows": [
-                    {
-                        "object": obj,
-                        "detail_url": reverse(
-                            "geodataset-feature-detail",
-                            kwargs={"pk": dataset.pk, "feature_pk": obj.pk},
-                        ),
-                        "values": [
-                            self.get_column_value(obj, policy.column_name)
-                            for policy in column_policies
-                        ],
-                    }
-                    for obj in context["object_list"]
-                ],
-                "dashboard_url": dataset.get_absolute_url(),
-                "public_map_url": dataset.get_map_url(),
-                "private_map_url": dataset.get_map_url(),
-                "review_map_url": dataset.get_map_url(),
-                "breadcrumb_module_label": "Maps",
-                "breadcrumb_module_url": reverse("maps-dashboard"),
-                "breadcrumb_section_label": "GeoDatasets",
-                "breadcrumb_section_url": reverse("geodataset-list"),
-                "breadcrumb_object_label": dataset.name,
-                "breadcrumb_object_url": dataset.get_absolute_url(),
-                "breadcrumb_action_label": "Table",
-                "breadcrumb_page_title": f"{dataset.name} table",
-            }
-        )
+        context_update = {
+            "dataset": dataset,
+            "column_policies": column_policies,
+            "table_columns": [
+                {
+                    "name": policy.column_name,
+                    "label": self.get_policy_label(policy),
+                }
+                for policy in column_policies
+            ],
+            "table_rows": [
+                {
+                    "object": obj,
+                    "detail_url": reverse(
+                        "geodataset-feature-detail",
+                        kwargs={"pk": dataset.pk, "feature_pk": obj.pk},
+                    ),
+                    "values": [
+                        self.get_column_value(obj, policy.column_name)
+                        for policy in column_policies
+                    ],
+                }
+                for obj in context["object_list"]
+            ],
+            "dashboard_url": dataset.get_absolute_url(),
+            "public_map_url": dataset.get_map_url(),
+            "private_map_url": dataset.get_map_url(),
+            "review_map_url": dataset.get_map_url(),
+            "breadcrumb_module_label": "Maps",
+            "breadcrumb_module_url": reverse("maps-dashboard"),
+            "breadcrumb_section_label": "GeoDatasets",
+            "breadcrumb_section_url": reverse("geodataset-list"),
+            "breadcrumb_object_label": dataset.name,
+            "breadcrumb_object_url": dataset.get_absolute_url(),
+            "breadcrumb_action_label": "Table",
+            "breadcrumb_page_title": f"{dataset.name} table",
+        }
+        if is_local_relation:
+            context_update.update(
+                {
+                    "filter": SimpleNamespace(form=filter_form),
+                    "result_count": adapter.get_record_count(
+                        query_params=self.request.GET
+                    ),
+                    "displayed_result_count": len(context["object_list"]),
+                }
+            )
+        context.update(context_update)
         return context
 
 

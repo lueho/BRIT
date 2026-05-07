@@ -15,6 +15,13 @@
 {% block list_card_header %}
   {{ dataset.name }} features
 {% endblock list_card_header %}
+{% block list_result_count %}
+  {% if result_count is not None %}
+    <p class="text-muted small mb-2">Showing {{ displayed_result_count }} of {{ result_count }} matching features</p>
+  {% else %}
+    {{ block.super }}
+  {% endif %}
+{% endblock list_result_count %}
 {% block list_table %}
   <div class="table-responsive">
     <table class="table modern-table">
