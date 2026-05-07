@@ -781,6 +781,26 @@ class Sample(NamedUserCreatedObject):
                 }
             )
 
+    def approve(self, user=None):
+        """
+        Approve this sample, transitioning from review to published.
+        Blocks approval when any composition has no component measurements in its group,
+        as such compositions are empty placeholders that would mislead public users.
+        """
+        empty_groups = [
+            composition.group.name
+            for composition in self.compositions.select_related("group")
+            if not self.component_measurements.filter(group=composition.group).exists()
+        ]
+        if empty_groups:
+            names = ", ".join(f'"{g}"' for g in empty_groups)
+            raise ValidationError(
+                f"Cannot approve this sample because the following composition "
+                f"group(s) have no component measurements: {names}. "
+                f"Either add measurements or remove the empty composition(s) before approving."
+            )
+        return super().approve(user=user)
+
     def duplicate(self, creator, **kwargs):
         post_save.disconnect(add_default_composition, sender=Sample)
         duplicate = Sample.objects.create(

@@ -4047,6 +4047,90 @@ class MaterialsReviewWorkflowTests(TestCase):
             self.review_sample.publication_status, UserCreatedObject.STATUS_REVIEW
         )
 
+    def test_approve_blocked_when_composition_has_no_measurements(self):
+        """Approving a sample with an empty composition group is blocked."""
+        with mute_signals(post_save, pre_save):
+            sample = Sample.objects.create(
+                name="Empty Composition Sample",
+                material=self.material,
+                owner=self.owner,
+                publication_status=UserCreatedObject.STATUS_REVIEW,
+                standalone=True,
+            )
+            group = MaterialComponentGroup.objects.create(
+                name="Placeholder Group",
+                owner=self.owner,
+                publication_status=UserCreatedObject.STATUS_PUBLISHED,
+            )
+            Composition.objects.create(
+                owner=self.owner,
+                group=group,
+                sample=sample,
+            )
+            # No ComponentMeasurement created for this group
+
+        self.client.force_login(self.moderator)
+        url = reverse(
+            "object_management:approve_item",
+            kwargs={
+                "content_type_id": self.sample_ct_id,
+                "object_id": sample.id,
+            },
+        )
+        with mute_signals(post_save, pre_save):
+            response = self.client.post(url)
+        self.assertEqual(response.status_code, 302)
+        sample.refresh_from_db()
+        self.assertEqual(sample.publication_status, UserCreatedObject.STATUS_REVIEW)
+
+    def test_approve_succeeds_when_all_compositions_have_measurements(self):
+        """Approving a sample where every composition group has measurements succeeds."""
+        with mute_signals(post_save, pre_save):
+            sample = Sample.objects.create(
+                name="Full Composition Sample",
+                material=self.material,
+                owner=self.owner,
+                publication_status=UserCreatedObject.STATUS_REVIEW,
+                standalone=True,
+            )
+            group = MaterialComponentGroup.objects.create(
+                name="Filled Group",
+                owner=self.owner,
+                publication_status=UserCreatedObject.STATUS_PUBLISHED,
+            )
+            component = MaterialComponent.objects.create(
+                name="Test Component",
+                owner=self.owner,
+                publication_status=UserCreatedObject.STATUS_PUBLISHED,
+            )
+            Composition.objects.create(
+                owner=self.owner,
+                group=group,
+                sample=sample,
+            )
+            ComponentMeasurement.objects.create(
+                owner=self.owner,
+                sample=sample,
+                group=group,
+                component=component,
+                average=50.0,
+                standard_deviation=0.0,
+            )
+
+        self.client.force_login(self.moderator)
+        url = reverse(
+            "object_management:approve_item",
+            kwargs={
+                "content_type_id": self.sample_ct_id,
+                "object_id": sample.id,
+            },
+        )
+        with mute_signals(post_save, pre_save):
+            response = self.client.post(url)
+        self.assertEqual(response.status_code, 302)
+        sample.refresh_from_db()
+        self.assertEqual(sample.publication_status, UserCreatedObject.STATUS_PUBLISHED)
+
     # --- Reject ---
 
     def test_moderator_can_reject_sample(self):
