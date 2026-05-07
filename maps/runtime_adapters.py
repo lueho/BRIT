@@ -236,7 +236,9 @@ class LocalRelationDatasetRuntimeAdapter:
         if include_geometry:
             select_sql.append(
                 "ST_AsGeoJSON("
+                "ST_Transform("
                 f"{connection.ops.quote_name(self.runtime_configuration.geometry_column)}"
+                ", 4326)"
                 ") AS __geometry_geojson"
             )
         if pk is not None:

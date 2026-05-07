@@ -172,7 +172,7 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
                     name varchar(100),
                     nuts_id varchar(20),
                     hidden_code varchar(20),
-                    geom geometry(Point, 4326)
+                    geom geometry(Point, 3857)
                 )
                 """
             )
@@ -181,8 +181,8 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
                 INSERT INTO public.{self.relation_name}
                     (feature_id, name, nuts_id, hidden_code, geom)
                 VALUES
-                    (1, 'Local feature A', 'DE-A', 'hidden-a', ST_SetSRID(ST_Point(10, 53), 4326)),
-                    (2, 'Local feature B', 'DE-B', 'hidden-b', ST_SetSRID(ST_Point(11, 54), 4326))
+                    (1, 'Local feature A', 'DE-A', 'hidden-a', ST_Transform(ST_SetSRID(ST_Point(10, 53), 4326), 3857)),
+                    (2, 'Local feature B', 'DE-B', 'hidden-b', ST_Transform(ST_SetSRID(ST_Point(11, 54), 4326), 3857))
                 """
             )
 
@@ -368,6 +368,10 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertEqual(response.json()["type"], "FeatureCollection")
         self.assertEqual(len(response.json()["features"]), 2)
         self.assertEqual(response.json()["features"][0]["geometry"]["type"], "Point")
+        self.assertEqual(
+            response.json()["features"][0]["geometry"]["coordinates"],
+            [10, 53],
+        )
         self.assertEqual(
             response.json()["features"][0]["properties"]["nuts_id"], "DE-A"
         )
