@@ -38,6 +38,7 @@ from .serializers import (
     CatchmentCollectionAmountSerializer,
     CatchmentCollectionCountRatioSerializer,
     CatchmentCollectionCountSerializer,
+    CatchmentCollectionPointCountSerializer,
     CatchmentCollectionSupportSerializer,
     CatchmentCollectionSystemCountSerializer,
     CatchmentCollectionSystemSerializer,
@@ -71,6 +72,7 @@ _GREEN_WASTE_CATEGORY_NAMES = ["Green waste"]
 
 # Property ID for "Connection rate" (properties_property table)
 CONNECTION_RATE_PROPERTY_ID = 4
+COLLECTION_POINT_COUNT_PROPERTY_NAME = "number of collection points"
 
 # Priority for picking the primary collection system per catchment.
 # Lower number = higher priority.
@@ -894,6 +896,53 @@ class CollectionCountRatioViewSet(viewsets.ViewSet):
                 }
             )
         serializer = CatchmentCollectionCountRatioSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class CollectionPointCountViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+
+        qs = Collection.objects.filter(
+            _country_filter_q("catchment__", country),
+            valid_from__year=year,
+        )
+        qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+        rows = qs.select_related("collection_system").values_list(
+            "id", "catchment_id", "collection_system__name"
+        )
+
+        best = {}
+        for col_id, cid, system in rows:
+            p = _COLLECTION_SYSTEM_PRIORITY.get(system, 99)
+            if cid not in best or p < best[cid][2]:
+                best[cid] = (col_id, system, p)
+
+        collection_ids = [v[0] for v in best.values()]
+        cpv_qs = (
+            CollectionPropertyValue.objects.filter(
+                collection_id__in=collection_ids,
+                property__name=COLLECTION_POINT_COUNT_PROPERTY_NAME,
+                unit__name="No unit",
+                year=year,
+            )
+            .order_by("collection_id", "-id")
+            .distinct("collection_id")
+            .values_list("collection_id", "average")
+        )
+        value_lookup = dict(cpv_qs)
+
+        data = [
+            {
+                "catchment_id": cid,
+                "collection_point_count": value_lookup.get(col_id),
+            }
+            for cid, (col_id, _system, _priority) in best.items()
+        ]
+        serializer = CatchmentCollectionPointCountSerializer(data, many=True)
         return Response(serializer.data)
 
 

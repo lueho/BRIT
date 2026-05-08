@@ -283,6 +283,9 @@ class CollectionImporter:
         self._properties: dict[int, Property] = {
             o.id: o for o in Property.objects.all()
         }
+        self._properties_by_name: dict[str, Property] = {
+            o.name: o for o in Property.objects.all()
+        }
         self._units: dict[str, Unit] = {o.name: o for o in Unit.objects.all()}
 
         # NUTS id → CollectionCatchment  (single JOIN, no per-row queries)
@@ -739,13 +742,16 @@ class CollectionImporter:
     def _import_property_value(
         self, collection: Collection, pv: dict, stats: dict
     ) -> None:
-        prop = self._properties.get(pv["property_id"])
+        prop = self._properties.get(pv.get("property_id"))
+        if prop is None:
+            prop = self._properties_by_name.get(pv.get("property_name") or "")
         unit = self._units.get(pv["unit_name"])
 
         if prop is None:
             stats["cpv_skipped"] += 1
+            property_label = pv.get("property_id") or pv.get("property_name")
             stats["warnings"].append(
-                f"Property id={pv['property_id']} not found — CPV skipped."
+                f"Property '{property_label}' not found — CPV skipped."
             )
             return
         if unit is None:

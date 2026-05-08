@@ -22,6 +22,10 @@ ITALY_SOUTH_TYROL_MAP_ROUTES = {
     "collection_count_ratio": {
         "IT-ST": "waste-atlas-south-tyrol-collection-count-ratio-map",
     },
+    "collection_point_count": {
+        "IT": "waste-atlas-italy-collection-point-count-map",
+        "IT-ST": "waste-atlas-south-tyrol-collection-point-count-map",
+    },
     "residual_frequency": {
         "IT": "waste-atlas-italy-residual-frequency-map",
         "IT-ST": "waste-atlas-south-tyrol-residual-frequency-map",
@@ -248,6 +252,12 @@ class ItalyGreenWasteCollectionSystemCountMapView(ItalyAtlasMapView):
     map_route_key = "green_waste_collection_system_count"
 
 
+class ItalyCollectionPointCountMapView(ItalyAtlasMapView):
+    template_name = "waste_atlas/karte44_collection_point_count.html"
+    map_title = "Number of collection points"
+    map_route_key = "collection_point_count"
+
+
 class ItalyResidualFrequencyMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte8_residual_frequency.html"
     map_title = "Collection frequency types for residual waste"
@@ -324,6 +334,12 @@ class SouthTyrolCollectionCountRatioMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte42_collection_count_ratio.html"
     map_title = "Collection count ratio: biowaste vs residual waste"
     map_route_key = "collection_count_ratio"
+
+
+class SouthTyrolCollectionPointCountMapView(SouthTyrolAtlasMapView):
+    template_name = "waste_atlas/karte44_collection_point_count.html"
+    map_title = "Number of collection points"
+    map_route_key = "collection_point_count"
 
 
 class SouthTyrolResidualFrequencyMapView(SouthTyrolAtlasMapView):

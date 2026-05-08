@@ -50,6 +50,8 @@ class German2024ImprovedStandaloneImportTests(SimpleTestCase):
             row[index["Connection Rate 2024"]] = 87.5
         if "Connection Rate 2024 Unit" in index:
             row[index["Connection Rate 2024 Unit"]] = "% residential properties"
+        if "No. of collection points" in index:
+            row[index["No. of collection points"]] = 7
         return row
 
     def test_row_layout_maps_improved_template_units_and_sources(self):
@@ -59,6 +61,7 @@ class German2024ImprovedStandaloneImportTests(SimpleTestCase):
             "Country",
             "Collector",
             "Collection System",
+            "No. of collection points",
             "Waste Category",
             "Introduction of collection system (Year)",
             "Change of specifics in the system (Year)",
@@ -135,6 +138,12 @@ class German2024ImprovedStandaloneImportTests(SimpleTestCase):
         self.assertEqual(
             record["property_values"],
             [
+                {
+                    "property_name": import_de_2024_improved_standalone._PROP_COLLECTION_POINTS,
+                    "unit_name": import_de_2024_improved_standalone._UNIT_NONE,
+                    "year": 2024,
+                    "average": 7.0,
+                },
                 {
                     "property_id": import_de_2024_improved_standalone._PROP_CONN_RATE,
                     "unit_name": "% of residential properties",

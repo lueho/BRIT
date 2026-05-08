@@ -464,6 +464,30 @@ class CollectionImportRecordSerializerTestCase(TestCase):
         self.assertIn("forbidden_materials", serializer.fields)
         self.assertIn("review_comment", serializer.fields)
 
+    def test_property_values_accept_property_name_for_bulk_import(self):
+        serializer = CollectionImportRecordSerializer(
+            data={
+                "nuts_or_lau_id": "DE123",
+                "collection_system": "Door to door",
+                "waste_category": "Residual waste",
+                "valid_from": "2024-01-01",
+                "property_values": [
+                    {
+                        "property_name": "number of collection points",
+                        "unit_name": "No unit",
+                        "year": 2024,
+                        "average": 7,
+                    }
+                ],
+            }
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertEqual(
+            serializer.validated_data["property_values"][0]["property_name"],
+            "number of collection points",
+        )
+
 
 class CollectionFlatSerializerNutsHierarchyTestCase(TestCase):
     """

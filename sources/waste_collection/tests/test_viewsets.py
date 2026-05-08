@@ -1847,6 +1847,67 @@ class GreenWasteCollectionSystemCountViewSetTests(APITestCase):
         self.assertEqual(len(count_by_catchment), 2)
 
 
+class CollectionPointCountViewSetTests(APITestCase):
+    endpoint = "/waste_collection/api/waste-atlas/collection-point-count/"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region.objects.create(name="Region IT", country="IT")
+        cls.catchment = CollectionCatchment.objects.create(
+            name="Catchment IT",
+            region=cls.region,
+        )
+        cls.d2d = CollectionSystem.objects.create(name="Door to door")
+        cls.bring_point = CollectionSystem.objects.create(name="Bring point")
+        cls.waste_category = WasteCategory.objects.create(name="Residual waste")
+        cls.prop = Property.objects.create(name="number of collection points")
+        cls.unit, _ = Unit.objects.get_or_create(
+            name="No unit",
+            defaults={"dimensionless": True},
+        )
+        cls.prop.allowed_units.add(cls.unit)
+        cls.d2d_collection = cls._create_collection(cls.d2d)
+        cls.bring_point_collection = cls._create_collection(cls.bring_point)
+        CollectionPropertyValue.objects.create(
+            collection=cls.d2d_collection,
+            property=cls.prop,
+            unit=cls.unit,
+            year=2024,
+            average=5,
+        )
+        CollectionPropertyValue.objects.create(
+            collection=cls.bring_point_collection,
+            property=cls.prop,
+            unit=cls.unit,
+            year=2024,
+            average=11,
+        )
+
+    @classmethod
+    def _create_collection(cls, collection_system):
+        return Collection.objects.create(
+            name=f"{collection_system.name} collection",
+            catchment=cls.catchment,
+            waste_category=cls.waste_category,
+            collection_system=collection_system,
+            valid_from=date(2024, 1, 1),
+        )
+
+    def test_returns_primary_collection_point_count_per_catchment(self):
+        response = self.client.get(self.endpoint, {"country": "IT", "year": 2024})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data,
+            [
+                {
+                    "catchment_id": self.catchment.id,
+                    "collection_point_count": 5.0,
+                }
+            ],
+        )
+
+
 class BinConfigurationViewSetTests(APITestCase):
     """Tests for bin-configuration atlas endpoint."""
 

@@ -25,8 +25,10 @@ _BATCH_SIZE = 50
 _PROP_SPECIFIC = 1
 _PROP_TOTAL = 9
 _PROP_CONN_RATE = 4
+_PROP_COLLECTION_POINTS = "number of collection points"
 _UNIT_KG = "kg/(cap.*a)"
 _UNIT_MG = "Mg/a"
+_UNIT_NONE = "No unit"
 _CONN_RATE_FALLBACK_UNIT = "% (of unknown reference)"
 _BROKEN_WEBARCHIVE_RE = re.compile(
     r"(https?://web\.archive\.org/web/\d{6}),\s*(\d{6,}/https?://)",
@@ -236,6 +238,19 @@ def _collect_property_values(
     warnings: list[str] | None = None,
 ) -> list[dict]:
     property_values = []
+
+    collection_points = _safe_float(
+        _row_value(row, header_index, "No. of collection points")
+    )
+    if collection_points is not None:
+        property_values.append(
+            {
+                "property_name": _PROP_COLLECTION_POINTS,
+                "unit_name": _UNIT_NONE,
+                "year": 2024,
+                "average": collection_points,
+            }
+        )
 
     for year in range(2020, 2025):
         value = _safe_float(_row_value(row, header_index, f"Connection Rate {year}"))

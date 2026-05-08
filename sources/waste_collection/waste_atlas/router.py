@@ -11,6 +11,7 @@ from .viewsets import (
     CatchmentPopulationViewSet,
     CatchmentViewSet,
     CollectionCountRatioViewSet,
+    CollectionPointCountViewSet,
     CollectionSupportViewSet,
     CollectionSystemViewSet,
     CombinedCollectionCountViewSet,
@@ -121,6 +122,11 @@ router.register(
     "collection-count-ratio",
     CollectionCountRatioViewSet,
     basename="api-waste-atlas-collection-count-ratio",
+)
+router.register(
+    "collection-point-count",
+    CollectionPointCountViewSet,
+    basename="api-waste-atlas-collection-point-count",
 )
 router.register(
     "residual-fee-system",

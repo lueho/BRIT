@@ -25,6 +25,7 @@ from .views import (
     GreenWasteCollectionSystemCountMapView,
     ItalyBiowasteCollectionAmountMapView,
     ItalyBiowasteFrequencyMapView,
+    ItalyCollectionPointCountMapView,
     ItalyCollectionSystemMapView,
     ItalyGreenWasteCollectionAmountMapView,
     ItalyGreenWasteCollectionSystemCountMapView,
@@ -56,6 +57,7 @@ from .views import (
     SouthTyrolBiowasteFrequencyMapView,
     SouthTyrolBiowasteMinBinSizeMapView,
     SouthTyrolCollectionCountRatioMapView,
+    SouthTyrolCollectionPointCountMapView,
     SouthTyrolCollectionSystemMapView,
     SouthTyrolCombinedCollectionCountMapView,
     SouthTyrolCombinedFeeSystemMapView,
@@ -118,6 +120,11 @@ urlpatterns = [
         name="waste-atlas-italy-green-waste-collection-system-count-map",
     ),
     path(
+        "map/italy/collection-point-count/",
+        ItalyCollectionPointCountMapView.as_view(),
+        name="waste-atlas-italy-collection-point-count-map",
+    ),
+    path(
         "map/italy/residual-frequency/",
         ItalyResidualFrequencyMapView.as_view(),
         name="waste-atlas-italy-residual-frequency-map",
@@ -171,6 +178,11 @@ urlpatterns = [
         "map/south-tyrol/collection-count-ratio/",
         SouthTyrolCollectionCountRatioMapView.as_view(),
         name="waste-atlas-south-tyrol-collection-count-ratio-map",
+    ),
+    path(
+        "map/south-tyrol/collection-point-count/",
+        SouthTyrolCollectionPointCountMapView.as_view(),
+        name="waste-atlas-south-tyrol-collection-point-count-map",
     ),
     path(
         "map/south-tyrol/residual-frequency/",

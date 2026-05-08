@@ -642,7 +642,12 @@ class CollectionImportPropertyValueSerializer(serializers.Serializer):
     """A single property value to attach to an imported collection."""
 
     property_id = serializers.IntegerField(
-        help_text="Primary key of the Property (e.g. 1=specific waste collected, 4=Connection rate)."
+        required=False,
+        help_text="Primary key of the Property (e.g. 1=specific waste collected, 4=Connection rate).",
+    )
+    property_name = serializers.CharField(
+        required=False,
+        help_text="Exact name of the Property. Used when property_id is not supplied.",
     )
     unit_name = serializers.CharField(
         help_text="Exact name of the Unit as stored in the database."
@@ -660,6 +665,13 @@ class CollectionImportPropertyValueSerializer(serializers.Serializer):
         default=list,
         help_text="Source URLs to attach as WasteFlyers to this property value.",
     )
+
+    def validate(self, attrs):
+        if attrs.get("property_id") is None and not attrs.get("property_name"):
+            raise serializers.ValidationError(
+                "Either property_id or property_name is required."
+            )
+        return attrs
 
 
 class CollectionPropertyValueMutationSerializer(serializers.Serializer):
