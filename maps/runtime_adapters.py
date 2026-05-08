@@ -22,6 +22,7 @@ LEGACY_DATASET_RUNTIME_COMPATIBILITY = {
 
 IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 MAX_LOCAL_RELATION_ROWS = 1000
+MAX_LOCAL_RELATION_FILTER_OPTIONS = 100
 
 
 @dataclass(frozen=True)
@@ -146,6 +147,13 @@ class LocalRelationDatasetRuntimeAdapter:
                 "column_name", flat=True
             )
         )
+
+    def get_filter_options(self):
+        self._validate_configured_columns()
+        return {
+            column_name: self._get_distinct_filter_values(column_name)
+            for column_name in sorted(self.get_filterable_column_names())
+        }
 
     def get_relation_columns(self):
         policies = {
@@ -279,6 +287,19 @@ class LocalRelationDatasetRuntimeAdapter:
         with connection.cursor() as cursor:
             cursor.execute(sql, params)
             return cursor.fetchone()[0]
+
+    def _get_distinct_filter_values(self, column_name):
+        self._validate_identifier(column_name)
+        quoted_column = connection.ops.quote_name(column_name)
+        sql = (
+            f"SELECT DISTINCT {quoted_column} FROM {self.relation_identifier}"
+            f" WHERE {quoted_column} IS NOT NULL"
+            f" ORDER BY {quoted_column}"
+            " LIMIT %s"
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(sql, [MAX_LOCAL_RELATION_FILTER_OPTIONS])
+            return [row[0] for row in cursor.fetchall()]
 
     def _build_filter_where_clause(self, query_params=None):
         where_sql = []

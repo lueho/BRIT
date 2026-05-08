@@ -319,6 +319,30 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertContains(response, 'name="nuts_id"')
         self.assertContains(response, 'type="submit"')
 
+    def test_local_relation_table_route_renders_filter_labels_and_options(self):
+        GeoDatasetColumnPolicy.objects.create(
+            dataset=self.dataset,
+            column_name="name",
+            is_visible=True,
+            is_filterable=True,
+        )
+
+        response = self.client.get(
+            reverse("geodataset-table", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "NUTS ID")
+        self.assertContains(response, "Name")
+        self.assertContains(response, 'list="id_nuts_id_options"')
+        self.assertContains(response, 'list="id_name_options"')
+        self.assertContains(response, '<datalist id="id_nuts_id_options">')
+        self.assertContains(response, '<option value="DE-A">')
+        self.assertContains(response, '<option value="DE-B">')
+        self.assertContains(response, '<datalist id="id_name_options">')
+        self.assertContains(response, '<option value="Local feature A">')
+        self.assertContains(response, '<option value="Local feature B">')
+
     def test_local_relation_table_route_applies_filterable_column(self):
         response = self.client.get(
             reverse("geodataset-table", kwargs={"pk": self.dataset.pk}),
@@ -327,7 +351,11 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "DE-B")
-        self.assertNotContains(response, "DE-A")
+        table_values = [
+            value for row in response.context["table_rows"] for value in row["values"]
+        ]
+        self.assertIn("DE-B", table_values)
+        self.assertNotIn("DE-A", table_values)
         self.assertEqual(response.context["result_count"], 1)
         self.assertEqual(response.context["displayed_result_count"], 1)
         self.assertContains(response, "Showing 1 of 1 matching features")
@@ -429,6 +457,8 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertIn("nuts_id", response.context["filter"].form.fields)
         self.assertNotIn("hidden_code", response.context["filter"].form.fields)
         self.assertContains(response, 'name="nuts_id"')
+        self.assertContains(response, 'list="id_nuts_id_options"')
+        self.assertContains(response, '<datalist id="id_nuts_id_options">')
         self.assertContains(
             response, reverse("geodataset-table", kwargs={"pk": self.dataset.pk})
         )

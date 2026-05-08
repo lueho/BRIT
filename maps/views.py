@@ -90,17 +90,24 @@ from .models import (
 from .signals import clear_geojson_cache_pattern
 
 
-def build_local_relation_filter_form(column_policies, data=None):
-    fields = {
-        policy.column_name: forms.CharField(
-            label=policy.display_label or policy.column_name,
+def build_local_relation_filter_form(column_policies, data=None, filter_options=None):
+    filter_options = filter_options or {}
+    fields = {}
+    for policy in column_policies:
+        if not policy.is_filterable:
+            continue
+        field = forms.CharField(
+            label=policy.display_label or policy.column_name.replace("_", " ").title(),
             required=False,
         )
-        for policy in column_policies
-        if policy.is_filterable
-    }
+        options = filter_options.get(policy.column_name)
+        if options:
+            field.widget.attrs["list"] = f"id_{policy.column_name}_options"
+            field.widget.attrs["autocomplete"] = "off"
+        fields[policy.column_name] = field
     form_class = type("LocalRelationFilterForm", (forms.Form,), fields)
     form = form_class(data=data)
+    form.filter_options = filter_options
     form.helper = FormHelper()
     form.helper.form_tag = False
     return form
@@ -745,6 +752,7 @@ class GeoDataSetRuntimeMapView(
             filter_form = build_local_relation_filter_form(
                 self.get_visible_column_policies(),
                 data=self.request.GET or None,
+                filter_options=adapter.get_filter_options(),
             )
             context_update["filter"] = SimpleNamespace(form=filter_form)
         context.update(context_update)
@@ -780,6 +788,7 @@ class GeoDataSetRuntimeTableView(
         filter_form = build_local_relation_filter_form(
             column_policies,
             data=self.request.GET or None,
+            filter_options=adapter.get_filter_options() if is_local_relation else None,
         )
         context_update = {
             "dataset": dataset,
