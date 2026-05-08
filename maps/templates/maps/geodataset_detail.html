@@ -1,6 +1,12 @@
 {% extends "detail_with_options.html" %}
 {% load static %}
 {% load leaflet_tags %}
+{% block style_sheets %}
+  {{ block.super }}
+  {% leaflet_js %}
+  {% leaflet_css %}
+  <link rel="stylesheet" href="{% static 'css/maps.min.css' %}">
+{% endblock style_sheets %}
 
 {% block title %}
   BRIT | {{ object.name }}
@@ -10,27 +16,61 @@
   {{ object.name }}
 {% endblock detail_header %}
 
+{% block detail_header_actions %}
+  <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
+    <div class="btn-group me-2" role="group" aria-label="View toggle">
+      <a class="btn btn-sm btn-outline-secondary active disabled"
+         aria-current="page"
+         aria-disabled="true"
+         tabindex="-1"
+         href="{{ object.get_absolute_url }}"
+         title="Detail">
+        <i class="fas fa-circle-info"></i> <span class="d-none d-md-inline">Detail</span>
+      </a>
+      <a class="btn btn-sm btn-outline-secondary"
+         href="{% url 'geodataset-table' pk=object.pk %}"
+         title="Table">
+        <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">Table</span>
+      </a>
+      <a class="btn btn-sm btn-outline-secondary"
+         href="{{ object.get_map_url }}"
+         title="Map">
+        <i class="fas fa-map"></i> <span class="d-none d-md-inline">Map</span>
+      </a>
+      <a class="btn btn-sm btn-outline-secondary"
+         href="{% url 'geodataset-list' %}"
+         title="Open Explorer">
+        <i class="fas fa-table-cells-large"></i> <span class="d-none d-md-inline">Explorer</span>
+      </a>
+    </div>
+    {{ block.super }}
+  </div>
+{% endblock detail_header_actions %}
+
+{% block detail_top_image %}
+  <div class="card-img-top map-container">{% leaflet_map "main" %}</div>
+{% endblock detail_top_image %}
+
 {% block detail_body %}
   {% if object.description %}<p class="card-text">{{ object.description }}</p>{% endif %}
-  <div class="mb-3">
-    {% if object.region %}<div class="small text-muted mb-2">{{ object.region.name }}</div>{% endif %}
-    {% leaflet_js %}
-    {% leaflet_css %}
-    <div class="card shadow-sm overflow-hidden">
-      <div class="card-body map-card-body map-height p-0">{% leaflet_map "main" %}</div>
-    </div>
-  </div>
+  {% if object.region %}
+    <p class="card-text">
+      <strong>Region:</strong>
+      <br>
+      {{ object.region.name }}
+    </p>
+  {% endif %}
 {% endblock detail_body %}
 
 {% block options_secondary_actions %}
   {{ block.super }}
   <a class="btn btn-outline-primary w-100 mb-2"
-     href="{{ object.get_map_url }}">
-    <i class="fas fa-map"></i> Open filtered map
-  </a>
-  <a class="btn btn-outline-primary w-100 mb-2"
      href="{% url 'geodataset-table' pk=object.pk %}">
     <i class="fas fa-table"></i> Open feature table
+  </a>
+  <a class="btn btn-outline-secondary w-100 mb-2"
+     href="{{ object.get_map_url }}">
+    <i class="fas fa-map"></i> Open filtered map
   </a>
   <a class="btn btn-outline-secondary w-100 mb-2"
      href="{% url 'geodataset-list' %}">

@@ -1,10 +1,51 @@
 {% extends "detail_with_options.html" %}
+{% load static %}
+{% load leaflet_tags %}
+{% block style_sheets %}
+  {{ block.super }}
+  {% leaflet_js %}
+  {% leaflet_css %}
+  <link rel="stylesheet" href="{% static 'css/maps.min.css' %}">
+{% endblock style_sheets %}
 {% block title %}
   BRIT | {{ dataset.name }} feature
 {% endblock title %}
 {% block detail_header %}
   {{ feature }}
 {% endblock detail_header %}
+{% block detail_header_actions %}
+  <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
+    <div class="btn-group me-2" role="group" aria-label="View toggle">
+      <a class="btn btn-sm btn-outline-secondary active disabled"
+         aria-current="page"
+         aria-disabled="true"
+         tabindex="-1"
+         href="{{ request.get_full_path }}"
+         title="Detail">
+        <i class="fas fa-circle-info"></i> <span class="d-none d-md-inline">Detail</span>
+      </a>
+      <a class="btn btn-sm btn-outline-secondary"
+         href="{% url 'geodataset-table' pk=dataset.pk %}"
+         title="Table">
+        <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">Table</span>
+      </a>
+      <a class="btn btn-sm btn-outline-secondary"
+         href="{{ dataset.get_map_url }}?id={{ feature.pk }}&load_features=true"
+         title="Map">
+        <i class="fas fa-map"></i> <span class="d-none d-md-inline">Map</span>
+      </a>
+      <a class="btn btn-sm btn-outline-secondary"
+         href="{{ dataset.get_absolute_url }}"
+         title="Dataset">
+        <i class="fas fa-layer-group"></i> <span class="d-none d-md-inline">Dataset</span>
+      </a>
+    </div>
+    {{ block.super }}
+  </div>
+{% endblock detail_header_actions %}
+{% block detail_top_image %}
+  <div class="card-img-top map-container">{% leaflet_map "main" %}</div>
+{% endblock detail_top_image %}
 {% block detail_body %}
   <p class="text-muted small mb-3">Feature from {{ dataset.name }}</p>
   <div class="table-responsive">
@@ -31,10 +72,31 @@
     <i class="fas fa-table"></i> Back to dataset table
   </a>
   <a class="btn btn-outline-secondary w-100 mb-2"
-     href="{{ dataset.get_map_url }}">
-    <i class="fas fa-map"></i> Open filtered map
+     href="{{ dataset.get_map_url }}?id={{ feature.pk }}&load_features=true">
+    <i class="fas fa-map"></i> Open feature on map
+  </a>
+  <a class="btn btn-outline-secondary w-100 mb-2"
+     href="{{ dataset.get_absolute_url }}">
+    <i class="fas fa-layer-group"></i> Dataset detail
   </a>
 {% endblock options_secondary_actions %}
 {% block learning_content %}
   {% include "maps/includes/learning_materials.html" %}
 {% endblock learning_content %}
+{% block javascript %}
+  {{ block.super }}
+  <script src="{% static 'js/maps.min.js' %}"></script>
+  <script src="{% static 'js/streaming-geojson.min.js' %}"></script>
+  {{ map_config|json_script:"mapConfig" }}
+  <script type="text/javascript">
+    const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
+
+    if (typeof fetchFeatureGeometriesWithProgress !== "undefined") {
+      window.fetchFeatureGeometries = fetchFeatureGeometriesWithProgress;
+    }
+
+    window.onload = () => {
+      loadMap(mapConfig);
+    };
+  </script>
+{% endblock javascript %}

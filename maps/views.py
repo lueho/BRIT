@@ -798,6 +798,7 @@ class GeoDataSetRuntimeTableView(
                 for obj in context["object_list"]
             ],
             "dashboard_url": dataset.get_absolute_url(),
+            "map_url": dataset.get_map_url(),
             "public_map_url": dataset.get_map_url(),
             "private_map_url": dataset.get_map_url(),
             "review_map_url": dataset.get_map_url(),
@@ -825,7 +826,7 @@ class GeoDataSetRuntimeTableView(
 
 
 class GeoDataSetRuntimeFeatureDetailView(
-    GeoDataSetRuntimePermissionMixin, UserPassesTestMixin, DetailView
+    GeoDataSetRuntimePermissionMixin, UserPassesTestMixin, MapMixin, DetailView
 ):
     template_name = "maps/geodataset_feature_detail.html"
     pk_url_kwarg = "feature_pk"
@@ -841,6 +842,27 @@ class GeoDataSetRuntimeFeatureDetailView(
         if not getattr(adapter, "uses_local_relation", False):
             return super().get_object(queryset=queryset)
         return adapter.get_record(self.kwargs[self.pk_url_kwarg])
+
+    def get_map_title(self):
+        return f"{self.get_dataset().name}: {self.object}"
+
+    def get_region_feature_id(self):
+        return self.get_dataset().region_id
+
+    def get_map_configuration(self):
+        dataset = self.get_dataset()
+        if dataset.map_configuration:
+            return dataset.map_configuration
+        return MapConfiguration.objects.get(name="Default Map Configuration")
+
+    def get_override_params(self):
+        params = super().get_override_params()
+        adapter = self.get_runtime_adapter()
+        if getattr(adapter, "uses_local_relation", False):
+            params["load_features"] = True
+            params["features_feature_id"] = self.kwargs[self.pk_url_kwarg]
+            params["features_layer_summary_url"] = ""
+        return params
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -882,7 +904,10 @@ class GeoDataSetRuntimeFeatureGeoJSONView(
         if not getattr(adapter, "uses_local_relation", False):
             raise Http404("Dataset does not use a local relation runtime.")
         return Response(
-            adapter.get_geojson_feature_collection(query_params=request.GET)
+            adapter.get_geojson_feature_collection(
+                query_params=request.GET,
+                pk=request.GET.get("id"),
+            )
         )
 
 

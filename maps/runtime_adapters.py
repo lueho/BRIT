@@ -211,8 +211,12 @@ class LocalRelationDatasetRuntimeAdapter:
     def get_record_count(self, query_params=None):
         return self._fetch_record_count(query_params=query_params)
 
-    def get_geojson_feature_collection(self, query_params=None):
-        records = self._fetch_records(query_params=query_params, include_geometry=True)
+    def get_geojson_feature_collection(self, query_params=None, pk=None):
+        records = self._fetch_records(
+            query_params=query_params,
+            pk=pk,
+            include_geometry=True,
+        )
         return {
             "type": "FeatureCollection",
             "features": [

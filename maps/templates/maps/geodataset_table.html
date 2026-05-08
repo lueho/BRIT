@@ -13,7 +13,29 @@
   </div>
 {% endblock list_intro %}
 {% block list_card_header %}
-  {{ dataset.name }} features
+  <span class="d-flex align-items-center justify-content-between gap-2 flex-wrap w-100">
+    <span>{{ dataset.name }} features</span>
+    <span class="d-flex align-items-center justify-content-end flex-wrap gap-2">
+      <span class="btn-group btn-group-sm" role="group" aria-label="View toggle">
+        <a class="btn btn-outline-secondary active disabled"
+           aria-current="page"
+           aria-disabled="true"
+           tabindex="-1"
+           href="{{ request.get_full_path }}"
+           title="Table">
+          <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">Table</span>
+        </a>
+        <a class="btn btn-outline-secondary" href="{{ map_url }}" title="Map">
+          <i class="fas fa-map"></i> <span class="d-none d-md-inline">Map</span>
+        </a>
+      </span>
+      <a class="btn btn-sm btn-outline-secondary"
+         href="{{ dashboard_url }}"
+         title="Open Explorer">
+        <i class="fas fa-table-cells-large"></i> Explorer
+      </a>
+    </span>
+  </span>
 {% endblock list_card_header %}
 {% block list_result_count %}
   {% if result_count is not None %}

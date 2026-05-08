@@ -31,18 +31,28 @@
                             </h5>
                             <div class="d-flex align-items-center justify-content-end flex-wrap gap-2">
                                 {% block map_card_header_actions %}
+                                    {% if table_url %}
+                                        <div class="btn-group btn-group-sm" role="group" aria-label="View toggle">
+                                            <a class="btn btn-outline-secondary"
+                                               href="{{ table_url }}"
+                                               title="Table">
+                                                <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">Table</span>
+                                            </a>
+                                            <a class="btn btn-outline-secondary active disabled"
+                                               aria-current="page"
+                                               aria-disabled="true"
+                                               tabindex="-1"
+                                               href="{{ request.get_full_path }}"
+                                               title="Map">
+                                                <i class="fas fa-map"></i> <span class="d-none d-md-inline">Map</span>
+                                            </a>
+                                        </div>
+                                    {% endif %}
                                     {% if dashboard_url %}
                                         <a class="btn btn-sm btn-outline-secondary"
                                            href="{{ dashboard_url }}"
                                            title="Open Explorer (dashboard)">
                                             <i class="fas fa-table-cells-large"></i> Explorer
-                                        </a>
-                                    {% endif %}
-                                    {% if table_url %}
-                                        <a class="btn btn-sm btn-outline-secondary"
-                                           href="{{ table_url }}"
-                                           title="Open feature table">
-                                            <i class="fas fa-table"></i> Table
                                         </a>
                                     {% endif %}
                                 {% endblock map_card_header_actions %}

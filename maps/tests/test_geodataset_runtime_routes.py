@@ -75,6 +75,8 @@ class GeoDataSetRuntimeRouteTestCase(TestCase):
             response,
             reverse("geodataset-table", kwargs={"pk": self.dataset.pk}),
         )
+        self.assertContains(response, self.dataset.get_map_url())
+        self.assertContains(response, 'aria-label="View toggle"')
 
     def test_dataset_table_route_renders_visible_columns(self):
         response = self.client.get(
@@ -357,7 +359,17 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertContains(response, "Local feature A")
         self.assertContains(response, "NUTS ID")
         self.assertContains(response, "DE-A")
-        self.assertNotContains(response, "Hidden code")
+        self.assertNotContains(response, "hidden-a")
+        self.assertContains(response, 'aria-label="View toggle"')
+        self.assertContains(response, "Open feature on map")
+        self.assertContains(response, "Dataset detail")
+        self.assertEqual(response.context["map_config"]["featuresId"], 1)
+        self.assertTrue(response.context["map_config"]["loadFeatures"])
+        self.assertEqual(
+            response.context["map_config"]["featuresLayerGeometriesUrl"],
+            reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk}),
+        )
+        self.assertContains(response, "mapConfig")
 
     def test_local_relation_geojson_route_returns_feature_collection(self):
         response = self.client.get(
@@ -385,8 +397,19 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()["features"]), 2)
-        for feature in response.json()["features"]:
-            self.assertNotIn("hidden_code", feature["properties"])
+
+    def test_local_relation_geojson_route_can_return_single_feature(self):
+        response = self.client.get(
+            reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk}),
+            {"id": "2"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()["features"]), 1)
+        self.assertEqual(response.json()["features"][0]["id"], 2)
+        self.assertEqual(
+            response.json()["features"][0]["properties"]["nuts_id"], "DE-B"
+        )
 
     def test_local_relation_map_route_uses_dataset_scoped_geojson_url(self):
         response = self.client.get(
@@ -404,6 +427,7 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertContains(
             response, reverse("geodataset-table", kwargs={"pk": self.dataset.pk})
         )
+        self.assertContains(response, 'aria-label="View toggle"')
         self.assertContains(response, "nav nav-pills sidebar-tabs")
         self.assertFalse(response.context["map_config"]["featuresId"])
         self.assertEqual(
