@@ -1060,11 +1060,6 @@ class CombinedFeeSystemViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-# For the 2022 atlas version the actual 2022 amounts were not yet
-# available, so the average of 2020 and 2021 is used instead.
-_2022_AMOUNT_YEARS = (2020, 2021)
-
-
 def _get_collection_amount(
     country,
     year,
@@ -1075,13 +1070,9 @@ def _get_collection_amount(
 ):
     """Return per-catchment collection amount in kg/person/year.
 
-    Strategy varies by atlas year:
-
-    * **2022** – average of ``specific waste collected`` (property 1) over
-      2020–2021, with ``AggregatedCollectionPropertyValue`` as fallback.
-    * **2024** – ``specific waste collected`` for 2024 directly.  Derived
-      CPV records (computed from total waste / population) are included
-      automatically via the ``is_derived`` mechanism.
+    Uses ``specific waste collected`` for the requested year directly.
+    Derived CPV records (computed from total waste / population) are
+    included automatically via the ``is_derived`` mechanism.
 
     Data is looked up across **all** collections for a catchment (any
     year) so that values attached to an earlier collection version are
@@ -1134,18 +1125,13 @@ def _get_collection_amount(
     # ------------------------------------------------------------------
     # Step 3: look up amounts (strategy depends on year)
     # ------------------------------------------------------------------
-    if year == 2022:
-        amounts, value_sources, acpv_group_keys = _amounts_for_2022(
-            all_collection_ids, col_to_cid
-        )
-    else:
-        amounts, value_sources, acpv_group_keys = _amounts_for_2024(
-            year,
-            all_collection_ids,
-            col_to_cid,
-            catchment_ids,
-            include_metadata=True,
-        )
+    amounts, value_sources, acpv_group_keys = _amounts_for_year(
+        year,
+        all_collection_ids,
+        col_to_cid,
+        catchment_ids,
+        include_metadata=True,
+    )
 
     # ------------------------------------------------------------------
     # Step 4: build result list
@@ -1184,59 +1170,7 @@ def _build_acpv_group_key(acpv_ids):
     return "acpv-" + "-".join(str(acpv_id) for acpv_id in sorted(acpv_ids))
 
 
-def _amounts_for_2022(all_collection_ids, col_to_cid):
-    """Average of *specific waste collected* over 2020–2021 per catchment."""
-    cfg = get_derived_property_config()
-    cpv_qs = (
-        CollectionPropertyValue.objects.filter(
-            collection_id__in=all_collection_ids,
-            property_id=cfg.specific_property_id,
-            year__in=_2022_AMOUNT_YEARS,
-        )
-        .exclude(average=0)
-        .values_list("collection_id", "average")
-    )
-    cpv_by_catchment: dict[int, list[float]] = {}
-    value_sources: dict[int, str] = {}
-    acpv_ids_by_catchment: dict[int, set[int]] = {}
-    for col_id, avg in cpv_qs:
-        cid = col_to_cid.get(col_id)
-        if cid is not None:
-            cpv_by_catchment.setdefault(cid, []).append(avg)
-            value_sources[cid] = "cpv"
-
-    # Aggregated fallback
-    missing_cols = {
-        col_id for col_id, cid in col_to_cid.items() if cid not in cpv_by_catchment
-    }
-    if missing_cols:
-        agg_qs = (
-            AggregatedCollectionPropertyValue.objects.filter(
-                collections__id__in=missing_cols,
-                property_id=cfg.specific_property_id,
-                year__in=_2022_AMOUNT_YEARS,
-            )
-            .exclude(average=0)
-            .values_list("collections__id", "average", "id")
-        )
-        for col_id, avg, acpv_id in agg_qs:
-            cid = col_to_cid.get(col_id)
-            if cid is not None and cid not in cpv_by_catchment:
-                cpv_by_catchment.setdefault(cid, []).append(avg)
-                value_sources[cid] = "acpv"
-                acpv_ids_by_catchment.setdefault(cid, set()).add(acpv_id)
-
-    return (
-        {cid: sum(vals) / len(vals) for cid, vals in cpv_by_catchment.items()},
-        value_sources,
-        {
-            cid: _build_acpv_group_key(acpv_ids)
-            for cid, acpv_ids in acpv_ids_by_catchment.items()
-        },
-    )
-
-
-def _amounts_for_2024(
+def _amounts_for_year(
     year,
     all_collection_ids,
     col_to_cid,
@@ -1270,11 +1204,40 @@ def _amounts_for_2024(
             result[cid] = avg
             value_sources[cid] = "cpv"
 
+    missing_cids = [cid for cid in catchment_ids if cid not in result]
+    acpv_group_keys: dict[int, str | None] = {}
+    if missing_cids:
+        missing_cid_set = set(missing_cids)
+        missing_cols = {
+            col_id for col_id, cid in col_to_cid.items() if cid in missing_cid_set
+        }
+        agg_qs = (
+            AggregatedCollectionPropertyValue.objects.filter(
+                collections__id__in=missing_cols,
+                property_id=cfg.specific_property_id,
+                year=year,
+            )
+            .exclude(average=0)
+            .values_list("collections__id", "average", "id")
+        )
+        acpv_by_catchment: dict[int, list[float]] = {}
+        acpv_ids_by_catchment: dict[int, set[int]] = {}
+        for col_id, avg, acpv_id in agg_qs:
+            cid = col_to_cid.get(col_id)
+            if cid is not None and cid not in result:
+                acpv_by_catchment.setdefault(cid, []).append(avg)
+                acpv_ids_by_catchment.setdefault(cid, set()).add(acpv_id)
+        for cid, values in acpv_by_catchment.items():
+            if values:
+                result[cid] = sum(values) / len(values)
+                value_sources[cid] = "acpv"
+                acpv_group_keys[cid] = _build_acpv_group_key(acpv_ids_by_catchment[cid])
+
     # Runtime fallback for missing catchments: total_Mg * 1000 / population.
     missing_cids = [cid for cid in catchment_ids if cid not in result]
     if not missing_cids:
         if include_metadata:
-            return result, value_sources, {}
+            return result, value_sources, acpv_group_keys
         return result
 
     missing_cid_set = set(missing_cids)
@@ -1298,7 +1261,7 @@ def _amounts_for_2024(
 
     if not total_by_catchment:
         if include_metadata:
-            return result, value_sources, {}
+            return result, value_sources, acpv_group_keys
         return result
 
     pop_qs = (
@@ -1326,8 +1289,12 @@ def _amounts_for_2024(
             result[cid] = convert_total_to_specific(total_mg, pop, ndigits=1)
             value_sources[cid] = "cpv"
     if include_metadata:
-        return result, value_sources, {}
+        return result, value_sources, acpv_group_keys
     return result
+
+
+def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
+    return _amounts_for_year(year, all_collection_ids, col_to_cid, catchment_ids)
 
 
 def _get_biowaste_acpv_outline_geojson(country, year, nuts_prefixes=()):

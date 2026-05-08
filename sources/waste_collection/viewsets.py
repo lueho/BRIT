@@ -173,10 +173,10 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     def get_filterset_kwargs(self):
         """Pass lightweight filter kwargs for API-only actions.
 
-        GeoJSON/version endpoints do not render filter widgets, so they can skip
+        API endpoints do not render filter widgets, so they can skip
         expensive min/max slider calculations performed during filterset init.
         """
-        if getattr(self, "action", None) in {"geojson", "version"}:
+        if getattr(self, "action", None) in {"geojson", "list", "version"}:
             return {"skip_min_max": True}
         return {}
 
