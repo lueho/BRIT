@@ -147,21 +147,21 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
             ],
             property_obj=cls.specific_property,
             unit_obj=cls.specific_unit,
-            year=2020,
+            year=2022,
             average=85.0,
         )
         cls.acpv_group_b = cls._create_agg_value(
             collections=[cls.acpv_group_b_source_collection],
             property_obj=cls.specific_property,
             unit_obj=cls.specific_unit,
-            year=2020,
+            year=2022,
             average=95.0,
         )
         cls._create_cpv(
             collection=cls.cpv_source_collection,
             property_obj=cls.specific_property,
             unit_obj=cls.specific_unit,
-            year=2020,
+            year=2022,
             average=110.0,
         )
 
