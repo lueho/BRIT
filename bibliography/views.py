@@ -137,7 +137,7 @@ class AuthorAutocompleteView(UserCreatedObjectAutocompleteView):
 
     def hook_prepare_results(self, results):
         for result in results:
-            result["label"] = f"{result["last_names"]}, {result["first_names"]}"
+            result["label"] = f"{result['last_names']}, {result['first_names']}"
         return results
 
 
@@ -246,10 +246,12 @@ class SourceBibtexArticleImportView(PermissionRequiredMixin, FormView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update({
-            "form_title": "Create New Reference from BibTeX @article",
-            "submit_button_text": "Import",
-        })
+        context.update(
+            {
+                "form_title": "Create New Reference from BibTeX @article",
+                "submit_button_text": "Import",
+            }
+        )
         return context
 
     def form_valid(self, form):
@@ -284,10 +286,12 @@ class SourceModalDetailView(UserCreatedObjectModalDetailView):
         serializer = HyperlinkedSourceSerializer(
             self.object, context={"request": self.request}
         )
-        context.update({
-            "modal_title": "Reference details",
-            "object_data": serializer.data,
-        })
+        context.update(
+            {
+                "modal_title": "Reference details",
+                "object_data": serializer.data,
+            }
+        )
         return context
 
 
@@ -630,7 +634,7 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
 
             if source_type == "waste_flyer":
                 url = result.get("url", "")
-                formatted_name = url if url else f"WasteFlyer #{result["id"]}"
+                formatted_name = url if url else f"WasteFlyer #{result['id']}"
             else:
                 title = result.get("title", "").strip()
                 authors = authors_by_source.get(result["id"], [])
@@ -642,7 +646,7 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
                     formatted_name = (
                         title
                         if title
-                        else result.get("citation_key", f"Source #{result["id"]}")
+                        else result.get("citation_key", f"Source #{result['id']}")
                     )
 
             result["text"] = formatted_name

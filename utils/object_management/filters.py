@@ -50,7 +50,7 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
     - Owner/submitter filtering
     - Submission date range
     - Sorting options
-    
+
     See: utils.object_management.review_filtering.ReviewItemFilter for the
     actual filtering implementation.
     """

@@ -7,7 +7,6 @@ from utils.object_management.models import get_default_owner
 
 
 class InitialDataTestCase(TestCase):
-
     def test_initial_superuser_is_created_from_migrations(self):
         User.objects.get(username=os.environ.get("ADMIN_USERNAME"))
         self.assertEqual(User.objects.all().count(), 1)
@@ -23,7 +22,6 @@ class InitialDataTestCase(TestCase):
 
 
 class UserTestCase(TestCase):
-
     def test_new_users_are_added_to_group_registered(self):
         user = User.objects.create(username="registered_user")
         registered = user.groups.get(name="registered")

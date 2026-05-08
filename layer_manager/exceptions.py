@@ -8,9 +8,9 @@ class TableAlreadyExists(Exception):
 
 class InvalidGeometryType(Exception):
     def __init__(self, geometry_type: str):
-        f"""Invalid geometry type: \"{geometry_type}\"."""
+        super().__init__(f'Invalid geometry type: "{geometry_type}".')
 
 
 class NoFeaturesProvided(Exception):
     def __init__(self, results):
-        f"""No features provided in results: \"{results}\"."""
+        super().__init__(f'No features provided in results: "{results}".')

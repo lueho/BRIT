@@ -4,18 +4,26 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('object_management', '0002_reviewlog'),
+        ("object_management", "0002_reviewlog"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='reviewaction',
-            name='action',
-            field=models.CharField(choices=[('submitted', 'Submitted'), ('approved', 'Approved'), ('rejected', 'Rejected'), ('withdrawn', 'Withdrawn'), ('comment', 'Comment')], max_length=20),
+            model_name="reviewaction",
+            name="action",
+            field=models.CharField(
+                choices=[
+                    ("submitted", "Submitted"),
+                    ("approved", "Approved"),
+                    ("rejected", "Rejected"),
+                    ("withdrawn", "Withdrawn"),
+                    ("comment", "Comment"),
+                ],
+                max_length=20,
+            ),
         ),
         migrations.DeleteModel(
-            name='ReviewLog',
+            name="ReviewLog",
         ),
     ]

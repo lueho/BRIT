@@ -114,9 +114,13 @@ class HamburgRoadsideTreeViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
             return False
         if not values_match(filters.get("plantation_year_max"), aggregates["year_max"]):
             return False
-        if not values_match(filters.get("stem_circumference_min"), aggregates["circ_min"]):
+        if not values_match(
+            filters.get("stem_circumference_min"), aggregates["circ_min"]
+        ):
             return False
-        if not values_match(filters.get("stem_circumference_max"), aggregates["circ_max"]):
+        if not values_match(
+            filters.get("stem_circumference_max"), aggregates["circ_max"]
+        ):
             return False
 
         return True

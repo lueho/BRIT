@@ -48,6 +48,7 @@ class HamburgRoadsideTreeFlatSerializer(serializers.ModelSerializer):
             "bezirk",
         )
 
+
 __all__ = [
     "HamburgRoadsideTreeFlatSerializer",
     "HamburgRoadsideTreeGeometrySerializer",

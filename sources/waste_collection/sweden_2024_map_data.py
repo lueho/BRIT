@@ -203,9 +203,9 @@ def _extract_page24_assets(pdf_path: Path):
     return left_image, right_image, left_legend, right_legend
 
 
-def _load_projected_regions() -> (
-    tuple[list[_ProjectedRegion], tuple[float, float, float, float]]
-):
+def _load_projected_regions() -> tuple[
+    list[_ProjectedRegion], tuple[float, float, float, float]
+]:
     from maps.models import LauRegion
 
     regions = []
@@ -223,9 +223,9 @@ def _load_projected_regions() -> (
         geom.transform(MAP_PROJECTION_SRID)
         polygons = []
         for polygon in _iter_polygons(geom):
-            polygons.append([
-                _coord_xy(coord) for coord in polygon.exterior_ring.coords
-            ])
+            polygons.append(
+                [_coord_xy(coord) for coord in polygon.exterior_ring.coords]
+            )
         regions.append(
             _ProjectedRegion(
                 lau_id=(region.lau_id or "").zfill(4),
@@ -587,11 +587,11 @@ def _load_raw_payload(raw_path: str | Path) -> dict[str, object]:
         payload = json.load(handle)
     if payload.get("format") != RAW_FILE_FORMAT:
         raise Sweden2024MapDataError(
-            f"Expected {RAW_FILE_FORMAT} format, found {payload.get("format")}."
+            f"Expected {RAW_FILE_FORMAT} format, found {payload.get('format')}."
         )
     if payload.get("version") != RAW_FILE_VERSION:
         raise Sweden2024MapDataError(
-            f"Expected version {RAW_FILE_VERSION}, found {payload.get("version")}."
+            f"Expected version {RAW_FILE_VERSION}, found {payload.get('version')}."
         )
     return payload
 

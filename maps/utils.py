@@ -135,11 +135,13 @@ def ensure_initial_data(stdout=None):
     created["default_map_configuration"] = map_config_created
 
     # Ensure layers are set
-    default_map_config.layers.set([
-        default_region_layer,
-        default_catchment_layer,
-        default_feature_layer,
-    ])
+    default_map_config.layers.set(
+        [
+            default_region_layer,
+            default_catchment_layer,
+            default_feature_layer,
+        ]
+    )
     log("Set layers for Default Map Configuration")
 
 
@@ -303,7 +305,7 @@ def build_collection_cache_key(
             ids_sorted = sorted([str(int(x)) for x in id_list])
         except (ValueError, TypeError):
             ids_sorted = sorted([str(x) for x in id_list])
-        return f"collection_geojson:id:{",".join(ids_sorted)}:dv:{dv}"
+        return f"collection_geojson:id:{','.join(ids_sorted)}:dv:{dv}"
 
     # Build filter part
     filter_part = _generate_filter_key_part(filters)

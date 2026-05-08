@@ -7,15 +7,28 @@ from rest_framework.serializers import ModelSerializer, Serializer
 
 
 class UserCreatedObjectSerializer(serializers.ModelSerializer):
-    owner = serializers.ReadOnlyField(source='owner.username')
+    owner = serializers.ReadOnlyField(source="owner.username")
 
     class Meta:
         fields = [
-            'id', 'owner', 'name', 'description', 'publication_status', 'created_at', 'created_by', 'lastmodified_at',
-            'last_modified_by'
+            "id",
+            "owner",
+            "name",
+            "description",
+            "publication_status",
+            "created_at",
+            "created_by",
+            "lastmodified_at",
+            "last_modified_by",
         ]
-        read_only_fields = ['owner', 'publication_status', 'created_at', 'created_by', 'lastmodified_at',
-                            'last_modified_by']
+        read_only_fields = [
+            "owner",
+            "publication_status",
+            "created_at",
+            "created_by",
+            "lastmodified_at",
+            "last_modified_by",
+        ]
 
 
 class FieldLabelMixin(Serializer):
@@ -24,7 +37,9 @@ class FieldLabelMixin(Serializer):
     field_labels_as_keys = False
 
     def __init__(self, *args, **kwargs):
-        self.field_labels_as_keys = kwargs.pop('field_labels_as_keys', self.field_labels_as_keys)
+        self.field_labels_as_keys = kwargs.pop(
+            "field_labels_as_keys", self.field_labels_as_keys
+        )
         super().__init__(*args, **kwargs)
 
     def to_representation(self, instance):
@@ -43,7 +58,9 @@ class FieldLabelMixin(Serializer):
             #
             # For related fields with `use_pk_only_optimization` we need to
             # resolve the pk value.
-            check_for_none = attribute.pk if isinstance(attribute, PKOnlyObject) else attribute
+            check_for_none = (
+                attribute.pk if isinstance(attribute, PKOnlyObject) else attribute
+            )
             key = field.label if self.field_labels_as_keys else field.field_name
             if check_for_none is None:
                 ret[key] = None

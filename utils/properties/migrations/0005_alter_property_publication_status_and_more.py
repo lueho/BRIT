@@ -4,20 +4,39 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('properties', '0004_alter_property_options'),
+        ("properties", "0004_alter_property_options"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='property',
-            name='publication_status',
-            field=models.CharField(choices=[('private', 'Private'), ('review', 'Review'), ('published', 'Published'), ('declined', 'Declined'), ('archived', 'Archived')], default='private', max_length=10),
+            model_name="property",
+            name="publication_status",
+            field=models.CharField(
+                choices=[
+                    ("private", "Private"),
+                    ("review", "Review"),
+                    ("published", "Published"),
+                    ("declined", "Declined"),
+                    ("archived", "Archived"),
+                ],
+                default="private",
+                max_length=10,
+            ),
         ),
         migrations.AlterField(
-            model_name='unit',
-            name='publication_status',
-            field=models.CharField(choices=[('private', 'Private'), ('review', 'Review'), ('published', 'Published'), ('declined', 'Declined'), ('archived', 'Archived')], default='private', max_length=10),
+            model_name="unit",
+            name="publication_status",
+            field=models.CharField(
+                choices=[
+                    ("private", "Private"),
+                    ("review", "Review"),
+                    ("published", "Published"),
+                    ("declined", "Declined"),
+                    ("archived", "Archived"),
+                ],
+                default="private",
+                max_length=10,
+            ),
         ),
     ]

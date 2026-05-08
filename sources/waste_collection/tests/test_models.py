@@ -433,21 +433,27 @@ class CollectionMaterialMatchingQuerySetTestCase(TestCase):
         cls.collection_allowed_subset.allowed_materials.set([cls.allowed_1])
         cls.collection_allowed_subset.forbidden_materials.set([cls.forbidden_1])
 
-        cls.collection_allowed_superset.allowed_materials.set([
-            cls.allowed_1,
-            cls.allowed_2,
-            cls.allowed_3,
-        ])
-        cls.collection_allowed_superset.forbidden_materials.set([
-            cls.forbidden_1,
-            cls.forbidden_2,
-        ])
+        cls.collection_allowed_superset.allowed_materials.set(
+            [
+                cls.allowed_1,
+                cls.allowed_2,
+                cls.allowed_3,
+            ]
+        )
+        cls.collection_allowed_superset.forbidden_materials.set(
+            [
+                cls.forbidden_1,
+                cls.forbidden_2,
+            ]
+        )
 
     def test_match_allowed_materials_requires_exact_set(self):
-        qs = Collection.objects.match_allowed_materials([
-            self.allowed_2,
-            self.allowed_1,
-        ])
+        qs = Collection.objects.match_allowed_materials(
+            [
+                self.allowed_2,
+                self.allowed_1,
+            ]
+        )
         self.assertIn(self.collection_exact, qs)
         self.assertNotIn(self.collection_allowed_subset, qs)
         self.assertNotIn(self.collection_allowed_superset, qs)

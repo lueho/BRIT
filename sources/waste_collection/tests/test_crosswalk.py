@@ -32,10 +32,12 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
         mappings_dir = root / "mappings"
         mappings_dir.mkdir()
         (mappings_dir / "fixture.csv").write_text(
-            "\n".join([
-                "domain,source_term,source_language,target_scheme_uri,target_concept_uri,target_label,notes",
-                *csv_rows,
-            ])
+            "\n".join(
+                [
+                    "domain,source_term,source_language,target_scheme_uri,target_concept_uri,target_label,notes",
+                    *csv_rows,
+                ]
+            )
             + "\n",
             encoding="utf-8",
         )
@@ -260,19 +262,21 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
                 ),
             },
         }
-        ttl_body = "\n".join([
-            "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
-            "@prefix britvoc: <https://example.org/vocab/soilcom/> .",
-            "",
-            "britvoc:concept/waste-category/residual-waste a skos:Concept ;",
-            "    skos:inScheme britvoc:scheme/waste-category ;",
-            '    skos:prefLabel "Residual waste"@en .',
-            "",
-            "britvoc:concept/required-bin-capacity-reference/person a skos:Concept ;",
-            "    skos:inScheme britvoc:scheme/required-bin-capacity-reference ;",
-            '    skos:prefLabel "per person"@en ;',
-            '    skos:notation "person" .',
-        ])
+        ttl_body = "\n".join(
+            [
+                "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
+                "@prefix britvoc: <https://example.org/vocab/soilcom/> .",
+                "",
+                "britvoc:concept/waste-category/residual-waste a skos:Concept ;",
+                "    skos:inScheme britvoc:scheme/waste-category ;",
+                '    skos:prefLabel "Residual waste"@en .',
+                "",
+                "britvoc:concept/required-bin-capacity-reference/person a skos:Concept ;",
+                "    skos:inScheme britvoc:scheme/required-bin-capacity-reference ;",
+                '    skos:prefLabel "per person"@en ;',
+                '    skos:notation "person" .',
+            ]
+        )
 
         with tempfile.TemporaryDirectory() as temp_dir:
             mappings_dir, ttl_path = self._write_crosswalk_validation_fixture(
@@ -294,15 +298,17 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
 
     def test_get_concepts_by_uri_reads_canonical_scheme_and_label_metadata(self):
         """Vocabulary helper should expose canonical concept metadata keyed by URI."""
-        ttl_body = "\n".join([
-            "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
-            "@prefix britvoc: <https://brit.bioresource-tools.net/vocab/soilcom/> .",
-            "",
-            "britvoc:concept/required-bin-capacity-reference/person a skos:Concept ;",
-            "    skos:inScheme britvoc:scheme/required-bin-capacity-reference ;",
-            '    skos:prefLabel "per person"@en ;',
-            '    skos:notation "person" .',
-        ])
+        ttl_body = "\n".join(
+            [
+                "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
+                "@prefix britvoc: <https://brit.bioresource-tools.net/vocab/soilcom/> .",
+                "",
+                "britvoc:concept/required-bin-capacity-reference/person a skos:Concept ;",
+                "    skos:inScheme britvoc:scheme/required-bin-capacity-reference ;",
+                '    skos:prefLabel "per person"@en ;',
+                '    skos:notation "person" .',
+            ]
+        )
 
         with tempfile.TemporaryDirectory() as temp_dir:
             ttl_path = Path(temp_dir) / "vocabulary.ttl"
@@ -376,14 +382,16 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
                 ),
             },
         }
-        ttl_body = "\n".join([
-            "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
-            "@prefix britvoc: <https://example.org/vocab/soilcom/> .",
-            "",
-            "britvoc:concept/waste-category/residual-waste a skos:Concept ;",
-            "    skos:inScheme britvoc:scheme/waste-category ;",
-            '    skos:prefLabel "Residual waste"@en .',
-        ])
+        ttl_body = "\n".join(
+            [
+                "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
+                "@prefix britvoc: <https://example.org/vocab/soilcom/> .",
+                "",
+                "britvoc:concept/waste-category/residual-waste a skos:Concept ;",
+                "    skos:inScheme britvoc:scheme/waste-category ;",
+                '    skos:prefLabel "Residual waste"@en .',
+            ]
+        )
 
         with tempfile.TemporaryDirectory() as temp_dir:
             mappings_dir, ttl_path = self._write_crosswalk_validation_fixture(
@@ -413,18 +421,20 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
                 ),
             },
         }
-        ttl_body = "\n".join([
-            "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
-            "@prefix britvoc: <https://example.org/vocab/soilcom/> .",
-            "",
-            "britvoc:concept/waste-category/residual-waste a skos:Concept ;",
-            "    skos:inScheme britvoc:scheme/waste-category ;",
-            '    skos:prefLabel "Residual waste"@en .',
-            "",
-            "britvoc:concept/waste-category/biowaste a skos:Concept ;",
-            "    skos:inScheme britvoc:scheme/waste-category ;",
-            '    skos:prefLabel "Biowaste"@en .',
-        ])
+        ttl_body = "\n".join(
+            [
+                "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
+                "@prefix britvoc: <https://example.org/vocab/soilcom/> .",
+                "",
+                "britvoc:concept/waste-category/residual-waste a skos:Concept ;",
+                "    skos:inScheme britvoc:scheme/waste-category ;",
+                '    skos:prefLabel "Residual waste"@en .',
+                "",
+                "britvoc:concept/waste-category/biowaste a skos:Concept ;",
+                "    skos:inScheme britvoc:scheme/waste-category ;",
+                '    skos:prefLabel "Biowaste"@en .',
+            ]
+        )
 
         with tempfile.TemporaryDirectory() as temp_dir:
             mappings_dir, ttl_path = self._write_crosswalk_validation_fixture(

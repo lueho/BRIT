@@ -27,7 +27,9 @@ class ReviewActionRedirectResolver:
     ) -> None:
         self.request = request
         self.obj = obj
-        self.action_handlers: dict[Any, HandlerSpec] = dict(self.default_action_handlers)
+        self.action_handlers: dict[Any, HandlerSpec] = dict(
+            self.default_action_handlers
+        )
         if action_handlers:
             self.action_handlers.update(action_handlers)
 
@@ -70,7 +72,9 @@ class ReviewActionRedirectResolver:
     def _should_redirect_owner_from_review(self, next_url: str) -> bool:
         """Return True when owner should avoid landing on review detail."""
         try:
-            policy = get_object_policy(self.request.user, self.obj, request=self.request)
+            policy = get_object_policy(
+                self.request.user, self.obj, request=self.request
+            )
             if not (
                 policy.get("is_owner")
                 and not (policy.get("is_in_review") or policy.get("is_declined"))

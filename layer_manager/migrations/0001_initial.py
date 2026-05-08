@@ -5,81 +5,203 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('distributions', '0001_initial'),
-        ('inventories', '0001_initial'),
-        ('materials', '0001_initial'),
+        ("distributions", "0001_initial"),
+        ("inventories", "0001_initial"),
+        ("materials", "0001_initial"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='LayerField',
+            name="LayerField",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('field_name', models.CharField(max_length=63)),
-                ('data_type', models.CharField(max_length=10)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("field_name", models.CharField(max_length=63)),
+                ("data_type", models.CharField(max_length=10)),
             ],
         ),
         migrations.CreateModel(
-            name='DistributionSet',
+            name="DistributionSet",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('timestep', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='distributions.timestep')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "timestep",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="distributions.timestep",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='DistributionShare',
+            name="DistributionShare",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('average', models.FloatField()),
-                ('standard_deviation', models.DecimalField(decimal_places=2, max_digits=5)),
-                ('component', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='materials.materialcomponent')),
-                ('distribution_set', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='layer_manager.distributionset')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("average", models.FloatField()),
+                (
+                    "standard_deviation",
+                    models.DecimalField(decimal_places=2, max_digits=5),
+                ),
+                (
+                    "component",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="materials.materialcomponent",
+                    ),
+                ),
+                (
+                    "distribution_set",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="layer_manager.distributionset",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='Layer',
+            name="Layer",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=56)),
-                ('geom_type', models.CharField(max_length=20)),
-                ('table_name', models.CharField(max_length=200)),
-                ('algorithm', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventories.inventoryalgorithm')),
-                ('feedstock', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='materials.sampleseries')),
-                ('scenario', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventories.scenario')),
-                ('layer_fields', models.ManyToManyField(to='layer_manager.layerfield')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=56)),
+                ("geom_type", models.CharField(max_length=20)),
+                ("table_name", models.CharField(max_length=200)),
+                (
+                    "algorithm",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="inventories.inventoryalgorithm",
+                    ),
+                ),
+                (
+                    "feedstock",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="materials.sampleseries",
+                    ),
+                ),
+                (
+                    "scenario",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="inventories.scenario",
+                    ),
+                ),
+                ("layer_fields", models.ManyToManyField(to="layer_manager.layerfield")),
             ],
         ),
         migrations.CreateModel(
-            name='LayerAggregatedDistribution',
+            name="LayerAggregatedDistribution",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255, null=True)),
-                ('type', models.CharField(choices=[('seasonal', 'seasonal')], max_length=255, null=True)),
-                ('distribution', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='distributions.temporaldistribution')),
-                ('layer', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='layer_manager.layer')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=255, null=True)),
+                (
+                    "type",
+                    models.CharField(
+                        choices=[("seasonal", "seasonal")], max_length=255, null=True
+                    ),
+                ),
+                (
+                    "distribution",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="distributions.temporaldistribution",
+                    ),
+                ),
+                (
+                    "layer",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="layer_manager.layer",
+                    ),
+                ),
             ],
         ),
         migrations.AddField(
-            model_name='distributionset',
-            name='aggregated_distribution',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='layer_manager.layeraggregateddistribution'),
+            model_name="distributionset",
+            name="aggregated_distribution",
+            field=models.ForeignKey(
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="layer_manager.layeraggregateddistribution",
+            ),
         ),
         migrations.CreateModel(
-            name='LayerAggregatedValue',
+            name="LayerAggregatedValue",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=63)),
-                ('value', models.FloatField()),
-                ('unit', models.CharField(blank=True, default='', max_length=15, null=True)),
-                ('layer', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='layer_manager.layer')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=63)),
+                ("value", models.FloatField()),
+                (
+                    "unit",
+                    models.CharField(blank=True, default="", max_length=15, null=True),
+                ),
+                (
+                    "layer",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="layer_manager.layer",
+                    ),
+                ),
             ],
         ),
         migrations.AddConstraint(
-            model_name='layer',
-            constraint=models.UniqueConstraint(fields=('table_name',), name='unique table_name'),
+            model_name="layer",
+            constraint=models.UniqueConstraint(
+                fields=("table_name",), name="unique table_name"
+            ),
         ),
     ]

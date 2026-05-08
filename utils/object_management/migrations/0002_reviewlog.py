@@ -6,29 +6,79 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('contenttypes', '0002_remove_content_type_name'),
-        ('object_management', '0001_initial'),
+        ("contenttypes", "0002_remove_content_type_name"),
+        ("object_management", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='ReviewLog',
+            name="ReviewLog",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('object_id', models.PositiveIntegerField()),
-                ('action', models.CharField(choices=[('comment', 'Comment'), ('submit', 'Submitted for review'), ('resubmit', 'Resubmitted for review'), ('withdraw', 'Withdrawn from review'), ('set_private', 'Set to private'), ('approve', 'Approved'), ('reject', 'Rejected')], max_length=20)),
-                ('message', models.TextField(blank=True, null=True)),
-                ('role', models.CharField(choices=[('owner', 'Owner'), ('moderator', 'Moderator'), ('system', 'System')], default='system', max_length=12)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('actor', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='+', to=settings.AUTH_USER_MODEL)),
-                ('content_type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='contenttypes.contenttype')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("object_id", models.PositiveIntegerField()),
+                (
+                    "action",
+                    models.CharField(
+                        choices=[
+                            ("comment", "Comment"),
+                            ("submit", "Submitted for review"),
+                            ("resubmit", "Resubmitted for review"),
+                            ("withdraw", "Withdrawn from review"),
+                            ("set_private", "Set to private"),
+                            ("approve", "Approved"),
+                            ("reject", "Rejected"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
+                ("message", models.TextField(blank=True, null=True)),
+                (
+                    "role",
+                    models.CharField(
+                        choices=[
+                            ("owner", "Owner"),
+                            ("moderator", "Moderator"),
+                            ("system", "System"),
+                        ],
+                        default="system",
+                        max_length=12,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "actor",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="+",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "content_type",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="contenttypes.contenttype",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['created_at', 'id'],
-                'indexes': [models.Index(fields=['content_type', 'object_id', 'created_at'], name='object_mana_content_e518e8_idx')],
+                "ordering": ["created_at", "id"],
+                "indexes": [
+                    models.Index(
+                        fields=["content_type", "object_id", "created_at"],
+                        name="object_mana_content_e518e8_idx",
+                    )
+                ],
             },
         ),
     ]

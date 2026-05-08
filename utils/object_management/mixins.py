@@ -54,9 +54,8 @@ class _BaseUserCreatedObjectAccessMixin(UserPassesTestMixin):
         if policy["can_edit"]:
             return True
         # Fallback for models without update URLs in the policy
-        return (
-            not policy["is_archived"]
-            and (policy["is_staff"] or (policy["is_owner"] and not policy["is_published"]))
+        return not policy["is_archived"] and (
+            policy["is_staff"] or (policy["is_owner"] and not policy["is_published"])
         )
 
 
@@ -78,7 +77,9 @@ class UserOwnsObjectMixin(UserPassesTestMixin):
     """Only allow the owner (and no publication logic)."""
 
     def test_func(self):
-        policy = get_object_policy(self.request.user, self.get_object(), request=self.request)
+        policy = get_object_policy(
+            self.request.user, self.get_object(), request=self.request
+        )
         return policy["is_owner"]
 
 

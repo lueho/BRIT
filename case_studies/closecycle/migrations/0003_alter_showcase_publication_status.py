@@ -4,15 +4,24 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('closecycle', '0002_showcase_approved_at_showcase_approved_by_and_more'),
+        ("closecycle", "0002_showcase_approved_at_showcase_approved_by_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='showcase',
-            name='publication_status',
-            field=models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published'), ('declined', 'Declined'), ('archived', 'Archived')], default='private', max_length=10),
+            model_name="showcase",
+            name="publication_status",
+            field=models.CharField(
+                choices=[
+                    ("private", "Private"),
+                    ("review", "Under Review"),
+                    ("published", "Published"),
+                    ("declined", "Declined"),
+                    ("archived", "Archived"),
+                ],
+                default="private",
+                max_length=10,
+            ),
         ),
     ]

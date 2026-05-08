@@ -508,10 +508,12 @@ class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
         if scenario.status == 2:
             context = {"scenario": scenario, "task_list": {"tasks": []}}
             for task in RunningTask.objects.filter(scenario=scenario):
-                context["task_list"]["tasks"].append({
-                    "task_id": task.uuid,
-                    "algorithm_name": task.algorithm.name,
-                })
+                context["task_list"]["tasks"].append(
+                    {
+                        "task_id": task.uuid,
+                        "algorithm_name": task.algorithm.name,
+                    }
+                )
 
             return render(request, "evaluation_progress.html", context)
         else:

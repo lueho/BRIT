@@ -170,7 +170,7 @@ def _expand_ttl_identifier(value: str, uri_base: str) -> str:
     if compact.startswith("<") and compact.endswith(">"):
         return compact[1:-1]
     if compact.startswith("britvoc:"):
-        return f"{uri_base}/{compact.removeprefix("britvoc:")}"
+        return f"{uri_base}/{compact.removeprefix('britvoc:')}"
     return compact
 
 
@@ -212,10 +212,12 @@ def _load_ttl_concept_registry(
                 line,
             )
             if literal_match:
-                current_pref_labels.append((
-                    literal_match.group("lang"),
-                    literal_match.group("label"),
-                ))
+                current_pref_labels.append(
+                    (
+                        literal_match.group("lang"),
+                        literal_match.group("label"),
+                    )
+                )
         elif line.startswith("skos:notation "):
             literal_match = re.search(r'"(?P<notation>[^"]+)"', line)
             if literal_match:
@@ -370,7 +372,7 @@ def get_crosswalk_uri_validation_errors(
             errors.append(
                 f"{csv_file.name}:{line_number}: Conflicting mapping for domain '{domain}' "
                 f"and source_term '{source_term}' (previously defined at "
-                f"{seen_mapping["file"]}:{seen_mapping["line"]})."
+                f"{seen_mapping['file']}:{seen_mapping['line']})."
             )
         else:
             seen_sources[source_key] = current_mapping
@@ -563,10 +565,12 @@ def get_crosswalk_equivalences() -> dict[str, dict[str, dict[str, object]]]:
                 if term_key in concept_seen_terms:
                     continue
 
-                concept_entry["source_terms"].append({
-                    "term": source_term,
-                    "language": source_language,
-                })
+                concept_entry["source_terms"].append(
+                    {
+                        "term": source_term,
+                        "language": source_language,
+                    }
+                )
                 concept_seen_terms.add(term_key)
 
     for concept_map in equivalences.values():

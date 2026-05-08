@@ -110,12 +110,12 @@ class Command(BaseCommand):
         if data.get("status") == "success":
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"{name}: {data.get("features_count", 0):,} features cached"
+                    f"{name}: {data.get('features_count', 0):,} features cached"
                 )
             )
         else:
             self.stdout.write(
-                self.style.ERROR(f"{name}: Failed - {data.get("error", "Unknown")}")
+                self.style.ERROR(f"{name}: Failed - {data.get('error', 'Unknown')}")
             )
 
     def _report_results(self, results):

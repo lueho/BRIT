@@ -5,7 +5,6 @@ from ..models import Period, TemporalDistribution, Timestep
 
 
 class InitialDataTestCase(TestCase):
-
     def test_base_distribution_is_created_from_migrations(self):
         TemporalDistribution.objects.get(name="Average")
 
@@ -53,7 +52,6 @@ class TemporalDistributionTestCase(TestCase):
 
 
 class TimeStepTestCase(TestCase):
-
     def test_get_default_timestep(self):
         default = Timestep.objects.default()
         self.assertIsInstance(default, Timestep)
@@ -74,7 +72,6 @@ class TimeStepTestCase(TestCase):
 
 
 class PeriodTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.period = Period.objects.get(

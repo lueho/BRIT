@@ -146,7 +146,7 @@ class ScenarioResult:
             if agg_dist is None:
                 continue
             for d in agg_dist.serialized:
-                d["label"] = f'{layer.feedstock.name}: {d["label"]}'
+                d["label"] = f"{layer.feedstock.name}: {d['label']}"
                 datasets.append(DataSet(**d))
         return datasets
 

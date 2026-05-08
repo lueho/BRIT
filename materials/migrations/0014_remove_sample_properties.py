@@ -82,18 +82,22 @@ def normalize_material_property_value_samples(apps, schema_editor):
             if auto_managed_field_names:
                 MaterialPropertyValue.objects.using(db_alias).filter(
                     pk=duplicate.pk
-                ).update(**{
-                    field_name: field_values[field_name]
-                    for field_name in auto_managed_field_names
-                })
+                ).update(
+                    **{
+                        field_name: field_values[field_name]
+                        for field_name in auto_managed_field_names
+                    }
+                )
             if source_ids:
-                source_link_model.objects.using(db_alias).bulk_create([
-                    source_link_model(
-                        materialpropertyvalue_id=duplicate.pk,
-                        source_id=source_id,
-                    )
-                    for source_id in source_ids
-                ])
+                source_link_model.objects.using(db_alias).bulk_create(
+                    [
+                        source_link_model(
+                            materialpropertyvalue_id=duplicate.pk,
+                            source_id=source_id,
+                        )
+                        for source_id in source_ids
+                    ]
+                )
 
 
 class Migration(migrations.Migration):

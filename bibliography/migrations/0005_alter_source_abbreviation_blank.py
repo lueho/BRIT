@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('bibliography', '0004_alter_author_publication_status_and_more'),
+        ("bibliography", "0004_alter_author_publication_status_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='source',
-            name='abbreviation',
+            model_name="source",
+            name="abbreviation",
             field=models.CharField(blank=True, max_length=50),
         ),
     ]

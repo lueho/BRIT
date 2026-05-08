@@ -191,7 +191,7 @@ class Command(BaseCommand):
             for app_label, _, dependencies in found_initializers:
                 if dependencies:
                     logger.info(
-                        f'  - {app_label} depends on: {", ".join(dependencies)}'
+                        f"  - {app_label} depends on: {', '.join(dependencies)}"
                     )
                 else:
                     logger.info(f"  - {app_label} has no dependencies")

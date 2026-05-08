@@ -2,7 +2,6 @@ from django.contrib.postgres.fields import ArrayField
 
 
 class SeasonalDistribution:
-
     def __init__(self, values):
         self.january = values[0]
         self.february = values[1]
@@ -19,23 +18,25 @@ class SeasonalDistribution:
 
     def as_dict(self):
         return {
-            'January': self.january,
-            'february': self.february,
-            'march': self.march,
-            'april': self.april,
-            'may': self.may,
-            'june': self.june,
-            'july': self.july,
-            'august': self.august,
-            'september': self.september,
-            'october': self.october,
-            'november': self.november,
-            'december': self.december
+            "January": self.january,
+            "february": self.february,
+            "march": self.march,
+            "april": self.april,
+            "may": self.may,
+            "june": self.june,
+            "july": self.july,
+            "august": self.august,
+            "september": self.september,
+            "october": self.october,
+            "november": self.november,
+            "december": self.december,
         }
 
 
 class SeasonalDistributionField(ArrayField):
-    description = "A seasonal distribution with a decimal number for each month of the year"
+    description = (
+        "A seasonal distribution with a decimal number for each month of the year"
+    )
 
     # def __init__(self, *args, **kwargs):
     #     kwargs['size'] = 12
@@ -47,23 +48,23 @@ class SeasonalDistributionField(ArrayField):
     #     return name, path, args, kwargs
 
     def db_type(self, connection):
-        return 'seasonal_distribution'
+        return "seasonal_distribution"
 
     @staticmethod
     def parse_distribution(obj: SeasonalDistribution):
         return {
-            'January': obj.january,
-            'february': obj.february,
-            'march': obj.march,
-            'april': obj.april,
-            'may': obj.may,
-            'june': obj.june,
-            'july': obj.july,
-            'august': obj.august,
-            'september': obj.september,
-            'october': obj.october,
-            'november': obj.november,
-            'december': obj.december
+            "January": obj.january,
+            "february": obj.february,
+            "march": obj.march,
+            "april": obj.april,
+            "may": obj.may,
+            "june": obj.june,
+            "july": obj.july,
+            "august": obj.august,
+            "september": obj.september,
+            "october": obj.october,
+            "november": obj.november,
+            "december": obj.december,
         }
 
     def _from_db_value(self, value, expression, connection):

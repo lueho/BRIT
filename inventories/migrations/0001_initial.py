@@ -8,117 +8,386 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('bibliography', '0001_initial'),
-        ('distributions', '0001_initial'),
-        ('maps', '0001_initial'),
-        ('materials', '0001_initial'),
+        ("bibliography", "0001_initial"),
+        ("distributions", "0001_initial"),
+        ("maps", "0001_initial"),
+        ("materials", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='InventoryAlgorithm',
+            name="InventoryAlgorithm",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=56)),
-                ('source_module', models.CharField(max_length=255, null=True)),
-                ('function_name', models.CharField(max_length=56, null=True)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('default', models.BooleanField(default=False, verbose_name='Default for this combination of geodataset and feedstock')),
-                ('feedstocks', models.ManyToManyField(to='materials.material')),
-                ('geodataset', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='maps.geodataset')),
-                ('source', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='bibliography.source')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=56)),
+                ("source_module", models.CharField(max_length=255, null=True)),
+                ("function_name", models.CharField(max_length=56, null=True)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "default",
+                    models.BooleanField(
+                        default=False,
+                        verbose_name="Default for this combination of geodataset and feedstock",
+                    ),
+                ),
+                ("feedstocks", models.ManyToManyField(to="materials.material")),
+                (
+                    "geodataset",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="maps.geodataset",
+                    ),
+                ),
+                (
+                    "source",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to="bibliography.source",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='InventoryAlgorithmParameter',
+            name="InventoryAlgorithmParameter",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('descriptive_name', models.CharField(max_length=56)),
-                ('short_name', models.CharField(max_length=28, validators=[django.core.validators.RegexValidator(code='invalid_parameter_name', message='Invalid parameter short_name. Do not use spaceor special characters.', regex='^\\w{1,28}$')])),
-                ('description', models.TextField(blank=True, null=True)),
-                ('unit', models.CharField(blank=True, max_length=20, null=True)),
-                ('is_required', models.BooleanField(default=False)),
-                ('inventory_algorithm', models.ManyToManyField(to='inventories.inventoryalgorithm')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("descriptive_name", models.CharField(max_length=56)),
+                (
+                    "short_name",
+                    models.CharField(
+                        max_length=28,
+                        validators=[
+                            django.core.validators.RegexValidator(
+                                code="invalid_parameter_name",
+                                message="Invalid parameter short_name. Do not use spaceor special characters.",
+                                regex="^\\w{1,28}$",
+                            )
+                        ],
+                    ),
+                ),
+                ("description", models.TextField(blank=True, null=True)),
+                ("unit", models.CharField(blank=True, max_length=20, null=True)),
+                ("is_required", models.BooleanField(default=False)),
+                (
+                    "inventory_algorithm",
+                    models.ManyToManyField(to="inventories.inventoryalgorithm"),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='InventoryAlgorithmParameterValue',
+            name="InventoryAlgorithmParameterValue",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=56)),
-                ('type', models.IntegerField(choices=[(1, 'Numeric'), (2, 'Selection')], default=1)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('value', models.FloatField()),
-                ('standard_deviation', models.FloatField(blank=True, null=True)),
-                ('source', models.CharField(blank=True, max_length=200, null=True)),
-                ('default', models.BooleanField(default=False)),
-                ('parameter', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='inventories.inventoryalgorithmparameter')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=56)),
+                (
+                    "type",
+                    models.IntegerField(
+                        choices=[(1, "Numeric"), (2, "Selection")], default=1
+                    ),
+                ),
+                ("description", models.TextField(blank=True, null=True)),
+                ("value", models.FloatField()),
+                ("standard_deviation", models.FloatField(blank=True, null=True)),
+                ("source", models.CharField(blank=True, max_length=200, null=True)),
+                ("default", models.BooleanField(default=False)),
+                (
+                    "parameter",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="inventories.inventoryalgorithmparameter",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='Scenario',
+            name="Scenario",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(default='Custom Scenario', max_length=56)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('catchment', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, related_name='scenarios', to='maps.catchment')),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
-                ('region', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='maps.region')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(default="Custom Scenario", max_length=56)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "catchment",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="scenarios",
+                        to="maps.catchment",
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "region",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="maps.region",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='RunningTask',
+            name="RunningTask",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('uuid', models.UUIDField()),
-                ('algorithm', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='inventories.inventoryalgorithm')),
-                ('scenario', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventories.scenario')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("uuid", models.UUIDField()),
+                (
+                    "algorithm",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="inventories.inventoryalgorithm",
+                    ),
+                ),
+                (
+                    "scenario",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="inventories.scenario",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='InventoryAmountShare',
+            name="InventoryAmountShare",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('average', models.FloatField(default=0.0)),
-                ('standard_deviation', models.FloatField(default=0.0)),
-                ('feedstock', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='materials.sampleseries')),
-                ('owner', models.ForeignKey(default=1, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
-                ('timestep', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='distributions.timestep')),
-                ('scenario', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='inventories.scenario')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("average", models.FloatField(default=0.0)),
+                ("standard_deviation", models.FloatField(default=0.0)),
+                (
+                    "feedstock",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="materials.sampleseries",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=1,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "timestep",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="distributions.timestep",
+                    ),
+                ),
+                (
+                    "scenario",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="inventories.scenario",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='ScenarioInventoryConfiguration',
+            name="ScenarioInventoryConfiguration",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('feedstock', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='materials.sampleseries')),
-                ('geodataset', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='maps.geodataset')),
-                ('inventory_algorithm', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventories.inventoryalgorithm')),
-                ('inventory_parameter', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='inventories.inventoryalgorithmparameter')),
-                ('inventory_value', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='inventories.inventoryalgorithmparametervalue')),
-                ('scenario', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventories.scenario')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "feedstock",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="materials.sampleseries",
+                    ),
+                ),
+                (
+                    "geodataset",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="maps.geodataset",
+                    ),
+                ),
+                (
+                    "inventory_algorithm",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="inventories.inventoryalgorithm",
+                    ),
+                ),
+                (
+                    "inventory_parameter",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="inventories.inventoryalgorithmparameter",
+                    ),
+                ),
+                (
+                    "inventory_value",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="inventories.inventoryalgorithmparametervalue",
+                    ),
+                ),
+                (
+                    "scenario",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="inventories.scenario",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='ScenarioStatus',
+            name="ScenarioStatus",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('status', models.IntegerField(choices=[(1, 'Changed'), (2, 'Running'), (3, 'Finished')], default=1)),
-                ('scenario', models.OneToOneField(null=True, on_delete=django.db.models.deletion.CASCADE, to='inventories.scenario')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "status",
+                    models.IntegerField(
+                        choices=[(1, "Changed"), (2, "Running"), (3, "Finished")],
+                        default=1,
+                    ),
+                ),
+                (
+                    "scenario",
+                    models.OneToOneField(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="inventories.scenario",
+                    ),
+                ),
             ],
         ),
     ]

@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("properties", "0003_alter_property_publication_status_and_more"),
         ("processes", "0002_processcategory_process_processinforesource_and_more"),

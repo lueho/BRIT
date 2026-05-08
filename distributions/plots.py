@@ -4,7 +4,7 @@ from utils.exceptions import UnitMismatchError
 
 
 class Distribution:
-    name = ''
+    name = ""
     temporal_distribution = None
     _components = None
     _shares = None
@@ -73,9 +73,9 @@ class Distribution:
 
     def serialize(self):
         dist = {
-            'name': self.name,
-            'distribution': self.temporal_distribution.id,
-            'sets': []
+            "name": self.name,
+            "distribution": self.temporal_distribution.id,
+            "sets": [],
         }
         sets = {}
         for share in self.shares:
@@ -83,41 +83,41 @@ class Distribution:
                 sets[share.timestep.id] = {}
             sets[share.timestep.id][share.component.id] = share.value
         for timestep_id, set_content in sets.items():
-            new_set = {'timestep': timestep_id, 'shares': []}
+            new_set = {"timestep": timestep_id, "shares": []}
             for component_id, value in set_content.items():
-                new_set['shares'].append({'component': component_id, 'average': value})
-            dist['sets'].append(new_set)
+                new_set["shares"].append({"component": component_id, "average": value})
+            dist["sets"].append(new_set)
         return dist
 
 
 BACKGROUND_COLORS = [
-    'rgba(4, 85, 94, 0.4)',
-    'rgba(148, 51, 41, 0.4)',
-    'rgba(99, 163, 60, 0.4)',
-    'rgba(244, 154, 51, 0.4)',
-    'rgba(130, 105, 55, 0.4)',
-    'rgba(252, 199, 103, 0.4)',
-    'rgba(255, 99, 132, 0.4)',
-    'rgba(54, 162, 235, 0.4)',
-    'rgba(255, 206, 86, 0.4)',
-    'rgba(75, 192, 192, 0.4)',
-    'rgba(153, 102, 255, 0.4)',
-    'rgba(255, 159, 64, 0.4)',
+    "rgba(4, 85, 94, 0.4)",
+    "rgba(148, 51, 41, 0.4)",
+    "rgba(99, 163, 60, 0.4)",
+    "rgba(244, 154, 51, 0.4)",
+    "rgba(130, 105, 55, 0.4)",
+    "rgba(252, 199, 103, 0.4)",
+    "rgba(255, 99, 132, 0.4)",
+    "rgba(54, 162, 235, 0.4)",
+    "rgba(255, 206, 86, 0.4)",
+    "rgba(75, 192, 192, 0.4)",
+    "rgba(153, 102, 255, 0.4)",
+    "rgba(255, 159, 64, 0.4)",
 ]
 
 BORDER_COLORS = [
-    'rgba(4, 85, 94, 1)',
-    'rgba(148, 51, 41, 1)',
-    'rgba(99, 163, 60, 1)',
-    'rgba(244, 154, 51, 1)',
-    'rgba(130, 105, 55, 1)',
-    'rgba(252, 199, 103, 1)',
-    'rgba(255, 99, 132, 1)',
-    'rgba(54, 162, 235, 1)',
-    'rgba(255, 206, 86, 1)',
-    'rgba(75, 192, 192, 1)',
-    'rgba(153, 102, 255, 1)',
-    'rgba(255, 159, 64, 1)'
+    "rgba(4, 85, 94, 1)",
+    "rgba(148, 51, 41, 1)",
+    "rgba(99, 163, 60, 1)",
+    "rgba(244, 154, 51, 1)",
+    "rgba(130, 105, 55, 1)",
+    "rgba(252, 199, 103, 1)",
+    "rgba(255, 99, 132, 1)",
+    "rgba(54, 162, 235, 1)",
+    "rgba(255, 206, 86, 1)",
+    "rgba(75, 192, 192, 1)",
+    "rgba(153, 102, 255, 1)",
+    "rgba(255, 159, 64, 1)",
 ]
 
 
@@ -140,7 +140,6 @@ class BaseDataSet(UserDict):
 
 
 class DataSet(BaseDataSet):
-
     def __init__(self, **attrs):
         super().__init__(**attrs)
 
@@ -149,6 +148,7 @@ class BaseChart:
     """
     Adapter between django database and and chart.js
     """
+
     type = None
     _labels = None
     has_data = False
@@ -159,17 +159,17 @@ class BaseChart:
     show_legend = None
 
     def __init__(self, **kwargs):
-        self.id = kwargs.get('id', '')
-        self.title = kwargs.get('title', '')
-        self.type = kwargs.get('type')
-        self.unit = kwargs.get('unit', '')
-        self.show_legend = kwargs.get('show_legend', False)
-        self.labels = kwargs.get('labels', [])
+        self.id = kwargs.get("id", "")
+        self.title = kwargs.get("title", "")
+        self.type = kwargs.get("type")
+        self.unit = kwargs.get("unit", "")
+        self.show_legend = kwargs.get("show_legend", False)
+        self.labels = kwargs.get("labels", [])
         self.data = []
-        for d in kwargs.get('data', []):
-            ds = BaseDataSet(dict(zip(kwargs.get('labels'), d['data'])))
-            ds.label = d['label']
-            ds.unit = d['unit']
+        for d in kwargs.get("data", []):
+            ds = BaseDataSet(dict(zip(kwargs.get("labels"), d["data"], strict=False)))
+            ds.label = d["label"]
+            ds.unit = d["unit"]
             self.data.append(ds)
 
     @property
@@ -196,7 +196,7 @@ class BaseChart:
             self.data.append(dataset)
 
         else:
-            if kwargs.get('unit') != self.unit:
+            if kwargs.get("unit") != self.unit:
                 raise UnitMismatchError
             dataset = BaseDataSet(**kwargs)
             self.data.append(dataset)
@@ -207,53 +207,56 @@ class BaseChart:
     def as_old_dict(self):
 
         return {
-            'id': self.id,
-            'type': self.type,
-            'title': self.title,
-            'labels': self.labels,
-            'data': [{'data': list(d.data.values()), 'label': d.label, 'unit': d.unit} for d in self.data],
-            'unit': self.unit,
-            'show_legend': self.show_legend
+            "id": self.id,
+            "type": self.type,
+            "title": self.title,
+            "labels": self.labels,
+            "data": [
+                {"data": list(d.data.values()), "label": d.label, "unit": d.unit}
+                for d in self.data
+            ],
+            "unit": self.unit,
+            "show_legend": self.show_legend,
         }
 
     def as_dict(self):
 
         chart_dict = {
-            'type': self.type,
-            'data': {
-                'labels': self.labels,
-                'unit': self.unit,
-                'datasets': [],
+            "type": self.type,
+            "data": {
+                "labels": self.labels,
+                "unit": self.unit,
+                "datasets": [],
             },
-            'options': {
-                'legend': {
-                    'display': True,
-                    'position': 'bottom',
+            "options": {
+                "legend": {
+                    "display": True,
+                    "position": "bottom",
                 },
-                'aspectRatio': 0.8
+                "aspectRatio": 0.8,
             },
         }
         for ds in self.data:
-            chart_dict['data']['datasets'].append({
-                'label': ds.label,
-                'data': list(ds.values()),
-                'backgroundColor': BACKGROUND_COLORS,
-                'borderColor': BORDER_COLORS,
-                'borderWidth': 1,
-                'hoverOffset': 4
-            })
+            chart_dict["data"]["datasets"].append(
+                {
+                    "label": ds.label,
+                    "data": list(ds.values()),
+                    "backgroundColor": BACKGROUND_COLORS,
+                    "borderColor": BORDER_COLORS,
+                    "borderWidth": 1,
+                    "hoverOffset": 4,
+                }
+            )
         return chart_dict
 
 
 class BarChart(BaseChart):
-
     def __init__(self, **kwargs):
-        kwargs.update({'type': 'barchart'})
+        kwargs.update({"type": "barchart"})
         super().__init__(**kwargs)
 
 
 class DoughnutChart(BaseChart):
-
     def __init__(self, **kwargs):
-        kwargs.update({'type': 'doughnut'})
+        kwargs.update({"type": "doughnut"})
         super().__init__(**kwargs)

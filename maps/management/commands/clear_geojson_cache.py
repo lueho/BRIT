@@ -8,17 +8,17 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--pattern',
-            dest='pattern',
+            "--pattern",
+            dest="pattern",
             required=True,
-            help='Cache key pattern to clear (e.g., "*region_geojson*")'
+            help='Cache key pattern to clear (e.g., "*region_geojson*")',
         )
 
     def handle(self, *args, **options):
-        pattern = options['pattern']
+        pattern = options["pattern"]
         geojson_cache = caches[settings.GEOJSON_CACHE]
 
-        if hasattr(geojson_cache, 'delete_pattern'):
+        if hasattr(geojson_cache, "delete_pattern"):
             geojson_cache.delete_pattern(pattern)
         else:
             try:

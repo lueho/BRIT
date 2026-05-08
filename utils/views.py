@@ -226,21 +226,25 @@ class ModelSelectOptionsView(ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update({
-            "include_empty_option": self.include_empty_option,
-            "selected": self.get_selected_object_pk(),
-        })
+        context.update(
+            {
+                "include_empty_option": self.include_empty_option,
+                "selected": self.get_selected_object_pk(),
+            }
+        )
         return context
 
     def get(self, request, *args, **kwargs):
         self.object_list = self.get_queryset()
-        return JsonResponse({
-            "options": render_to_string(
-                self.template_name,
-                context=self.get_context_data(),
-                request=self.request,
-            )
-        })
+        return JsonResponse(
+            {
+                "options": render_to_string(
+                    self.template_name,
+                    context=self.get_context_data(),
+                    request=self.request,
+                )
+            }
+        )
 
 
 class UtilsDashboardView(BreadcrumbContextMixin, TemplateView):

@@ -57,6 +57,7 @@ class HamburgRoadsideTreesCSVRenderer(BaseCSVRenderer):
         "bezirk": "Borough",
     }
 
+
 __all__ = [
     "HamburgRoadsideTreesCSVRenderer",
     "HamburgRoadsideTreesXLSXRenderer",

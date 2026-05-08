@@ -13,7 +13,8 @@ class ForeignkeyField(Field):
     Attributes:
         template (str): The template used to render the field.
     """
-    template = 'fields/foreignkey_field.html'
+
+    template = "fields/foreignkey_field.html"
 
 
 class RangeSliderField(Field):
@@ -26,7 +27,8 @@ class RangeSliderField(Field):
     Attributes:
         template (str): The template used to render the field.
     """
-    template = 'fields/range_slider_field.html'
+
+    template = "fields/range_slider_field.html"
 
 
 class FilterAccordionGroup(AccordionGroup):
@@ -39,4 +41,5 @@ class FilterAccordionGroup(AccordionGroup):
     Attributes:
         template (str): The template used to render the accordion group.
     """
-    template = 'fields/filter-accordion-group.html'
+
+    template = "fields/filter-accordion-group.html"

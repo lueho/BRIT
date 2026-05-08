@@ -84,20 +84,24 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
     def test_reimport_with_same_material_set_does_not_create_duplicate_collection(self):
         importer = CollectionImporter(owner=self.owner, publication_status="private")
 
-        stats_first = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name, self.allowed_2.name],
-                forbidden_materials=[self.forbidden_1.name],
-            )
-        ])
+        stats_first = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_2.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+            ]
+        )
         self.assertEqual(stats_first["created"], 1)
 
-        stats_second = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_2.name, self.allowed_1.name],
-                forbidden_materials=[self.forbidden_1.name],
-            )
-        ])
+        stats_second = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_2.name, self.allowed_1.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+            ]
+        )
 
         self.assertEqual(stats_second["created"], 0)
         self.assertEqual(stats_second["unchanged"], 1)
@@ -118,13 +122,15 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
         collection.forbidden_materials.set([self.forbidden_1])
 
         importer = CollectionImporter(owner=self.owner, publication_status="private")
-        stats = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_2.name, self.allowed_1.name],
-                forbidden_materials=[self.forbidden_1.name],
-            )
-            | {"description": "Updated by import"}
-        ])
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_2.name, self.allowed_1.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {"description": "Updated by import"}
+            ]
+        )
 
         collection.refresh_from_db()
         self.assertEqual(stats["created"], 0)
@@ -136,18 +142,22 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
     def test_different_material_set_creates_new_collection(self):
         importer = CollectionImporter(owner=self.owner, publication_status="private")
 
-        importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name, self.allowed_2.name],
-                forbidden_materials=[self.forbidden_1.name],
-            )
-        ])
-        stats_second = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name, self.allowed_3.name],
-                forbidden_materials=[self.forbidden_1.name],
-            )
-        ])
+        importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_2.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+            ]
+        )
+        stats_second = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_3.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+            ]
+        )
 
         self.assertEqual(stats_second["created"], 1)
         self.assertEqual(Collection.objects.filter(owner=self.owner).count(), 2)
@@ -155,22 +165,26 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
     def test_new_version_links_predecessor_even_when_materials_change(self):
         importer = CollectionImporter(owner=self.owner, publication_status="private")
 
-        predecessor_stats = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name, self.allowed_2.name],
-                forbidden_materials=[self.forbidden_1.name],
-                valid_from=date(2023, 1, 1),
-            )
-        ])
+        predecessor_stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_2.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                    valid_from=date(2023, 1, 1),
+                )
+            ]
+        )
         self.assertEqual(predecessor_stats["created"], 1)
 
-        stats = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name, self.allowed_3.name],
-                forbidden_materials=[],
-                valid_from=date(2024, 1, 1),
-            )
-        ])
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_3.name],
+                    forbidden_materials=[],
+                    valid_from=date(2024, 1, 1),
+                )
+            ]
+        )
 
         predecessor = Collection.objects.get(
             owner=self.owner, valid_from=date(2023, 1, 1)
@@ -193,13 +207,15 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
     def test_reimport_reuses_custom_source_notes(self):
         importer = CollectionImporter(owner=self.owner, publication_status="private")
 
-        stats_first = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name, self.allowed_2.name],
-                forbidden_materials=[self.forbidden_1.name],
-            )
-            | {"sources": ["Private correspondence with district office"]}
-        ])
+        stats_first = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_2.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {"sources": ["Private correspondence with district office"]}
+            ]
+        )
 
         self.assertEqual(stats_first["sources_created"], 1)
         collection = Collection.objects.get(
@@ -217,13 +233,15 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
             ).exists()
         )
 
-        stats_second = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_2.name, self.allowed_1.name],
-                forbidden_materials=[self.forbidden_1.name],
-            )
-            | {"sources": ["Private correspondence with district office"]}
-        ])
+        stats_second = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_2.name, self.allowed_1.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {"sources": ["Private correspondence with district office"]}
+            ]
+        )
 
         collection.refresh_from_db()
         self.assertEqual(stats_second["created"], 0)
@@ -233,26 +251,30 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
     def test_reimport_syncs_collection_source_notes_exactly(self):
         importer = CollectionImporter(owner=self.owner, publication_status="private")
 
-        importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name, self.allowed_2.name],
-                forbidden_materials=[self.forbidden_1.name],
-            )
-            | {
-                "sources": [
-                    "Private correspondence with district office",
-                    "Municipal waste guide",
-                ]
-            }
-        ])
+        importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_2.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {
+                    "sources": [
+                        "Private correspondence with district office",
+                        "Municipal waste guide",
+                    ]
+                }
+            ]
+        )
 
-        stats = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_2.name, self.allowed_1.name],
-                forbidden_materials=[self.forbidden_1.name],
-            )
-            | {"sources": ["Municipal waste guide"]}
-        ])
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_2.name, self.allowed_1.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {"sources": ["Municipal waste guide"]}
+            ]
+        )
 
         collection = Collection.objects.get(
             owner=self.owner, valid_from=date(2024, 1, 1)
@@ -269,13 +291,15 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
         importer = CollectionImporter(owner=self.owner, publication_status="private")
         url = "https://example.org/flyer"
 
-        stats = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name, self.allowed_2.name],
-                forbidden_materials=[self.forbidden_1.name],
-            )
-            | {"sources": [url]}
-        ])
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_2.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {"sources": [url]}
+            ]
+        )
 
         collection = Collection.objects.get(
             owner=self.owner, valid_from=date(2024, 1, 1)
@@ -296,13 +320,15 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
         url = "https://example.org/flyer"
         note = "Private correspondence with district office"
 
-        stats = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name, self.allowed_2.name],
-                forbidden_materials=[self.forbidden_1.name],
-            )
-            | {"sources": [f"{url}, {note}"]}
-        ])
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_2.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {"sources": [f"{url}, {note}"]}
+            ]
+        )
 
         collection = Collection.objects.get(
             owner=self.owner, valid_from=date(2024, 1, 1)
@@ -335,13 +361,15 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
             publication_status="private",
         )
 
-        stats = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name, self.allowed_2.name],
-                forbidden_materials=[self.forbidden_1.name],
-            )
-            | {"sources": [title]}
-        ])
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_2.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {"sources": [title]}
+            ]
+        )
 
         collection = Collection.objects.get(
             owner=self.owner, valid_from=date(2024, 1, 1)
@@ -361,13 +389,15 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
             first_flyer = WasteFlyer.objects.create(url=url)
             WasteFlyer.objects.create(url=url)
 
-        stats = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name, self.allowed_2.name],
-                forbidden_materials=[self.forbidden_1.name],
-            )
-            | {"flyer_urls": [url]}
-        ])
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_2.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {"flyer_urls": [url]}
+            ]
+        )
 
         collection = Collection.objects.get(
             owner=self.owner, valid_from=date(2024, 1, 1)
@@ -384,21 +414,25 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
         first_url = "https://example.org/flyer-a"
         second_url = "https://example.org/flyer-b"
 
-        importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name, self.allowed_2.name],
-                forbidden_materials=[self.forbidden_1.name],
-            )
-            | {"flyer_urls": [first_url, second_url]}
-        ])
+        importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name, self.allowed_2.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {"flyer_urls": [first_url, second_url]}
+            ]
+        )
 
-        stats = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_2.name, self.allowed_1.name],
-                forbidden_materials=[self.forbidden_1.name],
-            )
-            | {"flyer_urls": [second_url]}
-        ])
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_2.name, self.allowed_1.name],
+                    forbidden_materials=[self.forbidden_1.name],
+                )
+                | {"flyer_urls": [second_url]}
+            ]
+        )
 
         collection = Collection.objects.get(
             owner=self.owner, valid_from=date(2024, 1, 1)
@@ -419,17 +453,19 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
             catchment=self.catchment,
         )
 
-        stats = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name],
-                forbidden_materials=[],
-            )
-            | {
-                "nuts_or_lau_id": "DEG02, DEG0L",
-                "catchment_name": "",
-                "collector_name": collector.name,
-            }
-        ])
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name],
+                    forbidden_materials=[],
+                )
+                | {
+                    "nuts_or_lau_id": "DEG02, DEG0L",
+                    "catchment_name": "",
+                    "collector_name": collector.name,
+                }
+            ]
+        )
 
         collection = Collection.objects.get(
             owner=self.owner, valid_from=date(2024, 1, 1)
@@ -459,17 +495,19 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
         )
         predecessor.allowed_materials.set([self.allowed_1])
 
-        stats = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name],
-                forbidden_materials=[],
-            )
-            | {
-                "nuts_or_lau_id": "DEG0I, DEG0K",
-                "catchment_name": "",
-                "collector_name": collector.name,
-            }
-        ])
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name],
+                    forbidden_materials=[],
+                )
+                | {
+                    "nuts_or_lau_id": "DEG0I, DEG0K",
+                    "catchment_name": "",
+                    "collector_name": collector.name,
+                }
+            ]
+        )
 
         collection = Collection.objects.get(
             owner=self.owner, valid_from=date(2024, 1, 1)
@@ -504,17 +542,19 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
         predecessor.allowed_materials.set([self.allowed_2])
         predecessor.forbidden_materials.set([self.forbidden_1])
 
-        stats = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name],
-                forbidden_materials=[],
-            )
-            | {
-                "nuts_or_lau_id": "DEG0I, DEG0K",
-                "catchment_name": "",
-                "collector_name": collector.name,
-            }
-        ])
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name],
+                    forbidden_materials=[],
+                )
+                | {
+                    "nuts_or_lau_id": "DEG0I, DEG0K",
+                    "catchment_name": "",
+                    "collector_name": collector.name,
+                }
+            ]
+        )
 
         collection = Collection.objects.get(
             owner=self.owner, valid_from=date(2024, 1, 1)
@@ -528,15 +568,17 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
     def test_named_catchment_lookup_is_case_insensitive(self):
         importer = CollectionImporter(owner=self.owner, publication_status="private")
 
-        stats = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name],
-                forbidden_materials=[],
-            )
-            | {
-                "catchment_name": self.catchment.name.upper(),
-            }
-        ])
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name],
+                    forbidden_materials=[],
+                )
+                | {
+                    "catchment_name": self.catchment.name.upper(),
+                }
+            ]
+        )
 
         collection = Collection.objects.get(
             owner=self.owner, valid_from=date(2024, 1, 1)
@@ -553,16 +595,18 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
             catchment=self.catchment,
         )
 
-        stats = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name],
-                forbidden_materials=[],
-            )
-            | {
-                "catchment_name": "Unknown imported catchment name",
-                "collector_name": collector.name,
-            }
-        ])
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name],
+                    forbidden_materials=[],
+                )
+                | {
+                    "catchment_name": "Unknown imported catchment name",
+                    "collector_name": collector.name,
+                }
+            ]
+        )
 
         collection = Collection.objects.get(
             owner=self.owner, valid_from=date(2024, 1, 1)
@@ -592,16 +636,18 @@ class CollectionImporterMaterialIdentityTestCase(TestCase):
         )
         predecessor.allowed_materials.set([self.allowed_1])
 
-        stats = importer.run([
-            self._record(
-                allowed_materials=[self.allowed_1.name],
-                forbidden_materials=[],
-            )
-            | {
-                "catchment_name": "Unknown imported catchment name",
-                "collector_name": collector.name,
-            }
-        ])
+        stats = importer.run(
+            [
+                self._record(
+                    allowed_materials=[self.allowed_1.name],
+                    forbidden_materials=[],
+                )
+                | {
+                    "catchment_name": "Unknown imported catchment name",
+                    "collector_name": collector.name,
+                }
+            ]
+        )
 
         collection = Collection.objects.get(
             owner=self.owner, valid_from=date(2024, 1, 1)
@@ -774,15 +820,17 @@ class ImprovedWorkbookLoadRecordsTestCase(TestCase):
     def _create_workbook(self, rows: list[list]) -> Path:
         workbook = openpyxl.Workbook()
         sheet = workbook.active
-        sheet.append([
-            "Catchment",
-            "NUTS/LAU Id",
-            "Collector",
-            "Collection System",
-            "Waste Category",
-            "Valid from",
-            "Valid until",
-        ])
+        sheet.append(
+            [
+                "Catchment",
+                "NUTS/LAU Id",
+                "Collector",
+                "Collection System",
+                "Waste Category",
+                "Valid from",
+                "Valid until",
+            ]
+        )
         for row in rows:
             sheet.append(row)
 
@@ -792,17 +840,19 @@ class ImprovedWorkbookLoadRecordsTestCase(TestCase):
         return Path(handle.name)
 
     def test_load_records_accepts_iso_string_dates(self):
-        workbook_path = self._create_workbook([
+        workbook_path = self._create_workbook(
             [
-                "Koblenz, Kreisfreie Stadt (DEB11)",
-                "DEB11",
-                "Kommunaler Servicebetrieb Koblenz",
-                "Door to door",
-                "Biowaste",
-                "2024-01-01",
-                "2024-12-31",
+                [
+                    "Koblenz, Kreisfreie Stadt (DEB11)",
+                    "DEB11",
+                    "Kommunaler Servicebetrieb Koblenz",
+                    "Door to door",
+                    "Biowaste",
+                    "2024-01-01",
+                    "2024-12-31",
+                ]
             ]
-        ])
+        )
         self.addCleanup(workbook_path.unlink)
 
         records, warnings, row_count = _load_records(workbook_path)

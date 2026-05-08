@@ -4,25 +4,54 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('bibliography', '0002_author_approved_at_author_approved_by_and_more'),
+        ("bibliography", "0002_author_approved_at_author_approved_by_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='author',
-            name='publication_status',
-            field=models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published'), ('declined', 'Declined'), ('archived', 'Archived')], default='private', max_length=10),
+            model_name="author",
+            name="publication_status",
+            field=models.CharField(
+                choices=[
+                    ("private", "Private"),
+                    ("review", "Under Review"),
+                    ("published", "Published"),
+                    ("declined", "Declined"),
+                    ("archived", "Archived"),
+                ],
+                default="private",
+                max_length=10,
+            ),
         ),
         migrations.AlterField(
-            model_name='licence',
-            name='publication_status',
-            field=models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published'), ('declined', 'Declined'), ('archived', 'Archived')], default='private', max_length=10),
+            model_name="licence",
+            name="publication_status",
+            field=models.CharField(
+                choices=[
+                    ("private", "Private"),
+                    ("review", "Under Review"),
+                    ("published", "Published"),
+                    ("declined", "Declined"),
+                    ("archived", "Archived"),
+                ],
+                default="private",
+                max_length=10,
+            ),
         ),
         migrations.AlterField(
-            model_name='source',
-            name='publication_status',
-            field=models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published'), ('declined', 'Declined'), ('archived', 'Archived')], default='private', max_length=10),
+            model_name="source",
+            name="publication_status",
+            field=models.CharField(
+                choices=[
+                    ("private", "Private"),
+                    ("review", "Under Review"),
+                    ("published", "Published"),
+                    ("declined", "Declined"),
+                    ("archived", "Archived"),
+                ],
+                default="private",
+                max_length=10,
+            ),
         ),
     ]

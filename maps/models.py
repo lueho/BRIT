@@ -296,7 +296,7 @@ class Location(NamedUserCreatedObject):
         verbose_name = "Location"
 
     def __str__(self):
-        return f"{self.name}{" at " + self.address if self.address else ""}"
+        return f"{self.name}{' at ' + self.address if self.address else ''}"
 
 
 class GeoPolygon(models.Model):

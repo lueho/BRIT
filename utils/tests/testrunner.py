@@ -232,12 +232,12 @@ class SerialAwareTestRunner(DiscoverRunner):
         if self.tags or self.exclude_tags:
             if self.tags:
                 self.log(
-                    f"Including test tag(s): {", ".join(sorted(self.tags))}.",
+                    f"Including test tag(s): {', '.join(sorted(self.tags))}.",
                     level=logging.DEBUG,
                 )
             if self.exclude_tags:
                 self.log(
-                    f"Excluding test tag(s): {", ".join(sorted(self.exclude_tags))}.",
+                    f"Excluding test tag(s): {', '.join(sorted(self.exclude_tags))}.",
                     level=logging.DEBUG,
                 )
             all_tests = filter_tests_by_tags(all_tests, self.tags, self.exclude_tags)
@@ -251,7 +251,7 @@ class SerialAwareTestRunner(DiscoverRunner):
                 reverse=self.reverse,
             )
         )
-        self.log("Found %d test(s)." % len(all_tests))
+        self.log(f"Found {len(all_tests)} test(s).")
 
         parallel_tests = []
         serial_tests = []
