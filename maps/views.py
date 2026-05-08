@@ -554,6 +554,12 @@ class GeoDataSetRuntimePermissionMixin:
             ) from err
         return self._dataset
 
+    def add_current_query_params(self, url):
+        query_string = self.request.GET.urlencode()
+        if query_string:
+            return f"{url}?{query_string}"
+        return url
+
     def get_features_geometries_url(self):
         adapter = self.get_runtime_adapter()
         if getattr(adapter, "uses_local_relation", False):
@@ -731,7 +737,9 @@ class GeoDataSetRuntimeMapView(
             "public_map_url": dataset.get_map_url(),
             "private_map_url": dataset.get_map_url(),
             "review_map_url": dataset.get_map_url(),
-            "table_url": reverse("geodataset-table", kwargs={"pk": dataset.pk}),
+            "table_url": self.add_current_query_params(
+                reverse("geodataset-table", kwargs={"pk": dataset.pk})
+            ),
         }
         if is_local_relation:
             filter_form = build_local_relation_filter_form(
@@ -798,7 +806,7 @@ class GeoDataSetRuntimeTableView(
                 for obj in context["object_list"]
             ],
             "dashboard_url": dataset.get_absolute_url(),
-            "map_url": dataset.get_map_url(),
+            "map_url": self.add_current_query_params(dataset.get_map_url()),
             "public_map_url": dataset.get_map_url(),
             "private_map_url": dataset.get_map_url(),
             "review_map_url": dataset.get_map_url(),

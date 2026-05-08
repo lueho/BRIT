@@ -332,6 +332,10 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertEqual(response.context["displayed_result_count"], 1)
         self.assertContains(response, "Showing 1 of 1 matching features")
         self.assertEqual(response.context["filter"].form["nuts_id"].value(), "DE-B")
+        self.assertEqual(
+            response.context["map_url"],
+            f"{self.dataset.get_map_url()}?nuts_id=DE-B",
+        )
 
     def test_local_relation_table_route_ignores_hidden_column_filter(self):
         response = self.client.get(
@@ -413,7 +417,8 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
 
     def test_local_relation_map_route_uses_dataset_scoped_geojson_url(self):
         response = self.client.get(
-            reverse("geodataset-map", kwargs={"pk": self.dataset.pk})
+            reverse("geodataset-map", kwargs={"pk": self.dataset.pk}),
+            {"nuts_id": "DE-B"},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -426,6 +431,10 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertContains(response, 'name="nuts_id"')
         self.assertContains(
             response, reverse("geodataset-table", kwargs={"pk": self.dataset.pk})
+        )
+        self.assertEqual(
+            response.context["table_url"],
+            f"{reverse('geodataset-table', kwargs={'pk': self.dataset.pk})}?nuts_id=DE-B",
         )
         self.assertContains(response, 'aria-label="View toggle"')
         self.assertContains(response, "nav nav-pills sidebar-tabs")
