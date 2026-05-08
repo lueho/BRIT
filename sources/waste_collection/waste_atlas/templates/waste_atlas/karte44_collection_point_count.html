@@ -18,7 +18,8 @@
         { value: 'high',      label: '> 10',  color: '#d95f0e' },
         { value: 'medium',    label: '6 – 10', color: '#fe9929' },
         { value: 'low',       label: '2 – 5',  color: '#fed98e' },
-        { value: 'very_low',  label: '1',      color: '#ffffd4' }
+        { value: 'very_low',  label: 'Sammelplatz',      color: '#ffffd4' },
+        { value: 'full_dtd',  label: 'Full door-to-door/No data', color: '#74c476' }
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'No data',
@@ -29,7 +30,7 @@
           var value = r.collection_point_count;
           var cls;
           if (value === null || value === undefined) {
-            cls = null;
+            cls = r.is_door_to_door ? 'full_dtd' : null;
           } else if (value > 10) {
             cls = 'high';
           } else if (value > 5) {

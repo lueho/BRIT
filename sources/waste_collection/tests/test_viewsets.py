@@ -1903,6 +1903,7 @@ class CollectionPointCountViewSetTests(APITestCase):
                 {
                     "catchment_id": self.catchment.id,
                     "collection_point_count": 5.0,
+                    "is_door_to_door": True,
                 }
             ],
         )

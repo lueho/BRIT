@@ -939,8 +939,9 @@ class CollectionPointCountViewSet(viewsets.ViewSet):
             {
                 "catchment_id": cid,
                 "collection_point_count": value_lookup.get(col_id),
+                "is_door_to_door": system == "Door to door",
             }
-            for cid, (col_id, _system, _priority) in best.items()
+            for cid, (col_id, system, _priority) in best.items()
         ]
         serializer = CatchmentCollectionPointCountSerializer(data, many=True)
         return Response(serializer.data)

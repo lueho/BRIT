@@ -79,6 +79,7 @@ class CatchmentCollectionSystemCountSerializer(serializers.Serializer):
 class CatchmentCollectionPointCountSerializer(serializers.Serializer):
     catchment_id = serializers.IntegerField()
     collection_point_count = serializers.FloatField(allow_null=True)
+    is_door_to_door = serializers.BooleanField()
 
 
 class CatchmentConnectionRateSerializer(serializers.Serializer):
