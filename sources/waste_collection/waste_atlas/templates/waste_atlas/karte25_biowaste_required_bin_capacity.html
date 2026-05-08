@@ -19,16 +19,19 @@
         { value: 'low',       label: '6 – 10 L/Einheit',  color: '#a6d96a' },
         { value: 'medium',    label: '11 – 20 L/Einheit', color: '#66bd63' },
         { value: 'high',      label: '21 – 60 L/Einheit', color: '#1a9850' },
-        { value: 'very_high', label: '> 60 L/Einheit',    color: '#006837' }
+        { value: 'very_high', label: '> 60 L/Einheit',    color: '#006837' },
+        { value: 'no_door_to_door', label: 'Keine Tür-zu-Tür-Bioabfallsammlung', color: '#fff696' }
       ],
-      noDataColor: '#ffffff',
+      noDataColor: '#e0e0e0',
       noDataLabel: 'Keine Daten',
       legendTitle: 'Min. Behältervolumen (L/Einheit)',
       fileBase:    'karte25_biowaste_required_bin_capacity',
       transformData: function (records) {
         return records.map(function (r) {
           var cls;
-          if (r.required_bin_capacity === null) {
+          if (r.is_door_to_door === false) {
+            cls = 'no_door_to_door';
+          } else if (r.required_bin_capacity === null) {
             cls = null;
           } else if (r.required_bin_capacity <= 5) {
             cls = 'very_low';

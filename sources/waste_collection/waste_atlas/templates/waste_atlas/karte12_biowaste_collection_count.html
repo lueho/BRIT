@@ -1,7 +1,7 @@
 {% extends "waste_atlas/choropleth_map.html" %}
 
 {% block atlas_config %}
-<script>
+  <script>
   document.addEventListener('DOMContentLoaded', function () {
     WasteAtlasChoropleth.init({
       svgId:       'atlas-svg',
@@ -19,7 +19,7 @@
         { value: 'biweekly',        label: 'Alle zwei Wochen',           color: '#66CDAA' },
         { value: 'less_frequent',   label: 'Seltener',                   color: '#4b2a60' },
         { value: 'seasonal',        label: 'Saisonal wechselnd',         color: '#F4A460' },
-        { value: 'no_door_to_door', label: 'Keine Tür-zu-Tür-Sammlung',  color: '#FFF696' }
+        { value: 'no_door_to_door', label: 'Keine Tür-zu-Tür-Bioabfallsammlung', color: '#FFF696' }
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'Keine Daten',
@@ -28,8 +28,10 @@
       transformData: function (records) {
         return records.map(function (r) {
           var cls;
-          if (r.collection_count === null) {
+          if (r.is_door_to_door === false) {
             cls = 'no_door_to_door';
+          } else if (r.collection_count === null) {
+            cls = null;
           } else if (r.has_seasonal_variation) {
             cls = 'seasonal';
           } else if (r.collection_count >= 50) {
@@ -44,5 +46,5 @@
       }
     });
   });
-</script>
+  </script>
 {% endblock atlas_config %}

@@ -132,6 +132,7 @@ class CatchmentCollectionCountSerializer(serializers.Serializer):
     catchment_id = serializers.IntegerField()
     collection_count = serializers.IntegerField(allow_null=True)
     has_seasonal_variation = serializers.BooleanField()
+    is_door_to_door = serializers.BooleanField(required=False)
 
 
 class CatchmentCombinedCollectionCountSerializer(serializers.Serializer):
@@ -140,6 +141,22 @@ class CatchmentCombinedCollectionCountSerializer(serializers.Serializer):
     catchment_id = serializers.IntegerField()
     bio_count = serializers.IntegerField(allow_null=True)
     residual_count = serializers.IntegerField(allow_null=True)
+    bio_is_door_to_door = serializers.BooleanField(allow_null=True, required=False)
+    residual_is_door_to_door = serializers.BooleanField(allow_null=True, required=False)
+
+
+class CatchmentCollectionCountRatioSerializer(serializers.Serializer):
+    catchment_id = serializers.IntegerField()
+    bio_count = serializers.IntegerField(allow_null=True)
+    residual_count = serializers.IntegerField(allow_null=True)
+    ratio = serializers.FloatField(allow_null=True)
+    bio_is_door_to_door = serializers.BooleanField(allow_null=True, required=False)
+    residual_is_door_to_door = serializers.BooleanField(allow_null=True, required=False)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["ratio"] = _round_one_decimal(data.get("ratio"))
+        return data
 
 
 class CatchmentFeeSystemSerializer(serializers.Serializer):
@@ -195,6 +212,7 @@ class CatchmentMinBinSizeSerializer(serializers.Serializer):
 
     catchment_id = serializers.IntegerField()
     min_bin_size = serializers.FloatField(allow_null=True)
+    is_door_to_door = serializers.BooleanField(required=False)
 
 
 class CatchmentRequiredBinCapacitySerializer(serializers.Serializer):
@@ -203,3 +221,18 @@ class CatchmentRequiredBinCapacitySerializer(serializers.Serializer):
     catchment_id = serializers.IntegerField()
     required_bin_capacity = serializers.FloatField(allow_null=True)
     required_bin_capacity_reference = serializers.CharField(allow_null=True)
+    is_door_to_door = serializers.BooleanField(required=False)
+
+
+class CatchmentMinBinSizeRatioSerializer(serializers.Serializer):
+    catchment_id = serializers.IntegerField()
+    bio_min_bin_size = serializers.FloatField(allow_null=True)
+    residual_min_bin_size = serializers.FloatField(allow_null=True)
+    ratio = serializers.FloatField(allow_null=True)
+    bio_is_door_to_door = serializers.BooleanField(allow_null=True, required=False)
+    residual_is_door_to_door = serializers.BooleanField(allow_null=True, required=False)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["ratio"] = _round_one_decimal(data.get("ratio"))
+        return data

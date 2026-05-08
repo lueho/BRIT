@@ -36,6 +36,7 @@ from .serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
     CatchmentBinConfigurationSerializer,
     CatchmentCollectionAmountSerializer,
+    CatchmentCollectionCountRatioSerializer,
     CatchmentCollectionCountSerializer,
     CatchmentCollectionSupportSerializer,
     CatchmentCollectionSystemCountSerializer,
@@ -49,6 +50,7 @@ from .serializers import (
     CatchmentFrequencyTypeSerializer,
     CatchmentGeometrySerializer,
     CatchmentMaterialStatusSerializer,
+    CatchmentMinBinSizeRatioSerializer,
     CatchmentMinBinSizeSerializer,
     CatchmentOrgaLevelSerializer,
     CatchmentOrganicRatioSerializer,
@@ -307,6 +309,24 @@ class OrgaLevelViewSet(viewsets.ViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
 
+        collection_scope = Collection.objects.filter(
+            _country_filter_q("catchment__", country),
+            valid_from__year=year,
+            collector_id__isnull=False,
+        )
+        collection_scope = _apply_nuts_prefix_filter(
+            collection_scope, nuts_prefixes, catchment_path="catchment__"
+        )
+        shared_collector_ids = (
+            collection_scope.values("collector_id")
+            .annotate(catchment_count=Count("catchment_id", distinct=True))
+            .filter(catchment_count__gt=1)
+            .values_list("collector_id", flat=True)
+        )
+        shared_collector_catchment_ids = collection_scope.filter(
+            collector_id__in=shared_collector_ids
+        ).values_list("catchment_id", flat=True)
+
         nuts_exists = Exists(
             NutsRegion.objects.filter(region_ptr_id=OuterRef("region_id"))
         )
@@ -322,6 +342,10 @@ class OrgaLevelViewSet(viewsets.ViewSet):
             .distinct()
             .annotate(
                 orga_level=Case(
+                    When(
+                        id__in=shared_collector_catchment_ids,
+                        then=Value("individual"),
+                    ),
                     When(nuts_exists, then=Value("nuts")),
                     When(lau_exists, then=Value("lau")),
                     default=Value("individual"),
@@ -551,7 +575,9 @@ def _get_material_status(country, year, material_id, nuts_prefixes=()):
     return data
 
 
-def _get_collection_count(country, year, waste_categories, nuts_prefixes=()):
+def _get_collection_count(
+    country, year, waste_categories, nuts_prefixes=(), include_missing_primary=False
+):
     """Return per-catchment annual collection count for the given waste categories.
 
     For door-to-door collections, sums ``CollectionCountOptions.standard``
@@ -587,8 +613,38 @@ def _get_collection_count(country, year, waste_categories, nuts_prefixes=()):
                 "catchment_id": cid,
                 "collection_count": sum(options),
                 "has_seasonal_variation": len(set(options)) > 1,
+                "is_door_to_door": True,
             }
         )
+    if include_missing_primary:
+        existing_ids = {row["catchment_id"] for row in data}
+        all_qs = _filter_by_waste_categories(
+            Collection.objects.filter(
+                _country_filter_q("catchment__", country),
+                valid_from__year=year,
+            ),
+            waste_categories,
+        )
+        all_qs = _apply_nuts_prefix_filter(
+            all_qs, nuts_prefixes, catchment_path="catchment__"
+        )
+        best_system: dict[int, tuple[str, int]] = {}
+        for cid, system in all_qs.values_list(
+            "catchment_id", "collection_system__name"
+        ):
+            priority = _COLLECTION_SYSTEM_PRIORITY.get(system, 99)
+            if cid not in best_system or priority < best_system[cid][1]:
+                best_system[cid] = (system, priority)
+        for cid, (system, _priority) in best_system.items():
+            if cid not in existing_ids:
+                data.append(
+                    {
+                        "catchment_id": cid,
+                        "collection_count": None,
+                        "has_seasonal_variation": False,
+                        "is_door_to_door": system == "Door to door",
+                    }
+                )
     return data
 
 
@@ -742,38 +798,12 @@ class BiowasteCollectionCountViewSet(viewsets.ViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         door_to_door = _get_collection_count(
-            country, year, ["Biowaste", "Food waste"], nuts_prefixes
-        )
-        d2d_ids = {r["catchment_id"] for r in door_to_door}
-
-        # Include non-door-to-door biowaste catchments.
-        all_bio_qs = _filter_by_waste_categories(
-            Collection.objects.filter(
-                _country_filter_q("catchment__", country),
-                valid_from__year=year,
-            ),
+            country,
+            year,
             ["Biowaste", "Food waste"],
+            nuts_prefixes,
+            include_missing_primary=True,
         )
-        all_bio_qs = _apply_nuts_prefix_filter(
-            all_bio_qs, nuts_prefixes, catchment_path="catchment__"
-        )
-        all_bio = all_bio_qs.values_list("catchment_id", "collection_system__name")
-        best_system: dict[int, tuple[str, int]] = {}
-        for cid, system in all_bio:
-            p = _COLLECTION_SYSTEM_PRIORITY.get(system, 99)
-            if cid not in best_system or p < best_system[cid][1]:
-                best_system[cid] = (system, p)
-
-        for cid, (_system, _) in best_system.items():
-            if cid not in d2d_ids:
-                door_to_door.append(
-                    {
-                        "catchment_id": cid,
-                        "collection_count": None,
-                        "has_seasonal_variation": False,
-                    }
-                )
-
         serializer = CatchmentCollectionCountSerializer(door_to_door, many=True)
         return Response(serializer.data)
 
@@ -793,13 +823,17 @@ class CombinedCollectionCountViewSet(viewsets.ViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         bio = {
-            r["catchment_id"]: r["collection_count"]
+            r["catchment_id"]: r
             for r in _get_collection_count(
-                country, year, ["Biowaste", "Food waste"], nuts_prefixes
+                country,
+                year,
+                ["Biowaste", "Food waste"],
+                nuts_prefixes,
+                include_missing_primary=True,
             )
         }
         res = {
-            r["catchment_id"]: r["collection_count"]
+            r["catchment_id"]: r
             for r in _get_collection_count(
                 country, year, ["Residual waste"], nuts_prefixes
             )
@@ -808,12 +842,58 @@ class CombinedCollectionCountViewSet(viewsets.ViewSet):
         data = [
             {
                 "catchment_id": cid,
-                "bio_count": bio.get(cid),
-                "residual_count": res.get(cid),
+                "bio_count": bio.get(cid, {}).get("collection_count"),
+                "residual_count": res.get(cid, {}).get("collection_count"),
+                "bio_is_door_to_door": bio.get(cid, {}).get("is_door_to_door"),
+                "residual_is_door_to_door": res.get(cid, {}).get("is_door_to_door"),
             }
             for cid in all_ids
         ]
         serializer = CatchmentCombinedCollectionCountSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class CollectionCountRatioViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        bio = {
+            r["catchment_id"]: r
+            for r in _get_collection_count(
+                country,
+                year,
+                ["Biowaste", "Food waste"],
+                nuts_prefixes,
+                include_missing_primary=True,
+            )
+        }
+        res = {
+            r["catchment_id"]: r
+            for r in _get_collection_count(
+                country, year, ["Residual waste"], nuts_prefixes
+            )
+        }
+        all_ids = set(bio) | set(res)
+        data = []
+        for cid in all_ids:
+            bio_count = bio.get(cid, {}).get("collection_count")
+            residual_count = res.get(cid, {}).get("collection_count")
+            ratio = None
+            if bio_count is not None and residual_count:
+                ratio = bio_count / residual_count
+            data.append(
+                {
+                    "catchment_id": cid,
+                    "bio_count": bio_count,
+                    "residual_count": residual_count,
+                    "ratio": ratio,
+                    "bio_is_door_to_door": bio.get(cid, {}).get("is_door_to_door"),
+                    "residual_is_door_to_door": res.get(cid, {}).get("is_door_to_door"),
+                }
+            )
+        serializer = CatchmentCollectionCountRatioSerializer(data, many=True)
         return Response(serializer.data)
 
 
@@ -1285,6 +1365,19 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=()):
         if cid not in best or priority < best[cid][2]:
             best[cid] = (col_id, system, priority)
 
+    scoped_catchment_ids = list(
+        _apply_nuts_prefix_filter(
+            CollectionCatchment.objects.filter(
+                _country_filter_q("", country),
+                collections__valid_from__year=year,
+            ).distinct(),
+            nuts_prefixes,
+        ).values_list("id", flat=True)
+    )
+    for catchment_id in scoped_catchment_ids:
+        if catchment_id not in best:
+            best[catchment_id] = (None, "No separate collection", 99)
+
     catchment_ids = list(best.keys())
     if not catchment_ids:
         return []
@@ -1516,7 +1609,9 @@ class GreenWasteCollectionAmountViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-def _get_min_bin_size(country, year, waste_categories, nuts_prefixes=()):
+def _get_min_bin_size(
+    country, year, waste_categories, nuts_prefixes=(), include_missing_primary=False
+):
     """Return per-catchment minimum bin size (L) for door-to-door collections.
 
     Picks the primary door-to-door collection per catchment using
@@ -1534,15 +1629,46 @@ def _get_min_bin_size(country, year, waste_categories, nuts_prefixes=()):
     qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
     rows = qs.values_list("catchment_id", "min_bin_size")
 
-    best: dict[int, float | None] = {}
+    best: dict[int, tuple[float | None, bool]] = {}
     for cid, size in rows:
         if cid not in best:
-            best[cid] = float(size) if size is not None else None
+            best[cid] = (float(size) if size is not None else None, True)
 
-    return [{"catchment_id": cid, "min_bin_size": size} for cid, size in best.items()]
+    if include_missing_primary:
+        all_qs = _filter_by_waste_categories(
+            Collection.objects.filter(
+                _country_filter_q("catchment__", country),
+                valid_from__year=year,
+            ),
+            waste_categories,
+        )
+        all_qs = _apply_nuts_prefix_filter(
+            all_qs, nuts_prefixes, catchment_path="catchment__"
+        )
+        best_system: dict[int, tuple[str, int]] = {}
+        for cid, system in all_qs.values_list(
+            "catchment_id", "collection_system__name"
+        ):
+            priority = _COLLECTION_SYSTEM_PRIORITY.get(system, 99)
+            if cid not in best_system or priority < best_system[cid][1]:
+                best_system[cid] = (system, priority)
+        for cid, (system, _priority) in best_system.items():
+            if cid not in best:
+                best[cid] = (None, system == "Door to door")
+
+    return [
+        {
+            "catchment_id": cid,
+            "min_bin_size": size,
+            "is_door_to_door": is_door_to_door,
+        }
+        for cid, (size, is_door_to_door) in best.items()
+    ]
 
 
-def _get_required_bin_capacity(country, year, waste_categories, nuts_prefixes=()):
+def _get_required_bin_capacity(
+    country, year, waste_categories, nuts_prefixes=(), include_missing_primary=False
+):
     """Return per-catchment required specific bin capacity for door-to-door collections.
 
     Returns ``required_bin_capacity`` (L/reference) and
@@ -1562,18 +1688,41 @@ def _get_required_bin_capacity(country, year, waste_categories, nuts_prefixes=()
         "catchment_id", "required_bin_capacity", "required_bin_capacity_reference"
     )
 
-    best: dict[int, tuple[float | None, str | None]] = {}
+    best: dict[int, tuple[float | None, str | None, bool]] = {}
     for cid, cap, ref in rows:
         if cid not in best:
-            best[cid] = (float(cap) if cap is not None else None, ref or None)
+            best[cid] = (float(cap) if cap is not None else None, ref or None, True)
+
+    if include_missing_primary:
+        all_qs = _filter_by_waste_categories(
+            Collection.objects.filter(
+                _country_filter_q("catchment__", country),
+                valid_from__year=year,
+            ),
+            waste_categories,
+        )
+        all_qs = _apply_nuts_prefix_filter(
+            all_qs, nuts_prefixes, catchment_path="catchment__"
+        )
+        best_system: dict[int, tuple[str, int]] = {}
+        for cid, system in all_qs.values_list(
+            "catchment_id", "collection_system__name"
+        ):
+            priority = _COLLECTION_SYSTEM_PRIORITY.get(system, 99)
+            if cid not in best_system or priority < best_system[cid][1]:
+                best_system[cid] = (system, priority)
+        for cid, (system, _priority) in best_system.items():
+            if cid not in best:
+                best[cid] = (None, None, system == "Door to door")
 
     return [
         {
             "catchment_id": cid,
             "required_bin_capacity": cap,
             "required_bin_capacity_reference": ref,
+            "is_door_to_door": is_door_to_door,
         }
-        for cid, (cap, ref) in best.items()
+        for cid, (cap, ref, is_door_to_door) in best.items()
     ]
 
 
@@ -1592,7 +1741,11 @@ class BiowasteMinBinSizeViewSet(viewsets.ViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         data = _get_min_bin_size(
-            country, year, ["Biowaste", "Food waste"], nuts_prefixes
+            country,
+            year,
+            ["Biowaste", "Food waste"],
+            nuts_prefixes,
+            include_missing_primary=True,
         )
         serializer = CatchmentMinBinSizeSerializer(data, many=True)
         return Response(serializer.data)
@@ -1617,6 +1770,48 @@ class ResidualMinBinSizeViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
+class MinBinSizeRatioViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        bio = {
+            r["catchment_id"]: r
+            for r in _get_min_bin_size(
+                country,
+                year,
+                ["Biowaste", "Food waste"],
+                nuts_prefixes,
+                include_missing_primary=True,
+            )
+        }
+        res = {
+            r["catchment_id"]: r
+            for r in _get_min_bin_size(country, year, ["Residual waste"], nuts_prefixes)
+        }
+        all_ids = set(bio) | set(res)
+        data = []
+        for cid in all_ids:
+            bio_size = bio.get(cid, {}).get("min_bin_size")
+            residual_size = res.get(cid, {}).get("min_bin_size")
+            ratio = None
+            if bio_size is not None and residual_size:
+                ratio = bio_size / residual_size
+            data.append(
+                {
+                    "catchment_id": cid,
+                    "bio_min_bin_size": bio_size,
+                    "residual_min_bin_size": residual_size,
+                    "ratio": ratio,
+                    "bio_is_door_to_door": bio.get(cid, {}).get("is_door_to_door"),
+                    "residual_is_door_to_door": res.get(cid, {}).get("is_door_to_door"),
+                }
+            )
+        serializer = CatchmentMinBinSizeRatioSerializer(data, many=True)
+        return Response(serializer.data)
+
+
 class BiowasteRequiredBinCapacityViewSet(viewsets.ViewSet):
     """Return required specific bin capacity for biowaste collections (Karte 25).
 
@@ -1632,7 +1827,11 @@ class BiowasteRequiredBinCapacityViewSet(viewsets.ViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         data = _get_required_bin_capacity(
-            country, year, ["Biowaste", "Food waste"], nuts_prefixes
+            country,
+            year,
+            ["Biowaste", "Food waste"],
+            nuts_prefixes,
+            include_missing_primary=True,
         )
         serializer = CatchmentRequiredBinCapacitySerializer(data, many=True)
         return Response(serializer.data)

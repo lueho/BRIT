@@ -1,7 +1,7 @@
 {% extends "waste_atlas/choropleth_map.html" %}
 
 {% block atlas_config %}
-<script>
+  <script>
   document.addEventListener('DOMContentLoaded', function () {
     WasteAtlasChoropleth.init({
       svgId:       'atlas-svg',
@@ -24,9 +24,9 @@
         { value: 'bio_less_res_more',     label: 'Bio seltener, Rest öfter',         color: '#e33e88' },
         { value: 'bio_less_res_bi',       label: 'Bio seltener, Rest alle zwei Wochen', color: '#ff7986' },
         { value: 'bio_less_res_less',     label: 'Bio seltener, Rest seltener',      color: '#f7b1b8' },
-        { value: 'no_bio',               label: 'Keine Tür-zu-Tür Bioabfallsammlung', color: '#fff696' }
+        { value: 'no_bio',               label: 'Keine Tür-zu-Tür-Bioabfallsammlung', color: '#fff696' }
       ],
-      noDataColor: '#ffffff',
+      noDataColor: '#e0e0e0',
       noDataLabel: 'Keine Daten',
       legendTitle: 'Sammelhäufigkeit',
       fileBase:    'karte13_haeufigkeit_kombination',
@@ -41,8 +41,11 @@
           var b = bucket(r.bio_count);
           var re = bucket(r.residual_count);
           var cls;
-          if (b === null) {
+          if (r.bio_is_door_to_door === false ||
+              (r.bio_is_door_to_door == null && r.residual_count != null)) {
             cls = 'no_bio';
+          } else if (b === null) {
+            cls = null;
           } else if (re === null) {
             cls = null;
           } else {
@@ -53,5 +56,5 @@
       }
     });
   });
-</script>
+  </script>
 {% endblock atlas_config %}

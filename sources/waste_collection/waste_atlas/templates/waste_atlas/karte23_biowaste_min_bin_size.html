@@ -19,16 +19,19 @@
         { value: 'small',   label: '61 – 80 L',       color: '#a6d96a' },
         { value: 'medium',  label: '81 – 120 L',      color: '#66bd63' },
         { value: 'large',   label: '121 – 180 L',     color: '#1a9850' },
-        { value: 'xl',      label: '> 180 L',         color: '#006837' }
+        { value: 'xl',      label: '> 180 L',         color: '#006837' },
+        { value: 'no_door_to_door', label: 'Keine Tür-zu-Tür-Bioabfallsammlung', color: '#fff696' }
       ],
-      noDataColor: '#ffffff',
+      noDataColor: '#e0e0e0',
       noDataLabel: 'Keine Daten',
       legendTitle: 'Min. Behältergröße (L)',
       fileBase:    'karte23_biowaste_min_bin_size',
       transformData: function (records) {
         return records.map(function (r) {
           var cls;
-          if (r.min_bin_size === null) {
+          if (r.is_door_to_door === false) {
+            cls = 'no_door_to_door';
+          } else if (r.min_bin_size === null) {
             cls = null;
           } else if (r.min_bin_size <= 60) {
             cls = 'xs';

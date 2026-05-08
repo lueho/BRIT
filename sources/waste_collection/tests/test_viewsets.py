@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 
 from bibliography.models import Source
+from distributions.models import TemporalDistribution, Timestep
 from maps.models import (
     GeoPolygon,
     NutsRegion,
@@ -27,6 +28,7 @@ from sources.waste_collection.models import (
     CollectionCountOptions,
     CollectionFrequency,
     CollectionPropertyValue,
+    CollectionSeason,
     CollectionSystem,
     Collector,
     FeeSystem,
@@ -1197,6 +1199,44 @@ class CollectionMutationApiTestCase(APITestCase):
         self.assertEqual(cpv.collection, self.predecessor)
         self.assertEqual(cpv.owner, self.other_user)
 
+    def test_property_value_create_existing_value_returns_unchanged(self):
+        self.client.force_login(self.other_user)
+        cpv = CollectionPropertyValue.objects.create(
+            collection=self.predecessor,
+            property=self.property,
+            unit=self.unit,
+            owner=self.other_user,
+            publication_status="private",
+            year=2025,
+            average=42.0,
+        )
+
+        response = self.client.post(
+            reverse("api-waste-collection-property-value-create"),
+            {
+                "collection": self.predecessor.pk,
+                "property_id": self.property.pk,
+                "unit_name": self.unit.name,
+                "year": 2025,
+                "average": 42.0,
+                "submit_for_review": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["id"], cpv.pk)
+        self.assertEqual(response.data["cpv_unchanged"], 1)
+        self.assertEqual(
+            CollectionPropertyValue.objects.filter(
+                collection=self.predecessor,
+                property=self.property,
+                unit=self.unit,
+                year=2025,
+            ).count(),
+            1,
+        )
+
     def test_property_value_create_denies_non_owner_on_private_collection(self):
         self.client.force_login(self.other_user)
 
@@ -2231,7 +2271,8 @@ class GreenWasteCollectionAmountViewSetTests(APITestCase):
         )
         self.assertIsNone(data_by_catchment[self.catchment_no_collection.id]["amount"])
 
-        self.assertNotIn(self.catchment_ignored.id, data_by_catchment)
+        self.assertTrue(data_by_catchment[self.catchment_ignored.id]["no_collection"])
+        self.assertIsNone(data_by_catchment[self.catchment_ignored.id]["amount"])
 
 
 class BinSizeViewSetTests(APITestCase):
@@ -2308,18 +2349,21 @@ class BinSizeViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         by_catchment = {r["catchment_id"]: r for r in response.data}
         self.assertEqual(by_catchment[self.catchment_bio.id]["min_bin_size"], 80.0)
+        self.assertTrue(by_catchment[self.catchment_bio.id]["is_door_to_door"])
         self.assertIn(self.catchment_no_bin.id, by_catchment)
         self.assertIsNone(by_catchment[self.catchment_no_bin.id]["min_bin_size"])
+        self.assertTrue(by_catchment[self.catchment_no_bin.id]["is_door_to_door"])
         self.assertNotIn(self.catchment_residual.id, by_catchment)
 
-    def test_biowaste_min_bin_size_excludes_non_d2d(self):
-        """Karte 23 excludes bring-point and other non-D2D collections."""
+    def test_biowaste_min_bin_size_marks_non_d2d(self):
+        """Karte 23 marks bring-point and other non-D2D collections."""
         response = self.client.get(
             "/waste_collection/api/waste-atlas/biowaste-min-bin-size/",
             {"country": "DE", "year": 2024},
         )
         by_catchment = {r["catchment_id"]: r for r in response.data}
-        self.assertNotIn(self.catchment_ignored.id, by_catchment)
+        self.assertIsNone(by_catchment[self.catchment_ignored.id]["min_bin_size"])
+        self.assertFalse(by_catchment[self.catchment_ignored.id]["is_door_to_door"])
 
     def test_residual_min_bin_size_returns_d2d_collections(self):
         """Karte 24 returns min_bin_size for D2D residual catchments."""
@@ -2345,6 +2389,7 @@ class BinSizeViewSetTests(APITestCase):
         row = by_catchment[self.catchment_bio.id]
         self.assertEqual(row["required_bin_capacity"], 10.0)
         self.assertEqual(row["required_bin_capacity_reference"], "person")
+        self.assertTrue(row["is_door_to_door"])
         self.assertNotIn(self.catchment_residual.id, by_catchment)
 
     def test_biowaste_required_bin_capacity_null_when_not_set(self):
@@ -2357,6 +2402,19 @@ class BinSizeViewSetTests(APITestCase):
         row = by_catchment[self.catchment_no_bin.id]
         self.assertIsNone(row["required_bin_capacity"])
         self.assertIsNone(row["required_bin_capacity_reference"])
+        self.assertTrue(row["is_door_to_door"])
+
+    def test_biowaste_required_bin_capacity_marks_non_d2d(self):
+        """Karte 25 marks non-D2D biowaste catchments separately from no data."""
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/biowaste-required-bin-capacity/",
+            {"country": "DE", "year": 2024},
+        )
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        row = by_catchment[self.catchment_ignored.id]
+        self.assertIsNone(row["required_bin_capacity"])
+        self.assertIsNone(row["required_bin_capacity_reference"])
+        self.assertFalse(row["is_door_to_door"])
 
     def test_residual_required_bin_capacity_returns_value_and_reference(self):
         """Karte 26 returns required_bin_capacity and reference for residual D2D."""
@@ -2370,6 +2428,125 @@ class BinSizeViewSetTests(APITestCase):
         self.assertEqual(row["required_bin_capacity"], 40.0)
         self.assertEqual(row["required_bin_capacity_reference"], "household")
         self.assertNotIn(self.catchment_bio.id, by_catchment)
+
+
+class AtlasRatioViewSetTests(APITestCase):
+    """Tests for atlas endpoints comparing bio and residual collection settings."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
+        cls.food_category, _ = WasteCategory.objects.get_or_create(name="Food waste")
+        cls.residual_category, _ = WasteCategory.objects.get_or_create(
+            name="Residual waste"
+        )
+        cls.d2d, _ = CollectionSystem.objects.get_or_create(name="Door to door")
+        cls.region = Region.objects.create(name="Ratio Region DE", country="DE")
+        cls.catchment_both = CollectionCatchment.objects.create(
+            name="Ratio Both", region=cls.region
+        )
+        cls.catchment_residual_only = CollectionCatchment.objects.create(
+            name="Ratio Residual Only", region=cls.region
+        )
+        cls.bio_frequency = cls._create_frequency(name="Ratio Bio Frequency", count=52)
+        cls.residual_frequency = cls._create_frequency(
+            name="Ratio Residual Frequency", count=26
+        )
+        Collection.objects.create(
+            name="Ratio bio collection",
+            catchment=cls.catchment_both,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            frequency=cls.bio_frequency,
+            valid_from=date(2024, 1, 1),
+            min_bin_size=60,
+        )
+        Collection.objects.create(
+            name="Ratio residual collection",
+            catchment=cls.catchment_both,
+            waste_category=cls.residual_category,
+            collection_system=cls.d2d,
+            frequency=cls.residual_frequency,
+            valid_from=date(2024, 1, 1),
+            min_bin_size=120,
+        )
+        Collection.objects.create(
+            name="Ratio residual only collection",
+            catchment=cls.catchment_residual_only,
+            waste_category=cls.residual_category,
+            collection_system=cls.d2d,
+            frequency=cls.residual_frequency,
+            valid_from=date(2024, 1, 1),
+            min_bin_size=80,
+        )
+
+    @classmethod
+    def _create_frequency(cls, *, name, count):
+        frequency = CollectionFrequency.objects.create(name=name, type="Fixed")
+        distribution, _ = TemporalDistribution.objects.get_or_create(
+            name="Months of the year"
+        )
+        january, _ = Timestep.objects.get_or_create(
+            name=f"{name} January",
+            distribution=distribution,
+            defaults={"order": 10},
+        )
+        december, _ = Timestep.objects.get_or_create(
+            name=f"{name} December",
+            distribution=distribution,
+            defaults={"order": 120},
+        )
+        season = CollectionSeason.objects.create(
+            distribution=distribution,
+            first_timestep=january,
+            last_timestep=december,
+        )
+        CollectionCountOptions.objects.create(
+            frequency=frequency,
+            season=season,
+            standard=count,
+        )
+        return frequency
+
+    def test_collection_count_ratio_endpoint(self):
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/collection-count-ratio/",
+            {"country": "DE", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        self.assertEqual(by_catchment[self.catchment_both.id]["bio_count"], 52)
+        self.assertEqual(by_catchment[self.catchment_both.id]["residual_count"], 26)
+        self.assertEqual(by_catchment[self.catchment_both.id]["ratio"], 2.0)
+        self.assertTrue(by_catchment[self.catchment_both.id]["bio_is_door_to_door"])
+        self.assertTrue(
+            by_catchment[self.catchment_both.id]["residual_is_door_to_door"]
+        )
+        self.assertIsNone(by_catchment[self.catchment_residual_only.id]["bio_count"])
+        self.assertIsNone(by_catchment[self.catchment_residual_only.id]["ratio"])
+
+    def test_min_bin_size_ratio_endpoint(self):
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/min-bin-size-ratio/",
+            {"country": "DE", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        self.assertEqual(by_catchment[self.catchment_both.id]["bio_min_bin_size"], 60.0)
+        self.assertEqual(
+            by_catchment[self.catchment_both.id]["residual_min_bin_size"], 120.0
+        )
+        self.assertEqual(by_catchment[self.catchment_both.id]["ratio"], 0.5)
+        self.assertTrue(by_catchment[self.catchment_both.id]["bio_is_door_to_door"])
+        self.assertTrue(
+            by_catchment[self.catchment_both.id]["residual_is_door_to_door"]
+        )
+        self.assertIsNone(
+            by_catchment[self.catchment_residual_only.id]["bio_min_bin_size"]
+        )
+        self.assertIsNone(by_catchment[self.catchment_residual_only.id]["ratio"])
 
 
 @override_settings(

@@ -4127,13 +4127,21 @@ class WasteAtlasMapViewsTestCase(TestCase):
         map_names = [
             "waste-atlas-south-tyrol-collection-system-map",
             "waste-atlas-south-tyrol-green-waste-collection-system-count-map",
+            "waste-atlas-south-tyrol-collection-count-ratio-map",
             "waste-atlas-south-tyrol-residual-frequency-map",
             "waste-atlas-south-tyrol-biowaste-frequency-map",
+            "waste-atlas-south-tyrol-combined-frequency-map",
+            "waste-atlas-south-tyrol-combined-collection-count-map",
+            "waste-atlas-south-tyrol-biowaste-fee-system-map",
+            "waste-atlas-south-tyrol-combined-fee-system-map",
             "waste-atlas-south-tyrol-residual-collection-amount-map",
             "waste-atlas-south-tyrol-biowaste-collection-amount-map",
             "waste-atlas-south-tyrol-green-waste-collection-amount-map",
             "waste-atlas-south-tyrol-organic-collection-amount-map",
             "waste-atlas-south-tyrol-organic-waste-ratio-map",
+            "waste-atlas-south-tyrol-biowaste-min-bin-size-map",
+            "waste-atlas-south-tyrol-residual-min-bin-size-map",
+            "waste-atlas-south-tyrol-min-bin-size-ratio-map",
         ]
 
         for url_name in map_names:

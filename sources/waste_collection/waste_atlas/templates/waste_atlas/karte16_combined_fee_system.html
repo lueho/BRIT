@@ -1,7 +1,7 @@
 {% extends "waste_atlas/choropleth_map.html" %}
 
 {% block atlas_config %}
-<script>
+  <script>
   document.addEventListener('DOMContentLoaded', function () {
     WasteAtlasChoropleth.init({
       svgId:       'atlas-svg',
@@ -21,7 +21,7 @@
         { value: 'other',        label: 'Andere Kombinationen',                  color: '#66c2a5' },
         { value: 'no_bio',       label: 'Keine separate Bioabfallsammlung',      color: '#FFF696' }
       ],
-      noDataColor: '#ffffff',
+      noDataColor: '#e0e0e0',
       noDataLabel: 'Keine Daten',
       legendTitle: 'Gebührensystem',
       fileBase:    'karte16_gebuehrensystem_kombination',
@@ -50,5 +50,5 @@
       }
     });
   });
-</script>
+  </script>
 {% endblock atlas_config %}

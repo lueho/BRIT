@@ -1,7 +1,7 @@
 {% extends "waste_atlas/choropleth_map.html" %}
 
 {% block atlas_config %}
-<script>
+  <script>
   document.addEventListener('DOMContentLoaded', function () {
     WasteAtlasChoropleth.init({
       svgId:       'atlas-svg',
@@ -13,18 +13,28 @@
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
       title:       'Sammelrhythmus-Arten der Entsorger zur Bioabfallabholung',
       dataUrl:     '/waste_collection/api/waste-atlas/biowaste-frequency-type/',
-      dataField:   'frequency_type',
+      dataField:   '_classified',
       categories: [
         { value: 'Fixed-Seasonal',        label: 'Saisonal',                  color: '#2e8b57' },
         { value: 'Fixed-Flexible',         label: 'Flexibel',                  color: '#4169e1' },
         { value: 'Fixed',                  label: 'Fix',                       color: '#8c9eff' },
-        { value: 'No separate collection', label: 'Keine Tür-zu-Tür-Sammlung', color: '#fff696' }
+        { value: 'no_bio_collection',      label: 'Keine Tür-zu-Tür-Bioabfallsammlung', color: '#fff696' }
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'Keine Daten',
       legendTitle: 'Sammelrhythmus',
-      fileBase:    'karte9_sammelrhythmus_bioabfall'
+      fileBase:    'karte9_sammelrhythmus_bioabfall',
+      transformData: function (records) {
+        var NO_BIO = ['No separate collection', 'Bring point', 'Recycling centre',
+                      'On demand kerbside collection', 'Home-composting'];
+        return records.map(function (r) {
+          var cls = NO_BIO.indexOf(r.frequency_type) !== -1
+            ? 'no_bio_collection'
+            : r.frequency_type;
+          return { catchment_id: r.catchment_id, _classified: cls };
+        });
+      }
     });
   });
-</script>
+  </script>
 {% endblock atlas_config %}
