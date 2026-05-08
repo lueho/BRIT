@@ -1,6 +1,6 @@
 # Dataset Registry and Federated Geodata Target-State Plan
 
-- **Status**: Active roadmap; Phase 0 complete; Phase 1 local-relation runtime implementation is largely complete in code and tests; GeoDataset 8 is now registered as the runtime pilot candidate and validates the generic route family, but final Phase 1 sign-off still needs provenance and column-policy review closure
+- **Status**: Active roadmap; Phase 0 and Phase 1 complete for the local-relation pilot path. The deployed `raw_data.baumkataster_berlin_2024` dataset is registered as GeoDataset 8 and validates no-code local PostGIS exploration; next work is Phase 2 hardening, provenance/freshness visibility, and version/import-run semantics
 - **Date**: 2026-04-16
 - **Scope**: `maps` dataset onboarding, standalone exploration, long-term federation of external geospatial data sources, and domain-level harmonized integration across incompatible datasets
 
@@ -1080,14 +1080,14 @@ Done:
 - The `GeoDataset` admin shows a local-relation column-review table with discovered type and policy flags.
 - `maps/README.md` describes the implemented local-relation onboarding flow and compatibility boundaries.
 
-Left to finish Phase 1:
+Phase 1 completion status:
 
 - **Pilot dataset runtime validation**: complete for GeoDataset 8, `Roadside Trees Berlin`, backed by `raw_data.baumkataster_berlin_2024`.
-- **Pilot sign-off**: not complete. GeoDataset 8 proves the runtime route family, but it still needs provenance/source metadata and an explicit final column-policy review before Phase 1 can be closed.
+- **Pilot sign-off**: complete for the development step. The latest changes have been deployed, the real `raw_data.baumkataster_berlin_2024` dataset has been imported and registered, and the generic local-relation exploration flow works as intended without new dataset-specific code.
 
 ### Phase 1 pilot evaluation checkpoint - 2026-05-08
 
-Verdict: the pilot runtime step is **complete with caveats**, but full Phase 1 pilot sign-off is **not complete**.
+Verdict: the pilot runtime step and Phase 1 development step are **complete**.
 
 Evidence:
 
@@ -1114,28 +1114,37 @@ Evidence:
   - filtered map with `bezirk=Neukölln` returned HTTP 200 and enabled feature loading
   - feature detail for feature `1` returned HTTP 200 and loaded only that feature
   - dataset-scoped GeoJSON with `id=1` returned HTTP 200 with one feature
-- Remaining sign-off caveats:
-  - the dataset currently has no linked source/provenance record
-  - it remains private, so anonymous route checks redirect as expected
-  - the pilot is operationally useful but not “deliberately boring” in size; it has 839,693 rows, so Phase 2 performance safeguards remain important
-  - many columns are currently visible/filterable/exportable; this should be treated as a broad first review state until the intended exposure policy is explicitly confirmed
+- Deployment/import sign-off:
+  - the latest runtime-filter and GeoDataset route changes were deployed
+  - `raw_data.baumkataster_berlin_2024` was imported as a real local PostGIS relation and registered as GeoDataset 8
+  - the dataset works as intended in the deployed app
+  - no dataset-specific Django model, URL, view, serializer, or template was needed for the pilot dataset
+- Follow-up caveats moved to Phase 2:
+  - the pilot is operationally useful but not “deliberately boring” in size; it has 839,693 rows, so performance safeguards remain important
+  - provenance/source metadata, freshness labels, import-run history, and version semantics should become explicit product features rather than ad hoc pilot sign-off notes
+  - column-policy review should remain an operator workflow, with better UI affordances for labels, filter options, and future policy auditing
 
-Next steps to complete Phase 1:
+Next steps after Phase 1:
 
-1. **Close provenance**
-   - Link at least one source record to GeoDataset 8 or record why this pilot intentionally has no source metadata.
+1. **Phase 2 safety and performance hardening**
+   - Add observability around local-relation counts, filter-option queries, GeoJSON request sizes, and slow relations.
+   - Add explicit warnings or guardrails for very large unfiltered datasets.
+   - Keep validating that hidden columns cannot leak through table, detail, filter, export, or GeoJSON paths.
 
-2. **Close column-policy review**
-   - Confirm the intended visible, filterable, searchable, and exportable columns for GeoDataset 8.
-   - Narrow broad policy flags if any fields are not intentionally public/operator-visible.
-   - Keep hidden/internal columns out of table/detail views and GeoJSON.
+2. **Operator workflow polish**
+   - Improve admin/operator screens for column-policy review, including clearer display labels, filterability decisions, and exposure-policy auditing.
+   - Decide whether filter-option generation should be cached, capped per data type, or configured per column.
+   - Add clearer publication/provenance prompts before a runtime dataset is made public.
 
-3. **Decide publication-state sign-off**
-   - Either keep the pilot private and document that Phase 1 validation was authenticated-only, or publish it after source and column-policy review.
+3. **Provenance, freshness, and version semantics**
+   - Add visible source/provenance and freshness metadata to GeoDataset detail/map/table surfaces.
+   - Introduce import-run or dataset-version records so imported external datasets can keep a stable GeoDataset identity while preserving refresh/release history.
+   - Define the “current version” binding for normal browsing and immutable snapshots for formally released datasets.
 
-4. **Record final pilot sign-off**
-   - If provenance and column-policy review close without additional code changes, mark Phase 1 complete and move remaining hardening items into Phase 2.
-   - If code changes are required, keep Phase 1 open and document the specific blocker.
+4. **Compatibility cleanup and expansion**
+   - Re-express one additional existing local table or trusted view through the generic runtime path.
+   - Keep legacy `model_name`, custom feature API basenames, and `ModelMapConfiguration` only where compatibility still requires them.
+   - Start Phase 3 federation only after Phase 2 guardrails are sufficient for broad internal use.
 
 Compatibility-only paths after Phase 1:
 
@@ -1281,12 +1290,12 @@ Use this section to evaluate whether the roadmap is actually moving forward.
 
 | Capability | Status |
 |---|---|
-| Local table-backed dataset registration with no code changes | Partial: GeoDataset 8 validates the runtime route family; provenance and column-policy sign-off remain |
-| Local view-backed dataset registration with no code changes | Partial: implementation should support simple trusted views; real pilot registration and sign-off still needed |
-| Generic map/table/detail surfaces driven by metadata | Done for the authenticated GeoDataset 8 local-relation pilot; broader hardening remains Phase 2 work |
+| Local table-backed dataset registration with no code changes | Done for the deployed GeoDataset 8 pilot backed by `raw_data.baumkataster_berlin_2024`; broader hardening remains Phase 2 work |
+| Local view-backed dataset registration with no code changes | Partial: implementation should support simple trusted views; a real view-backed pilot remains useful as follow-up |
+| Generic map/table/detail surfaces driven by metadata | Done for the deployed GeoDataset 8 local-relation pilot; broader hardening remains Phase 2 work |
 | `GeoDataset` independent from hardcoded `model_name` routing | Partial: generic routes use dataset identity; compatibility paths remain |
 | Column exposure allowlists enforced | Done for current local-relation table/detail/GeoJSON path |
-| Safe relation-column introspection | Partial: metadata, policy flags, and admin review exist; GeoDataset 8 still needs final exposure-policy sign-off |
+| Safe relation-column introspection | Done for the Phase 1 pilot path; richer operator auditing remains Phase 2 work |
 | Federated read-only foreign table support | Not started |
 | Dataset freshness/version semantics visible in UI | Not started |
 | Imported datasets have import-run/current-version contracts | Not started |
