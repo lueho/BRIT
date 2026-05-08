@@ -1,6 +1,6 @@
 # Dataset Registry and Federated Geodata Target-State Plan
 
-- **Status**: Active roadmap; Phase 0 complete; Phase 1 local-relation runtime path mostly implemented; remaining work is pilot validation, UI polish, and compatibility cleanup
+- **Status**: Active roadmap; Phase 0 complete; Phase 1 local-relation runtime implementation is largely complete in code and tests, but the real pilot dataset sign-off is not complete because no real local-relation `GeoDataset` has been registered and validated end to end yet
 - **Date**: 2026-04-16
 - **Scope**: `maps` dataset onboarding, standalone exploration, long-term federation of external geospatial data sources, and domain-level harmonized integration across incompatible datasets
 
@@ -1082,8 +1082,54 @@ Done:
 
 Left to finish Phase 1:
 
-- **Pilot dataset**: register one deliberately simple real local PostGIS table or trusted view as a `GeoDataset` and verify the table, map, detail, filtering, and GeoJSON flow without code changes.
-- **Pilot sign-off**: use the admin column-review output to promote only approved `GeoDatasetColumnPolicy` rows, then record whether the current operator workflow is sufficient or needs Phase 2 polish.
+- **Pilot dataset**: not complete as of 2026-05-08. The runtime path is implemented and covered by regression tests, but a dev-database check found no registered local-relation `GeoDataset` (`GeoDatasetRuntimeConfiguration.backend_type` in `local_relation`, `db_table`, or `db_view`) to serve as the real pilot.
+- **Pilot sign-off**: not complete. There is no real pilot row whose admin column-review output has been used to promote approved `GeoDatasetColumnPolicy` rows and validate the operator workflow.
+
+### Phase 1 pilot evaluation checkpoint - 2026-05-08
+
+Verdict: the pilot dataset step is **not complete**.
+
+Evidence:
+
+- The implementation side is ready enough to run a pilot:
+  - dataset-scoped detail, map, table, feature-detail, and GeoJSON routes exist
+  - local-relation runtime configuration and column-policy models exist
+  - the local-relation adapter supports visible columns, filterable columns, counts, GeoJSON, CRS transformation to WGS84, and single-feature lookup
+  - the GeoDataset list, table, map, dataset detail, and feature detail views now share the same navigation pattern and preserve query parameters when switching between table and map
+  - regression tests cover the generic local-relation route family
+- The real pilot requirement is still unmet:
+  - no actual local-relation `GeoDataset` is currently registered in the dev database
+  - therefore the no-code onboarding claim has not yet been validated against a real table or trusted view outside the test fixture
+  - the admin/operator workflow for reviewing discovered columns and approving exposure policy has not been signed off with a real dataset
+
+Next steps to complete Phase 1:
+
+1. **Select the pilot relation**
+   - Pick one deliberately boring local PostGIS table or trusted database view.
+   - It must have one geometry column, one stable primary-key column, scalar display columns, and one or two safe filter columns.
+   - Do not use a dataset that requires federation, refresh orchestration, semantic harmonization, custom joins, or inventory pinning.
+
+2. **Register the pilot as a `GeoDataset`**
+   - Create the `GeoDataset` metadata record.
+   - Create its `GeoDatasetRuntimeConfiguration` with backend type, schema, relation, geometry column, primary-key column, and label field.
+   - Attach provenance through existing source metadata where available.
+
+3. **Review and approve column policy**
+   - Use the admin column-review output to inspect discovered columns.
+   - Approve only the visible and filterable fields required for the pilot.
+   - Confirm hidden/internal columns are neither rendered in table/detail views nor serialized in GeoJSON.
+
+4. **Validate the no-code route family**
+   - Open the dataset detail page.
+   - Switch to the feature table and apply at least one approved filter.
+   - Switch from table to map and back, confirming query parameters carry over.
+   - Open one feature detail page and confirm it fetches only that feature on the embedded map.
+   - Fetch the dataset-scoped GeoJSON endpoint directly and verify geometry, properties, count, and hidden-column behavior.
+
+5. **Record pilot sign-off**
+   - Add the pilot dataset name, relation, approved visible/filterable columns, validation date, and any operator-workflow gaps to this roadmap or a linked implementation note.
+   - If the pilot passes without code changes, mark Phase 1 complete and move remaining hardening items into Phase 2.
+   - If code changes are required, keep Phase 1 open and document the specific blocker.
 
 Compatibility-only paths after Phase 1:
 
@@ -1229,12 +1275,12 @@ Use this section to evaluate whether the roadmap is actually moving forward.
 
 | Capability | Status |
 |---|---|
-| Local table-backed dataset registration with no code changes | Partial: implementation exists; real pilot still needed |
-| Local view-backed dataset registration with no code changes | Partial: implementation should support simple views; real pilot still needed |
-| Generic map/table/detail surfaces driven by metadata | Partial: implementation exists for local relations; pilot validation remains |
+| Local table-backed dataset registration with no code changes | Partial: implementation exists and tests pass; real pilot registration and sign-off still needed |
+| Local view-backed dataset registration with no code changes | Partial: implementation should support simple trusted views; real pilot registration and sign-off still needed |
+| Generic map/table/detail surfaces driven by metadata | Partial: implementation exists for local relations and route UX is aligned; real pilot validation remains |
 | `GeoDataset` independent from hardcoded `model_name` routing | Partial: generic routes use dataset identity; compatibility paths remain |
 | Column exposure allowlists enforced | Done for current local-relation table/detail/GeoJSON path |
-| Safe relation-column introspection | Partial: metadata, policy flags, and admin review exist; pilot validation remains |
+| Safe relation-column introspection | Partial: metadata, policy flags, and admin review exist; real pilot column-policy sign-off remains |
 | Federated read-only foreign table support | Not started |
 | Dataset freshness/version semantics visible in UI | Not started |
 | Imported datasets have import-run/current-version contracts | Not started |
