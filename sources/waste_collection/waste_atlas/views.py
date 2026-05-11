@@ -574,6 +574,13 @@ class CombinedCollectionCountMapView(AtlasMapView):
     map_title = "Sammelhäufigkeit in Kombination (Bio × Rest)"
 
 
+class CollectionCountRatioMapView(AtlasMapView):
+    """Karte 42 — Sammelhäufigkeits-Verhältnis."""
+
+    template_name = "waste_atlas/karte42_collection_count_ratio.html"
+    map_title = "Verhältnis der Sammelhäufigkeit (Bio / Rest)"
+
+
 class ResidualFeeSystemMapView(AtlasMapView):
     """Karte 14 — Gebührensysteme Restmüll."""
 

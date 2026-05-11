@@ -2066,6 +2066,11 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
 
         cls.d2d = CollectionSystem.objects.create(name="Door to door")
         cls.biowaste_category = WasteCategory.objects.create(name="Biowaste")
+        cls.residual_category = WasteCategory.objects.create(name="Residual waste")
+        cls.residual_frequency = CollectionFrequency.objects.create(
+            name="NUTS residual frequency",
+            type="Fixed",
+        )
 
         for catchment in (cls.catchment_be1, cls.catchment_be2, cls.catchment_be3):
             Collection.objects.create(
@@ -2075,6 +2080,15 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
                 collection_system=cls.d2d,
                 valid_from=date(2022, 1, 1),
             )
+
+        Collection.objects.create(
+            name="Wallonia residual 2022",
+            catchment=cls.catchment_be3,
+            waste_category=cls.residual_category,
+            collection_system=cls.d2d,
+            frequency=cls.residual_frequency,
+            valid_from=date(2022, 1, 1),
+        )
 
     def test_collection_system_endpoint_respects_nuts_prefix(self):
         response = self.client.get(
@@ -2108,6 +2122,21 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
         }
 
         self.assertEqual(feature_ids, {self.catchment_be1.id, self.catchment_be2.id})
+
+    def test_combined_frequency_endpoint_respects_nuts_prefix_for_residual_branch(self):
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/combined-frequency-type/",
+            {
+                "country": "BE",
+                "year": 2022,
+                "nuts_prefix": "BE1,BE2",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        catchment_ids = {row["catchment_id"] for row in response.data}
+
+        self.assertEqual(catchment_ids, {self.catchment_be1.id, self.catchment_be2.id})
 
 
 @override_settings(

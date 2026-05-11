@@ -4123,6 +4123,17 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, 'value="2024" selected')
         self.assertContains(response, "nutsPrefix: 'ITH10'")
 
+    def test_collection_count_ratio_map_is_available_generically(self):
+        response = self.client.get(reverse("waste-atlas-collection-count-ratio-map"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Verhältnis der Sammelhäufigkeit (Bio / Rest)")
+        self.assertContains(
+            response,
+            "/waste_collection/api/waste-atlas/collection-count-ratio/",
+        )
+        self.assertContains(response, "Kartenübersicht")
+
     def test_south_tyrol_bundle_maps_default_to_regional_filter(self):
         map_names = [
             "waste-atlas-south-tyrol-collection-system-map",

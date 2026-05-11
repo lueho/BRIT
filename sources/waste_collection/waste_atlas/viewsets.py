@@ -727,7 +727,9 @@ class CombinedFrequencyTypeViewSet(viewsets.ViewSet):
         }
         res = {
             r["catchment_id"]: r["frequency_type"]
-            for r in _get_frequency_type(country, year, ["Residual waste"])
+            for r in _get_frequency_type(
+                country, year, ["Residual waste"], nuts_prefixes
+            )
         }
         all_ids = set(bio) | set(res)
         data = []

@@ -10,6 +10,7 @@ from .views import (
     BiowasteFrequencyMapView,
     BiowasteMinBinSizeMapView,
     BiowasteRequiredBinCapacityMapView,
+    CollectionCountRatioMapView,
     CollectionSupportMapView,
     CollectionSystemMapView,
     CombinedCollectionCountMapView,
@@ -373,6 +374,11 @@ urlpatterns = [
         "map/combined-collection-count/",
         CombinedCollectionCountMapView.as_view(),
         name="waste-atlas-combined-collection-count-map",
+    ),
+    path(
+        "map/collection-count-ratio/",
+        CollectionCountRatioMapView.as_view(),
+        name="waste-atlas-collection-count-ratio-map",
     ),
     path(
         "map/residual-fee-system/",
