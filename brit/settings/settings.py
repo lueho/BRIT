@@ -22,6 +22,7 @@ ALLOWED_HOSTS = []
 INSTALLED_APPS = [
     "django.contrib.sites",
     "registration",
+    "turnstile",
     "django_tomselect",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -146,6 +147,15 @@ SAMPLE_SUBSTRATE_CATEGORY_NAME = os.environ.get(
 ACCOUNT_ACTIVATION_DAYS = 2
 REGISTRATION_AUTO_LOGIN = True
 REGISTRATION_DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL")
+
+# Cloudflare Turnstile (bot protection on registration form)
+# Keys are provided via environment variables.
+# Dummy keys are used automatically by django-turnstile when not set (development).
+TURNSTILE_SITEKEY = os.environ.get("TURNSTILE_SITEKEY", "")
+TURNSTILE_SECRET = os.environ.get("TURNSTILE_SECRET", "")
+
+# Use the custom registration form with Turnstile
+REGISTRATION_FORM = "users.forms.UserRegistrationForm"
 
 # Login settings
 LOGIN_REDIRECT_URL = "home"

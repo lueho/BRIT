@@ -39,6 +39,7 @@ dependencies = [
     "requests>=2.33.1",
     "django-tree-queries>=0.24.0",
     "pint>=0.25.3",
+    "django-turnstile>=0.1.3",
 ]
 
 [dependency-groups]

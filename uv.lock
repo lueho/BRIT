@@ -125,6 +125,7 @@ dependencies = [
     { name = "django-storages" },
     { name = "django-tomselect" },
     { name = "django-tree-queries" },
+    { name = "django-turnstile" },
     { name = "djangorestframework" },
     { name = "djangorestframework-csv" },
     { name = "djangorestframework-gis" },
@@ -175,6 +176,7 @@ requires-dist = [
     { name = "django-storages", specifier = ">=1.14.6" },
     { name = "django-tomselect", specifier = ">=2026.4.1" },
     { name = "django-tree-queries", specifier = ">=0.24.0" },
+    { name = "django-turnstile", specifier = ">=0.1.3" },
     { name = "djangorestframework", specifier = ">=3.16.1,<3.17" },
     { name = "djangorestframework-csv", specifier = ">=3.0.2" },
     { name = "djangorestframework-gis", specifier = ">=1.2.0" },
@@ -717,6 +719,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e3/6d/eaee27d299a5a8874205a783632a9383c16e9a2e73e8a98f0f19f921a2e2/django_tree_queries-0.24.0.tar.gz", hash = "sha256:8971da3fd15a1e6a52a5a2af76c086aa460e6974a130d9ec90ca0d0588baf848", size = 41134, upload-time = "2026-03-25T14:49:46.289Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/33/f5/85030fa7c200847f413d3ddba348fe450194e2520d893b12e92f690996c9/django_tree_queries-0.24.0-py3-none-any.whl", hash = "sha256:568adb664cd9dab55c0e39ab44bb7c0931854cdea1463beb16a89228f9d99ec7", size = 35631, upload-time = "2026-03-25T14:49:44.452Z" },
+]
+
+[[package]]
+name = "django-turnstile"
+version = "0.1.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/cb/e5/795fc00bae0bdbf8fd72d3baa3b700174481ddd7096ba06ee4a7c1fed0af/django_turnstile-0.1.3.tar.gz", hash = "sha256:5079eb937938ba9a475c1a80c146fe1e71de025f25f3e572a911ae926bd5120d", size = 5662, upload-time = "2026-01-18T09:18:12.575Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/68/6f/8d4d5cd527d0cd42a894d51ce750dc3bae50a6cbed8294cfc870d119502a/django_turnstile-0.1.3-py3-none-any.whl", hash = "sha256:f7c82b020d5bd0fcaccb2ffac089809afb220671595c55a46a987283d7d5e61b", size = 7011, upload-time = "2026-01-18T09:18:11.486Z" },
 ]
 
 [[package]]
