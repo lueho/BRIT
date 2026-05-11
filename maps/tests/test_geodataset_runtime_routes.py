@@ -1,3 +1,5 @@
+import json
+
 from django.contrib.admin.sites import AdminSite
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
@@ -365,6 +367,33 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
             f"{self.dataset.get_map_url()}?nuts_id=DE-B",
         )
 
+    def test_local_relation_table_route_keeps_display_cap(self):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                INSERT INTO public.{self.relation_name}
+                    (feature_id, name, nuts_id, hidden_code, geom)
+                SELECT
+                    generated_id,
+                    'Local feature ' || generated_id,
+                    'DE-' || generated_id,
+                    'hidden-' || generated_id,
+                    ST_Transform(ST_SetSRID(ST_Point(10, 53), 4326), 3857)
+                FROM generate_series(3, 1002) AS generated_id
+                """
+            )
+
+        response = self.client.get(
+            reverse("geodataset-table", kwargs={"pk": self.dataset.pk})
+        )
+        adapter = get_dataset_runtime_adapter(self.dataset)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["result_count"], 1002)
+        self.assertEqual(response.context["displayed_result_count"], 50)
+        self.assertEqual(len(adapter.get_records()), 1000)
+        self.assertContains(response, "Showing 50 of 1002 matching features")
+
     def test_local_relation_table_route_ignores_hidden_column_filter(self):
         response = self.client.get(
             reverse("geodataset-table", kwargs={"pk": self.dataset.pk}),
@@ -409,17 +438,42 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["type"], "FeatureCollection")
-        self.assertEqual(len(response.json()["features"]), 2)
-        self.assertEqual(response.json()["features"][0]["geometry"]["type"], "Point")
+        self.assertEqual(response["X-Cache-Status"], "STREAM")
+        self.assertEqual(response["X-Total-Count"], "2")
+        data = self._streaming_json(response)
+        self.assertEqual(data["type"], "FeatureCollection")
+        self.assertEqual(len(data["features"]), 2)
+        self.assertEqual(data["features"][0]["geometry"]["type"], "Point")
         self.assertEqual(
-            response.json()["features"][0]["geometry"]["coordinates"],
+            data["features"][0]["geometry"]["coordinates"],
             [10, 53],
         )
-        self.assertEqual(
-            response.json()["features"][0]["properties"]["nuts_id"], "DE-A"
+        self.assertEqual(data["features"][0]["properties"]["nuts_id"], "DE-A")
+        self.assertNotIn("hidden_code", data["features"][0]["properties"])
+
+    def test_local_relation_geojson_route_streams_past_table_cap(self):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                INSERT INTO public.{self.relation_name}
+                    (feature_id, name, nuts_id, hidden_code, geom)
+                SELECT
+                    generated_id,
+                    'Local feature ' || generated_id,
+                    'DE-' || generated_id,
+                    'hidden-' || generated_id,
+                    ST_Transform(ST_SetSRID(ST_Point(10, 53), 4326), 3857)
+                FROM generate_series(3, 1002) AS generated_id
+                """
+            )
+
+        response = self.client.get(
+            reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk})
         )
-        self.assertNotIn("hidden_code", response.json()["features"][0]["properties"])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Total-Count"], "1002")
+        self.assertEqual(len(self._streaming_json(response)["features"]), 1002)
 
     def test_local_relation_geojson_route_ignores_hidden_column_filter(self):
         response = self.client.get(
@@ -428,7 +482,7 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()["features"]), 2)
+        self.assertEqual(len(self._streaming_json(response)["features"]), 2)
 
     def test_local_relation_geojson_route_can_return_single_feature(self):
         response = self.client.get(
@@ -437,11 +491,10 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()["features"]), 1)
-        self.assertEqual(response.json()["features"][0]["id"], 2)
-        self.assertEqual(
-            response.json()["features"][0]["properties"]["nuts_id"], "DE-B"
-        )
+        data = self._streaming_json(response)
+        self.assertEqual(len(data["features"]), 1)
+        self.assertEqual(data["features"][0]["id"], 2)
+        self.assertEqual(data["features"][0]["properties"]["nuts_id"], "DE-B")
 
     def test_local_relation_map_route_uses_dataset_scoped_geojson_url(self):
         response = self.client.get(
@@ -491,3 +544,7 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
                 dataset=self.dataset,
                 runtime_configuration=runtime_configuration,
             )
+
+    @staticmethod
+    def _streaming_json(response):
+        return json.loads(b"".join(response.streaming_content).decode("utf-8"))

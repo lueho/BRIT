@@ -238,7 +238,44 @@ class LocalRelationDatasetRuntimeAdapter:
             ],
         }
 
-    def _fetch_records(self, query_params=None, pk=None, include_geometry=False):
+    def stream_geojson_feature_collection(self, query_params=None, pk=None):
+        yield '{"type":"FeatureCollection","features":['
+        first = True
+        for record in self._iter_records(
+            query_params=query_params,
+            pk=pk,
+            include_geometry=True,
+            limit=None,
+        ):
+            if not first:
+                yield ","
+            first = False
+            yield json.dumps(
+                {
+                    "type": "Feature",
+                    "id": record.pk,
+                    "geometry": record.geometry,
+                    "properties": record.properties,
+                }
+            )
+        yield "]}"
+
+    def _fetch_records(
+        self, query_params=None, pk=None, include_geometry=False, limit=None
+    ):
+        limit = MAX_LOCAL_RELATION_ROWS if limit is None else limit
+        return list(
+            self._iter_records(
+                query_params=query_params,
+                pk=pk,
+                include_geometry=include_geometry,
+                limit=limit,
+            )
+        )
+
+    def _iter_records(
+        self, query_params=None, pk=None, include_geometry=False, limit=None
+    ):
         self._validate_configured_columns()
         selected_columns = self._get_selected_columns()
         select_sql = [
@@ -266,16 +303,16 @@ class LocalRelationDatasetRuntimeAdapter:
             f"SELECT {', '.join(select_sql)} FROM {self.relation_identifier}"
             f"{' WHERE ' + ' AND '.join(where_sql) if where_sql else ''}"
             f" ORDER BY {connection.ops.quote_name(self.runtime_configuration.primary_key_column)}"
-            " LIMIT %s"
         )
-        params.append(MAX_LOCAL_RELATION_ROWS)
+        if limit is not None:
+            sql += " LIMIT %s"
+            params.append(limit)
         with connection.cursor() as cursor:
             cursor.execute(sql, params)
-            rows = cursor.fetchall()
-        return [
-            self._build_record(row, selected_columns, include_geometry=include_geometry)
-            for row in rows
-        ]
+            for row in cursor:
+                yield self._build_record(
+                    row, selected_columns, include_geometry=include_geometry
+                )
 
     def _fetch_record_count(self, query_params=None):
         self._validate_configured_columns()

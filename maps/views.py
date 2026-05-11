@@ -8,7 +8,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.db.models import Subquery
 from django.forms import formset_factory
-from django.http import Http404, JsonResponse
+from django.http import Http404, JsonResponse, StreamingHttpResponse
 from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.views import View
 from django.views.generic import DetailView, TemplateView
@@ -920,12 +920,18 @@ class GeoDataSetRuntimeFeatureGeoJSONView(
         adapter = self.get_runtime_adapter()
         if not getattr(adapter, "uses_local_relation", False):
             raise Http404("Dataset does not use a local relation runtime.")
-        return Response(
-            adapter.get_geojson_feature_collection(
+        count = adapter.get_record_count(query_params=request.GET)
+        response = StreamingHttpResponse(
+            adapter.stream_geojson_feature_collection(
                 query_params=request.GET,
                 pk=request.GET.get("id"),
-            )
+            ),
+            content_type="application/geo+json",
         )
+        response["X-Cache-Status"] = "STREAM"
+        response["X-Total-Count"] = str(count)
+        response["Access-Control-Expose-Headers"] = "X-Total-Count, X-Cache-Status"
+        return response
 
 
 class GeoDataSetPublishedFilteredMapView(FilteredMapMixin, PublishedObjectFilterView):
