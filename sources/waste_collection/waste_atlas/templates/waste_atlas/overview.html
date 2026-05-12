@@ -6,447 +6,231 @@
 
 {% block content %}
   <div class="container mt-4">
-    <h1>Waste Atlas — Kartenübersicht</h1>
-    <p class="lead">
-      Einstiegskarte für Europa sowie thematische Karten zur Abfallsammlung in Deutschland, Italien, Schweden, Dänemark, den Niederlanden und Belgien
-    </p>
-
-    <div class="card mb-4">
-      <div class="card-header">
-        <strong>Europe</strong>
-      </div>
-      <ul class="list-group list-group-flush">
-        <li class="list-group-item">
-          <a href="{% url 'waste-atlas-europe-data-coverage-map' %}">Map 0 — Waste collection data coverage in Europe</a>
-        </li>
-        <li class="list-group-item">
-          <a href="{% url 'waste-atlas-europe-biowaste-collection-amount-map' %}">Map 41 — Regional average amount of separately collected biowaste in Europe</a>
-        </li>
-      </ul>
+    <div class="mb-4">
+      <h1>Waste Atlas — Kartenübersicht</h1>
+      <p class="lead mb-2">
+        Kartenverzeichnis nach räumlichem Ausschnitt und Fragestellung.
+      </p>
+      <p class="text-muted">
+        Wähle zuerst den gewünschten Bereich und danach die Information: Organisation, Sammelsystem, Rhythmus, Häufigkeit, Gebühren, Mengen oder Behälter.
+      </p>
     </div>
 
-    <h2 class="h4 mt-4">Germany</h2>
-
-    <div class="row">
-      <div class="col-md-6">
-        <div class="card mb-3">
-          <div class="card-header">
-            <strong>Sammelsysteme &amp; Organisation</strong>
+    <div class="row g-3 mb-4">
+      <div class="col-md-6 col-xl-3">
+        <div class="card h-100">
+          <div class="card-body">
+            <h2 class="h5">Europa</h2>
+            <p class="small text-muted">Abdeckung und europäische Vergleichswerte.</p>
+            <div class="d-grid gap-2">
+              <a class="btn btn-outline-primary btn-sm text-start" href="{% url 'waste-atlas-europe-data-coverage-map' %}">Map 0 — Datenabdeckung</a>
+              <a class="btn btn-outline-primary btn-sm text-start" href="{% url 'waste-atlas-europe-biowaste-collection-amount-map' %}">Map 41 — Bioabfallmenge</a>
+            </div>
           </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-orga-level-map' %}">Karte 1 — Sammlungs-Organisationsebene</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-collection-system-map' %}">Karte 2 — Küchenabfall-Sammelsysteme</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-green-waste-collection-system-count-map' %}">Karte 21 — Anzahl Grüngut-Sammelsysteme</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-connection-rate-map' %}">Karte 3 — Anschlussgrad an die Biotonne</a>
-            </li>
-          </ul>
-        </div>
-
-        <div class="card mb-3">
-          <div class="card-header">
-            <strong>Erlaubte Materialien</strong>
-          </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-food-waste-category-map' %}">Karte 4 — Küchenabfall in der Biotonne</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-paper-bags-map' %}">Karte 5 — Papierprodukte in Bioabfällen</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-plastic-bags-map' %}">Karte 6 — Kunststoffbeutel in Bioabfällen</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-collection-support-map' %}">Karte 7 — Bioabfall-Sammelhilfen</a>
-            </li>
-          </ul>
-        </div>
-
-        <div class="card mb-3">
-          <div class="card-header">
-            <strong>Sammelrhythmus</strong>
-          </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-residual-frequency-map' %}">Karte 8 — Sammelrhythmus Restmüll</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-biowaste-frequency-map' %}">Karte 9 — Sammelrhythmus Bioabfall</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-combined-frequency-map' %}">Karte 10 — Sammelrhythmus in Kombination</a>
-            </li>
-          </ul>
         </div>
       </div>
-
-      <div class="col-md-6">
-        <div class="card mb-3">
-          <div class="card-header">
-            <strong>Sammelhäufigkeit</strong>
+      <div class="col-md-6 col-xl-3">
+        <div class="card h-100">
+          <div class="card-body">
+            <h2 class="h5">Deutschland</h2>
+            <p class="small text-muted">Vollständiger thematischer Kartensatz.</p>
+            <a class="btn btn-primary btn-sm" href="#atlas-germany">Deutschland-Karten anzeigen</a>
           </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-residual-collection-count-map' %}">Karte 11 — Häufigkeit Restmüllabholung</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-biowaste-collection-count-map' %}">Karte 12 — Häufigkeit Bioabfallabholung</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-combined-collection-count-map' %}">Karte 13 — Sammelhäufigkeit in Kombination</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-collection-count-ratio-map' %}">Karte 42 — Sammelhäufigkeits-Verhältnis</a>
-            </li>
-          </ul>
         </div>
-
-        <div class="card mb-3">
-          <div class="card-header">
-            <strong>Gebührensysteme</strong>
+      </div>
+      <div class="col-md-6 col-xl-3">
+        <div class="card h-100">
+          <div class="card-body">
+            <h2 class="h5">Italien &amp; Südtirol</h2>
+            <p class="small text-muted">Route-spezifische Kartensets für Italien und Südtirol.</p>
+            <a class="btn btn-primary btn-sm" href="#atlas-italy-south-tyrol">Italien/Südtirol anzeigen</a>
           </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-residual-fee-system-map' %}">Karte 14 — Gebührensysteme Restmüll</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-biowaste-fee-system-map' %}">Karte 15 — Gebührensysteme Bioabfall</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-combined-fee-system-map' %}">Karte 16 — Gebührensysteme in Kombination</a>
-            </li>
-          </ul>
         </div>
-
-        <div class="card mb-3">
-          <div class="card-header">
-            <strong>Sammelmengen</strong>
+      </div>
+      <div class="col-md-6 col-xl-3">
+        <div class="card h-100">
+          <div class="card-body">
+            <h2 class="h5">Weitere Länder</h2>
+            <p class="small text-muted">Schweden, Dänemark, Niederlande und Belgien.</p>
+            <a class="btn btn-primary btn-sm" href="#atlas-other-countries">Weitere Länder anzeigen</a>
           </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-residual-collection-amount-map' %}">Karte 17 — Restmüll-Sammelmengen</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-biowaste-collection-amount-map' %}">Karte 18 — Bioabfall-Sammelmengen</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-green-waste-collection-amount-map' %}">Karte 22 — Grüngut-Sammelmengen</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-waste-ratio-map' %}">Karte 19 — Sammelmengen-Verhältnis</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-organic-collection-amount-map' %}">Karte 27 — Aggregierte organische Sammelmenge</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-organic-waste-ratio-map' %}">Karte 28 — Anteil organischer Fraktionen</a>
-            </li>
-          </ul>
-        </div>
-
-        <div class="card mb-3">
-          <div class="card-header">
-            <strong>Behältergrößen</strong>
-          </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-biowaste-min-bin-size-map' %}">Karte 23 — Mindest-Behältergröße Bioabfall</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-residual-min-bin-size-map' %}">Karte 24 — Mindest-Behältergröße Restmüll</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-biowaste-required-bin-capacity-map' %}">Karte 25 — Mindest-Behältervolumen Bioabfall</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-residual-required-bin-capacity-map' %}">Karte 26 — Mindest-Behältervolumen Restmüll</a>
-            </li>
-          </ul>
-        </div>
-
-        <div class="card mb-3">
-          <div class="card-header">
-            <strong>Demographie</strong>
-          </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-population-density-map' %}">Karte 20 — Einwohnerdichte</a>
-            </li>
-          </ul>
         </div>
       </div>
     </div>
 
-    <h2 class="h4 mt-4">Country-specific maps</h2>
-
-    <div class="row">
-      <div class="col-md-6 col-lg-4">
-        <div class="card mb-3">
-          <div class="card-header">
-            <strong>Italy</strong>
+    <section id="atlas-germany" class="mb-4">
+      <div class="d-flex align-items-baseline justify-content-between mb-2">
+        <h2 class="h4 mb-0">Deutschland</h2>
+        <span class="text-muted small">Standard: DE, aktuelles Kartenjahr</span>
+      </div>
+      <div class="accordion" id="atlasGermanyAccordion">
+        <div class="accordion-item">
+          <h3 class="accordion-header" id="germanySystemsHeading">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#germanySystems" aria-expanded="true" aria-controls="germanySystems">
+              Systeme, Organisation &amp; Materialien
+            </button>
+          </h3>
+          <div id="germanySystems" class="accordion-collapse collapse show" aria-labelledby="germanySystemsHeading" data-bs-parent="#atlasGermanyAccordion">
+            <div class="accordion-body">
+              <p class="small text-muted">Wo wird gesammelt, auf welcher Ebene, und welche Materialien oder Sammelhilfen sind erlaubt?</p>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-orga-level-map' %}">Karte 1 — Organisationsebene</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-collection-system-map' %}">Karte 2 — Küchenabfall-Sammelsysteme</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-connection-rate-map' %}">Karte 3 — Anschlussgrad</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-food-waste-category-map' %}">Karte 4 — Küchenabfall erlaubt</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-paper-bags-map' %}">Karte 5 — Papierprodukte</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-plastic-bags-map' %}">Karte 6 — Kunststoffbeutel</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-collection-support-map' %}">Karte 7 — Sammelhilfen</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-green-waste-collection-system-count-map' %}">Karte 21 — Grüngut-Systemanzahl</a>
+              </div>
+            </div>
           </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-orga-level-italy-map' %}">Map 29 — Administrative level of waste collection (Italy, EN)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-italy-collection-system-map' %}">Karte 2 — Küchenabfall-Sammelsysteme (Italy, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-italy-green-waste-collection-system-count-map' %}">Karte 21 — Anzahl Grüngut-Sammelsysteme (Italy, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-italy-collection-point-count-map' %}">Karte 44 — Anzahl Sammelstellen (Italy, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-italy-residual-frequency-map' %}">Karte 8 — Sammelrhythmus Restmüll (Italy, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-italy-biowaste-frequency-map' %}">Karte 9 — Sammelrhythmus Bioabfall (Italy, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-italy-residual-collection-count-map' %}">Karte 11 — Häufigkeit Restmüllabholung (Italy, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-italy-biowaste-collection-count-map' %}">Karte 12 — Häufigkeit Bioabfallabholung (Italy, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-italy-residual-collection-amount-map' %}">Karte 17 — Restmüll-Sammelmengen (Italy, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-italy-biowaste-collection-amount-map' %}">Karte 18 — Bioabfall-Sammelmengen (Italy, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-italy-green-waste-collection-amount-map' %}">Karte 22 — Grüngut-Sammelmengen (Italy, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-italy-organic-collection-amount-map' %}">Karte 27 — Aggregierte organische Sammelmenge (Italy, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-italy-organic-waste-ratio-map' %}">Karte 28 — Anteil organischer Fraktionen (Italy, 2024)</a>
-            </li>
-          </ul>
+        </div>
+        <div class="accordion-item">
+          <h3 class="accordion-header" id="germanyFrequencyHeading">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#germanyFrequency" aria-expanded="false" aria-controls="germanyFrequency">
+              Rhythmus &amp; Sammelhäufigkeit
+            </button>
+          </h3>
+          <div id="germanyFrequency" class="accordion-collapse collapse" aria-labelledby="germanyFrequencyHeading" data-bs-parent="#atlasGermanyAccordion">
+            <div class="accordion-body">
+              <p class="small text-muted">Rhythmus beschreibt die Art des Sammelplans; Häufigkeit zeigt die Anzahl der Abholungen pro Jahr.</p>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-residual-frequency-map' %}">Karte 8 — Rhythmus Restmüll</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-biowaste-frequency-map' %}">Karte 9 — Rhythmus Bioabfall</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-combined-frequency-map' %}">Karte 10 — Rhythmus kombiniert</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-residual-collection-count-map' %}">Karte 11 — Häufigkeit Restmüll</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-biowaste-collection-count-map' %}">Karte 12 — Häufigkeit Bioabfall</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-combined-collection-count-map' %}">Karte 13 — Häufigkeit kombiniert</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-collection-count-ratio-map' %}">Karte 42 — Häufigkeits-Verhältnis</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="accordion-item">
+          <h3 class="accordion-header" id="germanyAmountsHeading">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#germanyAmounts" aria-expanded="false" aria-controls="germanyAmounts">
+              Gebühren, Sammelmengen &amp; Behälter
+            </button>
+          </h3>
+          <div id="germanyAmounts" class="accordion-collapse collapse" aria-labelledby="germanyAmountsHeading" data-bs-parent="#atlasGermanyAccordion">
+            <div class="accordion-body">
+              <p class="small text-muted">Kostenlogik, gesammelte Mengen, Verhältnisse und Mindestbehältergrößen.</p>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-residual-fee-system-map' %}">Karte 14 — Gebühren Restmüll</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-biowaste-fee-system-map' %}">Karte 15 — Gebühren Bioabfall</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-combined-fee-system-map' %}">Karte 16 — Gebühren kombiniert</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-residual-collection-amount-map' %}">Karte 17 — Restmüllmenge</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-biowaste-collection-amount-map' %}">Karte 18 — Bioabfallmenge</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-waste-ratio-map' %}">Karte 19 — Mengen-Verhältnis</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-population-density-map' %}">Karte 20 — Einwohnerdichte</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-green-waste-collection-amount-map' %}">Karte 22 — Grüngutmenge</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-biowaste-min-bin-size-map' %}">Karte 23 — Behälter Bioabfall</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-residual-min-bin-size-map' %}">Karte 24 — Behälter Restmüll</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-biowaste-required-bin-capacity-map' %}">Karte 25 — Volumen Bioabfall</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-residual-required-bin-capacity-map' %}">Karte 26 — Volumen Restmüll</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-organic-collection-amount-map' %}">Karte 27 — Organische Menge</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-organic-waste-ratio-map' %}">Karte 28 — Organischer Anteil</a>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+    </section>
 
-      <div class="col-md-6 col-lg-4">
-        <div class="card mb-3">
-          <div class="card-header">
-            <strong>South Tyrol</strong>
-          </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-orga-level-map' %}">Map 29a — Administrative level of waste collection (South Tyrol, EN)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-collection-system-map' %}">Karte 2a — Küchenabfall-Sammelsysteme (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-green-waste-collection-system-count-map' %}">Karte 21a — Anzahl Grüngut-Sammelsysteme (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-residual-frequency-map' %}">Karte 8a — Sammelrhythmus Restmüll (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-biowaste-frequency-map' %}">Karte 9a — Sammelrhythmus Bioabfall (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-combined-frequency-map' %}">Karte 10a — Sammelrhythmus Bioabfall vs. Restmüll (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-residual-collection-count-map' %}">Karte 11a — Häufigkeit Restmüllabholung (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-biowaste-collection-count-map' %}">Karte 12a — Häufigkeit Bioabfallabholung (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-combined-collection-count-map' %}">Karte 13a — Sammelhäufigkeit Bioabfall vs. Restmüll (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-collection-count-ratio-map' %}">Karte 13b — Verhältnis der Sammelhäufigkeit Bioabfall vs. Restmüll (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-collection-point-count-map' %}">Karte 44a — Anzahl Sammelstellen (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-biowaste-fee-system-map' %}">Karte 15a — Gebührensystem Bioabfall (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-combined-fee-system-map' %}">Karte 16a — Gebührensystem Bioabfall vs. Restmüll (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-residual-collection-amount-map' %}">Karte 17a — Restmüll-Sammelmengen (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-biowaste-collection-amount-map' %}">Karte 18a — Bioabfall-Sammelmengen (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-green-waste-collection-amount-map' %}">Karte 22a — Grüngut-Sammelmengen (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-organic-collection-amount-map' %}">Karte 27a — Aggregierte organische Sammelmenge (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-organic-waste-ratio-map' %}">Karte 28a — Anteil organischer Fraktionen (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-biowaste-min-bin-size-map' %}">Karte 23a — Minimale Behältergröße Bioabfall (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-residual-min-bin-size-map' %}">Karte 24a — Minimale Behältergröße Restmüll (Südtirol, 2024)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-south-tyrol-min-bin-size-ratio-map' %}">Karte 24b — Verhältnis der Behältergrößen Bioabfall vs. Restmüll (Südtirol, 2024)</a>
-            </li>
-          </ul>
+    <section id="atlas-italy-south-tyrol" class="mb-4">
+      <h2 class="h4 mb-3">Italien &amp; Südtirol</h2>
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="card h-100"><div class="card-header"><strong>Italy</strong></div><div class="card-body"><div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-orga-level-italy-map' %}">Map 29 — Administrative level of waste collection</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-italy-collection-system-map' %}">Karte 2 — Küchenabfall-Systeme</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-italy-green-waste-collection-system-count-map' %}">Karte 21 — Grüngut-Systemanzahl</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-italy-collection-point-count-map' %}">Karte 44 — Sammelstellen</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-italy-residual-frequency-map' %}">Karte 8 — Rhythmus Restmüll</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-italy-biowaste-frequency-map' %}">Karte 9 — Rhythmus Bioabfall</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-italy-residual-collection-count-map' %}">Karte 11 — Häufigkeit Restmüll</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-italy-biowaste-collection-count-map' %}">Karte 12 — Häufigkeit Bioabfall</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-italy-residual-collection-amount-map' %}">Karte 17 — Restmüllmenge</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-italy-biowaste-collection-amount-map' %}">Karte 18 — Bioabfallmenge</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-italy-green-waste-collection-amount-map' %}">Karte 22 — Grüngutmenge</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-italy-organic-collection-amount-map' %}">Karte 27 — Organische Menge</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-italy-organic-waste-ratio-map' %}">Karte 28 — Organischer Anteil</a>
+          </div></div></div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card h-100"><div class="card-header"><strong>South Tyrol</strong></div><div class="card-body"><div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-orga-level-map' %}">Map 29a — Administrative level of waste collection</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-collection-system-map' %}">Karte 2a — Küchenabfall-Systeme</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-green-waste-collection-system-count-map' %}">Karte 21a — Grüngut-Systemanzahl</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-residual-frequency-map' %}">Karte 8a — Rhythmus Restmüll</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-biowaste-frequency-map' %}">Karte 9a — Rhythmus Bioabfall</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-combined-frequency-map' %}">Karte 10a — Rhythmus kombiniert</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-residual-collection-count-map' %}">Karte 11a — Häufigkeit Restmüll</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-biowaste-collection-count-map' %}">Karte 12a — Häufigkeit Bioabfall</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-combined-collection-count-map' %}">Karte 13a — Häufigkeit kombiniert</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-collection-count-ratio-map' %}">Karte 13b — Häufigkeits-Verhältnis</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-collection-point-count-map' %}">Karte 44a — Sammelstellen</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-biowaste-fee-system-map' %}">Karte 15a — Gebühren Bioabfall</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-combined-fee-system-map' %}">Karte 16a — Gebühren kombiniert</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-residual-collection-amount-map' %}">Karte 17a — Restmüllmenge</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-biowaste-collection-amount-map' %}">Karte 18a — Bioabfallmenge</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-green-waste-collection-amount-map' %}">Karte 22a — Grüngutmenge</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-organic-collection-amount-map' %}">Karte 27a — Organische Menge</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-organic-waste-ratio-map' %}">Karte 28a — Organischer Anteil</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-biowaste-min-bin-size-map' %}">Karte 23a — Behälter Bioabfall</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-residual-min-bin-size-map' %}">Karte 24a — Behälter Restmüll</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-south-tyrol-min-bin-size-ratio-map' %}">Karte 24b — Behälter-Verhältnis</a>
+          </div></div></div>
         </div>
       </div>
+    </section>
 
-      <div class="col-md-6 col-lg-4">
-        <div class="card mb-3">
-          <div class="card-header">
-            <strong>Sweden</strong>
-          </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-orga-level-sweden-map' %}">Map 30 — Administrative level of waste collection (Sweden, EN)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-bin-configuration-sweden-map' %}">Map 34 — Bin configuration of waste fractions (Sweden, EN)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-collection-system-map' %}?country=SE&amp;year=2023">Karte 2 — Küchenabfall-Sammelsysteme (SE, 2023)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-connection-rate-map' %}?country=SE&amp;year=2023">Karte 3 — Anschlussgrad an die Biotonne (SE, 2023)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-paper-bags-map' %}?country=SE&amp;year=2023">Karte 5 — Papierprodukte in Bioabfällen (SE, 2023)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-plastic-bags-map' %}?country=SE&amp;year=2023">Karte 6 — Kunststoffbeutel in Bioabfällen (SE, 2023)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-collection-support-map' %}?country=SE&amp;year=2023">Karte 7 — Bioabfall-Sammelhilfen (SE, 2023)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-residual-collection-amount-map' %}?country=SE&amp;year=2023">Karte 17 — Restmüll-Sammelmengen (SE, 2023)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-biowaste-collection-amount-map' %}?country=SE&amp;year=2023">Karte 18 — Bioabfall-Sammelmengen (SE, 2023)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-waste-ratio-map' %}?country=SE&amp;year=2023">Karte 19 — Sammelmengen-Verhältnis (SE, 2023)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-organic-collection-amount-map' %}?country=SE&amp;year=2023">Karte 27 — Aggregierte organische Sammelmenge (SE, 2023)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-organic-waste-ratio-map' %}?country=SE&amp;year=2023">Karte 28 — Anteil organischer Fraktionen (SE, 2023)</a>
-            </li>
-          </ul>
-        </div>
+    <section id="atlas-other-countries" class="mb-4">
+      <h2 class="h4 mb-3">Weitere Länder und Regionen</h2>
+      <div class="row g-3">
+        <div class="col-lg-6"><div class="card h-100"><div class="card-header"><strong>Sweden</strong></div><div class="card-body"><div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-orga-level-sweden-map' %}">Map 30 — Administrative level</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-bin-configuration-sweden-map' %}">Map 34 — Bin configuration</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-collection-system-map' %}?country=SE&amp;year=2023">Karte 2 — Küchenabfall-Systeme</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-connection-rate-map' %}?country=SE&amp;year=2023">Karte 3 — Anschlussgrad</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-paper-bags-map' %}?country=SE&amp;year=2023">Karte 5 — Papierprodukte</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-plastic-bags-map' %}?country=SE&amp;year=2023">Karte 6 — Kunststoffbeutel</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-collection-support-map' %}?country=SE&amp;year=2023">Karte 7 — Sammelhilfen</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-residual-collection-amount-map' %}?country=SE&amp;year=2023">Karte 17 — Restmüllmenge</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-biowaste-collection-amount-map' %}?country=SE&amp;year=2023">Karte 18 — Bioabfallmenge</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-waste-ratio-map' %}?country=SE&amp;year=2023">Karte 19 — Mengen-Verhältnis</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-organic-collection-amount-map' %}?country=SE&amp;year=2023">Karte 27 — Organische Menge</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-organic-waste-ratio-map' %}?country=SE&amp;year=2023">Karte 28 — Organischer Anteil</a>
+        </div></div></div></div>
+        <div class="col-lg-6"><div class="card h-100"><div class="card-header"><strong>Denmark</strong></div><div class="card-body"><div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-orga-level-denmark-map' %}">Map 31 — Administrative level</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-collection-system-map' %}?country=DK&amp;year=2023">Karte 2 — Küchenabfall-Systeme</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-biowaste-frequency-map' %}?country=DK&amp;year=2023">Karte 10 — Rhythmus Biotonne</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-biowaste-collection-amount-map' %}?country=DK&amp;year=2023">Karte 18 — Bioabfallmenge</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-organic-collection-amount-map' %}?country=DK&amp;year=2023">Karte 27 — Organische Menge</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-organic-waste-ratio-map' %}?country=DK&amp;year=2023">Karte 28 — Organischer Anteil</a>
+        </div></div></div></div>
+        <div class="col-lg-6"><div class="card h-100"><div class="card-header"><strong>The Netherlands</strong></div><div class="card-body"><div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-orga-level-netherlands-map' %}">Map 32 — Administrative level</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-collection-system-netherlands-map' %}">Map 36 — Kitchen-waste system</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-biowaste-frequency-netherlands-map' %}">Map 37 — Biowaste rhythm</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-biowaste-collection-amount-netherlands-map' %}">Map 38 — Biowaste amount</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-organic-collection-amount-netherlands-map' %}">Map 39 — Organic amount</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-organic-waste-ratio-netherlands-map' %}">Map 40 — Organic share</a>
+        </div></div></div></div>
+        <div class="col-lg-6"><div class="card h-100"><div class="card-header"><strong>Belgium (Flanders + Brussels)</strong></div><div class="card-body"><div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-orga-level-belgium-flanders-map' %}">Map 35 — Administrative level</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-collection-system-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 2 — Küchenabfall-Systeme</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-connection-rate-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 3 — Anschlussgrad</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-biowaste-fee-system-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 15 — Gebühren Biotonne</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-biowaste-frequency-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 10 — Rhythmus Biotonne</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-biowaste-collection-amount-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 18 — Bioabfallmenge</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-residual-collection-amount-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 17 — Restmüllmenge</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-waste-ratio-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 19 — Mengen-Verhältnis</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'waste-atlas-green-waste-collection-amount-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 22 — Grüngutmenge</a>
+        </div></div></div></div>
       </div>
-
-      <div class="col-md-6 col-lg-4">
-        <div class="card mb-3">
-          <div class="card-header">
-            <strong>Denmark</strong>
-          </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-orga-level-denmark-map' %}">Map 31 — Administrative level of waste collection (Denmark, EN)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-collection-system-map' %}?country=DK&amp;year=2023">Karte 2 — Küchenabfall-Sammelsysteme (DK, 2023)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-biowaste-frequency-map' %}?country=DK&amp;year=2023">Karte 10 — Abfuhrrhythmus Biotonne (DK, 2023)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-biowaste-collection-amount-map' %}?country=DK&amp;year=2023">Karte 18 — Bioabfall-Sammelmengen (DK, 2023)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-organic-collection-amount-map' %}?country=DK&amp;year=2023">Karte 27 — Aggregierte organische Sammelmenge (DK, 2023)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-organic-waste-ratio-map' %}?country=DK&amp;year=2023">Karte 28 — Anteil organischer Fraktionen (DK, 2023)</a>
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="col-md-6 col-lg-4">
-        <div class="card mb-3">
-          <div class="card-header">
-            <strong>The Netherlands</strong>
-          </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-orga-level-netherlands-map' %}">Map 32 — Administrative level of waste collection (The Netherlands, EN)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-collection-system-netherlands-map' %}">Map 36 — Primary collection system for kitchen waste (The Netherlands, EN)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-biowaste-frequency-netherlands-map' %}">Map 37 — Collection frequency types for biowaste (The Netherlands, EN)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-biowaste-collection-amount-netherlands-map' %}">Map 38 — Specifically collected amount of biowaste (The Netherlands, EN)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-organic-collection-amount-netherlands-map' %}">Map 39 — Aggregated collection amount of organic fractions (The Netherlands, EN)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-organic-waste-ratio-netherlands-map' %}">Map 40 — Share of organic fractions in total waste (The Netherlands, EN)</a>
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="col-md-6 col-lg-4">
-        <div class="card mb-3">
-          <div class="card-header">
-            <strong>Belgium (Flanders + Brussels)</strong>
-          </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-orga-level-belgium-flanders-map' %}">Map 35 — Administrative level of waste collection (Flanders + Brussels, EN)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-collection-system-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 2 — Küchenabfall-Sammelsysteme (Flanders + Brussels, 2022)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-connection-rate-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 3 — Anschlussgrad an die Biotonne (Flanders + Brussels, 2022)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-biowaste-fee-system-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 15 — Gebührensystem Biotonne (Flanders + Brussels, 2022)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-biowaste-frequency-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 10 — Abfuhrrhythmus Biotonne (Flanders + Brussels, 2022)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-biowaste-collection-amount-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 18 — Bioabfall-Sammelmengen (Flanders + Brussels, 2022)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-residual-collection-amount-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 17 — Restmüll-Sammelmengen (Flanders + Brussels, 2022)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-waste-ratio-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 19 — Sammelmengen-Verhältnis (Flanders + Brussels, 2022)</a>
-            </li>
-            <li class="list-group-item">
-              <a href="{% url 'waste-atlas-green-waste-collection-amount-map' %}?country=BE&amp;year=2022&amp;nuts_prefix=BE1%2CBE2">Karte 22 — Grüngut-Sammelmengen (Flanders + Brussels, 2022)</a>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
+    </section>
   </div>
 {% endblock content %}
