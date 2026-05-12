@@ -133,10 +133,10 @@
       var noCollectionFill = '#fff696';
       var noCollectionStroke = '#9f8b00';
       var categories = [
-        { min: 150.000001, label: '151+ kg/P/a', color: '#1a9850' },
-        { min: 100.000001, label: '101 – 150 kg/P/a', color: '#66bd63' },
-        { min: 50.000001, label: '51 – 100 kg/P/a', color: '#a6d96a' },
-        { min: 0, label: '0 – 50 kg/P/a', color: '#d9f0d3' }
+        { min: 150.000001, label: '151+ kg/cap/a', color: '#1a9850' },
+        { min: 100.000001, label: '101 – 150 kg/cap/a', color: '#66bd63' },
+        { min: 50.000001, label: '51 – 100 kg/cap/a', color: '#a6d96a' },
+        { min: 0, label: '0 – 50 kg/cap/a', color: '#d9f0d3' }
       ];
       var continentalEuropeExtent = {
         west: -10,
@@ -386,7 +386,7 @@
         if (value === null || value === undefined || Number.isNaN(value)) {
           return 'No 2024 data';
         }
-        return value.toFixed(1) + ' kg/P/a';
+        return value.toFixed(1) + ' kg/cap/a';
       }
 
       function buildRegionDetailUrl(region) {

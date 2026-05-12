@@ -11,7 +11,7 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Kleinste verfügbare Bin size für Residual waste (L)',
+      title:       'Smallest available bin size for residual waste (L)',
       dataUrl:     '/waste_collection/api/waste-atlas/residual-min-bin-size/',
       dataField:   '_classified',
       categories: [
