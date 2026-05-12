@@ -625,20 +625,23 @@ var WasteAtlasChoropleth = (function () {
 
   function _drawExportLegendItem(g, cat, x, y, opts) {
     var itemHeight = Math.max(opts.swatchH, cat.lines.length * opts.lineHeight);
+    var swatchY = y + Math.round((opts.lineHeight - opts.swatchH) / 2);
+    var textY = y + Math.round(opts.lineHeight / 2);
     g.append('rect')
-      .attr('x', x).attr('y', y + 4)
+      .attr('x', x).attr('y', swatchY)
       .attr('width', opts.swatchW).attr('height', opts.swatchH)
       .attr('fill', cat.color).attr('stroke', '#333');
     if (cat.pattern) {
       g.append('rect')
-        .attr('x', x).attr('y', y + 4)
+        .attr('x', x).attr('y', swatchY)
         .attr('width', opts.swatchW).attr('height', opts.swatchH)
         .attr('fill', 'url(#' + _overlayPatternId(opts.cfg) + ')')
         .attr('stroke', 'none');
     }
     var textX = x + opts.swatchW + opts.labelGap;
     var text = g.append('text')
-      .attr('x', textX).attr('y', y + opts.lineHeight - 3)
+      .attr('x', textX).attr('y', textY)
+      .attr('dominant-baseline', 'middle')
       .attr('font-size', opts.fontSize)
       .attr('font-family', opts.fontFamily);
     cat.lines.forEach(function (line, index) {
