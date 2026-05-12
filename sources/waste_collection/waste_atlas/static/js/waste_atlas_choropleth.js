@@ -35,9 +35,15 @@ var WasteAtlasChoropleth = (function () {
   var CATCHMENT_STROKE = '#232323';
   var CATCHMENT_STROKE_WIDTH = 0.35;   // ≈ 0.1 mm at 96 DPI
   var EXPORT_DPI = 300;
+  var EXPORT_WIDTH_MM = 160;
+  var EXPORT_HEIGHT_MM = 110;
+  var EXPORT_WIDTH = Math.round(EXPORT_WIDTH_MM / 25.4 * EXPORT_DPI);
+  var EXPORT_HEIGHT = Math.round(EXPORT_HEIGHT_MM / 25.4 * EXPORT_DPI);
 
   var _cfg = {};
   var _svg;
+  var _lastData = null;
+  var _lastLoadCfg = null;
 
   // ---- helpers --------------------------------------------------------------
 
@@ -162,7 +168,48 @@ var WasteAtlasChoropleth = (function () {
 
   // ---- rendering ------------------------------------------------------------
 
-  function _render(data, cfg) {
+  function _screenLayout(container) {
+    var width = container.clientWidth || 900;
+    var height = Math.round(width * 1.17);
+    return {
+      exportMode: false,
+      width: width,
+      height: height,
+      mapExtent: [[40, 60], [width - 40, height - 100]],
+      titleY: 30,
+      subtitleY: 50,
+      titleFontSize: 18,
+      subtitleFontSize: 13
+    };
+  }
+
+  function _exportLayout() {
+    return {
+      exportMode: true,
+      width: EXPORT_WIDTH,
+      height: EXPORT_HEIGHT,
+      mapExtent: [[80, 120], [Math.round(EXPORT_WIDTH * 0.68), EXPORT_HEIGHT - 80]],
+      titleY: 50,
+      subtitleY: 82,
+      titleFontSize: 38,
+      subtitleFontSize: 22,
+      legend: {
+        x: Math.round(EXPORT_WIDTH * 0.705),
+        y: 130,
+        width: Math.round(EXPORT_WIDTH * 0.265),
+        swatchW: 32,
+        swatchH: 24,
+        gap: 13,
+        titleFontSize: 30,
+        fontSize: 28,
+        lineHeight: 34,
+        maxChars: 28
+      }
+    };
+  }
+
+  function _render(data, cfg, options) {
+    options = options || {};
     // Build lookup: catchment_id -> thematic record
     var records = Array.isArray(data.thematicData) ? data.thematicData
       : (data.thematicData.results || []);
@@ -185,13 +232,16 @@ var WasteAtlasChoropleth = (function () {
 
     // SVG dimensions
     var container = document.getElementById(cfg.containerId);
-    var width = container.clientWidth || 900;
-    var height = Math.round(width * 1.17);
+    var layout = options.layout || _screenLayout(container);
+    var width = layout.width;
+    var height = layout.height;
 
-    _svg = d3.select('#' + cfg.svgId)
+    _svg = options.svgSelection || d3.select('#' + cfg.svgId);
+    _svg
       .attr('xmlns', 'http://www.w3.org/2000/svg')
       .attr('width', width)
       .attr('height', height)
+      .attr('viewBox', '0 0 ' + width + ' ' + height)
       .style('background', '#fff');
 
     _svg.selectAll('*').remove();
@@ -203,7 +253,7 @@ var WasteAtlasChoropleth = (function () {
     var fitData = (regionBorder && regionBorder.features && regionBorder.features.length)
       ? regionBorder : data.catchments;
     var projection = d3.geoMercator()
-      .fitExtent([[40, 60], [width - 40, height - 100]], fitData);
+      .fitExtent(layout.mapExtent, fitData);
     var path = d3.geoPath().projection(projection);
 
     // Layer 1: background fill (filtered NUTS1 regions when nutsPrefix set, else full country)
@@ -307,27 +357,71 @@ var WasteAtlasChoropleth = (function () {
 
     // Title
     _svg.append('text')
-      .attr('x', width / 2).attr('y', 30)
+      .attr('x', width / 2).attr('y', layout.titleY)
       .attr('text-anchor', 'middle')
       .attr('font-family', "'Nunito', sans-serif")
-      .attr('font-size', 18).attr('font-weight', 'bold')
+      .attr('font-size', layout.titleFontSize).attr('font-weight', 'bold')
       .text(cfg.title);
 
     // Subtitle / count
     var count = data.catchments.features ? data.catchments.features.length : 0;
     var subtitle = cfg.subtitle || (count + ' catchments');
     _svg.append('text')
-      .attr('x', width / 2).attr('y', 50)
+      .attr('x', width / 2).attr('y', layout.subtitleY)
       .attr('text-anchor', 'middle')
       .attr('font-family', "'Nunito', sans-serif")
-      .attr('font-size', 13).attr('fill', '#666')
+      .attr('font-size', layout.subtitleFontSize).attr('fill', '#666')
       .text(subtitle);
 
     // Legend
-    _drawLegend(width, height, cfg);
+    _drawLegend(width, height, cfg, layout);
   }
 
-  function _drawLegend(width, height, cfg) {
+  function _wrapLegendLabel(label, maxChars) {
+    var words = String(label).split(/\s+/);
+    var lines = [];
+    var current = '';
+    words.forEach(function (word) {
+      var next = current ? current + ' ' + word : word;
+      if (next.length > maxChars && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = next;
+      }
+    });
+    if (current) lines.push(current);
+    return lines;
+  }
+
+  function _drawExportLegendItem(g, cat, y, opts) {
+    var lines = _wrapLegendLabel(cat.label, opts.maxChars);
+    var itemHeight = Math.max(opts.swatchH, lines.length * opts.lineHeight);
+    g.append('rect')
+      .attr('x', 0).attr('y', y + 4)
+      .attr('width', opts.swatchW).attr('height', opts.swatchH)
+      .attr('fill', cat.color).attr('stroke', '#333');
+    if (cat.pattern) {
+      g.append('rect')
+        .attr('x', 0).attr('y', y + 4)
+        .attr('width', opts.swatchW).attr('height', opts.swatchH)
+        .attr('fill', 'url(#' + _overlayPatternId(opts.cfg) + ')')
+        .attr('stroke', 'none');
+    }
+    var text = g.append('text')
+      .attr('x', opts.swatchW + 14).attr('y', y + opts.lineHeight - 1)
+      .attr('font-size', opts.fontSize)
+      .attr('font-family', "'Nunito', sans-serif");
+    lines.forEach(function (line, index) {
+      text.append('tspan')
+        .attr('x', opts.swatchW + 14)
+        .attr('dy', index === 0 ? 0 : opts.lineHeight)
+        .text(line);
+    });
+    return itemHeight + opts.gap;
+  }
+
+  function _drawLegend(width, height, cfg, layout) {
     var swatchW = 22, swatchH = 16, gap = 6;
     var items = cfg.categories.slice();
     var hasOverlayLegend = cfg.overlayPatternField && cfg.overlayPatternLegendLabel;
@@ -335,6 +429,41 @@ var WasteAtlasChoropleth = (function () {
     if (cfg.noDataLabel) {
       items.push({ label: cfg.noDataLabel, color: cfg.noDataColor || '#e0e0e0' });
       legendRows += 1;
+    }
+
+    if (layout.exportMode) {
+      var opts = layout.legend;
+      var gExport = _svg.append('g')
+        .attr('class', 'atlas-legend')
+        .attr('transform', 'translate(' + opts.x + ',' + opts.y + ')');
+      var y = 26;
+      items.forEach(function (cat) {
+        y += _drawExportLegendItem(gExport, cat, y, opts);
+      });
+      if (hasOverlayLegend) {
+        y += _drawExportLegendItem(
+          gExport,
+          {
+            label: cfg.overlayPatternLegendLabel,
+            color: '#f8f9fa',
+            pattern: true
+          },
+          y,
+          Object.assign({}, opts, { cfg: cfg })
+        );
+      }
+      var totalH = y + 18;
+      gExport.insert('rect', ':first-child')
+        .attr('x', -18).attr('y', -28)
+        .attr('width', opts.width).attr('height', totalH)
+        .attr('fill', 'white').attr('fill-opacity', 0.94)
+        .attr('stroke', '#c9ced6').attr('rx', 8);
+      gExport.insert('text', ':nth-child(2)')
+        .attr('x', 0).attr('y', 0)
+        .attr('font-weight', 'bold').attr('font-size', opts.titleFontSize)
+        .attr('font-family', "'Nunito', sans-serif")
+        .text(cfg.legendTitle || '');
+      return;
     }
 
     var g = _svg.append('g')
@@ -388,14 +517,29 @@ var WasteAtlasChoropleth = (function () {
 
   // ---- export ---------------------------------------------------------------
 
-  function _svgSource() {
-    var svgEl = document.getElementById(_cfg.svgId);
+  function _svgSource(svgEl) {
+    svgEl = svgEl || document.getElementById(_cfg.svgId);
     var serializer = new XMLSerializer();
     var source = serializer.serializeToString(svgEl);
     if (!source.match(/^<svg[^>]+xmlns/)) {
       source = source.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
     }
     return '<?xml version="1.0" standalone="no"?>\r\n' + source;
+  }
+
+  function _buildExportSVGElement() {
+    if (!_lastData || !_lastLoadCfg) return document.getElementById(_cfg.svgId);
+    var node = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    _render(_lastData, _lastLoadCfg, {
+      layout: _exportLayout(),
+      svgSelection: d3.select(node)
+    });
+    d3.select(node)
+      .attr('width', EXPORT_WIDTH_MM + 'mm')
+      .attr('height', EXPORT_HEIGHT_MM + 'mm')
+      .attr('viewBox', '0 0 ' + EXPORT_WIDTH + ' ' + EXPORT_HEIGHT);
+    _svg = d3.select('#' + _cfg.svgId);
+    return node;
   }
 
   function _downloadBlob(blob, filename) {
@@ -409,31 +553,106 @@ var WasteAtlasChoropleth = (function () {
   }
 
   function exportSVG(filename) {
-    var source = _svgSource();
+    var source = _svgSource(_buildExportSVGElement());
     var blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
     _downloadBlob(blob, filename || 'waste_atlas_map.svg');
   }
 
+  function _crc32(bytes) {
+    var table = _crc32.table;
+    if (!table) {
+      table = [];
+      for (var n = 0; n < 256; n++) {
+        var c = n;
+        for (var k = 0; k < 8; k++) {
+          c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+        }
+        table[n] = c >>> 0;
+      }
+      _crc32.table = table;
+    }
+    var crc = 0xffffffff;
+    for (var i = 0; i < bytes.length; i++) {
+      crc = table[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+
+  function _pngChunk(type, data) {
+    var typeBytes = new TextEncoder().encode(type);
+    var chunk = new Uint8Array(12 + data.length);
+    var view = new DataView(chunk.buffer);
+    view.setUint32(0, data.length);
+    chunk.set(typeBytes, 4);
+    chunk.set(data, 8);
+    var crcInput = new Uint8Array(typeBytes.length + data.length);
+    crcInput.set(typeBytes, 0);
+    crcInput.set(data, typeBytes.length);
+    view.setUint32(8 + data.length, _crc32(crcInput));
+    return chunk;
+  }
+
+  function _pngWithDpi(blob, dpi) {
+    return blob.arrayBuffer().then(function (buffer) {
+      var input = new Uint8Array(buffer);
+      var ppm = Math.round(dpi / 0.0254);
+      var phys = new Uint8Array(9);
+      var physView = new DataView(phys.buffer);
+      physView.setUint32(0, ppm);
+      physView.setUint32(4, ppm);
+      phys[8] = 1;
+      var physChunk = _pngChunk('pHYs', phys);
+      var chunks = [input.slice(0, 8)];
+      var offset = 8;
+      while (offset < input.length) {
+        var length = new DataView(input.buffer, input.byteOffset + offset, 4).getUint32(0);
+        var type = String.fromCharCode(
+          input[offset + 4],
+          input[offset + 5],
+          input[offset + 6],
+          input[offset + 7]
+        );
+        var end = offset + 12 + length;
+        var chunk = input.slice(offset, end);
+        if (type !== 'pHYs') {
+          chunks.push(chunk);
+        }
+        if (type === 'IHDR') {
+          chunks.push(physChunk);
+        }
+        offset = end;
+      }
+      var total = chunks.reduce(function (sum, chunk) { return sum + chunk.length; }, 0);
+      var output = new Uint8Array(total);
+      var cursor = 0;
+      chunks.forEach(function (chunk) {
+        output.set(chunk, cursor);
+        cursor += chunk.length;
+      });
+      return new Blob([output], { type: 'image/png' });
+    });
+  }
+
   function exportPNG(filename) {
-    var svgEl = document.getElementById(_cfg.svgId);
-    var w = parseInt(svgEl.getAttribute('width'), 10);
-    var h = parseInt(svgEl.getAttribute('height'), 10);
-    var scale = EXPORT_DPI / 96;
+    var svgEl = _buildExportSVGElement();
+    var w = EXPORT_WIDTH;
+    var h = EXPORT_HEIGHT;
     var canvas = document.createElement('canvas');
-    canvas.width = w * scale;
-    canvas.height = h * scale;
+    canvas.width = w;
+    canvas.height = h;
     var ctx = canvas.getContext('2d');
-    ctx.scale(scale, scale);
 
     var img = new Image();
-    var source = _svgSource();
+    var source = _svgSource(svgEl);
     var url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(source);
     img.onload = function () {
       ctx.fillStyle = '#fff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, w, h);
       canvas.toBlob(function (blob) {
-        _downloadBlob(blob, filename || 'waste_atlas_map.png');
+        _pngWithDpi(blob, EXPORT_DPI).then(function (pngBlob) {
+          _downloadBlob(pngBlob, filename || 'waste_atlas_map.png');
+        });
       }, 'image/png');
     };
     img.src = url;
@@ -458,6 +677,8 @@ var WasteAtlasChoropleth = (function () {
 
       _fetchAll(loadCfg)
         .then(function (data) {
+          _lastData = data;
+          _lastLoadCfg = loadCfg;
           _render(data, loadCfg);
           _hide(loadingEl);
           if (btnSVG) btnSVG.disabled = false;
