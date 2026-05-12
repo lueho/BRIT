@@ -11,7 +11,7 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Aggregated collected amount of organic fractions (biowaste + food waste + green waste)',
+      title:       'Aggregated collected amount of organic fractions (kg/cap/a)',
       dataUrl:     '/waste_collection/api/waste-atlas/organic-collection-amount/',
       dataField:   '_classified',
       categories: [

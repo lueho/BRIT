@@ -268,25 +268,25 @@ class ItalyCollectionPointCountMapView(ItalyAtlasMapView):
 
 class ItalyResidualFrequencyMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte8_residual_frequency.html"
-    map_title = "Collection frequency types for residual waste"
+    map_title = "Collection frequency types for residual-waste collection"
     map_route_key = "residual_frequency"
 
 
 class ItalyBiowasteFrequencyMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte9_biowaste_frequency.html"
-    map_title = "Collection frequency types for biowaste"
+    map_title = "Collection frequency types for biowaste collection"
     map_route_key = "biowaste_frequency"
 
 
 class ItalyResidualCollectionCountMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte11_residual_collection_count.html"
-    map_title = "Collection frequency for residual waste"
+    map_title = "Annual residual-waste collection count"
     map_route_key = "residual_collection_count"
 
 
 class ItalyBiowasteCollectionCountMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte12_biowaste_collection_count.html"
-    map_title = "Collection frequency for biowaste"
+    map_title = "Annual biowaste collection count"
     map_route_key = "biowaste_collection_count"
 
 
@@ -310,7 +310,7 @@ class ItalyGreenWasteCollectionAmountMapView(ItalyAtlasMapView):
 
 class ItalyOrganicCollectionAmountMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte27_organic_collection_amount.html"
-    map_title = "Aggregated collected amount of organic fractions"
+    map_title = "Aggregated collected amount of organic fractions (kg/cap/a)"
     map_route_key = "organic_collection_amount"
 
 
@@ -352,7 +352,7 @@ class SouthTyrolGreenWasteCollectionSystemCountMapView(SouthTyrolAtlasMapView):
 
 class SouthTyrolCollectionCountRatioMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte42_collection_count_ratio.html"
-    map_title = "Collection count ratio: biowaste vs residual waste"
+    map_title = "Annual collection-count ratio: biowaste vs residual waste"
     map_route_key = "collection_count_ratio"
 
 
@@ -364,43 +364,43 @@ class SouthTyrolCollectionPointCountMapView(SouthTyrolAtlasMapView):
 
 class SouthTyrolResidualFrequencyMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte8_residual_frequency.html"
-    map_title = "Collection frequency types for residual waste"
+    map_title = "Collection frequency types for residual-waste collection"
     map_route_key = "residual_frequency"
 
 
 class SouthTyrolBiowasteFrequencyMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte9_biowaste_frequency.html"
-    map_title = "Collection frequency types for biowaste"
+    map_title = "Collection frequency types for biowaste collection"
     map_route_key = "biowaste_frequency"
 
 
 class SouthTyrolResidualCollectionCountMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte11_residual_collection_count.html"
-    map_title = "Collection frequency for residual waste"
+    map_title = "Annual residual-waste collection count"
     map_route_key = "residual_collection_count"
 
 
 class SouthTyrolBiowasteCollectionCountMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte12_biowaste_collection_count.html"
-    map_title = "Collection frequency for biowaste"
+    map_title = "Annual biowaste collection count"
     map_route_key = "biowaste_collection_count"
 
 
 class SouthTyrolCombinedFrequencyMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte10_combined_frequency.html"
-    map_title = "Collection frequency types: biowaste vs residual waste"
+    map_title = "Collection frequency type: biowaste vs residual waste"
     map_route_key = "combined_frequency"
 
 
 class SouthTyrolCombinedCollectionCountMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte13_combined_collection_count.html"
-    map_title = "Collection frequency: biowaste vs residual waste"
+    map_title = "Annual collection count: biowaste vs residual waste"
     map_route_key = "combined_collection_count"
 
 
 class SouthTyrolBiowasteFeeSystemMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte15_biowaste_fee_system.html"
-    map_title = "Fee system for biowaste"
+    map_title = "Fee system for biowaste collection"
     map_route_key = "biowaste_fee_system"
 
 
@@ -430,7 +430,7 @@ class SouthTyrolGreenWasteCollectionAmountMapView(SouthTyrolAtlasMapView):
 
 class SouthTyrolOrganicCollectionAmountMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte27_organic_collection_amount.html"
-    map_title = "Aggregated collected amount of organic fractions"
+    map_title = "Aggregated collected amount of organic fractions (kg/cap/a)"
     map_route_key = "organic_collection_amount"
 
 
@@ -442,13 +442,13 @@ class SouthTyrolOrganicWasteRatioMapView(SouthTyrolAtlasMapView):
 
 class SouthTyrolBiowasteMinBinSizeMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte23_biowaste_min_bin_size.html"
-    map_title = "Minimum bin size for biowaste"
+    map_title = "Smallest available bin size for biowaste (L)"
     map_route_key = "biowaste_min_bin_size"
 
 
 class SouthTyrolResidualMinBinSizeMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte24_residual_min_bin_size.html"
-    map_title = "Minimum bin size for residual waste"
+    map_title = "Smallest available bin size for residual waste (L)"
     map_route_key = "residual_min_bin_size"
 
 
