@@ -269,11 +269,12 @@ var WasteAtlasChoropleth = (function () {
   }
 
   function _measureExportLegend(cfg, width, columnCount) {
+    var swatchSize = Math.round(EXPORT_LEGEND_FONT_SIZE * 0.72);
     var opts = {
       paddingX: 20,
       paddingY: 18,
-      swatchW: 28,
-      swatchH: 22,
+      swatchW: swatchSize,
+      swatchH: swatchSize,
       labelGap: 10,
       rowGap: 8,
       titleGap: 14,
