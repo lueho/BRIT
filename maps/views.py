@@ -921,6 +921,7 @@ class GeoDataSetRuntimeFeatureGeoJSONView(
         if not getattr(adapter, "uses_local_relation", False):
             raise Http404("Dataset does not use a local relation runtime.")
         count = adapter.get_record_count(query_params=request.GET)
+        data_version = adapter.get_data_version(query_params=request.GET)
         response = StreamingHttpResponse(
             adapter.stream_geojson_feature_collection(
                 query_params=request.GET,
@@ -930,7 +931,10 @@ class GeoDataSetRuntimeFeatureGeoJSONView(
         )
         response["X-Cache-Status"] = "STREAM"
         response["X-Total-Count"] = str(count)
-        response["Access-Control-Expose-Headers"] = "X-Total-Count, X-Cache-Status"
+        response["X-Data-Version"] = data_version
+        response["Access-Control-Expose-Headers"] = (
+            "X-Total-Count, X-Cache-Status, X-Data-Version"
+        )
         return response
 
 

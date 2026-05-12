@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -218,6 +219,26 @@ class LocalRelationDatasetRuntimeAdapter:
 
     def get_record_count(self, query_params=None):
         return self._fetch_record_count(query_params=query_params)
+
+    def get_data_version(self, query_params=None):
+        self._validate_configured_columns()
+        where_sql, params = self._build_filter_where_clause(query_params=query_params)
+        primary_key_column = connection.ops.quote_name(
+            self.runtime_configuration.primary_key_column
+        )
+        sql = (
+            f"SELECT COUNT(*), MIN({primary_key_column}), MAX({primary_key_column}) "
+            f"FROM {self.relation_identifier}"
+            f"{' WHERE ' + ' AND '.join(where_sql) if where_sql else ''}"
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(sql, params)
+            count, min_pk, max_pk = cursor.fetchone()
+        base = (
+            f"local-relation-stream-v1:{self.dataset.pk}:{self.relation_identifier}:"
+            f"{count}:{min_pk}:{max_pk}"
+        )
+        return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
 
     def get_geojson_feature_collection(self, query_params=None, pk=None):
         records = self._fetch_records(

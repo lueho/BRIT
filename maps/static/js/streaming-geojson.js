@@ -324,10 +324,22 @@ async function fetchFeatureGeometriesWithProgress(params) {
     try {
         const cached = await getFromIndexedDB(cacheKey);
         if (cached && cached.data) {
-            console.log('Cache hit for feature data');
-            renderFeatures(cached.data);
-            if (typeof orderLayers === 'function') orderLayers();
-            return;
+            if (cached.version) {
+                const response = await fetch(url, {
+                    method: 'HEAD',
+                    headers: { 'Accept': 'application/geo+json, application/json' }
+                });
+                const currentVersion = response.headers.get('X-Data-Version');
+                if (response.ok && currentVersion && currentVersion === cached.version && cached.data.features && cached.data.features.length) {
+                    console.log('Cache hit for feature data');
+                    renderFeatures(cached.data);
+                    if (typeof orderLayers === 'function') orderLayers();
+                    return;
+                }
+                console.log(`Feature cache miss after version check (cached: ${cached.version}, current: ${currentVersion})`);
+            } else {
+                console.log('Ignoring legacy feature cache without version');
+            }
         }
     } catch (e) {
         console.warn('IndexedDB cache check failed:', e);

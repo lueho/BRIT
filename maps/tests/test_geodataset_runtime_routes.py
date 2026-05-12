@@ -440,6 +440,7 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["X-Cache-Status"], "STREAM")
         self.assertEqual(response["X-Total-Count"], "2")
+        self.assertEqual(len(response["X-Data-Version"]), 12)
         data = self._streaming_json(response)
         self.assertEqual(data["type"], "FeatureCollection")
         self.assertEqual(len(data["features"]), 2)
@@ -473,6 +474,7 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["X-Total-Count"], "1002")
+        self.assertEqual(len(response["X-Data-Version"]), 12)
         self.assertEqual(len(self._streaming_json(response)["features"]), 1002)
 
     def test_local_relation_geojson_route_ignores_hidden_column_filter(self):
