@@ -37,13 +37,17 @@ var WasteAtlasChoropleth = (function () {
   var EXPORT_DPI = 300;
   var EXPORT_WIDTH_MM = 160;
   var EXPORT_HEIGHT_MM = 110;
+  var EXPORT_MAX_HEIGHT_MM = 180;
   var EXPORT_WIDTH = Math.round(EXPORT_WIDTH_MM / 25.4 * EXPORT_DPI);
   var EXPORT_HEIGHT = Math.round(EXPORT_HEIGHT_MM / 25.4 * EXPORT_DPI);
+  var EXPORT_LEGEND_FONT_SIZE = 11 / 72 * EXPORT_DPI;
+  var EXPORT_LEGEND_FONT_FAMILY = "'Calibri', 'Carlito', Arial, sans-serif";
 
   var _cfg = {};
   var _svg;
   var _lastData = null;
   var _lastLoadCfg = null;
+  var _measureCtx = null;
 
   // ---- helpers --------------------------------------------------------------
 
@@ -183,28 +187,237 @@ var WasteAtlasChoropleth = (function () {
     };
   }
 
-  function _exportLayout() {
+  function _measureTextWidth(text, fontSize, fontWeight) {
+    if (!_measureCtx && typeof document !== 'undefined') {
+      _measureCtx = document.createElement('canvas').getContext('2d');
+    }
+    if (!_measureCtx) return String(text).length * fontSize * 0.52;
+    _measureCtx.font = (fontWeight ? fontWeight + ' ' : '') + fontSize + 'px ' + EXPORT_LEGEND_FONT_FAMILY;
+    return _measureCtx.measureText(text).width;
+  }
+
+  function _wrapTextToWidth(label, maxWidth, fontSize) {
+    var words = String(label)
+      .replace(/\s*\/\s*/g, ' / ')
+      .replace(/\s*[–—]\s*/g, ' – ')
+      .split(/\s+/)
+      .filter(function (word) { return word.length > 0; });
+    var lines = [];
+    var current = '';
+    words.forEach(function (word) {
+      var next = current ? current + ' ' + word : word;
+      if (_measureTextWidth(next, fontSize) <= maxWidth || !current) {
+        current = next;
+        if (_measureTextWidth(current, fontSize) <= maxWidth || current.length <= 1) return;
+      }
+      if (current !== word) {
+        lines.push(current);
+        current = word;
+      }
+      while (_measureTextWidth(current, fontSize) > maxWidth && current.length > 1) {
+        var part = current;
+        while (_measureTextWidth(part, fontSize) > maxWidth && part.length > 1) {
+          part = part.slice(0, -1);
+        }
+        lines.push(part);
+        current = current.slice(part.length);
+      }
+    });
+    if (current) lines.push(current);
+    return lines;
+  }
+
+  function _legendItems(cfg) {
+    var items = cfg.categories.slice();
+    if (cfg.noDataLabel) {
+      items.push({ label: cfg.noDataLabel, color: cfg.noDataColor || '#e0e0e0' });
+    }
+    if (cfg.overlayPatternField && cfg.overlayPatternLegendLabel) {
+      items.push({
+        label: cfg.overlayPatternLegendLabel,
+        color: '#f8f9fa',
+        pattern: true
+      });
+    }
+    return items;
+  }
+
+  function _measureExportLegend(cfg, width, columnCount) {
+    var opts = {
+      paddingX: 24,
+      paddingY: 22,
+      swatchW: 34,
+      swatchH: 24,
+      labelGap: 14,
+      rowGap: 11,
+      titleGap: 18,
+      columnGap: 42,
+      columnCount: columnCount || 1,
+      fontSize: EXPORT_LEGEND_FONT_SIZE,
+      titleFontSize: EXPORT_LEGEND_FONT_SIZE,
+      fontFamily: EXPORT_LEGEND_FONT_FAMILY
+    };
+    opts.lineHeight = Math.round(opts.fontSize * 1.16);
+    opts.width = width;
+    opts.columnWidth = (
+      width - opts.paddingX * 2 - (opts.columnCount - 1) * opts.columnGap
+    ) / opts.columnCount;
+    opts.textWidth = opts.columnWidth - opts.swatchW - opts.labelGap;
+    opts.titleLines = _wrapTextToWidth(cfg.legendTitle || '', width - opts.paddingX * 2, opts.titleFontSize);
+    opts.titleHeight = Math.max(opts.titleFontSize, opts.titleLines.length * opts.lineHeight);
+    opts.items = _legendItems(cfg).map(function (item) {
+      var lines = _wrapTextToWidth(item.label, opts.textWidth, opts.fontSize);
+      return Object.assign({}, item, {
+        lines: lines,
+        height: Math.max(opts.swatchH, lines.length * opts.lineHeight)
+      });
+    });
+    opts.columns = [];
+    for (var i = 0; i < opts.columnCount; i++) opts.columns.push([]);
+    opts.items.forEach(function (item) {
+      var shortestIndex = 0;
+      opts.columns.forEach(function (column, index) {
+        var columnHeight = column.reduce(function (total, columnItem, itemIndex) {
+          return total + columnItem.height + (itemIndex ? opts.rowGap : 0);
+        }, 0);
+        var shortestHeight = opts.columns[shortestIndex].reduce(function (total, columnItem, itemIndex) {
+          return total + columnItem.height + (itemIndex ? opts.rowGap : 0);
+        }, 0);
+        if (columnHeight < shortestHeight) shortestIndex = index;
+      });
+      opts.columns[shortestIndex].push(item);
+    });
+    opts.columnHeights = opts.columns.map(function (column) {
+      return column.reduce(function (total, item, index) {
+        return total + item.height + (index ? opts.rowGap : 0);
+      }, 0);
+    });
+    opts.height = opts.paddingY * 2 + opts.titleHeight + opts.titleGap
+      + Math.max.apply(null, opts.columnHeights);
+    return opts;
+  }
+
+  function _rectIntersectionArea(a, b) {
+    var x = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x));
+    var y = Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+    return x * y;
+  }
+
+  function _mapBoundsForExtent(fitData, extent) {
+    var projection = d3.geoMercator().fitExtent(extent, fitData);
+    var bounds = d3.geoPath().projection(projection).bounds(fitData);
+    return {
+      x: bounds[0][0],
+      y: bounds[0][1],
+      width: bounds[1][0] - bounds[0][0],
+      height: bounds[1][1] - bounds[0][1],
+      scale: projection.scale()
+    };
+  }
+
+  function _exportLayout(data, cfg) {
+    var margin = 58;
+    var titleBlock = 118;
+    var gap = 54;
+    var regionBorder = (cfg.nutsPrefix && data.bundeslaender && data.bundeslaender.features && data.bundeslaender.features.length)
+      ? data.bundeslaender : data.countryBorder;
+    var fitData = (regionBorder && regionBorder.features && regionBorder.features.length)
+      ? regionBorder : data.catchments;
+    var candidates = [];
+    [EXPORT_HEIGHT_MM, 130, 150, 170, EXPORT_MAX_HEIGHT_MM].forEach(function (heightMm) {
+      var exportHeight = Math.round(heightMm / 25.4 * EXPORT_DPI);
+      [
+        { placement: 'right', width: 0.32, columns: 1 },
+        { placement: 'right', width: 0.40, columns: 1 },
+        { placement: 'left', width: 0.32, columns: 1 },
+        { placement: 'left', width: 0.40, columns: 1 },
+        { placement: 'bottom-right', width: 0.52, columns: 2, overlay: true },
+        { placement: 'bottom-left', width: 0.52, columns: 2, overlay: true },
+        { placement: 'top-right', width: 0.52, columns: 2, overlay: true },
+        { placement: 'top-left', width: 0.52, columns: 2, overlay: true },
+        { placement: 'bottom', width: 0.88, columns: 3 }
+      ].forEach(function (spec) {
+        var legend = _measureExportLegend(cfg, Math.round(EXPORT_WIDTH * spec.width), spec.columns);
+        var x = margin;
+        var y = titleBlock;
+        var mapExtent = [[margin, titleBlock], [EXPORT_WIDTH - margin, exportHeight - margin]];
+        if (spec.placement === 'right') {
+          x = EXPORT_WIDTH - margin - legend.width;
+          mapExtent = [[margin, titleBlock], [x - gap, exportHeight - margin]];
+        } else if (spec.placement === 'left') {
+          x = margin;
+          mapExtent = [[x + legend.width + gap, titleBlock], [EXPORT_WIDTH - margin, exportHeight - margin]];
+        } else if (spec.placement === 'bottom-right') {
+          x = EXPORT_WIDTH - margin - legend.width;
+          y = exportHeight - margin - legend.height;
+        } else if (spec.placement === 'bottom-left') {
+          x = margin;
+          y = exportHeight - margin - legend.height;
+        } else if (spec.placement === 'top-right') {
+          x = EXPORT_WIDTH - margin - legend.width;
+          y = titleBlock;
+        } else if (spec.placement === 'top-left') {
+          x = margin;
+          y = titleBlock;
+        } else if (spec.placement === 'bottom') {
+          x = Math.round((EXPORT_WIDTH - legend.width) / 2);
+          y = exportHeight - margin - legend.height;
+          mapExtent = [[margin, titleBlock], [EXPORT_WIDTH - margin, y - gap]];
+        }
+        legend = Object.assign({}, legend, { x: x, y: y });
+        candidates.push({
+          name: spec.placement,
+          heightMm: heightMm,
+          height: exportHeight,
+          legend: legend,
+          mapExtent: mapExtent,
+          overlay: Boolean(spec.overlay)
+        });
+      });
+    });
+    var best = candidates.reduce(function (selected, candidate) {
+      var legendOverflow = Math.max(0, margin - candidate.legend.y)
+        + Math.max(0, candidate.legend.y + candidate.legend.height - (candidate.height - margin))
+        + Math.max(0, margin - candidate.legend.x)
+        + Math.max(0, candidate.legend.x + candidate.legend.width - (EXPORT_WIDTH - margin));
+      var mapW = candidate.mapExtent[1][0] - candidate.mapExtent[0][0];
+      var mapH = candidate.mapExtent[1][1] - candidate.mapExtent[0][1];
+      var invalidMap = mapW <= 0 || mapH <= 0;
+      var mapBounds = invalidMap
+        ? { x: 0, y: 0, width: 0, height: 0, scale: 0 }
+        : _mapBoundsForExtent(fitData, candidate.mapExtent);
+      var legendRect = {
+        x: candidate.legend.x,
+        y: candidate.legend.y,
+        width: candidate.legend.width,
+        height: candidate.legend.height
+      };
+      var overlap = _rectIntersectionArea(mapBounds, legendRect);
+      var legendArea = candidate.legend.width * candidate.legend.height;
+      var invalidOverlay = candidate.overlay && overlap > legendArea * 0.02;
+      var mapArea = mapBounds.width * mapBounds.height;
+      var usedArea = mapArea + legendArea - overlap;
+      candidate.score = mapBounds.scale * 100000 + usedArea / 1000
+        - (candidate.heightMm - EXPORT_HEIGHT_MM) * 120000
+        - legendOverflow * 1000000
+        - overlap * 1000
+        - (invalidOverlay ? 1000000000 : 0)
+        - (invalidMap ? 1000000000 : 0);
+      if (!selected || candidate.score > selected.score) return candidate;
+      return selected;
+    }, null);
     return {
       exportMode: true,
       width: EXPORT_WIDTH,
-      height: EXPORT_HEIGHT,
-      mapExtent: [[80, 120], [Math.round(EXPORT_WIDTH * 0.68), EXPORT_HEIGHT - 80]],
+      height: best.height,
+      widthMm: EXPORT_WIDTH_MM,
+      heightMm: best.heightMm,
+      mapExtent: best.mapExtent,
       titleY: 50,
       subtitleY: 82,
       titleFontSize: 38,
       subtitleFontSize: 22,
-      legend: {
-        x: Math.round(EXPORT_WIDTH * 0.705),
-        y: 130,
-        width: Math.round(EXPORT_WIDTH * 0.265),
-        swatchW: 32,
-        swatchH: 24,
-        gap: 13,
-        titleFontSize: 30,
-        fontSize: 28,
-        lineHeight: 34,
-        maxChars: 28
-      }
+      legend: best.legend
     };
   }
 
@@ -377,93 +590,77 @@ var WasteAtlasChoropleth = (function () {
     _drawLegend(width, height, cfg, layout);
   }
 
-  function _wrapLegendLabel(label, maxChars) {
-    var words = String(label).split(/\s+/);
-    var lines = [];
-    var current = '';
-    words.forEach(function (word) {
-      var next = current ? current + ' ' + word : word;
-      if (next.length > maxChars && current) {
-        lines.push(current);
-        current = word;
-      } else {
-        current = next;
-      }
-    });
-    if (current) lines.push(current);
-    return lines;
-  }
-
-  function _drawExportLegendItem(g, cat, y, opts) {
-    var lines = _wrapLegendLabel(cat.label, opts.maxChars);
-    var itemHeight = Math.max(opts.swatchH, lines.length * opts.lineHeight);
+  function _drawExportLegendItem(g, cat, x, y, opts) {
+    var itemHeight = Math.max(opts.swatchH, cat.lines.length * opts.lineHeight);
     g.append('rect')
-      .attr('x', 0).attr('y', y + 4)
+      .attr('x', x).attr('y', y + 4)
       .attr('width', opts.swatchW).attr('height', opts.swatchH)
       .attr('fill', cat.color).attr('stroke', '#333');
     if (cat.pattern) {
       g.append('rect')
-        .attr('x', 0).attr('y', y + 4)
+        .attr('x', x).attr('y', y + 4)
         .attr('width', opts.swatchW).attr('height', opts.swatchH)
         .attr('fill', 'url(#' + _overlayPatternId(opts.cfg) + ')')
         .attr('stroke', 'none');
     }
+    var textX = x + opts.swatchW + opts.labelGap;
     var text = g.append('text')
-      .attr('x', opts.swatchW + 14).attr('y', y + opts.lineHeight - 1)
+      .attr('x', textX).attr('y', y + opts.lineHeight - 3)
       .attr('font-size', opts.fontSize)
-      .attr('font-family', "'Nunito', sans-serif");
-    lines.forEach(function (line, index) {
+      .attr('font-family', opts.fontFamily);
+    cat.lines.forEach(function (line, index) {
       text.append('tspan')
-        .attr('x', opts.swatchW + 14)
+        .attr('x', textX)
         .attr('dy', index === 0 ? 0 : opts.lineHeight)
         .text(line);
     });
-    return itemHeight + opts.gap;
+    return itemHeight + opts.rowGap;
   }
 
   function _drawLegend(width, height, cfg, layout) {
     var swatchW = 22, swatchH = 16, gap = 6;
-    var items = cfg.categories.slice();
+    var items = _legendItems(cfg);
     var hasOverlayLegend = cfg.overlayPatternField && cfg.overlayPatternLegendLabel;
     var legendRows = items.length + (hasOverlayLegend ? 1 : 0);
-    if (cfg.noDataLabel) {
-      items.push({ label: cfg.noDataLabel, color: cfg.noDataColor || '#e0e0e0' });
-      legendRows += 1;
-    }
 
     if (layout.exportMode) {
       var opts = layout.legend;
+      opts.cfg = cfg;
       var gExport = _svg.append('g')
         .attr('class', 'atlas-legend')
         .attr('transform', 'translate(' + opts.x + ',' + opts.y + ')');
-      var y = 26;
-      items.forEach(function (cat) {
-        y += _drawExportLegendItem(gExport, cat, y, opts);
+      var columnStartY = opts.paddingY + opts.titleHeight + opts.titleGap;
+      opts.columns.forEach(function (column, columnIndex) {
+        var x = opts.paddingX + columnIndex * (opts.columnWidth + opts.columnGap);
+        var y = columnStartY;
+        column.forEach(function (cat, itemIndex) {
+          if (itemIndex) y += opts.rowGap;
+          y += _drawExportLegendItem(gExport, cat, x, y, opts) - opts.rowGap;
+        });
       });
-      if (hasOverlayLegend) {
-        y += _drawExportLegendItem(
-          gExport,
-          {
-            label: cfg.overlayPatternLegendLabel,
-            color: '#f8f9fa',
-            pattern: true
-          },
-          y,
-          Object.assign({}, opts, { cfg: cfg })
-        );
-      }
-      var totalH = y + 18;
       gExport.insert('rect', ':first-child')
-        .attr('x', -18).attr('y', -28)
-        .attr('width', opts.width).attr('height', totalH)
+        .attr('x', 0).attr('y', 0)
+        .attr('width', opts.width).attr('height', opts.height)
         .attr('fill', 'white').attr('fill-opacity', 0.94)
         .attr('stroke', '#c9ced6').attr('rx', 8);
-      gExport.insert('text', ':nth-child(2)')
-        .attr('x', 0).attr('y', 0)
+      var titleText = gExport.insert('text', ':nth-child(2)')
+        .attr('x', opts.paddingX).attr('y', opts.paddingY + opts.titleFontSize - 4)
         .attr('font-weight', 'bold').attr('font-size', opts.titleFontSize)
-        .attr('font-family', "'Nunito', sans-serif")
-        .text(cfg.legendTitle || '');
+        .attr('font-family', opts.fontFamily);
+      opts.titleLines.forEach(function (line, index) {
+        titleText.append('tspan')
+          .attr('x', opts.paddingX)
+          .attr('dy', index === 0 ? 0 : opts.lineHeight)
+          .text(line);
+      });
       return;
+    }
+
+    items = cfg.categories.slice();
+    legendRows = items.length + (hasOverlayLegend ? 1 : 0);
+    if (cfg.noDataLabel) {
+      items.push({ label: cfg.noDataLabel, color: cfg.noDataColor || '#e0e0e0' });
+      legendRows += 1;
     }
 
     var g = _svg.append('g')
@@ -530,14 +727,19 @@ var WasteAtlasChoropleth = (function () {
   function _buildExportSVGElement() {
     if (!_lastData || !_lastLoadCfg) return document.getElementById(_cfg.svgId);
     var node = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    var layout = _exportLayout(_lastData, _lastLoadCfg);
+    node.__wasteAtlasExportLayout = layout;
     _render(_lastData, _lastLoadCfg, {
-      layout: _exportLayout(),
+      layout: layout,
       svgSelection: d3.select(node)
     });
     d3.select(node)
-      .attr('width', EXPORT_WIDTH_MM + 'mm')
-      .attr('height', EXPORT_HEIGHT_MM + 'mm')
-      .attr('viewBox', '0 0 ' + EXPORT_WIDTH + ' ' + EXPORT_HEIGHT);
+      .attr('width', node.__wasteAtlasExportLayout.widthMm + 'mm')
+      .attr('height', node.__wasteAtlasExportLayout.heightMm + 'mm')
+      .attr(
+        'viewBox',
+        '0 0 ' + node.__wasteAtlasExportLayout.width + ' ' + node.__wasteAtlasExportLayout.height
+      );
     _svg = d3.select('#' + _cfg.svgId);
     return node;
   }
@@ -635,8 +837,9 @@ var WasteAtlasChoropleth = (function () {
 
   function exportPNG(filename) {
     var svgEl = _buildExportSVGElement();
-    var w = EXPORT_WIDTH;
-    var h = EXPORT_HEIGHT;
+    var layout = svgEl.__wasteAtlasExportLayout || { width: EXPORT_WIDTH, height: EXPORT_HEIGHT };
+    var w = layout.width;
+    var h = layout.height;
     var canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
