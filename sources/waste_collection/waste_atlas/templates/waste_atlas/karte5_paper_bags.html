@@ -1,7 +1,7 @@
 {% extends "waste_atlas/choropleth_map.html" %}
 
 {% block atlas_config %}
-<script>
+  <script>
   document.addEventListener('DOMContentLoaded', function () {
     WasteAtlasChoropleth.init({
       svgId:       'atlas-svg',
@@ -11,19 +11,19 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Anwendbarkeit von Papiertüten zur Bioabfallsammlung',
+      title:       'Use of paper bags for biowaste collection',
       dataUrl:     '/waste_collection/api/waste-atlas/paper-bags/',
       dataField:   'status',
       categories: [
-        { value: 'allowed',                label: 'Erlaubt',                            color: '#2196f3' },
-        { value: 'forbidden',              label: 'Verboten',                           color: '#f57c00' },
-        { value: 'No separate collection', label: 'Keine getrennte Bioabfallsammlung',  color: '#fff696' }
+        { value: 'allowed',                label: 'Allowed',                            color: '#2196f3' },
+        { value: 'forbidden',              label: 'Forbidden',                           color: '#f57c00' },
+        { value: 'No separate collection', label: 'No separate biowaste collection',  color: '#fff696' }
       ],
       noDataColor: '#ffffff',
-      noDataLabel: 'Keine Daten',
-      legendTitle: 'Papiertüten',
-      fileBase:    'karte5_papiertueten'
+      noDataLabel: 'No data',
+      legendTitle: 'Paper bags',
+      fileBase:    'paper_bags'
     });
   });
-</script>
+  </script>
 {% endblock atlas_config %}

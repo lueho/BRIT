@@ -11,19 +11,19 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Verhältnis der Sammelhäufigkeit (Bio / Rest)',
+      title:       'Annual collection-count ratio (biowaste/residual waste)',
       dataUrl:     '/waste_collection/api/waste-atlas/collection-count-ratio/',
       dataField:   '_classified',
       categories: [
-        { value: 'bio_more', label: 'Bio häufiger als Rest', color: '#1b9e77' },
-        { value: 'same',     label: 'Bio und Rest gleich häufig', color: '#7570b3' },
-        { value: 'bio_less', label: 'Bio seltener als Rest', color: '#d95f02' },
-        { value: 'no_bio',   label: 'Keine Tür-zu-Tür-Bioabfallsammlung', color: '#fff696' }
+        { value: 'bio_more', label: 'Biowaste collected more often than residual waste', color: '#1b9e77' },
+        { value: 'same',     label: 'Biowaste and residual waste collected equally often', color: '#7570b3' },
+        { value: 'bio_less', label: 'Biowaste collected less often than residual waste', color: '#d95f02' },
+        { value: 'no_bio',   label: 'No door-to-door biowaste collection', color: '#fff696' }
       ],
       noDataColor: '#e0e0e0',
-      noDataLabel: 'Keine Daten',
-      legendTitle: 'Bio / Rest',
-      fileBase:    'karte42_sammelhaeufigkeit_verhaeltnis',
+      noDataLabel: 'No data',
+      legendTitle: 'Biowaste / residual waste',
+      fileBase:    'collection_count_ratio',
       transformData: function (records) {
         return records.map(function (r) {
           var cls;

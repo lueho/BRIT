@@ -105,12 +105,12 @@ urlpatterns = [
         name="waste-atlas-europe-biowaste-collection-amount-map",
     ),
     path(
-        "map/orga-level/",
+        "map/administrative-level/",
         OrgaLevelMapView.as_view(),
         name="waste-atlas-orga-level-map",
     ),
     path(
-        "map/orga-level-italy/",
+        "map/italy/administrative-level/",
         ItalyOrgaLevelMapView.as_view(),
         name="waste-atlas-orga-level-italy-map",
     ),
@@ -175,7 +175,7 @@ urlpatterns = [
         name="waste-atlas-italy-organic-waste-ratio-map",
     ),
     path(
-        "map/south-tyrol/orga-level/",
+        "map/south-tyrol/administrative-level/",
         SouthTyrolOrgaLevelMapView.as_view(),
         name="waste-atlas-south-tyrol-orga-level-map",
     ),
@@ -280,7 +280,7 @@ urlpatterns = [
         name="waste-atlas-south-tyrol-min-bin-size-ratio-map",
     ),
     path(
-        "map/orga-level-sweden/",
+        "map/sweden/administrative-level/",
         SwedenOrgaLevelMapView.as_view(),
         name="waste-atlas-orga-level-sweden-map",
     ),
@@ -290,12 +290,12 @@ urlpatterns = [
         name="waste-atlas-bin-configuration-sweden-map",
     ),
     path(
-        "map/orga-level-denmark/",
+        "map/denmark/administrative-level/",
         DenmarkOrgaLevelMapView.as_view(),
         name="waste-atlas-orga-level-denmark-map",
     ),
     path(
-        "map/orga-level-netherlands/",
+        "map/netherlands/administrative-level/",
         NetherlandsOrgaLevelMapView.as_view(),
         name="waste-atlas-orga-level-netherlands-map",
     ),
@@ -325,12 +325,12 @@ urlpatterns = [
         name="waste-atlas-organic-waste-ratio-netherlands-map",
     ),
     path(
-        "map/orga-level-belgium/",
+        "map/belgium/administrative-level/",
         BelgiumOrgaLevelMapView.as_view(),
         name="waste-atlas-orga-level-belgium-map",
     ),
     path(
-        "map/orga-level-belgium-flanders/",
+        "map/belgium-flanders/administrative-level/",
         BelgiumFlandersOrgaLevelMapView.as_view(),
         name="waste-atlas-orga-level-belgium-flanders-map",
     ),

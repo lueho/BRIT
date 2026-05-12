@@ -11,7 +11,7 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Kleinste verfügbare Behältergröße für Bioabfall (L)',
+      title:       'Kleinste verfügbare Bin size für Biowaste (L)',
       dataUrl:     '/waste_collection/api/waste-atlas/biowaste-min-bin-size/',
       dataField:   '_classified',
       categories: [
@@ -20,12 +20,12 @@
         { value: 'medium',  label: '81 – 120 L',      color: '#66bd63' },
         { value: 'large',   label: '121 – 180 L',     color: '#1a9850' },
         { value: 'xl',      label: '> 180 L',         color: '#006837' },
-        { value: 'no_door_to_door', label: 'Keine Tür-zu-Tür-Bioabfallsammlung', color: '#fff696' }
+        { value: 'no_door_to_door', label: 'No door-to-door biowaste collection', color: '#fff696' }
       ],
       noDataColor: '#e0e0e0',
-      noDataLabel: 'Keine Daten',
-      legendTitle: 'Min. Behältergröße (L)',
-      fileBase:    'karte23_biowaste_min_bin_size',
+      noDataLabel: 'No data',
+      legendTitle: 'Min. Bin size (L)',
+      fileBase:    'biowaste_min_bin_size',
       transformData: function (records) {
         return records.map(function (r) {
           var cls;

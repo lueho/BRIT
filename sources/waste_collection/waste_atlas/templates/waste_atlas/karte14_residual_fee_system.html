@@ -11,7 +11,7 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Gebührensysteme der Restmüllabholung',
+      title:       'Fee systeme der Residual wasteabholung',
       dataUrl:     '/waste_collection/api/waste-atlas/residual-fee-system/',
       dataField:   'fee_system',
       categories: [
@@ -21,9 +21,9 @@
         { value: 'Pay as you throw (PAYT)', label: 'Pay as you throw',  color: '#4b2a60' }
       ],
       noDataColor: '#e0e0e0',
-      noDataLabel: 'Keine Daten',
-      legendTitle: 'Gebührensystem',
-      fileBase:    'karte14_gebuehrensystem_restmuell'
+      noDataLabel: 'No data',
+      legendTitle: 'Fee system',
+      fileBase:    'residual_fee_system'
     });
   });
 </script>

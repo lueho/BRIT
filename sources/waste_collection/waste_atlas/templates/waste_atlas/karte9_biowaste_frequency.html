@@ -11,19 +11,19 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Sammelrhythmus-Arten der Entsorger zur Bioabfallabholung',
+      title:       'Collection frequency types for biowaste collection',
       dataUrl:     '/waste_collection/api/waste-atlas/biowaste-frequency-type/',
       dataField:   '_classified',
       categories: [
         { value: 'Fixed-Seasonal',        label: 'Saisonal',                  color: '#2e8b57' },
         { value: 'Fixed-Flexible',         label: 'Flexibel',                  color: '#4169e1' },
         { value: 'Fixed',                  label: 'Fix',                       color: '#8c9eff' },
-        { value: 'no_bio_collection',      label: 'Keine Tür-zu-Tür-Bioabfallsammlung', color: '#fff696' }
+        { value: 'no_bio_collection',      label: 'No door-to-door biowaste collection', color: '#fff696' }
       ],
       noDataColor: '#e0e0e0',
-      noDataLabel: 'Keine Daten',
-      legendTitle: 'Sammelrhythmus',
-      fileBase:    'karte9_sammelrhythmus_bioabfall',
+      noDataLabel: 'No data',
+      legendTitle: 'Collection schedule',
+      fileBase:    'biowaste_collection_schedule',
       transformData: function (records) {
         var NO_BIO = ['No separate collection', 'Bring point', 'Recycling centre',
                       'On demand kerbside collection', 'Home-composting'];

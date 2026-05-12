@@ -11,20 +11,20 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Sammelhäufigkeit der Restmüllabholungen',
+      title:       'Annual residual-waste collection count',
       dataUrl:     '/waste_collection/api/waste-atlas/residual-collection-count/',
       dataField:   '_classified',
       categories: [
-        { value: 'weekly',        label: 'Wöchentlich',        color: '#08306B' },
-        { value: 'biweekly',      label: 'Alle zwei Wochen',   color: '#4292C6' },
-        { value: 'tri_weekly',    label: 'Alle drei Wochen',   color: '#FDBF6F' },
-        { value: 'four_weekly',   label: 'Alle vier Wochen',   color: '#A6CEE3' },
-        { value: 'seasonal',      label: 'Saisonal wechselnd', color: '#e4595b' }
+        { value: 'weekly',        label: 'Weekly',        color: '#08306B' },
+        { value: 'biweekly',      label: 'Every two weeks',   color: '#4292C6' },
+        { value: 'tri_weekly',    label: 'Every three weeks',   color: '#FDBF6F' },
+        { value: 'four_weekly',   label: 'Every four weeks',   color: '#A6CEE3' },
+        { value: 'seasonal',      label: 'Seasonally varying', color: '#e4595b' }
       ],
       noDataColor: '#e0e0e0',
-      noDataLabel: 'Keine Daten',
-      legendTitle: 'Sammelhäufigkeit',
-      fileBase:    'karte11_haeufigkeit_restmuell',
+      noDataLabel: 'No data',
+      legendTitle: 'Collection count',
+      fileBase:    'residual_collection_count',
       transformData: function (records) {
         return records.map(function (r) {
           var cls;

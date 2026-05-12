@@ -11,22 +11,22 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Sammelrhythmus in Kombination (Bio × Rest)',
+      title:       'Collection schedule: biowaste vs residual waste',
       dataUrl:     '/waste_collection/api/waste-atlas/combined-frequency-type/',
       dataField:   '_classified',
       categories: [
-        { value: 'bio_seasonal_res_flexible', label: 'Bio saisonal, Rest flexibel',  color: '#2e8b57' },
-        { value: 'bio_flexible_res_flexible', label: 'Bio flexibel, Rest flexibel',  color: '#4169e1' },
-        { value: 'bio_fixed_res_flexible',    label: 'Bio fix, Rest flexibel',       color: '#8c9eff' },
-        { value: 'bio_seasonal_res_fixed',    label: 'Bio saisonal, Rest fix',       color: '#66cdaa' },
-        { value: 'bio_flexible_res_fixed',    label: 'Bio flexibel, Rest fix',       color: '#e08840' },
-        { value: 'bio_fixed_res_fixed',       label: 'Bio fix, Rest fix',            color: '#b0b0ff' },
-        { value: 'no_bio_collection',         label: 'Keine Tür-zu-Tür-Bioabfallsammlung', color: '#fff696' }
+        { value: 'bio_seasonal_res_flexible', label: 'Bio seasonal, residual flexible',  color: '#2e8b57' },
+        { value: 'bio_flexible_res_flexible', label: 'Bio flexible, residual flexible',  color: '#4169e1' },
+        { value: 'bio_fixed_res_flexible',    label: 'Bio fixed, residual flexible',       color: '#8c9eff' },
+        { value: 'bio_seasonal_res_fixed',    label: 'Bio seasonal, residual fixed',       color: '#66cdaa' },
+        { value: 'bio_flexible_res_fixed',    label: 'Bio flexible, residual fixed',       color: '#e08840' },
+        { value: 'bio_fixed_res_fixed',       label: 'Bio fixed, residual fixed',            color: '#b0b0ff' },
+        { value: 'no_bio_collection',         label: 'No door-to-door biowaste collection', color: '#fff696' }
       ],
       noDataColor: '#e0e0e0',
-      noDataLabel: 'Keine Daten',
-      legendTitle: 'Sammelrhythmus',
-      fileBase:    'karte10_sammelrhythmus_kombination',
+      noDataLabel: 'No data',
+      legendTitle: 'Collection schedule',
+      fileBase:    'combined_collection_schedule',
       transformData: function (records) {
         var TYPE_KEY = {
           'Fixed':          'fixed',

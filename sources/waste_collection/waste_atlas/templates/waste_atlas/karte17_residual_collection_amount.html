@@ -11,19 +11,19 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Spezifisch gesammelte Menge an Restmüll pro Person und Jahr',
+      title:       'Specifically collected amount of residual waste per capita per year',
       dataUrl:     '/waste_collection/api/waste-atlas/residual-collection-amount/',
       dataField:   '_classified',
       categories: [
-        { value: 'high',      label: '226 – 311 kg (Viel)',       color: '#d95f0e' },
-        { value: 'medium',    label: '151 – 225 kg (Mittel)',     color: '#fe9929' },
-        { value: 'low',       label: '76 – 150 kg (Wenig)',       color: '#fed98e' },
-        { value: 'very_low',  label: '0 – 75 kg (Sehr wenig)',    color: '#ffffd4' }
+        { value: 'high',      label: '226–311 kg (high)',       color: '#d95f0e' },
+        { value: 'medium',    label: '151–225 kg (medium)',     color: '#fe9929' },
+        { value: 'low',       label: '76–150 kg (low)',       color: '#fed98e' },
+        { value: 'very_low',  label: '0 – 75 kg (Very low)',    color: '#ffffd4' }
       ],
       noDataColor: '#e0e0e0',
-      noDataLabel: 'Keine Daten',
-      legendTitle: 'Sammelmenge (kg/P/a)',
-      fileBase:    'karte17_sammelmengen_restmuell',
+      noDataLabel: 'No data',
+      legendTitle: 'Collected amount (kg/cap/a)',
+      fileBase:    'residual_collection_amount',
       transformData: function (records) {
         return records.map(function (r) {
           var cls;

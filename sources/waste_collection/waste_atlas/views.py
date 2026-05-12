@@ -112,7 +112,7 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
     default_year = "2024"
     default_nuts_prefix = ""
     default_nuts_level = ""
-    map_overview_label = "Kartenübersicht"
+    map_overview_label = "Map overview"
     allow_country_override = True
     allow_nuts_override = True
     map_set = ""
@@ -223,14 +223,14 @@ class PopulationDensityMapView(AtlasMapView):
     """Karte 20 — Einwohnerdichte."""
 
     template_name = "waste_atlas/population_density_map.html"
-    map_title = "Einwohnerdichte"
+    map_title = "Population density"
 
 
 class OrgaLevelMapView(AtlasMapView):
     """Karte 1 — Sammlungs-Organisationsebene."""
 
     template_name = "waste_atlas/karte1_orga_level.html"
-    map_title = "Administrative Ebene der Abfallsammlung"
+    map_title = "Administrative level of waste collection"
 
 
 class ItalyAtlasMapView(AtlasMapView):
@@ -519,189 +519,189 @@ class CollectionSystemMapView(AtlasMapView):
     """Karte 2 — Küchenabfall-Sammelsysteme."""
 
     template_name = "waste_atlas/karte2_collection_system.html"
-    map_title = "Primäres Sammelsystem für Küchenabfälle"
+    map_title = "Primary collection system for kitchen waste"
 
 
 class GreenWasteCollectionSystemCountMapView(AtlasMapView):
     """Karte 21 — Anzahl Grüngut-Sammelsysteme."""
 
     template_name = "waste_atlas/karte21_green_waste_collection_system_count.html"
-    map_title = "Anzahl Grüngut-Sammelsysteme pro Einzugsgebiet"
+    map_title = "Number of green-waste collection systems per catchment"
 
 
 class ConnectionRateMapView(AtlasMapView):
     """Karte 3 — Anschlussgrad an die Biotonne."""
 
     template_name = "waste_atlas/karte3_connection_rate.html"
-    map_title = "Anschlussgrade an Tür-zu-Tür-Bioabfallsammlungen"
+    map_title = "Connection rates for door-to-door biowaste collection"
 
 
 class FoodWasteCategoryMapView(AtlasMapView):
     """Karte 4 — Küchenabfall in der Biotonne."""
 
     template_name = "waste_atlas/karte4_food_waste_category.html"
-    map_title = "Erlaubte Lebensmittelabfälle im Bioabfall"
+    map_title = "Accepted food-waste categories in biowaste"
 
 
 class PaperBagsMapView(AtlasMapView):
     """Karte 5 — Papierprodukte in Bioabfällen."""
 
     template_name = "waste_atlas/karte5_paper_bags.html"
-    map_title = "Anwendbarkeit von Papiertüten zur Bioabfallsammlung"
+    map_title = "Use of paper bags for biowaste collection"
 
 
 class PlasticBagsMapView(AtlasMapView):
     """Karte 6 — Kunststoffbeutel in Bioabfällen."""
 
     template_name = "waste_atlas/karte6_plastic_bags.html"
-    map_title = "Anwendbarkeit von kompostierbaren Kunststoffbeuteln"
+    map_title = "Use of compostable plastic bags for biowaste collection"
 
 
 class CollectionSupportMapView(AtlasMapView):
     """Karte 7 — Bioabfall-Sammelhilfen."""
 
     template_name = "waste_atlas/karte7_collection_support.html"
-    map_title = "Erlaubte Materialien für Sammelhilfen"
+    map_title = "Accepted materials for collection aids"
 
 
 class ResidualFrequencyMapView(AtlasMapView):
     """Karte 8 — Sammelrhythmus Restmüll."""
 
     template_name = "waste_atlas/karte8_residual_frequency.html"
-    map_title = "Sammelrhythmus-Arten der Entsorger zur Restmüllabholung"
+    map_title = "Collection frequency types for residual-waste collection"
 
 
 class BiowasteFrequencyMapView(AtlasMapView):
     """Karte 9 — Sammelrhythmus Bioabfall."""
 
     template_name = "waste_atlas/karte9_biowaste_frequency.html"
-    map_title = "Sammelrhythmus-Arten der Entsorger zur Bioabfallabholung"
+    map_title = "Collection frequency types for biowaste collection"
 
 
 class CombinedFrequencyMapView(AtlasMapView):
     """Karte 10 — Sammelrhythmus in Kombination."""
 
     template_name = "waste_atlas/karte10_combined_frequency.html"
-    map_title = "Sammelrhythmus in Kombination (Bio × Rest)"
+    map_title = "Collection frequency type: biowaste vs residual waste"
 
 
 class ResidualCollectionCountMapView(AtlasMapView):
     """Karte 11 — Häufigkeit Restmüllabholung."""
 
     template_name = "waste_atlas/karte11_residual_collection_count.html"
-    map_title = "Sammelhäufigkeit der Restmüllabholungen"
+    map_title = "Annual residual-waste collection count"
 
 
 class BiowasteCollectionCountMapView(AtlasMapView):
     """Karte 12 — Häufigkeit Bioabfallabholung."""
 
     template_name = "waste_atlas/karte12_biowaste_collection_count.html"
-    map_title = "Sammelhäufigkeit der Bioabfallabholungen"
+    map_title = "Annual biowaste collection count"
 
 
 class CombinedCollectionCountMapView(AtlasMapView):
     """Karte 13 — Sammelhäufigkeit in Kombination."""
 
     template_name = "waste_atlas/karte13_combined_collection_count.html"
-    map_title = "Sammelhäufigkeit in Kombination (Bio × Rest)"
+    map_title = "Annual collection count: biowaste vs residual waste"
 
 
 class CollectionCountRatioMapView(AtlasMapView):
     """Karte 42 — Sammelhäufigkeits-Verhältnis."""
 
     template_name = "waste_atlas/karte42_collection_count_ratio.html"
-    map_title = "Verhältnis der Sammelhäufigkeit (Bio / Rest)"
+    map_title = "Annual collection-count ratio: biowaste vs residual waste"
 
 
 class ResidualFeeSystemMapView(AtlasMapView):
     """Karte 14 — Gebührensysteme Restmüll."""
 
     template_name = "waste_atlas/karte14_residual_fee_system.html"
-    map_title = "Gebührensysteme der Restmüllabholung"
+    map_title = "Fee system for residual-waste collection"
 
 
 class BiowasteFeeSystemMapView(AtlasMapView):
     """Karte 15 — Gebührensysteme Bioabfall."""
 
     template_name = "waste_atlas/karte15_biowaste_fee_system.html"
-    map_title = "Gebührensysteme der Bioabfallabholung"
+    map_title = "Fee system for biowaste collection"
 
 
 class CombinedFeeSystemMapView(AtlasMapView):
     """Karte 16 — Gebührensysteme in Kombination."""
 
     template_name = "waste_atlas/karte16_combined_fee_system.html"
-    map_title = "Gebührensysteme in Kombination (Bio × Rest)"
+    map_title = "Fee system: biowaste vs residual waste"
 
 
 class ResidualCollectionAmountMapView(AtlasMapView):
     """Karte 17 — Restmüll-Sammelmengen."""
 
     template_name = "waste_atlas/karte17_residual_collection_amount.html"
-    map_title = "Spezifisch gesammelte Menge an Restmüll"
+    map_title = "Specifically collected amount of residual waste"
 
 
 class BiowasteCollectionAmountMapView(AtlasMapView):
     """Karte 18 — Bioabfall-Sammelmengen."""
 
     template_name = "waste_atlas/karte18_biowaste_collection_amount.html"
-    map_title = "Spezifisch gesammelte Menge an Bioabfall"
+    map_title = "Specifically collected amount of biowaste"
 
 
 class GreenWasteCollectionAmountMapView(AtlasMapView):
     """Karte 22 — Grüngut-Sammelmengen."""
 
     template_name = "waste_atlas/karte22_green_waste_collection_amount.html"
-    map_title = "Spezifisch gesammelte Menge an Grüngut"
+    map_title = "Specifically collected amount of green waste"
 
 
 class OrganicCollectionAmountMapView(AtlasMapView):
     """Karte 27 — Aggregierte Sammelmenge organischer Fraktionen."""
 
     template_name = "waste_atlas/karte27_organic_collection_amount.html"
-    map_title = "Aggregierte Sammelmenge organischer Fraktionen (kg/P/a)"
+    map_title = "Aggregated collected amount of organic fractions (kg/cap/a)"
 
 
 class OrganicWasteRatioMapView(AtlasMapView):
     """Karte 28 — Verhältnis organischer Fraktionen zu Restabfall."""
 
     template_name = "waste_atlas/karte28_organic_waste_ratio.html"
-    map_title = "Anteil organischer Fraktionen an Gesamtabfall"
+    map_title = "Share of organic fractions in total waste"
 
 
 class BiowasteMinBinSizeMapView(AtlasMapView):
     """Karte 23 — Mindest-Behältergröße Bioabfall."""
 
     template_name = "waste_atlas/karte23_biowaste_min_bin_size.html"
-    map_title = "Kleinste verfügbare Behältergröße für Bioabfall (L)"
+    map_title = "Smallest available bin size for biowaste (L)"
 
 
 class ResidualMinBinSizeMapView(AtlasMapView):
     """Karte 24 — Mindest-Behältergröße Restmüll."""
 
     template_name = "waste_atlas/karte24_residual_min_bin_size.html"
-    map_title = "Kleinste verfügbare Behältergröße für Restmüll (L)"
+    map_title = "Smallest available bin size for residual waste (L)"
 
 
 class BiowasteRequiredBinCapacityMapView(AtlasMapView):
     """Karte 25 — Mindest-Behältervolumen Bioabfall."""
 
     template_name = "waste_atlas/karte25_biowaste_required_bin_capacity.html"
-    map_title = "Mindest-Behältervolumen für Bioabfall (L/Bezugseinheit)"
+    map_title = "Required bin capacity for biowaste (L/reference unit)"
 
 
 class ResidualRequiredBinCapacityMapView(AtlasMapView):
     """Karte 26 — Mindest-Behältervolumen Restmüll."""
 
     template_name = "waste_atlas/karte26_residual_required_bin_capacity.html"
-    map_title = "Mindest-Behältervolumen für Restmüll (L/Bezugseinheit)"
+    map_title = "Required bin capacity for residual waste (L/reference unit)"
 
 
 class WasteRatioMapView(AtlasMapView):
     """Karte 19 — Sammelmengen-Verhältnis."""
 
     template_name = "waste_atlas/karte19_waste_ratio.html"
-    map_title = "Verhältnis Bioabfall zu Gesamtabfall"
+    map_title = "Biowaste share of total waste"
 
 
 class NetherlandsCollectionSystemMapView(CollectionSystemMapView):

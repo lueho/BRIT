@@ -11,18 +11,18 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Anwendbarkeit von kompostierbaren Kunststoffbeuteln zur Bioabfallsammlung',
+      title:       'Use of compostable plastic bags for biowaste collection',
       dataUrl:     '/waste_collection/api/waste-atlas/plastic-bags/',
       dataField:   'status',
       categories: [
-        { value: 'allowed',                label: 'Erlaubt',                            color: '#fdd835' },
-        { value: 'forbidden',              label: 'Verboten',                           color: '#78909c' },
-        { value: 'No separate collection', label: 'Keine getrennte Bioabfallsammlung',  color: '#fff696' }
+        { value: 'allowed',                label: 'Allowed',                            color: '#fdd835' },
+        { value: 'forbidden',              label: 'Forbidden',                           color: '#78909c' },
+        { value: 'No separate collection', label: 'No separate biowaste collection',  color: '#fff696' }
       ],
       noDataColor: '#ffffff',
-      noDataLabel: 'Keine Daten',
-      legendTitle: 'Kunststoffbeutel',
-      fileBase:    'karte6_kunststoffbeutel'
+      noDataLabel: 'No data',
+      legendTitle: 'Plastic bags',
+      fileBase:    'plastic_bags'
     });
   });
 </script>

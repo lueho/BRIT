@@ -11,20 +11,20 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Gebührensysteme in Kombination (Bio × Rest)',
+      title:       'Fee system: biowaste vs residual waste',
       dataUrl:     '/waste_collection/api/waste-atlas/combined-fee-system/',
       dataField:   '_classified',
       categories: [
-        { value: 'flex_flex',    label: 'Bio flexibel, Rest flexibel',          color: '#a6cee3' },
-        { value: 'payt_payt',    label: 'Bio PAYT, Rest PAYT',                  color: '#4b2a60' },
-        { value: 'free_flex',    label: 'Bio gebührenfrei, Rest flexibel',       color: '#1f78b4' },
-        { value: 'other',        label: 'Andere Kombinationen',                  color: '#66c2a5' },
-        { value: 'no_bio',       label: 'Keine separate Bioabfallsammlung',      color: '#FFF696' }
+        { value: 'flex_flex',    label: 'Bio flexible, residual flexible',          color: '#a6cee3' },
+        { value: 'payt_payt',    label: 'Bio PAYT, residual PAYT',                  color: '#4b2a60' },
+        { value: 'free_flex',    label: 'Bio free of charge, residual flexible',       color: '#1f78b4' },
+        { value: 'other',        label: 'Other combinations',                  color: '#66c2a5' },
+        { value: 'no_bio',       label: 'No separate biowaste collection',      color: '#FFF696' }
       ],
       noDataColor: '#e0e0e0',
-      noDataLabel: 'Keine Daten',
-      legendTitle: 'Gebührensystem',
-      fileBase:    'karte16_gebuehrensystem_kombination',
+      noDataLabel: 'No data',
+      legendTitle: 'Fee system',
+      fileBase:    'combined_fee_system',
       transformData: function (records) {
         function key(fee) {
           if (fee === 'Flexible' || fee === 'Flexible+') return 'flex';

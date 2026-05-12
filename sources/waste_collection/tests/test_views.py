@@ -4129,12 +4129,14 @@ class WasteAtlasMapViewsTestCase(TestCase):
         response = self.client.get(reverse("waste-atlas-collection-count-ratio-map"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Verhältnis der Sammelhäufigkeit (Bio / Rest)")
+        self.assertContains(
+            response, "Annual collection-count ratio: biowaste vs residual waste"
+        )
         self.assertContains(
             response,
             "/waste_collection/api/waste-atlas/collection-count-ratio/",
         )
-        self.assertContains(response, "Kartenübersicht")
+        self.assertContains(response, "Map overview")
 
     def test_south_tyrol_bundle_maps_default_to_regional_filter(self):
         map_names = [
@@ -4237,12 +4239,12 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            "Map 41 — Bioabfallmenge",
+            "Biowaste amount",
         )
         self.assertContains(response, reverse("waste-atlas-orga-level-italy-map"))
         self.assertContains(
             response,
-            "Map 29 — Administrative level of waste collection",
+            "Administrative level of waste collection",
         )
         self.assertContains(
             response, reverse("waste-atlas-italy-collection-system-map")
@@ -4266,7 +4268,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, reverse("waste-atlas-south-tyrol-orga-level-map"))
         self.assertContains(
             response,
-            "Map 29a — Administrative level of waste collection",
+            "Administrative level of waste collection",
         )
         self.assertContains(
             response,
@@ -4291,14 +4293,14 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, reverse("waste-atlas-orga-level-sweden-map"))
         self.assertContains(
             response,
-            "Map 30 — Administrative level",
+            "Administrative level",
         )
         self.assertContains(
             response, reverse("waste-atlas-bin-configuration-sweden-map")
         )
         self.assertContains(
             response,
-            "Map 34 — Bin configuration",
+            "Bin configuration",
         )
         self.assertContains(
             response,
@@ -4319,7 +4321,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, reverse("waste-atlas-orga-level-denmark-map"))
         self.assertContains(
             response,
-            "Map 31 — Administrative level",
+            "Administrative level",
         )
         self.assertContains(
             response,
@@ -4347,7 +4349,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            "Map 32 — Administrative level",
+            "Administrative level",
         )
         self.assertContains(
             response,
@@ -4355,7 +4357,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            "Map 36 — Kitchen-waste system",
+            "Kitchen-waste system",
         )
         self.assertContains(
             response,
@@ -4363,7 +4365,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            "Map 37 — Biowaste rhythm",
+            "Biowaste rhythm",
         )
         self.assertContains(
             response,
@@ -4371,7 +4373,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            "Map 38 — Biowaste amount",
+            "Biowaste amount",
         )
         self.assertContains(
             response,
@@ -4379,7 +4381,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            "Map 39 — Organic amount",
+            "Organic amount",
         )
         self.assertContains(
             response,
@@ -4387,7 +4389,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            "Map 40 — Organic share",
+            "Organic share",
         )
         self.assertContains(
             response,
@@ -4395,7 +4397,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            "Map 35 — Administrative level",
+            "Administrative level",
         )
         self.assertContains(
             response,
