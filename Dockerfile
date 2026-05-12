@@ -66,11 +66,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && if [ "$INSTALL_PDF_PARSING" = "true" ]; then \
         apt-get install -y --no-install-recommends \
-        poppler-utils \
-        qpdf \
-        tesseract-ocr \
-        tesseract-ocr-swe \
-        ghostscript; \
+        poppler-utils; \
     fi \
     && rm -rf /var/lib/apt/lists/*
 
