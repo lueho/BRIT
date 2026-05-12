@@ -626,8 +626,9 @@ var WasteAtlasChoropleth = (function () {
 
   function _drawExportLegendItem(g, cat, x, y, opts) {
     var itemHeight = Math.max(opts.swatchH, cat.lines.length * opts.lineHeight);
-    var swatchY = y + Math.round((opts.lineHeight - opts.swatchH) / 2);
-    var textY = y + Math.round(opts.lineHeight / 2);
+    var textBaselineY = y + opts.fontSize;
+    var capCenterY = textBaselineY - Math.round(opts.fontSize * 0.36);
+    var swatchY = capCenterY - Math.round(opts.swatchH / 2);
     g.append('rect')
       .attr('x', x).attr('y', swatchY)
       .attr('width', opts.swatchW).attr('height', opts.swatchH)
@@ -641,8 +642,7 @@ var WasteAtlasChoropleth = (function () {
     }
     var textX = x + opts.swatchW + opts.labelGap;
     var text = g.append('text')
-      .attr('x', textX).attr('y', textY)
-      .attr('dominant-baseline', 'middle')
+      .attr('x', textX).attr('y', textBaselineY)
       .attr('font-size', opts.fontSize)
       .attr('font-family', opts.fontFamily);
     cat.lines.forEach(function (line, index) {
