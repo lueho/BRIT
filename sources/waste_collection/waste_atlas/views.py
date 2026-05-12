@@ -37,6 +37,14 @@ ITALY_SOUTH_TYROL_MAP_ROUTES = {
     "combined_frequency": {
         "IT-ST": "waste-atlas-south-tyrol-combined-frequency-map",
     },
+    "residual_collection_count": {
+        "IT": "waste-atlas-italy-residual-collection-count-map",
+        "IT-ST": "waste-atlas-south-tyrol-residual-collection-count-map",
+    },
+    "biowaste_collection_count": {
+        "IT": "waste-atlas-italy-biowaste-collection-count-map",
+        "IT-ST": "waste-atlas-south-tyrol-biowaste-collection-count-map",
+    },
     "combined_collection_count": {
         "IT-ST": "waste-atlas-south-tyrol-combined-collection-count-map",
     },
@@ -270,6 +278,18 @@ class ItalyBiowasteFrequencyMapView(ItalyAtlasMapView):
     map_route_key = "biowaste_frequency"
 
 
+class ItalyResidualCollectionCountMapView(ItalyAtlasMapView):
+    template_name = "waste_atlas/karte11_residual_collection_count.html"
+    map_title = "Collection frequency for residual waste"
+    map_route_key = "residual_collection_count"
+
+
+class ItalyBiowasteCollectionCountMapView(ItalyAtlasMapView):
+    template_name = "waste_atlas/karte12_biowaste_collection_count.html"
+    map_title = "Collection frequency for biowaste"
+    map_route_key = "biowaste_collection_count"
+
+
 class ItalyResidualCollectionAmountMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte17_residual_collection_amount.html"
     map_title = "Specifically collected amount of residual waste"
@@ -352,6 +372,18 @@ class SouthTyrolBiowasteFrequencyMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte9_biowaste_frequency.html"
     map_title = "Collection frequency types for biowaste"
     map_route_key = "biowaste_frequency"
+
+
+class SouthTyrolResidualCollectionCountMapView(SouthTyrolAtlasMapView):
+    template_name = "waste_atlas/karte11_residual_collection_count.html"
+    map_title = "Collection frequency for residual waste"
+    map_route_key = "residual_collection_count"
+
+
+class SouthTyrolBiowasteCollectionCountMapView(SouthTyrolAtlasMapView):
+    template_name = "waste_atlas/karte12_biowaste_collection_count.html"
+    map_title = "Collection frequency for biowaste"
+    map_route_key = "biowaste_collection_count"
 
 
 class SouthTyrolCombinedFrequencyMapView(SouthTyrolAtlasMapView):
