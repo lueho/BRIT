@@ -15,10 +15,10 @@
       dataUrl:     '/waste_collection/api/waste-atlas/organic-waste-ratio/',
       dataField:   '_classified',
       categories: [
-        { value: 'very_high', label: '> 0.66 (much more organic than residual)',  color: '#0868ac' },
-        { value: 'high',      label: '0.51–0.66 (More organic than residual)',     color: '#43a2ca' },
-        { value: 'medium',    label: '0.34–0.50 (More residual than organic)',     color: '#7bccc4' },
-        { value: 'low',       label: '0.00–0.33 (Low organic share)',   color: '#bae4bc' }
+        { value: 'very_high', label: '> 0.66 (much more organic than residual)', exportLabel: '> 0.66 organic-dominant', color: '#0868ac' },
+        { value: 'high',      label: '0.51–0.66 (More organic than residual)', exportLabel: '0.51–0.66 organic > residual', color: '#43a2ca' },
+        { value: 'medium',    label: '0.34–0.50 (More residual than organic)', exportLabel: '0.34–0.50 residual > organic', color: '#7bccc4' },
+        { value: 'low',       label: '0.00–0.33 (Low organic share)', exportLabel: '0.00–0.33 low organic share', color: '#bae4bc' }
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'No data',

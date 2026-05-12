@@ -179,7 +179,8 @@ var WasteAtlasChoropleth = (function () {
       exportMode: false,
       width: width,
       height: height,
-      mapExtent: [[40, 60], [width - 40, height - 100]],
+      mapExtent: [[40, 40], [width - 40, height - 100]],
+      showHeader: false,
       titleY: 30,
       subtitleY: 50,
       titleFontSize: 18,
@@ -227,14 +228,39 @@ var WasteAtlasChoropleth = (function () {
     return lines;
   }
 
-  function _legendItems(cfg) {
-    var items = cfg.categories.slice();
+  function _exportLegendLabel(item) {
+    if (item.exportLabel) return item.exportLabel;
+    return String(item.label)
+      .replace(/Biowaste/g, 'Bio')
+      .replace(/biowaste/g, 'bio')
+      .replace(/residual waste/g, 'residual')
+      .replace(/residual-waste/g, 'residual')
+      .replace(/every two weeks/g, '2 weeks')
+      .replace(/more often/g, 'more')
+      .replace(/less frequent/g, 'less')
+      .replace(/collected equally often/g, 'equal')
+      .replace(/collected more/g, 'more')
+      .replace(/collected less/g, 'less')
+      .replace(/No door-to-door bio collection/g, 'No D2D bio')
+      .replace(/No separate bio collection/g, 'No separate bio');
+  }
+
+  function _legendItems(cfg, exportMode) {
+    var items = cfg.categories.map(function (item) {
+      if (!exportMode) return item;
+      return Object.assign({}, item, { label: _exportLegendLabel(item) });
+    });
     if (cfg.noDataLabel) {
-      items.push({ label: cfg.noDataLabel, color: cfg.noDataColor || '#e0e0e0' });
+      items.push({
+        label: exportMode && cfg.exportNoDataLabel ? cfg.exportNoDataLabel : cfg.noDataLabel,
+        color: cfg.noDataColor || '#e0e0e0'
+      });
     }
     if (cfg.overlayPatternField && cfg.overlayPatternLegendLabel) {
       items.push({
-        label: cfg.overlayPatternLegendLabel,
+        label: exportMode && cfg.exportOverlayPatternLegendLabel
+          ? cfg.exportOverlayPatternLegendLabel
+          : cfg.overlayPatternLegendLabel,
         color: '#f8f9fa',
         pattern: true
       });
@@ -244,28 +270,32 @@ var WasteAtlasChoropleth = (function () {
 
   function _measureExportLegend(cfg, width, columnCount) {
     var opts = {
-      paddingX: 24,
-      paddingY: 22,
-      swatchW: 34,
-      swatchH: 24,
-      labelGap: 14,
-      rowGap: 11,
-      titleGap: 18,
-      columnGap: 42,
+      paddingX: 20,
+      paddingY: 18,
+      swatchW: 28,
+      swatchH: 22,
+      labelGap: 10,
+      rowGap: 8,
+      titleGap: 14,
+      columnGap: 34,
       columnCount: columnCount || 1,
       fontSize: EXPORT_LEGEND_FONT_SIZE,
       titleFontSize: EXPORT_LEGEND_FONT_SIZE,
       fontFamily: EXPORT_LEGEND_FONT_FAMILY
     };
-    opts.lineHeight = Math.round(opts.fontSize * 1.16);
+    opts.lineHeight = Math.round(opts.fontSize * 1.12);
     opts.width = width;
     opts.columnWidth = (
       width - opts.paddingX * 2 - (opts.columnCount - 1) * opts.columnGap
     ) / opts.columnCount;
     opts.textWidth = opts.columnWidth - opts.swatchW - opts.labelGap;
-    opts.titleLines = _wrapTextToWidth(cfg.legendTitle || '', width - opts.paddingX * 2, opts.titleFontSize);
+    opts.titleLines = _wrapTextToWidth(
+      cfg.exportLegendTitle || cfg.legendTitle || '',
+      width - opts.paddingX * 2,
+      opts.titleFontSize
+    );
     opts.titleHeight = Math.max(opts.titleFontSize, opts.titleLines.length * opts.lineHeight);
-    opts.items = _legendItems(cfg).map(function (item) {
+    opts.items = _legendItems(cfg, true).map(function (item) {
       var lines = _wrapTextToWidth(item.label, opts.textWidth, opts.fontSize);
       return Object.assign({}, item, {
         lines: lines,
@@ -316,9 +346,9 @@ var WasteAtlasChoropleth = (function () {
   }
 
   function _exportLayout(data, cfg) {
-    var margin = 58;
-    var titleBlock = 118;
-    var gap = 54;
+    var margin = 46;
+    var titleBlock = 46;
+    var gap = 46;
     var regionBorder = (cfg.nutsPrefix && data.bundeslaender && data.bundeslaender.features && data.bundeslaender.features.length)
       ? data.bundeslaender : data.countryBorder;
     var fitData = (regionBorder && regionBorder.features && regionBorder.features.length)
@@ -413,6 +443,7 @@ var WasteAtlasChoropleth = (function () {
       widthMm: EXPORT_WIDTH_MM,
       heightMm: best.heightMm,
       mapExtent: best.mapExtent,
+      showHeader: false,
       titleY: 50,
       subtitleY: 82,
       titleFontSize: 38,
@@ -568,23 +599,25 @@ var WasteAtlasChoropleth = (function () {
         .attr('stroke-width', COUNTRY_STROKE_WIDTH);
     }
 
-    // Title
-    _svg.append('text')
-      .attr('x', width / 2).attr('y', layout.titleY)
-      .attr('text-anchor', 'middle')
-      .attr('font-family', "'Nunito', sans-serif")
-      .attr('font-size', layout.titleFontSize).attr('font-weight', 'bold')
-      .text(cfg.title);
+    if (layout.showHeader !== false) {
+      // Title
+      _svg.append('text')
+        .attr('x', width / 2).attr('y', layout.titleY)
+        .attr('text-anchor', 'middle')
+        .attr('font-family', "'Nunito', sans-serif")
+        .attr('font-size', layout.titleFontSize).attr('font-weight', 'bold')
+        .text(cfg.title);
 
-    // Subtitle / count
-    var count = data.catchments.features ? data.catchments.features.length : 0;
-    var subtitle = cfg.subtitle || (count + ' catchments');
-    _svg.append('text')
-      .attr('x', width / 2).attr('y', layout.subtitleY)
-      .attr('text-anchor', 'middle')
-      .attr('font-family', "'Nunito', sans-serif")
-      .attr('font-size', layout.subtitleFontSize).attr('fill', '#666')
-      .text(subtitle);
+      // Subtitle / count
+      var count = data.catchments.features ? data.catchments.features.length : 0;
+      var subtitle = cfg.subtitle || (count + ' catchments');
+      _svg.append('text')
+        .attr('x', width / 2).attr('y', layout.subtitleY)
+        .attr('text-anchor', 'middle')
+        .attr('font-family', "'Nunito', sans-serif")
+        .attr('font-size', layout.subtitleFontSize).attr('fill', '#666')
+        .text(subtitle);
+    }
 
     // Legend
     _drawLegend(width, height, cfg, layout);
