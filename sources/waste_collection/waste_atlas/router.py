@@ -1,6 +1,7 @@
 from rest_framework import routers
 
 from .viewsets import (
+    AccessControlViewSet,
     BinConfigurationViewSet,
     BiowasteCollectionAmountViewSet,
     BiowasteCollectionCountViewSet,
@@ -54,6 +55,11 @@ router.register(
     "collection-system",
     CollectionSystemViewSet,
     basename="api-waste-atlas-collection-system",
+)
+router.register(
+    "access-control",
+    AccessControlViewSet,
+    basename="api-waste-atlas-access-control",
 )
 router.register(
     "bin-configuration",

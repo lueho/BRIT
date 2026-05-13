@@ -116,6 +116,15 @@
       <div class="col-md-6 col-xl-3">
         <div class="card h-100">
           <div class="card-body">
+            <h2 class="h5">Catalonia</h2>
+            <p class="small text-muted">Complete thematic map set for Catalonia.</p>
+            <a class="btn btn-primary btn-sm" href="#atlas-catalonia">Show Catalonia maps</a>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6 col-xl-3">
+        <div class="card h-100">
+          <div class="card-body">
             <h2 class="h5">Italy &amp; South Tyrol</h2>
             <p class="small text-muted">Route-specific map sets for Italy and South Tyrol.</p>
             <a class="btn btn-primary btn-sm" href="#atlas-italy-south-tyrol">Show Italy/South Tyrol</a>
@@ -239,6 +248,66 @@
                 <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-bio" href="{% url 'waste-atlas-bw-rp-green-waste-collection-amount-map' %}">Green waste amount</a>
                 <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-organic" href="{% url 'waste-atlas-bw-rp-organic-collection-amount-map' %}">Organic-fraction amount</a>
                 <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-ratio" href="{% url 'waste-atlas-bw-rp-organic-waste-ratio-map' %}">Organic-fraction share</a>
+              </div>
+            </div>
+          </div></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="atlas-catalonia" class="mb-4">
+      <h2 class="h4 mb-3">Catalonia</h2>
+      <div class="row g-3">
+        <div class="col-lg-12">
+          <div class="card h-100"><div class="card-header"><strong>Catalonia</strong></div><div class="card-body">
+            <div class="atlas-link-group">
+              <div class="atlas-link-group-title">Collection systems, bins, organization &amp; materials</div>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-admin" href="{% url 'waste-atlas-catalonia-orga-level-map' %}">Administrative level</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-system" href="{% url 'waste-atlas-catalonia-collection-system-map' %}">Biowaste collection systems</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-system" href="{% url 'waste-atlas-catalonia-access-control-map' %}">Access control</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-system" href="{% url 'waste-atlas-catalonia-connection-rate-map' %}">Connection rate</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-catalonia-food-waste-category-map' %}">Accepted food waste</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-catalonia-paper-bags-map' %}">Paper products</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-catalonia-plastic-bags-map' %}">Plastic bags</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-catalonia-collection-support-map' %}">Collection aids</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-system" href="{% url 'waste-atlas-catalonia-green-waste-collection-system-count-map' %}">Green waste system count</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-bin" href="{% url 'waste-atlas-catalonia-biowaste-min-bin-size-map' %}">Biowaste bin size</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-bin" href="{% url 'waste-atlas-catalonia-residual-min-bin-size-map' %}">Residual waste bin size</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-bin" href="{% url 'waste-atlas-catalonia-biowaste-required-bin-capacity-map' %}">Biowaste bin capacity</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-bin" href="{% url 'waste-atlas-catalonia-residual-required-bin-capacity-map' %}">Residual waste bin capacity</a>
+              </div>
+            </div>
+            <div class="atlas-link-group">
+              <div class="atlas-link-group-title">Schedule &amp; collection count</div>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-schedule" href="{% url 'waste-atlas-catalonia-residual-frequency-map' %}">Residual waste schedule</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-schedule" href="{% url 'waste-atlas-catalonia-biowaste-frequency-map' %}">Biowaste schedule</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-schedule" href="{% url 'waste-atlas-catalonia-combined-frequency-map' %}">Combined schedule</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-count" href="{% url 'waste-atlas-catalonia-residual-collection-count-map' %}">Residual waste collection count</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-count" href="{% url 'waste-atlas-catalonia-biowaste-collection-count-map' %}">Biowaste collection count</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-count" href="{% url 'waste-atlas-catalonia-combined-collection-count-map' %}">Combined collection count</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-count" href="{% url 'waste-atlas-catalonia-collection-count-ratio-map' %}">Collection-count ratio</a>
+              </div>
+            </div>
+            <div class="atlas-link-group">
+              <div class="atlas-link-group-title">Fees</div>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-fee" href="{% url 'waste-atlas-catalonia-residual-fee-system-map' %}">Residual waste fees</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-fee" href="{% url 'waste-atlas-catalonia-biowaste-fee-system-map' %}">Biowaste fees</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-fee" href="{% url 'waste-atlas-catalonia-combined-fee-system-map' %}">Combined fees</a>
+              </div>
+            </div>
+            <div class="atlas-link-group">
+              <div class="atlas-link-group-title">Collected amounts and ratios</div>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-residual" href="{% url 'waste-atlas-catalonia-residual-collection-amount-map' %}">Residual waste amount</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-bio" href="{% url 'waste-atlas-catalonia-biowaste-collection-amount-map' %}">Biowaste amount</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-ratio" href="{% url 'waste-atlas-catalonia-waste-ratio-map' %}">Amount ratio</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-admin" href="{% url 'waste-atlas-catalonia-population-density-map' %}">Population density</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-bio" href="{% url 'waste-atlas-catalonia-green-waste-collection-amount-map' %}">Green waste amount</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-organic" href="{% url 'waste-atlas-catalonia-organic-collection-amount-map' %}">Organic-fraction amount</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-ratio" href="{% url 'waste-atlas-catalonia-organic-waste-ratio-map' %}">Organic-fraction share</a>
               </div>
             </div>
           </div></div>

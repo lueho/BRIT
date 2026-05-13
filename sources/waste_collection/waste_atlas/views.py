@@ -959,6 +959,18 @@ class GermanyBWRPAtlasMapView(AtlasMapView):
     map_set_selector_label = "Map set"
 
 
+class CataloniaAtlasMapView(AtlasMapView):
+    default_country = "ES"
+    default_year = "2024"
+    default_nuts_prefix = "ES51"
+    default_nuts_level = "3"
+    map_overview_label = "Map overview"
+    allow_country_override = False
+    allow_nuts_override = False
+    map_set = "ES-CT"
+    map_set_selector_label = "Map set"
+
+
 class GermanyOrgaLevelMapView(GermanyAtlasMapView):
     template_name = "waste_atlas/karte1_orga_level.html"
     map_title = "Administrative level of waste collection"
@@ -975,6 +987,18 @@ class GermanyCollectionSystemMapView(GermanyAtlasMapView):
     template_name = "waste_atlas/karte2_collection_system.html"
     map_title = "Primary collection system for kitchen waste"
     map_route_key = "collection_system"
+
+
+class CataloniaCollectionSystemMapView(CataloniaAtlasMapView):
+    template_name = "waste_atlas/karte2_collection_system.html"
+    map_title = "Primary collection system for kitchen waste"
+    map_route_key = "collection_system"
+
+
+class CataloniaAccessControlMapView(CataloniaAtlasMapView):
+    template_name = "waste_atlas/access_control.html"
+    map_title = "Access control for biowaste collection"
+    map_route_key = "access_control"
 
 
 class GermanyBWRPCollectionSystemMapView(GermanyBWRPAtlasMapView):
@@ -1295,6 +1319,160 @@ class GermanyBWRPResidualRequiredBinCapacityMapView(GermanyBWRPAtlasMapView):
     map_route_key = "residual_required_bin_capacity"
 
 
+class CataloniaOrgaLevelMapView(CataloniaAtlasMapView, GermanyOrgaLevelMapView):
+    pass
+
+
+class CataloniaGreenWasteCollectionSystemCountMapView(
+    CataloniaAtlasMapView, GermanyGreenWasteCollectionSystemCountMapView
+):
+    pass
+
+
+class CataloniaCollectionPointCountMapView(
+    CataloniaAtlasMapView, GermanyCollectionPointCountMapView
+):
+    pass
+
+
+class CataloniaConnectionRateMapView(CataloniaAtlasMapView, GermanyConnectionRateMapView):
+    pass
+
+
+class CataloniaFoodWasteCategoryMapView(
+    CataloniaAtlasMapView, GermanyFoodWasteCategoryMapView
+):
+    pass
+
+
+class CataloniaPaperBagsMapView(CataloniaAtlasMapView, GermanyPaperBagsMapView):
+    pass
+
+
+class CataloniaPlasticBagsMapView(CataloniaAtlasMapView, GermanyPlasticBagsMapView):
+    pass
+
+
+class CataloniaCollectionSupportMapView(
+    CataloniaAtlasMapView, GermanyCollectionSupportMapView
+):
+    pass
+
+
+class CataloniaResidualFrequencyMapView(
+    CataloniaAtlasMapView, GermanyResidualFrequencyMapView
+):
+    pass
+
+
+class CataloniaBiowasteFrequencyMapView(
+    CataloniaAtlasMapView, GermanyBiowasteFrequencyMapView
+):
+    pass
+
+
+class CataloniaCombinedFrequencyMapView(
+    CataloniaAtlasMapView, GermanyCombinedFrequencyMapView
+):
+    pass
+
+
+class CataloniaResidualCollectionCountMapView(
+    CataloniaAtlasMapView, GermanyResidualCollectionCountMapView
+):
+    pass
+
+
+class CataloniaBiowasteCollectionCountMapView(
+    CataloniaAtlasMapView, GermanyBiowasteCollectionCountMapView
+):
+    pass
+
+
+class CataloniaCombinedCollectionCountMapView(
+    CataloniaAtlasMapView, GermanyCombinedCollectionCountMapView
+):
+    pass
+
+
+class CataloniaCollectionCountRatioMapView(
+    CataloniaAtlasMapView, GermanyCollectionCountRatioMapView
+):
+    pass
+
+
+class CataloniaResidualFeeSystemMapView(
+    CataloniaAtlasMapView, GermanyResidualFeeSystemMapView
+):
+    pass
+
+
+class CataloniaBiowasteFeeSystemMapView(
+    CataloniaAtlasMapView, GermanyBiowasteFeeSystemMapView
+):
+    pass
+
+
+class CataloniaCombinedFeeSystemMapView(
+    CataloniaAtlasMapView, GermanyCombinedFeeSystemMapView
+):
+    pass
+
+
+class CataloniaResidualCollectionAmountMapView(
+    CataloniaAtlasMapView, GermanyResidualCollectionAmountMapView
+):
+    pass
+
+
+class CataloniaBiowasteCollectionAmountMapView(
+    CataloniaAtlasMapView, GermanyBiowasteCollectionAmountMapView
+):
+    pass
+
+
+class CataloniaGreenWasteCollectionAmountMapView(
+    CataloniaAtlasMapView, GermanyGreenWasteCollectionAmountMapView
+):
+    pass
+
+
+class CataloniaOrganicCollectionAmountMapView(
+    CataloniaAtlasMapView, GermanyOrganicCollectionAmountMapView
+):
+    pass
+
+
+class CataloniaOrganicWasteRatioMapView(
+    CataloniaAtlasMapView, GermanyOrganicWasteRatioMapView
+):
+    pass
+
+
+class CataloniaBiowasteMinBinSizeMapView(
+    CataloniaAtlasMapView, GermanyBiowasteMinBinSizeMapView
+):
+    pass
+
+
+class CataloniaResidualMinBinSizeMapView(
+    CataloniaAtlasMapView, GermanyResidualMinBinSizeMapView
+):
+    pass
+
+
+class CataloniaBiowasteRequiredBinCapacityMapView(
+    CataloniaAtlasMapView, GermanyBiowasteRequiredBinCapacityMapView
+):
+    pass
+
+
+class CataloniaResidualRequiredBinCapacityMapView(
+    CataloniaAtlasMapView, GermanyResidualRequiredBinCapacityMapView
+):
+    pass
+
+
 class GermanyWasteRatioMapView(GermanyAtlasMapView):
     template_name = "waste_atlas/karte19_waste_ratio.html"
     map_title = "Biowaste share of total waste"
@@ -1317,6 +1495,61 @@ class GermanyBWRPPopulationDensityMapView(GermanyBWRPAtlasMapView):
     template_name = "waste_atlas/population_density_map.html"
     map_title = "Population density"
     map_route_key = "population_density"
+
+
+class CataloniaWasteRatioMapView(CataloniaAtlasMapView, GermanyWasteRatioMapView):
+    pass
+
+
+class CataloniaPopulationDensityMapView(
+    CataloniaAtlasMapView, GermanyPopulationDensityMapView
+):
+    pass
+
+
+for _catalonia_view, _germany_view in (
+    (CataloniaOrgaLevelMapView, GermanyOrgaLevelMapView),
+    (
+        CataloniaGreenWasteCollectionSystemCountMapView,
+        GermanyGreenWasteCollectionSystemCountMapView,
+    ),
+    (CataloniaCollectionPointCountMapView, GermanyCollectionPointCountMapView),
+    (CataloniaConnectionRateMapView, GermanyConnectionRateMapView),
+    (CataloniaFoodWasteCategoryMapView, GermanyFoodWasteCategoryMapView),
+    (CataloniaPaperBagsMapView, GermanyPaperBagsMapView),
+    (CataloniaPlasticBagsMapView, GermanyPlasticBagsMapView),
+    (CataloniaCollectionSupportMapView, GermanyCollectionSupportMapView),
+    (CataloniaResidualFrequencyMapView, GermanyResidualFrequencyMapView),
+    (CataloniaBiowasteFrequencyMapView, GermanyBiowasteFrequencyMapView),
+    (CataloniaCombinedFrequencyMapView, GermanyCombinedFrequencyMapView),
+    (CataloniaResidualCollectionCountMapView, GermanyResidualCollectionCountMapView),
+    (CataloniaBiowasteCollectionCountMapView, GermanyBiowasteCollectionCountMapView),
+    (CataloniaCombinedCollectionCountMapView, GermanyCombinedCollectionCountMapView),
+    (CataloniaCollectionCountRatioMapView, GermanyCollectionCountRatioMapView),
+    (CataloniaResidualFeeSystemMapView, GermanyResidualFeeSystemMapView),
+    (CataloniaBiowasteFeeSystemMapView, GermanyBiowasteFeeSystemMapView),
+    (CataloniaCombinedFeeSystemMapView, GermanyCombinedFeeSystemMapView),
+    (CataloniaResidualCollectionAmountMapView, GermanyResidualCollectionAmountMapView),
+    (CataloniaBiowasteCollectionAmountMapView, GermanyBiowasteCollectionAmountMapView),
+    (CataloniaGreenWasteCollectionAmountMapView, GermanyGreenWasteCollectionAmountMapView),
+    (CataloniaOrganicCollectionAmountMapView, GermanyOrganicCollectionAmountMapView),
+    (CataloniaOrganicWasteRatioMapView, GermanyOrganicWasteRatioMapView),
+    (CataloniaBiowasteMinBinSizeMapView, GermanyBiowasteMinBinSizeMapView),
+    (CataloniaResidualMinBinSizeMapView, GermanyResidualMinBinSizeMapView),
+    (
+        CataloniaBiowasteRequiredBinCapacityMapView,
+        GermanyBiowasteRequiredBinCapacityMapView,
+    ),
+    (
+        CataloniaResidualRequiredBinCapacityMapView,
+        GermanyResidualRequiredBinCapacityMapView,
+    ),
+    (CataloniaWasteRatioMapView, GermanyWasteRatioMapView),
+    (CataloniaPopulationDensityMapView, GermanyPopulationDensityMapView),
+):
+    _catalonia_view.template_name = _germany_view.template_name
+    _catalonia_view.map_title = _germany_view.map_title
+    _catalonia_view.map_route_key = _germany_view.map_route_key
 
 
 class NetherlandsCollectionSystemMapView(CollectionSystemMapView):

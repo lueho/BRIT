@@ -34,6 +34,7 @@ from sources.waste_collection.models import (
 
 from .serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
+    CatchmentAccessControlSerializer,
     CatchmentBinConfigurationSerializer,
     CatchmentCollectionAmountSerializer,
     CatchmentCollectionCountRatioSerializer,
@@ -444,6 +445,47 @@ class CollectionSystemViewSet(viewsets.ViewSet):
             ).items()
         ]
         serializer = CatchmentCollectionSystemSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class AccessControlViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        best = _select_primary_collections(
+            country,
+            year,
+            ["Biowaste", "Food waste"],
+            nuts_prefixes,
+            extra_fields=("access_control_bp", "access_control_pap"),
+        )
+
+        data = []
+        for cid, row in best.items():
+            system = row["collection_system"]
+            bp = row["access_control_bp"]
+            pap = row["access_control_pap"]
+            if system == "No separate collection":
+                value = "No separate collection"
+            elif bp is True and pap is True:
+                value = "BP and PAP access-controlled"
+            elif bp is True and pap is False:
+                value = "BP access-controlled, PAP not access-controlled"
+            elif bp is False and pap is True:
+                value = "PAP access-controlled, BP not access-controlled"
+            elif bp is True:
+                value = "BP access-controlled"
+            elif pap is True:
+                value = "PAP access-controlled"
+            elif bp is False or pap is False:
+                value = "No access control"
+            else:
+                value = "no_data"
+            data.append({"catchment_id": cid, "access_control": value})
+
+        serializer = CatchmentAccessControlSerializer(data, many=True)
         return Response(serializer.data)
 
 
