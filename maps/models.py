@@ -661,6 +661,7 @@ class GeoDatasetColumnPolicy(models.Model):
     is_searchable = models.BooleanField(default=False)
     is_exportable = models.BooleanField(default=False)
     is_orderable = models.BooleanField(default=False)
+    is_popup = models.BooleanField(default=False)
 
     class Meta:
         constraints = [
