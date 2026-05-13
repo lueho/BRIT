@@ -776,6 +776,549 @@ class WasteRatioMapView(AtlasMapView):
     map_title = "Biowaste share of total waste"
 
 
+class BwRpAtlasMapView(AtlasMapView):
+    """Base view for Baden-Württemberg (DE1) + Rheinland-Pfalz (DEB) case-study maps."""
+
+    default_country = "DE"
+    default_nuts_prefix = "DE1,DEB"
+    default_nuts_level = "3"
+    map_overview_label = "Map overview"
+    allow_country_override = False
+    allow_nuts_override = False
+
+
+class BwRpOrgaLevelMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte1_orga_level.html"
+    map_title = "Administrative level of waste collection"
+
+
+class BwRpCollectionSystemMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte2_collection_system.html"
+    map_title = "Primary collection system for kitchen waste"
+
+
+class BwRpConnectionRateMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte3_connection_rate.html"
+    map_title = "Connection rates for door-to-door biowaste collection"
+
+
+class BwRpFoodWasteCategoryMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte4_food_waste_category.html"
+    map_title = "Accepted food-waste categories in biowaste"
+
+
+class BwRpPaperBagsMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte5_paper_bags.html"
+    map_title = "Use of paper bags for biowaste collection"
+
+
+class BwRpPlasticBagsMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte6_plastic_bags.html"
+    map_title = "Use of compostable plastic bags for biowaste collection"
+
+
+class BwRpCollectionSupportMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte7_collection_support.html"
+    map_title = "Accepted materials for collection aids"
+
+
+class BwRpGreenWasteCollectionSystemCountMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte21_green_waste_collection_system_count.html"
+    map_title = "Number of green-waste collection systems per catchment"
+
+
+class BwRpBiowasteMinBinSizeMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte23_biowaste_min_bin_size.html"
+    map_title = "Smallest available bin size for biowaste (L)"
+
+
+class BwRpResidualMinBinSizeMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte24_residual_min_bin_size.html"
+    map_title = "Smallest available bin size for residual waste (L)"
+
+
+class BwRpBiowasteRequiredBinCapacityMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte25_biowaste_required_bin_capacity.html"
+    map_title = "Required bin capacity for biowaste (L/reference unit)"
+
+
+class BwRpResidualRequiredBinCapacityMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte26_residual_required_bin_capacity.html"
+    map_title = "Required bin capacity for residual waste (L/reference unit)"
+
+
+class BwRpResidualFrequencyMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte8_residual_frequency.html"
+    map_title = "Collection frequency types for residual-waste collection"
+
+
+class BwRpBiowasteFrequencyMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte9_biowaste_frequency.html"
+    map_title = "Collection frequency types for biowaste collection"
+
+
+class BwRpCombinedFrequencyMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte10_combined_frequency.html"
+    map_title = "Collection frequency type: biowaste vs residual waste"
+
+
+class BwRpResidualCollectionCountMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte11_residual_collection_count.html"
+    map_title = "Annual residual-waste collection count"
+
+
+class BwRpBiowasteCollectionCountMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte12_biowaste_collection_count.html"
+    map_title = "Annual biowaste collection count"
+
+
+class BwRpCombinedCollectionCountMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte13_combined_collection_count.html"
+    map_title = "Annual collection count: biowaste vs residual waste"
+
+
+class BwRpCollectionCountRatioMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte42_collection_count_ratio.html"
+    map_title = "Annual collection-count ratio: biowaste vs residual waste"
+
+
+class BwRpResidualFeeSystemMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte14_residual_fee_system.html"
+    map_title = "Fee system for residual-waste collection"
+
+
+class BwRpBiowasteFeeSystemMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte15_biowaste_fee_system.html"
+    map_title = "Fee system for biowaste collection"
+
+
+class BwRpCombinedFeeSystemMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte16_combined_fee_system.html"
+    map_title = "Fee system: biowaste vs residual waste"
+
+
+class BwRpResidualCollectionAmountMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte17_residual_collection_amount.html"
+    map_title = "Specifically collected amount of residual waste"
+
+
+class BwRpBiowasteCollectionAmountMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte18_biowaste_collection_amount.html"
+    map_title = "Specifically collected amount of biowaste"
+
+
+class BwRpWasteRatioMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte19_waste_ratio.html"
+    map_title = "Biowaste share of total waste"
+
+
+class BwRpPopulationDensityMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/population_density_map.html"
+    map_title = "Population density"
+
+
+class BwRpGreenWasteCollectionAmountMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte22_green_waste_collection_amount.html"
+    map_title = "Specifically collected amount of green waste"
+
+
+class BwRpOrganicCollectionAmountMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte27_organic_collection_amount.html"
+    map_title = "Aggregated collected amount of organic fractions (kg/cap/a)"
+
+
+class BwRpOrganicWasteRatioMapView(BwRpAtlasMapView):
+    template_name = "waste_atlas/karte28_organic_waste_ratio.html"
+    map_title = "Share of organic fractions in total waste"
+
+
+class GermanyAtlasMapView(AtlasMapView):
+    """Base view for Germany maps with Bundesländer borders."""
+
+    default_country = "DE"
+    default_year = "2024"
+    default_nuts_level = "1"  # NUTS-1 = Bundesländer level
+    map_overview_label = "Map overview"
+    allow_country_override = False
+    allow_nuts_override = False
+    map_set = "DE"
+    map_set_selector_label = "Map set"
+
+
+class GermanyBWRPAtlasMapView(AtlasMapView):
+    """Base view for Germany Baden-Württemberg & Rheinland-Pfalz case study."""
+
+    default_country = "DE"
+    default_year = "2024"
+    default_nuts_prefix = "DE1,DEB"  # Baden-Württemberg & Rheinland-Pfalz
+    default_nuts_level = "1"
+    map_overview_label = "Map overview"
+    allow_country_override = False
+    allow_nuts_override = False
+    map_set = "DE-BW-RP"
+    map_set_selector_label = "Map set"
+
+
+class GermanyOrgaLevelMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte1_orga_level.html"
+    map_title = "Administrative level of waste collection"
+    map_route_key = "orga_level"
+
+
+class GermanyBWRPOrgaLevelMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte1_orga_level.html"
+    map_title = "Administrative level of waste collection"
+    map_route_key = "orga_level"
+
+
+class GermanyCollectionSystemMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte2_collection_system.html"
+    map_title = "Primary collection system for kitchen waste"
+    map_route_key = "collection_system"
+
+
+class GermanyBWRPCollectionSystemMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte2_collection_system.html"
+    map_title = "Primary collection system for kitchen waste"
+    map_route_key = "collection_system"
+
+
+class GermanyGreenWasteCollectionSystemCountMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte21_green_waste_collection_system_count.html"
+    map_title = "Number of green-waste collection systems per catchment"
+    map_route_key = "green_waste_collection_system_count"
+
+
+class GermanyBWRPGreenWasteCollectionSystemCountMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte21_green_waste_collection_system_count.html"
+    map_title = "Number of green-waste collection systems per catchment"
+    map_route_key = "green_waste_collection_system_count"
+
+
+class GermanyCollectionPointCountMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte44_collection_point_count.html"
+    map_title = "Number of collection points"
+    map_route_key = "collection_point_count"
+
+
+class GermanyBWRPCollectionPointCountMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte44_collection_point_count.html"
+    map_title = "Number of collection points"
+    map_route_key = "collection_point_count"
+
+
+class GermanyConnectionRateMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte3_connection_rate.html"
+    map_title = "Connection rates for door-to-door biowaste collection"
+    map_route_key = "connection_rate"
+
+
+class GermanyBWRPConnectionRateMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte3_connection_rate.html"
+    map_title = "Connection rates for door-to-door biowaste collection"
+    map_route_key = "connection_rate"
+
+
+class GermanyFoodWasteCategoryMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte4_food_waste_category.html"
+    map_title = "Accepted food-waste categories in biowaste"
+    map_route_key = "food_waste_category"
+
+
+class GermanyBWRPFoodWasteCategoryMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte4_food_waste_category.html"
+    map_title = "Accepted food-waste categories in biowaste"
+    map_route_key = "food_waste_category"
+
+
+class GermanyPaperBagsMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte5_paper_bags.html"
+    map_title = "Use of paper bags for biowaste collection"
+    map_route_key = "paper_bags"
+
+
+class GermanyBWRPPaperBagsMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte5_paper_bags.html"
+    map_title = "Use of paper bags for biowaste collection"
+    map_route_key = "paper_bags"
+
+
+class GermanyPlasticBagsMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte6_plastic_bags.html"
+    map_title = "Use of compostable plastic bags for biowaste collection"
+    map_route_key = "plastic_bags"
+
+
+class GermanyBWRPPlasticBagsMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte6_plastic_bags.html"
+    map_title = "Use of compostable plastic bags for biowaste collection"
+    map_route_key = "plastic_bags"
+
+
+class GermanyCollectionSupportMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte7_collection_support.html"
+    map_title = "Accepted materials for collection aids"
+    map_route_key = "collection_support"
+
+
+class GermanyBWRPCollectionSupportMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte7_collection_support.html"
+    map_title = "Accepted materials for collection aids"
+    map_route_key = "collection_support"
+
+
+class GermanyResidualFrequencyMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte8_residual_frequency.html"
+    map_title = "Collection frequency types for residual-waste collection"
+    map_route_key = "residual_frequency"
+
+
+class GermanyBWRPResidualFrequencyMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte8_residual_frequency.html"
+    map_title = "Collection frequency types for residual-waste collection"
+    map_route_key = "residual_frequency"
+
+
+class GermanyBiowasteFrequencyMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte9_biowaste_frequency.html"
+    map_title = "Collection frequency types for biowaste collection"
+    map_route_key = "biowaste_frequency"
+
+
+class GermanyBWRPBiowasteFrequencyMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte9_biowaste_frequency.html"
+    map_title = "Collection frequency types for biowaste collection"
+    map_route_key = "biowaste_frequency"
+
+
+class GermanyCombinedFrequencyMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte10_combined_frequency.html"
+    map_title = "Collection frequency type: biowaste vs residual waste"
+    map_route_key = "combined_frequency"
+
+
+class GermanyBWRPCombinedFrequencyMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte10_combined_frequency.html"
+    map_title = "Collection frequency type: biowaste vs residual waste"
+    map_route_key = "combined_frequency"
+
+
+class GermanyResidualCollectionCountMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte11_residual_collection_count.html"
+    map_title = "Annual residual-waste collection count"
+    map_route_key = "residual_collection_count"
+
+
+class GermanyBWRPResidualCollectionCountMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte11_residual_collection_count.html"
+    map_title = "Annual residual-waste collection count"
+    map_route_key = "residual_collection_count"
+
+
+class GermanyBiowasteCollectionCountMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte12_biowaste_collection_count.html"
+    map_title = "Annual biowaste collection count"
+    map_route_key = "biowaste_collection_count"
+
+
+class GermanyBWRPBiowasteCollectionCountMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte12_biowaste_collection_count.html"
+    map_title = "Annual biowaste collection count"
+    map_route_key = "biowaste_collection_count"
+
+
+class GermanyCombinedCollectionCountMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte13_combined_collection_count.html"
+    map_title = "Annual collection count: biowaste vs residual waste"
+    map_route_key = "combined_collection_count"
+
+
+class GermanyBWRPCombinedCollectionCountMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte13_combined_collection_count.html"
+    map_title = "Annual collection count: biowaste vs residual waste"
+    map_route_key = "combined_collection_count"
+
+
+class GermanyCollectionCountRatioMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte42_collection_count_ratio.html"
+    map_title = "Annual collection-count ratio: biowaste vs residual waste"
+    map_route_key = "collection_count_ratio"
+
+
+class GermanyBWRPCollectionCountRatioMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte42_collection_count_ratio.html"
+    map_title = "Annual collection-count ratio: biowaste vs residual waste"
+    map_route_key = "collection_count_ratio"
+
+
+class GermanyResidualFeeSystemMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte14_residual_fee_system.html"
+    map_title = "Fee system for residual-waste collection"
+    map_route_key = "residual_fee_system"
+
+
+class GermanyBWRPResidualFeeSystemMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte14_residual_fee_system.html"
+    map_title = "Fee system for residual-waste collection"
+    map_route_key = "residual_fee_system"
+
+
+class GermanyBiowasteFeeSystemMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte15_biowaste_fee_system.html"
+    map_title = "Fee system for biowaste collection"
+    map_route_key = "biowaste_fee_system"
+
+
+class GermanyBWRPBiowasteFeeSystemMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte15_biowaste_fee_system.html"
+    map_title = "Fee system for biowaste collection"
+    map_route_key = "biowaste_fee_system"
+
+
+class GermanyCombinedFeeSystemMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte16_combined_fee_system.html"
+    map_title = "Fee system: biowaste vs residual waste"
+    map_route_key = "combined_fee_system"
+
+
+class GermanyBWRPCombinedFeeSystemMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte16_combined_fee_system.html"
+    map_title = "Fee system: biowaste vs residual waste"
+    map_route_key = "combined_fee_system"
+
+
+class GermanyResidualCollectionAmountMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte17_residual_collection_amount.html"
+    map_title = "Specifically collected amount of residual waste"
+    map_route_key = "residual_collection_amount"
+
+
+class GermanyBWRPResidualCollectionAmountMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte17_residual_collection_amount.html"
+    map_title = "Specifically collected amount of residual waste"
+    map_route_key = "residual_collection_amount"
+
+
+class GermanyBiowasteCollectionAmountMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte18_biowaste_collection_amount.html"
+    map_title = "Specifically collected amount of biowaste"
+    map_route_key = "biowaste_collection_amount"
+
+
+class GermanyBWRPBiowasteCollectionAmountMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte18_biowaste_collection_amount.html"
+    map_title = "Specifically collected amount of biowaste"
+    map_route_key = "biowaste_collection_amount"
+
+
+class GermanyGreenWasteCollectionAmountMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte22_green_waste_collection_amount.html"
+    map_title = "Specifically collected amount of green waste"
+    map_route_key = "green_waste_collection_amount"
+
+
+class GermanyBWRPGreenWasteCollectionAmountMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte22_green_waste_collection_amount.html"
+    map_title = "Specifically collected amount of green waste"
+    map_route_key = "green_waste_collection_amount"
+
+
+class GermanyOrganicCollectionAmountMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte27_organic_collection_amount.html"
+    map_title = "Aggregated collected amount of organic fractions (kg/cap/a)"
+    map_route_key = "organic_collection_amount"
+
+
+class GermanyBWRPOrganicCollectionAmountMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte27_organic_collection_amount.html"
+    map_title = "Aggregated collected amount of organic fractions (kg/cap/a)"
+    map_route_key = "organic_collection_amount"
+
+
+class GermanyOrganicWasteRatioMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte28_organic_waste_ratio.html"
+    map_title = "Share of organic fractions in total waste"
+    map_route_key = "organic_waste_ratio"
+
+
+class GermanyBWRPOrganicWasteRatioMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte28_organic_waste_ratio.html"
+    map_title = "Share of organic fractions in total waste"
+    map_route_key = "organic_waste_ratio"
+
+
+class GermanyBiowasteMinBinSizeMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte23_biowaste_min_bin_size.html"
+    map_title = "Smallest available bin size for biowaste (L)"
+    map_route_key = "biowaste_min_bin_size"
+
+
+class GermanyBWRPBiowasteMinBinSizeMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte23_biowaste_min_bin_size.html"
+    map_title = "Smallest available bin size for biowaste (L)"
+    map_route_key = "biowaste_min_bin_size"
+
+
+class GermanyResidualMinBinSizeMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte24_residual_min_bin_size.html"
+    map_title = "Smallest available bin size for residual waste (L)"
+    map_route_key = "residual_min_bin_size"
+
+
+class GermanyBWRPResidualMinBinSizeMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte24_residual_min_bin_size.html"
+    map_title = "Smallest available bin size for residual waste (L)"
+    map_route_key = "residual_min_bin_size"
+
+
+class GermanyBiowasteRequiredBinCapacityMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte25_biowaste_required_bin_capacity.html"
+    map_title = "Required bin capacity for biowaste (L/reference unit)"
+    map_route_key = "biowaste_required_bin_capacity"
+
+
+class GermanyBWRPBiowasteRequiredBinCapacityMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte25_biowaste_required_bin_capacity.html"
+    map_title = "Required bin capacity for biowaste (L/reference unit)"
+    map_route_key = "biowaste_required_bin_capacity"
+
+
+class GermanyResidualRequiredBinCapacityMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte26_residual_required_bin_capacity.html"
+    map_title = "Required bin capacity for residual waste (L/reference unit)"
+    map_route_key = "residual_required_bin_capacity"
+
+
+class GermanyBWRPResidualRequiredBinCapacityMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte26_residual_required_bin_capacity.html"
+    map_title = "Required bin capacity for residual waste (L/reference unit)"
+    map_route_key = "residual_required_bin_capacity"
+
+
+class GermanyWasteRatioMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/karte19_waste_ratio.html"
+    map_title = "Biowaste share of total waste"
+    map_route_key = "waste_ratio"
+
+
+class GermanyBWRPWasteRatioMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/karte19_waste_ratio.html"
+    map_title = "Biowaste share of total waste"
+    map_route_key = "waste_ratio"
+
+
+class GermanyPopulationDensityMapView(GermanyAtlasMapView):
+    template_name = "waste_atlas/population_density_map.html"
+    map_title = "Population density"
+    map_route_key = "population_density"
+
+
+class GermanyBWRPPopulationDensityMapView(GermanyBWRPAtlasMapView):
+    template_name = "waste_atlas/population_density_map.html"
+    map_title = "Population density"
+    map_route_key = "population_density"
+
+
 class NetherlandsCollectionSystemMapView(CollectionSystemMapView):
     """Map 36 — Collection system map for the Netherlands entry point."""
 
