@@ -478,54 +478,117 @@ class SplitSourceCellTests(SimpleTestCase):
 
 
 class AccessControlMappingTests(SimpleTestCase):
-    """Tests for _map_access_control."""
+    """Tests for _map_access_control and _access_control_fields."""
 
-    def test_yes_returns_true(self):
-        self.assertIs(cmd._map_access_control("yes"), True)
+    # --- _parse_yes_no --------------------------------------------------
 
-    def test_no_returns_false(self):
-        self.assertIs(cmd._map_access_control("no"), False)
+    def test_parse_yes(self):
+        self.assertIs(cmd._parse_yes_no("yes"), True)
 
-    def test_none_returns_none(self):
-        self.assertIsNone(cmd._map_access_control(None))
+    def test_parse_no(self):
+        self.assertIs(cmd._parse_yes_no("no"), False)
 
-    def test_case_insensitive(self):
-        self.assertIs(cmd._map_access_control("YES"), True)
-        self.assertIs(cmd._map_access_control("No"), False)
+    def test_parse_case_insensitive(self):
+        self.assertIs(cmd._parse_yes_no("YES"), True)
+        self.assertIs(cmd._parse_yes_no("No"), False)
 
-    def test_slash_yes_no_uses_first_token(self):
-        # 'yes/no' on PAP parcial rows → first token = yes → True
-        self.assertIs(cmd._map_access_control("yes/no"), True)
+    def test_parse_unknown_returns_none(self):
+        self.assertIsNone(cmd._parse_yes_no("maybe"))
 
-    def test_slash_no_yes_uses_first_token(self):
-        self.assertIs(cmd._map_access_control("no/yes"), False)
+    # --- _map_access_control returns (bp, pap) tuple -------------------
 
-    def test_slash_yes_yes_returns_true(self):
-        self.assertIs(cmd._map_access_control("yes/yes"), True)
+    def test_none_returns_none_tuple(self):
+        self.assertEqual(cmd._map_access_control(None), (None, None))
 
-    def test_slash_no_no_returns_false(self):
-        self.assertIs(cmd._map_access_control("no/no"), False)
+    def test_single_yes_returns_yes_in_bp_slot(self):
+        # Single value → bp slot carries value, pap = None
+        bp, pap = cmd._map_access_control("yes")
+        self.assertIs(bp, True)
+        self.assertIsNone(pap)
 
-    def test_unknown_value_returns_none(self):
-        self.assertIsNone(cmd._map_access_control("maybe"))
+    def test_single_no_returns_no_in_bp_slot(self):
+        bp, pap = cmd._map_access_control("no")
+        self.assertIs(bp, False)
+        self.assertIsNone(pap)
 
-    def test_row_to_record_yes_access_control(self):
+    def test_slash_yes_no_bp_yes_pap_no(self):
+        # BP/PAP order → 'yes/no' → bp=True, pap=False
+        bp, pap = cmd._map_access_control("yes/no")
+        self.assertIs(bp, True)
+        self.assertIs(pap, False)
+
+    def test_slash_no_yes_bp_no_pap_yes(self):
+        bp, pap = cmd._map_access_control("no/yes")
+        self.assertIs(bp, False)
+        self.assertIs(pap, True)
+
+    def test_slash_yes_yes_both_true(self):
+        bp, pap = cmd._map_access_control("yes/yes")
+        self.assertIs(bp, True)
+        self.assertIs(pap, True)
+
+    def test_slash_no_no_both_false(self):
+        bp, pap = cmd._map_access_control("no/no")
+        self.assertIs(bp, False)
+        self.assertIs(pap, False)
+
+    # --- _access_control_fields routing ---------------------------------
+
+    def test_single_yes_on_bring_point_row_routes_to_bp(self):
+        fields = cmd._access_control_fields("yes", cmd._CS_BRING_POINT)
+        self.assertIs(fields["access_control_bp"], True)
+        self.assertIsNone(fields["access_control_pap"])
+
+    def test_single_no_on_door_to_door_row_routes_to_pap(self):
+        fields = cmd._access_control_fields("no", cmd._CS_DOOR_TO_DOOR)
+        self.assertIsNone(fields["access_control_bp"])
+        self.assertIs(fields["access_control_pap"], False)
+
+    def test_single_value_on_other_system_both_none(self):
+        fields = cmd._access_control_fields("yes", cmd._CS_NO_SEPARATE)
+        self.assertIsNone(fields["access_control_bp"])
+        self.assertIsNone(fields["access_control_pap"])
+
+    def test_slash_value_fills_both_regardless_of_system(self):
+        fields = cmd._access_control_fields("yes/no", cmd._CS_DOOR_TO_DOOR)
+        self.assertIs(fields["access_control_bp"], True)
+        self.assertIs(fields["access_control_pap"], False)
+
+    def test_none_raw_both_none(self):
+        fields = cmd._access_control_fields(None, cmd._CS_BRING_POINT)
+        self.assertIsNone(fields["access_control_bp"])
+        self.assertIsNone(fields["access_control_pap"])
+
+    # --- _row_to_record integration -------------------------------------
+
+    def test_row_to_record_pap_row_yes_sets_pap_field(self):
+        # Default _make_row uses PAP Total → Door to door → single 'yes' → pap
         row = list(_make_row())
         row[14] = "yes"
         record = cmd._row_to_record(tuple(row))
-        self.assertIs(record["access_control"], True)
+        self.assertIsNone(record["access_control_bp"])
+        self.assertIs(record["access_control_pap"], True)
 
-    def test_row_to_record_no_access_control(self):
-        row = list(_make_row())
+    def test_row_to_record_bp_row_no_sets_bp_field(self):
+        row = list(_make_row(collection_system="Bring point"))
         row[14] = "no"
         record = cmd._row_to_record(tuple(row))
-        self.assertIs(record["access_control"], False)
+        self.assertIs(record["access_control_bp"], False)
+        self.assertIsNone(record["access_control_pap"])
+
+    def test_row_to_record_pap_parcial_slash_sets_both(self):
+        row = list(_make_row(collection_system="PAP parcial"))
+        row[14] = "yes/no"
+        record = cmd._row_to_record(tuple(row))
+        self.assertIs(record["access_control_bp"], True)
+        self.assertIs(record["access_control_pap"], False)
 
     def test_row_to_record_none_access_control(self):
         row = list(_make_row())
         row[14] = None
         record = cmd._row_to_record(tuple(row))
-        self.assertIsNone(record["access_control"])
+        self.assertIsNone(record["access_control_bp"])
+        self.assertIsNone(record["access_control_pap"])
 
 
 class FrequencyNormalisationTests(SimpleTestCase):

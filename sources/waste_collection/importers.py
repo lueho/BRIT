@@ -366,7 +366,12 @@ class CollectionImporter:
         fee_system = self._resolve_fee_system(record, label, stats)
         frequency = self._resolve_frequency(record, label, stats)
         connection_type = self._resolve_connection_type(record, label, stats)
-        access_control = record.get("access_control")  # bool or None, no mapping needed
+        access_control_bp = record.get(
+            "access_control_bp"
+        )  # bool or None, no mapping needed
+        access_control_pap = record.get(
+            "access_control_pap"
+        )  # bool or None, no mapping needed
         bin_configuration = self._resolve_bin_configuration(record, label, stats)
         established = record.get("established")
         bin_cap_ref = self._resolve_bin_capacity_reference(record)
@@ -443,16 +448,27 @@ class CollectionImporter:
                 collection.connection_type = connection_type
                 update_fields.append("connection_type")
 
-            # Update access_control if provided and different
+            # Update access_control_bp if provided and different
             if (
-                access_control is not None
-                and collection.access_control != access_control
+                access_control_bp is not None
+                and collection.access_control_bp != access_control_bp
             ):
                 changes.append(
-                    f"access_control: {collection.access_control} → {access_control}"
+                    f"access_control_bp: {collection.access_control_bp} → {access_control_bp}"
                 )
-                collection.access_control = access_control
-                update_fields.append("access_control")
+                collection.access_control_bp = access_control_bp
+                update_fields.append("access_control_bp")
+
+            # Update access_control_pap if provided and different
+            if (
+                access_control_pap is not None
+                and collection.access_control_pap != access_control_pap
+            ):
+                changes.append(
+                    f"access_control_pap: {collection.access_control_pap} → {access_control_pap}"
+                )
+                collection.access_control_pap = access_control_pap
+                update_fields.append("access_control_pap")
 
             # Update bin_configuration if different
             if bin_configuration and collection.bin_configuration_id != (
@@ -602,7 +618,8 @@ class CollectionImporter:
                 valid_from=valid_from,
                 valid_until=valid_until,
                 connection_type=connection_type,
-                access_control=access_control,
+                access_control_bp=access_control_bp,
+                access_control_pap=access_control_pap,
                 bin_configuration=bin_configuration,
                 established=established,
                 description=description,

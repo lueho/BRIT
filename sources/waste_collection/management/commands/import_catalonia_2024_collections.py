@@ -23,7 +23,7 @@ Source file columns (0-based index):
  11  PaP_status_2020     Door-to-door status in 2020
  12  porta.a.porta_2024  Door-to-door status in 2024 (text description)
  13  Collection_system_2024  Canonical collection system label
- 14  Access control/Use control_BP/PAP_2024  yes/no flags
+ 14  Access control/Use control_BP/PAP_2024  yes/no flags (BP first, PAP second when slash-separated)
  15  Connection rate to PaP_2020  %
  16  Connection rate to PaP_2024  %
  17  Collection frequency  BRIT frequency string
@@ -184,27 +184,68 @@ _FREQUENCY_NORMALISE_MAP: dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------------
-# Access control mapping: Excel col 14 → bool | None
+# Access control mapping: Excel col 14 → (bool | None, bool | None)
 #
 # Column 14 is "Access control/Use control_BP/PAP_2024".
-# Single values 'yes'/'no' are stored directly.
-# Slash-separated values (e.g. 'yes/no', 'no/yes') appear on PAP parcial rows
-# where the system has both a door-to-door and a bring-point component; the
-# first token (PAP) is used as the authoritative value for the collection row.
-# None (blank) → leave field unset.
+# The slash separates BP (bring-point) and PAP (door-to-door) values:
+#   - Single 'yes'/'no'  → applies to whichever system the row uses
+#   - 'BP_value/PAP_value' (e.g. 'yes/no') → first token = BP, second = PAP
+#
+# Returns a (access_control_bp, access_control_pap) tuple.
+# None means the field is not specified for that component.
 # ---------------------------------------------------------------------------
 
 
-def _map_access_control(raw) -> bool | None:
-    """Return True/False/None for col 14 access control values."""
-    if raw is None:
-        return None
-    first_token = str(raw).strip().split("/")[0].strip().lower()
-    if first_token == "yes":
+def _parse_yes_no(token: str) -> bool | None:
+    """Map a single 'yes'/'no' token (case-insensitive) to bool or None."""
+    t = token.strip().lower()
+    if t == "yes":
         return True
-    if first_token == "no":
+    if t == "no":
         return False
     return None
+
+
+def _map_access_control(raw) -> tuple[bool | None, bool | None]:
+    """Return (access_control_bp, access_control_pap) from col 14 raw value.
+
+    Slash-separated values encode BP/PAP independently (first token = BP,
+    second token = PAP).  A single token applies to whichever component is
+    relevant for that row's collection system; the other component is left None.
+    """
+    if raw is None:
+        return None, None
+    parts = [p.strip() for p in str(raw).strip().split("/")]
+    if len(parts) == 2:
+        # Explicit BP/PAP pair (PAP parcial rows)
+        return _parse_yes_no(parts[0]), _parse_yes_no(parts[1])
+    # Single value — caller decides which field to assign; return in BP slot
+    # for bring-point rows and PAP slot for door-to-door rows.
+    # The _row_to_record function routes to the correct field.
+    return _parse_yes_no(parts[0]), None
+
+
+def _access_control_fields(
+    raw, collection_system: str | None
+) -> dict[str, bool | None]:
+    """Return {'access_control_bp': ..., 'access_control_pap': ...} for a row.
+
+    Slash-separated values (PAP parcial rows) directly supply both components.
+    Single values are routed to the field that matches the collection system:
+    - Bring point rows  → access_control_bp
+    - Door-to-door rows → access_control_pap
+    - Others            → both None
+    """
+    ac_bp, ac_pap = _map_access_control(raw)
+    if raw is not None and "/" not in str(raw):
+        # Single token — route to the correct component field
+        if collection_system == _CS_BRING_POINT:
+            ac_bp, ac_pap = ac_bp, None
+        elif collection_system == _CS_DOOR_TO_DOOR:
+            ac_bp, ac_pap = None, ac_bp
+        else:
+            ac_bp, ac_pap = None, None
+    return {"access_control_bp": ac_bp, "access_control_pap": ac_pap}
 
 
 # ---------------------------------------------------------------------------
@@ -487,7 +528,7 @@ def _row_to_record(row: tuple) -> dict | None:
         "fee_system": _map_fee_system(row[19]),
         "frequency": _normalise_frequency(str(row[17] or "").strip()),
         "connection_type": "",
-        "access_control": _map_access_control(row[14]),
+        **_access_control_fields(row[14], collection_system),
         "min_bin_size": _to_float_or_none(row[20]),
         "required_bin_capacity": None,
         "required_bin_capacity_reference": "",

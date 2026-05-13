@@ -451,12 +451,27 @@ class Collection(NamedUserCreatedObject):
         verbose_name="Connection type",
         help_text="Indicates whether connection to the collection system is mandatory, voluntary, or not specified. Leave blank for never set; select 'not specified' for explicit user choice.",
     )
-    access_control = models.BooleanField(
+    access_control_bp = models.BooleanField(
         blank=True,
         null=True,
         default=None,
-        verbose_name="Access control",
-        help_text="Whether access to the collection point or bin is controlled (e.g. by chip, key card, or lock). True = access-controlled; False = no access control; blank = not specified.",
+        verbose_name="Access control (BP)",
+        help_text=(
+            "Whether access to the bring-point (BP) collection infrastructure is "
+            "controlled (e.g. by chip, key card, or lock). "
+            "True = access-controlled; False = no access control; blank = not specified."
+        ),
+    )
+    access_control_pap = models.BooleanField(
+        blank=True,
+        null=True,
+        default=None,
+        verbose_name="Access control (PAP)",
+        help_text=(
+            "Whether access to the door-to-door (PAP) container is controlled "
+            "(e.g. by chip, key card, or lock). "
+            "True = access-controlled; False = no access control; blank = not specified."
+        ),
     )
 
     min_bin_size = models.DecimalField(
@@ -503,7 +518,8 @@ class Collection(NamedUserCreatedObject):
         "flyer_urls",
         "established",
         "connection_type",
-        "access_control",
+        "access_control_bp",
+        "access_control_pap",
         "min_bin_size",
         "required_bin_capacity",
         "required_bin_capacity_reference",
@@ -718,7 +734,8 @@ class Collection(NamedUserCreatedObject):
             "bin_configuration": self.bin_configuration_id,
             "established": self.established,
             "connection_type": self.connection_type,
-            "access_control": self.access_control,
+            "access_control_bp": self.access_control_bp,
+            "access_control_pap": self.access_control_pap,
             "min_bin_size": self.min_bin_size,
             "required_bin_capacity": self.required_bin_capacity,
             "required_bin_capacity_reference": self.required_bin_capacity_reference,
