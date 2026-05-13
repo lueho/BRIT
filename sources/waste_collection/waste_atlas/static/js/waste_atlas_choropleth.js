@@ -28,10 +28,10 @@ var WasteAtlasChoropleth = (function () {
   'use strict';
 
   var COUNTRY_FILL = '#f0f0f0';
-  var BUNDESLAND_STROKE = '#000000';
-  var BUNDESLAND_STROKE_WIDTH = 1.5;   // ≈ 0.4 mm at 96 DPI
+  var BUNDESLAND_STROKE = '#666666';
+  var BUNDESLAND_STROKE_WIDTH = 1.0;   // Thinner than country border
   var COUNTRY_STROKE = '#000000';
-  var COUNTRY_STROKE_WIDTH = 1.5;      // ≈ 0.4 mm at 96 DPI
+  var COUNTRY_STROKE_WIDTH = 1.5;      // Thicker than Bundesläender border
   var CATCHMENT_STROKE = '#232323';
   var CATCHMENT_STROKE_WIDTH = 0.35;   // ≈ 0.1 mm at 96 DPI
   var EXPORT_DPI = 300;
@@ -106,7 +106,6 @@ var WasteAtlasChoropleth = (function () {
     var base = '/waste_collection/api/waste-atlas/';
     var nutsSuffix = cfg.nutsPrefix ? '&nuts_prefix=' + encodeURIComponent(cfg.nutsPrefix) : '';
     var catchUrl = base + 'catchment/geojson/?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix;
-    var allCatchUrl = base + 'catchment/geojson/?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix;
     var nuts0Url = '/maps/api/nuts_region/geojson/?levl_code=0&cntr_code=' + cfg.country;
     var nutsLevel = cfg.nutsLevel || 1;
     var nutsRegionUrl = '/maps/api/nuts_region/geojson/?levl_code=' + nutsLevel + '&cntr_code=' + cfg.country;
@@ -118,8 +117,7 @@ var WasteAtlasChoropleth = (function () {
       _fetchJSON(catchUrl),
       _fetchJSON(dataUrl),
       _fetchJSON(nuts0Url),
-      _fetchJSON(nutsRegionUrl),
-      _fetchJSON(allCatchUrl)
+      _fetchJSON(nutsRegionUrl)
     ];
     if (outlineUrl) requests.push(_fetchJSON(outlineUrl));
 
@@ -142,8 +140,8 @@ var WasteAtlasChoropleth = (function () {
         thematicData: results[1],
         countryBorder: results[2],
         bundeslaender: bundeslaender,
-        allCatchments: results[4],
-        acpvOutlines: outlineUrl ? results[5] : null,
+        allCatchments: results[0],
+        acpvOutlines: outlineUrl ? results[4] : null,
       };
     });
   }
@@ -352,8 +350,11 @@ var WasteAtlasChoropleth = (function () {
     var margin = 46;
     var titleBlock = 46;
     var gap = 46;
-    var regionBorder = (cfg.nutsPrefix && data.bundeslaender && data.bundeslaender.features && data.bundeslaender.features.length)
-      ? data.bundeslaender : data.countryBorder;
+    // Use the same logic as main rendering: country border for full maps, Bundesläender for regional maps
+    var regionBorder = data.countryBorder;
+    if (cfg.nutsPrefix && data.bundeslaender && data.bundeslaender.features && data.bundeslaender.features.length) {
+      regionBorder = data.bundeslaender;
+    }
     var fitData = (regionBorder && regionBorder.features && regionBorder.features.length)
       ? regionBorder : data.catchments;
     var candidates = [];
@@ -588,9 +589,19 @@ var WasteAtlasChoropleth = (function () {
         .attr('stroke-width', BUNDESLAND_STROKE_WIDTH);
     }
 
-    // Layer 5: outer border (very top) — filtered regions when nutsPrefix set, else full country
-    var borderData = (cfg.nutsPrefix && data.bundeslaender && data.bundeslaender.features && data.bundeslaender.features.length)
-      ? data.bundeslaender : data.countryBorder;
+    // Layer 5: outer border (very top) — always show country border for full maps,
+    // but show Bundesläender borders as outer border for regional maps (when nutsPrefix is set)
+    var borderData = data.countryBorder;
+    var borderStroke = COUNTRY_STROKE;
+    var borderWidth = COUNTRY_STROKE_WIDTH;
+
+    if (cfg.nutsPrefix && data.bundeslaender && data.bundeslaender.features && data.bundeslaender.features.length) {
+      // For regional maps (with nutsPrefix), use Bundesläender as outer border instead of country border
+      borderData = data.bundeslaender;
+      // Don't draw Bundesläender borders in layer 4 since we're drawing them as outer border
+      data.bundeslaender = null;
+    }
+
     if (borderData && borderData.features) {
       _svg.append('g').attr('class', 'layer-country-border')
         .selectAll('path')
@@ -598,8 +609,8 @@ var WasteAtlasChoropleth = (function () {
         .enter().append('path')
         .attr('d', path)
         .attr('fill', 'none')
-        .attr('stroke', COUNTRY_STROKE)
-        .attr('stroke-width', COUNTRY_STROKE_WIDTH);
+        .attr('stroke', borderStroke)
+        .attr('stroke-width', borderWidth);
     }
 
     if (layout.showHeader !== false) {

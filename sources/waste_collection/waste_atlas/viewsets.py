@@ -66,6 +66,7 @@ _FOOD_WASTE_MATERIAL_IDS = {11, 12, 13, 14}
 # Material IDs for collection support items (Karte 5, 6)
 _PAPER_BAGS_MATERIAL_ID = 19
 _PLASTIC_BAGS_MATERIAL_ID = 17
+_REGULAR_PLASTIC_BAGS_MATERIAL_ID = 18
 
 # Waste category names for green waste maps.
 _GREEN_WASTE_CATEGORY_NAMES = ["Green waste"]
@@ -2051,6 +2052,85 @@ class CollectionSupportViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
+class RegularPlasticCollectionSupportViewSet(viewsets.ViewSet):
+    """Return combined paper + regular-plastic bags status per catchment.
+
+    Like CollectionSupportViewSet but uses material 18 (regular plastic bags)
+    instead of material 17 (biodegradable) for the plastic bags slot.
+    Used for Denmark-specific collection-support maps.
+
+    Example::
+
+        GET /waste_collection/api/waste-atlas/regular-plastic-collection-support/?country=DK&year=2023
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        """Return a JSON array of {catchment_id, paper_bags, plastic_bags}."""
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+
+        best = _select_primary_collections(
+            country,
+            year,
+            ["Biowaste", "Food waste"],
+            nuts_prefixes,
+        )
+
+        collection_ids = [
+            row["collection_id"]
+            for row in best.values()
+            if row["collection_id"] is not None
+        ]
+
+        def _lookup(material_id):
+            allowed = set(
+                Collection.objects.filter(
+                    id__in=collection_ids,
+                    allowed_materials__id=material_id,
+                ).values_list("id", flat=True)
+            )
+            forbidden = set(
+                Collection.objects.filter(
+                    id__in=collection_ids,
+                    forbidden_materials__id=material_id,
+                ).values_list("id", flat=True)
+            )
+            return allowed, forbidden
+
+        paper_allowed, paper_forbidden = _lookup(_PAPER_BAGS_MATERIAL_ID)
+        plastic_allowed, plastic_forbidden = _lookup(_REGULAR_PLASTIC_BAGS_MATERIAL_ID)
+
+        def _status(collection_id, allowed_set, forbidden_set):
+            if collection_id in allowed_set:
+                return "allowed"
+            if collection_id in forbidden_set:
+                return "forbidden"
+            return "no_data"
+
+        data = []
+        for cid, row in best.items():
+            collection_id = row["collection_id"]
+            system = row["collection_system"]
+            if system == "No separate collection":
+                paper = "no_collection"
+                plastic = "no_collection"
+            else:
+                paper = _status(collection_id, paper_allowed, paper_forbidden)
+                plastic = _status(collection_id, plastic_allowed, plastic_forbidden)
+            data.append(
+                {
+                    "catchment_id": cid,
+                    "paper_bags": paper,
+                    "plastic_bags": plastic,
+                }
+            )
+
+        serializer = CatchmentCollectionSupportSerializer(data, many=True)
+        return Response(serializer.data)
+
+
 class PaperBagsStatusViewSet(viewsets.ViewSet):
     """Return paper-bags allowed/forbidden status per catchment (Karte 5).
 
@@ -2094,6 +2174,33 @@ class PlasticBagsStatusViewSet(viewsets.ViewSet):
         nuts_prefixes = _parse_nuts_prefixes(request)
         data = _get_material_status(
             country, year, _PLASTIC_BAGS_MATERIAL_ID, nuts_prefixes
+        )
+        serializer = CatchmentMaterialStatusSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class RegularPlasticBagsStatusViewSet(viewsets.ViewSet):
+    """Return regular (non-biodegradable) plastic bags allowed/forbidden status.
+
+    Checks whether 'Collection Support Item: Plastic bags' (material 18) appears
+    in the collection's ``allowed_materials`` or ``forbidden_materials``.
+
+    Used for Denmark-specific maps where collections record regular plastic bags
+    (material 18) rather than the biodegradable subtype (material 17).
+
+    Example::
+
+        GET /waste_collection/api/waste-atlas/regular-plastic-bags/?country=DK&year=2023
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        """Return a JSON array of {catchment_id, status}."""
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = _get_material_status(
+            country, year, _REGULAR_PLASTIC_BAGS_MATERIAL_ID, nuts_prefixes
         )
         serializer = CatchmentMaterialStatusSerializer(data, many=True)
         return Response(serializer.data)

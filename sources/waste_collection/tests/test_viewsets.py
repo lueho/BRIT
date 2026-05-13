@@ -1909,6 +1909,133 @@ class CollectionPointCountViewSetTests(APITestCase):
         )
 
 
+class WasteAtlasPrimarySelectionTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region.objects.create(
+            name="Primary Selection Region", country="DE"
+        )
+        cls.d2d = CollectionSystem.objects.create(name="Door to door")
+        cls.bring_point = CollectionSystem.objects.create(name="Bring point")
+        cls.no_collection = CollectionSystem.objects.create(
+            name="No separate collection"
+        )
+        cls.bio_category = WasteCategory.objects.create(name="Biowaste")
+        cls.food_category = WasteCategory.objects.create(name="Food waste")
+        cls.paper_bags, _ = Material.objects.get_or_create(
+            id=19,
+            defaults={"name": "Primary Selection Paper Bags"},
+        )
+        cls.prop, _ = Property.objects.get_or_create(
+            id=4,
+            defaults={"name": "Connection rate"},
+        )
+        cls.unit, _ = Unit.objects.get_or_create(
+            name="%",
+            defaults={"dimensionless": True},
+        )
+        cls.prop.allowed_units.add(cls.unit)
+
+        for index in range(6):
+            catchment = CollectionCatchment.objects.create(
+                name=f"Primary Selection Catchment {index}",
+                region=cls.region,
+            )
+            d2d_collection = Collection.objects.create(
+                name=f"Primary Selection D2D {index}",
+                catchment=catchment,
+                waste_category=cls.bio_category,
+                collection_system=cls.d2d,
+                valid_from=date(2024, 1, 1),
+            )
+            d2d_collection.allowed_materials.add(cls.paper_bags)
+            CollectionPropertyValue.objects.create(
+                collection=d2d_collection,
+                property=cls.prop,
+                unit=cls.unit,
+                year=2024,
+                average=80,
+            )
+            Collection.objects.create(
+                name=f"Primary Selection Bring Point {index}",
+                catchment=catchment,
+                waste_category=cls.food_category,
+                collection_system=cls.bring_point,
+                valid_from=date(2024, 1, 1),
+            )
+
+        cls.no_collection_catchment = CollectionCatchment.objects.create(
+            name="Primary Selection No Collection",
+            region=cls.region,
+        )
+        Collection.objects.create(
+            name="Primary Selection No Collection",
+            catchment=cls.no_collection_catchment,
+            waste_category=cls.bio_category,
+            collection_system=cls.no_collection,
+            valid_from=date(2024, 1, 1),
+        )
+
+    def test_primary_selection_is_consistent_across_map_endpoints(self):
+        endpoints = {
+            "collection_system": "/waste_collection/api/waste-atlas/collection-system/",
+            "paper_bags": "/waste_collection/api/waste-atlas/paper-bags/",
+            "connection_rate": "/waste_collection/api/waste-atlas/connection-rate/",
+        }
+        responses = {
+            name: self.client.get(endpoint, {"country": "DE", "year": 2024})
+            for name, endpoint in endpoints.items()
+        }
+
+        for response in responses.values():
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        system_by_catchment = {
+            row["catchment_id"]: row["collection_system"]
+            for row in responses["collection_system"].data
+        }
+        bag_status_by_catchment = {
+            row["catchment_id"]: row["status"] for row in responses["paper_bags"].data
+        }
+        rate_by_catchment = {
+            row["catchment_id"]: row for row in responses["connection_rate"].data
+        }
+
+        d2d_catchment_ids = {
+            catchment.id
+            for catchment in CollectionCatchment.objects.filter(
+                name__startswith="Primary Selection Catchment"
+            )
+        }
+        for catchment_id in d2d_catchment_ids:
+            self.assertEqual(system_by_catchment[catchment_id], "Door to door")
+            self.assertEqual(bag_status_by_catchment[catchment_id], "allowed")
+            self.assertEqual(rate_by_catchment[catchment_id]["connection_rate"], 0.8)
+            self.assertTrue(rate_by_catchment[catchment_id]["is_door_to_door"])
+
+        self.assertEqual(
+            system_by_catchment[self.no_collection_catchment.id],
+            "No separate collection",
+        )
+        self.assertEqual(
+            bag_status_by_catchment[self.no_collection_catchment.id],
+            "No separate collection",
+        )
+        self.assertFalse(
+            rate_by_catchment[self.no_collection_catchment.id]["is_door_to_door"]
+        )
+
+    def test_primary_selection_query_count_is_bounded(self):
+        with self.assertNumQueries(3):
+            response = self.client.get(
+                "/waste_collection/api/waste-atlas/paper-bags/",
+                {"country": "DE", "year": 2024},
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 7)
+
+
 class BinConfigurationViewSetTests(APITestCase):
     """Tests for bin-configuration atlas endpoint."""
 

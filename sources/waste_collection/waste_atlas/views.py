@@ -546,10 +546,10 @@ class DenmarkPaperBagsMapView(DenmarkAtlasMapView):
 
 
 class DenmarkPlasticBagsMapView(DenmarkAtlasMapView):
-    """Map 47 — Use of compostable plastic bags for biowaste collection in Denmark."""
+    """Map 47 — Use of plastic bags for biowaste collection in Denmark."""
 
     template_name = "waste_atlas/karte47_plastic_bags_denmark.html"
-    map_title = "Use of compostable plastic bags for biowaste collection"
+    map_title = "Use of plastic bags for biowaste collection"
 
 
 class DenmarkCollectionSupportMapView(DenmarkAtlasMapView):

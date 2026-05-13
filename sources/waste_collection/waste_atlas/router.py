@@ -27,6 +27,8 @@ from .viewsets import (
     OrganicWasteRatioViewSet,
     PaperBagsStatusViewSet,
     PlasticBagsStatusViewSet,
+    RegularPlasticBagsStatusViewSet,
+    RegularPlasticCollectionSupportViewSet,
     ResidualCollectionAmountViewSet,
     ResidualCollectionCountViewSet,
     ResidualFeeSystemViewSet,
@@ -82,6 +84,16 @@ router.register(
     "plastic-bags",
     PlasticBagsStatusViewSet,
     basename="api-waste-atlas-plastic-bags",
+)
+router.register(
+    "regular-plastic-bags",
+    RegularPlasticBagsStatusViewSet,
+    basename="api-waste-atlas-regular-plastic-bags",
+)
+router.register(
+    "regular-plastic-collection-support",
+    RegularPlasticCollectionSupportViewSet,
+    basename="api-waste-atlas-regular-plastic-collection-support",
 )
 router.register(
     "collection-support",

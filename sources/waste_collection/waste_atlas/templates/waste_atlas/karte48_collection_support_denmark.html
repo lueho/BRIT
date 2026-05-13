@@ -10,20 +10,20 @@
       country:     '{{ country }}',
       year:        parseInt('{{ year }}', 10) || 2023,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
-      {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
+      nutsLevel:    parseInt('{{ nuts_level|default:"1" }}', 10),
       title:       'Accepted materials for biowaste collection aids',
-      dataUrl:     '/waste_collection/api/waste-atlas/collection-support/',
+      dataUrl:     '/waste_collection/api/waste-atlas/regular-plastic-collection-support/',
       dataField:   '_classified',
       categories: [
-        { value: 'paper_a_plastic_a', label: 'Paper allowed, compostable plastic bags allowed',       color: '#4caf50' },
-        { value: 'paper_f_plastic_a', label: 'Paper forbidden, compostable plastic bags allowed',      color: '#fdd835' },
-        { value: 'paper_a_plastic_f', label: 'Paper allowed, compostable plastic bags forbidden',      color: '#2196f3' },
-        { value: 'paper_a_plastic_n', label: 'Paper allowed, compostable plastic bags unknown',   color: '#90caf9' },
-        { value: 'paper_f_plastic_f', label: 'Paper forbidden, compostable plastic bags forbidden',     color: '#7e57c2' },
-        { value: 'paper_n_plastic_f', label: 'Paper unknown, compostable plastic bags forbidden',  color: '#ff7043' },
-        { value: 'no_collection',     label: 'No separate biowaste collection',  color: '#fff696' }
+        { value: 'paper_a_plastic_a', label: 'Paper allowed, plastic bags allowed',       color: '#4caf50' },
+        { value: 'paper_f_plastic_a', label: 'Paper forbidden, plastic bags allowed',      color: '#fdd835' },
+        { value: 'paper_a_plastic_f', label: 'Paper allowed, plastic bags forbidden',      color: '#2196f3' },
+        { value: 'paper_a_plastic_n', label: 'Paper allowed, plastic bags unknown',        color: '#90caf9' },
+        { value: 'paper_f_plastic_f', label: 'Paper forbidden, plastic bags forbidden',    color: '#7e57c2' },
+        { value: 'paper_n_plastic_f', label: 'Paper unknown, plastic bags forbidden',      color: '#ff7043' },
+        { value: 'no_collection',     label: 'No separate biowaste collection',            color: '#fff696' }
       ],
-      noDataColor: '#ffffff',
+      noDataColor: '#e0e0e0',
       noDataLabel: 'No data',
       legendTitle: 'Collection aids',
       fileBase:    'map48_collection_aids_denmark',

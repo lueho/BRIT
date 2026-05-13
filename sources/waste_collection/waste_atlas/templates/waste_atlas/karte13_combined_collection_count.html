@@ -10,7 +10,7 @@
       country:     '{{ country }}',
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
-      {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
+      nutsLevel:    parseInt('{{ nuts_level|default:"1" }}', 10),
       title:       'Annual collection count: Biowaste vs Residual waste',
       dataUrl:     '/waste_collection/api/waste-atlas/combined-collection-count/',
       dataField:   '_classified',
