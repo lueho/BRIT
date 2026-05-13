@@ -11,17 +11,17 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Collection frequency types for residual waste collection',
+      title:       'Collection frequency setting for residual-waste collection',
       dataUrl:     '/waste_collection/api/waste-atlas/residual-frequency-type/',
       dataField:   'frequency_type',
       categories: [
-        { value: 'Fixed-Seasonal', label: 'Seasonal', color: '#2e8b57' },
-        { value: 'Fixed-Flexible', label: 'Flexible', color: '#4169e1' },
-        { value: 'Fixed',          label: 'Fixed',      color: '#b0b0ff' }
+        { value: 'Fixed-Seasonal', label: 'Seasonally varying', color: '#2e8b57' },
+        { value: 'Fixed-Flexible', label: 'Flexible',            color: '#4169e1' },
+        { value: 'Fixed',          label: 'Fixed',               color: '#b0b0ff' }
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'No data',
-      legendTitle: 'Collection schedule',
+      legendTitle: 'Collection frequency setting',
       fileBase:    'residual_collection_schedule'
     });
   });

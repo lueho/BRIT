@@ -11,36 +11,33 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Annual collection-count ratio: biowaste vs residual waste',
-      dataUrl:     '/waste_collection/api/waste-atlas/collection-count-ratio/',
+      title:       'Collection points: biowaste vs residual waste',
+      dataUrl:     '/waste_collection/api/waste-atlas/collection-point-count-ratio/',
       dataField:   '_classified',
       categories: [
-        { value: 'bio_2x',    label: '2 : 1 (biowaste collected twice as often)',    exportLabel: '2:1 bio > residual',  color: '#1b9e77' },
-        { value: 'same',      label: '1 : 1 (collected equally often)',              exportLabel: '1:1 equal',           color: '#7570b3' },
-        { value: 'bio_half',  label: '1 : 2 (residual collected twice as often)',   exportLabel: '1:2 bio < residual',  color: '#d95f02' },
-        { value: 'seasonal',  label: 'Seasonally varying ratio',                    exportLabel: 'Seasonal',            color: '#F4A460' },
-        { value: 'no_bio',    label: 'No door-to-door biowaste collection',         exportLabel: 'No D2D bio',          color: '#fff696' }
+        { value: 'bio_more', label: 'More biowaste than residual points',    exportLabel: 'Bio > residual', color: '#1b9e77' },
+        { value: 'same',     label: 'Equal number of points',                exportLabel: 'Equal',          color: '#7570b3' },
+        { value: 'bio_less', label: 'Fewer biowaste than residual points',   exportLabel: 'Bio < residual', color: '#d95f02' },
+        { value: 'no_bio',   label: 'No biowaste collection-point data',     exportLabel: 'No bio data',    color: '#fff696' }
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'No data',
-      legendTitle: 'Bio : residual count',
-      fileBase:    'collection_count_ratio',
+      legendTitle: 'Bio / residual points',
+      fileBase:    'collection_point_count_ratio',
       transformData: function (records) {
         return records.map(function (r) {
           var cls;
           if (r.bio_is_door_to_door === false ||
               (r.bio_is_door_to_door == null && r.residual_count != null)) {
             cls = 'no_bio';
-          } else if (r.bio_has_seasonal_variation) {
-            cls = 'seasonal';
           } else if (r.bio_count === null || r.bio_count === undefined) {
             cls = null;
           } else if (r.ratio === null || r.ratio === undefined) {
             cls = null;
-          } else if (r.ratio > 1.5) {
-            cls = 'bio_2x';
-          } else if (r.ratio < 0.67) {
-            cls = 'bio_half';
+          } else if (r.ratio > 1.05) {
+            cls = 'bio_more';
+          } else if (r.ratio < 0.95) {
+            cls = 'bio_less';
           } else {
             cls = 'same';
           }

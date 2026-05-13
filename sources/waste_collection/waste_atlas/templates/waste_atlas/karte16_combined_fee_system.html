@@ -11,40 +11,34 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Fee system: Biowaste vs Residual waste',
+      title:       'Fee system: biowaste vs residual waste',
       dataUrl:     '/waste_collection/api/waste-atlas/combined-fee-system/',
       dataField:   '_classified',
       categories: [
-        { value: 'flex_flex',    label: 'Biowaste flexible, residual waste flexible', exportLabel: 'Flexible / flexible', color: '#a6cee3' },
-        { value: 'payt_payt',    label: 'Biowaste PAYT, residual waste PAYT', exportLabel: 'PAYT / PAYT', color: '#4b2a60' },
-        { value: 'free_flex',    label: 'Biowaste free of charge, residual waste flexible', exportLabel: 'Free / flexible', color: '#1f78b4' },
-        { value: 'other',        label: 'Other combinations',                  color: '#66c2a5' },
-        { value: 'no_bio',       label: 'No separate biowaste collection', exportLabel: 'No separate bio', color: '#FFF696' }
+        { value: 'no_fee_payt', label: 'Biowaste: no separate fee — Residual: PAYT',   exportLabel: 'No fee / PAYT',  color: '#1b9e77' },
+        { value: 'flat_payt',   label: 'Biowaste: flat fee — Residual: PAYT',           exportLabel: 'Flat fee / PAYT', color: '#7570b3' },
+        { value: 'flex_payt',   label: 'Biowaste: flexible — Residual: PAYT',           exportLabel: 'Flexible / PAYT', color: '#d95f02' },
+        { value: 'other',       label: 'Other combinations',                            exportLabel: 'Other',           color: '#66c2a5' },
+        { value: 'no_bio',      label: 'No door-to-door biowaste collection',           exportLabel: 'No D2D bio',      color: '#fff696' }
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'No data',
-      legendTitle: 'Fee system',
-      exportLegendTitle: 'Fee: bio / residual',
+      legendTitle: 'Fee: bio / residual',
       fileBase:    'combined_fee_system',
       transformData: function (records) {
-        function key(fee) {
-          if (fee === 'Flexible' || fee === 'Flexible+') return 'flex';
-          if (fee === 'Pay as you throw (PAYT)') return 'payt';
-          if (fee === 'No fee') return 'free';
-          if (fee === 'Flat fee') return 'flat';
-          return fee;
-        }
         return records.map(function (r) {
           var cls;
-          if (r.bio_fee === 'No separate collection') {
+          var noSep = ['No separate collection', 'Recycling centre', 'Bring point'];
+          if (noSep.indexOf(r.bio_fee) !== -1) {
             cls = 'no_bio';
+          } else if (r.bio_fee === 'No fee' && r.residual_fee === 'Pay as you throw (PAYT)') {
+            cls = 'no_fee_payt';
+          } else if (r.bio_fee === 'Flat fee' && r.residual_fee === 'Pay as you throw (PAYT)') {
+            cls = 'flat_payt';
+          } else if ((r.bio_fee === 'Flexible' || r.bio_fee === 'Flexible+') && r.residual_fee === 'Pay as you throw (PAYT)') {
+            cls = 'flex_payt';
           } else {
-            var b = key(r.bio_fee);
-            var re = key(r.residual_fee);
-            if (b === 'flex' && re === 'flex') cls = 'flex_flex';
-            else if (b === 'payt' && re === 'payt') cls = 'payt_payt';
-            else if (b === 'free' && re === 'flex') cls = 'free_flex';
-            else cls = 'other';
+            cls = 'other';
           }
           return { catchment_id: r.catchment_id, _classified: cls };
         });

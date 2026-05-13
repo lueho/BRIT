@@ -158,6 +158,7 @@ class CatchmentCollectionCountRatioSerializer(serializers.Serializer):
     ratio = serializers.FloatField(allow_null=True)
     bio_is_door_to_door = serializers.BooleanField(allow_null=True, required=False)
     residual_is_door_to_door = serializers.BooleanField(allow_null=True, required=False)
+    bio_has_seasonal_variation = serializers.BooleanField(required=False)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

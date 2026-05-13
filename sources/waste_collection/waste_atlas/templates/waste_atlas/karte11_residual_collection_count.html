@@ -11,15 +11,15 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Annual residual waste collection count',
+      title:       'Annual residual-waste collection count',
       dataUrl:     '/waste_collection/api/waste-atlas/residual-collection-count/',
       dataField:   '_classified',
       categories: [
-        { value: 'weekly',        label: 'Weekly',        color: '#08306B' },
-        { value: 'biweekly',      label: 'Every two weeks',   color: '#4292C6' },
-        { value: 'tri_weekly',    label: 'Every three weeks',   color: '#FDBF6F' },
-        { value: 'four_weekly',   label: 'Every four weeks',   color: '#A6CEE3' },
-        { value: 'seasonal',      label: 'Seasonally varying', color: '#e4595b' }
+        { value: 'twice_weekly', label: '104 per year (2× per week)',            color: '#08306B' },
+        { value: 'weekly',       label: '52 per year (weekly)',                   color: '#4292C6' },
+        { value: 'biweekly',     label: '26 per year (every 2 weeks)',            color: '#9ECAE1' },
+        { value: 'less_frequent', label: '< 26 per year (every 3–4 weeks)',      color: '#FDBF6F' },
+        { value: 'seasonal',     label: 'Seasonally varying (9 – 27 per year)',  color: '#e4595b' }
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'No data',
@@ -30,14 +30,14 @@
           var cls;
           if (r.has_seasonal_variation) {
             cls = 'seasonal';
-          } else if (r.collection_count >= 50) {
+          } else if (r.collection_count >= 90) {
+            cls = 'twice_weekly';
+          } else if (r.collection_count >= 40) {
             cls = 'weekly';
-          } else if (r.collection_count >= 24) {
+          } else if (r.collection_count >= 20) {
             cls = 'biweekly';
-          } else if (r.collection_count >= 16) {
-            cls = 'tri_weekly';
           } else {
-            cls = 'four_weekly';
+            cls = 'less_frequent';
           }
           return { catchment_id: r.catchment_id, _classified: cls };
         });
