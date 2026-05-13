@@ -434,3 +434,81 @@ class SplitSourceCellTests(SimpleTestCase):
         urls, notes = cmd._split_source_cell(None)
         self.assertEqual(urls, [])
         self.assertEqual(notes, [])
+
+    def test_space_separated_urls_are_split(self):
+        # Two URLs separated by a space (not a comma) must each be a separate entry.
+        raw = "https://example.com/a.pdf https://example.com/b.pdf"
+        urls, notes = cmd._split_source_cell(raw)
+        self.assertEqual(
+            urls, ["https://example.com/a.pdf", "https://example.com/b.pdf"]
+        )
+        self.assertEqual(notes, [])
+
+    def test_webarchive_url_not_split_at_inner_https(self):
+        # A web.archive.org URL embeds the original URL after the timestamp —
+        # the inner https:// must NOT cause a split.
+        raw = (
+            "https://example.com/doc.pdf "
+            "https://web.archive.org/web/20240712210145/"
+            "https://example.com/original/"
+        )
+        urls, notes = cmd._split_source_cell(raw)
+        self.assertEqual(len(urls), 2)
+        self.assertEqual(urls[0], "https://example.com/doc.pdf")
+        self.assertIn("web.archive.org", urls[1])
+        self.assertIn("https://example.com/original/", urls[1])
+
+    def test_partial_scheme_ttps_is_repaired(self):
+        # "ttps://…" missing leading 'h' must be repaired and added to flyer_urls,
+        # not stored as a plain text note (which would crash on Source.title max_length).
+        raw = "ttps://example.com/some-very-long-path-that-exceeds-50-characters"
+        urls, notes = cmd._split_source_cell(raw)
+        self.assertEqual(len(urls), 1)
+        self.assertTrue(urls[0].startswith("https://"))
+        self.assertEqual(notes, [])
+
+    def test_change_year_string_in_description(self):
+        # Change year value like '2025/2026' must not crash row parsing.
+        row = list(_make_row())
+        row[21] = "PAP"
+        row[22] = "2025/2026"
+        record = cmd._row_to_record(tuple(row))
+        self.assertIsNotNone(record)
+        self.assertIn("2025/2026", record["description"])
+
+
+class FrequencyNormalisationTests(SimpleTestCase):
+    """Tests for _normalise_frequency."""
+
+    def test_xx_per_year_mapped_to_126(self):
+        raw = (
+            "Fixed-Seasonal; xx per year "
+            "(2 per week from October - April, 3 per week from May - September)"
+        )
+        expected = (
+            "Fixed-Seasonal; 126 per year "
+            "(2 per week from October - April, 3 per week from May - September)"
+        )
+        self.assertEqual(cmd._normalise_frequency(raw), expected)
+
+    def test_known_frequency_passes_through_unchanged(self):
+        raw = "Fixed; 104 per year (2 per week)"
+        self.assertEqual(cmd._normalise_frequency(raw), raw)
+
+    def test_empty_string_passes_through(self):
+        self.assertEqual(cmd._normalise_frequency(""), "")
+
+    def test_row_to_record_applies_normalisation(self):
+        # Confirm the normalisation is applied when building a record.
+        raw_freq = (
+            "Fixed-Seasonal; xx per year "
+            "(2 per week from October - April, 3 per week from May - September)"
+        )
+        row = list(_make_row(frequency=raw_freq))
+        record = cmd._row_to_record(tuple(row))
+        self.assertIsNotNone(record)
+        self.assertEqual(
+            record["frequency"],
+            "Fixed-Seasonal; 126 per year "
+            "(2 per week from October - April, 3 per week from May - September)",
+        )

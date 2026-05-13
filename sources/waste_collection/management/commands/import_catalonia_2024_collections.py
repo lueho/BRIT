@@ -146,6 +146,22 @@ _COLLECTION_SYSTEM_MAP: dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------------
+# Collection frequency normalisation: Excel string → BRIT CollectionFrequency name
+#
+# Only entries that differ from what is stored in the DB are listed here.
+# The primary case is the "xx per year" placeholder used in the source
+# spreadsheet where the exact annual count was unknown; we calculate the
+# correct value from the seasonal breakdown stated in the parentheses.
+# ---------------------------------------------------------------------------
+_FREQUENCY_NORMALISE_MAP: dict[str, str] = {
+    # xx per year → 126: Oct–Apr (7 mo, 2×/wk) + May–Sep (5 mo, 3×/wk)
+    # = 2 × (7×365/12/7) + 3 × (5×365/12/7) ≈ 60.9 + 65.1 = 126
+    "Fixed-Seasonal; xx per year (2 per week from October - April, 3 per week from May - September)": (
+        "Fixed-Seasonal; 126 per year (2 per week from October - April, 3 per week from May - September)"
+    ),
+}
+
+# ---------------------------------------------------------------------------
 # Fee system mapping: Excel label → BRIT FeeSystem name
 # ---------------------------------------------------------------------------
 _FEE_SYSTEM_MAP: dict[str, str] = {
@@ -164,15 +180,24 @@ _BROKEN_WEBARCHIVE_RE = re.compile(
     re.IGNORECASE,
 )
 _URL_START_RE = re.compile(r"https?://", re.IGNORECASE)
+# Partial scheme patterns that arise from copy-paste corruption (e.g. "ttps://…").
+_PARTIAL_SCHEME_RE = re.compile(r"t{1,2}ps?://", re.IGNORECASE)
 
 
 def _split_source_cell(raw) -> tuple[list[str], list[str]]:
-    """Split a source cell into (urls, notes)."""
+    """Split a source cell into (urls, notes).
+
+    Handles comma-separated entries as well as space-separated URL pairs that
+    occasionally appear in the source data (e.g. ``url1 url2`` without a
+    comma delimiter).  Also repairs truncated schemes such as ``ttps://``
+    (missing leading ``h``) to avoid storing them as plain text notes, which
+    would crash when the importer tries to write them into a 50-char DB column.
+    """
     text = " ".join(str(raw or "").split())
     if not text:
         return [], []
     text = _BROKEN_WEBARCHIVE_RE.sub(r"\1\2", text)
-    if _URL_START_RE.search(text) is None:
+    if _URL_START_RE.search(text) is None and not _PARTIAL_SCHEME_RE.search(text):
         return [], [text]
     urls: list[str] = []
     notes: list[str] = []
@@ -181,7 +206,26 @@ def _split_source_cell(raw) -> tuple[list[str], list[str]]:
         if not part:
             continue
         if part.lower().startswith("http"):
-            urls.append(part)
+            # A single comma-separated token can itself contain two URLs joined
+            # by a space (no comma).  Re-split on embedded "http" boundaries,
+            # but only on boundaries preceded by a space (not inside
+            # web.archive.org paths which embed the original URL in the path).
+            scheme_matches = list(re.finditer(r"(?<=\s)https?://", part, re.IGNORECASE))
+            if not scheme_matches:
+                urls.append(part)
+            else:
+                boundaries = [0] + [m.start() for m in scheme_matches] + [len(part)]
+                for start, end in zip(boundaries, boundaries[1:], strict=False):
+                    token = part[start:end].rstrip()
+                    if token:
+                        urls.append(token)
+        elif _PARTIAL_SCHEME_RE.match(part):
+            # Repair a truncated scheme (e.g. "ttps://" → "https://").
+            if part.lower().startswith("ttps://") or part.lower().startswith("tps://"):
+                repaired = "h" + part
+            else:
+                repaired = "ht" + part
+            urls.append(repaired)
         else:
             notes.append(part)
     return urls, notes
@@ -236,6 +280,16 @@ def _map_fee_system(raw: str | None) -> str:
         return ""
     key = raw.strip().lower()
     return _FEE_SYSTEM_MAP.get(key, "")
+
+
+def _normalise_frequency(raw: str) -> str:
+    """Return the canonical BRIT CollectionFrequency name for *raw*.
+
+    Looks up *raw* in ``_FREQUENCY_NORMALISE_MAP`` and returns the mapped
+    value when a correction exists (e.g. ``xx per year`` → calculated count).
+    Falls through unchanged for any string not listed in the map.
+    """
+    return _FREQUENCY_NORMALISE_MAP.get(raw, raw)
 
 
 def _to_float_or_none(value) -> float | None:
@@ -364,10 +418,15 @@ def _row_to_record(row: tuple) -> dict | None:
         description_parts.append(comments)
     change_impl = str(row[21] or "").strip()
     change_year = row[22]
-    if change_impl and change_year:
-        description_parts.append(
-            f"Implementation change: {change_impl} ({int(change_year)})"
+    if change_impl and change_year is not None:
+        # change_year may be an int or a string like "2025/2026"
+        year_str = (
+            str(int(change_year))
+            if isinstance(change_year, (int, float))
+            and not isinstance(change_year, bool)
+            else str(change_year).strip()
         )
+        description_parts.append(f"Implementation change: {change_impl} ({year_str})")
     elif change_impl:
         description_parts.append(f"Implementation change: {change_impl}")
 
@@ -380,7 +439,7 @@ def _row_to_record(row: tuple) -> dict | None:
         "allowed_materials": "",
         "forbidden_materials": "",
         "fee_system": _map_fee_system(row[19]),
-        "frequency": str(row[17] or "").strip(),
+        "frequency": _normalise_frequency(str(row[17] or "").strip()),
         "connection_type": "",
         "min_bin_size": _to_float_or_none(row[20]),
         "required_bin_capacity": None,
@@ -517,6 +576,49 @@ class Command(BaseCommand):
             default=_BATCH_SIZE,
             help=f"Number of records per API request (default: {_BATCH_SIZE}).",
         )
+        parser.add_argument(
+            "--create-collectors",
+            action="store_true",
+            help=(
+                "Pre-create any collector names from the workbook that are not yet "
+                "in the database.  Requires Django ORM access (i.e. the command must "
+                "run inside the container).  Has no effect during a dry run."
+            ),
+        )
+
+    # ------------------------------------------------------------------
+    # Collector pre-creation
+    # ------------------------------------------------------------------
+
+    def _ensure_collectors_exist(self, records: list[dict], owner) -> None:
+        """Create any collector names found in *records* that are not yet in the DB.
+
+        Uses the Django ORM directly, so this must run inside the container.
+        New collectors are created as private drafts owned by *owner*.
+        """
+        from sources.waste_collection.models import Collector  # noqa: PLC0415
+
+        # Collect unique non-empty names
+        names = sorted(
+            {r["collector_name"] for r in records if r.get("collector_name")}
+        )
+        existing = set(
+            Collector.objects.filter(name__in=names).values_list("name", flat=True)
+        )
+        missing = [n for n in names if n not in existing]
+        if not missing:
+            self.stdout.write("All collector names already exist in the database.\n")
+            return
+
+        created = []
+        for name in missing:
+            Collector.objects.get_or_create(name=name, defaults={"owner": owner})
+            created.append(name)
+
+        self.stdout.write(
+            f"Pre-created {len(created)} collector(s): "
+            f"{', '.join(created[:5])}" + (" …" if len(created) > 5 else "") + "\n"
+        )
 
     # ------------------------------------------------------------------
     # Auth helpers
@@ -619,6 +721,17 @@ class Command(BaseCommand):
             f"Loaded {len(records)} importable records "
             f"(skipped {len(pre_skip_warnings)} in pre-flight).\n"
         )
+
+        # Pre-create missing collectors by name (ORM, runs only inside container).
+        if options.get("create_collectors") and not dry_run:
+            from django.contrib.auth import get_user_model  # noqa: PLC0415
+            from rest_framework.authtoken.models import Token  # noqa: PLC0415
+
+            try:
+                orm_owner = Token.objects.select_related("user").get(key=token).user
+            except Exception:
+                orm_owner = get_user_model().objects.filter(is_staff=True).first()
+            self._ensure_collectors_exist(records, owner=orm_owner)
 
         totals = {
             "created": 0,
