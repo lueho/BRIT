@@ -26,6 +26,15 @@ ITALY_SOUTH_TYROL_MAP_ROUTES = {
         "IT": "waste-atlas-italy-collection-point-count-map",
         "IT-ST": "waste-atlas-south-tyrol-collection-point-count-map",
     },
+    "biowaste_collection_point_count": {
+        "IT-ST": "waste-atlas-south-tyrol-biowaste-collection-point-count-map",
+    },
+    "residual_collection_point_count": {
+        "IT-ST": "waste-atlas-south-tyrol-residual-collection-point-count-map",
+    },
+    "collection_point_count_ratio": {
+        "IT-ST": "waste-atlas-south-tyrol-collection-point-count-ratio-map",
+    },
     "residual_frequency": {
         "IT": "waste-atlas-italy-residual-frequency-map",
         "IT-ST": "waste-atlas-south-tyrol-residual-frequency-map",
@@ -47,6 +56,9 @@ ITALY_SOUTH_TYROL_MAP_ROUTES = {
     },
     "combined_collection_count": {
         "IT-ST": "waste-atlas-south-tyrol-combined-collection-count-map",
+    },
+    "residual_fee_system": {
+        "IT-ST": "waste-atlas-south-tyrol-residual-fee-system-map",
     },
     "biowaste_fee_system": {
         "IT-ST": "waste-atlas-south-tyrol-biowaste-fee-system-map",
@@ -362,15 +374,33 @@ class SouthTyrolCollectionPointCountMapView(SouthTyrolAtlasMapView):
     map_route_key = "collection_point_count"
 
 
+class SouthTyrolBiowasteCollectionPointCountMapView(SouthTyrolAtlasMapView):
+    template_name = "waste_atlas/karte45_biowaste_collection_point_count.html"
+    map_title = "Number of biowaste collection points"
+    map_route_key = "biowaste_collection_point_count"
+
+
+class SouthTyrolResidualCollectionPointCountMapView(SouthTyrolAtlasMapView):
+    template_name = "waste_atlas/karte46_residual_collection_point_count.html"
+    map_title = "Number of residual-waste collection points"
+    map_route_key = "residual_collection_point_count"
+
+
+class SouthTyrolCollectionPointCountRatioMapView(SouthTyrolAtlasMapView):
+    template_name = "waste_atlas/karte47_collection_point_count_ratio.html"
+    map_title = "Collection points: biowaste vs residual waste"
+    map_route_key = "collection_point_count_ratio"
+
+
 class SouthTyrolResidualFrequencyMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte8_residual_frequency.html"
-    map_title = "Collection frequency types for residual-waste collection"
+    map_title = "Collection frequency setting for residual-waste collection"
     map_route_key = "residual_frequency"
 
 
 class SouthTyrolBiowasteFrequencyMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte9_biowaste_frequency.html"
-    map_title = "Collection frequency types for biowaste collection"
+    map_title = "Collection frequency setting for biowaste collection"
     map_route_key = "biowaste_frequency"
 
 
@@ -388,7 +418,7 @@ class SouthTyrolBiowasteCollectionCountMapView(SouthTyrolAtlasMapView):
 
 class SouthTyrolCombinedFrequencyMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte10_combined_frequency.html"
-    map_title = "Collection frequency type: biowaste vs residual waste"
+    map_title = "Collection frequency setting: biowaste vs residual waste"
     map_route_key = "combined_frequency"
 
 
@@ -396,6 +426,12 @@ class SouthTyrolCombinedCollectionCountMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte13_combined_collection_count.html"
     map_title = "Annual collection count: biowaste vs residual waste"
     map_route_key = "combined_collection_count"
+
+
+class SouthTyrolResidualFeeSystemMapView(SouthTyrolAtlasMapView):
+    template_name = "waste_atlas/karte14_residual_fee_system.html"
+    map_title = "Fee system for residual-waste collection"
+    map_route_key = "residual_fee_system"
 
 
 class SouthTyrolBiowasteFeeSystemMapView(SouthTyrolAtlasMapView):
@@ -485,6 +521,42 @@ class DenmarkOrgaLevelMapView(AtlasMapView):
     default_country = "DK"
     default_year = "2023"
     map_overview_label = "Map overview"
+
+
+class DenmarkAtlasMapView(AtlasMapView):
+    default_country = "DK"
+    default_year = "2023"
+    map_overview_label = "Map overview"
+    allow_country_override = False
+    allow_nuts_override = False
+
+
+class DenmarkFoodWasteCategoryMapView(DenmarkAtlasMapView):
+    """Map 45 — Accepted food-waste categories in biowaste in Denmark."""
+
+    template_name = "waste_atlas/karte45_food_waste_category_denmark.html"
+    map_title = "Accepted food-waste categories in biowaste"
+
+
+class DenmarkPaperBagsMapView(DenmarkAtlasMapView):
+    """Map 46 — Use of paper bags for biowaste collection in Denmark."""
+
+    template_name = "waste_atlas/karte46_paper_bags_denmark.html"
+    map_title = "Use of paper bags for biowaste collection"
+
+
+class DenmarkPlasticBagsMapView(DenmarkAtlasMapView):
+    """Map 47 — Use of compostable plastic bags for biowaste collection in Denmark."""
+
+    template_name = "waste_atlas/karte47_plastic_bags_denmark.html"
+    map_title = "Use of compostable plastic bags for biowaste collection"
+
+
+class DenmarkCollectionSupportMapView(DenmarkAtlasMapView):
+    """Map 48 — Accepted materials for biowaste collection aids in Denmark."""
+
+    template_name = "waste_atlas/karte48_collection_support_denmark.html"
+    map_title = "Accepted materials for collection aids"
 
 
 class NetherlandsOrgaLevelMapView(AtlasMapView):

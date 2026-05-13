@@ -4333,6 +4333,22 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
+            reverse("waste-atlas-denmark-food-waste-category-map"),
+        )
+        self.assertContains(
+            response,
+            reverse("waste-atlas-denmark-paper-bags-map"),
+        )
+        self.assertContains(
+            response,
+            reverse("waste-atlas-denmark-plastic-bags-map"),
+        )
+        self.assertContains(
+            response,
+            reverse("waste-atlas-denmark-collection-support-map"),
+        )
+        self.assertContains(
+            response,
             f"{reverse('waste-atlas-biowaste-collection-amount-map')}?country=DK&amp;year=2023",
         )
         self.assertContains(

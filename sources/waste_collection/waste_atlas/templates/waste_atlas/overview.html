@@ -108,7 +108,7 @@
         <div class="card h-100">
           <div class="card-body">
             <h2 class="h5">Germany</h2>
-            <p class="small text-muted">Complete thematic map set.</p>
+            <p class="small text-muted">Complete thematic map set with Baden-Württemberg &amp; Rheinland-Pfalz case study.</p>
             <a class="btn btn-primary btn-sm" href="#atlas-germany">Show Germany maps</a>
           </div>
         </div>
@@ -134,89 +134,114 @@
     </div>
 
     <section id="atlas-germany" class="mb-4">
-      <div class="d-flex align-items-baseline justify-content-between mb-2">
-        <h2 class="h4 mb-0">Germany</h2>
-        <span class="text-muted small">Default: DE, current map year</span>
-      </div>
-      <div class="accordion" id="atlasGermanyAccordion">
-        <div class="accordion-item">
-          <h3 class="accordion-header" id="germanySystemsHeading">
-            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#germanySystems" aria-expanded="true" aria-controls="germanySystems">
-              Collection systems, bins, organization &amp; materials
-            </button>
-          </h3>
-          <div id="germanySystems" class="accordion-collapse collapse show" aria-labelledby="germanySystemsHeading" data-bs-parent="#atlasGermanyAccordion">
-            <div class="accordion-body">
-              <p class="small text-muted">Where collection happens, which bins are required or available, at which administrative level, and which materials or aids are accepted.</p>
+      <h2 class="h4 mb-3">Germany &amp; Baden-Württemberg/Rheinland-Pfalz</h2>
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="card h-100"><div class="card-header"><strong>Germany</strong></div><div class="card-body">
+            <div class="atlas-link-group">
+              <div class="atlas-link-group-title">Collection systems, bins, organization &amp; materials</div>
               <div class="d-flex flex-wrap gap-2">
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-admin" href="{% url 'waste-atlas-orga-level-map' %}">Administrative level</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-system" href="{% url 'waste-atlas-collection-system-map' %}">Biowaste collection systems</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-system" href="{% url 'waste-atlas-connection-rate-map' %}">Connection rate</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-food-waste-category-map' %}">Accepted food waste</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-paper-bags-map' %}">Paper products</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-plastic-bags-map' %}">Plastic bags</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-collection-support-map' %}">Collection aids</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-system" href="{% url 'waste-atlas-green-waste-collection-system-count-map' %}">Green waste system count</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-bin" href="{% url 'waste-atlas-biowaste-min-bin-size-map' %}">Biowaste bin size</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-bin" href="{% url 'waste-atlas-residual-min-bin-size-map' %}">Residual waste bin size</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-bin" href="{% url 'waste-atlas-biowaste-required-bin-capacity-map' %}">Biowaste bin capacity</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-bin" href="{% url 'waste-atlas-residual-required-bin-capacity-map' %}">Residual waste bin capacity</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-admin" href="{% url 'waste-atlas-germany-orga-level-map' %}">Administrative level</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-system" href="{% url 'waste-atlas-germany-collection-system-map' %}">Biowaste collection systems</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-system" href="{% url 'waste-atlas-germany-connection-rate-map' %}">Connection rate</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-germany-food-waste-category-map' %}">Accepted food waste</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-germany-paper-bags-map' %}">Paper products</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-germany-plastic-bags-map' %}">Plastic bags</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-germany-collection-support-map' %}">Collection aids</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-system" href="{% url 'waste-atlas-germany-green-waste-collection-system-count-map' %}">Green waste system count</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-bin" href="{% url 'waste-atlas-germany-biowaste-min-bin-size-map' %}">Biowaste bin size</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-bin" href="{% url 'waste-atlas-germany-residual-min-bin-size-map' %}">Residual waste bin size</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-bin" href="{% url 'waste-atlas-germany-biowaste-required-bin-capacity-map' %}">Biowaste bin capacity</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-bin" href="{% url 'waste-atlas-germany-residual-required-bin-capacity-map' %}">Residual waste bin capacity</a>
               </div>
             </div>
-          </div>
-        </div>
-        <div class="accordion-item">
-          <h3 class="accordion-header" id="germanyFrequencyHeading">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#germanyFrequency" aria-expanded="false" aria-controls="germanyFrequency">
-              Schedule &amp; collection count
-            </button>
-          </h3>
-          <div id="germanyFrequency" class="accordion-collapse collapse" aria-labelledby="germanyFrequencyHeading" data-bs-parent="#atlasGermanyAccordion">
-            <div class="accordion-body">
-              <p class="small text-muted">Schedule maps show how collection schedules are organized; collection-count maps show the resulting number of actual collection days per year.</p>
+            <div class="atlas-link-group">
+              <div class="atlas-link-group-title">Schedule &amp; collection count</div>
               <div class="d-flex flex-wrap gap-2">
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-schedule" href="{% url 'waste-atlas-residual-frequency-map' %}">Residual waste schedule</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-schedule" href="{% url 'waste-atlas-biowaste-frequency-map' %}">Biowaste schedule</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-schedule" href="{% url 'waste-atlas-combined-frequency-map' %}">Combined schedule</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-count" href="{% url 'waste-atlas-residual-collection-count-map' %}">Residual waste collection count</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-count" href="{% url 'waste-atlas-biowaste-collection-count-map' %}">Biowaste collection count</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-count" href="{% url 'waste-atlas-combined-collection-count-map' %}">Combined collection count</a>
-                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-count" href="{% url 'waste-atlas-collection-count-ratio-map' %}">Collection-count ratio</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-schedule" href="{% url 'waste-atlas-germany-residual-frequency-map' %}">Residual waste schedule</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-schedule" href="{% url 'waste-atlas-germany-biowaste-frequency-map' %}">Biowaste schedule</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-schedule" href="{% url 'waste-atlas-germany-combined-frequency-map' %}">Combined schedule</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-count" href="{% url 'waste-atlas-germany-residual-collection-count-map' %}">Residual waste collection count</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-count" href="{% url 'waste-atlas-germany-biowaste-collection-count-map' %}">Biowaste collection count</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-count" href="{% url 'waste-atlas-germany-combined-collection-count-map' %}">Combined collection count</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-count" href="{% url 'waste-atlas-germany-collection-count-ratio-map' %}">Collection-count ratio</a>
               </div>
             </div>
-          </div>
+            <div class="atlas-link-group">
+              <div class="atlas-link-group-title">Fees</div>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-fee" href="{% url 'waste-atlas-germany-residual-fee-system-map' %}">Residual waste fees</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-fee" href="{% url 'waste-atlas-germany-biowaste-fee-system-map' %}">Biowaste fees</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-fee" href="{% url 'waste-atlas-germany-combined-fee-system-map' %}">Combined fees</a>
+              </div>
+            </div>
+            <div class="atlas-link-group">
+              <div class="atlas-link-group-title">Collected amounts and ratios</div>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-residual" href="{% url 'waste-atlas-germany-residual-collection-amount-map' %}">Residual waste amount</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-bio" href="{% url 'waste-atlas-germany-biowaste-collection-amount-map' %}">Biowaste amount</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-ratio" href="{% url 'waste-atlas-germany-waste-ratio-map' %}">Amount ratio</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-admin" href="{% url 'waste-atlas-germany-population-density-map' %}">Population density</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-bio" href="{% url 'waste-atlas-germany-green-waste-collection-amount-map' %}">Green waste amount</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-organic" href="{% url 'waste-atlas-germany-organic-collection-amount-map' %}">Organic-fraction amount</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-ratio" href="{% url 'waste-atlas-germany-organic-waste-ratio-map' %}">Organic-fraction share</a>
+              </div>
+            </div>
+          </div></div>
         </div>
-        <div class="accordion-item">
-          <h3 class="accordion-header" id="germanyAmountsHeading">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#germanyAmounts" aria-expanded="false" aria-controls="germanyAmounts">
-              Fees &amp; collected amounts
-            </button>
-          </h3>
-          <div id="germanyAmounts" class="accordion-collapse collapse" aria-labelledby="germanyAmountsHeading" data-bs-parent="#atlasGermanyAccordion">
-            <div class="accordion-body">
-              <p class="small text-muted">Fee logic plus all collected amount maps and amount ratios.</p>
-              <div class="atlas-link-group">
-                <div class="atlas-link-group-title">Fees</div>
-                <div class="d-flex flex-wrap gap-2">
-                  <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-fee" href="{% url 'waste-atlas-residual-fee-system-map' %}">Residual waste fees</a>
-                  <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-fee" href="{% url 'waste-atlas-biowaste-fee-system-map' %}">Biowaste fees</a>
-                  <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-fee" href="{% url 'waste-atlas-combined-fee-system-map' %}">Combined fees</a>
-                </div>
-              </div>
-              <div class="atlas-link-group">
-                <div class="atlas-link-group-title">Collected amounts and ratios</div>
-                <div class="d-flex flex-wrap gap-2">
-                  <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-residual" href="{% url 'waste-atlas-residual-collection-amount-map' %}">Residual waste amount</a>
-                  <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-bio" href="{% url 'waste-atlas-biowaste-collection-amount-map' %}">Biowaste amount</a>
-                  <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-ratio" href="{% url 'waste-atlas-waste-ratio-map' %}">Amount ratio</a>
-                  <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-admin" href="{% url 'waste-atlas-population-density-map' %}">Population density</a>
-                  <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-bio" href="{% url 'waste-atlas-green-waste-collection-amount-map' %}">Green waste amount</a>
-                  <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-organic" href="{% url 'waste-atlas-organic-collection-amount-map' %}">Organic-fraction amount</a>
-                  <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-ratio" href="{% url 'waste-atlas-organic-waste-ratio-map' %}">Organic-fraction share</a>
-                </div>
+        <div class="col-lg-6">
+          <div class="card h-100"><div class="card-header"><strong>Baden-Württemberg &amp; Rheinland-Pfalz</strong></div><div class="card-body">
+            <p class="small text-muted mb-3">Case study maps for Baden-Württemberg (DE1) and Rheinland-Pfalz (DEB).</p>
+            <div class="atlas-link-group">
+              <div class="atlas-link-group-title">Collection systems, bins, organization &amp; materials</div>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-admin" href="{% url 'waste-atlas-bw-rp-orga-level-map' %}">Administrative level</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-system" href="{% url 'waste-atlas-bw-rp-collection-system-map' %}">Biowaste collection systems</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-system" href="{% url 'waste-atlas-bw-rp-connection-rate-map' %}">Connection rate</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-bw-rp-food-waste-category-map' %}">Accepted food waste</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-bw-rp-paper-bags-map' %}">Paper products</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-bw-rp-plastic-bags-map' %}">Plastic bags</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-bw-rp-collection-support-map' %}">Collection aids</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-system" href="{% url 'waste-atlas-bw-rp-green-waste-collection-system-count-map' %}">Green waste system count</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-bin" href="{% url 'waste-atlas-bw-rp-biowaste-min-bin-size-map' %}">Biowaste bin size</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-bin" href="{% url 'waste-atlas-bw-rp-residual-min-bin-size-map' %}">Residual waste bin size</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-bin" href="{% url 'waste-atlas-bw-rp-biowaste-required-bin-capacity-map' %}">Biowaste bin capacity</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-bin" href="{% url 'waste-atlas-bw-rp-residual-required-bin-capacity-map' %}">Residual waste bin capacity</a>
               </div>
             </div>
-          </div>
+            <div class="atlas-link-group">
+              <div class="atlas-link-group-title">Schedule &amp; collection count</div>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-schedule" href="{% url 'waste-atlas-bw-rp-residual-frequency-map' %}">Residual waste schedule</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-schedule" href="{% url 'waste-atlas-bw-rp-biowaste-frequency-map' %}">Biowaste schedule</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-schedule" href="{% url 'waste-atlas-bw-rp-combined-frequency-map' %}">Combined schedule</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-count" href="{% url 'waste-atlas-bw-rp-residual-collection-count-map' %}">Residual waste collection count</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-count" href="{% url 'waste-atlas-bw-rp-biowaste-collection-count-map' %}">Biowaste collection count</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-count" href="{% url 'waste-atlas-bw-rp-combined-collection-count-map' %}">Combined collection count</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-count" href="{% url 'waste-atlas-bw-rp-collection-count-ratio-map' %}">Collection-count ratio</a>
+              </div>
+            </div>
+            <div class="atlas-link-group">
+              <div class="atlas-link-group-title">Fees</div>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-fee" href="{% url 'waste-atlas-bw-rp-residual-fee-system-map' %}">Residual waste fees</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-fee" href="{% url 'waste-atlas-bw-rp-biowaste-fee-system-map' %}">Biowaste fees</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-fee" href="{% url 'waste-atlas-bw-rp-combined-fee-system-map' %}">Combined fees</a>
+              </div>
+            </div>
+            <div class="atlas-link-group">
+              <div class="atlas-link-group-title">Collected amounts and ratios</div>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-residual" href="{% url 'waste-atlas-bw-rp-residual-collection-amount-map' %}">Residual waste amount</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-bio" href="{% url 'waste-atlas-bw-rp-biowaste-collection-amount-map' %}">Biowaste amount</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-ratio" href="{% url 'waste-atlas-bw-rp-waste-ratio-map' %}">Amount ratio</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-admin" href="{% url 'waste-atlas-bw-rp-population-density-map' %}">Population density</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-bio" href="{% url 'waste-atlas-bw-rp-green-waste-collection-amount-map' %}">Green waste amount</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-organic" href="{% url 'waste-atlas-bw-rp-organic-collection-amount-map' %}">Organic-fraction amount</a>
+                <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-ratio" href="{% url 'waste-atlas-bw-rp-organic-waste-ratio-map' %}">Organic-fraction share</a>
+              </div>
+            </div>
+          </div></div>
         </div>
       </div>
     </section>
@@ -343,6 +368,15 @@
             <div class="atlas-link-group-title">Schedule organization and collection days</div>
             <div class="d-flex flex-wrap gap-2">
               <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-schedule" href="{% url 'waste-atlas-biowaste-frequency-map' %}?country=DK&amp;year=2023">Biowaste-bin schedule</a>
+            </div>
+          </div>
+          <div class="atlas-link-group">
+            <div class="atlas-link-group-title">Allowed materials and aids</div>
+            <div class="d-flex flex-wrap gap-2">
+              <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-denmark-food-waste-category-map' %}">Accepted food waste</a>
+              <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-denmark-paper-bags-map' %}">Paper products</a>
+              <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-denmark-plastic-bags-map' %}">Plastic bags</a>
+              <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-material" href="{% url 'waste-atlas-denmark-collection-support-map' %}">Collection aids</a>
             </div>
           </div>
           <div class="atlas-link-group">
