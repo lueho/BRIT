@@ -480,14 +480,44 @@ class SplitSourceCellTests(SimpleTestCase):
 class FrequencyNormalisationTests(SimpleTestCase):
     """Tests for _normalise_frequency."""
 
-    def test_xx_per_year_mapped_to_126(self):
+    def test_xx_per_year_mapped_to_canonical(self):
         raw = (
             "Fixed-Seasonal; xx per year "
             "(2 per week from October - April, 3 per week from May - September)"
         )
         expected = (
-            "Fixed-Seasonal; 126 per year "
-            "(2 per week from October - April, 3 per week from May - September)"
+            "Fixed-Seasonal; October-April 61 per year; May-September 66 per year"
+        )
+        self.assertEqual(cmd._normalise_frequency(raw), expected)
+
+    def test_205_per_year_mapped_to_canonical(self):
+        raw = (
+            "Fixed-Seasonal; 205 per year "
+            "(3 per week from October - June and 7 per week from July - September)"
+        )
+        expected = (
+            "Fixed-Seasonal; October-June 117 per year; July-September 88 per year"
+        )
+        self.assertEqual(cmd._normalise_frequency(raw), expected)
+
+    def test_165_per_year_mapped_to_canonical(self):
+        raw = (
+            "Fixed-Seasonal; 165 per year "
+            "(3 per week from September - June, 4 per week from July - August)"
+        )
+        expected = (
+            "Fixed-Seasonal; September-June 130 per year; July-August 35 per year"
+        )
+        self.assertEqual(cmd._normalise_frequency(raw), expected)
+
+    def test_169_per_year_mapped_to_canonical(self):
+        raw = (
+            "Fixed-Seasonal; 169 per year "
+            "(3 per week from mid September - mid June "
+            "& 4 per week from mid June - mid September)"
+        )
+        expected = (
+            "Fixed-Seasonal; September-June 130 per year; June-September 39 per year"
         )
         self.assertEqual(cmd._normalise_frequency(raw), expected)
 
@@ -509,6 +539,5 @@ class FrequencyNormalisationTests(SimpleTestCase):
         self.assertIsNotNone(record)
         self.assertEqual(
             record["frequency"],
-            "Fixed-Seasonal; 126 per year "
-            "(2 per week from October - April, 3 per week from May - September)",
+            "Fixed-Seasonal; October-April 61 per year; May-September 66 per year",
         )
