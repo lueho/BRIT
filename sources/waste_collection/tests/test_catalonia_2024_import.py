@@ -477,6 +477,57 @@ class SplitSourceCellTests(SimpleTestCase):
         self.assertIn("2025/2026", record["description"])
 
 
+class AccessControlMappingTests(SimpleTestCase):
+    """Tests for _map_access_control."""
+
+    def test_yes_returns_true(self):
+        self.assertIs(cmd._map_access_control("yes"), True)
+
+    def test_no_returns_false(self):
+        self.assertIs(cmd._map_access_control("no"), False)
+
+    def test_none_returns_none(self):
+        self.assertIsNone(cmd._map_access_control(None))
+
+    def test_case_insensitive(self):
+        self.assertIs(cmd._map_access_control("YES"), True)
+        self.assertIs(cmd._map_access_control("No"), False)
+
+    def test_slash_yes_no_uses_first_token(self):
+        # 'yes/no' on PAP parcial rows → first token = yes → True
+        self.assertIs(cmd._map_access_control("yes/no"), True)
+
+    def test_slash_no_yes_uses_first_token(self):
+        self.assertIs(cmd._map_access_control("no/yes"), False)
+
+    def test_slash_yes_yes_returns_true(self):
+        self.assertIs(cmd._map_access_control("yes/yes"), True)
+
+    def test_slash_no_no_returns_false(self):
+        self.assertIs(cmd._map_access_control("no/no"), False)
+
+    def test_unknown_value_returns_none(self):
+        self.assertIsNone(cmd._map_access_control("maybe"))
+
+    def test_row_to_record_yes_access_control(self):
+        row = list(_make_row())
+        row[14] = "yes"
+        record = cmd._row_to_record(tuple(row))
+        self.assertIs(record["access_control"], True)
+
+    def test_row_to_record_no_access_control(self):
+        row = list(_make_row())
+        row[14] = "no"
+        record = cmd._row_to_record(tuple(row))
+        self.assertIs(record["access_control"], False)
+
+    def test_row_to_record_none_access_control(self):
+        row = list(_make_row())
+        row[14] = None
+        record = cmd._row_to_record(tuple(row))
+        self.assertIsNone(record["access_control"])
+
+
 class FrequencyNormalisationTests(SimpleTestCase):
     """Tests for _normalise_frequency."""
 

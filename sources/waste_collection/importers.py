@@ -366,6 +366,7 @@ class CollectionImporter:
         fee_system = self._resolve_fee_system(record, label, stats)
         frequency = self._resolve_frequency(record, label, stats)
         connection_type = self._resolve_connection_type(record, label, stats)
+        access_control = record.get("access_control")  # bool or None, no mapping needed
         bin_configuration = self._resolve_bin_configuration(record, label, stats)
         established = record.get("established")
         bin_cap_ref = self._resolve_bin_capacity_reference(record)
@@ -441,6 +442,17 @@ class CollectionImporter:
                 )
                 collection.connection_type = connection_type
                 update_fields.append("connection_type")
+
+            # Update access_control if provided and different
+            if (
+                access_control is not None
+                and collection.access_control != access_control
+            ):
+                changes.append(
+                    f"access_control: {collection.access_control} → {access_control}"
+                )
+                collection.access_control = access_control
+                update_fields.append("access_control")
 
             # Update bin_configuration if different
             if bin_configuration and collection.bin_configuration_id != (
@@ -590,6 +602,7 @@ class CollectionImporter:
                 valid_from=valid_from,
                 valid_until=valid_until,
                 connection_type=connection_type,
+                access_control=access_control,
                 bin_configuration=bin_configuration,
                 established=established,
                 description=description,

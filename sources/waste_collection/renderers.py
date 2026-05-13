@@ -68,6 +68,7 @@ _STATIC_LABELS = {
     "bin_configuration": "Bin configuration",
     "waste_category": "Waste Category",
     "connection_type": "Connection type",
+    "access_control": "Access Control",
     "allowed_materials": "Allowed Materials",
     "forbidden_materials": "Forbidden Materials",
     "fee_system": "Fee System",

@@ -224,6 +224,7 @@ class CollectionModelSerializer(
     waste_category = serializers.SerializerMethodField()
     publication_status = serializers.CharField()
     connection_type = serializers.CharField(required=False, allow_null=True)
+    access_control = serializers.BooleanField(required=False, allow_null=True)
     allowed_materials = serializers.SerializerMethodField()
     forbidden_materials = serializers.SerializerMethodField()
     frequency = serializers.StringRelatedField()
@@ -266,6 +267,7 @@ class CollectionModelSerializer(
             "waste_category_id",
             "waste_category",
             "connection_type",
+            "access_control",
             "allowed_materials",
             "forbidden_materials",
             "frequency_id",
@@ -429,6 +431,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
         required=False, allow_null=True
     )
     connection_type = serializers.CharField(required=False, allow_null=True)
+    access_control = serializers.BooleanField(required=False, allow_null=True)
     comments = serializers.SerializerMethodField(source="description", label="Comments")
     flyer_urls = serializers.SerializerMethodField(label="Flyer URLs")
     bibliography_sources = serializers.SerializerMethodField(
@@ -447,6 +450,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
             "bin_configuration",
             "waste_category",
             "connection_type",
+            "access_control",
             "allowed_materials",
             "forbidden_materials",
             "fee_system",
@@ -737,6 +741,8 @@ class CollectionImportRecordSerializer(serializers.Serializer):
     frequency           Exact name of the CollectionFrequency.
     connection_type     One of 'mandatory', 'mandatory with exception', 'voluntary',
                         'not specified'.
+    access_control      Boolean (true/false/null). Whether access to the collection
+                        point or bin is controlled (e.g. by chip or key card).
     bin_configuration   Exact name of the BinConfiguration.
     established         Year (integer) the collection scheme was established.
     valid_until         ISO 8601 date string.
@@ -773,6 +779,7 @@ class CollectionImportRecordSerializer(serializers.Serializer):
     connection_type = serializers.CharField(
         required=False, allow_null=True, allow_blank=True
     )
+    access_control = serializers.BooleanField(required=False, allow_null=True)
     bin_configuration = serializers.CharField(
         required=False, allow_null=True, allow_blank=True
     )
@@ -1005,6 +1012,7 @@ class CollectionMutationCreateSerializer(
         required=False,
         allow_null=True,
     )
+    access_control = serializers.BooleanField(required=False, allow_null=True)
     min_bin_size = serializers.DecimalField(
         required=False,
         allow_null=True,
@@ -1093,6 +1101,7 @@ class CollectionMutationUpdateSerializer(
         required=False,
         allow_null=True,
     )
+    access_control = serializers.BooleanField(required=False, allow_null=True)
     min_bin_size = serializers.DecimalField(
         required=False,
         allow_null=True,
@@ -1144,6 +1153,7 @@ class CollectionMutationUpdateSerializer(
             "flyer_urls",
             "established",
             "connection_type",
+            "access_control",
             "min_bin_size",
             "required_bin_capacity",
             "required_bin_capacity_reference",

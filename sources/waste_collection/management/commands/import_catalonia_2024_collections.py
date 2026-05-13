@@ -184,6 +184,30 @@ _FREQUENCY_NORMALISE_MAP: dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------------
+# Access control mapping: Excel col 14 → bool | None
+#
+# Column 14 is "Access control/Use control_BP/PAP_2024".
+# Single values 'yes'/'no' are stored directly.
+# Slash-separated values (e.g. 'yes/no', 'no/yes') appear on PAP parcial rows
+# where the system has both a door-to-door and a bring-point component; the
+# first token (PAP) is used as the authoritative value for the collection row.
+# None (blank) → leave field unset.
+# ---------------------------------------------------------------------------
+
+
+def _map_access_control(raw) -> bool | None:
+    """Return True/False/None for col 14 access control values."""
+    if raw is None:
+        return None
+    first_token = str(raw).strip().split("/")[0].strip().lower()
+    if first_token == "yes":
+        return True
+    if first_token == "no":
+        return False
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Fee system mapping: Excel label → BRIT FeeSystem name
 # ---------------------------------------------------------------------------
 _FEE_SYSTEM_MAP: dict[str, str] = {
@@ -463,6 +487,7 @@ def _row_to_record(row: tuple) -> dict | None:
         "fee_system": _map_fee_system(row[19]),
         "frequency": _normalise_frequency(str(row[17] or "").strip()),
         "connection_type": "",
+        "access_control": _map_access_control(row[14]),
         "min_bin_size": _to_float_or_none(row[20]),
         "required_bin_capacity": None,
         "required_bin_capacity_reference": "",
