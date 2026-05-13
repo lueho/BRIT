@@ -577,8 +577,11 @@ var WasteAtlasChoropleth = (function () {
         .style('pointer-events', 'none');
     }
 
+    var hasRegionalBorder = cfg.nutsPrefix && data.bundeslaender && data.bundeslaender.features
+      && data.bundeslaender.features.length;
+
     // Layer 4: Bundesländer borders (on top of catchments)
-    if (data.bundeslaender && data.bundeslaender.features) {
+    if (!hasRegionalBorder && data.bundeslaender && data.bundeslaender.features) {
       _svg.append('g').attr('class', 'layer-bundeslaender')
         .selectAll('path')
         .data(data.bundeslaender.features)
@@ -595,11 +598,10 @@ var WasteAtlasChoropleth = (function () {
     var borderStroke = COUNTRY_STROKE;
     var borderWidth = COUNTRY_STROKE_WIDTH;
 
-    if (cfg.nutsPrefix && data.bundeslaender && data.bundeslaender.features && data.bundeslaender.features.length) {
+    if (hasRegionalBorder) {
       // For regional maps (with nutsPrefix), use Bundesläender as outer border instead of country border
       borderData = data.bundeslaender;
       // Don't draw Bundesläender borders in layer 4 since we're drawing them as outer border
-      data.bundeslaender = null;
     }
 
     if (borderData && borderData.features) {
@@ -926,7 +928,9 @@ var WasteAtlasChoropleth = (function () {
       if (btnSVG) btnSVG.disabled = true;
       if (btnPNG) btnPNG.disabled = true;
 
-      var loadCfg = _configForSelection(cfg, country, year, preserveScope);
+      var isConfiguredMultiRegion = cfg.nutsPrefix && cfg.nutsPrefix.indexOf(',') !== -1
+        && country === cfg.country;
+      var loadCfg = _configForSelection(cfg, country, year, preserveScope || isConfiguredMultiRegion);
 
       _fetchAll(loadCfg)
         .then(function (data) {

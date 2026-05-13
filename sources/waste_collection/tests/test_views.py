@@ -4022,6 +4022,15 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "nutsPrefix: 'ITH10'")
         self.assertContains(response, "nutsLevel: parseInt('3', 10)")
 
+    def test_bw_rp_orga_level_map_uses_bundesland_border_scope(self):
+        response = self.client.get(reverse("waste-atlas-bw-rp-orga-level-map"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="DE" selected')
+        self.assertContains(response, "nutsPrefix: 'DE1,DEB'")
+        self.assertContains(response, "nutsLevel:")
+        self.assertContains(response, "parseInt('1', 10)")
+
     def test_country_specific_orga_level_maps_default_to_expected_country(self):
         """Country-specific orga-level maps default to expected country and year."""
         map_defaults = {

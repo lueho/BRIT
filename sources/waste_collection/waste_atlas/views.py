@@ -781,7 +781,7 @@ class BwRpAtlasMapView(AtlasMapView):
 
     default_country = "DE"
     default_nuts_prefix = "DE1,DEB"
-    default_nuts_level = "3"
+    default_nuts_level = "1"
     map_overview_label = "Map overview"
     allow_country_override = False
     allow_nuts_override = False
