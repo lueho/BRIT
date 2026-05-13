@@ -899,6 +899,31 @@ class CollectionImporterWorkflowTestCase(APITestCase):
             [self.forbidden_material.name],
         )
 
+    def test_bulk_import_endpoint_can_create_missing_collectors(self):
+        self.client.force_login(self.staff_owner)
+
+        response = self.client.post(
+            reverse("api-waste-collection-bulk-import"),
+            {
+                "records": [
+                    self._make_record() | {"collector_name": "Ajuntament de Cardona"}
+                ],
+                "publication_status": "private",
+                "dry_run": False,
+                "create_collectors": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        collection = Collection.objects.get(
+            owner=self.staff_owner,
+            valid_from=self.valid_from,
+            collection_system=self.collection_system,
+        )
+        self.assertEqual(collection.collector.name, "Ajuntament de Cardona")
+        self.assertEqual(response.data["stats"]["collectors_created"], 1)
+
 
 class CollectionMutationApiTestCase(APITestCase):
     """Tests for programmatic collection creation and new-version endpoints."""

@@ -123,10 +123,9 @@ class CollectionSystemMappingTests(SimpleTestCase):
             cmd._map_collection_system("PAP parcial", "Biowaste"), "Door to door"
         )
 
-    def test_planned_pap_maps_to_door_to_door(self):
+    def test_planned_pap_maps_to_empty_string(self):
         self.assertEqual(
-            cmd._map_collection_system("Propera implantació PAP", "Biowaste"),
-            "Door to door",
+            cmd._map_collection_system("Propera implantació PAP", "Biowaste"), ""
         )
 
     def test_bring_point_maps_to_bring_point(self):
@@ -204,6 +203,10 @@ class RowToRecordBiowasteTests(SimpleTestCase):
         record = self._record(codi="080109")
         self.assertEqual(record["nuts_or_lau_id"], "08010")
 
+    def test_country_code_is_es(self):
+        record = self._record()
+        self.assertEqual(record["country_code"], "ES")
+
     def test_catchment_name_empty(self):
         record = self._record()
         self.assertEqual(record["catchment_name"], "")
@@ -219,6 +222,10 @@ class RowToRecordBiowasteTests(SimpleTestCase):
     def test_collection_system_bring_point(self):
         record = self._record(collection_system="Bring point")
         self.assertEqual(record["collection_system"], "Bring point")
+
+    def test_collection_system_planned_pap_is_empty(self):
+        record = self._record(collection_system="Propera implantació PAP")
+        self.assertEqual(record["collection_system"], "")
 
     def test_fee_system_no_payt(self):
         record = self._record(fee_system="no payt")

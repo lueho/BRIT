@@ -55,7 +55,7 @@ Excel value                         → BRIT canonical name
 PAP Total / PAP total               → Door to door
 PAP Total + PxG                     → Door to door
 PAP parcial                         → Door to door   (partial)
-Propera implantació PAP             → Door to door   (planned — included)
+Propera implantació PAP             → skipped        (planned, not active in 2024)
 Bring point                         → Bring point
 No separate collection              → No separate collection
 No PaP category / not shown as PaP → No separate collection
@@ -112,6 +112,7 @@ _PROP_CONN_RATE = 4  # "Connection rate"            [% of households]
 _UNIT_KG = "kg/(cap.*a)"
 _UNIT_MG = "Mg/a"
 _UNIT_PCT_HH = "% of households"
+_COUNTRY_CODE = "ES"
 
 # ---------------------------------------------------------------------------
 # Data year represented by this file
@@ -138,7 +139,6 @@ _COLLECTION_SYSTEM_MAP: dict[str, str] = {
     "pap total": _CS_DOOR_TO_DOOR,
     "pap total + pxg": _CS_DOOR_TO_DOOR,
     "pap parcial": _CS_DOOR_TO_DOOR,
-    "propera implantació pap": _CS_DOOR_TO_DOOR,
     "bring point": _CS_BRING_POINT,
     "no separate collection": _CS_NO_SEPARATE,
     "no pap category / not shown as pap": _CS_NO_SEPARATE,
@@ -357,6 +357,8 @@ def _map_collection_system(raw: str | None, waste_type: str) -> str:
         mapped = _COLLECTION_SYSTEM_MAP.get(key)
         if mapped:
             return mapped
+        if key == "propera implantació pap":
+            return ""
     if waste_type == _WC_RESIDUAL:
         return _CS_DOOR_TO_DOOR
     return ""
@@ -519,6 +521,7 @@ def _row_to_record(row: tuple) -> dict | None:
 
     return {
         "nuts_or_lau_id": lau_id,
+        "country_code": _COUNTRY_CODE,
         "catchment_name": "",
         "collector_name": str(row[4] or "").strip(),
         "collection_system": collection_system,
@@ -668,44 +671,9 @@ class Command(BaseCommand):
             "--create-collectors",
             action="store_true",
             help=(
-                "Pre-create any collector names from the workbook that are not yet "
-                "in the database.  Requires Django ORM access (i.e. the command must "
-                "run inside the container).  Has no effect during a dry run."
+                "Create missing collectors on the target BRIT instance during the "
+                "bulk import. Has no effect during a dry run."
             ),
-        )
-
-    # ------------------------------------------------------------------
-    # Collector pre-creation
-    # ------------------------------------------------------------------
-
-    def _ensure_collectors_exist(self, records: list[dict], owner) -> None:
-        """Create any collector names found in *records* that are not yet in the DB.
-
-        Uses the Django ORM directly, so this must run inside the container.
-        New collectors are created as private drafts owned by *owner*.
-        """
-        from sources.waste_collection.models import Collector  # noqa: PLC0415
-
-        # Collect unique non-empty names
-        names = sorted(
-            {r["collector_name"] for r in records if r.get("collector_name")}
-        )
-        existing = set(
-            Collector.objects.filter(name__in=names).values_list("name", flat=True)
-        )
-        missing = [n for n in names if n not in existing]
-        if not missing:
-            self.stdout.write("All collector names already exist in the database.\n")
-            return
-
-        created = []
-        for name in missing:
-            Collector.objects.get_or_create(name=name, defaults={"owner": owner})
-            created.append(name)
-
-        self.stdout.write(
-            f"Pre-created {len(created)} collector(s): "
-            f"{', '.join(created[:5])}" + (" …" if len(created) > 5 else "") + "\n"
         )
 
     # ------------------------------------------------------------------
@@ -744,6 +712,7 @@ class Command(BaseCommand):
         records: list[dict],
         publication_status: str,
         dry_run: bool,
+        create_collectors: bool,
     ) -> dict:
         try:
             url = f"{api_url.rstrip('/')}/waste_collection/api/collection/import/"
@@ -752,6 +721,7 @@ class Command(BaseCommand):
                     "records": records,
                     "publication_status": publication_status,
                     "dry_run": dry_run,
+                    "create_collectors": create_collectors,
                 }
             ).encode()
             req = Request(
@@ -780,6 +750,7 @@ class Command(BaseCommand):
         publication_status = options["publication_status"]
         batch_size = options["batch_size"]
         file_path = options["file"]
+        create_collectors = options.get("create_collectors", False)
 
         # Auth
         token = options.get("token")
@@ -810,21 +781,11 @@ class Command(BaseCommand):
             f"(skipped {len(pre_skip_warnings)} in pre-flight).\n"
         )
 
-        # Pre-create missing collectors by name (ORM, runs only inside container).
-        if options.get("create_collectors") and not dry_run:
-            from django.contrib.auth import get_user_model  # noqa: PLC0415
-            from rest_framework.authtoken.models import Token  # noqa: PLC0415
-
-            try:
-                orm_owner = Token.objects.select_related("user").get(key=token).user
-            except Exception:
-                orm_owner = get_user_model().objects.filter(is_staff=True).first()
-            self._ensure_collectors_exist(records, owner=orm_owner)
-
         totals = {
             "created": 0,
             "unchanged": 0,
             "skipped": 0,
+            "collectors_created": 0,
             "predecessor_links": 0,
             "cpv_created": 0,
             "cpv_unchanged": 0,
@@ -846,13 +807,19 @@ class Command(BaseCommand):
             )
             sys.stdout.flush()
             result = self._post_batch(
-                api_url, token, batch, publication_status, dry_run
+                api_url,
+                token,
+                batch,
+                publication_status,
+                dry_run,
+                create_collectors,
             )
             stats = result.get("stats", {})
             for key in (
                 "created",
                 "unchanged",
                 "skipped",
+                "collectors_created",
                 "predecessor_links",
                 "cpv_created",
                 "cpv_unchanged",
@@ -877,6 +844,7 @@ class Command(BaseCommand):
         self.stdout.write(f"  Collections created:   {totals['created']}\n")
         self.stdout.write(f"  Collections unchanged: {totals['unchanged']}\n")
         self.stdout.write(f"  Collections skipped:   {totals['skipped']}\n")
+        self.stdout.write(f"  Collectors created:    {totals['collectors_created']}\n")
         self.stdout.write(f"  Predecessor links:     {totals['predecessor_links']}\n")
         self.stdout.write(f"  CPVs created:          {totals['cpv_created']}\n")
         self.stdout.write(f"  CPVs unchanged:        {totals['cpv_unchanged']}\n")

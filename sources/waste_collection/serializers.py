@@ -741,6 +741,7 @@ class CollectionImportRecordSerializer(serializers.Serializer):
 
     Optional fields
     ---------------
+    country_code        Optional ISO country code used to disambiguate LAU identifiers.
     fee_system          Exact name of the FeeSystem.
     frequency           Exact name of the CollectionFrequency.
     connection_type     One of 'mandatory', 'mandatory with exception', 'voluntary',
@@ -766,6 +767,9 @@ class CollectionImportRecordSerializer(serializers.Serializer):
     )
     catchment_name = serializers.CharField(
         required=False, allow_null=True, allow_blank=True
+    )
+    country_code = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True, max_length=2
     )
     collector_name = serializers.CharField(
         required=False, allow_null=True, allow_blank=True

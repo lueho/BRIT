@@ -184,11 +184,17 @@ class CollectionImporter:
         #           "warnings": [...]}
     """
 
-    def __init__(self, owner, publication_status: str = "private"):
+    def __init__(
+        self,
+        owner,
+        publication_status: str = "private",
+        create_collectors: bool = False,
+    ):
         if owner is None or not getattr(owner, "is_authenticated", False):
             raise ValueError("owner must be an authenticated user")
         self.owner = owner
         self.publication_status = publication_status
+        self.create_collectors = create_collectors
         self.dry_run = False
         self._lookups_loaded = False
 
@@ -306,15 +312,41 @@ class CollectionImporter:
         lau_rows = (
             CollectionCatchment.objects.filter(region__lauregion__isnull=False)
             .select_related("region__lauregion")
-            .values_list("region__lauregion__lau_id", "id")
+            .values_list("region__lauregion__lau_id", "region__lauregion__cntr_code", "id")
         )
-        catchment_pks = {pk for _, pk in lau_rows}
+        catchment_pks = {pk for _, _, pk in lau_rows}
         _catchment_objs = {
             c.pk: c for c in CollectionCatchment.objects.filter(pk__in=catchment_pks)
         }
-        self._lau_catchments: dict[str, CollectionCatchment] = {
-            lau_id: _catchment_objs[pk] for lau_id, pk in lau_rows if lau_id
-        }
+        self._lau_catchments: dict[str, CollectionCatchment] = {}
+        self._lau_catchments_by_country: dict[
+            tuple[str, str], CollectionCatchment
+        ] = {}
+        self._ambiguous_lau_ids: set[str] = set()
+        self._ambiguous_lau_country_keys: set[tuple[str, str]] = set()
+        for lau_id, country_code, pk in lau_rows:
+            if not lau_id:
+                continue
+            catchment = _catchment_objs[pk]
+            existing = self._lau_catchments.get(lau_id)
+            if existing is None:
+                self._lau_catchments[lau_id] = catchment
+            elif existing.pk != catchment.pk:
+                self._ambiguous_lau_ids.add(lau_id)
+
+            normalized_country_code = (country_code or "").strip().upper()
+            if normalized_country_code:
+                country_key = (lau_id, normalized_country_code)
+                existing_country = self._lau_catchments_by_country.get(country_key)
+                if existing_country is None:
+                    self._lau_catchments_by_country[country_key] = catchment
+                elif existing_country.pk != catchment.pk:
+                    self._ambiguous_lau_country_keys.add(country_key)
+
+        for lau_id in self._ambiguous_lau_ids:
+            self._lau_catchments.pop(lau_id, None)
+        for country_key in self._ambiguous_lau_country_keys:
+            self._lau_catchments_by_country.pop(country_key, None)
 
         self._lookups_loaded = True
 
@@ -792,11 +824,30 @@ class CollectionImporter:
             return
 
         year = pv["year"]
+        exact_derived_qs = CollectionPropertyValue.objects.filter(
+            collection=collection,
+            property=prop,
+            unit=unit,
+            year=year,
+            is_derived=True,
+        )
+        flyer_urls = pv.get("flyer_urls") or []
+        exact_derived_urls = [
+            url for url in exact_derived_qs.values_list("sources__url", flat=True) if url
+        ]
+        if exact_derived_urls:
+            flyer_urls = list(dict.fromkeys([*exact_derived_urls, *flyer_urls]))
+
         existing_cpv = CollectionPropertyValue.objects.filter(
-            collection=collection, property=prop, unit=unit, year=year
+            collection=collection,
+            property=prop,
+            unit=unit,
+            year=year,
+            is_derived=False,
         ).first()
         if existing_cpv is not None:
-            flyer_urls = pv.get("flyer_urls") or []
+            if exact_derived_qs.exists():
+                exact_derived_qs.delete()
             self._attach_cpv_sources(existing_cpv, flyer_urls, stats)
             derived = CollectionPropertyValue.objects.filter(
                 collection=collection, year=year, is_derived=True
@@ -817,6 +868,9 @@ class CollectionImporter:
             stats["cpv_unchanged"] += 1
             return
 
+        if exact_derived_qs.exists():
+            exact_derived_qs.delete()
+
         cpv_name = f"{collection.name} {prop.name} {year}"
         cpv = CollectionPropertyValue.objects.create(
             name=cpv_name,
@@ -830,9 +884,8 @@ class CollectionImporter:
             standard_deviation=pv.get("standard_deviation"),
         )
         stats["cpv_created"] += 1
-        self._attach_cpv_sources(cpv, pv.get("flyer_urls") or [], stats)
+        self._attach_cpv_sources(cpv, flyer_urls, stats)
 
-        flyer_urls = pv.get("flyer_urls") or []
         derived = CollectionPropertyValue.objects.filter(
             collection=collection,
             year=year,
@@ -870,11 +923,31 @@ class CollectionImporter:
     ) -> CollectionCatchment | None:
         nuts_lau_id = (record.get("nuts_or_lau_id") or "").strip()
         catchment_name = (record.get("catchment_name") or "").strip()
+        country_code = (record.get("country_code") or "").strip().upper()
 
         if nuts_lau_id:
             catchment = self._nuts_catchments.get(nuts_lau_id)
             if catchment is None:
-                catchment = self._lau_catchments.get(nuts_lau_id)
+                if country_code:
+                    country_key = (nuts_lau_id, country_code)
+                    if country_key in self._ambiguous_lau_country_keys:
+                        stats["warnings"].append(
+                            f"{label}: LAU id '{nuts_lau_id}' is ambiguous for country '{country_code}'."
+                        )
+                        return None
+                    catchment = self._lau_catchments_by_country.get(country_key)
+                    if catchment is None and nuts_lau_id in self._ambiguous_lau_ids:
+                        stats["warnings"].append(
+                            f"{label}: LAU id '{nuts_lau_id}' did not resolve for country '{country_code}'."
+                        )
+                        return None
+                else:
+                    if nuts_lau_id in self._ambiguous_lau_ids:
+                        stats["warnings"].append(
+                            f"{label}: LAU id '{nuts_lau_id}' is ambiguous across countries — provide country_code."
+                        )
+                        return None
+                    catchment = self._lau_catchments.get(nuts_lau_id)
             if catchment is not None:
                 return catchment
             if self._has_combined_lookup_codes(nuts_lau_id):
@@ -1041,6 +1114,22 @@ class CollectionImporter:
 
         collector = self._lookup_known_collector(record)
         if collector is not None:
+            return collector
+
+        if self.create_collectors and name:
+            collector, created = Collector.objects.get_or_create(
+                name=name,
+                defaults={"owner": self.owner},
+            )
+            self._collectors[collector.name] = collector
+            self._normalized_collectors[
+                _normalize_collector_lookup_key(collector.name)
+            ] = collector
+            if created:
+                stats.setdefault("collectors_created", 0)
+                stats["collectors_created"] += 1
+                if self.publication_status == "review" and not self.dry_run:
+                    self._submit_for_review(collector)
             return collector
 
         # Secondary: look up by website URL

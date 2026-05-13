@@ -1165,6 +1165,13 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        create_collectors = payload.get("create_collectors", False)
+        if not isinstance(create_collectors, bool):
+            return Response(
+                {"detail": "'create_collectors' must be a boolean."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         pub_status = payload.get("publication_status", "private")
         valid_statuses = ("private", "review")
         if pub_status not in valid_statuses:
@@ -1184,6 +1191,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         importer = CollectionImporter(
             owner=request.user,
             publication_status=pub_status,
+            create_collectors=create_collectors,
         )
         stats = importer.run(serializer.validated_data, dry_run=dry_run)
 
