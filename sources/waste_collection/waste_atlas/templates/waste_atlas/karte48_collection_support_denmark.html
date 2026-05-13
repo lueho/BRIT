@@ -8,7 +8,7 @@
       containerId: 'map-container',
       loadingId:   'loading-overlay',
       country:     '{{ country }}',
-      year:        parseInt('{{ year }}', 10) || 2024,
+      year:        parseInt('{{ year }}', 10) || 2023,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
       title:       'Accepted materials for biowaste collection aids',
@@ -21,12 +21,12 @@
         { value: 'paper_a_plastic_n', label: 'Paper allowed, compostable plastic bags unknown',   color: '#90caf9' },
         { value: 'paper_f_plastic_f', label: 'Paper forbidden, compostable plastic bags forbidden',     color: '#7e57c2' },
         { value: 'paper_n_plastic_f', label: 'Paper unknown, compostable plastic bags forbidden',  color: '#ff7043' },
-        { value: 'no_collection',     label: 'No separate biowaste collection',  color: '#fff696' }
+        { value: 'no_collection',     label: 'No separate Biowaste collection',  color: '#fff696' }
       ],
       noDataColor: '#ffffff',
       noDataLabel: 'No data',
       legendTitle: 'Collection aids',
-      fileBase:    'collection_aids',
+      fileBase:    'map48_collection_aids_denmark',
       transformData: function (records) {
         var KEY_MAP = {
           'allowed':  'a',

@@ -11,7 +11,7 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Connection rate for Door to door Biowaste collection',
+      title:       'Connection rate for door to door biowaste collection',
       dataUrl:     '/waste_collection/api/waste-atlas/connection-rate/',
       dataField:   '_classified',
       categories: [
@@ -19,7 +19,7 @@
         { value: '50-74',  label: '74% – 50%',                  color: '#0090cb' },
         { value: '25-49',  label: '49% – 25%',                  color: '#7fcce9' },
         { value: '0-24',   label: '24% – 0%',                   color: '#d1e7e6' },
-        { value: 'no_d2d', label: 'No Door to door Biowaste collection', color: '#fff696' }
+        { value: 'no_d2d', label: 'No door to door biowaste collection', color: '#fff696' }
       ],
       noDataColor: '#ffffff',
       noDataLabel: 'No data',

@@ -241,9 +241,9 @@ var WasteAtlasChoropleth = (function () {
       .replace(/collected equally often/g, 'equal')
       .replace(/collected more/g, 'more')
       .replace(/collected less/g, 'less')
-      .replace(/No Door to door bio collection/g, 'No D2D bio')
+      .replace(/No door to door biowaste collection/g, 'No D2D bio')
       .replace(/No door-to-door bio collection/g, 'No D2D bio')
-      .replace(/No separate Biowaste collection/g, 'No separate bio')
+      .replace(/No separate biowaste collection/g, 'No separate bio')
       .replace(/No separate bio collection/g, 'No separate bio');
   }
 
