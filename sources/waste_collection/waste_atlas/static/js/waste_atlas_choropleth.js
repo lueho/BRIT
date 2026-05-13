@@ -233,15 +233,17 @@ var WasteAtlasChoropleth = (function () {
     return String(item.label)
       .replace(/Biowaste/g, 'Bio')
       .replace(/biowaste/g, 'bio')
+      .replace(/Residual waste/g, 'residual')
       .replace(/residual waste/g, 'residual')
-      .replace(/residual-waste/g, 'residual')
       .replace(/every two weeks/g, '2 weeks')
       .replace(/more often/g, 'more')
       .replace(/less frequent/g, 'less')
       .replace(/collected equally often/g, 'equal')
       .replace(/collected more/g, 'more')
       .replace(/collected less/g, 'less')
+      .replace(/No Door to door bio collection/g, 'No D2D bio')
       .replace(/No door-to-door bio collection/g, 'No D2D bio')
+      .replace(/No separate Biowaste collection/g, 'No separate bio')
       .replace(/No separate bio collection/g, 'No separate bio');
   }
 

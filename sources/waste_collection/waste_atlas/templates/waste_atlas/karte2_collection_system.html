@@ -11,14 +11,14 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Primary collection system for kitchen waste',
+      title:       'Primary collection system for Biowaste',
       dataUrl:     '/waste_collection/api/waste-atlas/collection-system/',
       dataField:   'collection_system',
       categories: [
-        { value: 'Door to door',           label: 'Door-to-door collection',               color: '#d0fcd5' },
+        { value: 'Door to door',           label: 'Door to door collection',               color: '#d0fcd5' },
         { value: 'Recycling centre',       label: 'Recycling centre',                       color: '#3dc79b' },
         { value: 'Bring point',            label: 'Bring point',                        color: '#3dc7dc' },
-        { value: 'No separate collection', label: 'No separate biowaste collection',  color: '#fff696' }
+        { value: 'No separate collection', label: 'No separate Biowaste collection',  color: '#fff696' }
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'No data',

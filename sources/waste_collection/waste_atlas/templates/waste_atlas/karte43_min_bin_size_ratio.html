@@ -11,18 +11,18 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Ratio der kleinsten Bin sizen (Biowaste / residual waste)',
+      title:       'Ratio der kleinsten Bin sizen (Biowaste / Residual waste)',
       dataUrl:     '/waste_collection/api/waste-atlas/min-bin-size-ratio/',
       dataField:   '_classified',
       categories: [
-        { value: 'bio_larger',  label: 'Biowaste bin larger than residual-waste bin', exportLabel: 'Bio bin larger', color: '#1b9e77' },
-        { value: 'same',        label: 'Biowaste and residual-waste bins equal size', exportLabel: 'Equal bin size', color: '#7570b3' },
-        { value: 'bio_smaller', label: 'Biowaste bin smaller than residual-waste bin', exportLabel: 'Bio bin smaller', color: '#d95f02' },
-        { value: 'no_bio',      label: 'No door-to-door biowaste collection', exportLabel: 'No D2D bio', color: '#fff696' }
+        { value: 'bio_larger',  label: 'Biowaste bin larger than Residual waste bin', exportLabel: 'Bio bin larger', color: '#1b9e77' },
+        { value: 'same',        label: 'Biowaste and Residual waste bins equal size', exportLabel: 'Equal bin size', color: '#7570b3' },
+        { value: 'bio_smaller', label: 'Biowaste bin smaller than Residual waste bin', exportLabel: 'Bio bin smaller', color: '#d95f02' },
+        { value: 'no_bio',      label: 'No Door to door Biowaste collection', exportLabel: 'No D2D bio', color: '#fff696' }
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'No data',
-      legendTitle: 'Biowaste / residual waste',
+      legendTitle: 'Biowaste / Residual waste',
       fileBase:    'min_bin_size_ratio',
       transformData: function (records) {
         return records.map(function (r) {

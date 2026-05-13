@@ -11,17 +11,17 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Collection frequency type: biowaste vs residual waste',
+      title:       'Collection frequency type: Biowaste vs Residual waste',
       dataUrl:     '/waste_collection/api/waste-atlas/combined-frequency-type/',
       dataField:   '_classified',
       categories: [
-        { value: 'bio_seasonal_res_flexible', label: 'Biowaste seasonal, residual waste flexible', exportLabel: 'Seasonal / flexible', color: '#2e8b57' },
-        { value: 'bio_flexible_res_flexible', label: 'Biowaste flexible, residual waste flexible', exportLabel: 'Flexible / flexible', color: '#4169e1' },
-        { value: 'bio_fixed_res_flexible',    label: 'Biowaste fixed, residual waste flexible', exportLabel: 'Fixed / flexible', color: '#8c9eff' },
-        { value: 'bio_seasonal_res_fixed',    label: 'Biowaste seasonal, residual waste fixed', exportLabel: 'Seasonal / fixed', color: '#66cdaa' },
-        { value: 'bio_flexible_res_fixed',    label: 'Biowaste flexible, residual waste fixed', exportLabel: 'Flexible / fixed', color: '#e08840' },
-        { value: 'bio_fixed_res_fixed',       label: 'Biowaste fixed, residual waste fixed', exportLabel: 'Fixed / fixed', color: '#b0b0ff' },
-        { value: 'no_bio_collection',         label: 'No door-to-door biowaste collection', exportLabel: 'No D2D bio', color: '#fff696' }
+        { value: 'bio_seasonal_res_flexible', label: 'Biowaste seasonal, Residual waste flexible', exportLabel: 'Seasonal / flexible', color: '#2e8b57' },
+        { value: 'bio_flexible_res_flexible', label: 'Biowaste flexible, Residual waste flexible', exportLabel: 'Flexible / flexible', color: '#4169e1' },
+        { value: 'bio_fixed_res_flexible',    label: 'Biowaste fixed, Residual waste flexible', exportLabel: 'Fixed / flexible', color: '#8c9eff' },
+        { value: 'bio_seasonal_res_fixed',    label: 'Biowaste seasonal, Residual waste fixed', exportLabel: 'Seasonal / fixed', color: '#66cdaa' },
+        { value: 'bio_flexible_res_fixed',    label: 'Biowaste flexible, Residual waste fixed', exportLabel: 'Flexible / fixed', color: '#e08840' },
+        { value: 'bio_fixed_res_fixed',       label: 'Biowaste fixed, Residual waste fixed', exportLabel: 'Fixed / fixed', color: '#b0b0ff' },
+        { value: 'no_bio_collection',         label: 'No Door to door Biowaste collection', exportLabel: 'No D2D bio', color: '#fff696' }
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'No data',
