@@ -10,7 +10,7 @@
       country:     '{{ country }}',
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
-      nutsLevel:    parseInt('{{ nuts_level|default:"1" }}', 10),
+      {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
       title:       'Use of paper bags for biowaste collection',
       dataUrl:     '/waste_collection/api/waste-atlas/paper-bags/',
       dataField:   'status',
