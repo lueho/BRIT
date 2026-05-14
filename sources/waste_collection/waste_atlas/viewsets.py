@@ -470,15 +470,15 @@ class AccessControlViewSet(viewsets.ViewSet):
             if system == "No separate collection":
                 value = "No separate collection"
             elif bp is True and pap is True:
-                value = "BP and PAP access-controlled"
+                value = "Bring point and door-to-door access-controlled"
             elif bp is True and pap is False:
-                value = "BP access-controlled, PAP not access-controlled"
+                value = "Bring point access-controlled, door-to-door not access-controlled"
             elif bp is False and pap is True:
-                value = "PAP access-controlled, BP not access-controlled"
+                value = "Door-to-door access-controlled, bring point not access-controlled"
             elif bp is True:
-                value = "BP access-controlled"
+                value = "Bring point access-controlled"
             elif pap is True:
-                value = "PAP access-controlled"
+                value = "Door-to-door access-controlled"
             elif bp is False or pap is False:
                 value = "No access control"
             else:
