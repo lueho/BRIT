@@ -1,4 +1,10 @@
+import logging
+from importlib import import_module
+
 from django.apps import AppConfig
+
+
+logger = logging.getLogger(__name__)
 
 
 class WasteCollectionConfig(AppConfig):
@@ -7,14 +13,12 @@ class WasteCollectionConfig(AppConfig):
     verbose_name = "Sources / Waste Collection"
 
     def ready(self):
-        signal_module = None
         try:
-            from . import signals as signal_module
+            signal_module = import_module("sources.waste_collection.signals")
         except Exception:
-            pass
-
-        if signal_module is None:
+            logger.exception("Failed to import waste_collection signal handlers.")
             return
+
         try:
             from django.db.models.signals import post_delete, post_save
 
@@ -30,4 +34,6 @@ class WasteCollectionConfig(AppConfig):
                 dispatch_uid="waste_collection.sync_derived_cpv_on_delete",
             )
         except LookupError:
-            pass
+            logger.warning(
+                "Waste collection signal registration skipped because CollectionPropertyValue could not be resolved."
+            )
