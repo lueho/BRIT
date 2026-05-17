@@ -1,7 +1,5 @@
 """Form tests for the processes module."""
 
-import unittest
-
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
@@ -13,10 +11,10 @@ from ..forms import (
     ProcessAddParameterForm,
     ProcessCategoryModalModelForm,
     ProcessCategoryModelForm,
-    # ProcessMaterialFormSet,  # Not exported - uses InlineFormSetFactory
     ProcessModalModelForm,
     ProcessModelForm,
-    # ProcessOperatingParameterFormSet,  # Not exported - uses InlineFormSetFactory
+    build_process_material_formset,
+    build_process_operating_parameter_formset,
 )
 from ..models import (
     Process,
@@ -94,45 +92,117 @@ class ProcessFormTestCase(TestCase):
         self.assertTrue(form.is_valid())
 
 
-@unittest.skip(
-    "ProcessMaterialFormSet not exported - uses InlineFormSetFactory pattern"
-)
 class ProcessMaterialFormSetTestCase(TestCase):
     """Test ProcessMaterial inline formset."""
 
     def setUp(self):
         self.owner = get_user_model().objects.create(username="test_user")
         self.process = Process.objects.create(name="Test Process", owner=self.owner)
-        self.material = Material.objects.create(name="Test Material", owner=self.owner)
-        self.unit = Unit.objects.create(name="kg", owner=self.owner)
+        self.material = Material.objects.create(
+            name="Test Material",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.unit = Unit.objects.create(
+            name="kg",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.formset_class = build_process_material_formset()
 
     def test_valid_formset(self):
         """Valid formset data should be valid."""
-        pass  # ProcessMaterialFormSet not exported; test skipped
+        formset = self.formset_class(
+            data={
+                "process_materials-TOTAL_FORMS": "1",
+                "process_materials-INITIAL_FORMS": "0",
+                "process_materials-MIN_NUM_FORMS": "0",
+                "process_materials-MAX_NUM_FORMS": "1000",
+                "process_materials-0-material": str(self.material.pk),
+                "process_materials-0-role": ProcessMaterial.Role.INPUT,
+                "process_materials-0-order": "0",
+                "process_materials-0-quantity_value": "2.5",
+                "process_materials-0-quantity_unit": str(self.unit.pk),
+            },
+            instance=self.process,
+            prefix="process_materials",
+        )
+
+        self.assertTrue(formset.is_valid(), formset.errors)
 
     def test_quantity_requires_unit(self):
         """Quantity value should require a unit."""
-        pass  # ProcessMaterialFormSet not exported; test skipped
+        formset = self.formset_class(
+            data={
+                "process_materials-TOTAL_FORMS": "1",
+                "process_materials-INITIAL_FORMS": "0",
+                "process_materials-MIN_NUM_FORMS": "0",
+                "process_materials-MAX_NUM_FORMS": "1000",
+                "process_materials-0-material": str(self.material.pk),
+                "process_materials-0-role": ProcessMaterial.Role.INPUT,
+                "process_materials-0-order": "0",
+                "process_materials-0-quantity_value": "2.5",
+                "process_materials-0-quantity_unit": "",
+            },
+            instance=self.process,
+            prefix="process_materials",
+        )
+
+        self.assertFalse(formset.is_valid())
+        self.assertIn("quantity_unit", formset.forms[0].errors)
 
 
-@unittest.skip(
-    "ProcessOperatingParameterFormSet not exported - uses InlineFormSetFactory pattern"
-)
 class ProcessOperatingParameterFormSetTestCase(TestCase):
     """Test ProcessOperatingParameter inline formset."""
 
     def setUp(self):
         self.owner = get_user_model().objects.create(username="test_user")
         self.process = Process.objects.create(name="Test Process", owner=self.owner)
-        self.unit = Unit.objects.create(name="°C", owner=self.owner)
+        self.unit = Unit.objects.create(
+            name="°C",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.formset_class = build_process_operating_parameter_formset()
 
     def test_valid_formset(self):
         """Valid formset data should be valid."""
-        pass  # ProcessOperatingParameterFormSet not exported; test skipped
+        formset = self.formset_class(
+            data={
+                "operating_parameters-TOTAL_FORMS": "1",
+                "operating_parameters-INITIAL_FORMS": "0",
+                "operating_parameters-MIN_NUM_FORMS": "0",
+                "operating_parameters-MAX_NUM_FORMS": "1000",
+                "operating_parameters-0-parameter": ProcessOperatingParameter.Parameter.TEMPERATURE,
+                "operating_parameters-0-order": "0",
+                "operating_parameters-0-nominal_value": "150",
+                "operating_parameters-0-unit": str(self.unit.pk),
+            },
+            instance=self.process,
+            prefix="operating_parameters",
+        )
+
+        self.assertTrue(formset.is_valid(), formset.errors)
 
     def test_custom_parameter_with_name(self):
         """Custom parameters should allow custom names."""
-        pass  # ProcessOperatingParameterFormSet not exported; test skipped
+        formset = self.formset_class(
+            data={
+                "operating_parameters-TOTAL_FORMS": "1",
+                "operating_parameters-INITIAL_FORMS": "0",
+                "operating_parameters-MIN_NUM_FORMS": "0",
+                "operating_parameters-MAX_NUM_FORMS": "1000",
+                "operating_parameters-0-parameter": ProcessOperatingParameter.Parameter.CUSTOM,
+                "operating_parameters-0-name": "Residence time at peak load",
+                "operating_parameters-0-order": "0",
+                "operating_parameters-0-nominal_value": "42",
+                "operating_parameters-0-unit": str(self.unit.pk),
+            },
+            instance=self.process,
+            prefix="operating_parameters",
+        )
+
+        self.assertTrue(formset.is_valid(), formset.errors)
 
 
 class ProcessAddMaterialFormTestCase(TestCase):

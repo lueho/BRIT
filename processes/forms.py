@@ -3,6 +3,7 @@
 import types
 
 from django import forms
+from django.forms import inlineformset_factory
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.forms import (
     TomSelectModelChoiceField,
@@ -174,6 +175,19 @@ class ProcessMaterialInline(InlineFormSetFactory):
     formset_helper_class = DynamicTableInlineFormSetHelper
 
 
+def build_process_material_formset(**kwargs):
+    """Return the inline formset class used for process materials."""
+
+    return inlineformset_factory(
+        Process,
+        ProcessMaterial,
+        form=ProcessMaterialInlineForm,
+        extra=1,
+        can_delete=True,
+        **kwargs,
+    )
+
+
 class ProcessOperatingParameterInlineForm(forms.ModelForm):
     unit = TomSelectModelChoiceField(
         queryset=Unit.objects.filter(publication_status="published"),
@@ -206,6 +220,19 @@ class ProcessOperatingParameterInline(InlineFormSetFactory):
     form_class = ProcessOperatingParameterInlineForm
     factory_kwargs = {"extra": 1, "can_delete": True}
     formset_helper_class = DynamicTableInlineFormSetHelper
+
+
+def build_process_operating_parameter_formset(**kwargs):
+    """Return the inline formset class used for process operating parameters."""
+
+    return inlineformset_factory(
+        Process,
+        ProcessOperatingParameter,
+        form=ProcessOperatingParameterInlineForm,
+        extra=1,
+        can_delete=True,
+        **kwargs,
+    )
 
 
 class ProcessLinkInline(InlineFormSetFactory):
