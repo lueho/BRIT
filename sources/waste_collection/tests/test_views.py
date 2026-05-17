@@ -4100,6 +4100,28 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertNotContains(response, "nutsLevel:")
                 self.assertContains(response, "Map overview")
 
+    def test_catalonia_generated_views_reuse_germany_metadata(self):
+        from sources.waste_collection.waste_atlas import views as atlas_views
+
+        self.assertEqual(
+            atlas_views.CataloniaResidualRequiredBinCapacityMapView.template_name,
+            atlas_views.GermanyResidualRequiredBinCapacityMapView.template_name,
+        )
+        self.assertEqual(
+            atlas_views.CataloniaResidualRequiredBinCapacityMapView.map_title,
+            atlas_views.GermanyResidualRequiredBinCapacityMapView.map_title,
+        )
+        self.assertEqual(
+            atlas_views.CataloniaResidualRequiredBinCapacityMapView.map_route_key,
+            atlas_views.GermanyResidualRequiredBinCapacityMapView.map_route_key,
+        )
+        self.assertTrue(
+            issubclass(
+                atlas_views.CataloniaResidualRequiredBinCapacityMapView,
+                atlas_views.CataloniaAtlasMapView,
+            )
+        )
+
     def test_italy_orga_level_map_ignores_country_and_nuts_query_overrides(self):
         response = self.client.get(
             reverse("waste-atlas-orga-level-italy-map"),
