@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 from datetime import date, timedelta
 from urllib.parse import urlencode
 
@@ -126,6 +127,9 @@ from utils.object_management.views import (
 from utils.views import BreadcrumbContextMixin
 
 
+logger = logging.getLogger(__name__)
+
+
 def _visible_collection_chain_for_user(collection, user):
     """Return visible collections from the version chain for ``collection``."""
 
@@ -139,7 +143,12 @@ def _visible_collection_chain_for_user(collection, user):
     try:
         related_qs = filter_queryset_for_user(related_qs, user)
     except Exception:
-        pass
+        logger.exception(
+            "Failed to filter visible collection chain for collection_id=%s and user_id=%s",
+            getattr(collection, "pk", None),
+            getattr(user, "pk", None),
+        )
+        return []
 
     return list(related_qs)
 
