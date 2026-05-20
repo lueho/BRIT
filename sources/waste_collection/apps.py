@@ -7,6 +7,11 @@ class WasteCollectionConfig(AppConfig):
     verbose_name = "Sources / Waste Collection"
 
     def ready(self):
+        try:
+            from .patches import disable_research_metrics  # noqa: F401
+        except Exception:
+            pass
+
         signal_module = None
         try:
             from . import signals as signal_module
