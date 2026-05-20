@@ -1,6 +1,14 @@
+import os
+from pathlib import Path
 from urllib.parse import urlparse, urlunparse
 
 from .settings import *
+
+# Keep all historical migrations and initialization helpers aligned on one owner.
+DEFAULT_OBJECT_OWNER_USERNAME = "admin"
+DEFAULT_OWNER_USERNAME = "admin"
+if not os.environ.get("ADMIN_USERNAME"):
+    os.environ["ADMIN_USERNAME"] = "admin"
 
 SITE_ID = 1
 
@@ -39,11 +47,19 @@ CELERY_TASK_EAGER_PROPAGATES = True
 
 AUTO_ENQUEUE_URL_CHECKS = False
 
-# Whitenoise is not suitable for serving static files during tests.
-# Fall back to Django's standard setting
+# Use local filesystem storage in tests to avoid S3 dependencies.
+MEDIA_ROOT = Path("/tmp/brit-test-media")
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+STORAGES["default"] = {
+    "BACKEND": "django.core.files.storage.FileSystemStorage",
+    "OPTIONS": {"location": str(MEDIA_ROOT)},
+}
 STORAGES["staticfiles"] = {
     "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
 }
+MEDIA_URL = "/media/"
+AWS_STORAGE_BUCKET_NAME = "tests"
+AWS_S3_CUSTOM_DOMAIN = "tests.invalid"
 
 COOKIE_CONSENT_ENABLED = False
 
@@ -57,8 +73,10 @@ MIDDLEWARE = [
 
 SILENCED_SYSTEM_CHECKS = ["debug_toolbar.W001"]
 
-# Use console email backend for tests to avoid external dependencies
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+# Use local email settings in tests and prevent admin-email logging.
+EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+ADMINS = ["tests@example.com"]
+MANAGERS = ["tests@example.com"]
 
 # Use DB-backed sessions for parallel test safety
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
@@ -67,23 +85,29 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "verbose": {
-            "format": "%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s"
-        },
         "simple": {"format": "%(levelname)s %(message)s"},
     },
     "handlers": {
         "console": {
-            "level": "DEBUG",
+            "level": "WARNING",
             "class": "logging.StreamHandler",
             "formatter": "simple",
         },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "WARNING",
     },
     "loggers": {
         "django_tomselect": {
             "handlers": ["console"],
             "level": "ERROR",
-            "propagate": True,
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
         },
     },
 }
