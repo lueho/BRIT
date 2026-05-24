@@ -2,109 +2,58 @@
 
 from __future__ import annotations
 
-from collections import OrderedDict
+from types import MethodType
+from typing import Any, Callable
 
 from sources.waste_collection import serializers as wc_serializers
 
 
-def _patched_collection_flat_serializer_to_representation(self, instance):
-    representation = super(wc_serializers.CollectionFlatSerializer, self).to_representation(  # type: ignore[name-defined]
-        instance
+def _make_empty_method(instance: Any) -> Callable[[Any, Any], list[Any]]:
+    def _empty_method(_self: Any, user: Any = None) -> list[Any]:  # noqa: ANN401
+        return []
+
+    return MethodType(_empty_method, instance)
+
+
+def _temporarily_disable_metric_queries(instance: Any):
+    attr_names = (
+        "collectionpropertyvalues_for_display",
+        "aggregatedcollectionpropertyvalues_for_display",
     )
-
-    ordered_representation = OrderedDict()
-
-    for field in self.Meta.fields:  # type: ignore[attr-defined]
-        ordered_representation[field] = representation.get(field, None)
-        if field == "nuts_or_lau_id":
-            try:
-                region = instance.catchment.region
-            except AttributeError:
-                region = None
-            if region is not None:
-                nuts_hierarchy = wc_serializers._get_nuts_hierarchy(region)
-                for level in sorted(nuts_hierarchy):
-                    nuts_id, nuts_name = nuts_hierarchy[level]
-                    ordered_representation[f"nuts_{level}_id"] = nuts_id
-                    ordered_representation[f"nuts_{level}_name"] = nuts_name
-
-    region_attributes = ["Population", "Population density"]
-    try:
-        region = instance.catchment.region
-    except AttributeError:
-        region = None
-    if region is not None:
-        for attr_name in region_attributes:
-            col_prefix = attr_name.lower().replace(" ", "_")
-            rav_qs = (
-                region.regionattributevalue_set.filter(property__name=attr_name)
-                .select_related("property", "unit")
-                .order_by("date")
-            )
-            for rav in rav_qs:
-                year = rav.date.year if rav.date else None
-                col = f"{col_prefix}_{year}" if year else col_prefix
-                ordered_representation[col] = rav.value
-                unit = rav.measurement_unit_label
-                ordered_representation[f"{col}_unit"] = unit if unit else ""
-
-    if getattr(self, "include_collection_metrics", True):
-        additional_properties = [
-            "specific waste collected",
-            "total waste collected",
-            "Connection rate",
-        ]
-        user = (
-            getattr(self.context.get("request"), "user", None) if self.context else None
+    originals = {}
+    for name in attr_names:
+        originals[name] = (
+            name in instance.__dict__,
+            instance.__dict__.get(name),
         )
-        for property_name in additional_properties:
-            specific_property = wc_serializers.Property.objects.filter(  # type: ignore[attr-defined]
-                name=property_name
-            ).first()
-            if not specific_property:
-                continue
-
-            values = [
-                value
-                for value in instance.collectionpropertyvalues_for_display(user=user)
-                if value.property_id == specific_property.pk
-            ]
-
-            if not values:
-                values = [
-                    value
-                    for value in instance.aggregatedcollectionpropertyvalues_for_display(
-                        user=user
-                    )
-                    if value.property_id == specific_property.pk
-                ]
-                is_aggregated = bool(values)
-            else:
-                is_aggregated = False
-
-            for value in values:
-                column_name = f"{property_name.lower().replace(' ', '_')}_{value.year}"
-                ordered_representation[column_name] = value.average
-                ordered_representation[f"{column_name}_unit"] = (
-                    str(value.unit) if value.unit else ""
-                )
-                if is_aggregated:
-                    ordered_representation["aggregated"] = True
-
-    return ordered_representation
+        instance.__dict__[name] = _make_empty_method(instance)
+    return originals
 
 
-def _patch_collection_serializers() -> None:
-    if getattr(
-        wc_serializers.CollectionFlatSerializer, "_metrics_patch_applied", False
-    ):
+def _restore_metric_queries(instance: Any, originals: dict[str, tuple[bool, Any]]):
+    for name, (had_instance_attr, value) in originals.items():
+        if had_instance_attr:
+            instance.__dict__[name] = value
+        else:
+            instance.__dict__.pop(name, None)
+
+
+def _patch_collection_research_serializer() -> None:
+    if getattr(wc_serializers.CollectionResearchSerializer, "_metrics_patch_applied", False):
         return
 
-    wc_serializers.CollectionFlatSerializer.to_representation = (  # type: ignore[assignment]
-        _patched_collection_flat_serializer_to_representation
-    )
-    wc_serializers.CollectionFlatSerializer._metrics_patch_applied = True  # type: ignore[attr-defined]
+    original_to_representation = wc_serializers.CollectionResearchSerializer.to_representation
+
+    def patched_to_representation(self, instance):  # type: ignore[override]
+        originals = _temporarily_disable_metric_queries(instance)
+        try:
+            return original_to_representation(self, instance)
+        finally:
+            _restore_metric_queries(instance, originals)
+
     wc_serializers.CollectionResearchSerializer.include_collection_metrics = False
+    wc_serializers.CollectionResearchSerializer.to_representation = patched_to_representation  # type: ignore[assignment]
+    wc_serializers.CollectionResearchSerializer._metrics_patch_applied = True  # type: ignore[attr-defined]
 
 
-_patch_collection_serializers()
+_patch_collection_research_serializer()
