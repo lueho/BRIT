@@ -171,6 +171,20 @@ class CatchmentCollectionCountRatioSerializer(serializers.Serializer):
         return data
 
 
+class CatchmentCollectionPointCountRatioSerializer(serializers.Serializer):
+    catchment_id = serializers.IntegerField()
+    bio_count = serializers.FloatField(allow_null=True)
+    residual_count = serializers.FloatField(allow_null=True)
+    ratio = serializers.FloatField(allow_null=True)
+    bio_is_door_to_door = serializers.BooleanField(allow_null=True, required=False)
+    residual_is_door_to_door = serializers.BooleanField(allow_null=True, required=False)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["ratio"] = _round_one_decimal(data.get("ratio"))
+        return data
+
+
 class CatchmentFeeSystemSerializer(serializers.Serializer):
     """Flat JSON serializer for fee system (Karte 14, 15)."""
 

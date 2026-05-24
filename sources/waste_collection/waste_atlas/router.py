@@ -5,6 +5,7 @@ from .viewsets import (
     BinConfigurationViewSet,
     BiowasteCollectionAmountViewSet,
     BiowasteCollectionCountViewSet,
+    BiowasteCollectionPointCountViewSet,
     BiowasteFeeSystemViewSet,
     BiowasteFrequencyTypeViewSet,
     BiowasteMinBinSizeViewSet,
@@ -13,6 +14,7 @@ from .viewsets import (
     CatchmentViewSet,
     CollectionCountRatioViewSet,
     CollectionPointCountViewSet,
+    CollectionPointCountRatioViewSet,
     CollectionSupportViewSet,
     CollectionSystemViewSet,
     CombinedCollectionCountViewSet,
@@ -32,6 +34,7 @@ from .viewsets import (
     RegularPlasticCollectionSupportViewSet,
     ResidualCollectionAmountViewSet,
     ResidualCollectionCountViewSet,
+    ResidualCollectionPointCountViewSet,
     ResidualFeeSystemViewSet,
     ResidualFrequencyTypeViewSet,
     ResidualMinBinSizeViewSet,
@@ -145,6 +148,21 @@ router.register(
     "collection-point-count",
     CollectionPointCountViewSet,
     basename="api-waste-atlas-collection-point-count",
+)
+router.register(
+    "biowaste-collection-point-count",
+    BiowasteCollectionPointCountViewSet,
+    basename="api-waste-atlas-biowaste-collection-point-count",
+)
+router.register(
+    "residual-collection-point-count",
+    ResidualCollectionPointCountViewSet,
+    basename="api-waste-atlas-residual-collection-point-count",
+)
+router.register(
+    "collection-point-count-ratio",
+    CollectionPointCountRatioViewSet,
+    basename="api-waste-atlas-collection-point-count-ratio",
 )
 router.register(
     "residual-fee-system",

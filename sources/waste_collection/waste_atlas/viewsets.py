@@ -39,6 +39,7 @@ from .serializers import (
     CatchmentCollectionAmountSerializer,
     CatchmentCollectionCountRatioSerializer,
     CatchmentCollectionCountSerializer,
+    CatchmentCollectionPointCountRatioSerializer,
     CatchmentCollectionPointCountSerializer,
     CatchmentCollectionSupportSerializer,
     CatchmentCollectionSystemCountSerializer,
@@ -924,7 +925,7 @@ class CollectionCountRatioViewSet(viewsets.ViewSet):
             bio_count = bio_row.get("collection_count")
             residual_count = res_row.get("collection_count")
             ratio = None
-            if bio_count is not None and residual_count:
+            if bio_count is not None and residual_count is not None and residual_count != 0:
                 ratio = bio_count / residual_count
             data.append(
                 {
@@ -945,15 +946,13 @@ class CollectionCountRatioViewSet(viewsets.ViewSet):
 
 class CollectionPointCountViewSet(viewsets.ViewSet):
     permission_classes = [permissions.AllowAny]
+    waste_categories = None
 
-    def list(self, request):
-        country, year = _parse_country_year(request)
-        nuts_prefixes = _parse_nuts_prefixes(request)
-
+    def _get_data(self, country, year, nuts_prefixes):
         best = _select_primary_collections(
             country,
             year,
-            None,
+            self.waste_categories,
             nuts_prefixes,
         )
 
@@ -971,7 +970,7 @@ class CollectionPointCountViewSet(viewsets.ViewSet):
         )
         value_lookup = dict(cpv_qs)
 
-        data = [
+        return [
             {
                 "catchment_id": cid,
                 "collection_point_count": value_lookup.get(row["collection_id"]),
@@ -979,7 +978,62 @@ class CollectionPointCountViewSet(viewsets.ViewSet):
             }
             for cid, row in best.items()
         ]
+
+    def list(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = self._get_data(country, year, nuts_prefixes)
         serializer = CatchmentCollectionPointCountSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class BiowasteCollectionPointCountViewSet(CollectionPointCountViewSet):
+    waste_categories = ["Biowaste", "Food waste"]
+
+
+class ResidualCollectionPointCountViewSet(CollectionPointCountViewSet):
+    waste_categories = ["Residual waste"]
+
+
+class CollectionPointCountRatioViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        bio = {
+            r["catchment_id"]: r
+            for r in BiowasteCollectionPointCountViewSet()._get_data(
+                country, year, nuts_prefixes
+            )
+        }
+        res = {
+            r["catchment_id"]: r
+            for r in ResidualCollectionPointCountViewSet()._get_data(
+                country, year, nuts_prefixes
+            )
+        }
+        all_ids = set(bio) | set(res)
+        data = []
+        for cid in all_ids:
+            bio_row = bio.get(cid, {})
+            res_row = res.get(cid, {})
+            bio_count = bio_row.get("collection_point_count")
+            residual_count = res_row.get("collection_point_count")
+            ratio = None
+            if bio_count is not None and residual_count is not None and residual_count != 0:
+                ratio = bio_count / residual_count
+            data.append(
+                {
+                    "catchment_id": cid,
+                    "bio_count": bio_count,
+                    "residual_count": residual_count,
+                    "ratio": ratio,
+                    "bio_is_door_to_door": bio_row.get("is_door_to_door"),
+                    "residual_is_door_to_door": res_row.get("is_door_to_door"),
+                }
+            )
+        serializer = CatchmentCollectionPointCountRatioSerializer(data, many=True)
         return Response(serializer.data)
 
 
@@ -1802,7 +1856,7 @@ class MinBinSizeRatioViewSet(viewsets.ViewSet):
             bio_size = bio.get(cid, {}).get("min_bin_size")
             residual_size = res.get(cid, {}).get("min_bin_size")
             ratio = None
-            if bio_size is not None and residual_size:
+            if bio_size is not None and residual_size is not None and residual_size != 0:
                 ratio = bio_size / residual_size
             data.append(
                 {

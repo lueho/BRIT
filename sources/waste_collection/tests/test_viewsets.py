@@ -3012,3 +3012,266 @@ class OrganicAmountViewSetTests(APITestCase):
         by_catchment = {r["catchment_id"]: r for r in response.data}
         self.assertIn(self.catchment_residual_only.id, by_catchment)
         self.assertIsNone(by_catchment[self.catchment_residual_only.id]["ratio"])
+
+
+class SouthTyrolCollectionPointTests(APITestCase):
+    """Regression tests for South Tyrol collection-point atlas fix.
+
+    Tests the new BiowasteCollectionPointCountViewSet, ResidualCollectionPointCountViewSet,
+    and CollectionPointCountRatioViewSet that support waste-category-specific collection
+    point counts for regions like South Tyrol.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
+        cls.food_category, _ = WasteCategory.objects.get_or_create(name="Food waste")
+        cls.residual_category, _ = WasteCategory.objects.get_or_create(
+            name="Residual waste"
+        )
+        cls.d2d, _ = CollectionSystem.objects.get_or_create(name="Door to door")
+        cls.region = Region.objects.create(name="South Tyrol Region", country="IT")
+        cls.catchment_both = CollectionCatchment.objects.create(
+            name="South Tyrol Both", region=cls.region
+        )
+        cls.catchment_bio_only = CollectionCatchment.objects.create(
+            name="South Tyrol Bio Only", region=cls.region
+        )
+        cls.cp_property = Property.objects.create(name="number of collection points")
+        cls.unit, _ = Unit.objects.get_or_create(
+            name="No unit",
+            defaults={"dimensionless": True},
+        )
+        cls.cp_property.allowed_units.add(cls.unit)
+
+        # Create biowaste and residual collections for catchment_both
+        cls.bio_collection = Collection.objects.create(
+            name="South Tyrol Bio Collection",
+            catchment=cls.catchment_both,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2024, 1, 1),
+        )
+        cls.residual_collection = Collection.objects.create(
+            name="South Tyrol Residual Collection",
+            catchment=cls.catchment_both,
+            waste_category=cls.residual_category,
+            collection_system=cls.d2d,
+            valid_from=date(2024, 1, 1),
+        )
+        # Create collection point values
+        CollectionPropertyValue.objects.create(
+            collection=cls.bio_collection,
+            property=cls.cp_property,
+            unit=cls.unit,
+            year=2024,
+            average=10.5,
+        )
+        CollectionPropertyValue.objects.create(
+            collection=cls.residual_collection,
+            property=cls.cp_property,
+            unit=cls.unit,
+            year=2024,
+            average=5,
+        )
+
+        # Create biowaste-only collection for catchment_bio_only
+        cls.bio_only_collection = Collection.objects.create(
+            name="South Tyrol Bio Only Collection",
+            catchment=cls.catchment_bio_only,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2024, 1, 1),
+        )
+        CollectionPropertyValue.objects.create(
+            collection=cls.bio_only_collection,
+            property=cls.cp_property,
+            unit=cls.unit,
+            year=2024,
+            average=8,
+        )
+
+    def test_biowaste_collection_point_count_endpoint(self):
+        """BiowasteCollectionPointCountViewSet returns bio-specific collection point counts."""
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/biowaste-collection-point-count/",
+            {"country": "IT", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        self.assertEqual(by_catchment[self.catchment_both.id]["collection_point_count"], 10.5)
+        self.assertEqual(by_catchment[self.catchment_bio_only.id]["collection_point_count"], 8.0)
+        self.assertTrue(by_catchment[self.catchment_both.id]["is_door_to_door"])
+
+    def test_residual_collection_point_count_endpoint(self):
+        """ResidualCollectionPointCountViewSet returns residual-specific collection point counts."""
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/residual-collection-point-count/",
+            {"country": "IT", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        self.assertEqual(by_catchment[self.catchment_both.id]["collection_point_count"], 5.0)
+        self.assertNotIn(self.catchment_bio_only.id, by_catchment)
+
+    def test_collection_point_count_ratio_endpoint(self):
+        """CollectionPointCountRatioViewSet computes bio/residual collection point ratio."""
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/collection-point-count-ratio/",
+            {"country": "IT", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        self.assertEqual(by_catchment[self.catchment_both.id]["bio_count"], 10.5)
+        self.assertEqual(by_catchment[self.catchment_both.id]["residual_count"], 5.0)
+        self.assertEqual(by_catchment[self.catchment_both.id]["ratio"], 2.1)
+        # Bio-only catchment should have null ratio
+        self.assertIsNone(by_catchment[self.catchment_bio_only.id]["residual_count"])
+        self.assertIsNone(by_catchment[self.catchment_bio_only.id]["ratio"])
+
+    def test_collection_point_count_ratio_zero_guard(self):
+        """CollectionPointCountRatioViewSet guards against division by zero."""
+        # Add a residual collection with 0 collection points
+        zero_collection = Collection.objects.create(
+            name="South Tyrol Zero Collection",
+            catchment=self.catchment_both,
+            waste_category=self.residual_category,
+            collection_system=self.d2d,
+            valid_from=date(2025, 1, 1),
+        )
+        CollectionPropertyValue.objects.create(
+            collection=zero_collection,
+            property=self.cp_property,
+            unit=self.unit,
+            year=2025,
+            average=0,
+        )
+
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/collection-point-count-ratio/",
+            {"country": "IT", "year": 2025},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        # When residual count is 0, ratio should be None (not ZeroDivisionError)
+        self.assertEqual(by_catchment[self.catchment_both.id]["residual_count"], 0)
+        self.assertIsNone(by_catchment[self.catchment_both.id]["ratio"])
+
+
+class FalsyZeroRatioGuardTests(APITestCase):
+    """Regression tests for falsy-zero guard fixes in ratio viewsets.
+
+    Tests that CollectionCountRatioViewSet and MinBinSizeRatioViewSet properly
+    handle zero values in the denominator, treating them as None rather than
+    as falsy values that would be skipped.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
+        cls.food_category, _ = WasteCategory.objects.get_or_create(name="Food waste")
+        cls.residual_category, _ = WasteCategory.objects.get_or_create(
+            name="Residual waste"
+        )
+        cls.d2d, _ = CollectionSystem.objects.get_or_create(name="Door to door")
+        cls.region = Region.objects.create(name="Zero Guard Region", country="DE")
+        cls.catchment_zero = CollectionCatchment.objects.create(
+            name="Zero Guard", region=cls.region
+        )
+
+        # Create collections with zero residual count
+        cls.bio_frequency = cls._create_frequency(name="Zero Bio Frequency", count=52)
+        cls.residual_frequency = cls._create_frequency(
+            name="Zero Residual Frequency", count=0
+        )
+
+        Collection.objects.create(
+            name="Zero bio collection",
+            catchment=cls.catchment_zero,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            frequency=cls.bio_frequency,
+            valid_from=date(2024, 1, 1),
+            min_bin_size=60,
+        )
+        Collection.objects.create(
+            name="Zero residual collection",
+            catchment=cls.catchment_zero,
+            waste_category=cls.residual_category,
+            collection_system=cls.d2d,
+            frequency=cls.residual_frequency,
+            valid_from=date(2024, 1, 1),
+            min_bin_size=0,
+        )
+
+    @classmethod
+    def _create_frequency(cls, *, name, count):
+        frequency = CollectionFrequency.objects.create(name=name, type="Fixed")
+        distribution, _ = TemporalDistribution.objects.get_or_create(
+            name="Months of the year"
+        )
+        january, _ = Timestep.objects.get_or_create(
+            name=f"{name} January",
+            distribution=distribution,
+            defaults={"order": 10},
+        )
+        december, _ = Timestep.objects.get_or_create(
+            name=f"{name} December",
+            distribution=distribution,
+            defaults={"order": 120},
+        )
+        season = CollectionSeason.objects.create(
+            distribution=distribution,
+            first_timestep=january,
+            last_timestep=december,
+        )
+        CollectionCountOptions.objects.create(
+            frequency=frequency,
+            season=season,
+            standard=count,
+        )
+        return frequency
+
+    def test_collection_count_ratio_zero_denominator_guard(self):
+        """CollectionCountRatioViewSet guards against division by zero.
+
+        Regression test: before the fix, the condition `if bio_count is not None and residual_count:`
+        would treat residual_count=0 as falsy and skip the ratio calculation entirely,
+        rather than computing the ratio and guarding against division by zero.
+        """
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/collection-count-ratio/",
+            {"country": "DE", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        row = by_catchment[self.catchment_zero.id]
+        self.assertEqual(row["bio_count"], 52)
+        self.assertEqual(row["residual_count"], 0)
+        # Ratio should be None when denominator is 0, not a ZeroDivisionError
+        self.assertIsNone(row["ratio"])
+
+    def test_min_bin_size_ratio_zero_denominator_guard(self):
+        """MinBinSizeRatioViewSet guards against division by zero.
+
+        Regression test: before the fix, the condition `if bio_size is not None and residual_size:`
+        would treat residual_size=0 as falsy and skip the ratio calculation entirely,
+        rather than computing the ratio and guarding against division by zero.
+        """
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/min-bin-size-ratio/",
+            {"country": "DE", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        row = by_catchment[self.catchment_zero.id]
+        self.assertEqual(row["bio_min_bin_size"], 60.0)
+        self.assertEqual(row["residual_min_bin_size"], 0)
+        # Ratio should be None when denominator is 0, not a ZeroDivisionError
+        self.assertIsNone(row["ratio"])
