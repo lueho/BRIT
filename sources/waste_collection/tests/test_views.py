@@ -785,6 +785,32 @@ class CollectionPropertyValueCRUDViewsTestCase(
             {predecessor.pk, self.related_objects["collection"].pk},
         )
 
+    def test_detail_context_hides_related_collections_when_visibility_filter_errors(self):
+        predecessor = Collection.objects.create(
+            owner=self.owner_user,
+            name="CPV predecessor hidden on filter error",
+            publication_status="published",
+            valid_from=date(2020, 1, 1),
+        )
+        self.related_objects["collection"].predecessors.add(predecessor)
+
+        self.client.force_login(self.owner_user)
+        with (
+            patch(
+                "sources.waste_collection.views.filter_queryset_for_user",
+                side_effect=RuntimeError("boom"),
+            ),
+            self.assertLogs("sources.waste_collection.views", level="ERROR") as logs,
+        ):
+            response = self.client.get(self.get_detail_url(self.published_object.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["visible_related_collections"], [])
+        self.assertIn(
+            "Failed to filter visible collection chain",
+            "\n".join(logs.output),
+        )
+
 
 # ----------- AggregatedCollectionPropertyValue CRUD -------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------

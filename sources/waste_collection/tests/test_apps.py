@@ -1,0 +1,130 @@
+from importlib import import_module
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from django.test import SimpleTestCase
+
+from sources.waste_collection.apps import WasteCollectionConfig
+
+
+class WasteCollectionConfigReadyTests(SimpleTestCase):
+    def setUp(self):
+        app_module = import_module("sources.waste_collection")
+        self.app_config = WasteCollectionConfig("sources.waste_collection", app_module)
+
+    def test_ready_logs_and_returns_when_signal_import_fails(self):
+        with (
+            patch(
+                "sources.waste_collection.apps.import_module",
+                side_effect=RuntimeError("boom"),
+            ),
+            patch("sources.waste_collection.apps.logger") as logger,
+        ):
+            self.app_config.ready()
+
+        logger.exception.assert_called_once_with(
+            "Failed to import waste_collection signal handlers."
+        )
+
+    def test_ready_connects_collection_property_value_signal_handlers(self):
+        signal_module = SimpleNamespace(
+            sync_derived_cpv_on_save=object(),
+            sync_derived_cpv_on_delete=object(),
+        )
+        collection_property_value_model = object()
+
+        with (
+            patch(
+                "sources.waste_collection.apps.import_module",
+                return_value=signal_module,
+            ),
+            patch.object(
+                self.app_config,
+                "get_model",
+                return_value=collection_property_value_model,
+            ),
+            patch("django.db.models.signals.post_save.connect") as post_save_connect,
+            patch("django.db.models.signals.post_delete.connect") as post_delete_connect,
+        ):
+            self.app_config.ready()
+
+        post_save_connect.assert_called_once_with(
+            signal_module.sync_derived_cpv_on_save,
+            sender=collection_property_value_model,
+            dispatch_uid="waste_collection.sync_derived_cpv_on_save",
+        )
+        post_delete_connect.assert_called_once_with(
+            signal_module.sync_derived_cpv_on_delete,
+            sender=collection_property_value_model,
+            dispatch_uid="waste_collection.sync_derived_cpv_on_delete",
+        )
+
+    def test_ready_logs_lookup_errors_when_model_resolution_fails(self):
+        signal_module = SimpleNamespace(
+            sync_derived_cpv_on_save=object(),
+            sync_derived_cpv_on_delete=object(),
+        )
+
+        with (
+            patch(
+                "sources.waste_collection.apps.import_module",
+                return_value=signal_module,
+            ),
+            patch.object(
+                self.app_config,
+                "get_model",
+                side_effect=LookupError("missing model"),
+            ),
+            patch("sources.waste_collection.apps.logger") as logger,
+        ):
+            self.app_config.ready()
+
+        logger.warning.assert_called_once_with(
+            "Waste collection signal registration skipped because CollectionPropertyValue could not be resolved."
+        )
+
+    def test_ready_skips_research_metrics_patch_outside_testing_and_debug(self):
+        with (
+            patch("sources.waste_collection.apps.settings.TESTING", False),
+            patch("sources.waste_collection.apps.settings.DEBUG", False),
+            patch(
+                "sources.waste_collection.apps.import_module",
+                return_value=SimpleNamespace(
+                    sync_derived_cpv_on_save=object(),
+                    sync_derived_cpv_on_delete=object(),
+                ),
+            ) as import_module_mock,
+            patch.object(self.app_config, "get_model", return_value=object()),
+            patch("django.db.models.signals.post_save.connect"),
+            patch("django.db.models.signals.post_delete.connect"),
+        ):
+            self.app_config.ready()
+
+        imported_modules = [call.args[0] for call in import_module_mock.call_args_list]
+        self.assertNotIn(
+            "sources.waste_collection.patches.disable_research_metrics",
+            imported_modules,
+        )
+
+    def test_ready_imports_research_metrics_patch_during_testing(self):
+        with (
+            patch("sources.waste_collection.apps.settings.TESTING", True),
+            patch("sources.waste_collection.apps.settings.DEBUG", False),
+            patch(
+                "sources.waste_collection.apps.import_module",
+                return_value=SimpleNamespace(
+                    sync_derived_cpv_on_save=object(),
+                    sync_derived_cpv_on_delete=object(),
+                ),
+            ) as import_module_mock,
+            patch.object(self.app_config, "get_model", return_value=object()),
+            patch("django.db.models.signals.post_save.connect"),
+            patch("django.db.models.signals.post_delete.connect"),
+        ):
+            self.app_config.ready()
+
+        imported_modules = [call.args[0] for call in import_module_mock.call_args_list]
+        self.assertIn(
+            "sources.waste_collection.patches.disable_research_metrics",
+            imported_modules,
+        )
