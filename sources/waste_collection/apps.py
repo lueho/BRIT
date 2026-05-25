@@ -2,7 +2,6 @@ import logging
 from importlib import import_module
 
 from django.apps import AppConfig
-from django.conf import settings
 
 
 logger = logging.getLogger(__name__)
@@ -14,13 +13,10 @@ class WasteCollectionConfig(AppConfig):
     verbose_name = "Sources / Waste Collection"
 
     def ready(self):
-        if getattr(settings, "TESTING", False) or getattr(settings, "DEBUG", False):
-            try:
-                import_module(
-                    "sources.waste_collection.patches.disable_research_metrics"
-                )
-            except Exception:
-                pass
+        try:
+            import_module("sources.waste_collection.patches.disable_research_metrics")
+        except Exception:
+            pass
 
         try:
             signal_module = import_module("sources.waste_collection.signals")

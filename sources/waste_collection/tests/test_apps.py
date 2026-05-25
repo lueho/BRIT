@@ -83,33 +83,8 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
             "Waste collection signal registration skipped because CollectionPropertyValue could not be resolved."
         )
 
-    def test_ready_skips_research_metrics_patch_outside_testing_and_debug(self):
+    def test_ready_imports_research_metrics_patch(self):
         with (
-            patch("sources.waste_collection.apps.settings.TESTING", False),
-            patch("sources.waste_collection.apps.settings.DEBUG", False),
-            patch(
-                "sources.waste_collection.apps.import_module",
-                return_value=SimpleNamespace(
-                    sync_derived_cpv_on_save=object(),
-                    sync_derived_cpv_on_delete=object(),
-                ),
-            ) as import_module_mock,
-            patch.object(self.app_config, "get_model", return_value=object()),
-            patch("django.db.models.signals.post_save.connect"),
-            patch("django.db.models.signals.post_delete.connect"),
-        ):
-            self.app_config.ready()
-
-        imported_modules = [call.args[0] for call in import_module_mock.call_args_list]
-        self.assertNotIn(
-            "sources.waste_collection.patches.disable_research_metrics",
-            imported_modules,
-        )
-
-    def test_ready_imports_research_metrics_patch_during_testing(self):
-        with (
-            patch("sources.waste_collection.apps.settings.TESTING", True),
-            patch("sources.waste_collection.apps.settings.DEBUG", False),
             patch(
                 "sources.waste_collection.apps.import_module",
                 return_value=SimpleNamespace(
