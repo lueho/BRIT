@@ -15,11 +15,11 @@
       dataUrl:     '/waste_collection/api/waste-atlas/residual-collection-count/',
       dataField:   '_classified',
       categories: [
-        { value: 'twice_weekly',  label: '≥ 90 per year (≥ 2× per week)',       color: '#08306B' },
-        { value: 'weekly',        label: '40 – 89 per year (approx. weekly)',    color: '#4292C6' },
-        { value: 'biweekly',      label: '20 – 39 per year (approx. biweekly)', color: '#9ECAE1' },
-        { value: 'less_frequent', label: '< 20 per year (less than biweekly)',  color: '#FDBF6F' },
-        { value: 'seasonal',      label: 'Seasonally varying',                  color: '#e4595b' }
+        { value: 'twice_weekly',  label: '104 per year (2× per week)',           color: '#08306B' },
+        { value: 'weekly',        label: '52 per year (weekly)',                  color: '#4292C6' },
+        { value: 'biweekly',      label: '26 per year (every 2 weeks)',           color: '#9ECAE1' },
+        { value: 'less_frequent', label: '< 26 per year (every 3–4 weeks)',      color: '#FDBF6F' },
+        { value: 'seasonal',      label: 'Seasonally varying',                   color: '#e4595b' }
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'No data',
@@ -34,7 +34,7 @@
             cls = 'twice_weekly';
           } else if (r.collection_count >= 40) {
             cls = 'weekly';
-          } else if (r.collection_count >= 20) {
+          } else if (r.collection_count >= 26) {
             cls = 'biweekly';
           } else {
             cls = 'less_frequent';
