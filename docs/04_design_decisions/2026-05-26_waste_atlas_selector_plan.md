@@ -47,7 +47,7 @@ WASTE_ATLAS_MAP_SELECTIONS = {
 }
 ```
 
-The implemented registry currently uses separate label and route-name constants in `sources/waste_collection/waste_atlas/map_selection.py`. A later cleanup can consolidate that into the nested target shape if it improves maintainability.
+The implemented registry now uses this nested target shape in `sources/waste_collection/waste_atlas/map_selection.py`.
 
 ## Existing duplicated knowledge to reduce
 
@@ -143,7 +143,7 @@ Status: **partially done**. Focused view/template regression coverage exists. Br
 - [ ] Manually verify route changes preserve `?year=YYYY`.
 - [ ] Decide whether Europe-level overview maps should be included in the selector registry.
 - [ ] Decide whether generic country query-parameter maps should remain discoverable only through direct links or become explicit registry entries.
-- [ ] Consider consolidating the registry into the nested `WASTE_ATLAS_MAP_SELECTIONS` target shape.
+- [x] Consolidate the registry into the nested `WASTE_ATLAS_MAP_SELECTIONS` target shape.
 - [ ] Improve theme grouping or ordering if the flat theme list becomes hard to scan.
 - [ ] Consider adding help text explaining that Region means map set/geographic scope, not municipality.
 - [ ] Consider extracting shared selector markup into an include if more templates need it.
@@ -183,3 +183,4 @@ git diff --check
 - `d5b500b4 fix: rename waste atlas selector theme label`
 - `56eaec01 refactor: use theme naming for atlas selector`
 - `ce72136d docs: track waste atlas selector plan`
+- `64ed1c03 docs: align atlas selector plan with phases`

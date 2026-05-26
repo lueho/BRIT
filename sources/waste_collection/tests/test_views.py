@@ -4018,6 +4018,23 @@ class WasteAtlasMapViewsTestCase(TestCase):
     def setUp(self):
         self.client.force_login(self.user)
 
+    def test_map_selection_registry_uses_nested_region_theme_route_shape(self):
+        from sources.waste_collection.waste_atlas.map_selection import (
+            WASTE_ATLAS_MAP_SELECTIONS,
+        )
+
+        germany_selection = WASTE_ATLAS_MAP_SELECTIONS["DE"]
+        collection_system_selection = germany_selection["themes"]["collection_system"]
+
+        self.assertEqual(germany_selection["label"], "Germany")
+        self.assertEqual(
+            collection_system_selection["label"], "Biowaste collection systems"
+        )
+        self.assertEqual(
+            collection_system_selection["route_name"],
+            "waste-atlas-germany-collection-system-map",
+        )
+
     def test_italy_orga_level_map_defaults_to_it_and_english_labels(self):
         response = self.client.get(reverse("waste-atlas-orga-level-italy-map"))
 
