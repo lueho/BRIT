@@ -58,39 +58,30 @@ ARG INSTALL_PDF_PARSING=false
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Minimum runtime OS libraries (removed gdal-bin to save ~20MB if not needed)
+# Minimum runtime OS libraries and non-root user setup
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     libproj25 \
     libgdal32 \
     curl \
     && if [ "$INSTALL_PDF_PARSING" = "true" ]; then \
-        apt-get install -y --no-install-recommends \
-        poppler-utils; \
+        apt-get install -y --no-install-recommends poppler-utils; \
     fi \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create non-root user & static-files directory
-RUN useradd --system --uid 1000 --create-home --shell /bin/bash standard_user \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --uid 1000 --create-home --shell /bin/bash standard_user \
     && install -d -o standard_user -g standard_user /app/staticfiles
 
 # Virtual environment first on PATH
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# Copy the virtual environment and project metadata from builder with proper ownership
+# Copy the virtual environment and project from builder with proper ownership
 COPY --from=builder --chown=standard_user:standard_user /opt/venv /opt/venv
 COPY --from=builder --chown=standard_user:standard_user /app /app
 
 WORKDIR /app
 
-# Copy the application source code with proper ownership
-COPY --chown=standard_user:standard_user . .
-
 USER standard_user
-
-# Ensure shell helpers are executable (optional)
-RUN find . -maxdepth 1 -name "*.sh" -exec chmod +x {} +
 
 # Expose & configure the port
 EXPOSE 8000
@@ -102,4 +93,4 @@ HEALTHCHECK --interval=30s --timeout=5s \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
 # Default command (production-ready with Gunicorn)
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:8000 --workers 3 $DJANGO_WSGI"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT} --workers ${WORKERS:-3} $DJANGO_WSGI"]
