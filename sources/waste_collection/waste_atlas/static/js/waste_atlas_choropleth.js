@@ -168,6 +168,11 @@ var WasteAtlasChoropleth = (function () {
     return window.location.pathname.replace(/\/$/, '') === path.replace(/\/$/, '');
   }
 
+  function _selectorNavigationTarget(url, year) {
+    if (!url || _isCurrentPath(url)) return null;
+    return url + '?year=' + encodeURIComponent(year);
+  }
+
   function initSelectorControls(loadCurrent) {
     var countrySelect = document.getElementById('sel-country');
     var themeSelect = document.getElementById('sel-theme');
@@ -206,8 +211,9 @@ var WasteAtlasChoropleth = (function () {
       ensureVisibleSelection();
       var url = selectedRouteUrl();
       var year = selectedYear();
-      if (url && !_isCurrentPath(url)) {
-        window.location.href = url + '?year=' + encodeURIComponent(year);
+      var navigationTarget = _selectorNavigationTarget(url, year);
+      if (navigationTarget) {
+        window.location.href = navigationTarget;
         return;
       }
       if (loadCurrent) loadCurrent(countrySelect.value, year, false);
@@ -1021,6 +1027,7 @@ var WasteAtlasChoropleth = (function () {
   return {
     init: init,
     initSelectorControls: initSelectorControls,
+    selectorNavigationTarget: _selectorNavigationTarget,
     exportSVG: exportSVG,
     exportPNG: exportPNG
   };

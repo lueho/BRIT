@@ -625,6 +625,50 @@ WASTE_ATLAS_MAP_SELECTIONS = {
 
 MAP_SELECTION_YEARS = ("2022", "2023", "2024")
 
+MAP_SELECTION_THEME_ORDER = {
+    "orga_level": 10,
+    "population_density": 20,
+    "collection_system": 100,
+    "food_waste_category": 110,
+    "paper_bags": 120,
+    "plastic_bags": 130,
+    "collection_support": 140,
+    "residual_min_bin_size": 150,
+    "biowaste_min_bin_size": 160,
+    "residual_required_bin_capacity": 170,
+    "biowaste_required_bin_capacity": 180,
+    "collection_point_count": 190,
+    "biowaste_collection_point_count": 200,
+    "residual_collection_point_count": 210,
+    "green_waste_collection_system_count": 220,
+    "residual_frequency": 300,
+    "biowaste_frequency": 310,
+    "combined_frequency": 320,
+    "residual_collection_count": 400,
+    "biowaste_collection_count": 410,
+    "combined_collection_count": 420,
+    "collection_count_ratio": 430,
+    "collection_point_count_ratio": 440,
+    "residual_fee_system": 500,
+    "biowaste_fee_system": 510,
+    "combined_fee_system": 520,
+    "residual_collection_amount": 600,
+    "biowaste_collection_amount": 610,
+    "green_waste_collection_amount": 620,
+    "organic_collection_amount": 630,
+    "waste_ratio": 640,
+    "organic_waste_ratio": 650,
+    "connection_rate": 700,
+}
+
+
+def _theme_sort_key(theme_item):
+    theme, theme_selection = theme_item
+    return (
+        MAP_SELECTION_THEME_ORDER.get(theme, 1000),
+        theme_selection["label"],
+    )
+
 
 def build_map_selection_context(
     reverse_func, selected_map_set="DE", selected_theme="orga_level"
@@ -638,7 +682,9 @@ def build_map_selection_context(
                 "label": theme_selection["label"],
                 "url": reverse_func(theme_selection["route_name"]),
             }
-            for theme, theme_selection in map_selection["themes"].items()
+            for theme, theme_selection in sorted(
+                map_selection["themes"].items(), key=_theme_sort_key
+            )
         ]
         map_sets.append(
             {

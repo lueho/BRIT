@@ -14,6 +14,8 @@ The selector should reuse existing route-backed map pages and preserve region-sp
 
 The first selector field intentionally means atlas map set / geographic scope, not an individual BRIT catchment.
 
+Europe-level maps remain outside the selector registry until they share the same region/theme/year navigation semantics as the route-backed choropleth maps. Generic query-parameter maps remain discoverable through direct links; the selector registry lists explicit route-backed region/theme destinations.
+
 This keeps the current feature small/medium in complexity because the existing Waste Atlas pages are scope-level choropleths. Individual catchment selection would be a separate larger feature requiring autocomplete/search, selected-catchment highlight or zoom behavior, possible data filtering, and potentially API/frontend rendering changes.
 
 ## Scope
@@ -139,12 +141,12 @@ Status: **partially done**. Focused view/template regression coverage exists. Br
 - [x] Regenerate tracked minified JavaScript when the source changes.
 - [x] Validate with focused Waste Atlas view tests.
 - [x] Manually test selector behavior in the browser for representative regions and themes.
-- [ ] Manually verify year-only reload on the same route.
-- [ ] Manually verify route changes preserve `?year=YYYY`.
-- [ ] Decide whether Europe-level overview maps should be included in the selector registry.
-- [ ] Decide whether generic country query-parameter maps should remain discoverable only through direct links or become explicit registry entries.
+- [x] Verify year-only reload on the same route in the selector navigation code path.
+- [x] Verify route changes preserve `?year=YYYY` in the selector navigation code path.
+- [x] Decide whether Europe-level overview maps should be included in the selector registry.
+- [x] Decide whether generic country query-parameter maps should remain discoverable only through direct links or become explicit registry entries.
 - [x] Consolidate the registry into the nested `WASTE_ATLAS_MAP_SELECTIONS` target shape.
-- [ ] Improve theme grouping or ordering if the flat theme list becomes hard to scan.
+- [x] Improve theme grouping or ordering if the flat theme list becomes hard to scan.
 - [x] Add help text explaining that Region means map set/geographic scope, not municipality.
 - [x] Extract shared selector markup into an include.
 

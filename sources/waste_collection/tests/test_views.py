@@ -4021,10 +4021,13 @@ class WasteAtlasMapViewsTestCase(TestCase):
     def test_map_selection_registry_uses_nested_region_theme_route_shape(self):
         from sources.waste_collection.waste_atlas.map_selection import (
             WASTE_ATLAS_MAP_SELECTIONS,
+            build_map_selection_context,
         )
 
         germany_selection = WASTE_ATLAS_MAP_SELECTIONS["DE"]
         collection_system_selection = germany_selection["themes"]["collection_system"]
+        selection_context = build_map_selection_context(reverse)
+        germany_themes = selection_context["map_selection_themes_by_map_set"]["DE"]
 
         self.assertEqual(germany_selection["label"], "Germany")
         self.assertEqual(
@@ -4033,6 +4036,11 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(
             collection_system_selection["route_name"],
             "waste-atlas-germany-collection-system-map",
+        )
+        self.assertEqual(germany_themes[0]["value"], "orga_level")
+        self.assertLess(
+            [theme["value"] for theme in germany_themes].index("collection_system"),
+            [theme["value"] for theme in germany_themes].index("residual_frequency"),
         )
 
     def test_italy_orga_level_map_defaults_to_it_and_english_labels(self):
