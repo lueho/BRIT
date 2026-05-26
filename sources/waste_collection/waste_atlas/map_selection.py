@@ -690,8 +690,19 @@ MAP_SELECTION_WASTE_CATEGORY_PREFIXES = (
     ("combined_", "combined"),
 )
 
+MAP_SELECTION_WASTE_CATEGORY_OVERRIDES = {
+    "collection_system": "biowaste",
+    "connection_rate": "biowaste",
+    "food_waste_category": "biowaste",
+    "paper_bags": "biowaste",
+    "plastic_bags": "biowaste",
+    "collection_support": "biowaste",
+}
+
 
 def _selection_waste_category(theme):
+    if theme in MAP_SELECTION_WASTE_CATEGORY_OVERRIDES:
+        return MAP_SELECTION_WASTE_CATEGORY_OVERRIDES[theme]
     for prefix, waste_category in MAP_SELECTION_WASTE_CATEGORY_PREFIXES:
         if theme.startswith(prefix):
             return waste_category

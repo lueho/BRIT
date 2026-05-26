@@ -4048,6 +4048,12 @@ class WasteAtlasMapViewsTestCase(TestCase):
             germany_themes[
                 [theme["value"] for theme in germany_themes].index("collection_system")
             ]["waste_category"],
+            "biowaste",
+        )
+        self.assertEqual(
+            germany_themes[
+                [theme["value"] for theme in germany_themes].index("orga_level")
+            ]["waste_category"],
             "general",
         )
         self.assertEqual(
