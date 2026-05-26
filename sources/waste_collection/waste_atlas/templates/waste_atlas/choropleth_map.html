@@ -66,14 +66,14 @@
       </select>
     </div>
     <div>
-      <label for="sel-aspect">Theme</label>
-      <select id="sel-aspect">
-        {% for map_set, aspects in map_selection_aspects_by_map_set.items %}
-          {% for option in aspects %}
+      <label for="sel-theme">Theme</label>
+      <select id="sel-theme">
+        {% for map_set, themes in map_selection_themes_by_map_set.items %}
+          {% for option in themes %}
             <option value="{{ option.value }}"
                     data-map-set="{{ map_set }}"
                     data-url="{{ option.url }}"
-                    {% if map_set == selected_map_set and option.value == selected_map_aspect %}selected{% endif %}>
+                    {% if map_set == selected_map_set and option.value == selected_map_theme %}selected{% endif %}>
               {{ option.label }}
             </option>
           {% endfor %}

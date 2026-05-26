@@ -11,7 +11,7 @@ MAP_SET_LABELS = {
     "BE-FL-BR": "Flanders + Brussels",
 }
 
-MAP_ASPECT_LABELS = {
+MAP_THEME_LABELS = {
     "orga_level": "Administrative level",
     "collection_system": "Biowaste collection systems",
     "connection_rate": "Connection rate",
@@ -220,20 +220,20 @@ MAP_SELECTION_YEARS = ("2022", "2023", "2024")
 
 
 def build_map_selection_context(
-    reverse_func, selected_map_set="DE", selected_aspect="orga_level"
+    reverse_func, selected_map_set="DE", selected_theme="orga_level"
 ):
     map_sets = []
-    aspects_by_map_set = {}
-    for map_set, aspect_routes in MAP_SELECTION_ROUTE_NAMES.items():
-        aspects = [
+    themes_by_map_set = {}
+    for map_set, theme_routes in MAP_SELECTION_ROUTE_NAMES.items():
+        themes = [
             {
-                "value": aspect,
-                "label": MAP_ASPECT_LABELS[aspect],
+                "value": theme,
+                "label": MAP_THEME_LABELS[theme],
                 "url": reverse_func(route_name),
             }
-            for aspect, route_name in aspect_routes.items()
+            for theme, route_name in theme_routes.items()
         ]
-        aspects_by_map_set[map_set] = aspects
+        themes_by_map_set[map_set] = themes
         map_sets.append(
             {
                 "value": map_set,
@@ -243,8 +243,8 @@ def build_map_selection_context(
         )
     return {
         "map_selection_map_sets": map_sets,
-        "map_selection_aspects_by_map_set": aspects_by_map_set,
+        "map_selection_themes_by_map_set": themes_by_map_set,
         "map_selection_years": MAP_SELECTION_YEARS,
         "selected_map_set": selected_map_set,
-        "selected_map_aspect": selected_aspect,
+        "selected_map_theme": selected_theme,
     }

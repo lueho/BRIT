@@ -182,7 +182,7 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
             build_map_selection_context(
                 reverse,
                 selected_map_set=self.get_selected_map_set(),
-                selected_aspect=self.map_route_key or "orga_level",
+                selected_theme=self.map_route_key or "orga_level",
             )
         )
         return ctx

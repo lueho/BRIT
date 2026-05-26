@@ -4034,12 +4034,12 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertNotContains(response, "nutsPrefix:")
         self.assertNotContains(response, "nutsLevel:")
 
-    def test_map_page_renders_region_aspect_year_selector(self):
+    def test_map_page_renders_region_theme_year_selector(self):
         response = self.client.get(reverse("waste-atlas-germany-collection-system-map"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '<label for="sel-country">Region</label>')
-        self.assertContains(response, '<label for="sel-aspect">Theme</label>')
+        self.assertContains(response, '<label for="sel-theme">Theme</label>')
         self.assertContains(response, 'value="DE"')
         self.assertContains(response, "selected>Germany</option>")
         self.assertContains(response, 'data-map-set="DE"')
@@ -4320,7 +4320,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            '<label class="form-label" for="sel-aspect">Theme</label>',
+            '<label class="form-label" for="sel-theme">Theme</label>',
         )
         self.assertContains(response, 'data-map-set="IT-ST"')
         self.assertContains(

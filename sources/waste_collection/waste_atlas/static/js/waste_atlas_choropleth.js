@@ -170,35 +170,35 @@ var WasteAtlasChoropleth = (function () {
 
   function initSelectorControls(loadCurrent) {
     var countrySelect = document.getElementById('sel-country');
-    var aspectSelect = document.getElementById('sel-aspect');
+    var themeSelect = document.getElementById('sel-theme');
     var yearSelect = document.getElementById('sel-year');
     var btnLoad = document.getElementById('btn-load');
     var form = document.getElementById('atlas-selection-form');
 
-    if (!countrySelect || !aspectSelect || !yearSelect || !btnLoad) return null;
+    if (!countrySelect || !themeSelect || !yearSelect || !btnLoad) return null;
 
-    var aspectOptions = Array.prototype.slice.call(aspectSelect.options);
+    var themeOptions = Array.prototype.slice.call(themeSelect.options);
 
     function selectedYear() {
       return parseInt(yearSelect.value, 10) || 2024;
     }
 
     function selectedRouteUrl() {
-      var selectedOption = aspectSelect.options[aspectSelect.selectedIndex];
+      var selectedOption = themeSelect.options[themeSelect.selectedIndex];
       return selectedOption ? selectedOption.getAttribute('data-url') : null;
     }
 
     function ensureVisibleSelection() {
       var selectedMapSet = countrySelect.value;
       var firstVisibleOption = null;
-      aspectOptions.forEach(function (option) {
+      themeOptions.forEach(function (option) {
         var isVisible = option.getAttribute('data-map-set') === selectedMapSet;
         option.hidden = !isVisible;
         option.disabled = !isVisible;
         if (isVisible && !firstVisibleOption) firstVisibleOption = option;
       });
-      if (aspectSelect.selectedOptions.length && !aspectSelect.selectedOptions[0].disabled) return;
-      if (firstVisibleOption) aspectSelect.selectedIndex = firstVisibleOption.index;
+      if (themeSelect.selectedOptions.length && !themeSelect.selectedOptions[0].disabled) return;
+      if (firstVisibleOption) themeSelect.selectedIndex = firstVisibleOption.index;
     }
 
     function navigateOrLoad(event) {
@@ -214,7 +214,7 @@ var WasteAtlasChoropleth = (function () {
     }
 
     countrySelect.addEventListener('change', ensureVisibleSelection);
-    aspectSelect.addEventListener('change', ensureVisibleSelection);
+    themeSelect.addEventListener('change', ensureVisibleSelection);
     if (form) form.addEventListener('submit', navigateOrLoad);
     btnLoad.addEventListener('click', navigateOrLoad);
     ensureVisibleSelection();
