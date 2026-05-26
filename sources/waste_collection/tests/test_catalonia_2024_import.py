@@ -186,6 +186,9 @@ class FeeSystemMappingTests(SimpleTestCase):
     def test_basic_fee(self):
         self.assertEqual(cmd._map_fee_system("Basic fee"), "Flat fee")
 
+    def test_no_fee(self):
+        self.assertEqual(cmd._map_fee_system("No fee"), "No fee")
+
     def test_no_payt_variants(self):
         for raw in ("no payt", "no Payt", "no PAYT"):
             with self.subTest(raw=raw):
@@ -249,6 +252,16 @@ class RowToRecordBiowasteTests(SimpleTestCase):
     def test_frequency_preserved(self):
         record = self._record(frequency="Fixed; 104 per year (2 per week)")
         self.assertEqual(record["frequency"], "Fixed; 104 per year (2 per week)")
+
+    def test_clear_frequency_for_update_2_removed_frequency_row(self):
+        record = self._record(codi="170059", frequency=None)
+        self.assertEqual(record["frequency"], "")
+        self.assertIs(record["clear_frequency"], True)
+
+    def test_blank_frequency_does_not_clear_unlisted_rows(self):
+        record = self._record(codi="080018", frequency=None)
+        self.assertEqual(record["frequency"], "")
+        self.assertIs(record["clear_frequency"], False)
 
     def test_valid_from_is_2024_01_01(self):
         record = self._record()

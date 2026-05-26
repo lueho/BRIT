@@ -486,6 +486,14 @@ class CollectionImporter:
                 )
                 collection.frequency = frequency
                 update_fields.append("frequency")
+            elif (
+                record.get("clear_frequency")
+                and not raw_frequency_name
+                and collection.frequency_id is not None
+            ):
+                changes.append(f"frequency: {collection.frequency} → None")
+                collection.frequency = None
+                update_fields.append("frequency")
 
             # Update connection_type if different
             if connection_type and collection.connection_type != connection_type:

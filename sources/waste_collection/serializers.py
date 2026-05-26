@@ -786,6 +786,7 @@ class CollectionImportRecordSerializer(serializers.Serializer):
         required=False, allow_null=True, allow_blank=True
     )
     frequency = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    clear_frequency = serializers.BooleanField(required=False, default=False)
     connection_type = serializers.CharField(
         required=False, allow_null=True, allow_blank=True
     )

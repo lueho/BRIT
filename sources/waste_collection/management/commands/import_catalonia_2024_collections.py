@@ -185,6 +185,24 @@ _HEADER_ALIASES = {
     "BP_Access control/PAP_Use control_2024": "access_control",
 }
 
+_CLEAR_FREQUENCY_KEYS = {
+    ("080044", _WC_RESIDUAL),
+    ("170059", _WC_BIOWASTE),
+    ("170118", _WC_BIOWASTE),
+    ("170160", _WC_BIOWASTE),
+    ("170221", _WC_BIOWASTE),
+    ("170221", _WC_RESIDUAL),
+    ("170307", _WC_BIOWASTE),
+    ("170773", _WC_BIOWASTE),
+    ("170932", _WC_BIOWASTE),
+    ("171289", _WC_BIOWASTE),
+    ("171328", _WC_BIOWASTE),
+    ("171788", _WC_BIOWASTE),
+    ("171984", _WC_BIOWASTE),
+    ("172214", _WC_BIOWASTE),
+    ("172214", _WC_RESIDUAL),
+}
+
 # ---------------------------------------------------------------------------
 # Collection frequency normalisation: Excel string → BRIT CollectionFrequency name
 #
@@ -297,6 +315,7 @@ _FEE_SYSTEM_MAP: dict[str, str] = {
     "pxg": "Pay as you throw (PAYT)",  # "pagament per generació" = PAYT
     "basic fee": "Flat fee",
     "no payt": "Flat fee",
+    "no fee": "No fee",
 }
 
 # ---------------------------------------------------------------------------
@@ -614,6 +633,11 @@ def _row_to_record(row: dict | tuple) -> dict | None:
         "frequency": _normalise_frequency(
             str(_row_value(row, "Collection frequency", 17) or "").strip()
         ),
+        "clear_frequency": (
+            codi,
+            waste_type,
+        )
+        in _CLEAR_FREQUENCY_KEYS,
         "connection_type": "",
         **_access_control_fields(
             _row_value(row, "access_control", 14), collection_system
