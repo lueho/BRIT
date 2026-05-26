@@ -146,7 +146,7 @@ Status: **partially done**. Focused view/template regression coverage exists. Br
 - [x] Consolidate the registry into the nested `WASTE_ATLAS_MAP_SELECTIONS` target shape.
 - [ ] Improve theme grouping or ordering if the flat theme list becomes hard to scan.
 - [x] Add help text explaining that Region means map set/geographic scope, not municipality.
-- [ ] Consider extracting shared selector markup into an include if more templates need it.
+- [x] Extract shared selector markup into an include.
 
 ## Validation commands
 

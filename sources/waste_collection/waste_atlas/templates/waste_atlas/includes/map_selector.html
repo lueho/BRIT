@@ -1,0 +1,79 @@
+{% if atlas_selector_bootstrap %}
+  <div class="row g-3 align-items-end">
+    <div class="col-md-4">
+      <label class="form-label" for="sel-country">Region</label>
+      <select class="form-select" id="sel-country">
+        {% for option in map_selection_map_sets %}
+          <option value="{{ option.value }}"
+                  {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
+        {% endfor %}
+      </select>
+      <div class="form-text">Region means the map scope, not an individual municipality.</div>
+    </div>
+    <div class="col-md-5">
+      <label class="form-label" for="sel-theme">Theme</label>
+      <select class="form-select" id="sel-theme">
+        {% for map_set, themes in map_selection_themes_by_map_set.items %}
+          {% for option in themes %}
+            <option value="{{ option.value }}"
+                    data-map-set="{{ map_set }}"
+                    data-url="{{ option.url }}"
+                    {% if map_set == selected_map_set and option.value == selected_map_theme %}selected{% endif %}>
+              {{ option.label }}
+            </option>
+          {% endfor %}
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label" for="sel-year">Year</label>
+      <select class="form-select" id="sel-year">
+        {% for option_year in map_selection_years %}
+          <option value="{{ option_year }}" {% if option_year == year or not year and option_year == "2024" %}selected{% endif %}>{{ option_year }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-1">
+      <button class="btn btn-primary w-100" id="btn-load" type="submit">
+        {{ atlas_selector_button_label|default:"Go" }}
+      </button>
+    </div>
+  </div>
+{% else %}
+  <div>
+    <label for="sel-country">Region</label>
+    <select id="sel-country">
+      {% for option in map_selection_map_sets %}
+        <option value="{{ option.value }}"
+                {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
+      {% endfor %}
+    </select>
+    <small class="text-muted d-block">Region means the map scope, not an individual municipality.</small>
+  </div>
+  <div>
+    <label for="sel-theme">Theme</label>
+    <select id="sel-theme">
+      {% for map_set, themes in map_selection_themes_by_map_set.items %}
+        {% for option in themes %}
+          <option value="{{ option.value }}"
+                  data-map-set="{{ map_set }}"
+                  data-url="{{ option.url }}"
+                  {% if map_set == selected_map_set and option.value == selected_map_theme %}selected{% endif %}>
+            {{ option.label }}
+          </option>
+        {% endfor %}
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="sel-year">Year</label>
+    <select id="sel-year">
+      {% for option_year in map_selection_years %}
+        <option value="{{ option_year }}" {% if option_year == year or not year and option_year == "2024" %}selected{% endif %}>{{ option_year }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button class="btn btn-primary btn-sm" id="btn-load" type="button">
+    <i class="fas fa-sync-alt"></i> {{ atlas_selector_button_label|default:"Load" }}
+  </button>
+{% endif %}
