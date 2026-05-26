@@ -280,7 +280,7 @@ class ItalyCollectionPointCountMapView(ItalyAtlasMapView):
 
 class ItalyResidualFrequencyMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte8_residual_frequency.html"
-    map_title = "Collection frequency types for residual-waste collection"
+    map_title = "Collection frequency types for residual waste collection"
     map_route_key = "residual_frequency"
 
 
@@ -292,7 +292,7 @@ class ItalyBiowasteFrequencyMapView(ItalyAtlasMapView):
 
 class ItalyResidualCollectionCountMapView(ItalyAtlasMapView):
     template_name = "waste_atlas/karte11_residual_collection_count.html"
-    map_title = "Annual residual-waste collection count"
+    map_title = "Annual residual waste collection count"
     map_route_key = "residual_collection_count"
 
 
@@ -382,7 +382,7 @@ class SouthTyrolBiowasteCollectionPointCountMapView(SouthTyrolAtlasMapView):
 
 class SouthTyrolResidualCollectionPointCountMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte46_residual_collection_point_count.html"
-    map_title = "Number of residual-waste collection points"
+    map_title = "Number of residual waste collection points"
     map_route_key = "residual_collection_point_count"
 
 
@@ -394,7 +394,7 @@ class SouthTyrolCollectionPointCountRatioMapView(SouthTyrolAtlasMapView):
 
 class SouthTyrolResidualFrequencyMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte8_residual_frequency.html"
-    map_title = "Collection frequency setting for residual-waste collection"
+    map_title = "Collection frequency setting for residual waste collection"
     map_route_key = "residual_frequency"
 
 
@@ -406,7 +406,7 @@ class SouthTyrolBiowasteFrequencyMapView(SouthTyrolAtlasMapView):
 
 class SouthTyrolResidualCollectionCountMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte11_residual_collection_count.html"
-    map_title = "Annual residual-waste collection count"
+    map_title = "Annual residual waste collection count"
     map_route_key = "residual_collection_count"
 
 
@@ -430,7 +430,7 @@ class SouthTyrolCombinedCollectionCountMapView(SouthTyrolAtlasMapView):
 
 class SouthTyrolResidualFeeSystemMapView(SouthTyrolAtlasMapView):
     template_name = "waste_atlas/karte14_residual_fee_system.html"
-    map_title = "Fee system for residual-waste collection"
+    map_title = "Fee system for residual waste collection"
     map_route_key = "residual_fee_system"
 
 
@@ -640,7 +640,7 @@ class ResidualFrequencyMapView(AtlasMapView):
     """Karte 8 — Sammelrhythmus Restmüll."""
 
     template_name = "waste_atlas/karte8_residual_frequency.html"
-    map_title = "Collection frequency types for residual-waste collection"
+    map_title = "Collection frequency types for residual waste collection"
 
 
 class BiowasteFrequencyMapView(AtlasMapView):
@@ -661,7 +661,7 @@ class ResidualCollectionCountMapView(AtlasMapView):
     """Karte 11 — Häufigkeit Restmüllabholung."""
 
     template_name = "waste_atlas/karte11_residual_collection_count.html"
-    map_title = "Annual residual-waste collection count"
+    map_title = "Annual residual waste collection count"
 
 
 class BiowasteCollectionCountMapView(AtlasMapView):
@@ -689,7 +689,7 @@ class ResidualFeeSystemMapView(AtlasMapView):
     """Karte 14 — Gebührensysteme Restmüll."""
 
     template_name = "waste_atlas/karte14_residual_fee_system.html"
-    map_title = "Fee system for residual-waste collection"
+    map_title = "Fee system for residual waste collection"
 
 
 class BiowasteFeeSystemMapView(AtlasMapView):
@@ -849,7 +849,7 @@ class BwRpResidualRequiredBinCapacityMapView(BwRpAtlasMapView):
 
 class BwRpResidualFrequencyMapView(BwRpAtlasMapView):
     template_name = "waste_atlas/karte8_residual_frequency.html"
-    map_title = "Collection frequency types for residual-waste collection"
+    map_title = "Collection frequency types for residual waste collection"
 
 
 class BwRpBiowasteFrequencyMapView(BwRpAtlasMapView):
@@ -864,7 +864,7 @@ class BwRpCombinedFrequencyMapView(BwRpAtlasMapView):
 
 class BwRpResidualCollectionCountMapView(BwRpAtlasMapView):
     template_name = "waste_atlas/karte11_residual_collection_count.html"
-    map_title = "Annual residual-waste collection count"
+    map_title = "Annual residual waste collection count"
 
 
 class BwRpBiowasteCollectionCountMapView(BwRpAtlasMapView):
@@ -884,7 +884,7 @@ class BwRpCollectionCountRatioMapView(BwRpAtlasMapView):
 
 class BwRpResidualFeeSystemMapView(BwRpAtlasMapView):
     template_name = "waste_atlas/karte14_residual_fee_system.html"
-    map_title = "Fee system for residual-waste collection"
+    map_title = "Fee system for residual waste collection"
 
 
 class BwRpBiowasteFeeSystemMapView(BwRpAtlasMapView):
@@ -1093,13 +1093,13 @@ class GermanyBWRPCollectionSupportMapView(GermanyBWRPAtlasMapView):
 
 class GermanyResidualFrequencyMapView(GermanyAtlasMapView):
     template_name = "waste_atlas/karte8_residual_frequency.html"
-    map_title = "Collection frequency types for residual-waste collection"
+    map_title = "Collection frequency types for residual waste collection"
     map_route_key = "residual_frequency"
 
 
 class GermanyBWRPResidualFrequencyMapView(GermanyBWRPAtlasMapView):
     template_name = "waste_atlas/karte8_residual_frequency.html"
-    map_title = "Collection frequency types for residual-waste collection"
+    map_title = "Collection frequency types for residual waste collection"
     map_route_key = "residual_frequency"
 
 
@@ -1129,13 +1129,13 @@ class GermanyBWRPCombinedFrequencyMapView(GermanyBWRPAtlasMapView):
 
 class GermanyResidualCollectionCountMapView(GermanyAtlasMapView):
     template_name = "waste_atlas/karte11_residual_collection_count.html"
-    map_title = "Annual residual-waste collection count"
+    map_title = "Annual residual waste collection count"
     map_route_key = "residual_collection_count"
 
 
 class GermanyBWRPResidualCollectionCountMapView(GermanyBWRPAtlasMapView):
     template_name = "waste_atlas/karte11_residual_collection_count.html"
-    map_title = "Annual residual-waste collection count"
+    map_title = "Annual residual waste collection count"
     map_route_key = "residual_collection_count"
 
 
@@ -1177,13 +1177,13 @@ class GermanyBWRPCollectionCountRatioMapView(GermanyBWRPAtlasMapView):
 
 class GermanyResidualFeeSystemMapView(GermanyAtlasMapView):
     template_name = "waste_atlas/karte14_residual_fee_system.html"
-    map_title = "Fee system for residual-waste collection"
+    map_title = "Fee system for residual waste collection"
     map_route_key = "residual_fee_system"
 
 
 class GermanyBWRPResidualFeeSystemMapView(GermanyBWRPAtlasMapView):
     template_name = "waste_atlas/karte14_residual_fee_system.html"
-    map_title = "Fee system for residual-waste collection"
+    map_title = "Fee system for residual waste collection"
     map_route_key = "residual_fee_system"
 
 
@@ -1356,8 +1356,14 @@ CATALONIA_GERMANY_VARIANT_VIEWS = (
     ("CataloniaResidualFeeSystemMapView", GermanyResidualFeeSystemMapView),
     ("CataloniaBiowasteFeeSystemMapView", GermanyBiowasteFeeSystemMapView),
     ("CataloniaCombinedFeeSystemMapView", GermanyCombinedFeeSystemMapView),
-    ("CataloniaResidualCollectionAmountMapView", GermanyResidualCollectionAmountMapView),
-    ("CataloniaBiowasteCollectionAmountMapView", GermanyBiowasteCollectionAmountMapView),
+    (
+        "CataloniaResidualCollectionAmountMapView",
+        GermanyResidualCollectionAmountMapView,
+    ),
+    (
+        "CataloniaBiowasteCollectionAmountMapView",
+        GermanyBiowasteCollectionAmountMapView,
+    ),
     (
         "CataloniaGreenWasteCollectionAmountMapView",
         GermanyGreenWasteCollectionAmountMapView,

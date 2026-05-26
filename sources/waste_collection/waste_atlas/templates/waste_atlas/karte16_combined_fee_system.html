@@ -15,11 +15,12 @@
       dataUrl:     '/waste_collection/api/waste-atlas/combined-fee-system/',
       dataField:   '_classified',
       categories: [
-        { value: 'no_fee_payt', label: 'Biowaste: no separate fee — Residual: PAYT',   exportLabel: 'No fee / PAYT',  color: '#1b9e77' },
-        { value: 'flat_payt',   label: 'Biowaste: flat fee — Residual: PAYT',           exportLabel: 'Flat fee / PAYT', color: '#7570b3' },
-        { value: 'flex_payt',   label: 'Biowaste: flexible — Residual: PAYT',           exportLabel: 'Flexible / PAYT', color: '#d95f02' },
-        { value: 'other',       label: 'Other combinations',                            exportLabel: 'Other',           color: '#66c2a5' },
-        { value: 'no_bio',      label: 'No door to door biowaste collection',           exportLabel: 'No D2D bio',      color: '#fff696' }
+        { value: 'flex_flex',   label: 'Biowaste: flexible — Residual: flexible',        exportLabel: 'Flexible / flexible', color: '#1b9e77' },
+        { value: 'no_fee_flex', label: 'Biowaste: no separate fee — Residual: flexible', exportLabel: 'No fee / flexible',   color: '#7570b3' },
+        { value: 'flat_any',    label: 'Biowaste: flat fee',                             exportLabel: 'Flat fee',            color: '#d95f02' },
+        { value: 'payt_payt',   label: 'Biowaste: PAYT — Residual: PAYT',               exportLabel: 'PAYT / PAYT',         color: '#e7298a' },
+        { value: 'no_fee_payt', label: 'Biowaste: no separate fee — Residual: PAYT',    exportLabel: 'No fee / PAYT',       color: '#66a61e' },
+        { value: 'no_bio',      label: 'No door-to-door biowaste collection',            exportLabel: 'No D2D bio',          color: '#fff696' }
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'No data',
@@ -29,16 +30,21 @@
         return records.map(function (r) {
           var cls;
           var noSep = ['No separate collection', 'Recycling centre', 'Bring point'];
+          var flexFees = ['Flexible', 'Flexible+'];
           if (noSep.indexOf(r.bio_fee) !== -1) {
             cls = 'no_bio';
+          } else if (flexFees.indexOf(r.bio_fee) !== -1 && flexFees.indexOf(r.residual_fee) !== -1) {
+            cls = 'flex_flex';
+          } else if (r.bio_fee === 'No fee' && flexFees.indexOf(r.residual_fee) !== -1) {
+            cls = 'no_fee_flex';
+          } else if (r.bio_fee === 'Flat fee') {
+            cls = 'flat_any';
+          } else if (r.bio_fee === 'Pay as you throw (PAYT)' && r.residual_fee === 'Pay as you throw (PAYT)') {
+            cls = 'payt_payt';
           } else if (r.bio_fee === 'No fee' && r.residual_fee === 'Pay as you throw (PAYT)') {
             cls = 'no_fee_payt';
-          } else if (r.bio_fee === 'Flat fee' && r.residual_fee === 'Pay as you throw (PAYT)') {
-            cls = 'flat_payt';
-          } else if ((r.bio_fee === 'Flexible' || r.bio_fee === 'Flexible+') && r.residual_fee === 'Pay as you throw (PAYT)') {
-            cls = 'flex_payt';
           } else {
-            cls = 'other';
+            cls = null;
           }
           return { catchment_id: r.catchment_id, _classified: cls };
         });

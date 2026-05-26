@@ -11,7 +11,7 @@
       year:        parseInt('{{ year }}', 10) || 2024,
       {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
       {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
-      title:       'Annual collection count: Biowaste vs Residual waste',
+      title:       'Annual collection count: biowaste vs residual waste',
       dataUrl:     '/waste_collection/api/waste-atlas/combined-collection-count/',
       dataField:   '_classified',
       categories: [
@@ -24,7 +24,7 @@
         { value: 'bio_less_res_more',     label: 'Biowaste less frequent, residual waste more often', exportLabel: 'Less / more', color: '#e33e88' },
         { value: 'bio_less_res_bi',       label: 'Biowaste less frequent, residual waste every two weeks', exportLabel: 'Less / 2 weeks', color: '#ff7986' },
         { value: 'bio_less_res_less',     label: 'Biowaste less frequent, residual waste less frequent', exportLabel: 'Less / less', color: '#f7b1b8' },
-        { value: 'no_bio',               label: 'No door to door biowaste collection', exportLabel: 'No D2D bio', color: '#fff696' }
+        { value: 'no_bio',               label: 'No door-to-door biowaste collection', exportLabel: 'No D2D bio', color: '#fff696' }
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'No data',
