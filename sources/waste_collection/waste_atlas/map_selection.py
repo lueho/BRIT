@@ -661,6 +661,54 @@ MAP_SELECTION_THEME_ORDER = {
     "connection_rate": 700,
 }
 
+MAP_SELECTION_WASTE_CATEGORIES = {
+    "general": "General / not waste-specific",
+    "residual": "Residual waste",
+    "biowaste": "Biowaste",
+    "green_waste": "Green waste",
+    "organic": "Organic fraction",
+    "combined": "Combined waste categories",
+}
+
+MAP_SELECTION_THEME_LABELS = {
+    "collection_amount": "Collected amount",
+    "collection_count": "Collection count",
+    "collection_point_count": "Collection points",
+    "collection_system": "Collection system",
+    "collection_system_count": "Collection system count",
+    "fee_system": "Fees",
+    "frequency": "Schedule",
+    "min_bin_size": "Bin size",
+    "required_bin_capacity": "Bin capacity",
+}
+
+MAP_SELECTION_WASTE_CATEGORY_PREFIXES = (
+    ("green_waste_", "green_waste"),
+    ("residual_", "residual"),
+    ("biowaste_", "biowaste"),
+    ("organic_", "organic"),
+    ("combined_", "combined"),
+)
+
+
+def _selection_waste_category(theme):
+    for prefix, waste_category in MAP_SELECTION_WASTE_CATEGORY_PREFIXES:
+        if theme.startswith(prefix):
+            return waste_category
+    return "general"
+
+
+def _selection_theme_group(theme):
+    for prefix, _waste_category in MAP_SELECTION_WASTE_CATEGORY_PREFIXES:
+        if theme.startswith(prefix):
+            return theme.removeprefix(prefix)
+    return theme
+
+
+def _selection_theme_label(theme, theme_selection):
+    theme_group = _selection_theme_group(theme)
+    return MAP_SELECTION_THEME_LABELS.get(theme_group, theme_selection["label"])
+
 
 def _theme_sort_key(theme_item):
     theme, theme_selection = theme_item
@@ -679,7 +727,9 @@ def build_map_selection_context(
         themes_by_map_set[map_set] = [
             {
                 "value": theme,
-                "label": theme_selection["label"],
+                "theme_group": _selection_theme_group(theme),
+                "waste_category": _selection_waste_category(theme),
+                "label": _selection_theme_label(theme, theme_selection),
                 "url": reverse_func(theme_selection["route_name"]),
             }
             for theme, theme_selection in sorted(
@@ -696,7 +746,9 @@ def build_map_selection_context(
     return {
         "map_selection_map_sets": map_sets,
         "map_selection_themes_by_map_set": themes_by_map_set,
+        "map_selection_waste_categories": MAP_SELECTION_WASTE_CATEGORIES,
         "map_selection_years": MAP_SELECTION_YEARS,
         "selected_map_set": selected_map_set,
         "selected_map_theme": selected_theme,
+        "selected_waste_category": _selection_waste_category(selected_theme),
     }

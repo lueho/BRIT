@@ -4038,6 +4038,24 @@ class WasteAtlasMapViewsTestCase(TestCase):
             "waste-atlas-germany-collection-system-map",
         )
         self.assertEqual(germany_themes[0]["value"], "orga_level")
+        self.assertEqual(
+            germany_themes[
+                [theme["value"] for theme in germany_themes].index("collection_system")
+            ]["label"],
+            "Collection system",
+        )
+        self.assertEqual(
+            germany_themes[
+                [theme["value"] for theme in germany_themes].index("collection_system")
+            ]["waste_category"],
+            "general",
+        )
+        self.assertEqual(
+            germany_themes[
+                [theme["value"] for theme in germany_themes].index("biowaste_frequency")
+            ]["waste_category"],
+            "biowaste",
+        )
         self.assertLess(
             [theme["value"] for theme in germany_themes].index("collection_system"),
             [theme["value"] for theme in germany_themes].index("residual_frequency"),
@@ -4069,9 +4087,14 @@ class WasteAtlasMapViewsTestCase(TestCase):
             "Region means the map scope, not an individual municipality.",
         )
         self.assertContains(response, '<label for="sel-theme">Theme</label>')
+        self.assertContains(
+            response, '<label for="sel-waste-category">Waste category</label>'
+        )
         self.assertContains(response, 'value="DE"')
         self.assertContains(response, "selected>Germany</option>")
         self.assertContains(response, 'data-map-set="DE"')
+        self.assertContains(response, 'data-waste-category="general"')
+        self.assertContains(response, 'data-waste-category="biowaste"')
         self.assertContains(response, 'value="collection_system"')
         self.assertContains(
             response,

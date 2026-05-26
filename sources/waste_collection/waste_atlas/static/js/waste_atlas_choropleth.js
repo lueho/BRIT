@@ -175,6 +175,7 @@ var WasteAtlasChoropleth = (function () {
 
   function initSelectorControls(loadCurrent) {
     var countrySelect = document.getElementById('sel-country');
+    var wasteCategorySelect = document.getElementById('sel-waste-category');
     var themeSelect = document.getElementById('sel-theme');
     var yearSelect = document.getElementById('sel-year');
     var btnLoad = document.getElementById('btn-load');
@@ -195,9 +196,11 @@ var WasteAtlasChoropleth = (function () {
 
     function ensureVisibleSelection() {
       var selectedMapSet = countrySelect.value;
+      var selectedWasteCategory = wasteCategorySelect ? wasteCategorySelect.value : null;
       var firstVisibleOption = null;
       themeOptions.forEach(function (option) {
-        var isVisible = option.getAttribute('data-map-set') === selectedMapSet;
+        var isVisible = option.getAttribute('data-map-set') === selectedMapSet
+          && (!selectedWasteCategory || option.getAttribute('data-waste-category') === selectedWasteCategory);
         option.hidden = !isVisible;
         option.disabled = !isVisible;
         if (isVisible && !firstVisibleOption) firstVisibleOption = option;
@@ -220,6 +223,7 @@ var WasteAtlasChoropleth = (function () {
     }
 
     countrySelect.addEventListener('change', ensureVisibleSelection);
+    if (wasteCategorySelect) wasteCategorySelect.addEventListener('change', ensureVisibleSelection);
     themeSelect.addEventListener('change', ensureVisibleSelection);
     if (form) form.addEventListener('submit', navigateOrLoad);
     btnLoad.addEventListener('click', navigateOrLoad);
