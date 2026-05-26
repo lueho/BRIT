@@ -833,6 +833,7 @@ class CollectionImportRecordSerializer(serializers.Serializer):
     reconcile_same_year_identity = serializers.BooleanField(
         required=False, default=False
     )
+    sync_owner = serializers.BooleanField(required=False, default=False)
 
     def validate_description(self, value):
         return normalize_collection_description(value)

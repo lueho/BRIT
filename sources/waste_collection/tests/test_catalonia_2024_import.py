@@ -267,9 +267,9 @@ class RowToRecordBiowasteTests(SimpleTestCase):
         record = self._record()
         self.assertEqual(record["valid_from"], "2024-01-01")
 
-    def test_valid_until_is_2024_12_31(self):
+    def test_valid_until_is_open_ended(self):
         record = self._record()
-        self.assertEqual(record["valid_until"], "2024-12-31")
+        self.assertIsNone(record["valid_until"])
 
     def test_property_values_contain_specific_2024(self):
         record = self._record(qty_2024_kg_per_cap=87.73, qty_2024_t=530.86)

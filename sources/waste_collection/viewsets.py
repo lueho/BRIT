@@ -782,6 +782,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                     "flyer_urls": data.get("flyer_urls", []),
                 },
                 cpv_stats,
+                record={},
             )
 
             cpv = (

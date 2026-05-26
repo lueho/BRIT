@@ -451,6 +451,11 @@ class CollectionImporter:
                 )
 
             # Update collector if different
+            if record.get("sync_owner") and collection.owner_id != self.owner.pk:
+                changes.append(f"owner: {collection.owner} → {self.owner}")
+                collection.owner = self.owner
+                update_fields.append("owner")
+
             if collector and collection.collector_id != (
                 collector.pk if collector else None
             ):
@@ -714,7 +719,7 @@ class CollectionImporter:
 
         # Property values
         for pv in record.get("property_values") or []:
-            self._import_property_value(collection, pv, stats)
+            self._import_property_value(collection, pv, stats, record=record)
 
     def _attach_collection_flyers(
         self, collection: Collection, urls: list[str], stats: dict
@@ -825,8 +830,17 @@ class CollectionImporter:
                     self._submit_for_review(flyer)
 
     def _import_property_value(
-        self, collection: Collection, pv: dict, stats: dict
+        self, collection: Collection, pv: dict, stats: dict, *, record: dict
     ) -> None:
+        """Import a single property value from a workbook record.
+
+        Both specific (kg/(cap.*a)) and total (Mg/a) values provided by the
+        workbook are stored as raw (``is_derived=False``) observations.  If an
+        auto-derived counterpart with the same collection/property/unit/year
+        already exists it is deleted before the raw value is created, so that
+        workbook-provided data always takes precedence over computed
+        counterparts.
+        """
         prop = self._properties.get(pv.get("property_id"))
         if prop is None:
             prop = self._properties_by_name.get(pv.get("property_name") or "")
@@ -871,6 +885,10 @@ class CollectionImporter:
             is_derived=False,
         ).first()
         if existing_cpv is not None:
+            if record.get("sync_owner") and existing_cpv.owner_id != self.owner.pk:
+                existing_cpv.owner = self.owner
+                if not self.dry_run:
+                    existing_cpv.save(update_fields=["owner", "lastmodified_at"])
             if exact_derived_qs.exists():
                 exact_derived_qs.delete()
             self._attach_cpv_sources(existing_cpv, flyer_urls, stats)
@@ -951,22 +969,24 @@ class CollectionImporter:
         country_code = (record.get("country_code") or "").strip().upper()
 
         if nuts_lau_id:
-            catchment = self._nuts_catchments.get(nuts_lau_id)
-            if catchment is None:
-                if country_code:
-                    country_key = (nuts_lau_id, country_code)
-                    if country_key in self._ambiguous_lau_country_keys:
-                        stats["warnings"].append(
-                            f"{label}: LAU id '{nuts_lau_id}' is ambiguous for country '{country_code}'."
-                        )
-                        return None
-                    catchment = self._lau_catchments_by_country.get(country_key)
-                    if catchment is None and nuts_lau_id in self._ambiguous_lau_ids:
-                        stats["warnings"].append(
-                            f"{label}: LAU id '{nuts_lau_id}' did not resolve for country '{country_code}'."
-                        )
-                        return None
-                else:
+            if country_code:
+                country_key = (nuts_lau_id, country_code)
+                if country_key in self._ambiguous_lau_country_keys:
+                    stats["warnings"].append(
+                        f"{label}: LAU id '{nuts_lau_id}' is ambiguous for country '{country_code}'."
+                    )
+                    return None
+                catchment = self._lau_catchments_by_country.get(country_key)
+                if catchment is None and nuts_lau_id in self._ambiguous_lau_ids:
+                    stats["warnings"].append(
+                        f"{label}: LAU id '{nuts_lau_id}' did not resolve for country '{country_code}'."
+                    )
+                    return None
+                if catchment is None:
+                    catchment = self._nuts_catchments.get(nuts_lau_id)
+            else:
+                catchment = self._nuts_catchments.get(nuts_lau_id)
+                if catchment is None:
                     if nuts_lau_id in self._ambiguous_lau_ids:
                         stats["warnings"].append(
                             f"{label}: LAU id '{nuts_lau_id}' is ambiguous across countries — provide country_code."

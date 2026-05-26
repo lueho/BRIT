@@ -119,7 +119,6 @@ _COUNTRY_CODE = "ES"
 # ---------------------------------------------------------------------------
 _DATA_YEAR = 2024
 _VALID_FROM = date(_DATA_YEAR, 1, 1)
-_VALID_UNTIL = date(_DATA_YEAR, 12, 31)
 
 # ---------------------------------------------------------------------------
 # BRIT canonical names
@@ -647,11 +646,12 @@ def _row_to_record(row: dict | tuple) -> dict | None:
         "required_bin_capacity_reference": "",
         "description": "\n\n".join(description_parts),
         "valid_from": _date_to_str(_VALID_FROM),
-        "valid_until": _date_to_str(_VALID_UNTIL),
+        "valid_until": None,
         "sources": row_notes,
         "flyer_urls": flyer_urls,
         "property_values": pvs,
         "reconcile_same_year_identity": True,
+        "sync_owner": True,
     }
 
 
