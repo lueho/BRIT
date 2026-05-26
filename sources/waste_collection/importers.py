@@ -312,16 +312,16 @@ class CollectionImporter:
         lau_rows = (
             CollectionCatchment.objects.filter(region__lauregion__isnull=False)
             .select_related("region__lauregion")
-            .values_list("region__lauregion__lau_id", "region__lauregion__cntr_code", "id")
+            .values_list(
+                "region__lauregion__lau_id", "region__lauregion__cntr_code", "id"
+            )
         )
         catchment_pks = {pk for _, _, pk in lau_rows}
         _catchment_objs = {
             c.pk: c for c in CollectionCatchment.objects.filter(pk__in=catchment_pks)
         }
         self._lau_catchments: dict[str, CollectionCatchment] = {}
-        self._lau_catchments_by_country: dict[
-            tuple[str, str], CollectionCatchment
-        ] = {}
+        self._lau_catchments_by_country: dict[tuple[str, str], CollectionCatchment] = {}
         self._ambiguous_lau_ids: set[str] = set()
         self._ambiguous_lau_country_keys: set[tuple[str, str]] = set()
         for lau_id, country_code, pk in lau_rows:
@@ -424,6 +424,14 @@ class CollectionImporter:
             allowed_material_ids=allowed_material_ids,
             forbidden_material_ids=forbidden_material_ids,
         )
+        if existing is None and record.get("reconcile_same_year_identity"):
+            existing = self._find_existing_collection_for_same_year_reconcile(
+                catchment=catchment,
+                waste_category=waste_category,
+                valid_from=valid_from,
+                allowed_material_ids=allowed_material_ids,
+                forbidden_material_ids=forbidden_material_ids,
+            )
 
         if existing:
             collection = existing
@@ -451,6 +459,13 @@ class CollectionImporter:
                 )
                 collection.collector = collector
                 update_fields.append("collector")
+
+            if collection.collection_system_id != collection_system.pk:
+                changes.append(
+                    f"collection_system: {collection.collection_system or 'None'} → {collection_system}"
+                )
+                collection.collection_system = collection_system
+                update_fields.append("collection_system")
 
             # Update fee_system if different
             if fee_system and collection.fee_system_id != (
@@ -833,7 +848,9 @@ class CollectionImporter:
         )
         flyer_urls = pv.get("flyer_urls") or []
         exact_derived_urls = [
-            url for url in exact_derived_qs.values_list("sources__url", flat=True) if url
+            url
+            for url in exact_derived_qs.values_list("sources__url", flat=True)
+            if url
         ]
         if exact_derived_urls:
             flyer_urls = list(dict.fromkeys([*exact_derived_urls, *flyer_urls]))
@@ -1454,6 +1471,31 @@ class CollectionImporter:
             .order_by("-id")
             .first()
         )
+
+    def _find_existing_collection_for_same_year_reconcile(
+        self,
+        *,
+        catchment: CollectionCatchment,
+        waste_category: WasteCategory,
+        valid_from,
+        allowed_material_ids: set[int],
+        forbidden_material_ids: set[int],
+    ) -> Collection | None:
+        qs = (
+            Collection.objects.filter(
+                catchment=catchment,
+                valid_from=valid_from,
+                waste_category=waste_category,
+            )
+            .match_materials(
+                allowed_materials=allowed_material_ids,
+                forbidden_materials=forbidden_material_ids,
+            )
+            .order_by("-id")
+        )
+        if qs.count() != 1:
+            return None
+        return qs.first()
 
     @staticmethod
     def _flyer_title(url: str) -> str:

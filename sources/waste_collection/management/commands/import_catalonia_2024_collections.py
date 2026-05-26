@@ -142,7 +142,47 @@ _COLLECTION_SYSTEM_MAP: dict[str, str] = {
     "bring point": _CS_BRING_POINT,
     "no separate collection": _CS_NO_SEPARATE,
     "no pap category / not shown as pap": _CS_NO_SEPARATE,
+    "community composting": _CS_NO_SEPARATE,
     "recycling centre": _CS_RECYCLING_CENTRE,
+}
+
+_OLD_LAYOUT_HEADERS = (
+    "nuts3_name",
+    "comarca",
+    "codi",
+    "municipi",
+    "Collector",
+    "població_2020",
+    "població_2024",
+    "population_ratio_2020_2024",
+    "superfície",
+    "altitud",
+    "Waste type",
+    "PaP_status_2020",
+    "porta.a.porta_2024",
+    "Collection_system_2024",
+    "Access control/Use control_BP/PAP_2024",
+    "Connection rate to PaP_2020",
+    "Connection rate to PaP_2024",
+    "Collection frequency",
+    "Weekly access days_BP",
+    "Fee system",
+    "Minimum bin size (L)",
+    "Change implementation",
+    "Change implementation year",
+    "Quantity_2020_t",
+    "Quantity_2020_kg",
+    "Quantity_2024_t",
+    "Quantity_2024_kg",
+    "Impurities_percentge_2020",
+    "Impurities_percentage 2024",
+    "Comments",
+    "Sources",
+)
+
+_HEADER_ALIASES = {
+    "Access control/Use control_BP/PAP_2024": "access_control",
+    "BP_Access control/PAP_Use control_2024": "access_control",
 }
 
 # ---------------------------------------------------------------------------
@@ -402,31 +442,68 @@ def _date_to_str(value) -> str | None:
     return str(value)
 
 
+def _normalise_header(value) -> str:
+    header = " ".join(str(value or "").split())
+    return _HEADER_ALIASES.get(header, header)
+
+
+def _row_dict_from_values(row: tuple, headers: tuple[str, ...]) -> dict:
+    return {
+        header: row[index] if index < len(row) else None
+        for index, header in enumerate(headers)
+    }
+
+
+def _row_value(row: dict | tuple, field: str, index: int):
+    if isinstance(row, dict):
+        return row.get(field)
+    return row[index] if index < len(row) else None
+
+
+def _raw_catalonia_collection_system_label(raw: str | None) -> str:
+    key = str(raw or "").strip().lower()
+    if key == "pap total":
+        return "PAP total"
+    if key == "pap total + pxg":
+        return "PAP total + PxG"
+    if key == "pap parcial":
+        return "PAP parcial"
+    if key == "bring point":
+        return "Bring point"
+    if key == "no separate collection":
+        return "No separate collection"
+    if key == "no pap category / not shown as pap":
+        return "No separate collection"
+    if key == "community composting":
+        return "Community composting"
+    return str(raw or "").strip()
+
+
 # ---------------------------------------------------------------------------
 # Record builder
 # ---------------------------------------------------------------------------
 
 
-def _row_to_record(row: tuple) -> dict | None:
+def _row_to_record(row: dict | tuple) -> dict | None:
     """Convert one Excel row to an importer-compatible record dict.
 
     Returns ``None`` for rows that should be skipped entirely (header
     fragments, empty rows, waste types outside scope).
     """
-    waste_type = row[10]
+    waste_type = _row_value(row, "Waste type", 10)
     if waste_type not in (_WC_BIOWASTE, _WC_RESIDUAL):
         return None
 
-    codi = str(row[2] or "").strip()
+    codi = str(_row_value(row, "codi", 2) or "").strip()
     lau_id = _ine_to_lau(codi)
     if not lau_id:
         return None
 
-    collection_system_raw = row[13]
+    collection_system_raw = _row_value(row, "Collection_system_2024", 13)
     collection_system = _map_collection_system(collection_system_raw, waste_type)
 
     # Build source URLs: use row-level Sources cell + fallback to dataset URL
-    raw_sources = row[30]
+    raw_sources = _row_value(row, "Sources", 30)
     row_urls, row_notes = _split_source_cell(raw_sources)
     flyer_urls = _dedupe_preserve_order(row_urls or [_SOURCE_URL])
 
@@ -434,7 +511,7 @@ def _row_to_record(row: tuple) -> dict | None:
     pvs: list[dict] = []
 
     # 2024 per-capita specific quantity [kg/(cap.*a)]
-    qty_kg_per_cap = _to_float_or_none(row[26])
+    qty_kg_per_cap = _to_float_or_none(_row_value(row, "Quantity_2024_kg", 26))
     if qty_kg_per_cap is not None and qty_kg_per_cap > 0:
         pvs.append(
             {
@@ -447,7 +524,7 @@ def _row_to_record(row: tuple) -> dict | None:
         )
 
     # 2024 total quantity [Mg/a]
-    qty_2024_t = _to_float_or_none(row[25])
+    qty_2024_t = _to_float_or_none(_row_value(row, "Quantity_2024_t", 25))
     if qty_2024_t is not None and qty_2024_t > 0:
         pvs.append(
             {
@@ -460,7 +537,7 @@ def _row_to_record(row: tuple) -> dict | None:
         )
 
     # 2020 per-capita specific quantity [kg/(cap.*a)]
-    qty_2020_kg_per_cap = _to_float_or_none(row[24])
+    qty_2020_kg_per_cap = _to_float_or_none(_row_value(row, "Quantity_2020_kg", 24))
     if qty_2020_kg_per_cap is not None and qty_2020_kg_per_cap > 0:
         pvs.append(
             {
@@ -473,7 +550,7 @@ def _row_to_record(row: tuple) -> dict | None:
         )
 
     # 2020 total quantity [Mg/a]
-    qty_2020_t = _to_float_or_none(row[23])
+    qty_2020_t = _to_float_or_none(_row_value(row, "Quantity_2020_t", 23))
     if qty_2020_t is not None and qty_2020_t > 0:
         pvs.append(
             {
@@ -487,7 +564,7 @@ def _row_to_record(row: tuple) -> dict | None:
 
     # Connection rate to PAP 2024 [% of households] — biowaste only
     if waste_type == _WC_BIOWASTE:
-        conn_rate_raw = row[16]
+        conn_rate_raw = _row_value(row, "Connection rate to PaP_2024", 16)
         conn_rate = _to_float_or_none(conn_rate_raw)
         if conn_rate is not None:
             pvs.append(
@@ -502,11 +579,16 @@ def _row_to_record(row: tuple) -> dict | None:
 
     # Description: combine comments + implementation notes
     description_parts: list[str] = []
-    comments = str(row[29] or "").strip()
+    comments = str(_row_value(row, "Comments", 29) or "").strip()
     if comments:
         description_parts.append(comments)
-    change_impl = str(row[21] or "").strip()
-    change_year = row[22]
+    raw_catalonia_system = _raw_catalonia_collection_system_label(collection_system_raw)
+    if raw_catalonia_system:
+        description_parts.append(
+            f"Catalonia 2024 source collection system: {raw_catalonia_system}"
+        )
+    change_impl = str(_row_value(row, "Change implementation", 21) or "").strip()
+    change_year = _row_value(row, "Change implementation year", 22)
     if change_impl and change_year is not None:
         # change_year may be an int or a string like "2025/2026"
         year_str = (
@@ -523,16 +605,20 @@ def _row_to_record(row: tuple) -> dict | None:
         "nuts_or_lau_id": lau_id,
         "country_code": _COUNTRY_CODE,
         "catchment_name": "",
-        "collector_name": str(row[4] or "").strip(),
+        "collector_name": str(_row_value(row, "Collector", 4) or "").strip(),
         "collection_system": collection_system,
         "waste_category": waste_type,
         "allowed_materials": "",
         "forbidden_materials": "",
-        "fee_system": _map_fee_system(row[19]),
-        "frequency": _normalise_frequency(str(row[17] or "").strip()),
+        "fee_system": _map_fee_system(_row_value(row, "Fee system", 19)),
+        "frequency": _normalise_frequency(
+            str(_row_value(row, "Collection frequency", 17) or "").strip()
+        ),
         "connection_type": "",
-        **_access_control_fields(row[14], collection_system),
-        "min_bin_size": _to_float_or_none(row[20]),
+        **_access_control_fields(
+            _row_value(row, "access_control", 14), collection_system
+        ),
+        "min_bin_size": _to_float_or_none(_row_value(row, "Minimum bin size (L)", 20)),
         "required_bin_capacity": None,
         "required_bin_capacity_reference": "",
         "description": "\n\n".join(description_parts),
@@ -541,6 +627,7 @@ def _row_to_record(row: tuple) -> dict | None:
         "sources": row_notes,
         "flyer_urls": flyer_urls,
         "property_values": pvs,
+        "reconcile_same_year_identity": True,
     }
 
 
@@ -557,7 +644,12 @@ def _load_records(file_path: Path) -> tuple[list[dict], list[str], int]:
     """
     workbook = openpyxl.load_workbook(str(file_path), read_only=True, data_only=True)
     rows = workbook.active.iter_rows(values_only=True)
-    next(rows, None)  # skip header
+    raw_headers = next(rows, None)
+    headers = (
+        tuple(_normalise_header(value) for value in raw_headers)
+        if raw_headers
+        else _OLD_LAYOUT_HEADERS
+    )
 
     records: list[dict] = []
     warnings: list[str] = []
@@ -565,16 +657,17 @@ def _load_records(file_path: Path) -> tuple[list[dict], list[str], int]:
 
     for row_number, row in enumerate(rows, start=2):
         row_count += 1
+        row_data = _row_dict_from_values(row, headers)
 
-        waste_type = row[10]
+        waste_type = row_data.get("Waste type")
         if waste_type not in (_WC_BIOWASTE, _WC_RESIDUAL):
             continue
 
-        record = _row_to_record(row)
+        record = _row_to_record(row_data)
         if record is None:
             warnings.append(
                 f"Row {row_number}: skipped — missing LAU code "
-                f"(codi={row[2]!r}, municipi={row[3]!r})"
+                f"(codi={row_data.get('codi')!r}, municipi={row_data.get('municipi')!r})"
             )
             continue
 
@@ -583,9 +676,9 @@ def _load_records(file_path: Path) -> tuple[list[dict], list[str], int]:
             missing.append("collection_system")
         if missing:
             warnings.append(
-                f"Row {row_number} ({row[3]!r}, {waste_type!r}): "
+                f"Row {row_number} ({row_data.get('municipi')!r}, {waste_type!r}): "
                 f"skipped — missing required field(s): {', '.join(missing)}; "
-                f"raw collection_system={row[13]!r}"
+                f"raw collection_system={row_data.get('Collection_system_2024')!r}"
             )
             continue
 

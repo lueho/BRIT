@@ -829,6 +829,9 @@ class CollectionImportRecordSerializer(serializers.Serializer):
     property_values = CollectionImportPropertyValueSerializer(
         many=True, required=False, default=list
     )
+    reconcile_same_year_identity = serializers.BooleanField(
+        required=False, default=False
+    )
 
     def validate_description(self, value):
         return normalize_collection_description(value)

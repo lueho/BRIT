@@ -123,6 +123,17 @@ class CollectionSystemMappingTests(SimpleTestCase):
             cmd._map_collection_system("PAP parcial", "Biowaste"), "Door to door"
         )
 
+    def test_pap_parcial_case_variant_maps_to_door_to_door(self):
+        self.assertEqual(
+            cmd._map_collection_system("PAP Parcial", "Biowaste"), "Door to door"
+        )
+
+    def test_community_composting_maps_to_no_separate_collection(self):
+        self.assertEqual(
+            cmd._map_collection_system("Community composting", "Biowaste"),
+            "No separate collection",
+        )
+
     def test_planned_pap_maps_to_empty_string(self):
         self.assertEqual(
             cmd._map_collection_system("Propera implantació PAP", "Biowaste"), ""
@@ -355,7 +366,48 @@ class RowToRecordBiowasteTests(SimpleTestCase):
 
     def test_description_empty_when_no_comments_or_change(self):
         record = self._record(comments=None, change_impl=None)
-        self.assertEqual(record["description"], "")
+        self.assertEqual(
+            record["description"],
+            "Catalonia 2024 source collection system: PAP total",
+        )
+
+    def test_raw_catalonia_collection_system_in_description(self):
+        record = self._record(collection_system="PAP Parcial")
+        self.assertIn(
+            "Catalonia 2024 source collection system: PAP parcial",
+            record["description"],
+        )
+
+    def test_updated_layout_dict_uses_header_names(self):
+        row = {
+            "codi": "080023",
+            "municipi": "Aguilar de Segarra",
+            "Collector": "Consorci del Bages per a la Gestió de Residus",
+            "Waste type": "Biowaste",
+            "Collection_system_2024": "Bring point",
+            "access_control": "yes",
+            "Connection rate to PaP_2024": 100,
+            "Collection frequency": "",
+            "Fee system": "",
+            "Minimum bin size (L)": None,
+            "Change implementation": "Access control",
+            "Change implementation year": 2022,
+            "Quantity_2020_t": 0,
+            "Quantity_2020_kg": 0,
+            "Quantity_2024_t": 29.33,
+            "Quantity_2024_kg": 100.79037800687286,
+            "Comments": None,
+            "Sources": "https://example.com/source.pdf",
+        }
+        record = cmd._row_to_record(row)
+
+        self.assertEqual(record["collection_system"], "Bring point")
+        self.assertIs(record["access_control_bp"], True)
+        self.assertIsNone(record["access_control_pap"])
+        self.assertIn(
+            "Catalonia 2024 source collection system: Bring point",
+            record["description"],
+        )
 
     def test_returns_none_for_unknown_waste_type(self):
         row = _make_row()
