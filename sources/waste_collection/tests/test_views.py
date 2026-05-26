@@ -4029,7 +4029,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(response, "Administrative level of waste collection")
         self.assertContains(response, "Map overview")
-        self.assertContains(response, "Mapped aspect")
+        self.assertContains(response, "Theme")
         self.assertContains(response, "No data")
         self.assertNotContains(response, "nutsPrefix:")
         self.assertNotContains(response, "nutsLevel:")
@@ -4039,7 +4039,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '<label for="sel-country">Region</label>')
-        self.assertContains(response, '<label for="sel-aspect">Mapped aspect</label>')
+        self.assertContains(response, '<label for="sel-aspect">Theme</label>')
         self.assertContains(response, 'value="DE"')
         self.assertContains(response, "selected>Germany</option>")
         self.assertContains(response, 'data-map-set="DE"')
@@ -4061,7 +4061,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, 'value="2024" selected')
         self.assertContains(response, "Administrative level of waste collection")
         self.assertContains(response, "Map overview")
-        self.assertContains(response, "Mapped aspect")
+        self.assertContains(response, "Theme")
         self.assertContains(response, "nutsPrefix: 'ITH10'")
         self.assertContains(response, "nutsLevel: parseInt('3', 10)")
 
@@ -4320,7 +4320,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            '<label class="form-label" for="sel-aspect">Mapped aspect</label>',
+            '<label class="form-label" for="sel-aspect">Theme</label>',
         )
         self.assertContains(response, 'data-map-set="IT-ST"')
         self.assertContains(
