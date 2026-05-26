@@ -54,13 +54,44 @@ Excel value                         → BRIT canonical name
 ---------------------------------   ----------------------------------
 PAP Total / PAP total               → Door to door
 PAP Total + PxG                     → Door to door
-PAP parcial                         → Door to door   (partial)
+PAP parcial                         → Mixed door-to-door and bring point
 Propera implantació PAP             → skipped        (planned, not active in 2024)
 Bring point                         → Bring point
 No separate collection              → No separate collection
 No PaP category / not shown as PaP → No separate collection
 Recycling centre                    → Recycling centre
 (residual waste rows, system=None)  → Door to door   (default)
+
+2020 collection-system records
+-------------------------------
+Column 11 (``PaP_status_2020``) carries a free-text description of the 2020
+door-to-door status.  Where the value is non-empty and maps to a known
+collection system, a second Collection record is emitted with
+``valid_from=2020-01-01`` and ``valid_until=2023-12-31``.
+
+Rows where ``PaP_status_2020`` is absent, empty, or maps to an unknown
+collection system are logged as preflight warnings and no 2020 record is
+created — this is expected and does not prevent the 2024 record being
+imported.  Property values (quantities, connection rate) are NOT duplicated
+onto the 2020 record; they are always attached to the year-appropriate 2024
+record.
+
+Collector-name resolution (issue #110)
+---------------------------------------
+Column 4 (``Collector``) holds the name of the waste-collection company.
+When a collector name is present in the spreadsheet the importer passes it
+directly to the API payload's ``collector`` field.
+
+The BRIT import endpoint creates Collector objects on demand when
+``create_collectors=True`` is set in the API request.  This flag is exposed
+as the ``--create-collectors`` CLI option so that operators can choose
+whether to auto-create collector entries (useful for a fresh import) or to
+leave unknown collectors unresolved (the default, which emits a warning for
+each unmatched collector name).
+
+Where column 4 is empty the municipality itself is assumed to operate the
+collection service.  An empty string is passed as the collector value so the
+API falls back to the default municipality-as-collector behaviour.
 
 Usage::
 
@@ -70,6 +101,8 @@ Usage::
         --api-url http://localhost:8000 --username staff --password secret
     python manage.py import_catalonia_2024_collections \\
         --api-url http://localhost:8000 --token <TOKEN> --dry-run
+    python manage.py import_catalonia_2024_collections \\
+        --api-url http://localhost:8000 --token <TOKEN> --create-collectors
 """
 
 from __future__ import annotations
@@ -109,21 +142,33 @@ _PROP_SPECIFIC = 1  # "specific waste collected"  [kg/(cap.*a)]
 _PROP_TOTAL = 9  # "total waste collected"      [Mg/a]
 _PROP_CONN_RATE = 4  # "Connection rate"            [% of households]
 
+# Properties looked up by name (not yet in the live DB; will be created on
+# first import via the importer's property_name fallback).
+_PROP_NAME_IMPURITY = "biowaste impurity rate"
+_PROP_NAME_WEEKLY_BP_DAYS = "weekly bring-point access days"
+
 _UNIT_KG = "kg/(cap.*a)"
 _UNIT_MG = "Mg/a"
 _UNIT_PCT_HH = "% of households"
+_UNIT_PCT = "%"
+_UNIT_DAYS_PER_WK = "d/wk"
 _COUNTRY_CODE = "ES"
 
 # ---------------------------------------------------------------------------
-# Data year represented by this file
+# Data years represented by this file
 # ---------------------------------------------------------------------------
 _DATA_YEAR = 2024
 _VALID_FROM = date(_DATA_YEAR, 1, 1)
+
+_DATA_YEAR_2020 = 2020
+_VALID_FROM_2020 = date(_DATA_YEAR_2020, 1, 1)
+_VALID_UNTIL_2020 = date(2023, 12, 31)
 
 # ---------------------------------------------------------------------------
 # BRIT canonical names
 # ---------------------------------------------------------------------------
 _CS_DOOR_TO_DOOR = "Door to door"
+_CS_MIXED_DT_BP = "Mixed door-to-door and bring point"
 _CS_BRING_POINT = "Bring point"
 _CS_NO_SEPARATE = "No separate collection"
 _CS_RECYCLING_CENTRE = "Recycling centre"
@@ -137,7 +182,7 @@ _WC_RESIDUAL = "Residual waste"
 _COLLECTION_SYSTEM_MAP: dict[str, str] = {
     "pap total": _CS_DOOR_TO_DOOR,
     "pap total + pxg": _CS_DOOR_TO_DOOR,
-    "pap parcial": _CS_DOOR_TO_DOOR,
+    "pap parcial": _CS_MIXED_DT_BP,
     "bring point": _CS_BRING_POINT,
     "no separate collection": _CS_NO_SEPARATE,
     "no pap category / not shown as pap": _CS_NO_SEPARATE,
@@ -287,11 +332,12 @@ def _access_control_fields(
 ) -> dict[str, bool | None]:
     """Return {'access_control_bp': ..., 'access_control_pap': ...} for a row.
 
-    Slash-separated values (PAP parcial rows) directly supply both components.
-    Single values are routed to the field that matches the collection system:
-    - Bring point rows  → access_control_bp
-    - Door-to-door rows → access_control_pap
-    - Others            → both None
+    Slash-separated values (Mixed / PAP parcial rows) directly supply both
+    components.  Single values are routed to the field that matches the
+    collection system:
+    - Bring point rows              → access_control_bp
+    - Door-to-door rows             → access_control_pap
+    - Mixed DtD+BP and other rows  → both None (use explicit slash form)
     """
     ac_bp, ac_pap = _map_access_control(raw)
     if raw is not None and "/" not in str(raw):
@@ -595,6 +641,50 @@ def _row_to_record(row: dict | tuple) -> dict | None:
                 }
             )
 
+    # Biowaste impurity rate [%] — biowaste only (2020 and 2024)
+    if waste_type == _WC_BIOWASTE:
+        impurity_2020 = _to_float_or_none(
+            _row_value(row, "Impurities_percentge_2020", 27)
+        )
+        if impurity_2020 is not None:
+            pvs.append(
+                {
+                    "property_name": _PROP_NAME_IMPURITY,
+                    "unit_name": _UNIT_PCT,
+                    "year": _DATA_YEAR_2020,
+                    "average": round(impurity_2020, 4),
+                    "flyer_urls": flyer_urls,
+                }
+            )
+        impurity_2024 = _to_float_or_none(
+            _row_value(row, "Impurities_percentage 2024", 28)
+        )
+        if impurity_2024 is not None:
+            pvs.append(
+                {
+                    "property_name": _PROP_NAME_IMPURITY,
+                    "unit_name": _UNIT_PCT,
+                    "year": _DATA_YEAR,
+                    "average": round(impurity_2024, 4),
+                    "flyer_urls": flyer_urls,
+                }
+            )
+
+    # Weekly bring-point access days [d/wk] — bring-point and mixed rows only
+    if collection_system in (_CS_BRING_POINT, _CS_MIXED_DT_BP):
+        weekly_bp_raw = _row_value(row, "Weekly access days_BP", 18)
+        weekly_bp = _to_float_or_none(weekly_bp_raw)
+        if weekly_bp is not None:
+            pvs.append(
+                {
+                    "property_name": _PROP_NAME_WEEKLY_BP_DAYS,
+                    "unit_name": _UNIT_DAYS_PER_WK,
+                    "year": _DATA_YEAR,
+                    "average": round(weekly_bp, 4),
+                    "flyer_urls": flyer_urls,
+                }
+            )
+
     # Description: combine comments + implementation notes
     description_parts: list[str] = []
     comments = str(_row_value(row, "Comments", 29) or "").strip()
@@ -656,6 +746,69 @@ def _row_to_record(row: dict | tuple) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
+# 2020 record builder
+# ---------------------------------------------------------------------------
+
+
+def _row_to_2020_record(row: dict | tuple) -> dict | None:
+    """Build a 2020 Collection record from a row's PaP_status_2020 column.
+
+    Returns ``None`` when the 2020 collection system cannot be determined
+    (empty / unknown value in col 11, or missing LAU code).  Callers should
+    emit a preflight warning in that case.
+
+    The returned record uses ``valid_from=2020-01-01`` and
+    ``valid_until=2023-12-31``.  Property values are intentionally omitted —
+    per-year quantities are carried by the 2024 record.
+    """
+    waste_type = _row_value(row, "Waste type", 10)
+    if waste_type not in (_WC_BIOWASTE, _WC_RESIDUAL):
+        return None
+
+    codi = str(_row_value(row, "codi", 2) or "").strip()
+    lau_id = _ine_to_lau(codi)
+    if not lau_id:
+        return None
+
+    pap_status_2020 = _row_value(row, "PaP_status_2020", 11)
+    collection_system_2020 = _map_collection_system(pap_status_2020, waste_type)
+    if not collection_system_2020:
+        return None
+
+    raw_sources = _row_value(row, "Sources", 30)
+    row_urls, row_notes = _split_source_cell(raw_sources)
+    flyer_urls = _dedupe_preserve_order(row_urls or [_SOURCE_URL])
+
+    return {
+        "nuts_or_lau_id": lau_id,
+        "country_code": _COUNTRY_CODE,
+        "catchment_name": "",
+        "collector_name": str(_row_value(row, "Collector", 4) or "").strip(),
+        "collection_system": collection_system_2020,
+        "waste_category": waste_type,
+        "allowed_materials": "",
+        "forbidden_materials": "",
+        "fee_system": "",
+        "frequency": "",
+        "clear_frequency": False,
+        "connection_type": "",
+        "access_control_bp": None,
+        "access_control_pap": None,
+        "min_bin_size": None,
+        "required_bin_capacity": None,
+        "required_bin_capacity_reference": "",
+        "description": "",
+        "valid_from": _date_to_str(_VALID_FROM_2020),
+        "valid_until": _date_to_str(_VALID_UNTIL_2020),
+        "sources": row_notes,
+        "flyer_urls": flyer_urls,
+        "property_values": [],
+        "reconcile_same_year_identity": True,
+        "sync_owner": True,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Workbook loader
 # ---------------------------------------------------------------------------
 
@@ -708,6 +861,27 @@ def _load_records(file_path: Path) -> tuple[list[dict], list[str], int]:
 
         record["_excel_row"] = row_number
         records.append(record)
+
+        # Attempt to build a 2020 collection record from PaP_status_2020.
+        # This is best-effort: missing / unrecognised values are warned but
+        # do NOT block the 2024 record from being imported.
+        record_2020 = _row_to_2020_record(row_data)
+        if record_2020 is not None:
+            record_2020["_excel_row"] = row_number
+            records.append(record_2020)
+        else:
+            pap_2020 = row_data.get("PaP_status_2020")
+            if pap_2020:
+                warnings.append(
+                    f"Row {row_number} ({row_data.get('municipi')!r}, {waste_type!r}): "
+                    f"2020 record skipped — unrecognised PaP_status_2020 value "
+                    f"{pap_2020!r}"
+                )
+            else:
+                warnings.append(
+                    f"Row {row_number} ({row_data.get('municipi')!r}, {waste_type!r}): "
+                    f"2020 record skipped — PaP_status_2020 is empty"
+                )
 
     return records, warnings, row_count
 

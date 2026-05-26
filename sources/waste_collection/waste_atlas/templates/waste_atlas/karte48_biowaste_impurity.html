@@ -1,0 +1,53 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+  <script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2024,
+      {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
+      {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
+      title:       'Biowaste impurity rate',
+      dataUrl:     '/waste_collection/api/waste-atlas/biowaste-impurity/',
+      dataField:   '_classified',
+      categories: [
+        { value: 'very_low',      label: '0–5% (very low)',              color: '#1a9850' },
+        { value: 'low',           label: '5–10% (low)',                  color: '#66bd63' },
+        { value: 'medium',        label: '10–20% (medium)',              color: '#fee08b' },
+        { value: 'high',          label: '20–40% (high)',                color: '#f46d43' },
+        { value: 'very_high',     label: '> 40% (very high)',            color: '#d73027' },
+        { value: 'no_collection', label: 'No separate biowaste collection', color: '#fff696' }
+      ],
+      noDataColor: '#ffffff',
+      noDataLabel: 'No data',
+      legendTitle: 'Impurity rate (%)',
+      fileBase:    'biowaste_impurity',
+      transformData: function (records) {
+        return records.map(function (r) {
+          var cls;
+          if (r.no_collection) {
+            cls = 'no_collection';
+          } else if (r.impurity_rate === null) {
+            cls = null;
+          } else if (r.impurity_rate <= 5) {
+            cls = 'very_low';
+          } else if (r.impurity_rate <= 10) {
+            cls = 'low';
+          } else if (r.impurity_rate <= 20) {
+            cls = 'medium';
+          } else if (r.impurity_rate <= 40) {
+            cls = 'high';
+          } else {
+            cls = 'very_high';
+          }
+          return { catchment_id: r.catchment_id, _classified: cls };
+        });
+      }
+    });
+  });
+  </script>
+{% endblock atlas_config %}

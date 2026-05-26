@@ -118,14 +118,16 @@ class CollectionSystemMappingTests(SimpleTestCase):
             "Door to door",
         )
 
-    def test_pap_parcial_maps_to_door_to_door(self):
+    def test_pap_parcial_maps_to_mixed(self):
         self.assertEqual(
-            cmd._map_collection_system("PAP parcial", "Biowaste"), "Door to door"
+            cmd._map_collection_system("PAP parcial", "Biowaste"),
+            cmd._CS_MIXED_DT_BP,
         )
 
-    def test_pap_parcial_case_variant_maps_to_door_to_door(self):
+    def test_pap_parcial_case_variant_maps_to_mixed(self):
         self.assertEqual(
-            cmd._map_collection_system("PAP Parcial", "Biowaste"), "Door to door"
+            cmd._map_collection_system("PAP Parcial", "Biowaste"),
+            cmd._CS_MIXED_DT_BP,
         )
 
     def test_community_composting_maps_to_no_separate_collection(self):
@@ -236,6 +238,10 @@ class RowToRecordBiowasteTests(SimpleTestCase):
     def test_collection_system_bring_point(self):
         record = self._record(collection_system="Bring point")
         self.assertEqual(record["collection_system"], "Bring point")
+
+    def test_collection_system_pap_parcial_is_mixed(self):
+        record = self._record(collection_system="PAP parcial")
+        self.assertEqual(record["collection_system"], cmd._CS_MIXED_DT_BP)
 
     def test_collection_system_planned_pap_is_empty(self):
         record = self._record(collection_system="Propera implantació PAP")
@@ -727,3 +733,201 @@ class FrequencyNormalisationTests(SimpleTestCase):
             record["frequency"],
             "Fixed-Seasonal; October-April 61 per year; May-September 66 per year",
         )
+
+
+class RowTo2020RecordTests(SimpleTestCase):
+    """Tests for _row_to_2020_record (issue #113: 2020 collection-system data)."""
+
+    def _make_row_with_2020(self, pap_status_2020=None, **kwargs):
+        row = list(_make_row(**kwargs))
+        row[11] = pap_status_2020  # PaP_status_2020
+        return tuple(row)
+
+    def test_returns_dict_when_2020_system_known(self):
+        row = self._make_row_with_2020(pap_status_2020="PAP Total")
+        record = cmd._row_to_2020_record(row)
+        self.assertIsNotNone(record)
+        self.assertIsInstance(record, dict)
+
+    def test_valid_from_is_2020(self):
+        row = self._make_row_with_2020(pap_status_2020="PAP Total")
+        record = cmd._row_to_2020_record(row)
+        self.assertEqual(record["valid_from"], "2020-01-01")
+
+    def test_valid_until_is_2023(self):
+        row = self._make_row_with_2020(pap_status_2020="PAP Total")
+        record = cmd._row_to_2020_record(row)
+        self.assertEqual(record["valid_until"], "2023-12-31")
+
+    def test_collection_system_pap_total_maps_to_door_to_door(self):
+        row = self._make_row_with_2020(pap_status_2020="PAP Total")
+        record = cmd._row_to_2020_record(row)
+        self.assertEqual(record["collection_system"], "Door to door")
+
+    def test_collection_system_bring_point_2020(self):
+        row = self._make_row_with_2020(pap_status_2020="Bring point")
+        record = cmd._row_to_2020_record(row)
+        self.assertEqual(record["collection_system"], "Bring point")
+
+    def test_collection_system_pap_parcial_is_mixed_for_2020(self):
+        row = self._make_row_with_2020(pap_status_2020="PAP parcial")
+        record = cmd._row_to_2020_record(row)
+        self.assertEqual(record["collection_system"], cmd._CS_MIXED_DT_BP)
+
+    def test_returns_none_when_2020_system_empty(self):
+        row = self._make_row_with_2020(pap_status_2020=None)
+        record = cmd._row_to_2020_record(row)
+        self.assertIsNone(record)
+
+    def test_returns_none_when_2020_system_unknown(self):
+        row = self._make_row_with_2020(pap_status_2020="Propera implantació PAP")
+        record = cmd._row_to_2020_record(row)
+        self.assertIsNone(record)
+
+    def test_residual_waste_defaults_to_door_to_door_when_system_empty(self):
+        row = list(
+            self._make_row_with_2020(
+                waste_type="Residual waste",
+                collection_system=None,
+                pap_status_2020=None,
+            )
+        )
+        # Residual rows default to Door to door even with empty PaP_status_2020
+        record = cmd._row_to_2020_record(tuple(row))
+        self.assertIsNotNone(record)
+        self.assertEqual(record["collection_system"], "Door to door")
+
+    def test_property_values_empty_for_2020_record(self):
+        row = self._make_row_with_2020(pap_status_2020="PAP Total")
+        record = cmd._row_to_2020_record(row)
+        self.assertEqual(record["property_values"], [])
+
+    def test_returns_none_for_missing_codi(self):
+        row = list(self._make_row_with_2020(pap_status_2020="PAP Total"))
+        row[2] = None
+        record = cmd._row_to_2020_record(tuple(row))
+        self.assertIsNone(record)
+
+
+class BiowasteImpurityPropertyTests(SimpleTestCase):
+    """Tests for biowaste impurity rate property values emitted by _row_to_record."""
+
+    def _pvs_by_property(self, record):
+        """Return a dict mapping property_name → list of PV dicts."""
+        result = {}
+        for pv in record["property_values"]:
+            key = pv.get("property_name") or pv.get("property_id")
+            result.setdefault(key, []).append(pv)
+        return result
+
+    def test_impurity_2024_present_when_value_given(self):
+        row = list(_make_row(impurities_2024=12.5))
+        record = cmd._row_to_record(tuple(row))
+        pvs = self._pvs_by_property(record)
+        self.assertIn(cmd._PROP_NAME_IMPURITY, pvs)
+        impurity_pvs = pvs[cmd._PROP_NAME_IMPURITY]
+        years = [pv["year"] for pv in impurity_pvs]
+        self.assertIn(cmd._DATA_YEAR, years)
+
+    def test_impurity_2024_value_rounded(self):
+        row = list(_make_row(impurities_2024=12.5555))
+        record = cmd._row_to_record(tuple(row))
+        pvs = self._pvs_by_property(record)
+        impurity_pvs = pvs[cmd._PROP_NAME_IMPURITY]
+        pv_2024 = next(pv for pv in impurity_pvs if pv["year"] == cmd._DATA_YEAR)
+        self.assertEqual(pv_2024["average"], round(12.5555, 4))
+
+    def test_impurity_2024_unit_is_percent(self):
+        row = list(_make_row(impurities_2024=10.0))
+        record = cmd._row_to_record(tuple(row))
+        pvs = self._pvs_by_property(record)
+        impurity_pvs = pvs[cmd._PROP_NAME_IMPURITY]
+        pv_2024 = next(pv for pv in impurity_pvs if pv["year"] == cmd._DATA_YEAR)
+        self.assertEqual(pv_2024["unit_name"], cmd._UNIT_PCT)
+
+    def test_impurity_2020_present_when_column_27_has_value(self):
+        row = list(_make_row())
+        row[27] = 8.3  # Impurities_percentge_2020
+        record = cmd._row_to_record(tuple(row))
+        pvs = self._pvs_by_property(record)
+        self.assertIn(cmd._PROP_NAME_IMPURITY, pvs)
+        years = [pv["year"] for pv in pvs[cmd._PROP_NAME_IMPURITY]]
+        self.assertIn(cmd._DATA_YEAR_2020, years)
+
+    def test_impurity_absent_when_none(self):
+        row = list(_make_row(impurities_2024=None))
+        # Also ensure col 27 is None
+        row[27] = None
+        record = cmd._row_to_record(tuple(row))
+        pvs = self._pvs_by_property(record)
+        self.assertNotIn(cmd._PROP_NAME_IMPURITY, pvs)
+
+    def test_impurity_only_emitted_for_biowaste(self):
+        row = list(_make_row(waste_type="Residual waste", impurities_2024=10.0))
+        record = cmd._row_to_record(tuple(row))
+        self.assertIsNotNone(record)
+        pvs = self._pvs_by_property(record)
+        self.assertNotIn(cmd._PROP_NAME_IMPURITY, pvs)
+
+
+class WeeklyBpAccessDaysPropertyTests(SimpleTestCase):
+    """Tests for weekly bring-point access days property values emitted by _row_to_record."""
+
+    def _pvs_by_property(self, record):
+        result = {}
+        for pv in record["property_values"]:
+            key = pv.get("property_name") or pv.get("property_id")
+            result.setdefault(key, []).append(pv)
+        return result
+
+    def test_weekly_bp_present_for_bring_point_row(self):
+        row = list(_make_row(collection_system="Bring point"))
+        row[18] = 7.0  # Weekly access days_BP
+        record = cmd._row_to_record(tuple(row))
+        pvs = self._pvs_by_property(record)
+        self.assertIn(cmd._PROP_NAME_WEEKLY_BP_DAYS, pvs)
+
+    def test_weekly_bp_present_for_mixed_row(self):
+        row = list(_make_row(collection_system="PAP parcial"))
+        row[18] = 3.0
+        record = cmd._row_to_record(tuple(row))
+        pvs = self._pvs_by_property(record)
+        self.assertIn(cmd._PROP_NAME_WEEKLY_BP_DAYS, pvs)
+
+    def test_weekly_bp_absent_for_door_to_door(self):
+        row = list(_make_row(collection_system="PAP Total"))
+        row[18] = 7.0
+        record = cmd._row_to_record(tuple(row))
+        pvs = self._pvs_by_property(record)
+        self.assertNotIn(cmd._PROP_NAME_WEEKLY_BP_DAYS, pvs)
+
+    def test_weekly_bp_absent_when_value_none(self):
+        row = list(_make_row(collection_system="Bring point"))
+        row[18] = None
+        record = cmd._row_to_record(tuple(row))
+        pvs = self._pvs_by_property(record)
+        self.assertNotIn(cmd._PROP_NAME_WEEKLY_BP_DAYS, pvs)
+
+    def test_weekly_bp_unit_is_days_per_week(self):
+        row = list(_make_row(collection_system="Bring point"))
+        row[18] = 5.0
+        record = cmd._row_to_record(tuple(row))
+        pvs = self._pvs_by_property(record)
+        pv = pvs[cmd._PROP_NAME_WEEKLY_BP_DAYS][0]
+        self.assertEqual(pv["unit_name"], cmd._UNIT_DAYS_PER_WK)
+
+    def test_weekly_bp_value_rounded(self):
+        row = list(_make_row(collection_system="Bring point"))
+        row[18] = 4.55555
+        record = cmd._row_to_record(tuple(row))
+        pvs = self._pvs_by_property(record)
+        pv = pvs[cmd._PROP_NAME_WEEKLY_BP_DAYS][0]
+        self.assertEqual(pv["average"], round(4.55555, 4))
+
+    def test_weekly_bp_year_is_data_year(self):
+        row = list(_make_row(collection_system="Bring point"))
+        row[18] = 2.0
+        record = cmd._row_to_record(tuple(row))
+        pvs = self._pvs_by_property(record)
+        pv = pvs[cmd._PROP_NAME_WEEKLY_BP_DAYS][0]
+        self.assertEqual(pv["year"], cmd._DATA_YEAR)

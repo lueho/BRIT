@@ -1,0 +1,50 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+  <script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2024,
+      {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
+      {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
+      title:       'Weekly bring-point access days',
+      dataUrl:     '/waste_collection/api/waste-atlas/weekly-bp-access-days/',
+      dataField:   '_classified',
+      categories: [
+        { value: '7',         label: '7 days (daily access)',   color: '#1a9850' },
+        { value: '5_6',       label: '5–6 days',                color: '#66bd63' },
+        { value: '3_4',       label: '3–4 days',                color: '#a6d96a' },
+        { value: '1_2',       label: '1–2 days',                color: '#d9f0d3' },
+        { value: 'no_bp',     label: 'No bring-point collection', color: '#fff696' }
+      ],
+      noDataColor: '#ffffff',
+      noDataLabel: 'No data',
+      legendTitle: 'Weekly access days',
+      fileBase:    'weekly_bp_access_days',
+      transformData: function (records) {
+        return records.map(function (r) {
+          var cls;
+          if (!r.has_bring_point) {
+            cls = 'no_bp';
+          } else if (r.weekly_access_days === null) {
+            cls = null;
+          } else if (r.weekly_access_days >= 7) {
+            cls = '7';
+          } else if (r.weekly_access_days >= 5) {
+            cls = '5_6';
+          } else if (r.weekly_access_days >= 3) {
+            cls = '3_4';
+          } else {
+            cls = '1_2';
+          }
+          return { catchment_id: r.catchment_id, _classified: cls };
+        });
+      }
+    });
+  });
+  </script>
+{% endblock atlas_config %}

@@ -3420,3 +3420,235 @@ class CollectionPointCountNoDataAndDtDTests(APITestCase):
         self.assertTrue(row["bio_is_door_to_door"])
         self.assertEqual(row["residual_count"], 7.0)
         self.assertIsNone(row["ratio"])
+
+
+class BiowasteImpurityViewSetTests(APITestCase):
+    """Tests for BiowasteImpurityViewSet."""
+
+    endpoint = "/waste_collection/api/waste-atlas/biowaste-impurity/"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
+        cls.d2d, _ = CollectionSystem.objects.get_or_create(name="Door to door")
+        cls.no_collection, _ = CollectionSystem.objects.get_or_create(
+            name="No separate collection"
+        )
+
+        cls.impurity_property, _ = Property.objects.get_or_create(
+            name="biowaste impurity rate"
+        )
+        cls.pct_unit, _ = Unit.objects.get_or_create(name="%")
+        cls.impurity_property.allowed_units.add(cls.pct_unit)
+
+        cls.region = Region.objects.create(name="Impurity Test Region", country="ES")
+
+        # Catchment A: DtD with impurity data
+        cls.catchment_with_data = CollectionCatchment.objects.create(
+            name="Impurity With Data", region=cls.region
+        )
+        cls.collection_with_data = Collection.objects.create(
+            name="Impurity With Data Bio",
+            catchment=cls.catchment_with_data,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2024, 1, 1),
+        )
+        CollectionPropertyValue.objects.create(
+            collection=cls.collection_with_data,
+            property=cls.impurity_property,
+            unit=cls.pct_unit,
+            year=2024,
+            average=8.5,
+        )
+
+        # Catchment B: DtD with no CPV → impurity_rate=null, no_collection=False
+        cls.catchment_no_data = CollectionCatchment.objects.create(
+            name="Impurity No Data", region=cls.region
+        )
+        Collection.objects.create(
+            name="Impurity No Data Bio",
+            catchment=cls.catchment_no_data,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2024, 1, 1),
+        )
+
+        # Catchment C: No separate collection → no_collection=True
+        cls.catchment_no_sep = CollectionCatchment.objects.create(
+            name="Impurity No Sep", region=cls.region
+        )
+        Collection.objects.create(
+            name="Impurity No Sep Bio",
+            catchment=cls.catchment_no_sep,
+            waste_category=cls.bio_category,
+            collection_system=cls.no_collection,
+            valid_from=date(2024, 1, 1),
+        )
+
+    def _by_catchment(self, country="ES", year=2024):
+        response = self.client.get(self.endpoint, {"country": country, "year": year})
+        self.assertEqual(response.status_code, 200)
+        return {r["catchment_id"]: r for r in response.data}
+
+    def test_returns_200(self):
+        response = self.client.get(self.endpoint, {"country": "ES", "year": 2024})
+        self.assertEqual(response.status_code, 200)
+
+    def test_impurity_rate_returned_for_catchment_with_data(self):
+        by_catchment = self._by_catchment()
+        row = by_catchment[self.catchment_with_data.id]
+        self.assertEqual(row["impurity_rate"], 8.5)
+        self.assertFalse(row["no_collection"])
+
+    def test_impurity_rate_null_when_no_cpv(self):
+        by_catchment = self._by_catchment()
+        row = by_catchment[self.catchment_no_data.id]
+        self.assertIsNone(row["impurity_rate"])
+        self.assertFalse(row["no_collection"])
+
+    def test_no_collection_flag_set_for_no_sep_catchment(self):
+        by_catchment = self._by_catchment()
+        row = by_catchment[self.catchment_no_sep.id]
+        self.assertTrue(row["no_collection"])
+        self.assertIsNone(row["impurity_rate"])
+
+    def test_country_filter_excludes_other_countries(self):
+        by_catchment = self._by_catchment(country="DE", year=2024)
+        self.assertNotIn(self.catchment_with_data.id, by_catchment)
+
+    def test_response_keys(self):
+        by_catchment = self._by_catchment()
+        row = by_catchment[self.catchment_with_data.id]
+        self.assertIn("catchment_id", row)
+        self.assertIn("impurity_rate", row)
+        self.assertIn("no_collection", row)
+
+
+class WeeklyBpAccessDaysViewSetTests(APITestCase):
+    """Tests for WeeklyBpAccessDaysViewSet."""
+
+    endpoint = "/waste_collection/api/waste-atlas/weekly-bp-access-days/"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
+        cls.d2d, _ = CollectionSystem.objects.get_or_create(name="Door to door")
+        cls.bring_point, _ = CollectionSystem.objects.get_or_create(name="Bring point")
+        cls.mixed, _ = CollectionSystem.objects.get_or_create(
+            name="Mixed door-to-door and bring point"
+        )
+
+        cls.bp_days_property, _ = Property.objects.get_or_create(
+            name="weekly bring-point access days"
+        )
+        cls.days_unit, _ = Unit.objects.get_or_create(name="d/wk")
+        cls.bp_days_property.allowed_units.add(cls.days_unit)
+
+        cls.region = Region.objects.create(name="Weekly BP Test Region", country="ES")
+
+        # Catchment A: bring-point with CPV → has_bring_point=True, value present
+        cls.catchment_bp_with_data = CollectionCatchment.objects.create(
+            name="Weekly BP With Data", region=cls.region
+        )
+        cls.collection_bp = Collection.objects.create(
+            name="Weekly BP With Data Bio",
+            catchment=cls.catchment_bp_with_data,
+            waste_category=cls.bio_category,
+            collection_system=cls.bring_point,
+            valid_from=date(2024, 1, 1),
+        )
+        CollectionPropertyValue.objects.create(
+            collection=cls.collection_bp,
+            property=cls.bp_days_property,
+            unit=cls.days_unit,
+            year=2024,
+            average=5.0,
+        )
+
+        # Catchment B: mixed with CPV → has_bring_point=True, value present
+        cls.catchment_mixed = CollectionCatchment.objects.create(
+            name="Weekly BP Mixed", region=cls.region
+        )
+        cls.collection_mixed = Collection.objects.create(
+            name="Weekly BP Mixed Bio",
+            catchment=cls.catchment_mixed,
+            waste_category=cls.bio_category,
+            collection_system=cls.mixed,
+            valid_from=date(2024, 1, 1),
+        )
+        CollectionPropertyValue.objects.create(
+            collection=cls.collection_mixed,
+            property=cls.bp_days_property,
+            unit=cls.days_unit,
+            year=2024,
+            average=3.0,
+        )
+
+        # Catchment C: DtD → has_bring_point=False, value null
+        cls.catchment_dtd = CollectionCatchment.objects.create(
+            name="Weekly BP DtD", region=cls.region
+        )
+        Collection.objects.create(
+            name="Weekly BP DtD Bio",
+            catchment=cls.catchment_dtd,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2024, 1, 1),
+        )
+
+        # Catchment D: bring-point but no CPV → has_bring_point=True, value null
+        cls.catchment_bp_no_data = CollectionCatchment.objects.create(
+            name="Weekly BP No CPV", region=cls.region
+        )
+        Collection.objects.create(
+            name="Weekly BP No CPV Bio",
+            catchment=cls.catchment_bp_no_data,
+            waste_category=cls.bio_category,
+            collection_system=cls.bring_point,
+            valid_from=date(2024, 1, 1),
+        )
+
+    def _by_catchment(self, country="ES", year=2024):
+        response = self.client.get(self.endpoint, {"country": country, "year": year})
+        self.assertEqual(response.status_code, 200)
+        return {r["catchment_id"]: r for r in response.data}
+
+    def test_returns_200(self):
+        response = self.client.get(self.endpoint, {"country": "ES", "year": 2024})
+        self.assertEqual(response.status_code, 200)
+
+    def test_bring_point_catchment_has_bp_flag_and_value(self):
+        by_catchment = self._by_catchment()
+        row = by_catchment[self.catchment_bp_with_data.id]
+        self.assertTrue(row["has_bring_point"])
+        self.assertEqual(row["weekly_access_days"], 5.0)
+
+    def test_mixed_catchment_has_bp_flag_and_value(self):
+        by_catchment = self._by_catchment()
+        row = by_catchment[self.catchment_mixed.id]
+        self.assertTrue(row["has_bring_point"])
+        self.assertEqual(row["weekly_access_days"], 3.0)
+
+    def test_dtd_catchment_no_bp_flag_and_null_value(self):
+        by_catchment = self._by_catchment()
+        row = by_catchment[self.catchment_dtd.id]
+        self.assertFalse(row["has_bring_point"])
+        self.assertIsNone(row["weekly_access_days"])
+
+    def test_bring_point_no_cpv_has_bp_flag_null_value(self):
+        by_catchment = self._by_catchment()
+        row = by_catchment[self.catchment_bp_no_data.id]
+        self.assertTrue(row["has_bring_point"])
+        self.assertIsNone(row["weekly_access_days"])
+
+    def test_country_filter_excludes_other_countries(self):
+        by_catchment = self._by_catchment(country="DE", year=2024)
+        self.assertNotIn(self.catchment_bp_with_data.id, by_catchment)
+
+    def test_response_keys(self):
+        by_catchment = self._by_catchment()
+        row = by_catchment[self.catchment_bp_with_data.id]
+        self.assertIn("catchment_id", row)
+        self.assertIn("weekly_access_days", row)
+        self.assertIn("has_bring_point", row)

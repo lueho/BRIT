@@ -8,13 +8,14 @@ from .viewsets import (
     BiowasteCollectionPointCountViewSet,
     BiowasteFeeSystemViewSet,
     BiowasteFrequencyTypeViewSet,
+    BiowasteImpurityViewSet,
     BiowasteMinBinSizeViewSet,
     BiowasteRequiredBinCapacityViewSet,
     CatchmentPopulationViewSet,
     CatchmentViewSet,
     CollectionCountRatioViewSet,
-    CollectionPointCountViewSet,
     CollectionPointCountRatioViewSet,
+    CollectionPointCountViewSet,
     CollectionSupportViewSet,
     CollectionSystemViewSet,
     CombinedCollectionCountViewSet,
@@ -40,6 +41,7 @@ from .viewsets import (
     ResidualMinBinSizeViewSet,
     ResidualRequiredBinCapacityViewSet,
     WasteRatioViewSet,
+    WeeklyBpAccessDaysViewSet,
 )
 
 router = routers.DefaultRouter()
@@ -233,4 +235,14 @@ router.register(
     "waste-ratio",
     WasteRatioViewSet,
     basename="api-waste-atlas-waste-ratio",
+)
+router.register(
+    "biowaste-impurity",
+    BiowasteImpurityViewSet,
+    basename="api-waste-atlas-biowaste-impurity",
+)
+router.register(
+    "weekly-bp-access-days",
+    WeeklyBpAccessDaysViewSet,
+    basename="api-waste-atlas-weekly-bp-access-days",
 )

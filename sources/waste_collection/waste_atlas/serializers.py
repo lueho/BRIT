@@ -262,3 +262,29 @@ class CatchmentMinBinSizeRatioSerializer(serializers.Serializer):
         data = super().to_representation(instance)
         data["ratio"] = _round_one_decimal(data.get("ratio"))
         return data
+
+
+class CatchmentBiowasteImpuritySerializer(serializers.Serializer):
+    """Flat JSON serializer for biowaste impurity rate per catchment."""
+
+    catchment_id = serializers.IntegerField()
+    impurity_rate = serializers.FloatField(allow_null=True)
+    no_collection = serializers.BooleanField(default=False)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["impurity_rate"] = _round_one_decimal(data.get("impurity_rate"))
+        return data
+
+
+class CatchmentWeeklyBpAccessDaysSerializer(serializers.Serializer):
+    """Flat JSON serializer for weekly bring-point access days per catchment."""
+
+    catchment_id = serializers.IntegerField()
+    weekly_access_days = serializers.FloatField(allow_null=True)
+    has_bring_point = serializers.BooleanField(default=False)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["weekly_access_days"] = _round_one_decimal(data.get("weekly_access_days"))
+        return data

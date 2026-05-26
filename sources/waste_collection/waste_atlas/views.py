@@ -1532,3 +1532,19 @@ class NetherlandsOrganicWasteRatioMapView(OrganicWasteRatioMapView):
     default_year = "2024"
     map_title = "Share of organic fractions in total waste"
     map_overview_label = "Map overview"
+
+
+class CatalunyaBiowasteImpurityMapView(CataloniaAtlasMapView):
+    """Map 48 — Biowaste impurity rate map for Catalonia."""
+
+    template_name = "waste_atlas/karte48_biowaste_impurity.html"
+    map_title = "Biowaste impurity rate"
+    map_route_key = "biowaste_impurity"
+
+
+class CataloniaWeeklyBpAccessDaysMapView(CataloniaAtlasMapView):
+    """Map 49 — Weekly bring-point access days map for Catalonia."""
+
+    template_name = "waste_atlas/karte49_weekly_bp_access_days.html"
+    map_title = "Weekly bring-point access days"
+    map_route_key = "weekly_bp_access_days"

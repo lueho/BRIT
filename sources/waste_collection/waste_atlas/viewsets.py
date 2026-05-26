@@ -36,6 +36,7 @@ from .serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
     CatchmentAccessControlSerializer,
     CatchmentBinConfigurationSerializer,
+    CatchmentBiowasteImpuritySerializer,
     CatchmentCollectionAmountSerializer,
     CatchmentCollectionCountRatioSerializer,
     CatchmentCollectionCountSerializer,
@@ -60,6 +61,7 @@ from .serializers import (
     CatchmentPopulationSerializer,
     CatchmentRequiredBinCapacitySerializer,
     CatchmentWasteRatioSerializer,
+    CatchmentWeeklyBpAccessDaysSerializer,
 )
 
 # Material IDs for food waste classification (Karte 4)
@@ -76,16 +78,19 @@ _GREEN_WASTE_CATEGORY_NAMES = ["Green waste"]
 # Property ID for "Connection rate" (properties_property table)
 CONNECTION_RATE_PROPERTY_ID = 4
 COLLECTION_POINT_COUNT_PROPERTY_NAME = "number of collection points"
+BIOWASTE_IMPURITY_RATE_PROPERTY_NAME = "biowaste impurity rate"
+WEEKLY_BP_ACCESS_DAYS_PROPERTY_NAME = "weekly bring-point access days"
 
 # Priority for picking the primary collection system per catchment.
 # Lower number = higher priority.
 _COLLECTION_SYSTEM_PRIORITY = {
     "Door to door": 1,
-    "Bring point": 2,
-    "Recycling centre": 3,
-    "On demand kerbside collection": 4,
-    "Home-composting": 5,
-    "No separate collection": 6,
+    "Mixed door-to-door and bring point": 2,
+    "Bring point": 3,
+    "Recycling centre": 4,
+    "On demand kerbside collection": 5,
+    "Home-composting": 6,
+    "No separate collection": 7,
 }
 
 # Attribute IDs for population data (maps_attribute table)
@@ -473,9 +478,13 @@ class AccessControlViewSet(viewsets.ViewSet):
             elif bp is True and pap is True:
                 value = "Bring point and door-to-door access-controlled"
             elif bp is True and pap is False:
-                value = "Bring point access-controlled, door-to-door not access-controlled"
+                value = (
+                    "Bring point access-controlled, door-to-door not access-controlled"
+                )
             elif bp is False and pap is True:
-                value = "Door-to-door access-controlled, bring point not access-controlled"
+                value = (
+                    "Door-to-door access-controlled, bring point not access-controlled"
+                )
             elif bp is True:
                 value = "Bring point access-controlled"
             elif pap is True:
@@ -925,7 +934,11 @@ class CollectionCountRatioViewSet(viewsets.ViewSet):
             bio_count = bio_row.get("collection_count")
             residual_count = res_row.get("collection_count")
             ratio = None
-            if bio_count is not None and residual_count is not None and residual_count != 0:
+            if (
+                bio_count is not None
+                and residual_count is not None
+                and residual_count != 0
+            ):
                 ratio = bio_count / residual_count
             data.append(
                 {
@@ -1021,7 +1034,11 @@ class CollectionPointCountRatioViewSet(viewsets.ViewSet):
             bio_count = bio_row.get("collection_point_count")
             residual_count = res_row.get("collection_point_count")
             ratio = None
-            if bio_count is not None and residual_count is not None and residual_count != 0:
+            if (
+                bio_count is not None
+                and residual_count is not None
+                and residual_count != 0
+            ):
                 ratio = bio_count / residual_count
             data.append(
                 {
@@ -1856,7 +1873,11 @@ class MinBinSizeRatioViewSet(viewsets.ViewSet):
             bio_size = bio.get(cid, {}).get("min_bin_size")
             residual_size = res.get(cid, {}).get("min_bin_size")
             ratio = None
-            if bio_size is not None and residual_size is not None and residual_size != 0:
+            if (
+                bio_size is not None
+                and residual_size is not None
+                and residual_size != 0
+            ):
                 ratio = bio_size / residual_size
             data.append(
                 {
@@ -2494,4 +2515,130 @@ class CatchmentPopulationViewSet(viewsets.ViewSet):
             for row in qs
         ]
         serializer = CatchmentPopulationSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class BiowasteImpurityViewSet(viewsets.ViewSet):
+    """Return the biowaste impurity rate per catchment (Catalonia KPI).
+
+    For each catchment, selects the primary biowaste collection and returns
+    its impurity rate from ``CollectionPropertyValue`` (property:
+    'biowaste impurity rate').
+
+    Supports query parameters:
+
+    - ``country``: ISO country code filter (default: ``DE``)
+    - ``year``: Year of ``valid_from`` on the collection (default: ``2022``)
+
+    Example::
+
+        GET /waste_collection/api/waste-atlas/biowaste-impurity/?country=ES&year=2024
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        """Return a JSON array of {catchment_id, impurity_rate, no_collection}."""
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+
+        best = _select_primary_collections(
+            country,
+            year,
+            ["Biowaste", "Food waste"],
+            nuts_prefixes,
+        )
+
+        collection_ids = [row["collection_id"] for row in best.values()]
+        cpv_qs = (
+            CollectionPropertyValue.objects.filter(
+                collection_id__in=collection_ids,
+                property__name=BIOWASTE_IMPURITY_RATE_PROPERTY_NAME,
+                year=year,
+            )
+            .order_by("collection_id", "-year")
+            .distinct("collection_id")
+            .values_list("collection_id", "average")
+        )
+        rate_lookup = dict(cpv_qs)
+
+        data = []
+        for cid, row in best.items():
+            col_id = row["collection_id"]
+            system = row["collection_system"]
+            no_collection = system == "No separate collection"
+            avg = None if no_collection else rate_lookup.get(col_id)
+            data.append(
+                {
+                    "catchment_id": cid,
+                    "impurity_rate": avg,
+                    "no_collection": no_collection,
+                }
+            )
+
+        serializer = CatchmentBiowasteImpuritySerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class WeeklyBpAccessDaysViewSet(viewsets.ViewSet):
+    """Return weekly bring-point access days per catchment (Catalonia KPI).
+
+    For each catchment, selects the primary biowaste collection and returns
+    the weekly bring-point access days from ``CollectionPropertyValue``
+    (property: 'weekly bring-point access days').
+
+    Supports query parameters:
+
+    - ``country``: ISO country code filter (default: ``DE``)
+    - ``year``: Year of ``valid_from`` on the collection (default: ``2022``)
+
+    Example::
+
+        GET /waste_collection/api/waste-atlas/weekly-bp-access-days/?country=ES&year=2024
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        """Return a JSON array of {catchment_id, weekly_access_days, has_bring_point}."""
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+
+        best = _select_primary_collections(
+            country,
+            year,
+            ["Biowaste", "Food waste"],
+            nuts_prefixes,
+        )
+
+        collection_ids = [row["collection_id"] for row in best.values()]
+        cpv_qs = (
+            CollectionPropertyValue.objects.filter(
+                collection_id__in=collection_ids,
+                property__name=WEEKLY_BP_ACCESS_DAYS_PROPERTY_NAME,
+                year=year,
+            )
+            .order_by("collection_id", "-year")
+            .distinct("collection_id")
+            .values_list("collection_id", "average")
+        )
+        days_lookup = dict(cpv_qs)
+
+        _BP_SYSTEMS = {"Bring point", "Mixed door-to-door and bring point"}
+
+        data = []
+        for cid, row in best.items():
+            col_id = row["collection_id"]
+            system = row["collection_system"]
+            has_bp = system in _BP_SYSTEMS
+            avg = days_lookup.get(col_id) if has_bp else None
+            data.append(
+                {
+                    "catchment_id": cid,
+                    "weekly_access_days": avg,
+                    "has_bring_point": has_bp,
+                }
+            )
+
+        serializer = CatchmentWeeklyBpAccessDaysSerializer(data, many=True)
         return Response(serializer.data)
