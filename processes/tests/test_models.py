@@ -1,4 +1,5 @@
 from decimal import Decimal
+from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -525,13 +526,14 @@ class ProcessModelTestCase(TestCase):
     def test_process_info_resource_target_url_for_document(self):
         """Test that target_url property returns document URL when type is DOCUMENT."""
         process = Process.objects.create(name="Process", owner=self.owner)
+        filename = f"info-{uuid4()}.pdf"
         resource = ProcessInfoResource.objects.create(
             process=process,
             title="Info PDF",
             resource_type=ProcessInfoResource.ResourceType.DOCUMENT,
-            document=SimpleUploadedFile("info.pdf", b"content"),
+            document=SimpleUploadedFile(filename, b"content"),
         )
-        self.assertIn("info.pdf", resource.target_url)
+        self.assertIn(filename, resource.target_url)
 
     def test_process_info_resource_target_url_for_url_types(self):
         """Test that target_url returns url field for INTERNAL and EXTERNAL types."""

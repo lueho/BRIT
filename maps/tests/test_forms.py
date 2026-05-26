@@ -86,8 +86,11 @@ class RegionModelFormTestCase(TestCase):
             "geom": "invalid_geometry",
         }
 
-        form = RegionModelForm(data=form_data)
-        self.assertFalse(form.is_valid())
+        with self.assertLogs("django.contrib.gis", level="ERROR") as captured_logs:
+            form = RegionModelForm(data=form_data)
+            self.assertFalse(form.is_valid())
+
+        self.assertIn("Error creating geometry", captured_logs.output[0])
         self.assertIn("country", form.errors)
         self.assertIn("geom", form.errors)
 

@@ -37,13 +37,17 @@ if _test_redis_url:
     CELERY_BROKER_URL = _test_redis_url
     CELERY_RESULT_BACKEND = _test_redis_url
 else:
-    _parsed_redis_url = urlparse(os.environ.get("REDIS_URL", "rediss://redis:6379/0"))
-    _test_redis_url = urlunparse(_parsed_redis_url._replace(path="/15"))
+    _parsed_redis_url = urlparse(os.environ.get("REDIS_URL", "redis://redis:6379/0"))
+    _test_redis_url = urlunparse(
+        _parsed_redis_url._replace(scheme="redis", path="/15", query="")
+    )
     CELERY_BROKER_URL = _test_redis_url
     CELERY_RESULT_BACKEND = _test_redis_url
 
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_BROKER_USE_SSL = None
+CELERY_REDIS_BACKEND_USE_SSL = None
 
 AUTO_ENQUEUE_URL_CHECKS = False
 
@@ -105,6 +109,11 @@ LOGGING = {
             "propagate": False,
         },
         "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "sources.waste_collection.apps": {
             "handlers": ["console"],
             "level": "ERROR",
             "propagate": False,

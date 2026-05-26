@@ -36,9 +36,9 @@ def convert_weight_fraction_value(value, source_token, target_token):
 
 
 CUSTOM_PINT_DEFINITIONS = (
-    "percent = 0.01 * count = %",
-    "permille = 0.001 * count = ‰",
-    "dry_matter_basis = [] = DM",
+    ("percent", "percent = 0.01 * count = %"),
+    ("permille", "permille = 0.001 * count = ‰"),
+    ("dry_matter_basis", "dry_matter_basis = [] = DM"),
 )
 
 
@@ -53,7 +53,12 @@ def get_unit_registry():
         return None
 
     registry = pint.UnitRegistry()
-    for definition in CUSTOM_PINT_DEFINITIONS:
+    for unit_name, definition in CUSTOM_PINT_DEFINITIONS:
+        try:
+            registry.Unit(unit_name)
+            continue
+        except Exception:
+            pass
         try:
             registry.define(definition)
         except Exception:
