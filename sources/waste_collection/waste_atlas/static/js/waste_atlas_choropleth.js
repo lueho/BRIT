@@ -168,6 +168,63 @@ var WasteAtlasChoropleth = (function () {
     return window.location.pathname.replace(/\/$/, '') === path.replace(/\/$/, '');
   }
 
+  function initSelectorControls(loadCurrent) {
+    var countrySelect = document.getElementById('sel-country');
+    var aspectSelect = document.getElementById('sel-aspect');
+    var yearSelect = document.getElementById('sel-year');
+    var btnLoad = document.getElementById('btn-load');
+    var form = document.getElementById('atlas-selection-form');
+
+    if (!countrySelect || !aspectSelect || !yearSelect || !btnLoad) return null;
+
+    var aspectOptions = Array.prototype.slice.call(aspectSelect.options);
+
+    function selectedYear() {
+      return parseInt(yearSelect.value, 10) || 2024;
+    }
+
+    function selectedRouteUrl() {
+      var selectedOption = aspectSelect.options[aspectSelect.selectedIndex];
+      return selectedOption ? selectedOption.getAttribute('data-url') : null;
+    }
+
+    function ensureVisibleSelection() {
+      var selectedMapSet = countrySelect.value;
+      var firstVisibleOption = null;
+      aspectOptions.forEach(function (option) {
+        var isVisible = option.getAttribute('data-map-set') === selectedMapSet;
+        option.hidden = !isVisible;
+        option.disabled = !isVisible;
+        if (isVisible && !firstVisibleOption) firstVisibleOption = option;
+      });
+      if (aspectSelect.selectedOptions.length && !aspectSelect.selectedOptions[0].disabled) return;
+      if (firstVisibleOption) aspectSelect.selectedIndex = firstVisibleOption.index;
+    }
+
+    function navigateOrLoad(event) {
+      if (event && event.preventDefault) event.preventDefault();
+      ensureVisibleSelection();
+      var url = selectedRouteUrl();
+      var year = selectedYear();
+      if (url && !_isCurrentPath(url)) {
+        window.location.href = url + '?year=' + encodeURIComponent(year);
+        return;
+      }
+      if (loadCurrent) loadCurrent(countrySelect.value, year, false);
+    }
+
+    countrySelect.addEventListener('change', ensureVisibleSelection);
+    aspectSelect.addEventListener('change', ensureVisibleSelection);
+    if (form) form.addEventListener('submit', navigateOrLoad);
+    btnLoad.addEventListener('click', navigateOrLoad);
+    ensureVisibleSelection();
+
+    return {
+      selectedYear: selectedYear,
+      selectedRouteUrl: selectedRouteUrl
+    };
+  }
+
   // ---- rendering ------------------------------------------------------------
 
   function _screenLayout(container) {
@@ -953,38 +1010,18 @@ var WasteAtlasChoropleth = (function () {
 
     load(cfg.country, cfg.year, true);
 
-    if (btnLoad) {
-      var countrySelect = document.getElementById('sel-country');
-      function selectedRouteUrl() {
-        var selectedOption = countrySelect.options[countrySelect.selectedIndex];
-        return selectedOption ? selectedOption.getAttribute('data-url') : null;
-      }
-      function selectedYear() {
-        return parseInt(document.getElementById('sel-year').value, 10) || 2022;
-      }
-
-      countrySelect.addEventListener('change', function () {
-        var url = selectedRouteUrl();
-        if (url && !_isCurrentPath(url)) {
-          window.location.href = url + '?year=' + encodeURIComponent(selectedYear());
-        }
-      });
-
-      btnLoad.addEventListener('click', function () {
-        var country = countrySelect.value;
-        var year = selectedYear();
-        var url = selectedRouteUrl();
-        if (url && !_isCurrentPath(url)) {
-          window.location.href = url + '?year=' + encodeURIComponent(year);
-          return;
-        }
-        load(country, year, false);
-      });
-    }
+    initSelectorControls(function (_selectedMapSet, year) {
+      load(cfg.country, year, true);
+    });
 
     if (btnSVG) btnSVG.addEventListener('click', function () { exportSVG(fileBase + '.svg'); });
     if (btnPNG) btnPNG.addEventListener('click', function () { exportPNG(fileBase + '.png'); });
   }
 
-  return { init: init, exportSVG: exportSVG, exportPNG: exportPNG };
+  return {
+    init: init,
+    initSelectorControls: initSelectorControls,
+    exportSVG: exportSVG,
+    exportPNG: exportPNG
+  };
 })();

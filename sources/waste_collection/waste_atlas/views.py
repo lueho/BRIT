@@ -4,6 +4,8 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
+from .map_selection import build_map_selection_context
+
 WASTE_ATLAS_GROUP_NAME = "waste_atlas"
 
 ITALY_SOUTH_TYROL_MAP_ROUTES = {
@@ -158,6 +160,13 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
             for value, route_name in routes.items()
         ]
 
+    def get_selected_map_set(self):
+        if self.map_set:
+            return self.map_set
+        if self.get_country() == "IT" and self.get_nuts_prefix() == "ITH10":
+            return "IT-ST"
+        return self.get_country()
+
     def get_context_data(self, **kwargs):
         """Pass country, year, nuts_prefix, and map_title to the template."""
         ctx = super().get_context_data(**kwargs)
@@ -169,6 +178,13 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
         ctx["map_overview_label"] = self.map_overview_label
         ctx["map_set_options"] = self.get_map_set_options()
         ctx["map_set_selector_label"] = self.map_set_selector_label
+        ctx.update(
+            build_map_selection_context(
+                reverse,
+                selected_map_set=self.get_selected_map_set(),
+                selected_aspect=self.map_route_key or "orga_level",
+            )
+        )
         return ctx
 
 
@@ -183,6 +199,7 @@ class WasteAtlasOverviewView(WasteAtlasGroupMixin, TemplateView):
             "required_bin_capacity_reference",
             "person",
         )
+        ctx.update(build_map_selection_context(reverse))
         return ctx
 
 
@@ -236,6 +253,7 @@ class PopulationDensityMapView(AtlasMapView):
 
     template_name = "waste_atlas/population_density_map.html"
     map_title = "Population density"
+    map_route_key = "population_density"
 
 
 class OrgaLevelMapView(AtlasMapView):
@@ -243,6 +261,7 @@ class OrgaLevelMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte1_orga_level.html"
     map_title = "Administrative level of waste collection"
+    map_route_key = "orga_level"
 
 
 class ItalyAtlasMapView(AtlasMapView):
@@ -501,6 +520,7 @@ class SwedenOrgaLevelMapView(AtlasMapView):
     map_title = "Administrative level of waste collection"
     default_country = "SE"
     map_overview_label = "Map overview"
+    map_route_key = "orga_level"
 
 
 class SwedenBinConfigurationMapView(AtlasMapView):
@@ -511,6 +531,7 @@ class SwedenBinConfigurationMapView(AtlasMapView):
     default_country = "SE"
     default_year = "2023"
     map_overview_label = "Map overview"
+    map_route_key = "bin_configuration"
 
 
 class DenmarkOrgaLevelMapView(AtlasMapView):
@@ -521,6 +542,7 @@ class DenmarkOrgaLevelMapView(AtlasMapView):
     default_country = "DK"
     default_year = "2023"
     map_overview_label = "Map overview"
+    map_route_key = "orga_level"
 
 
 class DenmarkAtlasMapView(AtlasMapView):
@@ -536,6 +558,7 @@ class DenmarkFoodWasteCategoryMapView(DenmarkAtlasMapView):
 
     template_name = "waste_atlas/karte45_food_waste_category_denmark.html"
     map_title = "Accepted food-waste categories in biowaste"
+    map_route_key = "food_waste_category"
 
 
 class DenmarkPaperBagsMapView(DenmarkAtlasMapView):
@@ -543,6 +566,7 @@ class DenmarkPaperBagsMapView(DenmarkAtlasMapView):
 
     template_name = "waste_atlas/karte46_paper_bags_denmark.html"
     map_title = "Use of paper bags for biowaste collection"
+    map_route_key = "paper_bags"
 
 
 class DenmarkPlasticBagsMapView(DenmarkAtlasMapView):
@@ -550,6 +574,7 @@ class DenmarkPlasticBagsMapView(DenmarkAtlasMapView):
 
     template_name = "waste_atlas/karte47_plastic_bags_denmark.html"
     map_title = "Use of plastic bags for biowaste collection"
+    map_route_key = "plastic_bags"
 
 
 class DenmarkCollectionSupportMapView(DenmarkAtlasMapView):
@@ -557,6 +582,7 @@ class DenmarkCollectionSupportMapView(DenmarkAtlasMapView):
 
     template_name = "waste_atlas/karte48_collection_support_denmark.html"
     map_title = "Accepted materials for collection aids"
+    map_route_key = "collection_support"
 
 
 class NetherlandsOrgaLevelMapView(AtlasMapView):
@@ -566,6 +592,7 @@ class NetherlandsOrgaLevelMapView(AtlasMapView):
     map_title = "Administrative level of waste collection"
     default_country = "NL"
     map_overview_label = "Map overview"
+    map_route_key = "orga_level"
 
 
 class BelgiumOrgaLevelMapView(AtlasMapView):
@@ -575,6 +602,7 @@ class BelgiumOrgaLevelMapView(AtlasMapView):
     map_title = "Administrative level of waste collection"
     default_country = "BE"
     map_overview_label = "Map overview"
+    map_route_key = "orga_level"
 
 
 class BelgiumFlandersOrgaLevelMapView(AtlasMapView):
@@ -585,6 +613,8 @@ class BelgiumFlandersOrgaLevelMapView(AtlasMapView):
     default_country = "BE"
     default_year = "2022"
     map_overview_label = "Map overview"
+    map_set = "BE-FL-BR"
+    map_route_key = "orga_level"
 
 
 class CollectionSystemMapView(AtlasMapView):
@@ -592,6 +622,7 @@ class CollectionSystemMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte2_collection_system.html"
     map_title = "Primary collection system for kitchen waste"
+    map_route_key = "collection_system"
 
 
 class GreenWasteCollectionSystemCountMapView(AtlasMapView):
@@ -599,6 +630,7 @@ class GreenWasteCollectionSystemCountMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte21_green_waste_collection_system_count.html"
     map_title = "Number of green-waste collection systems per catchment"
+    map_route_key = "green_waste_collection_system_count"
 
 
 class ConnectionRateMapView(AtlasMapView):
@@ -606,6 +638,7 @@ class ConnectionRateMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte3_connection_rate.html"
     map_title = "Connection rates for door-to-door biowaste collection"
+    map_route_key = "connection_rate"
 
 
 class FoodWasteCategoryMapView(AtlasMapView):
@@ -613,6 +646,7 @@ class FoodWasteCategoryMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte4_food_waste_category.html"
     map_title = "Accepted food-waste categories in biowaste"
+    map_route_key = "food_waste_category"
 
 
 class PaperBagsMapView(AtlasMapView):
@@ -620,6 +654,7 @@ class PaperBagsMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte5_paper_bags.html"
     map_title = "Use of paper bags for biowaste collection"
+    map_route_key = "paper_bags"
 
 
 class PlasticBagsMapView(AtlasMapView):
@@ -627,6 +662,7 @@ class PlasticBagsMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte6_plastic_bags.html"
     map_title = "Use of compostable plastic bags for biowaste collection"
+    map_route_key = "plastic_bags"
 
 
 class CollectionSupportMapView(AtlasMapView):
@@ -634,6 +670,7 @@ class CollectionSupportMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte7_collection_support.html"
     map_title = "Accepted materials for collection aids"
+    map_route_key = "collection_support"
 
 
 class ResidualFrequencyMapView(AtlasMapView):
@@ -641,6 +678,7 @@ class ResidualFrequencyMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte8_residual_frequency.html"
     map_title = "Collection frequency types for residual waste collection"
+    map_route_key = "residual_frequency"
 
 
 class BiowasteFrequencyMapView(AtlasMapView):
@@ -648,6 +686,7 @@ class BiowasteFrequencyMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte9_biowaste_frequency.html"
     map_title = "Collection frequency types for biowaste collection"
+    map_route_key = "biowaste_frequency"
 
 
 class CombinedFrequencyMapView(AtlasMapView):
@@ -655,6 +694,7 @@ class CombinedFrequencyMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte10_combined_frequency.html"
     map_title = "Collection frequency type: biowaste vs residual waste"
+    map_route_key = "combined_frequency"
 
 
 class ResidualCollectionCountMapView(AtlasMapView):
@@ -662,6 +702,7 @@ class ResidualCollectionCountMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte11_residual_collection_count.html"
     map_title = "Annual residual waste collection count"
+    map_route_key = "residual_collection_count"
 
 
 class BiowasteCollectionCountMapView(AtlasMapView):
@@ -669,6 +710,7 @@ class BiowasteCollectionCountMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte12_biowaste_collection_count.html"
     map_title = "Annual biowaste collection count"
+    map_route_key = "biowaste_collection_count"
 
 
 class CombinedCollectionCountMapView(AtlasMapView):
@@ -676,6 +718,7 @@ class CombinedCollectionCountMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte13_combined_collection_count.html"
     map_title = "Annual collection count: biowaste vs residual waste"
+    map_route_key = "combined_collection_count"
 
 
 class CollectionCountRatioMapView(AtlasMapView):
@@ -683,6 +726,7 @@ class CollectionCountRatioMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte42_collection_count_ratio.html"
     map_title = "Annual collection-count ratio: biowaste vs residual waste"
+    map_route_key = "collection_count_ratio"
 
 
 class ResidualFeeSystemMapView(AtlasMapView):
@@ -690,6 +734,7 @@ class ResidualFeeSystemMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte14_residual_fee_system.html"
     map_title = "Fee system for residual waste collection"
+    map_route_key = "residual_fee_system"
 
 
 class BiowasteFeeSystemMapView(AtlasMapView):
@@ -697,6 +742,7 @@ class BiowasteFeeSystemMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte15_biowaste_fee_system.html"
     map_title = "Fee system for biowaste collection"
+    map_route_key = "biowaste_fee_system"
 
 
 class CombinedFeeSystemMapView(AtlasMapView):
@@ -704,6 +750,7 @@ class CombinedFeeSystemMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte16_combined_fee_system.html"
     map_title = "Fee system: biowaste vs residual waste"
+    map_route_key = "combined_fee_system"
 
 
 class ResidualCollectionAmountMapView(AtlasMapView):
@@ -711,6 +758,7 @@ class ResidualCollectionAmountMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte17_residual_collection_amount.html"
     map_title = "Specifically collected amount of residual waste"
+    map_route_key = "residual_collection_amount"
 
 
 class BiowasteCollectionAmountMapView(AtlasMapView):
@@ -718,6 +766,7 @@ class BiowasteCollectionAmountMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte18_biowaste_collection_amount.html"
     map_title = "Specifically collected amount of biowaste"
+    map_route_key = "biowaste_collection_amount"
 
 
 class GreenWasteCollectionAmountMapView(AtlasMapView):
@@ -725,6 +774,7 @@ class GreenWasteCollectionAmountMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte22_green_waste_collection_amount.html"
     map_title = "Specifically collected amount of green waste"
+    map_route_key = "green_waste_collection_amount"
 
 
 class OrganicCollectionAmountMapView(AtlasMapView):
@@ -732,6 +782,7 @@ class OrganicCollectionAmountMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte27_organic_collection_amount.html"
     map_title = "Aggregated collected amount of organic fractions (kg/cap/a)"
+    map_route_key = "organic_collection_amount"
 
 
 class OrganicWasteRatioMapView(AtlasMapView):
@@ -739,6 +790,7 @@ class OrganicWasteRatioMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte28_organic_waste_ratio.html"
     map_title = "Share of organic fractions in total waste"
+    map_route_key = "organic_waste_ratio"
 
 
 class BiowasteMinBinSizeMapView(AtlasMapView):
@@ -746,6 +798,7 @@ class BiowasteMinBinSizeMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte23_biowaste_min_bin_size.html"
     map_title = "Smallest available bin size for biowaste (L)"
+    map_route_key = "biowaste_min_bin_size"
 
 
 class ResidualMinBinSizeMapView(AtlasMapView):
@@ -753,6 +806,7 @@ class ResidualMinBinSizeMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte24_residual_min_bin_size.html"
     map_title = "Smallest available bin size for residual waste (L)"
+    map_route_key = "residual_min_bin_size"
 
 
 class BiowasteRequiredBinCapacityMapView(AtlasMapView):
@@ -760,6 +814,7 @@ class BiowasteRequiredBinCapacityMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte25_biowaste_required_bin_capacity.html"
     map_title = "Required bin capacity for biowaste (L/reference unit)"
+    map_route_key = "biowaste_required_bin_capacity"
 
 
 class ResidualRequiredBinCapacityMapView(AtlasMapView):
@@ -767,6 +822,7 @@ class ResidualRequiredBinCapacityMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte26_residual_required_bin_capacity.html"
     map_title = "Required bin capacity for residual waste (L/reference unit)"
+    map_route_key = "residual_required_bin_capacity"
 
 
 class WasteRatioMapView(AtlasMapView):
@@ -774,6 +830,7 @@ class WasteRatioMapView(AtlasMapView):
 
     template_name = "waste_atlas/karte19_waste_ratio.html"
     map_title = "Biowaste share of total waste"
+    map_route_key = "waste_ratio"
 
 
 class BwRpAtlasMapView(AtlasMapView):
@@ -785,6 +842,7 @@ class BwRpAtlasMapView(AtlasMapView):
     map_overview_label = "Map overview"
     allow_country_override = False
     allow_nuts_override = False
+    map_set = "DE-BW-RP"
 
 
 class BwRpOrgaLevelMapView(BwRpAtlasMapView):

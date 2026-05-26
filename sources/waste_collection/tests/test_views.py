@@ -785,7 +785,9 @@ class CollectionPropertyValueCRUDViewsTestCase(
             {predecessor.pk, self.related_objects["collection"].pk},
         )
 
-    def test_detail_context_hides_related_collections_when_visibility_filter_errors(self):
+    def test_detail_context_hides_related_collections_when_visibility_filter_errors(
+        self,
+    ):
         predecessor = Collection.objects.create(
             owner=self.owner_user,
             name="CPV predecessor hidden on filter error",
@@ -4027,10 +4029,25 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(response, "Administrative level of waste collection")
         self.assertContains(response, "Map overview")
-        self.assertContains(response, "Map set")
+        self.assertContains(response, "Mapped aspect")
         self.assertContains(response, "No data")
         self.assertNotContains(response, "nutsPrefix:")
         self.assertNotContains(response, "nutsLevel:")
+
+    def test_map_page_renders_region_aspect_year_selector(self):
+        response = self.client.get(reverse("waste-atlas-germany-collection-system-map"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<label for="sel-country">Region</label>')
+        self.assertContains(response, '<label for="sel-aspect">Mapped aspect</label>')
+        self.assertContains(response, 'value="DE"')
+        self.assertContains(response, "selected>Germany</option>")
+        self.assertContains(response, 'data-map-set="DE"')
+        self.assertContains(response, 'value="collection_system"')
+        self.assertContains(
+            response,
+            f'data-url="{reverse("waste-atlas-germany-collection-system-map")}"',
+        )
 
     def test_south_tyrol_orga_level_map_uses_regional_border(self):
         response = self.client.get(reverse("waste-atlas-south-tyrol-orga-level-map"))
@@ -4044,7 +4061,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, 'value="2024" selected')
         self.assertContains(response, "Administrative level of waste collection")
         self.assertContains(response, "Map overview")
-        self.assertContains(response, "Map set")
+        self.assertContains(response, "Mapped aspect")
         self.assertContains(response, "nutsPrefix: 'ITH10'")
         self.assertContains(response, "nutsLevel: parseInt('3', 10)")
 
@@ -4052,7 +4069,10 @@ class WasteAtlasMapViewsTestCase(TestCase):
         response = self.client.get(reverse("waste-atlas-bw-rp-orga-level-map"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="DE" selected')
+        self.assertContains(response, 'value="DE-BW-RP"')
+        self.assertContains(
+            response, "selected>Baden-Württemberg &amp; Rheinland-Pfalz</option>"
+        )
         self.assertContains(response, "nutsPrefix: 'DE1,DEB'")
         self.assertContains(response, "nutsLevel:")
         self.assertContains(response, "parseInt('1', 10)")
@@ -4095,7 +4115,8 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 response = self.client.get(reverse(url_name))
 
                 self.assertEqual(response.status_code, 200)
-                self.assertContains(response, 'value="NL" selected')
+                self.assertContains(response, 'value="NL"')
+                self.assertContains(response, "selected>The Netherlands</option>")
                 self.assertContains(response, 'value="2024" selected')
                 self.assertContains(response, expected_title)
                 self.assertContains(response, "Map overview")
@@ -4156,7 +4177,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="IT"')
-        self.assertNotContains(response, 'value="DE"')
+        self.assertContains(response, "selected>Italy</option>")
         self.assertNotContains(response, "nutsPrefix:")
         self.assertNotContains(response, "nutsLevel:")
 
@@ -4234,7 +4255,8 @@ class WasteAtlasMapViewsTestCase(TestCase):
         response = self.client.get(reverse("waste-atlas-bin-configuration-sweden-map"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="SE" selected')
+        self.assertContains(response, 'value="SE"')
+        self.assertContains(response, "selected>Sweden</option>")
         self.assertContains(response, 'value="2023" selected')
         self.assertContains(response, "Bin configuration of waste fractions")
         self.assertContains(response, "Map overview")
@@ -4249,7 +4271,8 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="BE" selected')
+        self.assertContains(response, 'value="BE-FL-BR"')
+        self.assertContains(response, "selected>Flanders + Brussels</option>")
         self.assertContains(response, 'value="2022" selected')
         self.assertContains(response, "Administrative level of waste collection")
         self.assertContains(response, "Map overview")
@@ -4290,6 +4313,16 @@ class WasteAtlasMapViewsTestCase(TestCase):
         response = self.client.get(reverse("waste-atlas-overview"))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Find a map")
+        self.assertContains(
+            response,
+            '<label class="form-label" for="sel-country">Region</label>',
+        )
+        self.assertContains(
+            response,
+            '<label class="form-label" for="sel-aspect">Mapped aspect</label>',
+        )
+        self.assertContains(response, 'data-map-set="IT-ST"')
         self.assertContains(
             response,
             reverse("waste-atlas-europe-biowaste-collection-amount-map"),
