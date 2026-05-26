@@ -4056,6 +4056,10 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '<label for="sel-country">Region</label>')
+        self.assertContains(
+            response,
+            "Region means the map scope, not an individual municipality.",
+        )
         self.assertContains(response, '<label for="sel-theme">Theme</label>')
         self.assertContains(response, 'value="DE"')
         self.assertContains(response, "selected>Germany</option>")
@@ -4334,6 +4338,10 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(
             response,
             '<label class="form-label" for="sel-country">Region</label>',
+        )
+        self.assertContains(
+            response,
+            "Region means the map scope, not an individual municipality.",
         )
         self.assertContains(
             response,

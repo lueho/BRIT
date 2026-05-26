@@ -138,14 +138,14 @@ Status: **partially done**. Focused view/template regression coverage exists. Br
 - [x] Add focused regression coverage for selector context and rendering.
 - [x] Regenerate tracked minified JavaScript when the source changes.
 - [x] Validate with focused Waste Atlas view tests.
-- [ ] Manually test selector behavior in the browser for representative regions and themes.
+- [x] Manually test selector behavior in the browser for representative regions and themes.
 - [ ] Manually verify year-only reload on the same route.
 - [ ] Manually verify route changes preserve `?year=YYYY`.
 - [ ] Decide whether Europe-level overview maps should be included in the selector registry.
 - [ ] Decide whether generic country query-parameter maps should remain discoverable only through direct links or become explicit registry entries.
 - [x] Consolidate the registry into the nested `WASTE_ATLAS_MAP_SELECTIONS` target shape.
 - [ ] Improve theme grouping or ordering if the flat theme list becomes hard to scan.
-- [ ] Consider adding help text explaining that Region means map set/geographic scope, not municipality.
+- [x] Add help text explaining that Region means map set/geographic scope, not municipality.
 - [ ] Consider extracting shared selector markup into an include if more templates need it.
 
 ## Validation commands
