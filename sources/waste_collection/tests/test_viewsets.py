@@ -3100,8 +3100,12 @@ class SouthTyrolCollectionPointTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         by_catchment = {r["catchment_id"]: r for r in response.data}
-        self.assertEqual(by_catchment[self.catchment_both.id]["collection_point_count"], 10.5)
-        self.assertEqual(by_catchment[self.catchment_bio_only.id]["collection_point_count"], 8.0)
+        self.assertEqual(
+            by_catchment[self.catchment_both.id]["collection_point_count"], 10.5
+        )
+        self.assertEqual(
+            by_catchment[self.catchment_bio_only.id]["collection_point_count"], 8.0
+        )
         self.assertTrue(by_catchment[self.catchment_both.id]["is_door_to_door"])
 
     def test_residual_collection_point_count_endpoint(self):
@@ -3113,7 +3117,9 @@ class SouthTyrolCollectionPointTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         by_catchment = {r["catchment_id"]: r for r in response.data}
-        self.assertEqual(by_catchment[self.catchment_both.id]["collection_point_count"], 5.0)
+        self.assertEqual(
+            by_catchment[self.catchment_both.id]["collection_point_count"], 5.0
+        )
         self.assertNotIn(self.catchment_bio_only.id, by_catchment)
 
     def test_collection_point_count_ratio_endpoint(self):
@@ -3274,4 +3280,143 @@ class FalsyZeroRatioGuardTests(APITestCase):
         self.assertEqual(row["bio_min_bin_size"], 60.0)
         self.assertEqual(row["residual_min_bin_size"], 0)
         # Ratio should be None when denominator is 0, not a ZeroDivisionError
+        self.assertIsNone(row["ratio"])
+
+
+class CollectionPointCountNoDataAndDtDTests(APITestCase):
+    """Tests for no-data and door-to-door cases in split collection-point count endpoints.
+
+    Verifies that:
+    - Catchments with a collection but no collection_point_count property value
+      return collection_point_count=null (no-data case).
+    - Catchments with a door-to-door collection and no property value set
+      is_door_to_door=True and collection_point_count=null.
+    - The ratio endpoint exposes bio_is_door_to_door correctly when bio has DtD
+      but no count data.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
+        cls.residual_category, _ = WasteCategory.objects.get_or_create(
+            name="Residual waste"
+        )
+        cls.d2d, _ = CollectionSystem.objects.get_or_create(name="Door to door")
+        cls.bring_point, _ = CollectionSystem.objects.get_or_create(name="Bring point")
+
+        cls.region = Region.objects.create(name="CP No-Data Region", country="AT")
+        # Catchment A: biowaste DtD collection, no CPV → no-data + is_door_to_door=True
+        cls.catchment_dtd_no_cpv = CollectionCatchment.objects.create(
+            name="CP DtD No CPV", region=cls.region
+        )
+        Collection.objects.create(
+            name="CP DtD No CPV Bio Collection",
+            catchment=cls.catchment_dtd_no_cpv,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2024, 1, 1),
+        )
+
+        # Catchment B: biowaste bring-point collection, no CPV → no-data + is_door_to_door=False
+        cls.catchment_bp_no_cpv = CollectionCatchment.objects.create(
+            name="CP BP No CPV", region=cls.region
+        )
+        Collection.objects.create(
+            name="CP BP No CPV Bio Collection",
+            catchment=cls.catchment_bp_no_cpv,
+            waste_category=cls.bio_category,
+            collection_system=cls.bring_point,
+            valid_from=date(2024, 1, 1),
+        )
+
+        # Catchment C: biowaste DtD (no CPV) + residual with CPV
+        #   → ratio endpoint should expose bio_is_door_to_door=True, bio_count=null
+        cls.catchment_dtd_bio_with_residual = CollectionCatchment.objects.create(
+            name="CP DtD Bio With Residual", region=cls.region
+        )
+        cls.cp_property = Property.objects.create(
+            name="number of collection points [nodata-test]"
+        )
+        cls.unit, _ = Unit.objects.get_or_create(
+            name="No unit",
+            defaults={"dimensionless": True},
+        )
+        cls.cp_property.allowed_units.add(cls.unit)
+
+        Collection.objects.create(
+            name="CP DtD Bio Collection (no CPV)",
+            catchment=cls.catchment_dtd_bio_with_residual,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2024, 1, 1),
+        )
+        cls.residual_collection_c = Collection.objects.create(
+            name="CP Residual Collection C",
+            catchment=cls.catchment_dtd_bio_with_residual,
+            waste_category=cls.residual_category,
+            collection_system=cls.bring_point,
+            valid_from=date(2024, 1, 1),
+        )
+        # Only create a CPV for the property used by COLLECTION_POINT_COUNT_PROPERTY_NAME
+        # (viewsets hardcode "number of collection points")
+        cls.std_property, _ = Property.objects.get_or_create(
+            name="number of collection points"
+        )
+        cls.std_property.allowed_units.add(cls.unit)
+        CollectionPropertyValue.objects.create(
+            collection=cls.residual_collection_c,
+            property=cls.std_property,
+            unit=cls.unit,
+            year=2024,
+            average=7,
+        )
+
+    def test_biowaste_dtd_no_cpv_returns_null_count_and_dtd_flag(self):
+        """BiowasteCollectionPointCountViewSet: DtD catchment with no CPV has null count, is_door_to_door=True."""
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/biowaste-collection-point-count/",
+            {"country": "AT", "year": 2024},
+        )
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        row = by_catchment[self.catchment_dtd_no_cpv.id]
+        self.assertIsNone(row["collection_point_count"])
+        self.assertTrue(row["is_door_to_door"])
+
+    def test_biowaste_bp_no_cpv_returns_null_count_and_no_dtd_flag(self):
+        """BiowasteCollectionPointCountViewSet: bring-point catchment with no CPV has null count, is_door_to_door=False."""
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/biowaste-collection-point-count/",
+            {"country": "AT", "year": 2024},
+        )
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        row = by_catchment[self.catchment_bp_no_cpv.id]
+        self.assertIsNone(row["collection_point_count"])
+        self.assertFalse(row["is_door_to_door"])
+
+    def test_residual_no_cpv_catchment_excluded(self):
+        """ResidualCollectionPointCountViewSet: catchments with only biowaste collections are excluded."""
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/residual-collection-point-count/",
+            {"country": "AT", "year": 2024},
+        )
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        # Catchments A and B have only biowaste collections
+        self.assertNotIn(self.catchment_dtd_no_cpv.id, by_catchment)
+        self.assertNotIn(self.catchment_bp_no_cpv.id, by_catchment)
+
+    def test_ratio_endpoint_bio_dtd_no_count_with_residual_count(self):
+        """Ratio endpoint: bio DtD (no count) + residual with count → bio_is_door_to_door=True, bio_count=null, ratio=null."""
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/collection-point-count-ratio/",
+            {"country": "AT", "year": 2024},
+        )
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        row = by_catchment[self.catchment_dtd_bio_with_residual.id]
+        self.assertIsNone(row["bio_count"])
+        self.assertTrue(row["bio_is_door_to_door"])
+        self.assertEqual(row["residual_count"], 7.0)
         self.assertIsNone(row["ratio"])
