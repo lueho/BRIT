@@ -1061,6 +1061,41 @@ class CataloniaCollectionSystemMapView(CataloniaAtlasMapView):
     map_route_key = "collection_system"
 
 
+class CataloniaBiowasteCollectionSystemMapView(CataloniaAtlasMapView):
+    template_name = "waste_atlas/catalonia_collection_system.html"
+    map_title = "Biowaste collection system"
+    map_route_key = "biowaste_collection_system"
+    data_url = "/waste_collection/api/waste-atlas/biowaste-collection-system/"
+    file_base = "catalonia_biowaste_collection_system"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["data_url"] = self.data_url
+        ctx["file_base"] = self.file_base
+        return ctx
+
+
+class CataloniaResidualCollectionSystemMapView(
+    CataloniaBiowasteCollectionSystemMapView
+):
+    map_title = "Residual waste collection system"
+    map_route_key = "residual_collection_system"
+    data_url = "/waste_collection/api/waste-atlas/residual-collection-system/"
+    file_base = "catalonia_residual_collection_system"
+
+
+class CataloniaCombinedCollectionSystemMapView(CataloniaAtlasMapView):
+    template_name = "waste_atlas/catalonia_combined_collection_system.html"
+    map_title = "Collection system combination: biowaste vs residual waste"
+    map_route_key = "combined_collection_system"
+
+
+class CataloniaSystemAccessControlMapView(CataloniaAtlasMapView):
+    template_name = "waste_atlas/catalonia_system_access_control.html"
+    map_title = "Collection system and access/use control"
+    map_route_key = "system_access_control"
+
+
 class CataloniaAccessControlMapView(CataloniaAtlasMapView):
     template_name = "waste_atlas/access_control.html"
     map_title = "Access control for biowaste collection"

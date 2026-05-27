@@ -6,11 +6,13 @@ from .viewsets import (
     BiowasteCollectionAmountViewSet,
     BiowasteCollectionCountViewSet,
     BiowasteCollectionPointCountViewSet,
+    BiowasteCollectionSystemViewSet,
     BiowasteFeeSystemViewSet,
     BiowasteFrequencyTypeViewSet,
     BiowasteImpurityViewSet,
     BiowasteMinBinSizeViewSet,
     BiowasteRequiredBinCapacityViewSet,
+    CataloniaSystemAccessControlViewSet,
     CatchmentPopulationViewSet,
     CatchmentViewSet,
     CollectionCountRatioViewSet,
@@ -19,6 +21,7 @@ from .viewsets import (
     CollectionSupportViewSet,
     CollectionSystemViewSet,
     CombinedCollectionCountViewSet,
+    CombinedCollectionSystemViewSet,
     CombinedFeeSystemViewSet,
     CombinedFrequencyTypeViewSet,
     ConnectionRateViewSet,
@@ -36,6 +39,7 @@ from .viewsets import (
     ResidualCollectionAmountViewSet,
     ResidualCollectionCountViewSet,
     ResidualCollectionPointCountViewSet,
+    ResidualCollectionSystemViewSet,
     ResidualFeeSystemViewSet,
     ResidualFrequencyTypeViewSet,
     ResidualMinBinSizeViewSet,
@@ -60,6 +64,26 @@ router.register(
     "collection-system",
     CollectionSystemViewSet,
     basename="api-waste-atlas-collection-system",
+)
+router.register(
+    "biowaste-collection-system",
+    BiowasteCollectionSystemViewSet,
+    basename="api-waste-atlas-biowaste-collection-system",
+)
+router.register(
+    "residual-collection-system",
+    ResidualCollectionSystemViewSet,
+    basename="api-waste-atlas-residual-collection-system",
+)
+router.register(
+    "combined-collection-system",
+    CombinedCollectionSystemViewSet,
+    basename="api-waste-atlas-combined-collection-system",
+)
+router.register(
+    "catalonia-system-access-control",
+    CataloniaSystemAccessControlViewSet,
+    basename="api-waste-atlas-catalonia-system-access-control",
 )
 router.register(
     "access-control",

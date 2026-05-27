@@ -303,6 +303,10 @@ WASTE_ATLAS_MAP_SELECTIONS = {
                 "label": "Biowaste collection count",
                 "route_name": "waste-atlas-catalonia-biowaste-collection-count-map",
             },
+            "biowaste_collection_system": {
+                "label": "Biowaste collection system",
+                "route_name": "waste-atlas-catalonia-biowaste-collection-system-map",
+            },
             "biowaste_fee_system": {
                 "label": "Biowaste fees",
                 "route_name": "waste-atlas-catalonia-biowaste-fee-system-map",
@@ -310,6 +314,10 @@ WASTE_ATLAS_MAP_SELECTIONS = {
             "biowaste_frequency": {
                 "label": "Biowaste schedule",
                 "route_name": "waste-atlas-catalonia-biowaste-frequency-map",
+            },
+            "biowaste_impurity": {
+                "label": "Biowaste impurity",
+                "route_name": "waste-atlas-catalonia-biowaste-impurity-map",
             },
             "biowaste_min_bin_size": {
                 "label": "Biowaste bin size",
@@ -338,6 +346,10 @@ WASTE_ATLAS_MAP_SELECTIONS = {
             "combined_collection_count": {
                 "label": "Combined collection count",
                 "route_name": "waste-atlas-catalonia-combined-collection-count-map",
+            },
+            "combined_collection_system": {
+                "label": "Combined collection system",
+                "route_name": "waste-atlas-catalonia-combined-collection-system-map",
             },
             "combined_fee_system": {
                 "label": "Combined fees",
@@ -395,6 +407,10 @@ WASTE_ATLAS_MAP_SELECTIONS = {
                 "label": "Residual waste collection count",
                 "route_name": "waste-atlas-catalonia-residual-collection-count-map",
             },
+            "residual_collection_system": {
+                "label": "Residual waste collection system",
+                "route_name": "waste-atlas-catalonia-residual-collection-system-map",
+            },
             "residual_fee_system": {
                 "label": "Residual waste fees",
                 "route_name": "waste-atlas-catalonia-residual-fee-system-map",
@@ -410,6 +426,10 @@ WASTE_ATLAS_MAP_SELECTIONS = {
             "residual_required_bin_capacity": {
                 "label": "Residual waste bin capacity",
                 "route_name": "waste-atlas-catalonia-residual-required-bin-capacity-map",
+            },
+            "system_access_control": {
+                "label": "System + access/use control",
+                "route_name": "waste-atlas-catalonia-system-access-control-map",
             },
             "waste_ratio": {
                 "label": "Amount ratio",

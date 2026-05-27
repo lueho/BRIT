@@ -62,6 +62,12 @@ class CatchmentCollectionSystemSerializer(serializers.Serializer):
     collection_system = serializers.CharField()
 
 
+class CatchmentCombinedCollectionSystemSerializer(serializers.Serializer):
+    catchment_id = serializers.IntegerField()
+    bio_collection_system = serializers.CharField(allow_null=True)
+    residual_collection_system = serializers.CharField(allow_null=True)
+
+
 class CatchmentAccessControlSerializer(serializers.Serializer):
     catchment_id = serializers.IntegerField()
     access_control = serializers.CharField()

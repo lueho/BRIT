@@ -1872,6 +1872,173 @@ class GreenWasteCollectionSystemCountViewSetTests(APITestCase):
         self.assertEqual(len(count_by_catchment), 2)
 
 
+class CataloniaCollectionSystemViewSetTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.region_es = Region.objects.create(name="Catalonia", country="ES")
+        cls.region_fr = Region.objects.create(name="France", country="FR")
+        cls.catchment_same_bp = CollectionCatchment.objects.create(
+            name="Same BP",
+            region=cls.region_es,
+        )
+        cls.catchment_same_pap = CollectionCatchment.objects.create(
+            name="Same PAP",
+            region=cls.region_es,
+        )
+        cls.catchment_other = CollectionCatchment.objects.create(
+            name="Other",
+            region=cls.region_es,
+        )
+        cls.catchment_other_country = CollectionCatchment.objects.create(
+            name="Other country",
+            region=cls.region_fr,
+        )
+
+        cls.bring_point = CollectionSystem.objects.create(name="Bring point")
+        cls.door_to_door = CollectionSystem.objects.create(name="Door to door")
+        cls.no_collection = CollectionSystem.objects.create(
+            name="No separate collection"
+        )
+        cls.biowaste = WasteCategory.objects.create(name="Biowaste")
+        cls.residual = WasteCategory.objects.create(name="Residual waste")
+
+        cls._create_collection(
+            catchment=cls.catchment_same_bp,
+            waste_category=cls.biowaste,
+            collection_system=cls.bring_point,
+            access_control_bp=True,
+        )
+        cls._create_collection(
+            catchment=cls.catchment_same_bp,
+            waste_category=cls.residual,
+            collection_system=cls.bring_point,
+            access_control_bp=True,
+        )
+        cls._create_collection(
+            catchment=cls.catchment_same_pap,
+            waste_category=cls.biowaste,
+            collection_system=cls.door_to_door,
+            access_control_pap=False,
+        )
+        cls._create_collection(
+            catchment=cls.catchment_same_pap,
+            waste_category=cls.residual,
+            collection_system=cls.door_to_door,
+            access_control_pap=False,
+        )
+        cls._create_collection(
+            catchment=cls.catchment_other,
+            waste_category=cls.biowaste,
+            collection_system=cls.no_collection,
+        )
+        cls._create_collection(
+            catchment=cls.catchment_other,
+            waste_category=cls.residual,
+            collection_system=cls.bring_point,
+            access_control_bp=False,
+        )
+        cls._create_collection(
+            catchment=cls.catchment_other_country,
+            waste_category=cls.biowaste,
+            collection_system=cls.bring_point,
+        )
+
+    @classmethod
+    def _create_collection(
+        cls,
+        *,
+        catchment,
+        waste_category,
+        collection_system,
+        access_control_bp=None,
+        access_control_pap=None,
+    ):
+        return Collection.objects.create(
+            name=f"{catchment.name}-{waste_category.name}",
+            catchment=catchment,
+            waste_category=waste_category,
+            collection_system=collection_system,
+            valid_from=date(2024, 1, 1),
+            access_control_bp=access_control_bp,
+            access_control_pap=access_control_pap,
+        )
+
+    def test_stream_specific_collection_system_endpoints(self):
+        bio_response = self.client.get(
+            "/waste_collection/api/waste-atlas/biowaste-collection-system/",
+            {"country": "ES", "year": 2024},
+        )
+        residual_response = self.client.get(
+            "/waste_collection/api/waste-atlas/residual-collection-system/",
+            {"country": "ES", "year": 2024},
+        )
+
+        self.assertEqual(bio_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(residual_response.status_code, status.HTTP_200_OK)
+
+        bio_by_catchment = {
+            row["catchment_id"]: row["collection_system"] for row in bio_response.data
+        }
+        residual_by_catchment = {
+            row["catchment_id"]: row["collection_system"]
+            for row in residual_response.data
+        }
+        self.assertEqual(bio_by_catchment[self.catchment_same_bp.id], "Bring point")
+        self.assertEqual(
+            bio_by_catchment[self.catchment_other.id], "No separate collection"
+        )
+        self.assertEqual(residual_by_catchment[self.catchment_other.id], "Bring point")
+        self.assertNotIn(self.catchment_other_country.id, bio_by_catchment)
+
+    def test_combined_collection_system_endpoint(self):
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/combined-collection-system/",
+            {"country": "ES", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        by_catchment = {row["catchment_id"]: row for row in response.data}
+        self.assertEqual(
+            by_catchment[self.catchment_same_bp.id]["bio_collection_system"],
+            "Bring point",
+        )
+        self.assertEqual(
+            by_catchment[self.catchment_same_bp.id]["residual_collection_system"],
+            "Bring point",
+        )
+        self.assertEqual(
+            by_catchment[self.catchment_other.id]["bio_collection_system"],
+            "No separate collection",
+        )
+        self.assertEqual(
+            by_catchment[self.catchment_other.id]["residual_collection_system"],
+            "Bring point",
+        )
+
+    def test_catalonia_system_access_control_endpoint(self):
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/catalonia-system-access-control/",
+            {"country": "ES", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        by_catchment = {
+            row["catchment_id"]: row["access_control"] for row in response.data
+        }
+        self.assertEqual(
+            by_catchment[self.catchment_same_bp.id],
+            "Bring point + access control",
+        )
+        self.assertEqual(
+            by_catchment[self.catchment_same_pap.id],
+            "PAP + no use control",
+        )
+        self.assertEqual(
+            by_catchment[self.catchment_other.id],
+            "Other combination",
+        )
+
+
 class CollectionPointCountViewSetTests(APITestCase):
     endpoint = "/waste_collection/api/waste-atlas/collection-point-count/"
 

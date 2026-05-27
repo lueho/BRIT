@@ -46,6 +46,7 @@ from .serializers import (
     CatchmentCollectionSystemCountSerializer,
     CatchmentCollectionSystemSerializer,
     CatchmentCombinedCollectionCountSerializer,
+    CatchmentCombinedCollectionSystemSerializer,
     CatchmentCombinedFeeSystemSerializer,
     CatchmentCombinedFrequencySerializer,
     CatchmentConnectionRateSerializer,
@@ -451,6 +452,122 @@ class CollectionSystemViewSet(viewsets.ViewSet):
             ).items()
         ]
         serializer = CatchmentCollectionSystemSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class BiowasteCollectionSystemViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = [
+            {"catchment_id": cid, "collection_system": row["collection_system"]}
+            for cid, row in _select_primary_collections(
+                country,
+                year,
+                ["Biowaste", "Food waste"],
+                nuts_prefixes,
+            ).items()
+        ]
+        serializer = CatchmentCollectionSystemSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class ResidualCollectionSystemViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        data = [
+            {"catchment_id": cid, "collection_system": row["collection_system"]}
+            for cid, row in _select_primary_collections(
+                country,
+                year,
+                ["Residual waste"],
+                nuts_prefixes,
+            ).items()
+        ]
+        serializer = CatchmentCollectionSystemSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class CombinedCollectionSystemViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        bio = _select_primary_collections(
+            country,
+            year,
+            ["Biowaste", "Food waste"],
+            nuts_prefixes,
+        )
+        residual = _select_primary_collections(
+            country,
+            year,
+            ["Residual waste"],
+            nuts_prefixes,
+        )
+        data = [
+            {
+                "catchment_id": cid,
+                "bio_collection_system": bio.get(cid, {}).get("collection_system"),
+                "residual_collection_system": residual.get(cid, {}).get(
+                    "collection_system"
+                ),
+            }
+            for cid in set(bio) | set(residual)
+        ]
+        serializer = CatchmentCombinedCollectionSystemSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class CataloniaSystemAccessControlViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        bio = _select_primary_collections(
+            country,
+            year,
+            ["Biowaste", "Food waste"],
+            nuts_prefixes,
+            extra_fields=("access_control_bp", "access_control_pap"),
+        )
+        residual = _select_primary_collections(
+            country,
+            year,
+            ["Residual waste"],
+            nuts_prefixes,
+            extra_fields=("access_control_bp", "access_control_pap"),
+        )
+        data = []
+        for cid in set(bio) | set(residual):
+            bio_row = bio.get(cid)
+            residual_row = residual.get(cid)
+            value = "Other combination"
+            if (
+                bio_row
+                and residual_row
+                and bio_row["collection_system"] == residual_row["collection_system"]
+            ):
+                system = bio_row["collection_system"]
+                if system == "Bring point":
+                    if bio_row["access_control_bp"] is True:
+                        value = "Bring point + access control"
+                    elif bio_row["access_control_bp"] is False:
+                        value = "Bring point + no access control"
+                elif system == "Door to door":
+                    if bio_row["access_control_pap"] is True:
+                        value = "PAP + use control"
+                    elif bio_row["access_control_pap"] is False:
+                        value = "PAP + no use control"
+            data.append({"catchment_id": cid, "access_control": value})
+        serializer = CatchmentAccessControlSerializer(data, many=True)
         return Response(serializer.data)
 
 

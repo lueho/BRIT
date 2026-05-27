@@ -4107,6 +4107,55 @@ class WasteAtlasMapViewsTestCase(TestCase):
             f'data-url="{reverse("waste-atlas-germany-collection-system-map")}"',
         )
 
+    def test_catalonia_collection_system_maps_render(self):
+        map_names = {
+            "waste-atlas-catalonia-biowaste-collection-system-map": (
+                "Biowaste collection system",
+                "/waste_collection/api/waste-atlas/biowaste-collection-system/",
+            ),
+            "waste-atlas-catalonia-residual-collection-system-map": (
+                "Residual waste collection system",
+                "/waste_collection/api/waste-atlas/residual-collection-system/",
+            ),
+            "waste-atlas-catalonia-combined-collection-system-map": (
+                "Collection system combination: biowaste vs residual waste",
+                "/waste_collection/api/waste-atlas/combined-collection-system/",
+            ),
+            "waste-atlas-catalonia-system-access-control-map": (
+                "Collection system and access/use control",
+                "/waste_collection/api/waste-atlas/catalonia-system-access-control/",
+            ),
+            "waste-atlas-catalonia-biowaste-impurity-map": (
+                "Biowaste impurity rate",
+                "/waste_collection/api/waste-atlas/biowaste-impurity/",
+            ),
+        }
+
+        for route_name, (title, data_url) in map_names.items():
+            with self.subTest(route_name=route_name):
+                response = self.client.get(reverse(route_name))
+
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, title)
+                self.assertContains(response, data_url)
+                self.assertContains(response, "nutsPrefix: 'ES51'")
+                self.assertContains(response, "nutsLevel: parseInt('3', 10)")
+
+    def test_catalonia_selector_includes_new_collection_system_maps(self):
+        response = self.client.get(
+            reverse("waste-atlas-catalonia-biowaste-collection-system-map")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for route_name in [
+            "waste-atlas-catalonia-biowaste-collection-system-map",
+            "waste-atlas-catalonia-residual-collection-system-map",
+            "waste-atlas-catalonia-combined-collection-system-map",
+            "waste-atlas-catalonia-system-access-control-map",
+            "waste-atlas-catalonia-biowaste-impurity-map",
+        ]:
+            self.assertContains(response, f'data-url="{reverse(route_name)}"')
+
     def test_south_tyrol_orga_level_map_uses_regional_border(self):
         response = self.client.get(reverse("waste-atlas-south-tyrol-orga-level-map"))
 

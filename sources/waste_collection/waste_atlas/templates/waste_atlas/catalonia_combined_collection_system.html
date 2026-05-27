@@ -1,0 +1,48 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+  <script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2024,
+      {% if nuts_prefix %}nutsPrefix: '{{ nuts_prefix }}',{% endif %}
+      {% if nuts_level %}nutsLevel: parseInt('{{ nuts_level }}', 10),{% endif %}
+      title:       'Collection system combination: biowaste vs residual waste',
+      dataUrl:     '/waste_collection/api/waste-atlas/combined-collection-system/',
+      dataField:   '_classified',
+      categories: [
+        { value: 'Door to door / Door to door', label: 'PAP total / PAP total', exportLabel: 'PAP total / PAP total', color: '#238b45' },
+        { value: 'Door to door / Bring point', label: 'PAP total / Bring point', exportLabel: 'PAP total / BP', color: '#74c476' },
+        { value: 'Door to door / No separate collection', label: 'PAP total / no residual', exportLabel: 'PAP total / none', color: '#bae4b3' },
+        { value: 'Mixed door-to-door and bring point / Door to door', label: 'PAP parcial / PAP total', exportLabel: 'PAP parcial / PAP total', color: '#2b8cbe' },
+        { value: 'Mixed door-to-door and bring point / Bring point', label: 'PAP parcial / Bring point', exportLabel: 'PAP parcial / BP', color: '#7bccc4' },
+        { value: 'Mixed door-to-door and bring point / No separate collection', label: 'PAP parcial / no residual', exportLabel: 'PAP parcial / none', color: '#bae4bc' },
+        { value: 'Bring point / Door to door', label: 'Bring point / PAP total', exportLabel: 'BP / PAP total', color: '#756bb1' },
+        { value: 'Bring point / Bring point', label: 'Bring point / Bring point', exportLabel: 'BP / BP', color: '#9e9ac8' },
+        { value: 'Bring point / No separate collection', label: 'Bring point / no residual', exportLabel: 'BP / none', color: '#cbc9e2' },
+        { value: 'No separate collection / Door to door', label: 'No biowaste / PAP total', exportLabel: 'None / PAP total', color: '#fd8d3c' },
+        { value: 'No separate collection / Bring point', label: 'No biowaste / Bring point', exportLabel: 'None / BP', color: '#fdae6b' },
+        { value: 'No separate collection / No separate collection', label: 'No separate collection', exportLabel: 'None / none', color: '#fff696' }
+      ],
+      noDataColor: '#e0e0e0',
+      noDataLabel: 'No data',
+      legendTitle: 'Collection system: bio / residual',
+      fileBase:    'catalonia_combined_collection_system',
+      transformData: function (records) {
+        return records.map(function (r) {
+          var bio = r.bio_collection_system;
+          var residual = r.residual_collection_system;
+          return {
+            catchment_id: r.catchment_id,
+            _classified: bio && residual ? bio + ' / ' + residual : null
+          };
+        });
+      }
+    });
+  });
+  </script>
+{% endblock atlas_config %}
