@@ -175,7 +175,7 @@
         { key: 'DK', label: 'Denmark', geometryType: 'country', geometryId: 'DK', country: 'DK', nutsPrefix: '', isClickable: true },
         { key: 'SE', label: 'Sweden', geometryType: 'country', geometryId: 'SE', country: 'SE', nutsPrefix: '', isClickable: true },
         { key: 'NL', label: 'The Netherlands', geometryType: 'country', geometryId: 'NL', country: 'NL', nutsPrefix: '', isClickable: true },
-        { key: 'IT', label: 'Italy', geometryType: 'country', geometryId: 'IT', country: 'IT', nutsPrefix: '', isClickable: true },
+        { key: 'ITH1', label: 'South Tyrol', geometryType: 'custom', geometryId: 'ITH1', country: 'IT', nutsPrefix: 'ITH1', isClickable: true },
         { key: 'BE1,BE2', label: 'Flanders + Brussels', geometryType: 'custom', geometryId: 'BE1,BE2', country: 'BE', nutsPrefix: 'BE1,BE2', isClickable: true },
         { key: 'ES51', label: 'Catalonia', geometryType: 'custom', geometryId: 'ES51', country: 'ES', nutsPrefix: 'ES51', isClickable: true }
       ];
@@ -525,11 +525,13 @@
       Promise.all([
         fetchJson('/maps/api/nuts_region/geojson/?levl_code=0'),
         fetchJson('/maps/api/nuts_region/geojson/?levl_code=1&cntr_code=BE'),
-        fetchJson('/maps/api/nuts_region/geojson/?levl_code=2&cntr_code=ES')
+        fetchJson('/maps/api/nuts_region/geojson/?levl_code=2&cntr_code=ES'),
+        fetchJson('/maps/api/nuts_region/geojson/?levl_code=2&cntr_code=IT')
       ]).then(function (results) {
         var countries = trimFeatureCollectionToExtent(results[0]);
         var belgiumRegions = trimFeatureCollectionToExtent(results[1]);
         var spainRegions = trimFeatureCollectionToExtent(results[2]);
+        var italyRegions = trimFeatureCollectionToExtent(results[3]);
         var europeBackgroundFeatures = (countries.features || []).filter(function (feature) {
           var nutsId = feature.properties && feature.properties.nuts_id;
           return eu27PlusUkCountryCodes.has(nutsId);
@@ -550,6 +552,12 @@
         (spainRegions.features || []).forEach(function (feature) {
           var nutsId = feature.properties && feature.properties.nuts_id;
           if (nutsId === 'ES51') {
+            customFeatureById[nutsId] = feature;
+          }
+        });
+        (italyRegions.features || []).forEach(function (feature) {
+          var nutsId = feature.properties && feature.properties.nuts_id;
+          if (nutsId === 'ITH1') {
             customFeatureById[nutsId] = feature;
           }
         });
