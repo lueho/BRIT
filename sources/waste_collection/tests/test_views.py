@@ -4155,6 +4155,8 @@ class WasteAtlasMapViewsTestCase(TestCase):
             "waste-atlas-catalonia-biowaste-impurity-map",
         ]:
             self.assertContains(response, f'data-url="{reverse(route_name)}"')
+        self.assertContains(response, '<option value="2020"')
+        self.assertContains(response, '<option value="2021"')
 
     def test_south_tyrol_orga_level_map_uses_regional_border(self):
         response = self.client.get(reverse("waste-atlas-south-tyrol-orga-level-map"))
