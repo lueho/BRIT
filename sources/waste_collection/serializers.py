@@ -718,6 +718,32 @@ class AggregatedCollectionPropertyValueMutationSerializer(serializers.Serializer
     submit_for_review = serializers.BooleanField(required=False, default=True)
 
 
+class CollectionPropertyValueSerializer(serializers.ModelSerializer):
+    """Read-only serializer for CollectionPropertyValue list responses."""
+
+    property_id = serializers.IntegerField(source="property.pk", read_only=True)
+    property_name = serializers.CharField(source="property.name", read_only=True)
+    unit_name = serializers.CharField(source="unit.name", read_only=True)
+    unit_symbol = serializers.CharField(source="unit.symbol", read_only=True)
+    publication_status = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = models.CollectionPropertyValue
+        fields = (
+            "id",
+            "collection",
+            "property_id",
+            "property_name",
+            "unit_name",
+            "unit_symbol",
+            "year",
+            "average",
+            "standard_deviation",
+            "is_derived",
+            "publication_status",
+        )
+
+
 class CollectionImportRecordSerializer(serializers.Serializer):
     """
     Validates a single collection record for the bulk import endpoint.
@@ -1300,6 +1326,7 @@ __all__ = [
     "CollectionMutationUpdateSerializer",
     "CollectionMutationVersionSerializer",
     "CollectionPropertyValueMutationSerializer",
+    "CollectionPropertyValueSerializer",
     "CollectionResearchSerializer",
     "CollectionSystemSerializer",
     "CollectorGeometrySerializer",

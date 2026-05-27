@@ -37,6 +37,7 @@ from sources.waste_collection.serializers import (
     CollectionMutationUpdateSerializer,
     CollectionMutationVersionSerializer,
     CollectionPropertyValueMutationSerializer,
+    CollectionPropertyValueSerializer,
     CollectionResearchSerializer,
     CollectorGeometrySerializer,
     WasteCollectionGeometrySerializer,
@@ -549,6 +550,17 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         return filter_queryset_for_user(queryset, user)
 
     @staticmethod
+    def _visible_property_value_queryset(request):
+        queryset = CollectionPropertyValue.objects.all()
+        scope = request.query_params.get("scope", "published")
+        user = getattr(request, "user", None)
+
+        if scope in {"published", "private", "review", "declined", "archived"}:
+            return apply_scope_filter(queryset, scope, user=user)
+
+        return filter_queryset_for_user(queryset, user)
+
+    @staticmethod
     def _existing_mutation_frequency(actor, canonical_name):
         if actor is None or not actor.is_authenticated:
             return CollectionFrequency.objects.none().first()
@@ -712,6 +724,34 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             response_payload,
             status=status.HTTP_200_OK,
         )
+
+    @action(
+        detail=False,
+        methods=["get"],
+        permission_classes=[permissions.AllowAny],
+        url_path="property-value",
+        url_name="property-value-list",
+    )
+    def property_values(self, request, *args, **kwargs):
+        """List CollectionPropertyValue records, optionally filtered by collection."""
+        self.check_permissions(request)
+        queryset = self._visible_property_value_queryset(request)
+
+        collection_id = request.query_params.get("collection")
+        if collection_id is not None:
+            queryset = queryset.filter(collection_id=collection_id)
+
+        try:
+            limit = int(request.query_params.get("limit", 50))
+        except (TypeError, ValueError):
+            limit = 50
+        limit = max(1, min(limit, 200))
+
+        serializer = CollectionPropertyValueSerializer(
+            queryset.select_related("property", "unit").order_by("pk")[:limit],
+            many=True,
+        )
+        return Response({"results": serializer.data})
 
     @action(
         detail=False,
