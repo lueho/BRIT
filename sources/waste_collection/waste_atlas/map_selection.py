@@ -619,6 +619,10 @@ WASTE_ATLAS_MAP_SELECTIONS = {
                 "label": "Administrative level",
                 "route_name": "waste-atlas-orga-level-sweden-map",
             },
+            "population_density": {
+                "label": "Population density",
+                "route_name": "waste-atlas-sweden-population-density-map",
+            },
         },
     },
 }

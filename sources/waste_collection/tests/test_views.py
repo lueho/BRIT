@@ -4320,6 +4320,19 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "Map overview")
         self.assertContains(response, "No data")
 
+    def test_sweden_population_density_map_defaults_to_se_and_uses_population_api(self):
+        response = self.client.get(reverse("waste-atlas-sweden-population-density-map"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="SE"')
+        self.assertContains(response, "selected>Sweden</option>")
+        self.assertContains(response, 'value="2024" selected')
+        self.assertContains(response, "Population density")
+        self.assertContains(response, "/waste_collection/api/waste-atlas/population/")
+        self.assertContains(response, "dataField:   'population_density'")
+        self.assertContains(response, "Urban (> 1 500 / km²)")
+        self.assertContains(response, "Map overview")
+
     def test_belgium_flanders_orga_level_map_defaults_to_be_2022_and_english_labels(
         self,
     ):

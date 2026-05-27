@@ -523,6 +523,14 @@ class SwedenOrgaLevelMapView(AtlasMapView):
     map_route_key = "orga_level"
 
 
+class SwedenPopulationDensityMapView(AtlasMapView):
+    template_name = "waste_atlas/population_density_map.html"
+    map_title = "Population density"
+    default_country = "SE"
+    map_overview_label = "Map overview"
+    map_route_key = "population_density"
+
+
 class SwedenBinConfigurationMapView(AtlasMapView):
     """Map 34 — Bin configuration of waste fractions in Sweden (English)."""
 

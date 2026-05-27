@@ -178,6 +178,7 @@ from .views import (
     SouthTyrolResidualMinBinSizeMapView,
     SwedenBinConfigurationMapView,
     SwedenOrgaLevelMapView,
+    SwedenPopulationDensityMapView,
     WasteAtlasOverviewView,
     WasteRatioMapView,
 )
@@ -403,6 +404,11 @@ urlpatterns = [
         "map/sweden/administrative-level/",
         SwedenOrgaLevelMapView.as_view(),
         name="waste-atlas-orga-level-sweden-map",
+    ),
+    path(
+        "map/sweden/population-density/",
+        SwedenPopulationDensityMapView.as_view(),
+        name="waste-atlas-sweden-population-density-map",
     ),
     path(
         "map/bin-configuration-sweden/",
