@@ -1,4 +1,5 @@
 {% extends base_template %}
+{% load static %}
 
 {% block title %}
   Waste Atlas — {{ map_title }}
@@ -47,6 +48,8 @@
     .coverage-region-list li + li {
       margin-top: .25rem;
     }
+    #export-buttons { margin-top: .75rem; margin-bottom: 1rem; }
+    #export-buttons .btn { margin-right: .5rem; }
   </style>
 {% endblock style_sheets %}
 
@@ -75,6 +78,23 @@
     </div>
 
     {% if not iframe_mode %}
+      <div id="export-buttons">
+        <button class="btn btn-outline-secondary btn-sm"
+                id="btn-export-svg"
+                type="button"
+                disabled>
+          <i class="fas fa-download"></i> Download SVG
+        </button>
+        <button class="btn btn-outline-secondary btn-sm"
+                id="btn-export-png"
+                type="button"
+                disabled>
+          <i class="fas fa-image"></i> Download PNG (Word-ready, 300 DPI)
+        </button>
+      </div>
+    {% endif %}
+
+    {% if not iframe_mode %}
       <div class="card">
         <div class="card-header">
           <strong>Highlighted regions</strong>
@@ -98,11 +118,14 @@
 {% block javascript %}
   {{ block.super }}
   <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script src="{% static 'js/waste_atlas_choropleth.js' %}?v=20260527-1"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       var svgEl = document.getElementById('europe-coverage-svg');
       var mapContainer = document.getElementById('map-container');
       var loadingEl = document.getElementById('loading-overlay');
+      var btnSVG = document.getElementById('btn-export-svg');
+      var btnPNG = document.getElementById('btn-export-png');
       var highlightedCountries = new Set(['DE', 'DK', 'SE', 'NL']);
       var highlightedRegions = new Set(['BE1', 'BE2', 'ES51', 'ITH1']);
       var highlightFill = '#6dbb5a';
@@ -448,11 +471,27 @@
 
         drawLegend(svg, width, height);
         loadingEl.style.display = 'none';
+        if (btnSVG) {
+          btnSVG.disabled = false;
+        }
+        if (btnPNG) {
+          btnPNG.disabled = false;
+        }
       }).catch(function (error) {
         loadingEl.style.display = 'none';
         mapContainer.innerHTML = '<div class="alert alert-danger m-3"><strong>Error loading map data:</strong> '
           + error.message + '</div>';
       });
+      if (btnSVG) {
+        btnSVG.addEventListener('click', function () {
+          WasteAtlasChoropleth.exportElementSVG(svgEl, 'waste_atlas_europe_data_coverage.svg');
+        });
+      }
+      if (btnPNG) {
+        btnPNG.addEventListener('click', function () {
+          WasteAtlasChoropleth.exportElementPNG(svgEl, 'waste_atlas_europe_data_coverage.png');
+        });
+      }
     });
   </script>
 {% endblock javascript %}

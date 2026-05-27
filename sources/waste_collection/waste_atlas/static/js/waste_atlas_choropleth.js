@@ -982,6 +982,35 @@ var WasteAtlasChoropleth = (function () {
     img.src = url;
   }
 
+  function exportElementSVG(svgEl, filename) {
+    var source = _svgSource(svgEl);
+    var blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+    _downloadBlob(blob, filename || 'waste_atlas_map.svg');
+  }
+
+  function exportElementPNG(svgEl, filename, dpi) {
+    var width = parseInt(svgEl.getAttribute('width'), 10) || svgEl.viewBox.baseVal.width || EXPORT_WIDTH;
+    var height = parseInt(svgEl.getAttribute('height'), 10) || svgEl.viewBox.baseVal.height || EXPORT_HEIGHT;
+    var canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    var ctx = canvas.getContext('2d');
+    var img = new Image();
+    var source = _svgSource(svgEl);
+    var url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(source);
+    img.onload = function () {
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(function (blob) {
+        _pngWithDpi(blob, dpi || EXPORT_DPI).then(function (pngBlob) {
+          _downloadBlob(pngBlob, filename || 'waste_atlas_map.png');
+        });
+      }, 'image/png');
+    };
+    img.src = url;
+  }
+
   // ---- public API -----------------------------------------------------------
 
   function init(cfg) {
@@ -1035,6 +1064,8 @@ var WasteAtlasChoropleth = (function () {
     initSelectorControls: initSelectorControls,
     selectorNavigationTarget: _selectorNavigationTarget,
     exportSVG: exportSVG,
-    exportPNG: exportPNG
+    exportPNG: exportPNG,
+    exportElementSVG: exportElementSVG,
+    exportElementPNG: exportElementPNG
   };
 })();

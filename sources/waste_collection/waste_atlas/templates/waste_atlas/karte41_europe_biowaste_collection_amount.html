@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}
   Waste Atlas — {{ map_title }}
@@ -71,6 +72,8 @@
       font-weight: 600;
       font-family: 'Nunito', sans-serif;
     }
+    #export-buttons { margin-top: .75rem; margin-bottom: 1rem; }
+    #export-buttons .btn { margin-right: .5rem; }
   </style>
 {% endblock style_sheets %}
 
@@ -101,6 +104,21 @@
       </svg>
     </div>
 
+    <div id="export-buttons">
+      <button class="btn btn-outline-secondary btn-sm"
+              id="btn-export-svg"
+              type="button"
+              disabled>
+        <i class="fas fa-download"></i> Download SVG
+      </button>
+      <button class="btn btn-outline-secondary btn-sm"
+              id="btn-export-png"
+              type="button"
+              disabled>
+        <i class="fas fa-image"></i> Download PNG (Word-ready, 300 DPI)
+      </button>
+    </div>
+
     <div class="card">
       <div class="card-header">
         <strong>Regional averages for 2024</strong>
@@ -116,12 +134,15 @@
 {% block javascript %}
   {{ block.super }}
   <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script src="{% static 'js/waste_atlas_choropleth.js' %}?v=20260527-1"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       var svgEl = document.getElementById('europe-biowaste-svg');
       var mapContainer = document.getElementById('map-container');
       var loadingEl = document.getElementById('loading-overlay');
       var regionAverageList = document.getElementById('region-average-list');
+      var btnSVG = document.getElementById('btn-export-svg');
+      var btnPNG = document.getElementById('btn-export-png');
       var year = parseInt('{{ year }}', 10) || 2024;
       var biowasteDataUrl = '/waste_collection/api/waste-atlas/biowaste-collection-amount/';
       var populationDataUrl = '/waste_collection/api/waste-atlas/population/';
@@ -656,10 +677,26 @@
         drawLegend(svg, width, height);
         renderRegionList(regionsWithData);
         loadingEl.style.display = 'none';
+        if (btnSVG) {
+          btnSVG.disabled = false;
+        }
+        if (btnPNG) {
+          btnPNG.disabled = false;
+        }
       }).catch(function (error) {
         loadingEl.style.display = 'none';
         mapContainer.innerHTML = '<div class="alert alert-danger m-3"><strong>Error loading map data:</strong> ' + error.message + '</div>';
       });
+      if (btnSVG) {
+        btnSVG.addEventListener('click', function () {
+          WasteAtlasChoropleth.exportElementSVG(svgEl, 'waste_atlas_europe_biowaste_collection_amount.svg');
+        });
+      }
+      if (btnPNG) {
+        btnPNG.addEventListener('click', function () {
+          WasteAtlasChoropleth.exportElementPNG(svgEl, 'waste_atlas_europe_biowaste_collection_amount.png');
+        });
+      }
     });
   </script>
 {% endblock javascript %}

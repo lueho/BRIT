@@ -4431,6 +4431,20 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(response, "Flanders + Brussels")
         self.assertContains(response, "Catalonia")
+        self.assertContains(response, "Download SVG")
+        self.assertContains(response, "Download PNG (Word-ready, 300 DPI)")
+        self.assertContains(response, "WasteAtlasChoropleth.exportElementSVG")
+        self.assertContains(response, "WasteAtlasChoropleth.exportElementPNG")
+
+    def test_europe_data_coverage_map_renders_download_buttons(self):
+        response = self.client.get(reverse("waste-atlas-europe-data-coverage-map"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Waste collection data coverage in Europe")
+        self.assertContains(response, "Download SVG")
+        self.assertContains(response, "Download PNG (Word-ready, 300 DPI)")
+        self.assertContains(response, "WasteAtlasChoropleth.exportElementSVG")
+        self.assertContains(response, "WasteAtlasChoropleth.exportElementPNG")
 
     def test_waste_atlas_overview_includes_italy_orga_level_entry(self):
         """Overview page lists all country-specific organizational-level maps."""
