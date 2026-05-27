@@ -2657,11 +2657,12 @@ class BiowasteImpurityViewSet(viewsets.ViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, impurity_rate, no_collection}."""
         country, year = _parse_country_year(request)
+        collection_year = int(request.query_params.get("collection_year", year))
         nuts_prefixes = _parse_nuts_prefixes(request)
 
         best = _select_primary_collections(
             country,
-            year,
+            collection_year,
             ["Biowaste", "Food waste"],
             nuts_prefixes,
         )

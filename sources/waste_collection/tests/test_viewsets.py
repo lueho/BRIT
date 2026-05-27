@@ -3628,6 +3628,13 @@ class BiowasteImpurityViewSetTests(APITestCase):
             year=2024,
             average=8.5,
         )
+        CollectionPropertyValue.objects.create(
+            collection=cls.collection_with_data,
+            property=cls.impurity_property,
+            unit=cls.pct_unit,
+            year=2020,
+            average=12.5,
+        )
 
         # Catchment B: DtD with no CPV → impurity_rate=null, no_collection=False
         cls.catchment_no_data = CollectionCatchment.objects.create(
@@ -3666,6 +3673,18 @@ class BiowasteImpurityViewSetTests(APITestCase):
         by_catchment = self._by_catchment()
         row = by_catchment[self.catchment_with_data.id]
         self.assertEqual(row["impurity_rate"], 8.5)
+        self.assertFalse(row["no_collection"])
+
+    def test_impurity_year_can_differ_from_collection_year(self):
+        response = self.client.get(
+            self.endpoint,
+            {"country": "ES", "year": 2020, "collection_year": 2024},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        row = by_catchment[self.catchment_with_data.id]
+        self.assertEqual(row["impurity_rate"], 12.5)
         self.assertFalse(row["no_collection"])
 
     def test_impurity_rate_null_when_no_cpv(self):

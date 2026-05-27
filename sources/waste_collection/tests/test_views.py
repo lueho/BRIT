@@ -4140,6 +4140,8 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertContains(response, data_url)
                 self.assertContains(response, "nutsPrefix: 'ES51'")
                 self.assertContains(response, "nutsLevel: parseInt('3', 10)")
+                if route_name == "waste-atlas-catalonia-biowaste-impurity-map":
+                    self.assertContains(response, "collectionYear: 2024")
 
     def test_catalonia_selector_includes_new_collection_system_maps(self):
         response = self.client.get(
