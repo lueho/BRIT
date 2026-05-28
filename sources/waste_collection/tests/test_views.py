@@ -4201,6 +4201,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "Other combinations")
         self.assertContains(response, "flex_flex_plus")
         self.assertContains(response, "other_combined")
+        self.assertContains(response, "exportLegendBottomColumns: 2")
         self.assertNotContains(response, "No fee / Flexible")
         self.assertNotContains(response, "Flexible / PAYT")
         self.assertNotContains(response, "No fee / PAYT")

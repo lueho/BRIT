@@ -438,7 +438,7 @@ var WasteAtlasChoropleth = (function () {
         { placement: 'bottom-left', width: 0.52, columns: 2, overlay: true },
         { placement: 'top-right', width: 0.52, columns: 2, overlay: true },
         { placement: 'top-left', width: 0.52, columns: 2, overlay: true },
-        { placement: 'bottom', width: 0.88, columns: 3 }
+        { placement: 'bottom', width: 0.88, columns: cfg.exportLegendBottomColumns || 3 }
       ].forEach(function (spec) {
         var legend = _measureExportLegend(cfg, Math.round(EXPORT_WIDTH * spec.width), spec.columns);
         var x = margin;
