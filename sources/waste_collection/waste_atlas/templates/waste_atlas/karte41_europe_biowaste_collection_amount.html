@@ -38,6 +38,7 @@
       color: #555;
     }
     .atlas-legend text,
+    #europe-biowaste-svg text,
     .biowaste-region-value,
     .biowaste-region-name,
     .biowaste-region-note {
@@ -519,13 +520,9 @@
       }
 
       function drawLegend(svg, width, height) {
-        var legendItems = categories.concat([
-          { label: 'No separate collection only', color: noCollectionFill, stroke: noCollectionStroke },
-          { label: 'No 2024 amount data', color: noDataFill, stroke: noDataStroke },
-          { label: 'EU27 + UK background', color: backgroundFill, stroke: backgroundStroke }
-        ]);
+        var legendItems = categories;
         var rowHeight = 22;
-        var legendWidth = 260;
+        var legendWidth = 180;
         var legendHeight = 34 + legendItems.length * rowHeight;
         var legend = svg.append('g')
           .attr('class', 'atlas-legend')
@@ -545,7 +542,8 @@
           .attr('x', 12)
           .attr('y', 20)
           .attr('font-weight', 'bold')
-          .text('Collected biowaste amount');
+          .attr('font-family', "'Nunito', sans-serif")
+          .text('kg/cap/a');
 
         legendItems.forEach(function (item, index) {
           var y = 34 + index * rowHeight;
@@ -560,6 +558,7 @@
           legend.append('text')
             .attr('x', 44)
             .attr('y', y + 11)
+            .attr('font-family', "'Nunito', sans-serif")
             .text(item.label);
         });
       }

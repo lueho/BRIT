@@ -842,6 +842,12 @@ var WasteAtlasChoropleth = (function () {
     if (!source.match(/^<svg[^>]+xmlns/)) {
       source = source.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
     }
+    if (source.indexOf('data-waste-atlas-export-font') === -1) {
+      source = source.replace(
+        /<svg([^>]*)>/,
+        '<svg$1><style data-waste-atlas-export-font="true">text{font-family:Nunito,Calibri,Carlito,Arial,sans-serif;}</style>'
+      );
+    }
     return '<?xml version="1.0" standalone="no"?>\r\n' + source;
   }
 
