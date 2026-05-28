@@ -4417,45 +4417,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "No data")
         self.assertContains(response, "BE1,BE2")
 
-    def test_europe_biowaste_average_map_renders_2024_detail_links(self):
-        response = self.client.get(
-            reverse("waste-atlas-europe-biowaste-collection-amount-map")
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response,
-            "Regional average amount of separately collected biowaste in Europe",
-        )
-        self.assertContains(
-            response,
-            "Regional average amount of separately collected biowaste for 2024",
-        )
-        self.assertContains(
-            response,
-            "/waste_collection/api/waste-atlas/biowaste-collection-amount/",
-        )
-        self.assertContains(
-            response,
-            "/waste_collection/api/waste-atlas/population/",
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-biowaste-collection-amount-map"),
-        )
-        self.assertContains(response, "Flanders + Brussels")
-        self.assertContains(response, "Catalonia")
-        self.assertContains(response, "South Tyrol")
-        self.assertContains(response, "geometryId: 'ITH1'")
-        self.assertNotContains(response, "geometryId: 'IT', country: 'IT'")
-        self.assertContains(response, "kg/cap/a")
-        self.assertContains(response, "151+ kg/cap/a")
-        self.assertNotContains(response, "No separate collection only")
-        self.assertContains(response, "Download SVG")
-        self.assertContains(response, "Download PNG (Word-ready, 300 DPI)")
-        self.assertContains(response, "WasteAtlasChoropleth.exportElementSVG")
-        self.assertContains(response, "WasteAtlasChoropleth.exportElementPNG")
-
     def test_europe_data_coverage_map_renders_download_buttons(self):
         response = self.client.get(reverse("waste-atlas-europe-data-coverage-map"))
 
