@@ -4192,11 +4192,15 @@ class WasteAtlasMapViewsTestCase(TestCase):
         response = self.client.get(reverse("waste-atlas-bw-rp-combined-fee-system-map"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "flex_other")
-        self.assertContains(response, "no_fee_other")
-        self.assertContains(response, "payt_other")
-        self.assertContains(response, "knownResidualFees")
-        self.assertContains(response, "hasKnownResidualFee")
+        self.assertContains(response, "BWB & RWB | Flexible")
+        self.assertContains(response, "BWB | No fee & RWB | Flexible")
+        self.assertContains(response, "BWB & RWB | PAYT")
+        self.assertContains(response, "BWB | Flexible & RWB | PAYT")
+        self.assertContains(response, "BWB | No fee & RWB | PAYT")
+        self.assertContains(response, "BWB: Flexible | RWB: Flexible+")
+        self.assertContains(response, "Other combinations")
+        self.assertContains(response, "flex_flex_plus")
+        self.assertContains(response, "other_combined")
 
     def test_country_specific_orga_level_maps_default_to_expected_country(self):
         """Country-specific orga-level maps default to expected country and year."""
