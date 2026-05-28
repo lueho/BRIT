@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from utils.viewsets import AutoPermModelViewSet
 
 from .filters import CatchmentFilterSet, RegionFilterSet
-from .mixins import CachedGeoJSONMixin
+from .mixins import CachedGeoJSONMixin, get_unbounded_geojson_rejection_response
 from .models import Catchment, Location, NutsRegion, Region
 from .serializers import (
     CatchmentGeoFeatureModelSerializer,
@@ -40,6 +40,12 @@ class LocationViewSet(AutoPermModelViewSet):
     @action(detail=False, methods=["get"])
     def geojson(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        rejection_response = get_unbounded_geojson_rejection_response(
+            request, queryset.count()
+        )
+        if rejection_response is not None:
+            return rejection_response
+
         serializer = LocationGeoFeatureModelSerializer(
             queryset, many=True, context={"request": request}
         )

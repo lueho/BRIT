@@ -1874,6 +1874,38 @@ class StreamingGeoJSONTests(TestCase):
             cache_status = response.get("X-Cache-Status", "")
             self.assertEqual(cache_status, "STREAM")
 
+    def test_large_unbounded_cache_miss_is_rejected(self):
+        with patch(
+            "maps.mixins.CachedGeoJSONMixin.max_unbounded_geojson_features", 100
+        ):
+            response = self.client.get(f"{self.regions_geojson_url}?stream=true")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response["X-Cache-Status"], "REJECT")
+        self.assertEqual(response["X-Total-Count"], str(Region.objects.count()))
+
+    def test_large_bounded_request_is_not_rejected(self):
+        with patch("maps.mixins.CachedGeoJSONMixin.max_unbounded_geojson_features", 0):
+            response = self.client.get(
+                self.regions_geojson_url,
+                {"id": self.regions[0].pk},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(response["X-Cache-Status"], "REJECT")
+
+    def test_unknown_query_parameter_does_not_bound_large_request(self):
+        with patch(
+            "maps.mixins.CachedGeoJSONMixin.max_unbounded_geojson_features", 100
+        ):
+            response = self.client.get(
+                self.regions_geojson_url,
+                {"not_a_filter": "value"},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response["X-Cache-Status"], "REJECT")
+
     def test_streaming_features_match_database_count(self):
         """Verify all features are included in streaming response."""
         url = f"{self.regions_geojson_url}?stream=true"

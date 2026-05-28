@@ -1,6 +1,10 @@
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from maps.mixins import (
+    get_unbounded_geojson_rejection_response,
+    get_view_geojson_bounded_query_params,
+)
 from utils.viewsets import AutoPermModelViewSet
 
 from .models import BiogasPlantsSweden, Showcase
@@ -36,6 +40,14 @@ class ShowcaseViewSet(AutoPermModelViewSet):
             Response: The serialized geographical details of the Showcase instance in geoJSON format.
         """
         queryset = self.filter_queryset(self.get_queryset())
+        rejection_response = get_unbounded_geojson_rejection_response(
+            request,
+            queryset.count(),
+            bounded_query_params=get_view_geojson_bounded_query_params(self),
+        )
+        if rejection_response is not None:
+            return rejection_response
+
         serializer = ShowcaseGeoFeatureModelSerializer(
             queryset, many=True, context={"request": request}
         )

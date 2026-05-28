@@ -20,6 +20,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from maps.db_functions import SimplifyPreserveTopology
+from maps.mixins import get_unbounded_geojson_rejection_response
 from maps.models import LauRegion, NutsRegion, RegionAttributeValue, RegionProperty
 from sources.waste_collection.derived_values import (
     convert_total_to_specific,
@@ -330,6 +331,14 @@ class CatchmentViewSet(viewsets.ReadOnlyModelViewSet):
     def geojson(self, request, *args, **kwargs):
         """Return a GeoJSON FeatureCollection of matching catchments."""
         queryset = self.filter_queryset(self.get_queryset())
+        rejection_response = get_unbounded_geojson_rejection_response(
+            request,
+            queryset.count(),
+            bounded_query_params={"country", "id", "nuts_prefix", "year"},
+        )
+        if rejection_response is not None:
+            return rejection_response
+
         queryset = queryset.annotate(
             simplified_geom=SimplifyPreserveTopology(
                 F("region__borders__geom"),

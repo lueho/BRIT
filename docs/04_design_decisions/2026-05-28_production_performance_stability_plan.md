@@ -80,6 +80,20 @@ Commit:
 
 Goal: make it impossible for crawlers or malformed requests to trigger production-scale GIS serialization through public routes.
 
+Status: implemented for known public GeoJSON serialization paths.
+
+Implementation checkpoint:
+
+- The shared `CachedGeoJSONMixin` now rejects cache-miss or forced-stream unbounded GeoJSON requests above the configured feature cap before serialization.
+- Bounded requests remain allowed when they use `id`, a valid `bbox`, or a filter declared by the endpoint's filterset.
+- Unknown query parameters do not count as bounds.
+- Dataset-scoped local-relation GeoJSON routes now apply the same guard using `id` and explicitly filterable dataset columns.
+- Direct GeoJSON actions that bypass the shared mixin now call the shared rejection helper:
+  - `maps.viewsets.LocationViewSet.geojson`
+  - `sources.greenhouses.viewsets.NantesGreenhousesViewSet.geojson`
+  - `case_studies.closecycle.viewsets.ShowcaseViewSet.geojson`
+  - `sources.waste_collection.waste_atlas.viewsets.CatchmentViewSet.geojson`
+
 Tasks:
 
 - Inventory all public or anonymous geometry endpoints, including:

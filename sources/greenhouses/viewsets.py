@@ -3,6 +3,10 @@ from django.http import JsonResponse
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from maps.mixins import (
+    get_unbounded_geojson_rejection_response,
+    get_view_geojson_bounded_query_params,
+)
 from sources.greenhouses.filters import NantesGreenhousesFilterSet
 from sources.greenhouses.models import NantesGreenhouses
 from sources.greenhouses.serializers import (
@@ -30,6 +34,14 @@ class NantesGreenhousesViewSet(AutoPermModelViewSet):
         """Return filtered greenhouse features as GeoJSON."""
 
         queryset = self.filter_queryset(self.get_queryset())
+        rejection_response = get_unbounded_geojson_rejection_response(
+            request,
+            queryset.count(),
+            bounded_query_params=get_view_geojson_bounded_query_params(self),
+        )
+        if rejection_response is not None:
+            return rejection_response
+
         serializer = NantesGreenhousesGeometrySerializer(
             queryset, many=True, context={"request": request}
         )

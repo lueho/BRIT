@@ -6,6 +6,7 @@ from django.contrib.gis.geos import Polygon
 from django.core.cache import caches
 from django.db.models import Count, Max, Min
 from django.http import StreamingHttpResponse
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -14,6 +15,106 @@ STREAMING_THRESHOLD = 1000
 
 # Enable streaming for large uncached requests
 STREAMING_ENABLED = True
+
+MAX_UNBOUNDED_GEOJSON_FEATURES = getattr(
+    settings, "GEOJSON_MAX_UNBOUNDED_FEATURES", 5000
+)
+GEOJSON_CONTROL_QUERY_PARAMS = {
+    "csrfmiddlewaretoken",
+    "dv",
+    "format",
+    "next",
+    "page",
+    "scope",
+    "stream",
+}
+
+
+def is_bounded_geojson_request(request, *, bbox=None):
+    if bbox is not None:
+        return True
+
+    bounded_query_params = get_view_geojson_bounded_query_params(None)
+    return has_bounded_geojson_query_param(
+        request, bounded_query_params=bounded_query_params
+    )
+
+
+def has_bounded_geojson_query_param(request, *, bounded_query_params):
+    params = getattr(request, "query_params", None) or getattr(request, "GET", {})
+    for key in params.keys():
+        if key in GEOJSON_CONTROL_QUERY_PARAMS or key == "bbox":
+            continue
+        if key not in bounded_query_params:
+            continue
+
+        values = (
+            params.getlist(key) if hasattr(params, "getlist") else [params.get(key)]
+        )
+        if any(str(value).strip() for value in values if value is not None):
+            return True
+
+    return False
+
+
+def get_view_geojson_bounded_query_params(view):
+    bounded_query_params = {"id", "bbox"}
+    if view is None:
+        return bounded_query_params
+
+    filterset_fields = getattr(view, "filterset_fields", None)
+    if isinstance(filterset_fields, dict):
+        bounded_query_params.update(filterset_fields)
+    elif filterset_fields:
+        bounded_query_params.update(filterset_fields)
+
+    filterset_class = getattr(view, "filterset_class", None)
+    if filterset_class is not None:
+        bounded_query_params.update(getattr(filterset_class, "base_filters", {}).keys())
+
+    return bounded_query_params
+
+
+def get_unbounded_geojson_rejection_response(
+    request,
+    count,
+    *,
+    bbox=None,
+    bounded_query_params=None,
+    max_features=None,
+):
+    max_features = (
+        MAX_UNBOUNDED_GEOJSON_FEATURES if max_features is None else max_features
+    )
+    if (
+        max_features is None
+        or count <= max_features
+        or bbox is not None
+        or has_bounded_geojson_query_param(
+            request,
+            bounded_query_params=(
+                get_view_geojson_bounded_query_params(None)
+                if bounded_query_params is None
+                else bounded_query_params
+            ),
+        )
+    ):
+        return None
+
+    response = Response(
+        {
+            "detail": (
+                "Unbounded GeoJSON requests above "
+                f"{max_features} features are not allowed. Provide an id, bbox, "
+                "or endpoint-specific filter."
+            )
+        },
+        status=status.HTTP_400_BAD_REQUEST,
+    )
+    response["X-Cache-Status"] = "REJECT"
+    response["X-Total-Count"] = str(count)
+    response["Access-Control-Expose-Headers"] = "X-Total-Count, X-Cache-Status"
+    return response
 
 
 class CachedGeoJSONMixin:
@@ -27,6 +128,7 @@ class CachedGeoJSONMixin:
     """
 
     # Default cache timeout for this mixin - can be overridden in ViewSet
+    max_unbounded_geojson_features = MAX_UNBOUNDED_GEOJSON_FEATURES
     cache_timeout = (
         getattr(settings, "CACHES", {})
         .get(getattr(settings, "GEOJSON_CACHE", "default"), {})
@@ -181,13 +283,13 @@ class CachedGeoJSONMixin:
         use_stream = request.query_params.get("stream", "").lower() == "true"
         bbox = self._parse_bbox(request)
         cache_key = self.get_cache_key(request)
-        data_version = self.get_dataset_version(request)
 
         # Try cache first (unless streaming is explicitly requested)
         if not use_stream and not bbox:
             data = caches[getattr(settings, "GEOJSON_CACHE", "default")].get(cache_key)
 
             if data is not None:
+                data_version = self.get_dataset_version(request)
                 response = Response(data)
                 response["X-Cache-Status"] = "HIT"
                 # Add feature count for frontend progress
@@ -203,6 +305,17 @@ class CachedGeoJSONMixin:
         # Cache miss or streaming requested - get queryset
         queryset = self.get_geojson_queryset_with_bbox(request)
         count = queryset.count()
+        rejection_response = get_unbounded_geojson_rejection_response(
+            request,
+            count,
+            bbox=bbox,
+            bounded_query_params=get_view_geojson_bounded_query_params(self),
+            max_features=self.max_unbounded_geojson_features,
+        )
+        if rejection_response is not None:
+            return rejection_response
+
+        data_version = self.get_dataset_version(request)
 
         # Use streaming for large datasets to prevent memory issues
         if STREAMING_ENABLED and count > STREAMING_THRESHOLD:
