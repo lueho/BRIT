@@ -7,6 +7,7 @@ This section contains Architecture Decision Records (ADRs) and major design rati
 - Provide context and rationale for future contributors.
 
 ## Recent design records
+- [2026-05-28: Production performance and stability plan](2026-05-28_production_performance_stability_plan.md)
 - [2026-04-22: Shared breadcrumb navigation contract (MADR)](2026-04-22_breadcrumb_navigation_contract.madr.md)
 - [2026-04-16: Dataset registry and federated geodata target-state plan](2026-04-16_dataset_registry_and_federated_geodata_target_state_plan.md)
 - [2026-04-14: Materials database target-state plan (authoritative materials roadmap)](2026-04-14_materials_database_target_state_plan.md)
@@ -41,4 +42,4 @@ _What becomes easier or harder as a result?_
 
 *Add new ADRs or design records as needed. For rationale behind major decisions, use the template above.*
 
-_Last updated: 2026-04-29_
+_Last updated: 2026-05-28_
