@@ -4201,6 +4201,10 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "Other combinations")
         self.assertContains(response, "flex_flex_plus")
         self.assertContains(response, "other_combined")
+        self.assertNotContains(response, "No fee / Flexible")
+        self.assertNotContains(response, "Flexible / PAYT")
+        self.assertNotContains(response, "No fee / PAYT")
+        self.assertNotContains(response, "Flexible / Flexible+")
 
     def test_country_specific_orga_level_maps_default_to_expected_country(self):
         """Country-specific orga-level maps default to expected country and year."""
