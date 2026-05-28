@@ -435,7 +435,7 @@
         amountRows.forEach(function (row) {
           var numericAmount = row.amount;
           if (row.no_collection) {
-            numericAmount = 0;
+            return;
           } else if (numericAmount === null || numericAmount === undefined) {
             hasOnlyNoCollection = false;
             return;
@@ -519,7 +519,49 @@
       }
 
       function drawLegend(svg, width, height) {
-        return;
+        var legendItems = categories.concat([
+          { label: 'No separate collection only', color: noCollectionFill, stroke: noCollectionStroke },
+          { label: 'No 2024 amount data', color: noDataFill, stroke: noDataStroke },
+          { label: 'EU27 + UK background', color: backgroundFill, stroke: backgroundStroke }
+        ]);
+        var rowHeight = 22;
+        var legendWidth = 260;
+        var legendHeight = 34 + legendItems.length * rowHeight;
+        var legend = svg.append('g')
+          .attr('class', 'atlas-legend')
+          .attr('transform', 'translate(' + (width - legendWidth - 28) + ',' + (height - legendHeight - 28) + ')');
+
+        legend.append('rect')
+          .attr('x', 0)
+          .attr('y', 0)
+          .attr('width', legendWidth)
+          .attr('height', legendHeight)
+          .attr('fill', '#ffffff')
+          .attr('fill-opacity', 0.94)
+          .attr('stroke', '#c9ced6')
+          .attr('rx', 4);
+
+        legend.append('text')
+          .attr('x', 12)
+          .attr('y', 20)
+          .attr('font-weight', 'bold')
+          .text('Collected biowaste amount');
+
+        legendItems.forEach(function (item, index) {
+          var y = 34 + index * rowHeight;
+          legend.append('rect')
+            .attr('x', 12)
+            .attr('y', y)
+            .attr('width', 22)
+            .attr('height', 14)
+            .attr('fill', item.color)
+            .attr('stroke', item.stroke || '#3e5f3f');
+
+          legend.append('text')
+            .attr('x', 44)
+            .attr('y', y + 11)
+            .text(item.label);
+        });
       }
 
       Promise.all([
