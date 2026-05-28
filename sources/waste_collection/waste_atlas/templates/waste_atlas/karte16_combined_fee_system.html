@@ -15,12 +15,15 @@
       dataUrl:     '/waste_collection/api/waste-atlas/combined-fee-system/',
       dataField:   '_classified',
       categories: [
-        { value: 'flex_flex',   label: 'Biowaste: flexible — Residual: flexible',        exportLabel: 'Flexible / flexible', color: '#1b9e77' },
-        { value: 'no_fee_flex', label: 'Biowaste: no separate fee — Residual: flexible', exportLabel: 'No fee / flexible',   color: '#7570b3' },
-        { value: 'flat_any',    label: 'Biowaste: flat fee',                             exportLabel: 'Flat fee',            color: '#d95f02' },
-        { value: 'payt_payt',   label: 'Biowaste: PAYT — Residual: PAYT',               exportLabel: 'PAYT / PAYT',         color: '#e7298a' },
-        { value: 'no_fee_payt', label: 'Biowaste: no separate fee — Residual: PAYT',    exportLabel: 'No fee / PAYT',       color: '#66a61e' },
-        { value: 'no_bio',      label: 'No door-to-door biowaste collection',            exportLabel: 'No D2D bio',          color: '#fff696' }
+        { value: 'flex_flex',    label: 'Biowaste: flexible — Residual: flexible',        exportLabel: 'Flexible / flexible', color: '#1b9e77' },
+        { value: 'flex_other',   label: 'Biowaste: flexible — Residual: other fee',       exportLabel: 'Flexible / other',    color: '#a6dba0' },
+        { value: 'no_fee_flex',  label: 'Biowaste: no separate fee — Residual: flexible', exportLabel: 'No fee / flexible',   color: '#7570b3' },
+        { value: 'no_fee_payt',  label: 'Biowaste: no separate fee — Residual: PAYT',     exportLabel: 'No fee / PAYT',       color: '#66a61e' },
+        { value: 'no_fee_other', label: 'Biowaste: no separate fee — Residual: other fee', exportLabel: 'No fee / other',      color: '#b2df8a' },
+        { value: 'flat_any',     label: 'Biowaste: flat fee',                             exportLabel: 'Flat fee',            color: '#d95f02' },
+        { value: 'payt_payt',    label: 'Biowaste: PAYT — Residual: PAYT',                exportLabel: 'PAYT / PAYT',         color: '#e7298a' },
+        { value: 'payt_other',   label: 'Biowaste: PAYT — Residual: other fee',           exportLabel: 'PAYT / other',        color: '#f781bf' },
+        { value: 'no_bio',       label: 'No door-to-door biowaste collection',            exportLabel: 'No D2D bio',          color: '#fff696' }
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'No data',
@@ -31,18 +34,26 @@
           var cls;
           var noSep = ['No separate collection', 'Recycling centre', 'Bring point'];
           var flexFees = ['Flexible', 'Flexible+'];
+          var knownResidualFees = ['Flat fee', 'Flexible', 'Flexible+', 'Pay as you throw (PAYT)'];
+          var hasKnownResidualFee = knownResidualFees.indexOf(r.residual_fee) !== -1;
           if (noSep.indexOf(r.bio_fee) !== -1) {
             cls = 'no_bio';
           } else if (flexFees.indexOf(r.bio_fee) !== -1 && flexFees.indexOf(r.residual_fee) !== -1) {
             cls = 'flex_flex';
+          } else if (flexFees.indexOf(r.bio_fee) !== -1 && hasKnownResidualFee) {
+            cls = 'flex_other';
           } else if (r.bio_fee === 'No fee' && flexFees.indexOf(r.residual_fee) !== -1) {
             cls = 'no_fee_flex';
-          } else if (r.bio_fee === 'Flat fee') {
+          } else if (r.bio_fee === 'No fee' && r.residual_fee === 'Pay as you throw (PAYT)') {
+            cls = 'no_fee_payt';
+          } else if (r.bio_fee === 'No fee' && hasKnownResidualFee) {
+            cls = 'no_fee_other';
+          } else if (r.bio_fee === 'Flat fee' && hasKnownResidualFee) {
             cls = 'flat_any';
           } else if (r.bio_fee === 'Pay as you throw (PAYT)' && r.residual_fee === 'Pay as you throw (PAYT)') {
             cls = 'payt_payt';
-          } else if (r.bio_fee === 'No fee' && r.residual_fee === 'Pay as you throw (PAYT)') {
-            cls = 'no_fee_payt';
+          } else if (r.bio_fee === 'Pay as you throw (PAYT)' && hasKnownResidualFee) {
+            cls = 'payt_other';
           } else {
             cls = null;
           }

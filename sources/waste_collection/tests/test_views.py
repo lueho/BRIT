@@ -4188,6 +4188,16 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "nutsLevel:")
         self.assertContains(response, "parseInt('1', 10)")
 
+    def test_bw_rp_combined_fee_system_classifies_valid_fee_combinations(self):
+        response = self.client.get(reverse("waste-atlas-bw-rp-combined-fee-system-map"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "flex_other")
+        self.assertContains(response, "no_fee_other")
+        self.assertContains(response, "payt_other")
+        self.assertContains(response, "knownResidualFees")
+        self.assertContains(response, "hasKnownResidualFee")
+
     def test_country_specific_orga_level_maps_default_to_expected_country(self):
         """Country-specific orga-level maps default to expected country and year."""
         map_defaults = {
