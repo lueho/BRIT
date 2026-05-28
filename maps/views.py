@@ -1353,13 +1353,24 @@ class CatchmentOptionGeometryAPI(APIView):
     def get(request):
         """Return GeoJSON for catchment options.
 
-        If a ``parent_id`` query parameter is provided, the endpoint returns all
-        child catchments of the parent catchment's region. Otherwise it returns
-        *all* catchments.
+        The endpoint returns either one catchment by ``id`` or all child
+        catchments of a parent catchment's region by ``parent_id``.
         """
         qs = Catchment.objects.select_related("region", "region__borders").all()
 
+        catchment_id = request.query_params.get("id")
         parent_id = request.query_params.get("parent_id")
+        if catchment_id is None and parent_id is None:
+            return JsonResponse(
+                {"detail": 'Query parameter "id" or "parent_id" is required.'},
+                status=400,
+            )
+
+        if catchment_id is not None:
+            qs = qs.filter(pk=catchment_id)
+            if not qs.exists():
+                return JsonResponse({"detail": "Catchment not found."}, status=404)
+
         if parent_id is not None:
             try:
                 parent_catchment = Catchment.objects.get(pk=parent_id)
