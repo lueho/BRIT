@@ -15,13 +15,15 @@
       dataUrl:     '/waste_collection/api/waste-atlas/access-control/',
       dataField:   'access_control',
       categories: [
-        { value: 'Bring point and door-to-door access-controlled', label: 'Bring point and door-to-door access-controlled', color: '#14532d' },
-        { value: 'Bring point access-controlled', label: 'Bring point access-controlled', color: '#22c55e' },
-        { value: 'Door-to-door access-controlled', label: 'Door-to-door access-controlled', color: '#86efac' },
-        { value: 'Bring point access-controlled, door-to-door not access-controlled', label: 'Bring point access-controlled, door-to-door not access-controlled', color: '#65a30d' },
-        { value: 'Door-to-door access-controlled, bring point not access-controlled', label: 'Door-to-door access-controlled, bring point not access-controlled', color: '#a3e635' },
-        { value: 'No access control', label: 'No access control', color: '#facc15' },
-        { value: 'No separate collection', label: 'No separate biowaste collection', color: '#fff696' }
+        { value: 'Bring point: yes', label: 'Bring point: yes', color: '#1b9e77' },
+        { value: 'Bring point: no', label: 'Bring point: no', color: '#a6dba0' },
+        { value: 'Door-to-door: yes', label: 'Door-to-door: yes', color: '#2166ac' },
+        { value: 'Door-to-door: no', label: 'Door-to-door: no', color: '#92c5de' },
+        { value: 'Bring point: yes | Door-to-door: yes', label: 'Bring point: yes | Door-to-door: yes', color: '#542788' },
+        { value: 'Bring point: no | Door-to-door: no', label: 'Bring point: no | Door-to-door: no', color: '#c2a5cf' },
+        { value: 'Bring point: yes | Door-to-door: no', label: 'Bring point: yes | Door-to-door: no', color: '#b2182b' },
+        { value: 'Bring point: no | Door-to-door: yes', label: 'Bring point: no | Door-to-door: yes', color: '#ef8a62' },
+        { value: 'No separate biowaste collection', label: 'No separate biowaste collection', color: '#fff696' }
       ],
       noDataColor: '#e0e0e0',
       noDataLabel: 'No data',
@@ -30,4 +32,4 @@
     });
   });
   </script>
-{% endblock %}
+{% endblock atlas_config %}

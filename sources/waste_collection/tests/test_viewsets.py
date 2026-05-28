@@ -1885,6 +1885,14 @@ class CataloniaCollectionSystemViewSetTests(APITestCase):
             name="Same PAP",
             region=cls.region_es,
         )
+        cls.catchment_both_yes = CollectionCatchment.objects.create(
+            name="Both yes",
+            region=cls.region_es,
+        )
+        cls.catchment_both_no = CollectionCatchment.objects.create(
+            name="Both no",
+            region=cls.region_es,
+        )
         cls.catchment_other = CollectionCatchment.objects.create(
             name="Other",
             region=cls.region_es,
@@ -1924,6 +1932,20 @@ class CataloniaCollectionSystemViewSetTests(APITestCase):
             catchment=cls.catchment_same_pap,
             waste_category=cls.residual,
             collection_system=cls.door_to_door,
+            access_control_pap=False,
+        )
+        cls._create_collection(
+            catchment=cls.catchment_both_yes,
+            waste_category=cls.biowaste,
+            collection_system=cls.door_to_door,
+            access_control_bp=True,
+            access_control_pap=True,
+        )
+        cls._create_collection(
+            catchment=cls.catchment_both_no,
+            waste_category=cls.biowaste,
+            collection_system=cls.door_to_door,
+            access_control_bp=False,
             access_control_pap=False,
         )
         cls._create_collection(
@@ -2036,6 +2058,31 @@ class CataloniaCollectionSystemViewSetTests(APITestCase):
         self.assertEqual(
             by_catchment[self.catchment_other.id],
             "Other combination",
+        )
+
+    def test_access_control_endpoint_uses_concise_labels(self):
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/access-control/",
+            {"country": "ES", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        by_catchment = {
+            row["catchment_id"]: row["access_control"] for row in response.data
+        }
+        self.assertEqual(by_catchment[self.catchment_same_bp.id], "Bring point: yes")
+        self.assertEqual(by_catchment[self.catchment_same_pap.id], "Door-to-door: no")
+        self.assertEqual(
+            by_catchment[self.catchment_both_yes.id],
+            "Bring point: yes | Door-to-door: yes",
+        )
+        self.assertEqual(
+            by_catchment[self.catchment_both_no.id],
+            "Bring point: no | Door-to-door: no",
+        )
+        self.assertEqual(
+            by_catchment[self.catchment_other.id],
+            "No separate biowaste collection",
         )
 
 

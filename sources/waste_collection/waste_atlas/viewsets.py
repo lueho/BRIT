@@ -591,23 +591,23 @@ class AccessControlViewSet(viewsets.ViewSet):
             bp = row["access_control_bp"]
             pap = row["access_control_pap"]
             if system == "No separate collection":
-                value = "No separate collection"
+                value = "No separate biowaste collection"
             elif bp is True and pap is True:
-                value = "Bring point and door-to-door access-controlled"
+                value = "Bring point: yes | Door-to-door: yes"
             elif bp is True and pap is False:
-                value = (
-                    "Bring point access-controlled, door-to-door not access-controlled"
-                )
+                value = "Bring point: yes | Door-to-door: no"
             elif bp is False and pap is True:
-                value = (
-                    "Door-to-door access-controlled, bring point not access-controlled"
-                )
+                value = "Bring point: no | Door-to-door: yes"
+            elif bp is False and pap is False:
+                value = "Bring point: no | Door-to-door: no"
             elif bp is True:
-                value = "Bring point access-controlled"
+                value = "Bring point: yes"
             elif pap is True:
-                value = "Door-to-door access-controlled"
-            elif bp is False or pap is False:
-                value = "No access control"
+                value = "Door-to-door: yes"
+            elif bp is False:
+                value = "Bring point: no"
+            elif pap is False:
+                value = "Door-to-door: no"
             else:
                 value = "no_data"
             data.append({"catchment_id": cid, "access_control": value})
