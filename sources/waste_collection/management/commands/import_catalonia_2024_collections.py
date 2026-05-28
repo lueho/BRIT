@@ -225,8 +225,27 @@ _OLD_LAYOUT_HEADERS = (
 )
 
 _HEADER_ALIASES = {
+    "Waste_type": "Waste type",
+    "Collection_system_2020": "PaP_status_2020",
+    "Collection_system_2024": "Collection_system_2024",
+    "PaP_Connection_rate_2020": "Connection rate to PaP_2020",
+    "PaP_Connection_rate_2024": "Connection rate to PaP_2024",
+    "Collection_frequency_2024": "Collection frequency",
+    "BP_Weekly_access_days_2024": "Weekly access days_BP",
+    "Fee_system": "Fee system",
+    "Minimum_bin_size_L": "Minimum bin size (L)",
+    "Change_implementation": "Change implementation",
+    "Change_implementation_year": "Change implementation year",
+    "Quantity_2020_t": "Quantity_2020_t",
+    "Quantity_2020_kg": "Quantity_2020_kg",
+    "Quantity_2024_t": "Quantity_2024_t",
+    "Quantity_2024_kg": "Quantity_2024_kg",
+    "Impurities_percentage_2020": "Impurities_percentge_2020",
+    "Impurities_percentage_2024": "Impurities_percentage 2024",
     "Access control/Use control_BP/PAP_2024": "access_control",
     "BP_Access control/PAP_Use control_2024": "access_control",
+    "BP_Access_control_2024": "bp_access_control",
+    "PAP_Use_control_2024": "pap_use_control",
 }
 
 _CLEAR_FREQUENCY_KEYS = {
@@ -351,6 +370,27 @@ def _access_control_fields(
     return {"access_control_bp": ac_bp, "access_control_pap": ac_pap}
 
 
+def _access_control_fields_from_row(
+    row: dict | tuple, collection_system: str | None
+) -> dict[str, bool | None]:
+    bp_raw = _row_value(row, "bp_access_control", 14)
+    pap_raw = _row_value(row, "pap_use_control", 14)
+    if isinstance(row, dict) and (
+        "bp_access_control" in row or "pap_use_control" in row
+    ):
+        return {
+            "access_control_bp": _parse_yes_no(str(bp_raw))
+            if bp_raw is not None
+            else None,
+            "access_control_pap": _parse_yes_no(str(pap_raw))
+            if pap_raw is not None
+            else None,
+        }
+    return _access_control_fields(
+        _row_value(row, "access_control", 14), collection_system
+    )
+
+
 # ---------------------------------------------------------------------------
 # Fee system mapping: Excel label → BRIT FeeSystem name
 # ---------------------------------------------------------------------------
@@ -449,7 +489,9 @@ def _ine_to_lau(codi: str | None) -> str:
     return codi[:5]
 
 
-def _map_collection_system(raw: str | None, waste_type: str) -> str:
+def _map_collection_system(
+    raw: str | None, waste_type: str, connection_rate: float | None = None
+) -> str:
     """Return the BRIT collection system name for a raw Excel value.
 
     For residual waste rows the ``Collection_system_2024`` cell is often empty;
@@ -458,6 +500,12 @@ def _map_collection_system(raw: str | None, waste_type: str) -> str:
     """
     if raw:
         key = raw.strip().lower()
+        if key in {"pap total", "pap total + pxg", "door-to-door", "door to door"}:
+            if connection_rate is not None and connection_rate < 95:
+                return _CS_MIXED_DT_BP
+            return _CS_DOOR_TO_DOOR
+        if key == "mixed door-to-door and bring point":
+            return _CS_MIXED_DT_BP
         mapped = _COLLECTION_SYSTEM_MAP.get(key)
         if mapped:
             return mapped
@@ -564,7 +612,10 @@ def _row_to_record(row: dict | tuple) -> dict | None:
         return None
 
     collection_system_raw = _row_value(row, "Collection_system_2024", 13)
-    collection_system = _map_collection_system(collection_system_raw, waste_type)
+    conn_rate = _to_float_or_none(_row_value(row, "Connection rate to PaP_2024", 16))
+    collection_system = _map_collection_system(
+        collection_system_raw, waste_type, conn_rate
+    )
 
     # Build source URLs: use row-level Sources cell + fallback to dataset URL
     raw_sources = _row_value(row, "Sources", 30)
@@ -628,8 +679,6 @@ def _row_to_record(row: dict | tuple) -> dict | None:
 
     # Connection rate to PAP 2024 [% of households] — biowaste only
     if waste_type == _WC_BIOWASTE:
-        conn_rate_raw = _row_value(row, "Connection rate to PaP_2024", 16)
-        conn_rate = _to_float_or_none(conn_rate_raw)
         if conn_rate is not None:
             pvs.append(
                 {
@@ -728,9 +777,7 @@ def _row_to_record(row: dict | tuple) -> dict | None:
         )
         in _CLEAR_FREQUENCY_KEYS,
         "connection_type": "",
-        **_access_control_fields(
-            _row_value(row, "access_control", 14), collection_system
-        ),
+        **_access_control_fields_from_row(row, collection_system),
         "min_bin_size": _to_float_or_none(_row_value(row, "Minimum bin size (L)", 20)),
         "required_bin_capacity": None,
         "required_bin_capacity_reference": "",
@@ -771,7 +818,12 @@ def _row_to_2020_record(row: dict | tuple) -> dict | None:
         return None
 
     pap_status_2020 = _row_value(row, "PaP_status_2020", 11)
-    collection_system_2020 = _map_collection_system(pap_status_2020, waste_type)
+    conn_rate_2020 = _to_float_or_none(
+        _row_value(row, "Connection rate to PaP_2020", 15)
+    )
+    collection_system_2020 = _map_collection_system(
+        pap_status_2020, waste_type, conn_rate_2020
+    )
     if not collection_system_2020:
         return None
 

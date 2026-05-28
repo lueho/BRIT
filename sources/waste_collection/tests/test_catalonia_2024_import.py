@@ -104,6 +104,24 @@ class CollectionSystemMappingTests(SimpleTestCase):
             cmd._map_collection_system("PAP Total", "Biowaste"), "Door to door"
         )
 
+    def test_pap_total_maps_to_door_to_door_when_connection_rate_at_least_95(self):
+        self.assertEqual(
+            cmd._map_collection_system("PAP Total", "Biowaste", 95),
+            "Door to door",
+        )
+
+    def test_pap_total_below_connection_rate_threshold_maps_to_mixed(self):
+        self.assertEqual(
+            cmd._map_collection_system("PAP Total", "Biowaste", 94.9),
+            cmd._CS_MIXED_DT_BP,
+        )
+
+    def test_door_to_door_below_connection_rate_threshold_maps_to_mixed(self):
+        self.assertEqual(
+            cmd._map_collection_system("Door-to-door", "Biowaste", 94.9),
+            cmd._CS_MIXED_DT_BP,
+        )
+
     def test_pap_total_case_insensitive(self):
         self.assertEqual(
             cmd._map_collection_system("pap total", "Biowaste"), "Door to door"
@@ -116,6 +134,14 @@ class CollectionSystemMappingTests(SimpleTestCase):
         self.assertEqual(
             cmd._map_collection_system("PAP Total + PxG", "Biowaste"),
             "Door to door",
+        )
+
+    def test_mixed_door_to_door_and_bring_point_maps_to_mixed(self):
+        self.assertEqual(
+            cmd._map_collection_system(
+                "Mixed Door-to-door and Bring point", "Biowaste"
+            ),
+            cmd._CS_MIXED_DT_BP,
         )
 
     def test_pap_parcial_maps_to_mixed(self):
