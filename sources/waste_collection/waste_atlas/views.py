@@ -178,6 +178,7 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
         ctx["map_title"] = self.map_title
         ctx["map_overview_label"] = self.map_overview_label
         ctx["map_overview_url"] = self.map_overview_url
+        ctx["map_route_key"] = self.map_route_key
         ctx["map_set_options"] = self.get_map_set_options()
         ctx["map_set_selector_label"] = self.map_set_selector_label
         ctx.update(

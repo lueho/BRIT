@@ -4775,6 +4775,99 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
 
 
+class GenericMapTemplateTests(TestCase):
+    """Tests for the generic map.html template backed by MAP_CONFIGS."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            username="generic-atlas-user", password="secret"
+        )
+        waste_atlas_group, _ = Group.objects.get_or_create(name="waste_atlas")
+        cls.user.groups.add(waste_atlas_group)
+
+    def _render_generic(self, map_route_key, query=None):
+        from django.test import RequestFactory
+
+        from sources.waste_collection.waste_atlas.views import AtlasMapView
+
+        factory = RequestFactory()
+        request = factory.get("/", query or {})
+        request.user = self.user
+
+        class TestMapView(AtlasMapView):
+            template_name = "waste_atlas/map.html"
+
+        TestMapView.map_route_key = map_route_key
+
+        view = TestMapView.as_view()
+        response = view(request)
+        return response.render().content.decode("utf-8")
+
+    def test_orga_level_renders_categories_in_json_config(self):
+        content = self._render_generic("orga_level")
+        self.assertIn(
+            '"dataUrl": "/waste_collection/api/waste-atlas/orga-level/"', content
+        )
+        self.assertIn('"dataField": "orga_level"', content)
+        self.assertIn('"value": "nuts"', content)
+        self.assertIn("Districts and district-free cities", content)
+        self.assertIn("WasteAtlasChoropleth.init", content)
+        self.assertIn('"svgId": "atlas-svg"', content)
+        self.assertIn('"containerId": "map-container"', content)
+
+    def test_orga_level_forwards_country_and_year(self):
+        content = self._render_generic("orga_level", {"country": "SE", "year": "2023"})
+        self.assertIn('"country": "SE"', content)
+        self.assertIn('"year": 2023', content)
+
+    def test_orga_level_forwards_nuts_prefix_and_level(self):
+        content = self._render_generic(
+            "orga_level", {"country": "IT", "nuts_prefix": "ITH10", "nuts_level": "3"}
+        )
+        self.assertIn('"nutsPrefix": "ITH10"', content)
+        self.assertIn('"nutsLevel": 3', content)
+
+    def test_connection_rate_renders_transform_name(self):
+        content = self._render_generic("connection_rate")
+        self.assertIn(
+            '"dataUrl": "/waste_collection/api/waste-atlas/connection-rate/"', content
+        )
+        self.assertIn('"transformName": "connectionRate"', content)
+        self.assertIn("WasteAtlasChoropleth.init", content)
+
+    def test_collection_amount_renders_overlay_config(self):
+        content = self._render_generic("biowaste_collection_amount")
+        self.assertIn(
+            '"dataUrl": "/waste_collection/api/waste-atlas/biowaste-collection-amount/"',
+            content,
+        )
+        self.assertIn('"overlayPatternField": "_has_acpv_overlay"', content)
+        self.assertIn("Hatched = aggregated value (ACPV)", content)
+        self.assertIn('"outlineGeoJsonUrl"', content)
+
+    def test_residual_collection_count_renders_transform_name(self):
+        content = self._render_generic("residual_collection_count")
+        self.assertIn('"transformName": "residualCollectionCount"', content)
+        self.assertIn('"fileBase": "residual_collection_count"', content)
+
+    def test_biowaste_frequency_renders_transform_name(self):
+        content = self._render_generic("biowaste_frequency")
+        self.assertIn('"transformName": "biowasteFrequency"', content)
+
+    def test_waste_ratio_renders_export_labels(self):
+        content = self._render_generic("waste_ratio")
+        # json_script HTML-escapes > as \u003E
+        self.assertIn("0.66 bio-dominant", content)
+        self.assertIn('"transformName": "wasteRatio"', content)
+
+    def test_unregistered_map_route_key_renders_empty_config(self):
+        """Unknown route keys produce an empty config dict; init is still called."""
+        content = self._render_generic("nonexistent_route")
+        self.assertIn("WasteAtlasChoropleth.init", content)
+        self.assertIn('"svgId": "atlas-svg"', content)
+
+
 @override_settings(
     WASTE_COLLECTION_POPULATION_ATTRIBUTE_ID=None,
     WASTE_COLLECTION_POPULATION_ATTRIBUTE_NAME="Population [atlas population filter test]",

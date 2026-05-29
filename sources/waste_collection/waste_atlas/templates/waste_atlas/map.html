@@ -1,0 +1,13 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+{% load atlas_tags %}
+
+{% block atlas_config %}
+  {% atlas_js_config map_route_key as atlas_cfg %}
+  {{ atlas_cfg|json_script:"atlas-config" }}
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var cfg = JSON.parse(document.getElementById('atlas-config').textContent);
+      WasteAtlasChoropleth.init(cfg);
+    });
+  </script>
+{% endblock atlas_config %}
