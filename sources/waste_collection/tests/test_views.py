@@ -3,6 +3,7 @@ import csv
 import time
 from collections import namedtuple
 from datetime import date, timedelta
+from decimal import Decimal
 from io import BytesIO
 from unittest.mock import patch
 from urllib.parse import urlencode
@@ -6261,7 +6262,7 @@ class DerivedValuesTestCase(TestCase):
             col_to_cid={collection.pk: catchment.pk},
             catchment_ids=[catchment.pk],
         )
-        self.assertEqual(amounts[catchment.pk], round(6.5 * 1000 / 2500, 1))
+        self.assertEqual(amounts[catchment.pk], Decimal("2.6"))
 
     def test_compute_counterpart_value_returns_none_for_non_convertible_property(self):
         other_property = Property.objects.create(name="other property [test]")
@@ -6361,15 +6362,25 @@ class DerivedValuesTestCase(TestCase):
         self.assertEqual(convert_total_to_specific(100, 2000), 50.0)
         self.assertEqual(convert_total_to_specific(5, 500), 10.0)
 
-    def test_conversion_helpers_ndigits_none_returns_exact_float(self):
+    def test_conversion_helpers_ndigits_none_returns_exact_decimal(self):
         result = convert_specific_to_total_mg(7, 3000, ndigits=None)
-        self.assertEqual(result, 7 * 3000 / 1000)
+        self.assertEqual(result, Decimal("21"))
         result = convert_total_to_specific(7, 3000, ndigits=None)
-        self.assertEqual(result, 7 * 1000 / 3000)
+        self.assertEqual(result, Decimal("7") * 1000 / Decimal("3000"))
 
     def test_conversion_helpers_respect_ndigits(self):
-        self.assertEqual(convert_specific_to_total_mg(7, 3000, ndigits=1), 21.0)
-        self.assertEqual(convert_total_to_specific(6.5, 2500, ndigits=1), 2.6)
+        self.assertEqual(
+            convert_specific_to_total_mg(7, 3000, ndigits=1), Decimal("21.0")
+        )
+        self.assertEqual(
+            convert_total_to_specific(6.5, 2500, ndigits=1), Decimal("2.6")
+        )
+
+    def test_conversion_helpers_accept_float_population_with_decimal_value(self):
+        """Regression: float population from DB must not raise TypeError."""
+        value = Decimal("50.0")
+        self.assertEqual(convert_specific_to_total_mg(value, 2000.0), 100.0)
+        self.assertEqual(convert_total_to_specific(value, 2000.0), 25.0)
 
     def test_compute_counterpart_specific_to_total(self):
         collection, _ = self._create_collection("s2t", population=5000)

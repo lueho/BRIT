@@ -13,6 +13,7 @@ distinguished from manually entered data and regenerated at will.
 
 import logging
 from dataclasses import dataclass
+from decimal import Decimal
 from functools import lru_cache
 
 from django.conf import settings
@@ -60,7 +61,7 @@ def convert_specific_to_total_mg(value, population, ndigits=2):
     """Convert specific waste (kg/cap/a) to total waste (Mg/a)."""
     if not population or population <= 0:
         return None
-    total_mg = value * population / _MG_TO_KG
+    total_mg = Decimal(str(value)) * Decimal(str(population)) / _MG_TO_KG
     if ndigits is None:
         return total_mg
     return round(total_mg, ndigits)
@@ -70,7 +71,7 @@ def convert_total_to_specific(value, population, ndigits=2):
     """Convert total waste (Mg/a) to specific waste (kg/cap/a)."""
     if not population or population <= 0:
         return None
-    specific = value * _MG_TO_KG / population
+    specific = Decimal(str(value)) * _MG_TO_KG / Decimal(str(population))
     if ndigits is None:
         return specific
     return round(specific, ndigits)
