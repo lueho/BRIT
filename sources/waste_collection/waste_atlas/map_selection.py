@@ -59,6 +59,7 @@ WASTE_ATLAS_MAP_SELECTIONS = {
             "collection_system": {
                 "label": "Biowaste collection systems",
                 "route_name": "waste-atlas-germany-collection-system-map",
+                "change_route_name": "waste-atlas-germany-collection-system-change-map",
             },
             "combined_collection_count": {
                 "label": "Combined collection count",
@@ -766,6 +767,9 @@ def build_map_selection_context(
                 "waste_category": _selection_waste_category(theme),
                 "label": _selection_theme_label(theme, theme_selection),
                 "url": reverse_func(theme_selection["route_name"]),
+                "change_url": reverse_func(theme_selection["change_route_name"])
+                if "change_route_name" in theme_selection
+                else None,
             }
             for theme, theme_selection in sorted(
                 map_selection["themes"].items(), key=_theme_sort_key

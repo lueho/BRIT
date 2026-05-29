@@ -19,6 +19,7 @@ from .viewsets import (
     CollectionPointCountRatioViewSet,
     CollectionPointCountViewSet,
     CollectionSupportViewSet,
+    CollectionSystemChangeViewSet,
     CollectionSystemViewSet,
     CombinedCollectionCountViewSet,
     CombinedCollectionSystemViewSet,
@@ -64,6 +65,11 @@ router.register(
     "collection-system",
     CollectionSystemViewSet,
     basename="api-waste-atlas-collection-system",
+)
+router.register(
+    "collection-system-change",
+    CollectionSystemChangeViewSet,
+    basename="api-waste-atlas-collection-system-change",
 )
 router.register(
     "biowaste-collection-system",

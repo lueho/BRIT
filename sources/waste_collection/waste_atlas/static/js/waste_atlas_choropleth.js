@@ -111,7 +111,8 @@ var WasteAtlasChoropleth = (function () {
     var nuts0Url = '/maps/api/nuts_region/geojson/?levl_code=0&cntr_code=' + cfg.country;
     var nutsLevel = cfg.nutsLevel || 1;
     var nutsRegionUrl = '/maps/api/nuts_region/geojson/?levl_code=' + nutsLevel + '&cntr_code=' + cfg.country;
-    var dataUrl = cfg.dataUrl + '?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix + collectionYearSuffix;
+    var fromYearSuffix = cfg.fromYear ? '&from_year=' + encodeURIComponent(cfg.fromYear) : '';
+    var dataUrl = cfg.dataUrl + '?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix + collectionYearSuffix + fromYearSuffix;
     var outlineUrl = cfg.outlineGeoJsonUrl
       ? cfg.outlineGeoJsonUrl + '?country=' + cfg.country + '&year=' + collectionYear + nutsSuffix
       : null;
@@ -170,25 +171,39 @@ var WasteAtlasChoropleth = (function () {
     return window.location.pathname.replace(/\/$/, '') === path.replace(/\/$/, '');
   }
 
-  function _selectorNavigationTarget(url, year) {
+  function _selectorNavigationTarget(url, year, fromYear) {
     if (!url || _isCurrentPath(url)) return null;
-    return url + '?year=' + encodeURIComponent(year);
+    var isChangeMap = window.location.pathname.indexOf('-change') !== -1;
+    var targetIsChangeMap = url.indexOf('-change') !== -1;
+    if (isChangeMap && !targetIsChangeMap) return null;
+    var params = 'year=' + encodeURIComponent(year);
+    if (fromYear) params += '&from_year=' + encodeURIComponent(fromYear);
+    return url + '?' + params;
   }
 
-  function initSelectorControls(loadCurrent) {
+  function initSelectorControls(loadCurrent, options) {
+    options = options || {};
+    var disableNavigation = options.disableNavigation || false;
     var countrySelect = document.getElementById('sel-country');
     var wasteCategorySelect = document.getElementById('sel-waste-category');
     var themeSelect = document.getElementById('sel-theme');
     var yearSelect = document.getElementById('sel-year');
+    var fromYearSelect = document.getElementById('sel-from-year');
+    var toYearSelect = document.getElementById('sel-to-year');
     var btnLoad = document.getElementById('btn-load');
     var form = document.getElementById('atlas-selection-form');
 
-    if (!countrySelect || !themeSelect || !yearSelect || !btnLoad) return null;
+    var yearSelectEl = toYearSelect || yearSelect;
+    if (!countrySelect || !themeSelect || !yearSelectEl || !btnLoad) return null;
 
     var themeOptions = Array.prototype.slice.call(themeSelect.options);
 
     function selectedYear() {
-      return parseInt(yearSelect.value, 10) || 2024;
+      return parseInt(yearSelectEl.value, 10) || 2024;
+    }
+
+    function selectedFromYear() {
+      return fromYearSelect ? parseInt(fromYearSelect.value, 10) || 2023 : null;
     }
 
     function selectedRouteUrl() {
@@ -216,12 +231,13 @@ var WasteAtlasChoropleth = (function () {
       ensureVisibleSelection();
       var url = selectedRouteUrl();
       var year = selectedYear();
-      var navigationTarget = _selectorNavigationTarget(url, year);
-      if (navigationTarget) {
+      var fromYear = selectedFromYear();
+      var navigationTarget = _selectorNavigationTarget(url, year, fromYear);
+      if (navigationTarget && !disableNavigation) {
         window.location.href = navigationTarget;
         return;
       }
-      if (loadCurrent) loadCurrent(countrySelect.value, year, false);
+      if (loadCurrent) loadCurrent(countrySelect.value, year, false, fromYear);
     }
 
     countrySelect.addEventListener('change', ensureVisibleSelection);
@@ -233,6 +249,7 @@ var WasteAtlasChoropleth = (function () {
 
     return {
       selectedYear: selectedYear,
+      selectedFromYear: selectedFromYear,
       selectedRouteUrl: selectedRouteUrl
     };
   }
@@ -1027,7 +1044,7 @@ var WasteAtlasChoropleth = (function () {
     var btnLoad = document.getElementById('btn-load');
     var fileBase = cfg.fileBase || 'waste_atlas_map';
 
-    function load(country, year, preserveScope) {
+    function load(country, year, preserveScope, fromYear) {
       _show(loadingEl);
       if (btnSVG) btnSVG.disabled = true;
       if (btnPNG) btnPNG.disabled = true;
@@ -1035,6 +1052,7 @@ var WasteAtlasChoropleth = (function () {
       var isConfiguredMultiRegion = cfg.nutsPrefix && cfg.nutsPrefix.indexOf(',') !== -1
         && country === cfg.country;
       var loadCfg = _configForSelection(cfg, country, year, preserveScope || isConfiguredMultiRegion);
+      if (fromYear) loadCfg.fromYear = fromYear;
 
       _fetchAll(loadCfg)
         .then(function (data) {
@@ -1057,9 +1075,23 @@ var WasteAtlasChoropleth = (function () {
 
     load(cfg.country, cfg.year, true);
 
-    initSelectorControls(function (_selectedMapSet, year) {
-      load(cfg.country, year, true);
-    });
+    if (cfg.fromYear) {
+      var fromYearSelect = document.getElementById('sel-from-year');
+      var toYearSelect = document.getElementById('sel-to-year');
+      if (btnLoad) {
+        btnLoad.addEventListener('click', function (event) {
+          if (event && event.preventDefault) event.preventDefault();
+          if (event && event.stopPropagation) event.stopPropagation();
+          var fromYear = fromYearSelect ? parseInt(fromYearSelect.value, 10) || cfg.fromYear : cfg.fromYear;
+          var year = toYearSelect ? parseInt(toYearSelect.value, 10) || cfg.year : cfg.year;
+          load(cfg.country, year, true, fromYear);
+        });
+      }
+    } else {
+      initSelectorControls(function (_selectedMapSet, year) {
+        load(cfg.country, year, true);
+      });
+    }
 
     if (btnSVG) btnSVG.addEventListener('click', function () { exportSVG(fileBase + '.svg'); });
     if (btnPNG) btnPNG.addEventListener('click', function () { exportPNG(fileBase + '.png'); });

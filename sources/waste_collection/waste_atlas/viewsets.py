@@ -43,6 +43,7 @@ from .serializers import (
     CatchmentCollectionPointCountRatioSerializer,
     CatchmentCollectionPointCountSerializer,
     CatchmentCollectionSupportSerializer,
+    CatchmentCollectionSystemChangeSerializer,
     CatchmentCollectionSystemCountSerializer,
     CatchmentCollectionSystemSerializer,
     CatchmentCombinedCollectionCountSerializer,
@@ -452,6 +453,79 @@ class CollectionSystemViewSet(viewsets.ViewSet):
             ).items()
         ]
         serializer = CatchmentCollectionSystemSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class CollectionSystemChangeViewSet(viewsets.ViewSet):
+    """Return biowaste collection system changes per catchment between two years.
+
+    Supports query parameters:
+
+    - ``country``: ISO country code filter (default: ``DE``)
+    - ``from_year``: Baseline year (default: ``2023``)
+    - ``to_year``: Comparison year (default: ``2024``)
+    - ``nuts_prefix``: Optional NUTS-ID prefix filter
+
+    Example::
+
+        GET /waste_collection/api/waste-atlas/collection-system-change/?country=DE&from_year=2023&to_year=2024
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        country = request.query_params.get("country", "DE")
+        from_year = request.query_params.get("from_year", "2023")
+        to_year = request.query_params.get("to_year") or request.query_params.get(
+            "year", "2024"
+        )
+        try:
+            from_year = int(from_year)
+            to_year = int(to_year)
+        except (TypeError, ValueError):
+            from_year = 2023
+            to_year = 2024
+        nuts_prefixes = _parse_nuts_prefixes(request)
+
+        from_data = _select_primary_collections(
+            country,
+            from_year,
+            ["Biowaste", "Food waste"],
+            nuts_prefixes,
+        )
+        to_data = _select_primary_collections(
+            country,
+            to_year,
+            ["Biowaste", "Food waste"],
+            nuts_prefixes,
+        )
+
+        all_catchments = set(from_data.keys()) | set(to_data.keys())
+        results = []
+        for cid in all_catchments:
+            from_system = from_data.get(cid, {}).get("collection_system")
+            to_system = to_data.get(cid, {}).get("collection_system")
+            if from_system and to_system:
+                if from_system == to_system:
+                    change_type = "no_change"
+                else:
+                    change_type = "changed"
+            elif to_system:
+                change_type = "new"
+            elif from_system:
+                change_type = "removed"
+            else:
+                continue
+            results.append(
+                {
+                    "catchment_id": cid,
+                    "change_type": change_type,
+                    "from_system": from_system,
+                    "to_system": to_system,
+                }
+            )
+
+        serializer = CatchmentCollectionSystemChangeSerializer(results, many=True)
         return Response(serializer.data)
 
 

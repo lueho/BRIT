@@ -127,6 +127,7 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
     default_nuts_prefix = ""
     default_nuts_level = ""
     map_overview_label = "Map overview"
+    map_overview_url = "waste-atlas-overview"
     allow_country_override = True
     allow_nuts_override = True
     map_set = ""
@@ -176,6 +177,7 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
         ctx["nuts_level"] = self.get_nuts_level()
         ctx["map_title"] = self.map_title
         ctx["map_overview_label"] = self.map_overview_label
+        ctx["map_overview_url"] = self.map_overview_url
         ctx["map_set_options"] = self.get_map_set_options()
         ctx["map_set_selector_label"] = self.map_set_selector_label
         ctx.update(
@@ -200,6 +202,47 @@ class WasteAtlasOverviewView(WasteAtlasGroupMixin, TemplateView):
             "person",
         )
         ctx.update(build_map_selection_context(reverse))
+        return ctx
+
+
+class WasteAtlasChangeMapOverviewView(WasteAtlasGroupMixin, TemplateView):
+    """Overview page for change maps — compare two versions of a waste atlas map."""
+
+    template_name = "waste_atlas/change_map_overview.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        selection_ctx = build_map_selection_context(reverse)
+        years = list(selection_ctx["map_selection_years"])
+        ctx.update(selection_ctx)
+        ctx["default_from_year"] = self.request.GET.get(
+            "from_year", years[-2] if len(years) > 1 else years[0]
+        )
+        ctx["default_to_year"] = self.request.GET.get(
+            "to_year", years[-1] if years else "2024"
+        )
+        return ctx
+
+
+class AtlasChangeMapView(AtlasMapView):
+    """Base view for waste atlas change map pages.
+
+    Subclasses set ``template_name``, ``map_title``, and ``data_url``.
+    Supports ``from_year`` and ``to_year`` query params.
+    """
+
+    data_url = ""
+    default_from_year = "2023"
+    default_to_year = "2024"
+    map_overview_url = "waste-atlas-change-map-overview"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["from_year"] = self.request.GET.get("from_year", self.default_from_year)
+        ctx["to_year"] = self.request.GET.get("to_year", self.default_to_year)
+        ctx["default_from_year"] = ctx["from_year"]
+        ctx["default_to_year"] = ctx["to_year"]
+        ctx["data_url"] = self.data_url
         return ctx
 
 
@@ -1052,6 +1095,18 @@ class GermanyBWRPOrgaLevelMapView(GermanyBWRPAtlasMapView):
 class GermanyCollectionSystemMapView(GermanyAtlasMapView):
     template_name = "waste_atlas/karte2_collection_system.html"
     map_title = "Primary collection system for kitchen waste"
+    map_route_key = "collection_system"
+
+
+class GermanyBiowasteCollectionSystemChangeMapView(AtlasChangeMapView):
+    """Change map — biowaste collection system changes in Germany."""
+
+    template_name = "waste_atlas/karte50_biowaste_collection_system_change.html"
+    map_title = "Biowaste collection system changes"
+    default_country = "DE"
+    default_from_year = "2023"
+    default_to_year = "2024"
+    data_url = "/waste_collection/api/waste-atlas/collection-system-change/"
     map_route_key = "collection_system"
 
 

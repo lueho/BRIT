@@ -4642,6 +4642,138 @@ class WasteAtlasMapViewsTestCase(TestCase):
             "person",
         )
 
+    def test_change_map_overview_renders_for_waste_atlas_group(self):
+        response = self.client.get(reverse("waste-atlas-change-map-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Waste Atlas — Change maps")
+        self.assertContains(response, "Compare waste atlas data between two years")
+        self.assertContains(response, "Configure comparison")
+
+    def test_change_map_overview_includes_dual_year_selector(self):
+        response = self.client.get(reverse("waste-atlas-change-map-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            '<label class="form-label" for="sel-from-year">From year</label>',
+        )
+        self.assertContains(
+            response,
+            '<label class="form-label" for="sel-to-year">To year</label>',
+        )
+        self.assertContains(response, '<select class="form-select" id="sel-from-year">')
+        self.assertContains(response, '<select class="form-select" id="sel-to-year">')
+        self.assertContains(response, 'id="sel-country"')
+        self.assertContains(response, 'id="sel-theme"')
+
+    def test_change_map_overview_defaults_from_year_to_second_last(self):
+        response = self.client.get(reverse("waste-atlas-change-map-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<option value="2023"')
+        self.assertContains(response, '<option value="2024"')
+
+    def test_change_map_overview_allows_year_override_via_query_params(self):
+        response = self.client.get(
+            reverse("waste-atlas-change-map-overview"),
+            {"from_year": "2020", "to_year": "2022"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<option value="2020"')
+        self.assertContains(response, '<option value="2022"')
+
+    def test_change_map_overview_links_back_to_map_overview(self):
+        response = self.client.get(reverse("waste-atlas-change-map-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'href="{reverse("waste-atlas-overview")}"',
+        )
+        self.assertContains(response, "Map overview")
+
+    def test_change_map_overview_denies_anonymous_users(self):
+        self.client.logout()
+        response = self.client.get(reverse("waste-atlas-change-map-overview"))
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_change_map_overview_denies_users_without_waste_atlas_group(self):
+        non_atlas_user = User.objects.create_user(
+            username="non-atlas-user", password="secret"
+        )
+        self.client.force_login(non_atlas_user)
+        response = self.client.get(reverse("waste-atlas-change-map-overview"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_map_overview_links_to_change_map_overview(self):
+        response = self.client.get(reverse("waste-atlas-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'href="{reverse("waste-atlas-change-map-overview")}"',
+        )
+        self.assertContains(response, "Change maps")
+
+    def test_germany_collection_system_change_map_renders(self):
+        response = self.client.get(
+            reverse("waste-atlas-germany-collection-system-change-map")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Biowaste collection system changes")
+        self.assertContains(response, "2023")
+        self.assertContains(response, "2024")
+        self.assertContains(
+            response,
+            "/waste_collection/api/waste-atlas/collection-system-change/",
+        )
+
+    def test_germany_collection_system_change_map_year_params(self):
+        response = self.client.get(
+            reverse("waste-atlas-germany-collection-system-change-map"),
+            {"from_year": "2020", "to_year": "2022"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "2020")
+        self.assertContains(response, "2022")
+        # Year selectors should reflect query params
+        self.assertContains(response, '<option value="2020"')
+        self.assertContains(response, '<option value="2022"')
+
+    def test_germany_collection_system_change_map_denies_anonymous(self):
+        self.client.logout()
+        response = self.client.get(
+            reverse("waste-atlas-germany-collection-system-change-map")
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_germany_collection_system_change_map_denies_non_atlas_user(self):
+        non_atlas_user = User.objects.create_user(
+            username="non-atlas-change-user", password="secret"
+        )
+        self.client.force_login(non_atlas_user)
+        response = self.client.get(
+            reverse("waste-atlas-germany-collection-system-change-map")
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_change_map_overview_links_to_germany_change_map(self):
+        response = self.client.get(reverse("waste-atlas-change-map-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse("waste-atlas-germany-collection-system-change-map"),
+        )
+
 
 @override_settings(
     WASTE_COLLECTION_POPULATION_ATTRIBUTE_ID=None,

@@ -94,6 +94,7 @@ from .views import (
     FoodWasteCategoryMapView,
     GermanyBiowasteCollectionAmountMapView,
     GermanyBiowasteCollectionCountMapView,
+    GermanyBiowasteCollectionSystemChangeMapView,
     GermanyBiowasteFeeSystemMapView,
     GermanyBiowasteFrequencyMapView,
     GermanyBiowasteMinBinSizeMapView,
@@ -183,6 +184,7 @@ from .views import (
     SwedenBinConfigurationMapView,
     SwedenOrgaLevelMapView,
     SwedenPopulationDensityMapView,
+    WasteAtlasChangeMapOverviewView,
     WasteAtlasOverviewView,
     WasteRatioMapView,
 )
@@ -193,6 +195,11 @@ urlpatterns = [
         "map/",
         WasteAtlasOverviewView.as_view(),
         name="waste-atlas-overview",
+    ),
+    path(
+        "map/changes/",
+        WasteAtlasChangeMapOverviewView.as_view(),
+        name="waste-atlas-change-map-overview",
     ),
     path(
         "map/europe-data-coverage/",
@@ -634,6 +641,11 @@ urlpatterns = [
         "map/germany/collection-system/",
         GermanyCollectionSystemMapView.as_view(),
         name="waste-atlas-germany-collection-system-map",
+    ),
+    path(
+        "map/germany/collection-system-change/",
+        GermanyBiowasteCollectionSystemChangeMapView.as_view(),
+        name="waste-atlas-germany-collection-system-change-map",
     ),
     path(
         "map/germany/connection-rate/",
