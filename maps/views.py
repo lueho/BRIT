@@ -17,9 +17,9 @@ from django_filters.views import FilterView
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.views import APIView, Response
 
+from maps.mixins import get_unbounded_geojson_rejection_response
 from maps.runtime_adapters import get_dataset_runtime_adapter
 from maps.serializers import (
-    CatchmentGeoFeatureModelSerializer,
     LauRegionOptionSerializer,
     LauRegionSummarySerializer,
     MapConfigurationSerializer,
@@ -921,6 +921,14 @@ class GeoDataSetRuntimeFeatureGeoJSONView(
         if not getattr(adapter, "uses_local_relation", False):
             raise Http404("Dataset does not use a local relation runtime.")
         count = adapter.get_record_count(query_params=request.GET)
+        rejection_response = get_unbounded_geojson_rejection_response(
+            request,
+            count,
+            bounded_query_params={"id", *adapter.get_filterable_column_names()},
+        )
+        if rejection_response is not None:
+            return rejection_response
+
         data_version = adapter.get_data_version(query_params=request.GET)
         response = StreamingHttpResponse(
             adapter.stream_geojson_feature_collection(
@@ -1343,38 +1351,6 @@ class RegionOfLauAutocompleteView(UserCreatedObjectAutocompleteView):
 
 class RegionPropertyAutocompleteView(UserCreatedObjectAutocompleteView):
     model = RegionProperty
-
-
-class CatchmentOptionGeometryAPI(APIView):
-    authentication_classes = []
-    permission_classes = []
-
-    @staticmethod
-    def get(request):
-        """Return GeoJSON for catchment options.
-
-        If a ``parent_id`` query parameter is provided, the endpoint returns all
-        child catchments of the parent catchment's region. Otherwise it returns
-        *all* catchments.
-        """
-        qs = Catchment.objects.select_related("region", "region__borders").all()
-
-        parent_id = request.query_params.get("parent_id")
-        if parent_id is not None:
-            try:
-                parent_catchment = Catchment.objects.get(pk=parent_id)
-            except Catchment.DoesNotExist:
-                return JsonResponse(
-                    {"detail": "Parent catchment not found."}, status=404
-                )
-            parent_region = parent_catchment.region
-            # Keep select_related for serializer geometry access
-            qs = parent_region.child_catchments.select_related(
-                "region", "region__borders"
-            ).all()
-
-        serializer = CatchmentGeoFeatureModelSerializer(qs, many=True)
-        return JsonResponse({"geoJson": serializer.data})
 
 
 # ----------- NutsRegions ----------------------------------------------------------------------------------------------

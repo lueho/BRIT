@@ -6,7 +6,11 @@ from django.urls import reverse
 from django_filters import rest_framework as rf_filters
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import (
+    NotAuthenticated,
+    PermissionDenied,
+    ValidationError,
+)
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
@@ -180,6 +184,21 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         if getattr(self, "action", None) in {"geojson", "list", "version"}:
             return {"skip_min_max": True}
         return {}
+
+    def _enforce_authenticated_non_public_scope(self, request):
+        scope = (request.query_params.get("scope") or "published").lower()
+        if scope == "published":
+            return
+
+        user = getattr(request, "user", None)
+        if user is None or not user.is_authenticated:
+            raise NotAuthenticated(
+                f"Authentication is required to access the '{scope}' scope."
+            )
+
+    def list(self, request, *args, **kwargs):
+        self._enforce_authenticated_non_public_scope(request)
+        return super().list(request, *args, **kwargs)
 
     def get_cache_key(self, request):
         """Build a deterministic cache key including filters and dataset version.
@@ -735,6 +754,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     def property_values(self, request, *args, **kwargs):
         """List CollectionPropertyValue records, optionally filtered by collection."""
         self.check_permissions(request)
+        self._enforce_authenticated_non_public_scope(request)
         queryset = self._visible_property_value_queryset(request)
 
         collection_id = request.query_params.get("collection")
@@ -1242,6 +1262,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
     def summaries(self, request, *args, **kwargs):
         self.check_permissions(request)
+        self._enforce_authenticated_non_public_scope(request)
         queryset = self._visible_summary_queryset(request).filter(
             id__in=request.query_params.getlist("id")
         )
@@ -1256,6 +1277,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
     def frequencies(self, request, *args, **kwargs):
         self.check_permissions(request)
+        self._enforce_authenticated_non_public_scope(request)
         queryset = self._visible_frequency_queryset(request)
 
         exact_name = str(request.query_params.get("exact_name") or "").strip()
@@ -1289,6 +1311,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         Uses simplified geometry to reduce payload size and improve performance.
         Rate limited to prevent abuse and protect against crawler overload.
         """
+        self._enforce_authenticated_non_public_scope(request)
         return super().geojson(request, *args, **kwargs)
 
 

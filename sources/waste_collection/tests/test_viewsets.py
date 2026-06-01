@@ -132,6 +132,26 @@ class CollectionViewSetTestCase(APITestCase):
         self.assertIn(self.published_collection.pk, feature_ids)
         self.assertIn(self.other_user_published_collection.pk, feature_ids)
 
+    def test_geojson_published_scope_allows_anonymous_access(self):
+        url = reverse("api-waste-collection-geojson")
+
+        response = self.client.get(url, {"scope": "published"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        feature_ids = {
+            feature["properties"]["id"] for feature in response.data["features"]
+        }
+        self.assertIn(self.published_collection.pk, feature_ids)
+        self.assertIn(self.other_user_published_collection.pk, feature_ids)
+
+    def test_geojson_non_public_scope_requires_authentication(self):
+        url = reverse("api-waste-collection-geojson")
+
+        response = self.client.get(url, {"scope": "private"})
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn("Authentication is required", response.data["detail"])
+
     def test_geojson_endpoint_with_private_scope(self):
         """Should return only the user's collections (private, review, published) for 'private' scope."""
         self.client.force_login(self.regular_user)
@@ -298,6 +318,15 @@ class CollectionViewSetTestCase(APITestCase):
         self.assertEqual(result["predecessor_ids"], [predecessor.pk])
         self.assertEqual(result["successor_ids"], [])
 
+    def test_list_non_public_scope_requires_authentication(self):
+        response = self.client.get(
+            reverse("api-waste-collection-list"),
+            {"scope": "private"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn("Authentication is required", response.data["detail"])
+
     def test_summaries_endpoint_returns_own_private_collection_without_scope(self):
         self.client.force_login(self.regular_user)
 
@@ -314,6 +343,18 @@ class CollectionViewSetTestCase(APITestCase):
             summaries[0]["Publication status"],
             UserCreatedObject.STATUS_PRIVATE,
         )
+
+    def test_summaries_non_public_scope_requires_authentication(self):
+        response = self.client.get(
+            reverse("api-waste-collection-summaries"),
+            {
+                "scope": "review",
+                "id": [self.review_collection.pk],
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn("Authentication is required", response.data["detail"])
 
     def test_summaries_endpoint_hides_other_users_private_collection(self):
         self.client.force_login(self.regular_user)
@@ -355,6 +396,15 @@ class CollectionViewSetTestCase(APITestCase):
                 }
             ],
         )
+
+    def test_frequencies_non_public_scope_requires_authentication(self):
+        response = self.client.get(
+            reverse("api-waste-collection-frequencies"),
+            {"scope": "private"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn("Authentication is required", response.data["detail"])
 
     def test_create_permission_denied_without_model_permission(self):
         """User without add_collection permission cannot create collections."""

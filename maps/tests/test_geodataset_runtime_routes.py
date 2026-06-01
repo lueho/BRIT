@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 
 from django.contrib.admin.sites import AdminSite
 from django.core.exceptions import ImproperlyConfigured
@@ -476,6 +477,41 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertEqual(response["X-Total-Count"], "1002")
         self.assertEqual(len(response["X-Data-Version"]), 12)
         self.assertEqual(len(self._streaming_json(response)["features"]), 1002)
+
+    def test_local_relation_geojson_route_rejects_large_unbounded_request(self):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                INSERT INTO public.{self.relation_name}
+                    (feature_id, name, nuts_id, hidden_code, geom)
+                SELECT
+                    generated_id,
+                    'Local feature ' || generated_id,
+                    'DE-' || generated_id,
+                    'hidden-' || generated_id,
+                    ST_Transform(ST_SetSRID(ST_Point(10, 53), 4326), 3857)
+                FROM generate_series(3, 102) AS generated_id
+                """
+            )
+
+        with patch("maps.mixins.MAX_UNBOUNDED_GEOJSON_FEATURES", 100):
+            response = self.client.get(
+                reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk})
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response["X-Cache-Status"], "REJECT")
+        self.assertEqual(response["X-Total-Count"], "102")
+
+    def test_local_relation_geojson_route_allows_filterable_bound(self):
+        with patch("maps.mixins.MAX_UNBOUNDED_GEOJSON_FEATURES", 0):
+            response = self.client.get(
+                reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk}),
+                {"nuts_id": "DE-B"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(self._streaming_json(response)["features"]), 1)
 
     def test_local_relation_geojson_route_ignores_hidden_column_filter(self):
         response = self.client.get(
