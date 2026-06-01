@@ -196,6 +196,10 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 f"Authentication is required to access the '{scope}' scope."
             )
 
+    def list(self, request, *args, **kwargs):
+        self._enforce_authenticated_non_public_scope(request)
+        return super().list(request, *args, **kwargs)
+
     def get_cache_key(self, request):
         """Build a deterministic cache key including filters and dataset version.
 

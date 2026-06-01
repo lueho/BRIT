@@ -708,6 +708,7 @@ Implementation checkpoint:
 - Waste Collection API scope guard started:
   - `scope=published` remains anonymously accessible for public map/data use.
   - Explicit non-public scopes now require authentication on:
+    - `/waste_collection/api/collection/`
     - `/waste_collection/api/collection/geojson/`
     - `/waste_collection/api/collection/summaries/`
     - `/waste_collection/api/collection/frequencies/`

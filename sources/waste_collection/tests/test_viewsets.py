@@ -318,6 +318,15 @@ class CollectionViewSetTestCase(APITestCase):
         self.assertEqual(result["predecessor_ids"], [predecessor.pk])
         self.assertEqual(result["successor_ids"], [])
 
+    def test_list_non_public_scope_requires_authentication(self):
+        response = self.client.get(
+            reverse("api-waste-collection-list"),
+            {"scope": "private"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn("Authentication is required", response.data["detail"])
+
     def test_summaries_endpoint_returns_own_private_collection_without_scope(self):
         self.client.force_login(self.regular_user)
 
