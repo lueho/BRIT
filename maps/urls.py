@@ -21,7 +21,6 @@ from .views import (
     CatchmentCreateView,
     CatchmentDetailView,
     CatchmentModalDeleteView,
-    CatchmentOptionGeometryAPI,
     CatchmentPrivateFilterView,
     CatchmentPublishedFilterView,
     CatchmentRegionGeometryAPI,
@@ -259,11 +258,6 @@ urlpatterns = [
         "catchments/autocomplete/",
         CatchmentAutocompleteView.as_view(),
         name="catchment-autocomplete",
-    ),
-    path(
-        "catchment_options/data/",
-        CatchmentOptionGeometryAPI.as_view(),
-        name="data.catchment-options",
     ),
     path(
         "catchment_region_geometries/",

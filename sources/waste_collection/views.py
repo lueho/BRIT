@@ -26,12 +26,10 @@ from bibliography.views import (
     SourceModalDetailView,
 )
 from maps.filters import CatchmentFilterSet
-from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.views import (
     CatchmentCreateView,
     CatchmentDetailView,
     CatchmentUpdateView,
-    GeoDataSetFormMixin,
     GeoDataSetPrivateFilteredMapView,
     GeoDataSetPublishedFilteredMapView,
     GeoDataSetReviewFilteredMapView,
@@ -125,7 +123,6 @@ from utils.object_management.views import (
     WithdrawFromReviewView,
 )
 from utils.views import BreadcrumbContextMixin
-
 
 logger = logging.getLogger(__name__)
 
@@ -2007,36 +2004,6 @@ class SoilcomDatasetVersionMixin:
         ctx = super().get_context_data(**kwargs)
         ctx["dataset_version"] = self.get_dataset_version()
         return ctx
-
-
-# TODO: This is out of use - Decide to fix or remove
-class CatchmentSelectView(GeoDataSetFormMixin, MapMixin, TemplateView):
-    template_name = "waste_collection_catchment_list.html"
-    form_class = NutsAndLauCatchmentQueryForm
-    region_url = reverse_lazy("data.catchment_region_geometries")
-    feature_url = reverse_lazy("data.catchment-options")
-    feature_summary_url = reverse_lazy("data.catchment_region_summaries")
-    load_features = False
-    load_catchment = True
-    adjust_bounds_to_features = False
-    load_region = False
-    map_title = "Catchments"
-    feature_layer_style = {"color": "#4061d2", "fillOpacity": 1, "stroke": False}
-
-    def get_initial(self):
-        initial = {}
-        region_id = self.get_region_feature_id()
-        catchment_id = self.request.GET.get("catchment")
-        if catchment_id:
-            catchment = CollectionCatchment.objects.get(id=catchment_id)
-            initial["parent_region"] = catchment.parent_region.id
-            initial["catchment"] = catchment.id
-        elif region_id:
-            initial["region"] = region_id
-        return initial
-
-    def get_region_feature_id(self):
-        return self.request.GET.get("region")
 
 
 class WasteCollectionPublishedMapView(

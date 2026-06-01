@@ -20,7 +20,6 @@ from rest_framework.views import APIView, Response
 from maps.mixins import get_unbounded_geojson_rejection_response
 from maps.runtime_adapters import get_dataset_runtime_adapter
 from maps.serializers import (
-    CatchmentGeoFeatureModelSerializer,
     LauRegionOptionSerializer,
     LauRegionSummarySerializer,
     MapConfigurationSerializer,
@@ -1352,49 +1351,6 @@ class RegionOfLauAutocompleteView(UserCreatedObjectAutocompleteView):
 
 class RegionPropertyAutocompleteView(UserCreatedObjectAutocompleteView):
     model = RegionProperty
-
-
-class CatchmentOptionGeometryAPI(APIView):
-    authentication_classes = []
-    permission_classes = []
-
-    @staticmethod
-    def get(request):
-        """Return GeoJSON for catchment options.
-
-        The endpoint returns either one catchment by ``id`` or all child
-        catchments of a parent catchment's region by ``parent_id``.
-        """
-        qs = Catchment.objects.select_related("region", "region__borders").all()
-
-        catchment_id = request.query_params.get("id")
-        parent_id = request.query_params.get("parent_id")
-        if catchment_id is None and parent_id is None:
-            return JsonResponse(
-                {"detail": 'Query parameter "id" or "parent_id" is required.'},
-                status=400,
-            )
-
-        if catchment_id is not None:
-            qs = qs.filter(pk=catchment_id)
-            if not qs.exists():
-                return JsonResponse({"detail": "Catchment not found."}, status=404)
-
-        if parent_id is not None:
-            try:
-                parent_catchment = Catchment.objects.get(pk=parent_id)
-            except Catchment.DoesNotExist:
-                return JsonResponse(
-                    {"detail": "Parent catchment not found."}, status=404
-                )
-            parent_region = parent_catchment.region
-            # Keep select_related for serializer geometry access
-            qs = parent_region.child_catchments.select_related(
-                "region", "region__borders"
-            ).all()
-
-        serializer = CatchmentGeoFeatureModelSerializer(qs, many=True)
-        return JsonResponse({"geoJson": serializer.data})
 
 
 # ----------- NutsRegions ----------------------------------------------------------------------------------------------

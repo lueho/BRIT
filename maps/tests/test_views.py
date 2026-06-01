@@ -1042,45 +1042,6 @@ class NutsRegionMapViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
 
 
-class CatchmentOptionGeometryAPITestCase(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.parent_region = Region.objects.create(name="Parent Region")
-        cls.parent_catchment = Catchment.objects.create(region=cls.parent_region)
-        cls.child_region = Region.objects.create(name="Child Region")
-        cls.child_catchment = Catchment.objects.create(
-            region=cls.child_region,
-            parent_region=cls.parent_region,
-        )
-
-    def test_rejects_unbounded_request(self):
-        response = self.client.get(reverse("data.catchment-options"))
-
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(
-            response.json()["detail"],
-            'Query parameter "id" or "parent_id" is required.',
-        )
-
-    def test_returns_single_catchment_by_id(self):
-        response = self.client.get(
-            reverse("data.catchment-options"),
-            {"id": self.parent_catchment.pk},
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()["geoJson"]["features"]), 1)
-
-    def test_returns_children_by_parent_id(self):
-        response = self.client.get(
-            reverse("data.catchment-options"),
-            {"parent_id": self.parent_catchment.pk},
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()["geoJson"]["features"]), 1)
-
-
 class NutsAndLauCatchmentPedigreeAPITestCase(ViewSetWithPermissionsTestCase):
     member_permissions = "add_collection"
 
