@@ -1,6 +1,6 @@
 # Production Performance and Stability Plan
 
-- **Status**: Active roadmap; May 31 logs add collection-list serialization and deployment-verification priorities; June 1 endpoint-consumer review adds guardrail priorities by use case
+- **Status**: Active roadmap; May 31 logs add collection-list serialization and deployment-verification priorities; June 1 endpoint-consumer review adds guardrail priorities, a DRF-GIS-first geospatial delivery strategy, and public-surface/bot-protection work
 - **Date**: 2026-05-28
 - **Scope**: Production latency, crawler resilience, GIS serialization safety, GeoJSON delivery, heavy API list serialization, deployment verification, and operational noise reduction
 
@@ -32,11 +32,22 @@ This document tracks the remaining recommendations needed to make the system mor
 - **Prefer server-side enforcement over crawler etiquette**
   - `robots.txt` is useful, but not sufficient. Expensive endpoints need application-level guards.
 
+- **Minimize the anonymous public attack surface**
+  - Every performance-critical endpoint should have an explicit access decision: public by product requirement, registered-user only, staff/reviewer only, or internal/worker only.
+  - Public endpoints should be the exception for product-facing maps, public datasets, documented external GIS access, and registration/login flows, not the default for every API route.
+
+- **Treat bots and crawlers as a first-class performance risk**
+  - Bot controls, anonymous rate limits, cheap rejection, Cloudflare rules, and registration protection should be implemented before changing serializer architecture.
+
 - **Treat "implemented" as incomplete until production behavior is verified**
   - Every critical guard needs a post-deploy smoke check against the production route, because an undeployed or misconfigured guard is operationally equivalent to no guard.
 
-- **Move geometry serialization out of Python hot paths where possible**
-  - Large geometry responses should avoid repeated DRF-GIS and GEOS/OGR conversion when database-side GeoJSON or cached artifacts can serve the same purpose.
+- **Keep DRF-GIS where it is the right abstraction**
+  - Normal API/CRUD endpoints should keep DRF/DRF-GIS serializers for validation, permissions, browsable API behavior, nested fields, create/update behavior, and serializer reuse.
+
+- **Switch away from DRF-GIS only as a last resort**
+  - For heavy read-only layer delivery, first restrict unnecessary public access, add bounds and pagination, improve query planning, cache and pre-warm common responses, offload exports, and add bot/rate-limit controls.
+  - Only move a route to database-side GeoJSON, vector tiles, cached artifacts, or worker-generated files when DRF-GIS remains too slow after those measures or when the endpoint is clearly a rendered geospatial transport rather than a domain API.
 
 - **Keep generic dataset exploration safe by default**
   - Dynamic `GeoDataset` surfaces need caps, indexes, observability, and clear exposure policies before broad public use.
@@ -65,11 +76,19 @@ This document tracks the remaining recommendations needed to make the system mor
 - This confirms a separate high-risk class from GIS: list/research/export endpoints that combine many rows with dynamic per-row fields, relationship lookups, property lookup, region attributes, CPV/ACPV display values, flyers, and sources.
 - The default API list path should therefore be compact, paginated, and query-planned. Heavy dynamic-column output should be bounded, explicitly requested, or moved to an asynchronous export path.
 
-### 3.3 Bot and invalid POST latency
+### 3.3 Bot and invalid-request latency
 
 Repeated `/users/register/?next=/home/` POSTs from varied IP addresses took up to about 3.2 seconds and returned HTTP 200. This is likely invalid bot/form traffic, possibly involving Turnstile validation. It is not the main stability issue, but it is a cheap hardening target.
 
 The 2026-05-31 router logs additionally showed repeated invalid `POST /` traffic from one IP, taking about 2.3-3.1 seconds and returning 301/403. Root-level invalid POSTs should fail cheaply for the same reason as registration bot traffic.
+
+Bot and crawler traffic should be treated as a likely amplifier for the GeoJSON
+and heavy-list incidents. Before replacing DRF-GIS paths, audit which heavy
+endpoints actually need anonymous access and apply registered-user, group,
+throttle, or edge protections where public access is not part of the product
+requirement. BRIT already uses Cloudflare Turnstile on registration; for API and
+map endpoints, evaluate Cloudflare WAF rules, rate limiting, managed challenges,
+or Turnstile/pre-clearance flows where compatible with normal browser map use.
 
 ### 3.4 Broken-link and warning noise
 
@@ -101,6 +120,40 @@ datasets for maps, Waste Atlas pages, QGIS, or exports. Guardrails therefore
 need to distinguish unsupported unbounded requests from legitimate broad
 product use cases that should be cached, streamed, precomputed, or moved to
 workers.
+
+Serializer and delivery strategy should be tiered, with DRF-GIS as the default
+and database/vector-tile transports as escalation paths rather than a blanket
+replacement:
+
+1. **DRF-GIS**
+   - Use for correctness-oriented domain APIs, normal CRUD, admin-facing edit
+     flows, modest payloads, object details, validation, permissions, browsable
+     API behavior, and serializer reuse.
+2. **DB-side GeoJSON streaming**
+   - Use only after access restrictions, bot controls, caching/warming,
+     query-planning improvements, bounds, pagination, and async exports are not
+     enough for a heavy read-only endpoint.
+   - Target endpoints that represent a rendered layer or export payload rather
+     than editable domain objects.
+   - Require bbox, country, year, waste category, collection system, ID, or
+     similarly explicit filters unless the endpoint is backed by a warmed
+     artifact or intentionally supports a broad public scope.
+   - Generate each feature with PostGIS, transform output to EPSG:4326, and
+     stream rows in chunks from Django without hydrating model instances.
+   - Do not use a single `json_agg`/`json_build_object` query as the default
+     implementation for large responses, because it still materializes the full
+     FeatureCollection before returning it.
+3. **PostGIS vector tiles**
+   - Use as a later escalation for high-performance interactive maps with many
+     features or complex nationwide geometries.
+   - Keep GeoJSON available for smaller filtered datasets, debugging, public
+     data access, and exports where FeatureCollection semantics are required.
+
+Decision criterion: if an endpoint represents **domain objects**, keep DRF or
+DRF-GIS. If it represents a **rendered geospatial layer**, still try DRF-GIS
+with access controls, caching, throttling, and bounded requests first; prefer a
+dedicated read-only transport path backed by PostGIS, artifacts, or vector tiles
+only when those lower-risk measures are insufficient.
 
 #### Shared map GeoJSON endpoints
 
@@ -157,8 +210,10 @@ Recommended guardrails:
   client-side version-aware caching.
 - Do not require `bbox` for Waste Atlas NUTS requests, because country-level
   NUTS geometry is a valid product use case.
-- Move large Region/Catchment/NUTS serialization toward DB-side GeoJSON
-  streaming or precomputed simplified artifacts.
+- Keep large Region/Catchment/NUTS responses on DRF-GIS where caching,
+  warming, simplified geometry, and bounded requests are sufficient.
+- Escalate only persistently failing large Region/Catchment/NUTS responses to
+  DB-side GeoJSON streaming or precomputed simplified artifacts.
 - Add feature-count, estimated point-count, serialization-mode, cache-status,
   duration, and response-size logging.
 - Pre-warm common country and NUTS-level artifacts used by Waste Atlas.
@@ -205,8 +260,8 @@ Current guardrails:
 Recommended guardrails:
 
 - Treat this as the highest-priority remaining GeoJSON endpoint.
-- Replace DRF-GIS serialization on large responses with DB-side GeoJSON
-  streaming or precomputed artifacts.
+- Bypass DRF-GIS only for large read-only layer responses, using DB-side
+  GeoJSON streaming or precomputed artifacts.
 - Pre-warm common scopes:
   - published all
   - per country
@@ -612,26 +667,106 @@ Success criteria:
 - Representative paginated collection list responses have bounded query counts and avoid N+1 relationship lookups.
 - Heavy exports are explicit, bounded, or asynchronous and cannot trigger Gunicorn worker timeouts.
 
-### Phase 2 - Move large GeoJSON generation to cheaper serialization paths
+### Phase 2 - Audit public exposure and add bot/crawler protection
 
-Goal: reduce CPU and memory cost for legitimate large geometry requests.
+Goal: reduce avoidable anonymous load before changing serializer architecture.
 
 Tasks:
 
-- Prefer database-side geometry serialization for large querysets:
+- Classify every high-cost endpoint as one of:
+  - anonymous public by product requirement
+  - registered-user only
+  - staff/reviewer only
+  - internal/worker only
+- Restrict endpoints to registered users when the only known consumers are
+  authenticated BRIT UI flows, review workflows, admin/editor workflows, or
+  internal tooling.
+- Keep anonymous access only for intentional public surfaces:
+  - public map pages and their necessary layer endpoints
+  - public Waste Atlas views
+  - documented public data or QGIS access
+  - registration, login, static assets, and public documentation
+- For anonymous public heavy endpoints, add or verify:
+  - DRF throttling or middleware-level rate limits
+  - cheap rejection for invalid methods and malformed parameters
+  - required bbox/filter/country/year/category bounds where product-compatible
+  - cache-aware handling so repeated public requests do not recompute data
+  - structured logging for rejects, throttle hits, and suspicious user agents
+- Use Cloudflare as an outer protection layer:
+  - keep Turnstile on registration and confirm failures are cheap
+  - consider Cloudflare WAF/rate-limiting rules for expensive anonymous API
+    paths
+  - consider managed challenges or Turnstile/pre-clearance for browser-facing
+    map entry points where it does not break normal map tile/layer fetches
+  - avoid adding interactive challenges directly to machine-oriented documented
+    GIS/API endpoints unless an alternate authenticated access path exists
+- Add post-deploy smoke checks for both anonymous rejection and allowed
+  registered-user access.
+
+Implementation checkpoint:
+
+- Waste Collection API scope guard started:
+  - `scope=published` remains anonymously accessible for public map/data use.
+  - Explicit non-public scopes now require authentication on:
+    - `/waste_collection/api/collection/geojson/`
+    - `/waste_collection/api/collection/summaries/`
+    - `/waste_collection/api/collection/frequencies/`
+    - `/waste_collection/api/collection/property-value/`
+  - Anonymous requests to `private`, `review`, `declined`, or `archived` scopes
+    fail before expensive filtering or serialization work.
+- Validation:
+  - `docker compose exec web python manage.py test sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase --settings=brit.settings.testrunner --keepdb --noinput`
+  - `docker compose exec web ruff check sources/waste_collection/viewsets.py sources/waste_collection/tests/test_viewsets.py`
+
+Success criteria:
+
+- Each critical endpoint has an explicit public/authenticated/staff/internal
+  exposure decision.
+- Anonymous bots cannot freely exercise high-cost endpoints that are not
+  intentionally public.
+- Public map and data pages still work for legitimate users.
+- DRF-GIS remains the serving path unless production evidence shows that access
+  control, throttling, bounds, caching, and query improvements are insufficient.
+
+### Phase 3 - Keep DRF-GIS viable for large read-only GeoJSON where possible
+
+Goal: reduce CPU and memory cost for legitimate large geometry requests while
+keeping DRF-GIS as the default implementation.
+
+Tasks:
+
+- Keep DRF-GIS on normal domain-object APIs and CRUD/edit endpoints.
+- Optimize existing DRF-GIS layer endpoints before replacing them:
+  - narrow querysets with `only()`, `defer()`, `select_related()`, and
+    `prefetch_related()` where relevant
+  - use simplified or annotated geometries for map display where full precision
+    is unnecessary
+  - avoid expensive dynamic properties in geometry serializers
+  - precompute or cache repeated properties used in GeoJSON `properties`
+  - keep `CachedGeoJSONMixin` cache/version behavior and pre-warm common scopes
+  - enforce safe bbox/filter/country/year/category bounds on cache misses
+- Prefer database-side geometry serialization only as a fallback for heavy
+  read-only layer,
+  export, or public data endpoints:
   - `ST_AsGeoJSON`
   - Django GIS `AsGeoJSON`
   - controlled `SimplifyPreserveTopology` where appropriate
 - Avoid materializing `serializer.data` for large geometry result sets.
 - Add simplified geometry modes for UI map display where full precision is not needed.
 - Evaluate whether common boundaries should have precomputed simplified geometry columns or cached artifacts.
-- Stream database rows, not serializer objects:
-  - Use `iterator()` or raw cursors.
+- Stream database rows, not serializer objects or aggregate JSON blobs:
+  - Use server-side cursors, `iterator()`, or chunked raw cursor fetches.
   - Let PostGIS return geometry as GeoJSON text.
+  - Transform geometry to EPSG:4326 before serializing GeoJSON transport.
   - Build each GeoJSON feature with lightweight Python `json.dumps`.
+  - Yield the FeatureCollection wrapper and one feature per row.
   - Avoid model instantiation and DRF serializers for bulk map payloads.
+- Avoid relying on one `json_build_object(..., "features", json_agg(...))`
+  query for large endpoints. It can reduce Python overhead, but it still
+  constructs the full response before Django can send bytes to the client.
 - Evaluate vector tiles (`MVT`) for interactive map browsing:
   - Use `ST_AsMVT` for tile generation.
+  - Use `ST_AsMVTGeom` to transform and clip features to tile coordinate space.
   - Return only features visible in the current tile/zoom.
   - Simplify automatically per zoom level.
   - Cache tiles aggressively.
@@ -649,15 +784,22 @@ Tasks:
   - Cursor, limit, or page-based chunking.
   - Newline-delimited GeoJSON features.
   - Asynchronous export jobs for large datasets.
+- Prefer the existing Celery file-export pattern for very large exports, because
+  WSGI streaming still occupies a web worker for the full response duration and
+  does not allow normal middleware to compute full-content metadata such as
+  `ETag` or `Content-Length`.
 - Keep full-resolution geometry available only where the product actually needs it.
 
 Success criteria:
 
-- Large map responses avoid repeated Python GEOS/OGR conversion.
-- Memory usage is bounded during cache misses.
+- Most large map responses remain on DRF-GIS and are served from cache, warmed
+  artifacts, or bounded querysets.
+- Routes that still time out after the earlier measures have a documented
+  last-resort escalation plan.
+- Memory usage is bounded during legitimate cache misses.
 - Visual map quality remains acceptable for normal browsing.
 
-### Phase 3 - Harden GeoJSON caching, streaming, and cache warming
+### Phase 4 - Harden GeoJSON caching, streaming, and cache warming
 
 Goal: make cold map loads predictable and reduce repeated expensive cache misses.
 
@@ -679,7 +821,8 @@ Tasks:
 - Offload repeatable expensive work to worker dynos:
   - GeoJSON cache warmers for common full-layer and filtered artifacts.
   - Materialized GeoJSON generation for common scopes.
-  - Vector tile pre-generation for hot areas and zoom ranges.
+  - Vector tile pre-generation for hot areas and zoom ranges only if a route is
+    escalated beyond DRF-GIS/cached GeoJSON.
   - Simplified geometry column refresh after source geometry changes.
   - Dataset-version computation if current aggregation is expensive.
   - Async export file generation for user-requested large exports.
@@ -692,7 +835,7 @@ Success criteria:
 - Cache misses have bounded memory/CPU behavior.
 - Production logs make slow GeoJSON requests diagnosable without stack traces.
 
-### Phase 4 - Frontend request discipline
+### Phase 5 - Frontend request discipline
 
 Goal: prevent BRIT's own JavaScript from accidentally making broad geometry requests.
 
@@ -710,7 +853,7 @@ Success criteria:
 - Empty selector states load cheap defaults, not detailed features.
 - Frontend behavior matches server-side guard expectations.
 
-### Phase 5 - Generic GeoDataset runtime safeguards
+### Phase 6 - Generic GeoDataset runtime safeguards
 
 Goal: ensure dynamic dataset exploration remains safe as more datasets become runtime-configured.
 
@@ -732,13 +875,14 @@ Success criteria:
 - Operators can see when a dataset is unsafe to publish broadly.
 - Dynamic routes retain the same exposure-policy guarantees as bespoke routes.
 
-### Phase 6 - Reduce bot and invalid-request pressure
+### Phase 7 - Reduce remaining bot and invalid-request pressure
 
 Goal: reduce avoidable latency and wasted work from automated traffic.
 
 Tasks:
 
-- Add rate limiting for `/users/register/`.
+- Keep rate limiting for `/users/register/` aligned with existing Cloudflare
+  Turnstile protection.
 - Confirm Turnstile validation fails cheaply for invalid submissions.
 - Make invalid `POST /` requests fail cheaply before expensive middleware, form, or permission work.
 - Consider infrastructure-level bot rules for repeated invalid registration POSTs.
@@ -752,7 +896,7 @@ Success criteria:
 - Expensive anonymous endpoints have a clear request budget.
 - Legitimate logged-in users are not blocked by crawler protections.
 
-### Phase 7 - Clean production warning noise
+### Phase 8 - Clean production warning noise
 
 Goal: make logs actionable and remove repeated stale-link patterns.
 
@@ -770,14 +914,16 @@ Success criteria:
 - Repeated known 404/400 warnings are removed or intentionally downgraded.
 - Production warning logs are useful for detecting new regressions.
 
-### Phase 8 - Web dyno vs worker dyno responsibility split
+### Phase 9 - Web dyno vs worker dyno responsibility split
 
 Goal: keep the web request path fast while still serving large feature collections.
 
 Web dyno responsibilities:
 
 - Small filtered GeoJSON responses.
-- Streaming DB-side GeoJSON rows for medium/large arbitrary filters.
+- DRF-GIS GeoJSON responses for normal and optimized layer requests.
+- Streaming DB-side GeoJSON rows only for approved last-resort medium filtered
+  layer requests where tying up a WSGI worker is acceptable.
 - Serving cached or precomputed artifacts directly.
 - Returning `202 Accepted` for async exports.
 - Returning `400` only for clearly abusive or unsupported requests.
@@ -795,25 +941,42 @@ Database responsibilities:
 
 - Spatial filtering.
 - Geometry simplification.
-- Geometry-to-GeoJSON conversion.
-- Vector tile generation.
+- Geometry-to-GeoJSON conversion only for escalated DB-side GeoJSON endpoints.
+- Vector tile generation only for escalated interactive-map endpoints.
 - Aggregation for summaries and dataset versions.
 
-### Phase 9 - Recommended immediate next steps for the current branch
+Important caveat: streaming is not a universal scalability answer under the
+current WSGI/Gunicorn deployment model. It bounds Python memory during response
+generation, but the request still occupies a web worker until the client
+finishes receiving the response. Very large exports and repeatable broad scopes
+should therefore be generated by workers and served as files or artifacts.
+
+### Phase 10 - Recommended immediate next steps for the current branch
 
 1. **Keep guardrails**
    - Treat rejection as a fallback for uncached/unsafe paths, not the desired steady state.
-2. **Replace DRF-GIS serialization for large endpoints**
-   - Start with `CachedGeoJSONMixin._stream_geojson` and any remaining custom GeoJSON endpoints.
-3. **Add a DB-side streaming GeoJSON helper**
-   - Shared utility that streams `ST_AsGeoJSON` rows as a feature collection.
-4. **Add worker cache warmers**
+2. **Audit public exposure**
+   - Decide for each high-cost endpoint whether it must be anonymous public, registered-user only, staff/reviewer only, or internal/worker only.
+3. **Add bot and crawler protections**
+   - Apply Cloudflare, DRF throttling, middleware rate limits, and cheap invalid-request handling before changing serializer architecture.
+4. **Keep DRF-GIS for domain APIs and default layer delivery**
+   - Do not replace DRF-GIS globally. Preserve it for CRUD, details, validation, permissions, modest payloads, and browsable API surfaces.
+5. **Optimize DRF-GIS paths first**
+   - Improve querysets, serializer properties, simplified geometries, caching, warmers, and bounds before replacing the transport.
+6. **Bypass DRF-GIS only as a last resort**
+   - Start only with endpoints that still fail after access control, bot controls, caching, bounds, and query optimization.
+7. **Add a DB-side streaming GeoJSON helper only for escalated endpoints**
+   - Shared utility that streams `ST_AsGeoJSON` rows as a feature collection when a route is approved for last-resort bypass.
+   - Ensure the helper streams row chunks and does not hide a full `json_agg` response behind a streaming wrapper.
+8. **Add worker cache warmers**
    - Especially for public map scopes and Waste Atlas defaults.
-5. **Add artifact serving**
+9. **Add artifact serving**
    - Serve precomputed compressed GeoJSON for common full-dataset scopes.
-6. **Make large exports async**
+10. **Keep large exports async**
    - Use Celery workers and a download/status endpoint.
-7. **Add observability**
+11. **Evaluate vector tiles only after earlier measures**
+   - Use vector tiles only for high-feature-count pan/zoom maps where public-surface control, DRF-GIS optimization, streaming, and caching are still insufficient.
+12. **Add observability**
    - Log feature count, point count estimate, cache hit/miss, serialization mode, duration, and response size.
 
 ## 6. Observability Checklist
@@ -838,7 +1001,9 @@ This roadmap is complete when:
 
 - no public GIS endpoint can trigger unbounded full-dataset serialization through normal HTTP requests
 - heavy non-GIS list/research/export endpoints cannot trigger unbounded full-dataset serialization or N+1 query storms through normal HTTP requests
-- large legitimate GeoJSON responses are cached, streamed safely, or generated through cheaper database-side serialization
+- DRF-GIS remains in use for normal domain-object APIs and CRUD endpoints
+- large legitimate GeoJSON responses remain on DRF-GIS where possible and are cached, bounded, warmed, or moved to async worker-generated artifacts
+- DB-side GeoJSON streaming or vector tiles are used only where earlier access-control, bot-protection, caching, and DRF-GIS optimization measures are insufficient
 - common public map scopes are pre-warmed or have predictable cache-miss behavior
 - dynamic GeoDataset routes have explicit size, policy, and index safeguards
 - registration and expensive anonymous routes have reasonable bot protection
