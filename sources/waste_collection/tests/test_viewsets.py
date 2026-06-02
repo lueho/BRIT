@@ -354,6 +354,41 @@ class CollectionViewSetTestCase(APITestCase):
         ]
         self.assertLessEqual(len(relationship_queries), 2)
 
+    def test_list_endpoint_prefetches_m2m_fields(self):
+        collection = self._create_collection(
+            name="Research M2M Collection",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PRIVATE,
+        )
+        allowed_material = Material.objects.create(name="Research Allowed Material")
+        forbidden_material = Material.objects.create(name="Research Forbidden Material")
+        flyer = WasteFlyer.objects.create(url="https://example.com/research.pdf")
+        source = Source.objects.create(title="Research Source")
+        collection.allowed_materials.add(allowed_material)
+        collection.forbidden_materials.add(forbidden_material)
+        collection.flyers.add(flyer)
+        collection.sources.add(source)
+
+        self.client.force_login(self.regular_user)
+        with CaptureQueriesContext(connection) as captured_queries:
+            response = self.client.get(
+                reverse("api-waste-collection-list"),
+                {"scope": "private", "id": [collection.pk]},
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        table_names = (
+            "waste_collection_collection_allowed_materials",
+            "waste_collection_collection_forbidden_materials",
+            "waste_collection_collection_flyers",
+            "waste_collection_collection_sources",
+        )
+        for table_name in table_names:
+            table_queries = [
+                query["sql"] for query in captured_queries if table_name in query["sql"]
+            ]
+            self.assertLessEqual(len(table_queries), 1)
+
     def test_list_endpoint_returns_paginated_response(self):
         self.client.force_login(self.regular_user)
 

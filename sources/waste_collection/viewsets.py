@@ -114,7 +114,21 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             return queryset
 
         relation_queryset = Collection.objects.only("pk").order_by("pk")
-        return queryset.prefetch_related(
+        return queryset.select_related(
+            "owner",
+            "catchment",
+            "catchment__region",
+            "collector",
+            "collection_system",
+            "waste_category",
+            "fee_system",
+            "frequency",
+            "bin_configuration",
+        ).prefetch_related(
+            "allowed_materials",
+            "forbidden_materials",
+            "flyers",
+            "sources",
             Prefetch(
                 "predecessors",
                 queryset=relation_queryset,
