@@ -604,6 +604,8 @@ Current guardrails:
 - Cache key varies by `country` and `id`.
 - Queryset filters to collectors with geometry and optimizes related geometry
   access.
+- The collector GeoJSON action uses the shared anonymous/authenticated GeoJSON
+  throttles.
 
 Recommended guardrails:
 
@@ -617,6 +619,15 @@ Recommended guardrails:
   - selected collector IDs when known from workflows
 - Move large responses to DB-side streaming or artifact serving before relying
   on rejection.
+
+Implementation checkpoint:
+
+- `CollectorViewSet.geojson` now applies `GeoJSONAnonThrottle` and
+  `GeoJSONUserThrottle`, matching the collection GeoJSON endpoint while
+  preserving anonymous QGIS-compatible access.
+- Validation:
+  - `docker compose exec web python manage.py test sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_collector_geojson_endpoint_is_throttled --settings=brit.settings.testrunner --keepdb --noinput`
+  - `docker compose exec web ruff check sources/waste_collection/viewsets.py sources/waste_collection/tests/test_viewsets.py`
 
 #### Guardrail strategy by use case
 
