@@ -403,6 +403,8 @@ Exact use cases:
 Current guardrails:
 
 - Export dispatch is already asynchronous through Celery and returns a task ID.
+- Waste Collection list exports opt in to a pre-dispatch row-count estimate; the
+  JSON dispatch response includes `row_count` and `large_export`.
 
 Recommended guardrails:
 
@@ -413,6 +415,16 @@ Recommended guardrails:
   warming or other production-critical worker tasks.
 - Require explicit confirmation, staff-only mode, or background-only handling
   for very large exports.
+
+Implementation checkpoint:
+
+- `GenericUserCreatedObjectExportView` now supports opt-in row-count estimates
+  before dispatching the Celery export task.
+- `CollectionListFileExportView` enables this estimate for
+  `/waste_collection/collections/export/`.
+- Validation:
+  - `docker compose exec web python manage.py test utils.file_export.tests.test_views.GenericUserCreatedObjectExportViewTests --settings=brit.settings.testrunner --keepdb --noinput`
+  - `docker compose exec web ruff check utils/file_export/views.py utils/file_export/tests/test_views.py sources/waste_collection/views.py`
 
 #### Dynamic GeoDataset local-relation GeoJSON
 
