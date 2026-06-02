@@ -11,6 +11,7 @@ from rest_framework.exceptions import (
     PermissionDenied,
     ValidationError,
 )
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
@@ -79,6 +80,12 @@ class GeoJSONUserThrottle(UserRateThrottle):
     rate = "60/minute"
 
 
+class CollectionListPagination(PageNumberPagination):
+    page_size = 100
+    page_size_query_param = "page_size"
+    max_page_size = 200
+
+
 class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     """Collection viewset that integrates with GeoJSONMixin and UserCreatedObjectViewSet.
 
@@ -93,6 +100,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     geojson_serializer_class = WasteCollectionGeometrySerializer
     filter_backends = (CollectionDjangoFilterBackend,)
     filterset_class = CollectionFilterSet
+    pagination_class = CollectionListPagination
     requires_add_permission_actions = {
         "create_collection",
         "create_new_version",

@@ -354,6 +354,29 @@ class CollectionViewSetTestCase(APITestCase):
         ]
         self.assertLessEqual(len(relationship_queries), 2)
 
+    def test_list_endpoint_returns_paginated_response(self):
+        self.client.force_login(self.regular_user)
+
+        response = self.client.get(
+            reverse("api-waste-collection-list"),
+            {"scope": "private", "page_size": 2},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("count", response.data)
+        self.assertIn("next", response.data)
+        self.assertIn("previous", response.data)
+        self.assertIn("results", response.data)
+        self.assertEqual(len(response.data["results"]), 2)
+        self.assertGreaterEqual(response.data["count"], 3)
+
+    def test_list_endpoint_caps_page_size(self):
+        pagination_class = CollectionViewSet.pagination_class
+
+        self.assertEqual(pagination_class.page_size, 100)
+        self.assertEqual(pagination_class.page_size_query_param, "page_size")
+        self.assertEqual(pagination_class.max_page_size, 200)
+
     def test_list_non_public_scope_requires_authentication(self):
         response = self.client.get(
             reverse("api-waste-collection-list"),
