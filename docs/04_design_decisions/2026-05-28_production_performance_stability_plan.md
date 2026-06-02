@@ -370,9 +370,14 @@ Implementation checkpoint:
   - `CollectionFlatSerializer` still supports heavyweight dynamic export
     columns, but resolves the dynamic metric `Property` rows once per serializer
     instance instead of once per row and property.
+  - Collection list responses now emit a structured warning log when
+    serialization exceeds the configured slow-response threshold, including the
+    action, result count, total count, page size, serializer, duration, and query
+    count when Django query logging is available.
 - Validation:
   - `docker compose exec web python manage.py test sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_list_endpoint_prefetches_relationship_ids sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_list_endpoint_prefetches_m2m_fields sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_list_endpoint_returns_paginated_response --settings=brit.settings.testrunner --keepdb --noinput`
   - `docker compose exec web python manage.py test sources.waste_collection.tests.test_collection_research_metrics.CollectionResearchPerformanceTests.test_list_endpoint_skips_expensive_collection_metrics sources.waste_collection.tests.test_apps.WasteCollectionConfigReadyTests --settings=brit.settings.testrunner --noinput`
+  - `docker compose exec web python manage.py test sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_list_endpoint_logs_slow_serialization --settings=brit.settings.testrunner --keepdb --noinput`
   - `docker compose exec web ruff check sources/waste_collection/viewsets.py sources/waste_collection/serializers.py sources/waste_collection/apps.py sources/waste_collection/tests/test_viewsets.py sources/waste_collection/tests/test_apps.py sources/waste_collection/tests/test_collection_research_metrics.py`
 
 #### Waste Collection export
