@@ -256,6 +256,17 @@ Current guardrails:
 - Scope-aware latest-visible collection filtering.
 - `skip_min_max=True` for `geojson`, `list`, and `version` actions to avoid
   expensive filter-widget min/max work.
+- Consumer-impact check after the non-public scope auth guard:
+  - Published map and iframe views force `scope=published`, so anonymous public
+    map consumers should not change behavior.
+  - Private and review map views are login/review gated before rendering; their
+    browser GeoJSON, summary, detail, and version checks carry the authenticated
+    session and can continue using `scope=private` or `scope=review`.
+  - No source-code frontend consumer was found that anonymously constructs
+    `scope=private` or `scope=review` for this endpoint.
+- Production log check from `2026-06-01T12:00Z` through `2026-06-02T06:59Z`
+  showed 12 `400 Bad Request` events for this endpoint. These are consistent
+  with unsafe/unbounded GeoJSON requests being rejected instead of serialized.
 
 Recommended guardrails:
 
@@ -298,17 +309,37 @@ Exact use cases:
 - Fetching relationship metadata, predecessor IDs, flyers, sources, and
   collection properties.
 
+Consumer-impact check after the non-public scope auth guard:
+
+- Known in-repo consumers that request non-public scopes are authenticated:
+  - browser list/map flows are served from login-gated private/review views
+  - `import_denmark_affaldsstatistik_cpvs` uses token authentication when it
+    reads `published`, `review`, and `private` scopes
+  - tests and MCP/review-style tooling are expected to authenticate for
+    non-public scopes
+- No in-repo JavaScript or template consumer was found that anonymously calls
+  the collection list API with `scope=private` or `scope=review`.
+- External anonymous clients must use `scope=published` or authenticate before
+  requesting private/review/declined/archived scopes.
+
 Current risk:
 
 - The 2026-05-31 timeout shows that non-GIS collection serialization can kill a
   web worker. The hot path reached `CollectionFlatSerializer` and
   `CollectionReferenceFieldsMixin.get_predecessor_ids()`.
+- The 2026-06-02 logs show the GeoJSON guardrails helped, but one web worker
+  still timed out in the collection list API. The stack reached
+  `CollectionResearchSerializer` and
+  `CollectionReferenceFieldsMixin.get_successor_ids()`, indicating remaining
+  N+1 relationship lookup risk in list serialization.
 - Dynamic region attributes, CPV/ACPV display values, sources, flyers, and
   predecessor/successor fields can create per-row query storms when responses
   are too large or not preplanned.
 
 Recommended guardrails:
 
+- Prefetch predecessor and successor relationships for the list queryset and
+  make `CollectionReferenceFieldsMixin` consume prefetched objects when present.
 - Confirm and enforce DRF pagination for the collection API list action.
 - Cap maximum page size for research/list API clients.
 - Reject unpaginated heavy list requests unless routed to a safe asynchronous
