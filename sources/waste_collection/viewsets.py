@@ -1,7 +1,7 @@
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import Exists, F, OuterRef, Q
+from django.db.models import Exists, F, OuterRef, Prefetch, Q
 from django.urls import reverse
 from django_filters import rest_framework as rf_filters
 from rest_framework import permissions, status, viewsets
@@ -99,6 +99,25 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         "create_collection_property_value",
         "create_aggregated_collection_property_value",
     }
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if getattr(self, "action", None) != "list":
+            return queryset
+
+        relation_queryset = Collection.objects.only("pk").order_by("pk")
+        return queryset.prefetch_related(
+            Prefetch(
+                "predecessors",
+                queryset=relation_queryset,
+                to_attr="_prefetched_predecessors",
+            ),
+            Prefetch(
+                "successors",
+                queryset=relation_queryset,
+                to_attr="_prefetched_successors",
+            ),
+        )
 
     def get_geojson_queryset(self):
         """Return optimized queryset for GeoJSON with simplified geometry.

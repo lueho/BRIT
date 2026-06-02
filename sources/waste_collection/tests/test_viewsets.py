@@ -2,7 +2,9 @@ from datetime import date
 
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
+from django.db import connection
 from django.test import override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
@@ -317,6 +319,40 @@ class CollectionViewSetTestCase(APITestCase):
         self.assertEqual(result["frequency_id"], self.frequency.pk)
         self.assertEqual(result["predecessor_ids"], [predecessor.pk])
         self.assertEqual(result["successor_ids"], [])
+
+    def test_list_endpoint_prefetches_relationship_ids(self):
+        predecessor = self._create_collection(
+            name="Research Query Predecessor",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PRIVATE,
+        )
+        collection = self._create_collection(
+            name="Research Query Collection",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PRIVATE,
+        )
+        successor = self._create_collection(
+            name="Research Query Successor",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PRIVATE,
+        )
+        collection.add_predecessor(predecessor)
+        successor.add_predecessor(collection)
+
+        self.client.force_login(self.regular_user)
+        with CaptureQueriesContext(connection) as captured_queries:
+            response = self.client.get(
+                reverse("api-waste-collection-list"),
+                {"scope": "private"},
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        relationship_queries = [
+            query["sql"]
+            for query in captured_queries
+            if "waste_collection_collection_predecessors" in query["sql"]
+        ]
+        self.assertLessEqual(len(relationship_queries), 2)
 
     def test_list_non_public_scope_requires_authentication(self):
         response = self.client.get(

@@ -61,10 +61,16 @@ class CollectionReferenceFieldsMixin(serializers.Serializer):
 
     @staticmethod
     def get_predecessor_ids(obj):
+        prefetched = getattr(obj, "_prefetched_predecessors", None)
+        if prefetched is not None:
+            return [item.pk for item in prefetched]
         return list(obj.predecessors.order_by("pk").values_list("pk", flat=True))
 
     @staticmethod
     def get_successor_ids(obj):
+        prefetched = getattr(obj, "_prefetched_successors", None)
+        if prefetched is not None:
+            return [item.pk for item in prefetched]
         return list(obj.successors.order_by("pk").values_list("pk", flat=True))
 
 
