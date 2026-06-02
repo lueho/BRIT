@@ -407,6 +407,11 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
 
     include_collection_metrics = True
     include_region_attributes = True
+    collection_metric_property_names = (
+        "specific waste collected",
+        "total waste collected",
+        "Connection rate",
+    )
 
     catchment = serializers.StringRelatedField(label="Catchment")
     nuts_or_lau_id = serializers.StringRelatedField(
@@ -522,6 +527,23 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
         choices = dict(models.REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES)
         return choices.get(value, value)
 
+    def get_collection_metric_properties(self):
+        properties = getattr(self, "_collection_metric_properties", None)
+        if properties is None:
+            property_by_name = {
+                prop.name: prop
+                for prop in Property.objects.filter(
+                    name__in=self.collection_metric_property_names
+                )
+            }
+            properties = [
+                (name, property_by_name[name])
+                for name in self.collection_metric_property_names
+                if name in property_by_name
+            ]
+            self._collection_metric_properties = properties
+        return properties
+
     def to_representation(self, instance):
         representation = super().to_representation(instance)
 
@@ -567,19 +589,10 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
         if not self.include_collection_metrics:
             return ordered_representation
 
-        additional_properties = [
-            "specific waste collected",
-            "total waste collected",
-            "Connection rate",
-        ]
         user = (
             getattr(self.context.get("request"), "user", None) if self.context else None
         )
-        for property_name in additional_properties:
-            specific_property = Property.objects.filter(name=property_name).first()
-            if not specific_property:
-                continue
-
+        for property_name, specific_property in self.get_collection_metric_properties():
             values = [
                 value
                 for value in instance.collectionpropertyvalues_for_display(user=user)
