@@ -1758,6 +1758,7 @@ class CollectionAutocompleteView(UserCreatedObjectAutocompleteView):
 
 class CollectionListFileExportView(GenericUserCreatedObjectExportView):
     model_label = "waste_collection.Collection"
+    include_row_count_estimate = True
 
 
 class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
