@@ -1,4 +1,5 @@
 from datetime import date
+from unittest.mock import patch
 
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
@@ -411,6 +412,30 @@ class CollectionViewSetTestCase(APITestCase):
         self.assertEqual(pagination_class.page_size, 100)
         self.assertEqual(pagination_class.page_size_query_param, "page_size")
         self.assertEqual(pagination_class.max_page_size, 200)
+
+    def test_list_endpoint_logs_slow_serialization(self):
+        self.client.force_login(self.regular_user)
+
+        with (
+            patch.object(
+                CollectionViewSet,
+                "collection_list_slow_log_threshold_seconds",
+                0,
+            ),
+            self.assertLogs(
+                "sources.waste_collection.viewsets", level="WARNING"
+            ) as logs,
+        ):
+            response = self.client.get(
+                reverse("api-waste-collection-list"),
+                {"scope": "private", "page_size": 2},
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("slow_collection_list_api", logs.output[0])
+        self.assertIn("action=list", logs.output[0])
+        self.assertIn("serializer=CollectionResearchSerializer", logs.output[0])
+        self.assertIn("result_count=2", logs.output[0])
 
     def test_list_non_public_scope_requires_authentication(self):
         response = self.client.get(

@@ -1,6 +1,9 @@
+import logging
+import time
+
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Exists, F, OuterRef, Prefetch, Q
 from django.urls import reverse
 from django_filters import rest_framework as rf_filters
@@ -56,6 +59,8 @@ from utils.object_management.permissions import (
 )
 from utils.object_management.viewsets import UserCreatedObjectViewSet
 
+logger = logging.getLogger(__name__)
+
 
 class CollectionDjangoFilterBackend(rf_filters.DjangoFilterBackend):
     """DjangoFilterBackend variant that accepts extra view-provided kwargs."""
@@ -101,6 +106,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     filter_backends = (CollectionDjangoFilterBackend,)
     filterset_class = CollectionFilterSet
     pagination_class = CollectionListPagination
+    collection_list_slow_log_threshold_seconds = 1.0
     requires_add_permission_actions = {
         "create_collection",
         "create_new_version",
@@ -239,7 +245,53 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
 
     def list(self, request, *args, **kwargs):
         self._enforce_authenticated_non_public_scope(request)
-        return super().list(request, *args, **kwargs)
+        started_at = time.perf_counter()
+        query_count_start = (
+            len(connection.queries)
+            if getattr(connection, "queries_logged", False)
+            else None
+        )
+
+        response = super().list(request, *args, **kwargs)
+
+        duration_seconds = time.perf_counter() - started_at
+        if duration_seconds >= self.collection_list_slow_log_threshold_seconds:
+            data = response.data
+            result_count = None
+            total_count = None
+            if isinstance(data, dict):
+                total_count = data.get("count")
+                results = data.get("results")
+                if results is not None:
+                    result_count = len(results)
+            elif isinstance(data, list):
+                result_count = len(data)
+
+            query_count = None
+            if query_count_start is not None:
+                query_count = len(connection.queries) - query_count_start
+
+            page_size = getattr(getattr(self, "paginator", None), "page_size", None)
+            logger.warning(
+                "slow_collection_list_api action=%s result_count=%s total_count=%s page_size=%s serializer=%s duration_ms=%.1f query_count=%s",
+                getattr(self, "action", None),
+                result_count,
+                total_count,
+                page_size,
+                self.get_serializer_class().__name__,
+                duration_seconds * 1000,
+                query_count,
+                extra={
+                    "action": getattr(self, "action", None),
+                    "result_count": result_count,
+                    "total_count": total_count,
+                    "page_size": page_size,
+                    "serializer": self.get_serializer_class().__name__,
+                    "duration_ms": duration_seconds * 1000,
+                    "query_count": query_count,
+                },
+            )
+        return response
 
     def get_cache_key(self, request):
         """Build a deterministic cache key including filters and dataset version.
