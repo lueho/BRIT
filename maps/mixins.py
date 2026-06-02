@@ -4,6 +4,7 @@ import json
 from django.conf import settings
 from django.contrib.gis.geos import Polygon
 from django.core.cache import caches
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count, Max, Min
 from django.http import StreamingHttpResponse
 from rest_framework import status
@@ -170,10 +171,24 @@ class CachedGeoJSONMixin:
         else:
             queryset = self.filter_queryset(self.get_queryset())
 
+        queryset = self._apply_id_filter(queryset, request)
         bbox = self._parse_bbox(request)
         if bbox:
             queryset = self._apply_bbox_filter(queryset, bbox)
         return queryset
+
+    def _apply_id_filter(self, queryset, request):
+        params = getattr(request, "query_params", None) or getattr(request, "GET", {})
+        values = (
+            params.getlist("id") if hasattr(params, "getlist") else [params.get("id")]
+        )
+        values = [value for value in values if value is not None and str(value).strip()]
+        if not values:
+            return queryset
+        try:
+            return queryset.filter(pk__in=values)
+        except (DjangoValidationError, TypeError, ValueError):
+            return queryset.none()
 
     def get_geojson_data(self):
         """Generates the GeoJSON data. Expected to be called on cache miss."""

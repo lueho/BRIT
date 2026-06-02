@@ -1,3 +1,5 @@
+import json
+
 from django.contrib.gis.geos import Point
 from django.urls import reverse
 
@@ -93,6 +95,20 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, dataset.name)
         self.assertContains(response, reverse("api-hamburg-roadside-trees-geojson"))
+
+    def test_geojson_id_query_filters_to_single_tree(self):
+        other_tree = HamburgRoadsideTrees.objects.create(geom=Point(1, 1, srid=4326))
+
+        response = self.client.get(
+            reverse("api-hamburg-roadside-trees-geojson"),
+            {"id": other_tree.pk, "load_features": "true", "page": 3},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Total-Count"], "1")
+        data = json.loads(response.content)
+        self.assertEqual(len(data["features"]), 1)
+        self.assertEqual(data["features"][0]["id"], other_tree.pk)
 
 
 class HamburgRoadsideTreeCatchmentAutocompleteViewTests(ViewWithPermissionsTestCase):
