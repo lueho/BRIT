@@ -1,8 +1,12 @@
 from datetime import date
+from unittest.mock import patch
 
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
+from django.db import connection
 from django.test import override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
@@ -143,6 +147,21 @@ class CollectionViewSetTestCase(APITestCase):
         }
         self.assertIn(self.published_collection.pk, feature_ids)
         self.assertIn(self.other_user_published_collection.pk, feature_ids)
+
+    def test_collector_geojson_endpoint_is_throttled(self):
+        cache.clear()
+        url = reverse("api-collector-geojson")
+
+        with patch("sources.waste_collection.viewsets.GeoJSONAnonThrottle.rate", "1/m"):
+            first_response = self.client.get(url)
+            second_response = self.client.get(url)
+
+        cache.clear()
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            second_response.status_code,
+            status.HTTP_429_TOO_MANY_REQUESTS,
+        )
 
     def test_geojson_non_public_scope_requires_authentication(self):
         url = reverse("api-waste-collection-geojson")
@@ -317,6 +336,122 @@ class CollectionViewSetTestCase(APITestCase):
         self.assertEqual(result["frequency_id"], self.frequency.pk)
         self.assertEqual(result["predecessor_ids"], [predecessor.pk])
         self.assertEqual(result["successor_ids"], [])
+
+    def test_list_endpoint_prefetches_relationship_ids(self):
+        predecessor = self._create_collection(
+            name="Research Query Predecessor",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PRIVATE,
+        )
+        collection = self._create_collection(
+            name="Research Query Collection",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PRIVATE,
+        )
+        successor = self._create_collection(
+            name="Research Query Successor",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PRIVATE,
+        )
+        collection.add_predecessor(predecessor)
+        successor.add_predecessor(collection)
+
+        self.client.force_login(self.regular_user)
+        with CaptureQueriesContext(connection) as captured_queries:
+            response = self.client.get(
+                reverse("api-waste-collection-list"),
+                {"scope": "private"},
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        relationship_queries = [
+            query["sql"]
+            for query in captured_queries
+            if "waste_collection_collection_predecessors" in query["sql"]
+        ]
+        self.assertLessEqual(len(relationship_queries), 2)
+
+    def test_list_endpoint_prefetches_m2m_fields(self):
+        collection = self._create_collection(
+            name="Research M2M Collection",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_PRIVATE,
+        )
+        allowed_material = Material.objects.create(name="Research Allowed Material")
+        forbidden_material = Material.objects.create(name="Research Forbidden Material")
+        flyer = WasteFlyer.objects.create(url="https://example.com/research.pdf")
+        source = Source.objects.create(title="Research Source")
+        collection.allowed_materials.add(allowed_material)
+        collection.forbidden_materials.add(forbidden_material)
+        collection.flyers.add(flyer)
+        collection.sources.add(source)
+
+        self.client.force_login(self.regular_user)
+        with CaptureQueriesContext(connection) as captured_queries:
+            response = self.client.get(
+                reverse("api-waste-collection-list"),
+                {"scope": "private", "id": [collection.pk]},
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        table_names = (
+            "waste_collection_collection_allowed_materials",
+            "waste_collection_collection_forbidden_materials",
+            "waste_collection_collection_flyers",
+            "waste_collection_collection_sources",
+        )
+        for table_name in table_names:
+            table_queries = [
+                query["sql"] for query in captured_queries if table_name in query["sql"]
+            ]
+            self.assertLessEqual(len(table_queries), 1)
+
+    def test_list_endpoint_returns_paginated_response(self):
+        self.client.force_login(self.regular_user)
+
+        response = self.client.get(
+            reverse("api-waste-collection-list"),
+            {"scope": "private", "page_size": 2},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("count", response.data)
+        self.assertIn("next", response.data)
+        self.assertIn("previous", response.data)
+        self.assertIn("results", response.data)
+        self.assertEqual(len(response.data["results"]), 2)
+        self.assertGreaterEqual(response.data["count"], 3)
+
+    def test_list_endpoint_caps_page_size(self):
+        pagination_class = CollectionViewSet.pagination_class
+
+        self.assertEqual(pagination_class.page_size, 100)
+        self.assertEqual(pagination_class.page_size_query_param, "page_size")
+        self.assertEqual(pagination_class.max_page_size, 200)
+
+    def test_list_endpoint_logs_slow_serialization(self):
+        self.client.force_login(self.regular_user)
+
+        with (
+            patch.object(
+                CollectionViewSet,
+                "collection_list_slow_log_threshold_seconds",
+                0,
+            ),
+            self.assertLogs(
+                "sources.waste_collection.viewsets", level="WARNING"
+            ) as logs,
+        ):
+            response = self.client.get(
+                reverse("api-waste-collection-list"),
+                {"scope": "private", "page_size": 2},
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("slow_collection_list_api", logs.output[0])
+        self.assertIn("action=list", logs.output[0])
+        self.assertIn("serializer=CollectionResearchSerializer", logs.output[0])
+        self.assertIn("result_count=2", logs.output[0])
 
     def test_list_non_public_scope_requires_authentication(self):
         response = self.client.get(
@@ -1920,6 +2055,36 @@ class GreenWasteCollectionSystemCountViewSetTests(APITestCase):
         self.assertEqual(count_by_catchment[self.catchment_a.id], 2)
         self.assertEqual(count_by_catchment[self.catchment_b.id], 1)
         self.assertEqual(len(count_by_catchment), 2)
+
+
+class WasteAtlasThrottleTests(APITestCase):
+    endpoint = "/waste_collection/api/waste-atlas/green-waste-collection-system-count/"
+
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_waste_atlas_endpoints_are_throttled(self):
+        with patch(
+            "rest_framework.throttling.ScopedRateThrottle.THROTTLE_RATES",
+            {"waste_atlas": "1/minute"},
+        ):
+            first_response = self.client.get(
+                self.endpoint,
+                {"country": "DE", "year": 2024},
+            )
+            second_response = self.client.get(
+                self.endpoint,
+                {"country": "DE", "year": 2024},
+            )
+
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            second_response.status_code,
+            status.HTTP_429_TOO_MANY_REQUESTS,
+        )
 
 
 class CataloniaCollectionSystemViewSetTests(APITestCase):

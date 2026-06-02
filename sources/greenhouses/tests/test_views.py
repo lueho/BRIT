@@ -1,3 +1,4 @@
+from django.test import SimpleTestCase
 from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
@@ -11,6 +12,12 @@ from materials.models import (
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
 from ..models import Culture, Greenhouse, GreenhouseGrowthCycle, GrowthTimeStepSet
+from ..viewsets import NantesGreenhousesViewSet
+
+
+class NantesGreenhousesViewSetTestCase(SimpleTestCase):
+    def test_list_queryset_has_deterministic_ordering(self):
+        self.assertEqual(NantesGreenhousesViewSet.queryset.query.order_by, ("pk",))
 
 
 class CultureCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):

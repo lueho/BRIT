@@ -256,6 +256,17 @@ Current guardrails:
 - Scope-aware latest-visible collection filtering.
 - `skip_min_max=True` for `geojson`, `list`, and `version` actions to avoid
   expensive filter-widget min/max work.
+- Consumer-impact check after the non-public scope auth guard:
+  - Published map and iframe views force `scope=published`, so anonymous public
+    map consumers should not change behavior.
+  - Private and review map views are login/review gated before rendering; their
+    browser GeoJSON, summary, detail, and version checks carry the authenticated
+    session and can continue using `scope=private` or `scope=review`.
+  - No source-code frontend consumer was found that anonymously constructs
+    `scope=private` or `scope=review` for this endpoint.
+- Production log check from `2026-06-01T12:00Z` through `2026-06-02T06:59Z`
+  showed 12 `400 Bad Request` events for this endpoint. These are consistent
+  with unsafe/unbounded GeoJSON requests being rejected instead of serialized.
 
 Recommended guardrails:
 
@@ -298,17 +309,37 @@ Exact use cases:
 - Fetching relationship metadata, predecessor IDs, flyers, sources, and
   collection properties.
 
+Consumer-impact check after the non-public scope auth guard:
+
+- Known in-repo consumers that request non-public scopes are authenticated:
+  - browser list/map flows are served from login-gated private/review views
+  - `import_denmark_affaldsstatistik_cpvs` uses token authentication when it
+    reads `published`, `review`, and `private` scopes
+  - tests and MCP/review-style tooling are expected to authenticate for
+    non-public scopes
+- No in-repo JavaScript or template consumer was found that anonymously calls
+  the collection list API with `scope=private` or `scope=review`.
+- External anonymous clients must use `scope=published` or authenticate before
+  requesting private/review/declined/archived scopes.
+
 Current risk:
 
 - The 2026-05-31 timeout shows that non-GIS collection serialization can kill a
   web worker. The hot path reached `CollectionFlatSerializer` and
   `CollectionReferenceFieldsMixin.get_predecessor_ids()`.
+- The 2026-06-02 logs show the GeoJSON guardrails helped, but one web worker
+  still timed out in the collection list API. The stack reached
+  `CollectionResearchSerializer` and
+  `CollectionReferenceFieldsMixin.get_successor_ids()`, indicating remaining
+  N+1 relationship lookup risk in list serialization.
 - Dynamic region attributes, CPV/ACPV display values, sources, flyers, and
   predecessor/successor fields can create per-row query storms when responses
   are too large or not preplanned.
 
 Recommended guardrails:
 
+- Prefetch predecessor and successor relationships for the list queryset and
+  make `CollectionReferenceFieldsMixin` consume prefetched objects when present.
 - Confirm and enforce DRF pagination for the collection API list action.
 - Cap maximum page size for research/list API clients.
 - Reject unpaginated heavy list requests unless routed to a safe asynchronous
@@ -321,6 +352,33 @@ Recommended guardrails:
   property.
 - Add query-count and response-time tests for representative collection list
   responses.
+
+Implementation checkpoint:
+
+- Collection list/research API hardening continued:
+  - `CollectionResearchSerializer` remains the list serializer, but now emits
+    compact research metadata without dynamic region attributes or CPV/ACPV
+    metric columns.
+  - The former app-startup monkey patch for disabling research metrics was
+    removed and replaced with explicit serializer flags.
+  - The list queryset now uses `select_related()` for foreign keys and
+    `prefetch_related()` for materials, flyers, sources, predecessors, and
+    successors used by the list serializer.
+  - Predecessor and successor ID fields consume prefetched objects when present.
+  - List responses use DRF page-number pagination with a default page size of
+    100 and a maximum client-requested page size of 200.
+  - `CollectionFlatSerializer` still supports heavyweight dynamic export
+    columns, but resolves the dynamic metric `Property` rows once per serializer
+    instance instead of once per row and property.
+  - Collection list responses now emit a structured warning log when
+    serialization exceeds the configured slow-response threshold, including the
+    action, result count, total count, page size, serializer, duration, and query
+    count when Django query logging is available.
+- Validation:
+  - `docker compose exec web python manage.py test sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_list_endpoint_prefetches_relationship_ids sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_list_endpoint_prefetches_m2m_fields sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_list_endpoint_returns_paginated_response --settings=brit.settings.testrunner --keepdb --noinput`
+  - `docker compose exec web python manage.py test sources.waste_collection.tests.test_collection_research_metrics.CollectionResearchPerformanceTests.test_list_endpoint_skips_expensive_collection_metrics sources.waste_collection.tests.test_apps.WasteCollectionConfigReadyTests --settings=brit.settings.testrunner --noinput`
+  - `docker compose exec web python manage.py test sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_list_endpoint_logs_slow_serialization --settings=brit.settings.testrunner --keepdb --noinput`
+  - `docker compose exec web ruff check sources/waste_collection/viewsets.py sources/waste_collection/serializers.py sources/waste_collection/apps.py sources/waste_collection/tests/test_viewsets.py sources/waste_collection/tests/test_apps.py sources/waste_collection/tests/test_collection_research_metrics.py`
 
 #### Waste Collection export
 
@@ -345,6 +403,8 @@ Exact use cases:
 Current guardrails:
 
 - Export dispatch is already asynchronous through Celery and returns a task ID.
+- Waste Collection list exports opt in to a pre-dispatch row-count estimate; the
+  JSON dispatch response includes `row_count` and `large_export`.
 
 Recommended guardrails:
 
@@ -355,6 +415,16 @@ Recommended guardrails:
   warming or other production-critical worker tasks.
 - Require explicit confirmation, staff-only mode, or background-only handling
   for very large exports.
+
+Implementation checkpoint:
+
+- `GenericUserCreatedObjectExportView` now supports opt-in row-count estimates
+  before dispatching the Celery export task.
+- `CollectionListFileExportView` enables this estimate for
+  `/waste_collection/collections/export/`.
+- Validation:
+  - `docker compose exec web python manage.py test utils.file_export.tests.test_views.GenericUserCreatedObjectExportViewTests --settings=brit.settings.testrunner --keepdb --noinput`
+  - `docker compose exec web ruff check utils/file_export/views.py utils/file_export/tests/test_views.py sources/waste_collection/views.py`
 
 #### Dynamic GeoDataset local-relation GeoJSON
 
@@ -398,6 +468,17 @@ Recommended guardrails:
 - Add operator-facing warnings for public datasets with unsafe unfiltered map
   defaults.
 
+Implementation checkpoint:
+
+- `GeoDataSetRuntimeFeatureGeoJSONView` now passes the selected `id` through to
+  record count, data-version, and streaming calls so single-feature requests
+  report `X-Total-Count` and `X-Data-Version` for the selected feature scope.
+- `LocalRelationDatasetRuntimeAdapter` now shares the same record-scope WHERE
+  builder for count, data-version, and feature streaming.
+- Validation:
+  - `docker compose exec web python manage.py test maps.tests.test_geodataset_runtime_routes.GeoDataSetLocalRelationRuntimeRouteTestCase.test_local_relation_geojson_route_can_return_single_feature maps.tests.test_geodataset_runtime_routes.GeoDataSetLocalRelationRuntimeRouteTestCase.test_local_relation_geojson_route_rejects_large_unbounded_request maps.tests.test_geodataset_runtime_routes.GeoDataSetLocalRelationRuntimeRouteTestCase.test_local_relation_geojson_route_allows_filterable_bound --settings=brit.settings.testrunner --keepdb --noinput`
+  - `docker compose exec web ruff check maps/runtime_adapters.py maps/views.py maps/tests/test_geodataset_runtime_routes.py`
+
 #### Waste Atlas GeoJSON and thematic data endpoints
 
 Geometry endpoint:
@@ -431,6 +512,7 @@ Current guardrails:
   group.
 - Geometry endpoint supports country, year, NUTS-prefix, and `id` bounds.
 - Catchment geometry uses simplified geometry annotation.
+- Waste Atlas API endpoints use a dedicated DRF `waste_atlas` throttle scope.
 
 Recommended guardrails:
 
@@ -443,6 +525,16 @@ Recommended guardrails:
 - Add cache-version metadata and conditional request support.
 - Add throttling even though the pages are group-restricted.
 - Consider async render/export jobs for publication-quality map outputs.
+
+Implementation checkpoint:
+
+- Waste Atlas viewsets now inherit shared throttled base classes while keeping
+  existing `AllowAny` API behavior for map data consumers.
+- `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["waste_atlas"]` is configured at
+  `300/minute`.
+- Validation:
+  - `docker compose exec web python manage.py test sources.waste_collection.tests.test_viewsets.WasteAtlasThrottleTests sources.waste_collection.tests.test_viewsets.GreenWasteCollectionSystemCountViewSetTests.test_returns_distinct_green_waste_system_count_per_catchment --settings=brit.settings.testrunner --keepdb --noinput`
+  - `docker compose exec web ruff check brit/settings/settings.py sources/waste_collection/waste_atlas/viewsets.py sources/waste_collection/tests/test_viewsets.py`
 
 #### Source-domain map GeoJSON endpoints
 
@@ -512,6 +604,8 @@ Current guardrails:
 - Cache key varies by `country` and `id`.
 - Queryset filters to collectors with geometry and optimizes related geometry
   access.
+- The collector GeoJSON action uses the shared anonymous/authenticated GeoJSON
+  throttles.
 
 Recommended guardrails:
 
@@ -525,6 +619,15 @@ Recommended guardrails:
   - selected collector IDs when known from workflows
 - Move large responses to DB-side streaming or artifact serving before relying
   on rejection.
+
+Implementation checkpoint:
+
+- `CollectorViewSet.geojson` now applies `GeoJSONAnonThrottle` and
+  `GeoJSONUserThrottle`, matching the collection GeoJSON endpoint while
+  preserving anonymous QGIS-compatible access.
+- Validation:
+  - `docker compose exec web python manage.py test sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_collector_geojson_endpoint_is_throttled --settings=brit.settings.testrunner --keepdb --noinput`
+  - `docker compose exec web ruff check sources/waste_collection/viewsets.py sources/waste_collection/tests/test_viewsets.py`
 
 #### Guardrail strategy by use case
 
@@ -909,6 +1012,15 @@ Tasks:
 - Fix stale `/waste_collection/properties/<id>/` links or redirect legacy paths where appropriate.
 - Investigate repeated `/waste_collection/api/collection/geojson/` bad requests and align frontend query construction if needed.
 - Add deterministic ordering to `NantesGreenhouses` list pagination.
+
+Implementation checkpoint:
+
+- `NantesGreenhousesViewSet` now orders its base queryset by primary key, making
+  paginated list responses deterministic and removing the unordered pagination
+  warning source.
+- Validation:
+  - `docker compose exec web python manage.py test sources.greenhouses.tests.test_views.NantesGreenhousesViewSetTestCase.test_list_queryset_has_deterministic_ordering --settings=brit.settings.testrunner --keepdb --noinput`
+  - `docker compose exec web ruff check sources/greenhouses/viewsets.py sources/greenhouses/tests/test_views.py`
 
 Success criteria:
 

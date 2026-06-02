@@ -217,12 +217,15 @@ class LocalRelationDatasetRuntimeAdapter:
             raise Http404("Feature not found.")
         return records[0]
 
-    def get_record_count(self, query_params=None):
-        return self._fetch_record_count(query_params=query_params)
+    def get_record_count(self, query_params=None, pk=None):
+        return self._fetch_record_count(query_params=query_params, pk=pk)
 
-    def get_data_version(self, query_params=None):
+    def get_data_version(self, query_params=None, pk=None):
         self._validate_configured_columns()
-        where_sql, params = self._build_filter_where_clause(query_params=query_params)
+        where_sql, params = self._build_record_where_clause(
+            query_params=query_params,
+            pk=pk,
+        )
         primary_key_column = connection.ops.quote_name(
             self.runtime_configuration.primary_key_column
         )
@@ -311,15 +314,10 @@ class LocalRelationDatasetRuntimeAdapter:
                 ", 4326)"
                 ") AS __geometry_geojson"
             )
-        if pk is not None:
-            where_sql = [
-                f"{connection.ops.quote_name(self.runtime_configuration.primary_key_column)} = %s"
-            ]
-            params = [pk]
-        else:
-            where_sql, params = self._build_filter_where_clause(
-                query_params=query_params
-            )
+        where_sql, params = self._build_record_where_clause(
+            query_params=query_params,
+            pk=pk,
+        )
         sql = (
             f"SELECT {', '.join(select_sql)} FROM {self.relation_identifier}"
             f"{' WHERE ' + ' AND '.join(where_sql) if where_sql else ''}"
@@ -335,9 +333,12 @@ class LocalRelationDatasetRuntimeAdapter:
                     row, selected_columns, include_geometry=include_geometry
                 )
 
-    def _fetch_record_count(self, query_params=None):
+    def _fetch_record_count(self, query_params=None, pk=None):
         self._validate_configured_columns()
-        where_sql, params = self._build_filter_where_clause(query_params=query_params)
+        where_sql, params = self._build_record_where_clause(
+            query_params=query_params,
+            pk=pk,
+        )
         sql = (
             f"SELECT COUNT(*) FROM {self.relation_identifier}"
             f"{' WHERE ' + ' AND '.join(where_sql) if where_sql else ''}"
@@ -345,6 +346,13 @@ class LocalRelationDatasetRuntimeAdapter:
         with connection.cursor() as cursor:
             cursor.execute(sql, params)
             return cursor.fetchone()[0]
+
+    def _build_record_where_clause(self, query_params=None, pk=None):
+        if pk is not None:
+            return [
+                f"{connection.ops.quote_name(self.runtime_configuration.primary_key_column)} = %s"
+            ], [pk]
+        return self._build_filter_where_clause(query_params=query_params)
 
     def _get_distinct_filter_values(self, column_name):
         self._validate_identifier(column_name)

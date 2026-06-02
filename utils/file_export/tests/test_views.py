@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from urllib.parse import quote
 
@@ -261,6 +262,38 @@ class GenericUserCreatedObjectExportViewTests(TestCase):
             call_args, _ = mock_task.delay.call_args
             self.assertEqual(call_args[0], "auth.User")
             self.assertEqual(call_args[1], "xlsx")
+
+    def test_can_include_row_count_estimate_before_dispatch(self):
+        class DummyFilterSet:
+            def __init__(self, data, queryset):
+                self.qs = queryset
+
+        class LabelView(GenericUserCreatedObjectExportView):
+            model_label = "auth.User"
+            include_row_count_estimate = True
+
+        request = self.factory.get("/dummy/?format=csv&list_type=public")
+        request.user = self.user
+        request.session = SessionStore()
+
+        spec = SimpleNamespace(model=User, filterset=DummyFilterSet)
+        with (
+            patch(
+                "utils.file_export.export_registry.get_export_spec",
+                return_value=spec,
+            ),
+            patch(
+                "utils.file_export.generic_tasks.export_user_created_object_to_file"
+            ) as mock_task,
+        ):
+            mock_task.delay.return_value = MagicMock(task_id="generic-task-id")
+            response = LabelView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data["task_id"], "generic-task-id")
+        self.assertEqual(data["row_count"], User.objects.count())
+        self.assertFalse(data["large_export"])
 
 
 class ExportModalViewTests(TestCase):

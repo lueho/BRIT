@@ -3,11 +3,13 @@ import logging
 from celery.result import AsyncResult
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
+from django.http.request import MultiValueDict, QueryDict
 from django.views import View
 from django.views.generic import TemplateView
 from django.views.generic.detail import SingleObjectMixin
 
 from utils.object_management.permissions import (
+    apply_scope_filter,
     build_scope_filter_params,
     filter_queryset_for_user,
 )
@@ -160,6 +162,57 @@ class GenericUserCreatedObjectExportView(FilteredListFileExportView):
     """
 
     model_label = None  # e.g. 'waste_collection.Collection'
+    include_row_count_estimate = False
+    large_export_row_count = 10000
+
+    def get_export_row_count_estimate(self, filter_params, export_context):
+        from .export_registry import get_export_spec
+
+        if not self.model_label:
+            raise NotImplementedError("Subclasses must set model_label")
+
+        spec = get_export_spec(self.model_label)
+        qdict = QueryDict("", mutable=True)
+        qdict.update(MultiValueDict(filter_params))
+
+        list_type = export_context.get("list_type", "published")
+        if list_type == "public":
+            list_type = "published"
+
+        has_publication_status = "publication_status" in [
+            field.name for field in spec.model._meta.get_fields()
+        ]
+
+        if has_publication_status:
+            visible_qs = filter_queryset_for_user(
+                spec.model.objects.all(), self.request.user
+            )
+            base_qs = apply_scope_filter(visible_qs, list_type, user=self.request.user)
+        else:
+            base_qs = spec.model.objects.all()
+
+        return spec.filterset(qdict, queryset=base_qs).qs.count()
+
+    def get(self, request, *args, **kwargs):
+        params = dict(request.GET)
+        file_format = params.pop("format", ["csv"])[0]
+
+        filter_params = self.get_filter_params(request, params.copy())
+        export_context = self.get_export_context(request, params.copy())
+        row_count = None
+        if self.include_row_count_estimate:
+            row_count = self.get_export_row_count_estimate(
+                filter_params, export_context
+            )
+
+        task = self._dispatch_task(request, file_format, filter_params, export_context)
+        _store_task_id(request, task.task_id)
+
+        response_data = {"task_id": task.task_id}
+        if row_count is not None:
+            response_data["row_count"] = row_count
+            response_data["large_export"] = row_count >= self.large_export_row_count
+        return JsonResponse(response_data)
 
     def _dispatch_task(self, request, file_format, filter_params, export_context):
         """Dispatch the generic UserCreatedObject export task."""

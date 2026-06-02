@@ -523,12 +523,20 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertEqual(len(self._streaming_json(response)["features"]), 2)
 
     def test_local_relation_geojson_route_can_return_single_feature(self):
+        full_response = self.client.get(
+            reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk})
+        )
         response = self.client.get(
             reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk}),
             {"id": "2"},
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Total-Count"], "1")
+        self.assertNotEqual(
+            response["X-Data-Version"],
+            full_response["X-Data-Version"],
+        )
         data = self._streaming_json(response)
         self.assertEqual(len(data["features"]), 1)
         self.assertEqual(data["features"][0]["id"], 2)
