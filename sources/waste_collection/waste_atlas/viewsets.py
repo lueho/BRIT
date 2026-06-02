@@ -18,6 +18,7 @@ from django.db.models import (
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 
 from maps.db_functions import SimplifyPreserveTopology
 from maps.mixins import get_unbounded_geojson_rejection_response
@@ -98,6 +99,18 @@ _COLLECTION_SYSTEM_PRIORITY = {
 # Attribute IDs for population data (maps_attribute table)
 POPULATION_ATTRIBUTE_ID = 3
 POPULATION_DENSITY_ATTRIBUTE_ID = 2
+
+
+class WasteAtlasViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "waste_atlas"
+
+
+class WasteAtlasReadOnlyModelViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "waste_atlas"
 
 
 def _resolve_property_id_by_name(name_setting, default_name):
@@ -296,7 +309,7 @@ def _select_primary_collections(
     return best
 
 
-class CatchmentViewSet(viewsets.ReadOnlyModelViewSet):
+class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
     """Read-only viewset returning GeoJSON for catchments that have waste collections.
 
     Supports query parameters:
@@ -349,7 +362,7 @@ class CatchmentViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(serializer.data)
 
 
-class OrgaLevelViewSet(viewsets.ViewSet):
+class OrgaLevelViewSet(WasteAtlasViewSet):
     """Return the organizational level for catchments with waste collections (Karte 1).
 
     Determines whether each catchment's region is a NUTS region
@@ -427,7 +440,7 @@ class OrgaLevelViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class CollectionSystemViewSet(viewsets.ViewSet):
+class CollectionSystemViewSet(WasteAtlasViewSet):
     """Return the primary biowaste collection system per catchment (Karte 2).
 
     For each catchment, selects the biowaste / food-waste collection with the
@@ -464,7 +477,7 @@ class CollectionSystemViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class BiowasteCollectionSystemViewSet(viewsets.ViewSet):
+class BiowasteCollectionSystemViewSet(WasteAtlasViewSet):
     permission_classes = [permissions.AllowAny]
 
     def list(self, request):
@@ -483,7 +496,7 @@ class BiowasteCollectionSystemViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class ResidualCollectionSystemViewSet(viewsets.ViewSet):
+class ResidualCollectionSystemViewSet(WasteAtlasViewSet):
     permission_classes = [permissions.AllowAny]
 
     def list(self, request):
@@ -502,7 +515,7 @@ class ResidualCollectionSystemViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class CombinedCollectionSystemViewSet(viewsets.ViewSet):
+class CombinedCollectionSystemViewSet(WasteAtlasViewSet):
     permission_classes = [permissions.AllowAny]
 
     def list(self, request):
@@ -534,7 +547,7 @@ class CombinedCollectionSystemViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class CataloniaSystemAccessControlViewSet(viewsets.ViewSet):
+class CataloniaSystemAccessControlViewSet(WasteAtlasViewSet):
     permission_classes = [permissions.AllowAny]
 
     def list(self, request):
@@ -580,7 +593,7 @@ class CataloniaSystemAccessControlViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class AccessControlViewSet(viewsets.ViewSet):
+class AccessControlViewSet(WasteAtlasViewSet):
     permission_classes = [permissions.AllowAny]
 
     def list(self, request):
@@ -625,7 +638,7 @@ class AccessControlViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class BinConfigurationViewSet(viewsets.ViewSet):
+class BinConfigurationViewSet(WasteAtlasViewSet):
     """Return the primary sorting method for biowaste per catchment.
 
     For each catchment, selects the primary biowaste / food-waste collection via
@@ -663,7 +676,7 @@ class BinConfigurationViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class GreenWasteCollectionSystemCountViewSet(viewsets.ViewSet):
+class GreenWasteCollectionSystemCountViewSet(WasteAtlasViewSet):
     """Return number of distinct green-waste collection systems per catchment.
 
     Counts distinct collection systems among Green waste collections
@@ -859,7 +872,7 @@ def _get_frequency_type(country, year, waste_categories, nuts_prefixes=()):
     return data
 
 
-class ResidualFrequencyTypeViewSet(viewsets.ViewSet):
+class ResidualFrequencyTypeViewSet(WasteAtlasViewSet):
     """Return collection frequency type for residual waste (Karte 8).
 
     Example::
@@ -878,7 +891,7 @@ class ResidualFrequencyTypeViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class CombinedFrequencyTypeViewSet(viewsets.ViewSet):
+class CombinedFrequencyTypeViewSet(WasteAtlasViewSet):
     """Return combined bio + residual frequency type per catchment (Karte 10).
 
     Example::
@@ -918,7 +931,7 @@ class CombinedFrequencyTypeViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class BiowasteFrequencyTypeViewSet(viewsets.ViewSet):
+class BiowasteFrequencyTypeViewSet(WasteAtlasViewSet):
     """Return collection frequency type for biowaste (Karte 9).
 
     Example::
@@ -939,7 +952,7 @@ class BiowasteFrequencyTypeViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class ResidualCollectionCountViewSet(viewsets.ViewSet):
+class ResidualCollectionCountViewSet(WasteAtlasViewSet):
     """Return annual collection count for residual waste (Karte 11).
 
     Example::
@@ -958,7 +971,7 @@ class ResidualCollectionCountViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class BiowasteCollectionCountViewSet(viewsets.ViewSet):
+class BiowasteCollectionCountViewSet(WasteAtlasViewSet):
     """Return annual collection count for biowaste (Karte 12).
 
     Includes non-door-to-door catchments with ``collection_count=null``.
@@ -985,7 +998,7 @@ class BiowasteCollectionCountViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class CombinedCollectionCountViewSet(viewsets.ViewSet):
+class CombinedCollectionCountViewSet(WasteAtlasViewSet):
     """Return combined bio + residual collection count per catchment (Karte 13).
 
     Example::
@@ -1030,7 +1043,7 @@ class CombinedCollectionCountViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class CollectionCountRatioViewSet(viewsets.ViewSet):
+class CollectionCountRatioViewSet(WasteAtlasViewSet):
     permission_classes = [permissions.AllowAny]
 
     def list(self, request):
@@ -1083,7 +1096,7 @@ class CollectionCountRatioViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class CollectionPointCountViewSet(viewsets.ViewSet):
+class CollectionPointCountViewSet(WasteAtlasViewSet):
     permission_classes = [permissions.AllowAny]
     waste_categories = None
 
@@ -1134,7 +1147,7 @@ class ResidualCollectionPointCountViewSet(CollectionPointCountViewSet):
     waste_categories = ["Residual waste"]
 
 
-class CollectionPointCountRatioViewSet(viewsets.ViewSet):
+class CollectionPointCountRatioViewSet(WasteAtlasViewSet):
     permission_classes = [permissions.AllowAny]
 
     def list(self, request):
@@ -1208,7 +1221,7 @@ def _get_fee_system(country, year, waste_categories, nuts_prefixes=()):
     return data
 
 
-class ResidualFeeSystemViewSet(viewsets.ViewSet):
+class ResidualFeeSystemViewSet(WasteAtlasViewSet):
     """Return fee system for residual waste per catchment (Karte 14).
 
     Example::
@@ -1227,7 +1240,7 @@ class ResidualFeeSystemViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class BiowasteFeeSystemViewSet(viewsets.ViewSet):
+class BiowasteFeeSystemViewSet(WasteAtlasViewSet):
     """Return fee system for biowaste per catchment (Karte 15).
 
     Example::
@@ -1246,7 +1259,7 @@ class BiowasteFeeSystemViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class CombinedFeeSystemViewSet(viewsets.ViewSet):
+class CombinedFeeSystemViewSet(WasteAtlasViewSet):
     """Return combined bio + residual fee system per catchment (Karte 16).
 
     Example::
@@ -1762,7 +1775,7 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=()):
     return data
 
 
-class ResidualCollectionAmountViewSet(viewsets.ViewSet):
+class ResidualCollectionAmountViewSet(WasteAtlasViewSet):
     """Return specific waste collected for residual waste (Karte 17).
 
     Example::
@@ -1781,7 +1794,7 @@ class ResidualCollectionAmountViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class BiowasteCollectionAmountViewSet(viewsets.ViewSet):
+class BiowasteCollectionAmountViewSet(WasteAtlasViewSet):
     """Return specific waste collected for biowaste (Karte 18).
 
     Example::
@@ -1815,7 +1828,7 @@ class BiowasteCollectionAmountViewSet(viewsets.ViewSet):
         )
 
 
-class GreenWasteCollectionAmountViewSet(viewsets.ViewSet):
+class GreenWasteCollectionAmountViewSet(WasteAtlasViewSet):
     """Return specific waste collected for green waste (Karte 22).
 
     Example::
@@ -1929,7 +1942,7 @@ def _get_required_bin_capacity(
     ]
 
 
-class BiowasteMinBinSizeViewSet(viewsets.ViewSet):
+class BiowasteMinBinSizeViewSet(WasteAtlasViewSet):
     """Return minimum bin size for biowaste door-to-door collections (Karte 23).
 
     Example::
@@ -1954,7 +1967,7 @@ class BiowasteMinBinSizeViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class ResidualMinBinSizeViewSet(viewsets.ViewSet):
+class ResidualMinBinSizeViewSet(WasteAtlasViewSet):
     """Return minimum bin size for residual waste door-to-door collections (Karte 24).
 
     Example::
@@ -1973,7 +1986,7 @@ class ResidualMinBinSizeViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class MinBinSizeRatioViewSet(viewsets.ViewSet):
+class MinBinSizeRatioViewSet(WasteAtlasViewSet):
     permission_classes = [permissions.AllowAny]
 
     def list(self, request):
@@ -2019,7 +2032,7 @@ class MinBinSizeRatioViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class BiowasteRequiredBinCapacityViewSet(viewsets.ViewSet):
+class BiowasteRequiredBinCapacityViewSet(WasteAtlasViewSet):
     """Return required specific bin capacity for biowaste collections (Karte 25).
 
     Example::
@@ -2044,7 +2057,7 @@ class BiowasteRequiredBinCapacityViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class ResidualRequiredBinCapacityViewSet(viewsets.ViewSet):
+class ResidualRequiredBinCapacityViewSet(WasteAtlasViewSet):
     """Return required specific bin capacity for residual waste collections (Karte 26).
 
     Example::
@@ -2103,7 +2116,7 @@ def _get_organic_amounts(country, year, nuts_prefixes=()):
     return result
 
 
-class OrganicCollectionAmountViewSet(viewsets.ViewSet):
+class OrganicCollectionAmountViewSet(WasteAtlasViewSet):
     """Return aggregated organic waste amount per catchment (Karte 27).
 
     Sums biowaste/food waste and green waste specific collection amounts
@@ -2126,7 +2139,7 @@ class OrganicCollectionAmountViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class OrganicWasteRatioViewSet(viewsets.ViewSet):
+class OrganicWasteRatioViewSet(WasteAtlasViewSet):
     """Return organic / (organic + residual) ratio per catchment (Karte 28).
 
     Example::
@@ -2168,7 +2181,7 @@ class OrganicWasteRatioViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class WasteRatioViewSet(viewsets.ViewSet):
+class WasteRatioViewSet(WasteAtlasViewSet):
     """Return biowaste / (biowaste + residual) ratio per catchment (Karte 19).
 
     Example::
@@ -2215,7 +2228,7 @@ class WasteRatioViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class CollectionSupportViewSet(viewsets.ViewSet):
+class CollectionSupportViewSet(WasteAtlasViewSet):
     """Return combined paper + plastic bags status per catchment (Karte 7).
 
     Returns both statuses so the front-end can classify into the 2D
@@ -2295,7 +2308,7 @@ class CollectionSupportViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class RegularPlasticCollectionSupportViewSet(viewsets.ViewSet):
+class RegularPlasticCollectionSupportViewSet(WasteAtlasViewSet):
     """Return combined paper + regular-plastic bags status per catchment.
 
     Like CollectionSupportViewSet but uses material 18 (regular plastic bags)
@@ -2374,7 +2387,7 @@ class RegularPlasticCollectionSupportViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class PaperBagsStatusViewSet(viewsets.ViewSet):
+class PaperBagsStatusViewSet(WasteAtlasViewSet):
     """Return paper-bags allowed/forbidden status per catchment (Karte 5).
 
     Checks whether 'Collection Support Item: Paper bags' (material 19) appears
@@ -2398,7 +2411,7 @@ class PaperBagsStatusViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class PlasticBagsStatusViewSet(viewsets.ViewSet):
+class PlasticBagsStatusViewSet(WasteAtlasViewSet):
     """Return biodegradable plastic bags allowed/forbidden status (Karte 6).
 
     Checks whether 'Collection Support Item: Biodegradable plastic bags'
@@ -2422,7 +2435,7 @@ class PlasticBagsStatusViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class RegularPlasticBagsStatusViewSet(viewsets.ViewSet):
+class RegularPlasticBagsStatusViewSet(WasteAtlasViewSet):
     """Return regular (non-biodegradable) plastic bags allowed/forbidden status.
 
     Checks whether 'Collection Support Item: Plastic bags' (material 18) appears
@@ -2449,7 +2462,7 @@ class RegularPlasticBagsStatusViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class FoodWasteCategoryViewSet(viewsets.ViewSet):
+class FoodWasteCategoryViewSet(WasteAtlasViewSet):
     """Return the allowed food waste category per catchment (Karte 4).
 
     Classifies each catchment's biowaste collection by which food waste
@@ -2511,7 +2524,7 @@ class FoodWasteCategoryViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class ConnectionRateViewSet(viewsets.ViewSet):
+class ConnectionRateViewSet(WasteAtlasViewSet):
     """Return the connection rate for biowaste door-to-door collections (Karte 3).
 
     For each catchment, selects the primary biowaste/food-waste collection
@@ -2574,7 +2587,7 @@ class ConnectionRateViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class CatchmentPopulationViewSet(viewsets.ViewSet):
+class CatchmentPopulationViewSet(WasteAtlasViewSet):
     """Return population and population density for catchments with waste collections.
 
     Supports query parameters:
@@ -2644,7 +2657,7 @@ class CatchmentPopulationViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class BiowasteImpurityViewSet(viewsets.ViewSet):
+class BiowasteImpurityViewSet(WasteAtlasViewSet):
     """Return the biowaste impurity rate per catchment (Catalonia KPI).
 
     For each catchment, selects the primary biowaste collection and returns
@@ -2707,7 +2720,7 @@ class BiowasteImpurityViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class WeeklyBpAccessDaysViewSet(viewsets.ViewSet):
+class WeeklyBpAccessDaysViewSet(WasteAtlasViewSet):
     """Return weekly bring-point access days per catchment (Catalonia KPI).
 
     For each catchment, selects the primary biowaste collection and returns

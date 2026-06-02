@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from django.db import connection
 from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
@@ -2039,6 +2040,36 @@ class GreenWasteCollectionSystemCountViewSetTests(APITestCase):
         self.assertEqual(count_by_catchment[self.catchment_a.id], 2)
         self.assertEqual(count_by_catchment[self.catchment_b.id], 1)
         self.assertEqual(len(count_by_catchment), 2)
+
+
+class WasteAtlasThrottleTests(APITestCase):
+    endpoint = "/waste_collection/api/waste-atlas/green-waste-collection-system-count/"
+
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_waste_atlas_endpoints_are_throttled(self):
+        with patch(
+            "rest_framework.throttling.ScopedRateThrottle.THROTTLE_RATES",
+            {"waste_atlas": "1/minute"},
+        ):
+            first_response = self.client.get(
+                self.endpoint,
+                {"country": "DE", "year": 2024},
+            )
+            second_response = self.client.get(
+                self.endpoint,
+                {"country": "DE", "year": 2024},
+            )
+
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            second_response.status_code,
+            status.HTTP_429_TOO_MANY_REQUESTS,
+        )
 
 
 class CataloniaCollectionSystemViewSetTests(APITestCase):

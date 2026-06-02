@@ -238,6 +238,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "10/minute",
         "user": "60/minute",
+        "waste_atlas": "300/minute",
     },
 }
 
