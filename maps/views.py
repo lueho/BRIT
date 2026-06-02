@@ -920,7 +920,8 @@ class GeoDataSetRuntimeFeatureGeoJSONView(
         adapter = self.get_runtime_adapter()
         if not getattr(adapter, "uses_local_relation", False):
             raise Http404("Dataset does not use a local relation runtime.")
-        count = adapter.get_record_count(query_params=request.GET)
+        feature_id = request.GET.get("id")
+        count = adapter.get_record_count(query_params=request.GET, pk=feature_id)
         rejection_response = get_unbounded_geojson_rejection_response(
             request,
             count,
@@ -929,11 +930,11 @@ class GeoDataSetRuntimeFeatureGeoJSONView(
         if rejection_response is not None:
             return rejection_response
 
-        data_version = adapter.get_data_version(query_params=request.GET)
+        data_version = adapter.get_data_version(query_params=request.GET, pk=feature_id)
         response = StreamingHttpResponse(
             adapter.stream_geojson_feature_collection(
                 query_params=request.GET,
-                pk=request.GET.get("id"),
+                pk=feature_id,
             ),
             content_type="application/geo+json",
         )
