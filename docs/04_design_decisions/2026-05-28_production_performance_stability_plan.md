@@ -468,6 +468,17 @@ Recommended guardrails:
 - Add operator-facing warnings for public datasets with unsafe unfiltered map
   defaults.
 
+Implementation checkpoint:
+
+- `GeoDataSetRuntimeFeatureGeoJSONView` now passes the selected `id` through to
+  record count, data-version, and streaming calls so single-feature requests
+  report `X-Total-Count` and `X-Data-Version` for the selected feature scope.
+- `LocalRelationDatasetRuntimeAdapter` now shares the same record-scope WHERE
+  builder for count, data-version, and feature streaming.
+- Validation:
+  - `docker compose exec web python manage.py test maps.tests.test_geodataset_runtime_routes.GeoDataSetLocalRelationRuntimeRouteTestCase.test_local_relation_geojson_route_can_return_single_feature maps.tests.test_geodataset_runtime_routes.GeoDataSetLocalRelationRuntimeRouteTestCase.test_local_relation_geojson_route_rejects_large_unbounded_request maps.tests.test_geodataset_runtime_routes.GeoDataSetLocalRelationRuntimeRouteTestCase.test_local_relation_geojson_route_allows_filterable_bound --settings=brit.settings.testrunner --keepdb --noinput`
+  - `docker compose exec web ruff check maps/runtime_adapters.py maps/views.py maps/tests/test_geodataset_runtime_routes.py`
+
 #### Waste Atlas GeoJSON and thematic data endpoints
 
 Geometry endpoint:
