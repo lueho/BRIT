@@ -405,6 +405,9 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     Creates a flat, human-readable representation of Collections, suitable for file exports.
     """
 
+    include_collection_metrics = True
+    include_region_attributes = True
+
     catchment = serializers.StringRelatedField(label="Catchment")
     nuts_or_lau_id = serializers.StringRelatedField(
         source="catchment.region.nuts_or_lau_id", label="NUTS/LAU Id"
@@ -540,25 +543,29 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
                         ordered_representation[f"nuts_{level}_id"] = nuts_id
                         ordered_representation[f"nuts_{level}_name"] = nuts_name
 
-        region_attributes = ["Population", "Population density"]
-        try:
-            region = instance.catchment.region
-        except AttributeError:
-            region = None
-        if region is not None:
-            for attr_name in region_attributes:
-                col_prefix = attr_name.lower().replace(" ", "_")
-                rav_qs = (
-                    region.regionattributevalue_set.filter(property__name=attr_name)
-                    .select_related("property", "unit")
-                    .order_by("date")
-                )
-                for rav in rav_qs:
-                    year = rav.date.year if rav.date else None
-                    col = f"{col_prefix}_{year}" if year else col_prefix
-                    ordered_representation[col] = rav.value
-                    unit = rav.measurement_unit_label
-                    ordered_representation[f"{col}_unit"] = unit if unit else ""
+        if self.include_region_attributes:
+            region_attributes = ["Population", "Population density"]
+            try:
+                region = instance.catchment.region
+            except AttributeError:
+                region = None
+            if region is not None:
+                for attr_name in region_attributes:
+                    col_prefix = attr_name.lower().replace(" ", "_")
+                    rav_qs = (
+                        region.regionattributevalue_set.filter(property__name=attr_name)
+                        .select_related("property", "unit")
+                        .order_by("date")
+                    )
+                    for rav in rav_qs:
+                        year = rav.date.year if rav.date else None
+                        col = f"{col_prefix}_{year}" if year else col_prefix
+                        ordered_representation[col] = rav.value
+                        unit = rav.measurement_unit_label
+                        ordered_representation[f"{col}_unit"] = unit if unit else ""
+
+        if not self.include_collection_metrics:
+            return ordered_representation
 
         additional_properties = [
             "specific waste collected",
@@ -606,6 +613,9 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
 class CollectionResearchSerializer(
     CollectionReferenceFieldsMixin, CollectionFlatSerializer
 ):
+    include_collection_metrics = False
+    include_region_attributes = False
+
     id = serializers.IntegerField(read_only=True)
     owner_id = serializers.IntegerField(source="owner.id", read_only=True)
     publication_status = serializers.CharField(read_only=True)
