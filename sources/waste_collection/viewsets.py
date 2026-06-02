@@ -1469,7 +1469,12 @@ class CollectorViewSet(CachedGeoJSONMixin, viewsets.ReadOnlyModelViewSet):
         """Use CollectorGeometrySerializer for GeoJSON endpoint."""
         return CollectorGeometrySerializer
 
-    @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
+    @action(
+        detail=False,
+        methods=["get"],
+        permission_classes=[permissions.AllowAny],
+        throttle_classes=[GeoJSONAnonThrottle, GeoJSONUserThrottle],
+    )
     def geojson(self, request, *args, **kwargs):
         """GeoJSON endpoint optimized for QGIS rendering."""
         return super().geojson(request, *args, **kwargs)

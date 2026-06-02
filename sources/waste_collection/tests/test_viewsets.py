@@ -148,6 +148,21 @@ class CollectionViewSetTestCase(APITestCase):
         self.assertIn(self.published_collection.pk, feature_ids)
         self.assertIn(self.other_user_published_collection.pk, feature_ids)
 
+    def test_collector_geojson_endpoint_is_throttled(self):
+        cache.clear()
+        url = reverse("api-collector-geojson")
+
+        with patch("sources.waste_collection.viewsets.GeoJSONAnonThrottle.rate", "1/m"):
+            first_response = self.client.get(url)
+            second_response = self.client.get(url)
+
+        cache.clear()
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            second_response.status_code,
+            status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
     def test_geojson_non_public_scope_requires_authentication(self):
         url = reverse("api-waste-collection-geojson")
 
