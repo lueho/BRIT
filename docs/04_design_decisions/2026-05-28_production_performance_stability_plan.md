@@ -353,6 +353,28 @@ Recommended guardrails:
 - Add query-count and response-time tests for representative collection list
   responses.
 
+Implementation checkpoint:
+
+- Collection list/research API hardening continued:
+  - `CollectionResearchSerializer` remains the list serializer, but now emits
+    compact research metadata without dynamic region attributes or CPV/ACPV
+    metric columns.
+  - The former app-startup monkey patch for disabling research metrics was
+    removed and replaced with explicit serializer flags.
+  - The list queryset now uses `select_related()` for foreign keys and
+    `prefetch_related()` for materials, flyers, sources, predecessors, and
+    successors used by the list serializer.
+  - Predecessor and successor ID fields consume prefetched objects when present.
+  - List responses use DRF page-number pagination with a default page size of
+    100 and a maximum client-requested page size of 200.
+  - `CollectionFlatSerializer` still supports heavyweight dynamic export
+    columns, but resolves the dynamic metric `Property` rows once per serializer
+    instance instead of once per row and property.
+- Validation:
+  - `docker compose exec web python manage.py test sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_list_endpoint_prefetches_relationship_ids sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_list_endpoint_prefetches_m2m_fields sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_list_endpoint_returns_paginated_response --settings=brit.settings.testrunner --keepdb --noinput`
+  - `docker compose exec web python manage.py test sources.waste_collection.tests.test_collection_research_metrics.CollectionResearchPerformanceTests.test_list_endpoint_skips_expensive_collection_metrics sources.waste_collection.tests.test_apps.WasteCollectionConfigReadyTests --settings=brit.settings.testrunner --noinput`
+  - `docker compose exec web ruff check sources/waste_collection/viewsets.py sources/waste_collection/serializers.py sources/waste_collection/apps.py sources/waste_collection/tests/test_viewsets.py sources/waste_collection/tests/test_apps.py sources/waste_collection/tests/test_collection_research_metrics.py`
+
 #### Waste Collection export
 
 Endpoint:
