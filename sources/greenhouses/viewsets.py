@@ -19,7 +19,7 @@ from utils.viewsets import AutoPermModelViewSet
 class NantesGreenhousesViewSet(AutoPermModelViewSet):
     """Greenhouse map/API viewset."""
 
-    queryset = NantesGreenhouses.objects.all()
+    queryset = NantesGreenhouses.objects.order_by("pk")
     serializer_class = NantesGreenhousesModelSerializer
     filterset_class = NantesGreenhousesFilterSet
     custom_permission_required = {
