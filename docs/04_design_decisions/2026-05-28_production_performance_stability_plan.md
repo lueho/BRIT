@@ -512,6 +512,7 @@ Current guardrails:
   group.
 - Geometry endpoint supports country, year, NUTS-prefix, and `id` bounds.
 - Catchment geometry uses simplified geometry annotation.
+- Waste Atlas API endpoints use a dedicated DRF `waste_atlas` throttle scope.
 
 Recommended guardrails:
 
@@ -524,6 +525,16 @@ Recommended guardrails:
 - Add cache-version metadata and conditional request support.
 - Add throttling even though the pages are group-restricted.
 - Consider async render/export jobs for publication-quality map outputs.
+
+Implementation checkpoint:
+
+- Waste Atlas viewsets now inherit shared throttled base classes while keeping
+  existing `AllowAny` API behavior for map data consumers.
+- `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["waste_atlas"]` is configured at
+  `300/minute`.
+- Validation:
+  - `docker compose exec web python manage.py test sources.waste_collection.tests.test_viewsets.WasteAtlasThrottleTests sources.waste_collection.tests.test_viewsets.GreenWasteCollectionSystemCountViewSetTests.test_returns_distinct_green_waste_system_count_per_catchment --settings=brit.settings.testrunner --keepdb --noinput`
+  - `docker compose exec web ruff check brit/settings/settings.py sources/waste_collection/waste_atlas/viewsets.py sources/waste_collection/tests/test_viewsets.py`
 
 #### Source-domain map GeoJSON endpoints
 
