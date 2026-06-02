@@ -1013,6 +1013,15 @@ Tasks:
 - Investigate repeated `/waste_collection/api/collection/geojson/` bad requests and align frontend query construction if needed.
 - Add deterministic ordering to `NantesGreenhouses` list pagination.
 
+Implementation checkpoint:
+
+- `NantesGreenhousesViewSet` now orders its base queryset by primary key, making
+  paginated list responses deterministic and removing the unordered pagination
+  warning source.
+- Validation:
+  - `docker compose exec web python manage.py test sources.greenhouses.tests.test_views.NantesGreenhousesViewSetTestCase.test_list_queryset_has_deterministic_ordering --settings=brit.settings.testrunner --keepdb --noinput`
+  - `docker compose exec web ruff check sources/greenhouses/viewsets.py sources/greenhouses/tests/test_views.py`
+
 Success criteria:
 
 - Repeated known 404/400 warnings are removed or intentionally downgraded.
