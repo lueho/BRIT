@@ -112,7 +112,7 @@ def _load_records(file_path: Path) -> tuple[list[dict], list[str], int]:
         weblinks = weblinks_urls + weblinks_notes
 
         record = {
-            "catchment": row_data.get("Catchment"),
+            "catchment_name": row_data.get("Catchment"),
             "collection_system": row_data.get("Collection System"),
             "waste_category": row_data.get("Waste Category"),
             "valid_from": valid_from,
