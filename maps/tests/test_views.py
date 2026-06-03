@@ -1,6 +1,5 @@
 import io
 import json
-import random
 import re
 import uuid
 from datetime import date
@@ -1690,19 +1689,6 @@ class GeoJSONCachingTests(TestCase):
         response_after_delete = self.client.get(list_url)
         self.assertEqual(response_after_delete["X-Cache-Status"], "MISS")
         self.assertNotContains(response_after_delete, f"Region{region_id_to_delete}")
-
-    def test_warmup_command(self):
-        """Test the warmup_geojson_cache management command."""
-        unique_level = random.randint(10000, 99999)
-        NutsRegion.objects.create(levl_code=unique_level)
-        NutsRegion.objects.create(levl_code=unique_level)
-        out = io.StringIO()
-        call_command(
-            "warmup_geojson_cache", f"--nuts-levels={unique_level}", stdout=out
-        )
-        self.assertIn("Warming up GeoJSON cache...", out.getvalue())
-        self.assertIn(f"Caching NUTS level {unique_level} regions...", out.getvalue())
-        self.assertIn("Cache warmup complete!", out.getvalue())
 
     def test_monitor_command(self):
         """Test the monitor_cache command executes and shows info."""

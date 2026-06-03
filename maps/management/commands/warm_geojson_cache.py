@@ -11,12 +11,19 @@ Usage:
     # Warm only collections cache
     python manage.py warm_geojson_cache --collections
 
+    # Warm only NUTS regions cache
+    python manage.py warm_geojson_cache --nuts
+
     # Run asynchronously via Celery
     python manage.py warm_geojson_cache --async
 """
 
+from django.conf import settings
+from django.core.cache import caches
 from django.core.management.base import BaseCommand
 
+from maps.models import NutsRegion
+from maps.serializers import NutsRegionGeometrySerializer
 from sources.registry import get_source_domain_geojson_cache_warmers
 
 
@@ -40,6 +47,23 @@ class Command(BaseCommand):
             help="Warm only the waste collections cache",
         )
         parser.add_argument(
+            "--nuts",
+            action="store_true",
+            help="Warm only the NUTS regions cache",
+        )
+        parser.add_argument(
+            "--nuts-levels",
+            type=str,
+            default="0,1,2",
+            help="Comma-separated list of NUTS levels to cache (default: 0,1,2)",
+        )
+        parser.add_argument(
+            "--limit",
+            type=int,
+            default=None,
+            help="Limit the number of items to cache per type",
+        )
+        parser.add_argument(
             "--async",
             action="store_true",
             dest="run_async",
@@ -51,14 +75,21 @@ class Command(BaseCommand):
 
         warm_trees = options["trees"]
         warm_collections = options["collections"]
+        warm_nuts = options["nuts"]
         run_async = options["run_async"]
         warmers_by_slug = dict(get_source_domain_geojson_cache_warmers())
 
         # If neither flag specified, warm all
-        if not warm_trees and not warm_collections:
+        if not warm_trees and not warm_collections and not warm_nuts:
             warm_trees = True
             warm_collections = True
+            warm_nuts = True
 
+        # Warm NUTS cache (synchronous only)
+        if warm_nuts:
+            self._warm_nuts_cache(options)
+
+        # Handle plugin cache warming
         if warm_trees and warm_collections and not run_async:
             # Warm all synchronously
             self.stdout.write("Warming all GeoJSON caches (synchronous)...")
@@ -122,3 +153,30 @@ class Command(BaseCommand):
         for key, data in results.items():
             name = key.replace("_", " ").title()
             self._report_single_result(name, data)
+
+    def _warm_nuts_cache(self, options):
+        """Warm NUTS regions cache."""
+        geojson_cache = caches[getattr(settings, "GEOJSON_CACHE", "default")]
+        nuts_levels = [int(level) for level in options["nuts_levels"].split(",")]
+        limit = options["limit"]
+
+        self.stdout.write("Warming up NUTS GeoJSON cache...")
+
+        # Cache NUTS regions by level
+        for level in nuts_levels:
+            self.stdout.write(f"Caching NUTS level {level} regions...")
+            queryset = NutsRegion.objects.filter(levl_code=level)
+            if limit:
+                queryset = queryset[:limit]
+
+            for region in queryset:
+                cache_key = f"nuts_geojson:level:{level}:id:{region.id}"
+                serializer = NutsRegionGeometrySerializer([region], many=True)
+                geojson_cache.set(cache_key, serializer.data)
+
+            # Also cache the collection
+            cache_key = f"nuts_geojson:level:{level}"
+            serializer = NutsRegionGeometrySerializer(queryset, many=True)
+            geojson_cache.set(cache_key, serializer.data)
+
+        self.stdout.write("NUTS cache warmup complete!")
