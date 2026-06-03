@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from io import StringIO
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -21,6 +21,48 @@ from utils.object_management.models import ReviewAction
 from utils.properties.models import Property, Unit
 
 User = get_user_model()
+
+
+def _resolve_date(value) -> date | None:
+    """Convert various date formats to date object."""
+    if value is None:
+        return None
+    if isinstance(value, date):
+        # If it's already a date but not a datetime, return it
+        if not isinstance(value, datetime):
+            return value
+        # If it's a datetime, convert to date
+        return value.date()
+    # Try to parse string
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return None
+        # Try common formats
+        for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%Y/%m/%d"):
+            try:
+                parsed = datetime.strptime(value, fmt)
+                return parsed.date()
+            except ValueError:
+                continue
+    return None
+
+
+def _split_source_cell(raw: str) -> tuple[list[str], list[str]]:
+    """Split a source cell into URLs and notes."""
+    if not raw:
+        return [], []
+    urls = []
+    notes = []
+    for item in raw.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        if item.startswith("http"):
+            urls.append(item)
+        else:
+            notes.append(item)
+    return urls, notes
 
 
 def _load_records(file_path: Path) -> tuple[list[dict], list[str], int]:
@@ -48,7 +90,9 @@ def _load_records(file_path: Path) -> tuple[list[dict], list[str], int]:
         missing = []
         if not row_data.get("Collection System"):
             missing.append("collection_system")
-        if not row_data.get("Valid from"):
+        valid_from_raw = row_data.get("Valid from")
+        valid_from = _resolve_date(valid_from_raw)
+        if not valid_from:
             missing.append("valid_from")
 
         if missing:
@@ -60,15 +104,22 @@ def _load_records(file_path: Path) -> tuple[list[dict], list[str], int]:
             continue
 
         # Convert to API payload format
+        sources_raw = row_data.get("Sources_new") or ""
+        sources_urls, sources_notes = _split_source_cell(sources_raw)
+        weblinks_raw = row_data.get("Weblinks") or ""
+        weblinks_urls, weblinks_notes = _split_source_cell(weblinks_raw)
+        sources = sources_urls + sources_notes
+        weblinks = weblinks_urls + weblinks_notes
+
         record = {
             "catchment": row_data.get("Catchment"),
             "collection_system": row_data.get("Collection System"),
             "waste_category": row_data.get("Waste Category"),
-            "valid_from": row_data.get("Valid from"),
+            "valid_from": valid_from,
             "allowed_materials": row_data.get("Allowed Materials") or "",
             "forbidden_materials": row_data.get("Forbidden Materials") or "",
-            "weblinks": row_data.get("Weblinks") or "",
-            "sources": row_data.get("Sources_new") or "",
+            "weblinks": weblinks,
+            "sources": sources,
         }
 
         # Add property values if present
