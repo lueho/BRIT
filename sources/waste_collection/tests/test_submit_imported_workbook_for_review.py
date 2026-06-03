@@ -23,6 +23,73 @@ from utils.properties.models import Property, Unit
 User = get_user_model()
 
 
+def _load_records(file_path: Path) -> tuple[list[dict], list[str], int]:
+    """Load a generic workbook into importer-compatible records for testing.
+
+    Returns:
+        Tuple of (valid_records, preflight_warnings, total_data_row_count).
+    """
+    workbook = openpyxl.load_workbook(str(file_path), read_only=True, data_only=True)
+    rows = workbook.active.iter_rows(values_only=True)
+    headers = next(rows, None)
+
+    if not headers:
+        return [], ["No headers found"], 0
+
+    records: list[dict] = []
+    warnings: list[str] = []
+    row_count = 0
+
+    for row_number, row in enumerate(rows, start=2):
+        row_count += 1
+        row_data = dict(zip(headers, row, strict=True))
+
+        # Check for required fields
+        missing = []
+        if not row_data.get("Collection System"):
+            missing.append("collection_system")
+        if not row_data.get("Valid from"):
+            missing.append("valid_from")
+
+        if missing:
+            catchment = row_data.get("Catchment", "unknown")
+            warnings.append(
+                f"Row {row_number} ({catchment!r}): "
+                f"skipped — missing required field(s): {', '.join(missing)}"
+            )
+            continue
+
+        # Convert to API payload format
+        record = {
+            "catchment": row_data.get("Catchment"),
+            "collection_system": row_data.get("Collection System"),
+            "waste_category": row_data.get("Waste Category"),
+            "valid_from": row_data.get("Valid from"),
+            "allowed_materials": row_data.get("Allowed Materials") or "",
+            "forbidden_materials": row_data.get("Forbidden Materials") or "",
+            "weblinks": row_data.get("Weblinks") or "",
+            "sources": row_data.get("Sources_new") or "",
+        }
+
+        # Add property values if present
+        for header in headers:
+            if header and "Specific Waste Collected" in header:
+                year_match = header.split()[-1]  # e.g., "2020"
+                if year_match.isdigit():
+                    year = int(year_match)
+                    unit_header = f"{header} Unit"
+                    unit = row_data.get(unit_header)
+                    value = row_data.get(header)
+                    if value is not None:
+                        record[f"property_{year}"] = value
+                        if unit:
+                            record[f"property_{year}_unit"] = unit
+
+        records.append(record)
+
+    return records, warnings, row_count
+
+
 @override_settings(AUTO_ENQUEUE_URL_CHECKS=False)
 class SubmitImportedWorkbookForReviewCommandTestCase(TestCase):
     @classmethod

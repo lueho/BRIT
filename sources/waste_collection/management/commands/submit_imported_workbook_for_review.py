@@ -1,15 +1,13 @@
 from collections import Counter
 from pathlib import Path
 
+import openpyxl
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import Q
 
 from sources.waste_collection.importers import CollectionImporter
-from sources.waste_collection.management.commands.import_bw_2024_collections import (
-    _load_records,
-)
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
     Collection,
@@ -26,6 +24,95 @@ def _normalize_url(url) -> str | None:
     if not normalized or len(normalized) > 2083:
         return None
     return normalized
+
+
+def _load_records(file_path: Path) -> tuple[list[dict], list[str], int]:
+    """Load a generic workbook into importer-compatible records.
+
+    Returns:
+        Tuple of (valid_records, preflight_warnings, total_data_row_count).
+    """
+    workbook = openpyxl.load_workbook(str(file_path), read_only=True, data_only=True)
+    rows = workbook.active.iter_rows(values_only=True)
+    headers = next(rows, None)
+
+    if not headers:
+        return [], ["No headers found"], 0
+
+    records: list[dict] = []
+    warnings: list[str] = []
+    row_count = 0
+
+    for row_number, row in enumerate(rows, start=2):
+        row_count += 1
+        row_data = dict(zip(headers, row, strict=True))
+
+        # Check for required fields (try common header names)
+        collection_system = None
+        for header in ["Collection System", "collection_system", "Collection system"]:
+            if row_data.get(header):
+                collection_system = row_data[header]
+                break
+
+        valid_from = None
+        for header in ["Valid from", "valid_from", "Valid From"]:
+            if row_data.get(header):
+                valid_from = row_data[header]
+                break
+
+        missing = []
+        if not collection_system:
+            missing.append("collection_system")
+        if not valid_from:
+            missing.append("valid_from")
+
+        if missing:
+            catchment = (
+                row_data.get("Catchment") or row_data.get("catchment") or "unknown"
+            )
+            warnings.append(
+                f"Row {row_number} ({catchment!r}): "
+                f"skipped — missing required field(s): {', '.join(missing)}"
+            )
+            continue
+
+        # Convert to API payload format
+        record = {
+            "catchment": row_data.get("Catchment") or row_data.get("catchment"),
+            "collection_system": collection_system,
+            "waste_category": row_data.get("Waste Category")
+            or row_data.get("waste_category"),
+            "valid_from": valid_from,
+            "allowed_materials": row_data.get("Allowed Materials")
+            or row_data.get("allowed_materials")
+            or "",
+            "forbidden_materials": row_data.get("Forbidden Materials")
+            or row_data.get("forbidden_materials")
+            or "",
+            "weblinks": row_data.get("Weblinks") or row_data.get("weblinks") or "",
+            "sources": row_data.get("Sources_new") or row_data.get("sources_new") or "",
+        }
+
+        # Add property values if present
+        for header in headers:
+            if header and (
+                "Specific Waste Collected" in str(header)
+                or "Specific waste collected" in str(header)
+            ):
+                year_match = str(header).split()[-1]  # e.g., "2020"
+                if year_match.isdigit():
+                    year = int(year_match)
+                    unit_header = f"{header} Unit"
+                    unit = row_data.get(unit_header)
+                    value = row_data.get(header)
+                    if value is not None:
+                        record[f"property_{year}"] = value
+                        if unit:
+                            record[f"property_{year}_unit"] = unit
+
+        records.append(record)
+
+    return records, warnings, row_count
 
 
 class Command(BaseCommand):
