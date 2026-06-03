@@ -7,7 +7,7 @@ from django.db import transaction
 from django.db.models import Q
 
 from sources.waste_collection.importers import CollectionImporter
-from sources.waste_collection.management.commands.import_de_2024_improved_standalone import (
+from sources.waste_collection.management.commands.import_bw_2024_collections import (
     _load_records,
 )
 from sources.waste_collection.models import (
