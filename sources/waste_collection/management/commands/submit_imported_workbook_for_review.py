@@ -140,7 +140,7 @@ def _load_records(file_path: Path) -> tuple[list[dict], list[str], int]:
             "forbidden_materials": row_data.get("Forbidden Materials")
             or row_data.get("forbidden_materials")
             or "",
-            "weblinks": weblinks,
+            "flyer_urls": weblinks,
             "sources": sources,
         }
 

@@ -118,7 +118,7 @@ def _load_records(file_path: Path) -> tuple[list[dict], list[str], int]:
             "valid_from": valid_from,
             "allowed_materials": row_data.get("Allowed Materials") or "",
             "forbidden_materials": row_data.get("Forbidden Materials") or "",
-            "weblinks": weblinks,
+            "flyer_urls": weblinks,
             "sources": sources,
         }
 
