@@ -816,7 +816,7 @@ function renderSummaries(featureInfos) {
             renderSummaryContainer(summary, outer_summary_container);
         }
 
-        document.querySelector('#info-card-body').classList.add('show');
+        document.querySelector('#info-card-body')?.classList.add('show');
     }
 }
 
@@ -907,7 +907,7 @@ function renderFeatureDetails(data) {
         });
 
     container.appendChild(fragment);
-    document.querySelector('#info-card-body').classList.add('show');
+    document.querySelector('#info-card-body')?.classList.add('show');
 }
 
 // This function needs to be defined elsewhere in your code

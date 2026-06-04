@@ -320,9 +320,6 @@ class MapMixin:
         if self.get_features_layer_summary_url():
             params["features_layer_summary_url"] = self.get_features_layer_summary_url()
 
-        if hasattr(self, "object"):
-            params["features_feature_id"] = getattr(self.object, "pk", None)
-
         return params
 
     def get_map_config_serialized(self):
@@ -594,7 +591,6 @@ class GeoDataSetRuntimePermissionMixin:
         params = super().get_override_params()
         adapter = self.get_runtime_adapter()
         if getattr(adapter, "uses_local_relation", False):
-            params.pop("features_feature_id", None)
             params["features_layer_summary_url"] = ""
         return params
 
@@ -866,6 +862,10 @@ class GeoDataSetRuntimeFeatureDetailView(
     def get_region_feature_id(self):
         return self.get_dataset().region_id
 
+    def get_features_feature_id(self):
+        # This view shows a single feature, so the features layer is scoped to it.
+        return self.kwargs.get(self.pk_url_kwarg)
+
     def get_map_configuration(self):
         dataset = self.get_dataset()
         if dataset.map_configuration:
@@ -877,7 +877,6 @@ class GeoDataSetRuntimeFeatureDetailView(
         adapter = self.get_runtime_adapter()
         if getattr(adapter, "uses_local_relation", False):
             params["load_features"] = True
-            params["features_feature_id"] = self.kwargs[self.pk_url_kwarg]
             params["features_layer_summary_url"] = ""
         return params
 
@@ -1062,7 +1061,6 @@ class RegionDetailView(MapMixin, UserCreatedObjectDetailView):
 
     def get_override_params(self):
         params = super().get_override_params()
-        params.pop("features_feature_id", None)
 
         show_composed = self.request.GET.get("show_composed_of") in {"1", "true"}
         if show_composed:

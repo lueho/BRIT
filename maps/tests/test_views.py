@@ -3,6 +3,7 @@ import json
 import re
 import uuid
 from datetime import date
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from urllib.parse import urlencode
 
@@ -206,6 +207,22 @@ class MapMixinTestCase(TestCase):
         self.assertEqual(
             map_config["featuresLayerDetailsUrlTemplate"], "/maps/api/catchment/"
         )
+
+    def test_object_pk_does_not_leak_into_features_id(self):
+        # Regression: a DetailView-style map (self.object is the dataset/region,
+        # not a feature) must not inject self.object.pk as the features layer id.
+        # Doing so previously appended ?id=<object pk> to the features GeoJSON
+        # request, which filtered the features down to a single (usually missing)
+        # primary key and made the map appear empty.
+        self.view.object = SimpleNamespace(pk=999)
+        request = self.factory.get(f"/?map_config_id={self.map_config.id}")
+        self.view.request = request
+
+        map_config = self.view.get_context_data()["map_config"]
+
+        # featuresId comes from the layer configuration ("1"), never the object pk.
+        self.assertEqual(map_config["featuresId"], "1")
+        self.assertNotEqual(map_config["featuresId"], 999)
 
     def test_layer_not_loaded_when_url_missing(self):
         for layer in self.map_config.layers.all():
