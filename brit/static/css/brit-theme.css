@@ -9304,6 +9304,25 @@ input[type=radio]:focus {
 
 .sb-sidenav .sb-sidenav-menu .nav .nav-link.sb-nav-link-with-badge .sb-nav-link-badge {
   max-width: 100%;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%) !important;
+  color: white !important;
+  font-weight: 600;
+  font-size: 0.7rem;
+  padding: 0.25rem 0.5rem;
+  box-shadow: 0 2px 4px rgba(238, 90, 82, 0.3);
+  animation: pulse-badge 2s ease-in-out infinite;
+  border: 2px solid white;
+}
+
+@keyframes pulse-badge {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 2px 4px rgba(238, 90, 82, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 3px 8px rgba(238, 90, 82, 0.5);
+  }
 }
 
 .sb-sidenav .sb-sidenav-menu .nav .nav-link .sb-sidenav-collapse-arrow {
