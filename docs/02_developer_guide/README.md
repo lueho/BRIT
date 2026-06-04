@@ -10,6 +10,9 @@ This section contains developer-facing documentation for BRIT. Workflow instruct
 - **Code style and conventions**
   Read [Style Guide](style_guide.md).
 
+- **Static assets (SCSS → CSS → minified CSS/JS)**
+  Read [Static Assets](static_assets.md).
+
 - **Architecture**
   Read [Architecture Overview](architecture.md) and [Applications Overview](applications.md).
 

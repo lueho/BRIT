@@ -19,6 +19,9 @@ brit/static/lib/bootstrap/scss/*.css.map
 brit/static/scss/*.css
 brit/static/scss/*.css.map
 
+# Node tooling (asset build image installs deps globally; nothing lands here)
+node_modules/
+
 /test-results/
 /.venv/
 /.devcontainer/

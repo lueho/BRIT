@@ -1,0 +1,42 @@
+name: assets
+
+# Verifies that the committed static assets (compiled CSS + minified CSS/JS)
+# are in sync with their sources, using the exact same pinned, Dockerized
+# toolchain developers use locally (docker/assets/Dockerfile).
+
+on:
+  push:
+    paths:
+      - "**/*.scss"
+      - "**/*.css"
+      - "**/*.js"
+      - "docker/assets/**"
+      - "scripts/build_assets.mjs"
+      - ".github/workflows/assets.yml"
+  pull_request:
+    paths:
+      - "**/*.scss"
+      - "**/*.css"
+      - "**/*.js"
+      - "docker/assets/**"
+      - "scripts/build_assets.mjs"
+      - ".github/workflows/assets.yml"
+
+jobs:
+  verify-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build asset toolchain image
+        run: docker build -f docker/assets/Dockerfile -t brit-assets .
+
+      - name: Rebuild all assets
+        run: docker run --rm -v "$PWD:/app" -w /app brit-assets node scripts/build_assets.mjs
+
+      - name: Fail if compiled assets are out of date
+        run: |
+          if ! git diff --exit-code -- '*.css' '*.css.map' '*.min.css' '*.min.js'; then
+            echo "::error::Compiled assets are out of date. Run 'make assets' and commit the result."
+            exit 1
+          fi
