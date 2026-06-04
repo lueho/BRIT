@@ -27,7 +27,7 @@
                            class="text-decoration-none text-body">
                             <img class="card-img-top sample-gallery-image"
                                  src="{{ object.display_image.url }}"
-                                 alt="{% if object.display_image_source == 'series' %}Series image for {{ object.name }}{% else %}{{ object.name }} image{% endif %}"
+                                 alt="{{ object.display_image_alt_text }}"
                                  width="800"
                                  height="450">
                         </a>

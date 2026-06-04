@@ -1,3 +1,4 @@
+from crispy_forms.layout import HTML, Div, Field, Layout
 from django.core.exceptions import ValidationError
 from django.forms import (
     DateTimeInput,
@@ -37,6 +38,27 @@ from .models import (
     SampleSeries,
     get_or_create_sample_substrate_category,
 )
+
+
+def image_metadata_section():
+    return Div(
+        HTML(
+            '<div class="card-header bg-body-tertiary">'
+            '<h6 class="mb-0">Image details</h6>'
+            '<div class="form-text mb-0">'
+            "Alt text, caption, and rights notice belong to the uploaded image."
+            "</div>"
+            "</div>"
+        ),
+        Div(
+            Field("image"),
+            Field("image_alt_text"),
+            Field("image_caption"),
+            Field("image_rights_notice"),
+            css_class="card-body",
+        ),
+        css_class="card border mb-3",
+    )
 
 
 class MaterialCategoryModelForm(SimpleModelForm):
@@ -343,9 +365,28 @@ class AnalyticalMethodModelForm(
 
 
 class SampleSeriesModelForm(SimpleModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper.layout = Layout(
+            "name",
+            "material",
+            image_metadata_section(),
+            "publish",
+            "description",
+        )
+
     class Meta:
         model = SampleSeries
-        fields = ("name", "material", "image", "publish", "description")
+        fields = (
+            "name",
+            "material",
+            "image",
+            "image_alt_text",
+            "image_caption",
+            "image_rights_notice",
+            "publish",
+            "description",
+        )
         labels = {"publish": "featured"}
 
 
@@ -414,6 +455,18 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
                 create_url=reverse("sample-substrate-material-quick-create"),
                 error_message="Could not create substrate.",
             )
+        self.helper.layout = Layout(
+            "name",
+            "material",
+            image_metadata_section(),
+            "datetime",
+            "location",
+            "description",
+            "standalone",
+            "series",
+            "timestep",
+            "sources",
+        )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -433,6 +486,9 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             "name",
             "material",
             "image",
+            "image_alt_text",
+            "image_caption",
+            "image_rights_notice",
             "datetime",
             "location",
             "description",
@@ -447,6 +503,9 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
         labels = {
             "datetime": "Date/Time",
             "image": "Image",
+            "image_alt_text": "Image alt text",
+            "image_caption": "Image caption",
+            "image_rights_notice": "Image rights notice",
         }
 
 

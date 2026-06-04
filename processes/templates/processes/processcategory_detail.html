@@ -1,21 +1,17 @@
 {% extends "detail_with_options.html" %}
-
 {% block title %}
     BRIT | Process Category: {{ object.name }}
 {% endblock title %}
-
 {% block detail_body %}
     <dl class="row">
         <dt class="col-sm-3">Name</dt>
         <dd class="col-sm-9">
             {{ object.name }}
         </dd>
-
         <dt class="col-sm-3">Description</dt>
         <dd class="col-sm-9">
             {{ object.description|default:"No description provided" }}
         </dd>
-
         <dt class="col-sm-3">Supplementary PDF</dt>
         <dd class="col-sm-9">
             {% if object.supplementary_document %}
@@ -29,9 +25,7 @@
             {% endif %}
         </dd>
     </dl>
-
     <hr class="my-4">
-
     <h6 class="mb-3">Related Categories ({{ related_categories.count }})</h6>
     {% if related_categories %}
         <div class="list-group mb-4">
@@ -49,9 +43,7 @@
     {% else %}
         <p class="text-muted">No related categories found.</p>
     {% endif %}
-
     <hr class="my-4">
-
     <h6 class="mb-3">Processes in This Category ({{ processes.count }})</h6>
     {% if processes %}
         <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
@@ -62,7 +54,7 @@
                         {% if process.image %}
                             <img src="{{ process.image.url }}"
                                  class="card-img-top"
-                                 alt="{{ process.name }}"
+                                 alt="{{ process.image_alt_text|default_if_none:''|default:process.name }}"
                                  style="height: 12rem;
                                         object-fit: cover">
                         {% else %}

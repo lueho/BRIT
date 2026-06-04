@@ -129,6 +129,7 @@ class ProcessCategoryCRUDViewsTestCase(
                 b"image content",
                 content_type="image/jpeg",
             ),
+            image_alt_text="Process reactor with feedstock",
         )
         process.categories.add(self.published_object)
 
@@ -140,7 +141,27 @@ class ProcessCategoryCRUDViewsTestCase(
         self.assertContains(response, "row-cols-md-2")
         self.assertContains(response, "card-img-top")
         self.assertContains(response, "process-image")
-        self.assertContains(response, 'alt="Illustrated process"')
+        self.assertContains(response, 'alt="Process reactor with feedstock"')
+
+    def test_detail_shows_process_image_caption_and_rights_notice(self):
+        self.published_object.image = SimpleUploadedFile(
+            "process-detail.jpg",
+            b"image content",
+            content_type="image/jpeg",
+        )
+        self.published_object.image_alt_text = "Process equipment"
+        self.published_object.image_caption = "Pilot-scale process equipment."
+        self.published_object.image_rights_notice = "Image: BRIT team, CC BY 4.0."
+        self.published_object.save()
+
+        response = self.client.get(
+            reverse("processes:process-detail", kwargs={"pk": self.published_object.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'alt="Process equipment"')
+        self.assertContains(response, "Pilot-scale process equipment.")
+        self.assertContains(response, "Image: BRIT team, CC BY 4.0.")
 
     def test_list_shows_published_process_count(self):
         """Category list should count published processes assigned to the category."""

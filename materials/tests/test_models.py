@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.db.models import signals
 from django.test import TestCase
@@ -624,6 +625,36 @@ class SampleTestCase(TestCase):
         )
 
         self.assertIn(raw_component, self.sample.components)
+
+    def test_display_image_metadata_uses_sample_values(self):
+        self.sample.image = SimpleUploadedFile(
+            "sample.jpg", b"image content", content_type="image/jpeg"
+        )
+        self.sample.image_alt_text = "Close-up of a substrate sample"
+        self.sample.image_caption = "Prepared substrate sample."
+        self.sample.image_rights_notice = "Image: BRIT team, CC BY 4.0."
+
+        self.assertEqual(
+            self.sample.display_image_alt_text, "Close-up of a substrate sample"
+        )
+        self.assertEqual(
+            self.sample.display_image_caption, "Prepared substrate sample."
+        )
+        self.assertEqual(
+            self.sample.display_image_rights_notice, "Image: BRIT team, CC BY 4.0."
+        )
+
+    def test_display_image_metadata_falls_back_to_series_values(self):
+        self.sample.series.image = SimpleUploadedFile(
+            "series.jpg", b"image content", content_type="image/jpeg"
+        )
+        self.sample.series.image_alt_text = "Series setup"
+        self.sample.series.image_caption = "Sampling campaign setup."
+        self.sample.series.image_rights_notice = "Image: Lab archive."
+
+        self.assertEqual(self.sample.display_image_alt_text, "Series setup")
+        self.assertEqual(self.sample.display_image_caption, "Sampling campaign setup.")
+        self.assertEqual(self.sample.display_image_rights_notice, "Image: Lab archive.")
 
     def test_clean_raises_when_not_standalone_and_no_series(self):
         material = Material.objects.get(name="Test Material")

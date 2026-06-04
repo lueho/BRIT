@@ -2,6 +2,7 @@
 
 import types
 
+from crispy_forms.layout import HTML, Div, Field, Layout
 from django import forms
 from django.forms import inlineformset_factory
 from django_tomselect.app_settings import TomSelectConfig
@@ -29,6 +30,28 @@ from .models import (
     ProcessOperatingParameter,
     ProcessReference,
 )
+
+
+def image_metadata_section():
+    return Div(
+        HTML(
+            '<div class="card-header bg-body-tertiary">'
+            '<h6 class="mb-0">Image details</h6>'
+            '<div class="form-text mb-0">'
+            "Alt text, caption, and rights notice belong to the uploaded image."
+            "</div>"
+            "</div>"
+        ),
+        Div(
+            Field("image"),
+            Field("image_alt_text"),
+            Field("image_caption"),
+            Field("image_rights_notice"),
+            css_class="card-body",
+        ),
+        css_class="card border mb-3",
+    )
+
 
 # ==============================================================================
 # ProcessCategory Forms
@@ -89,6 +112,9 @@ class ProcessModelForm(SimpleModelForm):
             "description",
             "process_technology",
             "image",
+            "image_alt_text",
+            "image_caption",
+            "image_rights_notice",
             "supplementary_document",
         )
         widgets = {
@@ -121,6 +147,20 @@ class ProcessModelForm(SimpleModelForm):
             field.valid_value = types.MethodType(queryset_valid_value, field)
             if hasattr(field, "_check_values"):
                 field._check_values = types.MethodType(queryset_check_values, field)
+        self.helper.layout = Layout(
+            "name",
+            "parent",
+            "categories",
+            "author",
+            "author_institution",
+            "contact_email",
+            "short_description",
+            "mechanism",
+            "description",
+            "process_technology",
+            image_metadata_section(),
+            "supplementary_document",
+        )
 
 
 class ProcessModalModelForm(ModalModelFormMixin, ProcessModelForm):

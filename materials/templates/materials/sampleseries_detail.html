@@ -12,7 +12,13 @@
     <div class="card-img-top detail-uploaded-image-frame">
       <img class="detail-uploaded-image"
            src="{{ object.image.url }}"
-           alt="Image of {{ object.material.name }}">
+           alt="{{ object.image_alt_text|default_if_none:''|default:object.material.name }}">
+      {% if object.image_caption or object.image_rights_notice %}
+        <div class="small text-muted px-3 py-2 bg-body-tertiary border-top w-100">
+          {% if object.image_caption %}<div>{{ object.image_caption }}</div>{% endif %}
+          {% if object.image_rights_notice %}<div>{{ object.image_rights_notice }}</div>{% endif %}
+        </div>
+      {% endif %}
     </div>
   {% endif %}
 {% endblock detail_top_image %}

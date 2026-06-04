@@ -1,17 +1,19 @@
 {% extends "detail_with_options.html" %}
-
 {% block title %}BRIT | Process: {{ object.name }}{% endblock %}
-
 {% block detail_body %}
-
     <section class="mb-4">
         <h5 class="text-uppercase mb-2">{{ object.name }}</h5>
         {% if object.image %}
             <img src="{{ object.image.url }}"
                  class="detail-uploaded-image mb-3"
-                 alt="{{ object.name }}">
+                 alt="{{ object.image_alt_text|default_if_none:''|default:object.name }}">
+            {% if object.image_caption or object.image_rights_notice %}
+                <div class="small text-muted mb-3">
+                    {% if object.image_caption %}<div>{{ object.image_caption }}</div>{% endif %}
+                    {% if object.image_rights_notice %}<div>{{ object.image_rights_notice }}</div>{% endif %}
+                </div>
+            {% endif %}
         {% endif %}
-
         {% if object.author or object.author_institution or object.contact_email %}
             <div class="text-muted mb-3">
                 {% if object.author %}<div>{{ object.author }}</div>{% endif %}
@@ -23,9 +25,7 @@
                 {% endif %}
             </div>
         {% endif %}
-
         <p class="lead mb-3">{{ object.short_description|default:"No short description" }}</p>
-
         <dl class="row mb-0">
             {% if object.parent %}
                 <dt class="col-sm-3">Parent Process</dt>
@@ -33,7 +33,6 @@
                     <a href="{% url 'processes:process-detail' object.parent.pk %}">{{ object.parent.name }}</a>
                 </dd>
             {% endif %}
-
             <dt class="col-sm-3">Categories</dt>
             <dd class="col-sm-9">
                 {% for category in object.categories.all %}
@@ -45,7 +44,6 @@
             </dd>
         </dl>
     </section>
-
     {% if object.supplementary_document %}
         <section class="mb-4">
             <a href="{{ object.supplementary_document.url }}"
@@ -55,7 +53,6 @@
             </a>
         </section>
     {% endif %}
-
     <section class="mb-4">
         <dl class="row mb-0">
             {% if object.mechanism %}
@@ -64,7 +61,6 @@
                     {{ object.mechanism }}
                 </dd>
             {% endif %}
-
             {% if operating_parameters %}
                 <dt class="col-sm-3 text-uppercase">Operating parameters</dt>
                 <dd class="col-sm-9">
@@ -86,7 +82,6 @@
                     </ul>
                 </dd>
             {% endif %}
-
             {% if input_materials %}
                 <dt class="col-sm-3 text-uppercase">Input</dt>
                 <dd class="col-sm-9">
@@ -97,7 +92,9 @@
                                     <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
                                 </strong>
                                 {% if pm.quantity_value %}
-                                    <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
+                                    <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}
+                                        {% if pm.quantity_unit %}{{ pm.quantity_unit.name }}{% endif %}
+                                    </span>
                                 {% endif %}
                                 {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes }}</p>{% endif %}
                             </li>
@@ -105,7 +102,6 @@
                     </ul>
                 </dd>
             {% endif %}
-
             {% if output_materials %}
                 <dt class="col-sm-3 text-uppercase">Output</dt>
                 <dd class="col-sm-9">
@@ -116,7 +112,9 @@
                                     <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
                                 </strong>
                                 {% if pm.quantity_value %}
-                                    <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
+                                    <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}
+                                        {% if pm.quantity_unit %}{{ pm.quantity_unit.name }}{% endif %}
+                                    </span>
                                 {% endif %}
                                 {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes }}</p>{% endif %}
                             </li>
@@ -124,7 +122,6 @@
                     </ul>
                 </dd>
             {% endif %}
-
             {% if parameters_by_type.Yield %}
                 <dt class="col-sm-3 text-uppercase">Yield</dt>
                 <dd class="col-sm-9">
@@ -146,17 +143,14 @@
             {% endif %}
         </dl>
     </section>
-
     {% if object.description %}
         <h6 class="mt-4">Description</h6>
         <div>{{ object.description|linebreaks }}</div>
     {% endif %}
-
     {% if object.process_technology %}
         <h6 class="mt-4">Process Technology</h6>
         <div>{{ object.process_technology|linebreaks }}</div>
     {% endif %}
-
     <!-- Links and Resources -->
     {% if process_links %}
         <h6 class="mb-3 mt-4">Links</h6>
@@ -172,7 +166,6 @@
             {% endfor %}
         </ul>
     {% endif %}
-
     {% if process_info_resources %}
         <h6 class="mb-3 mt-4">Information Resources</h6>
         <ul class="list-group">
@@ -185,7 +178,6 @@
             {% endfor %}
         </ul>
     {% endif %}
-
     <!-- Variants (Child Processes) -->
     {% if process_variants %}
         <h6 class="mb-3 mt-4">Process Variants</h6>
@@ -197,7 +189,6 @@
             {% endfor %}
         </ul>
     {% endif %}
-
     <!-- Bibliography -->
     {% if bibliography_references %}
         <h6 class="mb-3 mt-4">Bibliography</h6>

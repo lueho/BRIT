@@ -156,6 +156,22 @@ class Process(NamedUserCreatedObject):
         null=True,
         help_text="Optional illustrative image for cards or detail views.",
     )
+    image_alt_text = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="image alt text",
+        help_text="Accessible description of the image.",
+    )
+    image_caption = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Caption displayed with the image.",
+    )
+    image_rights_notice = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Copyright, license, or attribution notice for the image.",
+    )
     supplementary_document = models.FileField(
         upload_to="processes/supplementary_documents/",
         blank=True,

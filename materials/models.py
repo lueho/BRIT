@@ -348,6 +348,22 @@ class SampleSeries(NamedUserCreatedObject):
     image = models.ImageField(
         upload_to="materials_sampleseries/", blank=True, null=True
     )
+    image_alt_text = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="image alt text",
+        help_text="Accessible description of the image.",
+    )
+    image_caption = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Caption displayed with the image.",
+    )
+    image_rights_notice = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Copyright, license, or attribution notice for the image.",
+    )
     publish = models.BooleanField(default=False)
     standard = models.BooleanField(default=True)
     temporal_distributions = models.ManyToManyField(TemporalDistribution)
@@ -670,6 +686,22 @@ class Sample(NamedUserCreatedObject):
     """
 
     image = models.ImageField(upload_to="materials_sample/", blank=True, null=True)
+    image_alt_text = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="image alt text",
+        help_text="Accessible description of the image.",
+    )
+    image_caption = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Caption displayed with the image.",
+    )
+    image_rights_notice = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Copyright, license, or attribution notice for the image.",
+    )
     material = models.ForeignKey(
         Material,
         on_delete=models.PROTECT,
@@ -768,6 +800,30 @@ class Sample(NamedUserCreatedObject):
         if self.series and self.series.image:
             return "series"
         return None
+
+    @property
+    def display_image_alt_text(self):
+        if self.image:
+            return self.image_alt_text or f"Image of sample {self.name}"
+        if self.series and self.series.image:
+            return self.series.image_alt_text or f"Series image for {self.name}"
+        return ""
+
+    @property
+    def display_image_caption(self):
+        if self.image:
+            return self.image_caption
+        if self.series and self.series.image:
+            return self.series.image_caption
+        return ""
+
+    @property
+    def display_image_rights_notice(self):
+        if self.image:
+            return self.image_rights_notice
+        if self.series and self.series.image:
+            return self.series.image_rights_notice
+        return ""
 
     def clean(self):
         super().clean()
