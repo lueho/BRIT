@@ -719,6 +719,64 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
 
         return review_items
 
+    def has_review_items(self):
+        """Return whether the user can moderate any pending review item."""
+        from django.apps import apps
+        from django.contrib.auth.models import Permission
+
+        user = self.request.user
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+
+        if user.is_staff:
+            user_can_moderate_all = True
+            user_permission_codenames = set()
+        else:
+            user_can_moderate_all = False
+            user_permission_codenames = set(
+                Permission.objects.filter(user=user).values_list("codename", flat=True)
+            )
+            user_permission_codenames |= set(
+                Permission.objects.filter(group__user=user).values_list(
+                    "codename", flat=True
+                )
+            )
+
+        def can_moderate(model):
+            if user_can_moderate_all:
+                return True
+            codename = f"can_moderate_{model._meta.model_name}"
+            return codename in user_permission_codenames
+
+        for model_class in apps.get_models():
+            if (
+                not issubclass(model_class, UserCreatedObject)
+                or model_class._meta.abstract
+                or not self._is_primary_model_module(model_class)
+                or not hasattr(model_class, "objects")
+                or not can_moderate(model_class)
+            ):
+                continue
+
+            try:
+                has_items = (
+                    self._in_review_queryset_for_model(model_class)
+                    .exclude(owner=user)
+                    .exists()
+                )
+            except Exception as exc:
+                logger.debug(
+                    "Could not check review items for %s: %s",
+                    model_class.__name__,
+                    exc,
+                )
+                continue
+
+            if has_items:
+                return True
+
+        return False
+
     def get_queryset(self):
         """Override to return dummy queryset for FilterView compatibility.
 
@@ -1259,6 +1317,19 @@ class UserCreatedObjectListMixin:
             raise ImproperlyConfigured(
                 f"The model {queryset.model.__name__} must have a 'publication_status' field."
             )
+
+        # List rows render the owner (status cells, policy checks), so pull it in
+        # the same query to avoid one auth_user lookup per row.
+        owner_field = next(
+            (
+                field
+                for field in queryset.model._meta.fields
+                if field.name == "owner" and field.is_relation
+            ),
+            None,
+        )
+        if owner_field is not None:
+            queryset = queryset.select_related("owner")
 
         if self.list_type in {"published", "private", "review", "declined", "archived"}:
             queryset = apply_scope_filter(queryset, self.list_type, user=user)
