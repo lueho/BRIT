@@ -202,6 +202,12 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
 
     user_created = True
 
+    # Templates access the model class via ``object_list.model``. Django auto-calls
+    # callables during variable resolution, so without this flag every such access
+    # instantiates the model (``Sample()`` etc.), which evaluates the ``owner``
+    # field default and fires a ``get_default_owner()`` query on every list row.
+    do_not_call_in_templates = True
+
     class Meta:
         abstract = True
         indexes = [
