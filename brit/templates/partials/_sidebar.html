@@ -11,20 +11,18 @@
       {% is_moderator_for_any_model user as is_moderator %}
       {% if is_moderator %}
         <div class="sb-sidenav-menu-heading">Moderation</div>
-        <a class="nav-link sb-nav-link-with-badge {% if '/object_management/review/' in request.path %}active{% endif %}"
+        <a class="nav-link {% if '/object_management/review/' in request.path %}active{% endif %}"
            href="{% url 'object_management:review_dashboard' %}">
           <div class="sb-nav-link-icon">
             <i class="fas fa-clipboard-check"></i>
           </div>
-          <div class="sb-nav-link-content">
-            <span class="sb-nav-link-text">Review Dashboard</span>
-            {% has_pending_review_items_for_user user as has_pending_reviews %}
-            {% if has_pending_reviews %}
-              <span class="badge bg-warning text-dark rounded-pill sb-nav-link-badge"
-                    aria-label="Items pending review"
-                    title="You have items to review">●</span>
-            {% endif %}
-          </div>
+          <span class="sb-nav-link-text">Review Dashboard</span>
+          {% has_pending_review_items_for_user user as has_pending_reviews %}
+          {% if has_pending_reviews %}
+            <span class="review-hint-dot"
+                  aria-label="Items pending review"
+                  title="You have items to review"></span>
+          {% endif %}
         </a>
       {% endif %}
       {% user_in_group user "process-team" as can_view_processes %}

@@ -30,7 +30,7 @@
           {% is_moderator_for_any_model user as is_moderator %}
           {% if is_moderator %}
             <li>
-              <a class="dropdown-item d-flex justify-content-between align-items-center"
+              <a class="dropdown-item d-flex align-items-center gap-2"
                  href="{% url 'object_management:review_dashboard' %}">
                 <span>
                   <i class="fas fa-clipboard-check fa-fw me-1"></i>
@@ -38,9 +38,9 @@
                 </span>
                 {% has_pending_review_items_for_user user as has_pending_reviews %}
                 {% if has_pending_reviews %}
-                  <span class="badge bg-warning text-dark rounded-pill"
+                  <span class="review-hint-dot"
                         aria-label="Items pending review"
-                        title="You have items to review">●</span>
+                        title="You have items to review"></span>
                 {% endif %}
               </a>
             </li>

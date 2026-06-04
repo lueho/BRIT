@@ -42,35 +42,15 @@
                     text-align: center;
                 }
 
-                .sb-nav-link-content {
-                    flex: 1 1 auto;
-                    min-width: 0;
-                }
-
                 .sb-nav-link-text {
-                    flex: 1 1 auto;
+                    // Don't grow to fill the row: keeping the label at its
+                    // content width lets a trailing indicator (e.g. the review
+                    // dot) sit right next to the text instead of being pushed
+                    // to the far edge by a stretched, left-aligned label box.
+                    flex: 0 1 auto;
                     min-width: 0;
                     overflow-wrap: break-word;
                     word-break: normal;
-                }
-
-                .badge {
-                    flex-shrink: 0;
-                }
-
-                &.sb-nav-link-with-badge {
-                    align-items: flex-start;
-
-                    .sb-nav-link-content {
-                        display: flex;
-                        flex-direction: column;
-                        align-items: flex-start;
-                        gap: 0.35rem;
-                    }
-
-                    .sb-nav-link-badge {
-                        max-width: 100%;
-                    }
                 }
 
                 .sb-sidenav-collapse-arrow {
