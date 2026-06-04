@@ -144,18 +144,23 @@ class ProcessCategoryCRUDViewsTestCase(
         self.assertContains(response, 'alt="Process reactor with feedstock"')
 
     def test_detail_shows_process_image_caption_and_rights_notice(self):
-        self.published_object.image = SimpleUploadedFile(
-            "process-detail.jpg",
-            b"image content",
-            content_type="image/jpeg",
+        process = Process.objects.create(
+            name="Process with image metadata",
+            owner=self.owner_user,
+            publication_status="published",
+            image=SimpleUploadedFile(
+                "process-detail.jpg",
+                b"image content",
+                content_type="image/jpeg",
+            ),
         )
-        self.published_object.image_alt_text = "Process equipment"
-        self.published_object.image_caption = "Pilot-scale process equipment."
-        self.published_object.image_rights_notice = "Image: BRIT team, CC BY 4.0."
-        self.published_object.save()
+        process.image_alt_text = "Process equipment"
+        process.image_caption = "Pilot-scale process equipment."
+        process.image_rights_notice = "Image: BRIT team, CC BY 4.0."
+        process.save()
 
         response = self.client.get(
-            reverse("processes:process-detail", kwargs={"pk": self.published_object.pk})
+            reverse("processes:process-detail", kwargs={"pk": process.pk})
         )
 
         self.assertEqual(response.status_code, 200)

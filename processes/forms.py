@@ -167,6 +167,10 @@ class ProcessModalModelForm(ModalModelFormMixin, ProcessModelForm):
     class Meta(ProcessModelForm.Meta):
         fields = ("name", "categories", "short_description")
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper.layout = Layout("name", "categories", "short_description")
+
 
 # ==============================================================================
 # Inline form helpers
