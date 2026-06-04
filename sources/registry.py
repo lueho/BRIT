@@ -1,6 +1,7 @@
 from importlib import import_module
 
 from django.apps import apps
+from django.core.cache import cache
 
 from sources.contracts import (
     SourceDomainDatasetRuntimeCompatibility,
@@ -259,6 +260,12 @@ def get_source_domain_explorer_cards() -> tuple[dict[str, object], ...]:
         if plugin.explorer_card is None:
             continue
 
+        cache_key = f"source_domain:{plugin.slug}:published_count"
+        published_count = cache.get(cache_key)
+        if published_count is None:
+            published_count = plugin.get_published_count()
+            cache.set(cache_key, published_count, 3600)
+
         cards.append(
             {
                 "slug": plugin.slug,
@@ -270,7 +277,7 @@ def get_source_domain_explorer_cards() -> tuple[dict[str, object], ...]:
                 "icon_class": plugin.explorer_card.icon_class,
                 "cta_label": plugin.explorer_card.cta_label,
                 "order": plugin.explorer_card.order,
-                "published_count": plugin.get_published_count(),
+                "published_count": published_count,
             }
         )
 
