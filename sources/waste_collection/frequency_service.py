@@ -108,11 +108,14 @@ class CollectionFrequencyScheduleService:
         ).count()
 
     @classmethod
-    def count_from_cadence(cls, cadence, first_timestep, last_timestep):
+    def count_from_cadence(
+        cls, cadence, first_timestep, last_timestep, month_span=None
+    ):
         annual_count = CADENCE_TO_ANNUAL_COUNT.get(cadence)
         if annual_count is None:
             return None
-        month_span = cls.month_span(first_timestep, last_timestep)
+        if month_span is None:
+            month_span = cls.month_span(first_timestep, last_timestep)
         if not month_span:
             return None
         derived_count = (
@@ -125,10 +128,16 @@ class CollectionFrequencyScheduleService:
         if count in (None, ""):
             return ""
         count = int(count)
+        # month_span only depends on the timesteps, not the cadence, so compute it
+        # once instead of issuing an identical COUNT query for every candidate.
+        month_span = cls.month_span(first_timestep, last_timestep)
         matches = [
             cadence
             for cadence in CADENCE_TO_ANNUAL_COUNT
-            if cls.count_from_cadence(cadence, first_timestep, last_timestep) == count
+            if cls.count_from_cadence(
+                cadence, first_timestep, last_timestep, month_span=month_span
+            )
+            == count
         ]
         if len(matches) == 1:
             return matches[0]
