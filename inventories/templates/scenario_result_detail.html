@@ -81,6 +81,8 @@
     {{ plot_data|json_script:"plot_data" }}
     {{ charts|json_script:"charts" }}
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js"
+            crossorigin="anonymous"></script>
     <script src="{% static 'js/feedstock_summary_bar_chart.js' %}"></script>
     <script>
         let charts = JSON.parse(document.getElementById("charts").textContent);
