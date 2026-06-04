@@ -16,7 +16,7 @@
 //   node scripts/build_assets.mjs --check    # build, then fail if anything is missing
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, watch } from "node:fs";
+import { readdirSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -167,58 +167,90 @@ function buildAll() {
 
 // ---------------------------------------------------------------------------
 // Watch mode: rebuild only what changed for fast dev feedback.
+//
+// Uses mtime polling rather than inotify (fs.watch): file-change events do not
+// reliably propagate through Docker bind mounts (WSL2/macOS), so polling is the
+// portable choice. Builds are synchronous, so poll ticks never overlap.
 // ---------------------------------------------------------------------------
 
-function rebuildFor(path) {
+const POLL_INTERVAL_MS = 500;
+
+/** Source files the watcher tracks for changes. */
+function watchSources() {
+  return walk(ROOT).filter(
+    (f) =>
+      f.endsWith(".scss") ||
+      (f.endsWith(".css") && !f.endsWith(".min.css") && !inScssDir(f)) ||
+      (f.endsWith(".js") && !f.endsWith(".min.js") && !f.endsWith(".src.js")),
+  );
+}
+
+function mtime(path) {
   try {
-    if (path.endsWith(".scss")) {
-      // A partial can affect any entry, so recompile every entry + its min.
-      for (const entry of scssEntries(walk(ROOT))) {
-        const out = compileScss(entry);
-        minifyCss(out);
-        console.log(`scss  ${rel(entry)} (recompiled + minified)`);
-      }
-    } else if (path.endsWith(".css") && !path.endsWith(".min.css") && !inScssDir(path)) {
-      minifyCss(path);
-      console.log(`css   ${rel(path)} -> ${rel(minCss(path))}`);
-    } else if (path.endsWith(".js") && !path.endsWith(".min.js") && !path.endsWith(".src.js")) {
-      minifyJs(path);
-      console.log(`js    ${rel(path)} -> ${rel(minJs(path))}`);
-    } else {
-      return;
-    }
+    return statSync(path).mtimeMs;
   } catch {
-    // Error details already streamed to stderr by the CLI; keep watching.
-    console.error(`\u2717 build failed for ${rel(path)} (see error above)`);
+    return null;
   }
+}
+
+function recompileScss() {
+  const outputs = [];
+  for (const entry of scssEntries(walk(ROOT))) {
+    outputs.push(compileScss(entry));
+    console.log(`scss  ${rel(entry)} (recompiled)`);
+  }
+  return outputs;
 }
 
 function startWatch() {
   buildAll();
-  console.log("\nWatching for changes (Ctrl-C to stop)...");
+  console.log(`\nWatching for changes (polling every ${POLL_INTERVAL_MS}ms; Ctrl-C to stop)...`);
 
-  const dirs = new Set(
-    walk(ROOT)
-      .filter(underStatic)
-      .map(dirname),
-  );
+  const seen = new Map();
+  for (const f of watchSources()) seen.set(f, mtime(f));
 
-  const pending = new Map();
-  for (const dir of dirs) {
-    if (!existsSync(dir)) continue;
-    watch(dir, (_event, filename) => {
-      if (!filename) return;
-      const path = join(dir, filename);
-      clearTimeout(pending.get(path));
-      pending.set(
-        path,
-        setTimeout(() => {
-          pending.delete(path);
-          rebuildFor(path);
-        }, 120),
-      );
-    });
-  }
+  setInterval(() => {
+    const current = watchSources();
+    const changed = [];
+    const present = new Set();
+    for (const f of current) {
+      present.add(f);
+      const m = mtime(f);
+      if (m !== null && seen.get(f) !== m) {
+        changed.push(f);
+        seen.set(f, m);
+      }
+    }
+    for (const f of [...seen.keys()]) if (!present.has(f)) seen.delete(f);
+    if (changed.length === 0) return;
+
+    try {
+      // SCSS partials can affect any entry: recompile all entries once, then
+      // re-minify the generated CSS. Skip those generated files below.
+      const scssOutputs = new Set();
+      if (changed.some((f) => f.endsWith(".scss"))) {
+        for (const out of recompileScss()) {
+          scssOutputs.add(out);
+          minifyCss(out);
+          console.log(`css   ${rel(out)} -> ${rel(minCss(out))}`);
+          seen.set(out, mtime(out));
+        }
+      }
+      for (const f of changed) {
+        if (f.endsWith(".scss") || scssOutputs.has(f)) continue;
+        if (f.endsWith(".css")) {
+          minifyCss(f);
+          console.log(`css   ${rel(f)} -> ${rel(minCss(f))}`);
+        } else if (f.endsWith(".js")) {
+          minifyJs(f);
+          console.log(`js    ${rel(f)} -> ${rel(minJs(f))}`);
+        }
+      }
+    } catch {
+      // Error details already streamed to stderr by the CLI; keep watching.
+      console.error("\u2717 asset build failed (see error above)");
+    }
+  }, POLL_INTERVAL_MS);
 }
 
 if (WATCH) {
