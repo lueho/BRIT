@@ -2,6 +2,21 @@ networks:
   full:
 
 services:
+  # Dev/CI-only static asset builder (SCSS -> CSS -> minified CSS/JS).
+  # Not started by `docker compose up` (guarded by the `assets` profile).
+  #   make assets         # one-shot build
+  #   make assets-watch   # rebuild on change for live dev feedback
+  assets:
+    build:
+      context: .
+      dockerfile: docker/assets/Dockerfile
+    image: brit-assets
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - ./:/app
+    working_dir: /app
+    profiles: ["assets"]
+
   db:
     image: "postgis/postgis:15-3.4"
     ports:
