@@ -1,14 +1,11 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block title %}
   Waste Atlas — {{ map_title }}
 {% endblock title %}
-
 {% block meta_keywords %}
   waste atlas, {{ map_title|lower }}
 {% endblock meta_keywords %}
-
 {% block custom_style %}
   <style>
   #atlas-controls {
@@ -51,10 +48,8 @@
   #export-buttons .btn { margin-right: .5rem; }
   </style>
 {% endblock custom_style %}
-
 {% block content %}
   <h2>Waste Atlas — {{ map_title }}</h2>
-
   <div id="atlas-controls">
     {% block atlas_selector %}
       {% include "waste_atlas/includes/map_selector.html" with atlas_selector_bootstrap=False atlas_selector_button_label="Load" %}
@@ -64,7 +59,6 @@
       <i class="fas fa-th-list"></i> {{ map_overview_label|default:"Map overview" }}
     </a>
   </div>
-
   <div id="map-container">
     <div id="loading-overlay">
       <i class="fas fa-spinner fa-spin me-2"></i> Loading map data…
@@ -72,7 +66,6 @@
     <svg id="atlas-svg">
     </svg>
   </div>
-
   <div id="export-buttons">
     <button class="btn btn-outline-secondary btn-sm"
             id="btn-export-svg"
@@ -88,11 +81,10 @@
     </button>
   </div>
 {% endblock content %}
-
 {% block javascript %}
   {{ block.super }}
   <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-  <script src="{% static 'js/waste_atlas_choropleth.js' %}?v=20260529-4"></script>
+  <script src="{% static 'js/waste_atlas_choropleth.min.js' %}?v=20260529-4"></script>
   {% block atlas_config %}
   {% endblock atlas_config %}
 {% endblock javascript %}

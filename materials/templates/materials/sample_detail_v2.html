@@ -6,7 +6,7 @@
   BRIT · {{ object.name }} · v2 preview
 {% endblock title %}
 {% block style_sheets %}
-  <link href="{% static 'css/sample_detail_v2.css' %}" rel="stylesheet">
+  <link href="{% static 'css/sample_detail_v2.min.css' %}" rel="stylesheet">
 {% endblock style_sheets %}
 {% block content %}
   <div class="sdv2"
@@ -833,5 +833,5 @@
       });
     })();
   </script>
-  <script src="{% static 'js/sample_detail_v2.js' %}"></script>
+  <script src="{% static 'js/sample_detail_v2.min.js' %}"></script>
 {% endblock javascript %}

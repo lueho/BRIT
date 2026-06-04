@@ -1,10 +1,8 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block title %}
   Waste Atlas — {{ map_title }}
 {% endblock title %}
-
 {% block style_sheets %}
   {{ block.super }}
   <style>
@@ -77,26 +75,22 @@
     #export-buttons .btn { margin-right: .5rem; }
   </style>
 {% endblock style_sheets %}
-
 {% block content %}
   <div class="coverage-page">
     <h1>Waste Atlas — {{ map_title }}</h1>
     <p class="lead">
       Regional average amount of separately collected biowaste for 2024. The full EU27 + UK outline is shown for orientation, and only highlighted regions open detailed biowaste amount maps.
     </p>
-
     <div class="mb-3">
       <a href="{% url 'waste-atlas-overview' %}"
          class="btn btn-outline-secondary btn-sm">
         <i class="fas fa-th-list"></i> {{ map_overview_label }}
       </a>
     </div>
-
     <div class="map-hint">
       <i class="fas fa-hand-pointer"></i>
       <span>Highlighted regions are clickable and open the detailed map.</span>
     </div>
-
     <div id="map-container">
       <div id="loading-overlay">
         <i class="fas fa-spinner fa-spin me-2"></i> Loading map data…
@@ -104,7 +98,6 @@
       <svg id="europe-biowaste-svg">
       </svg>
     </div>
-
     <div id="export-buttons">
       <button class="btn btn-outline-secondary btn-sm"
               id="btn-export-svg"
@@ -119,7 +112,6 @@
         <i class="fas fa-image"></i> Download PNG (Word-ready, 300 DPI)
       </button>
     </div>
-
     <div class="card">
       <div class="card-header">
         <strong>Regional averages for 2024</strong>
@@ -131,11 +123,10 @@
     </div>
   </div>
 {% endblock content %}
-
 {% block javascript %}
   {{ block.super }}
   <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-  <script src="{% static 'js/waste_atlas_choropleth.js' %}?v=20260528-1"></script>
+  <script src="{% static 'js/waste_atlas_choropleth.min.js' %}?v=20260528-1"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       var svgEl = document.getElementById('europe-biowaste-svg');

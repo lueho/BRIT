@@ -1,6 +1,6 @@
 {% load static cookie_consent_tags %}
 {% if request|cookie_consent_enabled %}
-    <link href="{% static 'css/cookie-bar.css' %}" rel="stylesheet">
+    <link href="{% static 'css/cookie-bar.min.css' %}" rel="stylesheet">
     {% static "cookie_consent/cookiebar.module.js" as cookiebar_src %}
     {% url "cookie_consent_cookie_group_list" as url_cookies %}
     {% url "cookie_consent_status" as status_url %}

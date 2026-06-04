@@ -1,10 +1,8 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block title %}
    Waste Atlas — Map overview
 {% endblock title %}
-
 {% block custom_style %}
    <style>
     .atlas-topic-legend {
@@ -64,7 +62,6 @@
     .atlas-topic-coverage { --atlas-color: #5c6975; --atlas-bg: #f3f5f7; --atlas-border: #c3cbd2; }
    </style>
 {% endblock custom_style %}
-
 {% block content %}
    <div class="container mt-4">
       <div class="mb-4">
@@ -74,21 +71,18 @@
             Choose a region first, then the information you need: collection systems and bins, schedule organization and resulting collection counts, fees, or collected amounts.
          </p>
       </div>
-
       <div class="mb-3">
          <a class="btn btn-outline-secondary btn-sm"
             href="{% url 'waste-atlas-change-map-overview' %}">
             <i class="fas fa-exchange-alt"></i> Change maps
          </a>
       </div>
-
       <form class="card mb-4" id="atlas-selection-form">
          <div class="card-body">
             <h2 class="h5">Find a map</h2>
             {% include "waste_atlas/includes/map_selector.html" with atlas_selector_bootstrap=True atlas_selector_button_label="Go" %}
          </div>
       </form>
-
       <div class="atlas-topic-legend" aria-label="Map topic color legend">
          <span class="atlas-topic-key atlas-topic-admin">Administration</span>
          <span class="atlas-topic-key atlas-topic-system">Collection systems</span>
@@ -101,7 +95,6 @@
          <span class="atlas-topic-key atlas-topic-amount-ratio">Amount ratios &amp; shares</span>
          <span class="atlas-topic-key atlas-topic-bin">Bins</span>
       </div>
-
       <div class="row g-3 mb-4">
          <div class="col-md-6 col-xl-3">
             <div class="card h-100">
@@ -154,7 +147,6 @@
             </div>
          </div>
       </div>
-
       <section id="atlas-germany" class="mb-4">
          <h2 class="h4 mb-3">Germany &amp; Baden-Württemberg/Rheinland-Pfalz</h2>
          <div class="row g-3">
@@ -335,7 +327,6 @@
             </div>
          </div>
       </section>
-
       <section id="atlas-catalonia" class="mb-4">
          <h2 class="h4 mb-3">Catalonia</h2>
          <div class="row g-3">
@@ -430,7 +421,6 @@
             </div>
          </div>
       </section>
-
       <section id="atlas-italy-south-tyrol" class="mb-4">
          <h2 class="h4 mb-3">Italy &amp; South Tyrol</h2>
          <div class="row g-3">
@@ -557,7 +547,6 @@
             </div>
          </div>
       </section>
-
       <section id="atlas-other-countries" class="mb-4">
          <h2 class="h4 mb-3">Other countries and regions</h2>
          <div class="row g-3">
@@ -740,9 +729,8 @@
       </section>
    </div>
 {% endblock content %}
-
 {% block javascript %}
    {{ block.super }}
-   <script src="{% static 'js/waste_atlas_choropleth.js' %}?v=20260528-1"></script>
+   <script src="{% static 'js/waste_atlas_choropleth.min.js' %}?v=20260528-1"></script>
    <script>WasteAtlasChoropleth.initSelectorControls();</script>
 {% endblock javascript %}

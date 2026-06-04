@@ -21,7 +21,8 @@
             {% has_pending_review_items_for_user user as has_pending_reviews %}
             {% if has_pending_reviews %}
               <span class="badge bg-warning text-dark rounded-pill sb-nav-link-badge"
-                    aria-label="Items pending review">!</span>
+                    aria-label="Items pending review"
+                    title="You have items to review">●</span>
             {% endif %}
           </div>
         </a>

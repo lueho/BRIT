@@ -1,10 +1,8 @@
 {% extends base_template %}
 {% load static %}
-
 {% block title %}
   Waste Atlas — {{ map_title }}
 {% endblock title %}
-
 {% block style_sheets %}
   {{ block.super }}
   <style>
@@ -52,7 +50,6 @@
     #export-buttons .btn { margin-right: .5rem; }
   </style>
 {% endblock style_sheets %}
-
 {% block content %}
   <div class="coverage-page{% if iframe_mode %} coverage-page--iframe{% endif %}">
     {% if not iframe_mode %}
@@ -60,7 +57,6 @@
       <p class="lead">
         Overview of European countries and regions for which waste collection data is already available in the atlas.
       </p>
-
       <div class="mb-3">
         <a href="{% url 'waste-atlas-overview' %}"
            class="btn btn-outline-secondary btn-sm">
@@ -68,7 +64,6 @@
         </a>
       </div>
     {% endif %}
-
     <div id="map-container">
       <div id="loading-overlay">
         <i class="fas fa-spinner fa-spin me-2"></i> Loading map data…
@@ -76,7 +71,6 @@
       <svg id="europe-coverage-svg">
       </svg>
     </div>
-
     {% if not iframe_mode %}
       <div id="export-buttons">
         <button class="btn btn-outline-secondary btn-sm"
@@ -93,7 +87,6 @@
         </button>
       </div>
     {% endif %}
-
     {% if not iframe_mode %}
       <div class="card">
         <div class="card-header">
@@ -114,11 +107,10 @@
     {% endif %}
   </div>
 {% endblock content %}
-
 {% block javascript %}
   {{ block.super }}
   <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-  <script src="{% static 'js/waste_atlas_choropleth.js' %}?v=20260528-1"></script>
+  <script src="{% static 'js/waste_atlas_choropleth.min.js' %}?v=20260528-1"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       var svgEl = document.getElementById('europe-coverage-svg');

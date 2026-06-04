@@ -6,7 +6,7 @@
 {% load leaflet_tags %}
 {% block style_sheets %}
   {{ block.super }}
-  <link rel="stylesheet" href="{% static 'css/source_url_display.css' %}">
+  <link rel="stylesheet" href="{% static 'css/source_url_display.min.css' %}">
   {% if not review_mode %}
     {% leaflet_js %}
     {% leaflet_css %}
@@ -596,7 +596,8 @@
 {% endblock second_row %}
 {% block detail_with_options_scripts %}
   <script src="{% static 'js/file_export.min.js' %}" type="text/javascript"></script>
-  <script src="{% static 'js/source_url_display.js' %}" type="text/javascript"></script>
+  <script src="{% static 'js/source_url_display.min.js' %}"
+          type="text/javascript"></script>
   {% if not review_mode %}
     <script src="{% static 'js/maps.min.js' %}"></script>
     {{ map_config|json_script:"mapConfig" }}
