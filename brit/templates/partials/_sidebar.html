@@ -18,9 +18,10 @@
           </div>
           <div class="sb-nav-link-content">
             <span class="sb-nav-link-text">Review Dashboard</span>
-            {% pending_review_count_for_user user as pending_count %}
-            {% if pending_count > 0 %}
-              <span class="badge bg-warning text-dark rounded-pill sb-nav-link-badge">{{ pending_count }}</span>
+            {% has_pending_review_items_for_user user as has_pending_reviews %}
+            {% if has_pending_reviews %}
+              <span class="badge bg-warning text-dark rounded-pill sb-nav-link-badge"
+                    aria-label="Items pending review">!</span>
             {% endif %}
           </div>
         </a>

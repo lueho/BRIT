@@ -235,7 +235,7 @@ def _clear_moderator_caches():
 
         for user in moderator_users:
             cache_keys = [
-                f"pending_review_count_{user.id}",
+                f"has_pending_review_items_{user.id}",
                 f"is_moderator_any_model_{user.id}",
             ]
             for key in cache_keys:
@@ -249,7 +249,7 @@ def _clear_user_moderator_cache(user_id):
     """Clear moderation cache for a specific user."""
     try:
         cache_keys = [
-            f"pending_review_count_{user_id}",
+            f"has_pending_review_items_{user_id}",
             f"is_moderator_any_model_{user_id}",
         ]
         for key in cache_keys:

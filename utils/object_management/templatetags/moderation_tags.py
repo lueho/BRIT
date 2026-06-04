@@ -478,34 +478,35 @@ def is_moderator_for_any_model(user):
                 perm_codename = f"can_moderate_{model._meta.model_name}"
                 full_perm = f"{model._meta.app_label}.{perm_codename}"
                 if user.has_perm(full_perm):
-                    # Cache the positive result for 10 minutes (600 seconds)
-                    cache.set(cache_key, True, 600)
+                    # Cache the positive result for 20 minutes. Permission and
+                    # review-status signals clear this cache when needed.
+                    cache.set(cache_key, True, 1200)
                     return True
     except Exception:
         # If something goes wrong, fail closed
         return False
 
-    # Cache the negative result for 10 minutes
-    cache.set(cache_key, False, 600)
+    # Cache the negative result for 20 minutes. Permission and review-status
+    # signals clear this cache when needed.
+    cache.set(cache_key, False, 1200)
     return False
 
 
 @register.simple_tag
-def pending_review_count_for_user(user):
-    """Count items pending review that the user can moderate.
+def has_pending_review_items_for_user(user):
+    """Return whether the user can moderate any pending review items.
 
-    Returns the total count of items in review status across all models
-    where the user has moderation permissions (excluding their own items).
-    Results are cached for 5 minutes to reduce database load.
+    This intentionally avoids counting all review items because the shared
+    navigation only needs a simple indicator.
     """
     if not user or not getattr(user, "is_authenticated", False):
-        return 0
+        return False
 
     # Use cache to avoid repeated database queries
-    cache_key = f"pending_review_count_{user.id}"
-    cached_count = cache.get(cache_key)
-    if cached_count is not None:
-        return cached_count
+    cache_key = f"has_pending_review_items_{user.id}"
+    cached_result = cache.get(cache_key)
+    if cached_result is not None:
+        return cached_result
 
     try:
         from utils.object_management.views import ReviewDashboardView
@@ -516,20 +517,21 @@ def pending_review_count_for_user(user):
         view = ReviewDashboardView()
         view.setup(request)
         view.request = request
-        total_count = len(view.collect_review_items())
+        has_items = view.has_review_items()
 
-        # Cache the result for 5 minutes (300 seconds)
-        cache.set(cache_key, total_count, 300)
-        return total_count
+        # Cache the result for 20 minutes. This badge appears in the shared
+        # navigation, so cold checks otherwise affect unrelated pages.
+        cache.set(cache_key, has_items, 1200)
+        return has_items
     except Exception:
-        # If something goes wrong, return 0
-        return 0
+        # If something goes wrong, return no signal.
+        return False
 
 
 def clear_moderation_cache_for_user(user_id):
     """Clear moderation-related cache for a specific user."""
     cache_keys = [
-        f"pending_review_count_{user_id}",
+        f"has_pending_review_items_{user_id}",
         f"is_moderator_any_model_{user_id}",
     ]
     for key in cache_keys:
@@ -548,7 +550,7 @@ def clear_all_moderation_cache():
         # Clear all cache keys that match our moderation patterns
         # Note: This requires a cache backend that supports pattern deletion
         # For Redis or similar, you could use:
-        # cache.delete_many([key for key in cache.keys('*pending_review_count_*')])
+        # cache.delete_many([key for key in cache.keys('*has_pending_review_items_*')])
         # cache.delete_many([key for key in cache.keys('*is_moderator_any_model_*')])
 
         # For simplicity, we'll just let the cache expire naturally

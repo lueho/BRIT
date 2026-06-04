@@ -5,20 +5,19 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db.models.signals import post_save, pre_save
 from django.template import Context, Template
-from django.test import RequestFactory, TestCase
+from django.test import TestCase
 from factory.django import mute_signals
 
 from sources.waste_collection.models import Collection
 from utils.object_management.models import UserCreatedObject
 from utils.object_management.templatetags.moderation_tags import (
     collection_description_to_html,
+    has_pending_review_items_for_user,
     markdown_to_html,
-    pending_review_count_for_user,
 )
-from utils.object_management.views import ReviewDashboardView
 
 
-class PendingReviewCountTagTests(TestCase):
+class PendingReviewSignalTagTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = get_user_model().objects.create_user(
@@ -40,26 +39,21 @@ class PendingReviewCountTagTests(TestCase):
                 )
 
     def setUp(self):
-        cache.delete(f"pending_review_count_{self.user.id}")
+        cache.delete(f"has_pending_review_items_{self.user.id}")
 
-    def test_pending_review_count_matches_unfiltered_dashboard_results(self):
-        with patch.object(ReviewDashboardView, "paginate_by", 1):
-            request = RequestFactory().get("/")
-            request.user = self.user
+    def test_pending_review_signal_is_true_when_review_items_exist(self):
+        has_items = has_pending_review_items_for_user(self.user)
 
-            view = ReviewDashboardView()
-            view.setup(request)
-            view.request = request
+        self.assertIs(has_items, True)
 
-            expected_count = len(view.collect_review_items())
-            actual_count = pending_review_count_for_user(self.user)
+    def test_pending_review_signal_returns_boolean(self):
+        has_items = has_pending_review_items_for_user(self.user)
 
-        self.assertEqual(actual_count, expected_count)
-        self.assertEqual(actual_count, 10)
+        self.assertIs(has_items, True)
 
-    def test_pending_review_count_uses_cache_on_second_call(self):
-        first = pending_review_count_for_user(self.user)
-        second = pending_review_count_for_user(self.user)
+    def test_pending_review_signal_uses_cache_on_second_call(self):
+        first = has_pending_review_items_for_user(self.user)
+        second = has_pending_review_items_for_user(self.user)
 
         self.assertEqual(first, second)
 

@@ -36,9 +36,10 @@
                   <i class="fas fa-clipboard-check fa-fw me-1"></i>
                   Review Dashboard
                 </span>
-                {% pending_review_count_for_user user as pending_count %}
-                {% if pending_count > 0 %}
-                  <span class="badge bg-warning text-dark rounded-pill">{{ pending_count }}</span>
+                {% has_pending_review_items_for_user user as has_pending_reviews %}
+                {% if has_pending_reviews %}
+                  <span class="badge bg-warning text-dark rounded-pill"
+                        aria-label="Items pending review">!</span>
                 {% endif %}
               </a>
             </li>
