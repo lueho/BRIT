@@ -145,6 +145,25 @@ class MapMixinTestCase(TestCase):
         map_config = self.view.get_context_data()["map_config"]
         self.assertFalse(map_config["loadFeatures"])
 
+    def test_navigation_param_does_not_force_feature_loading(self):
+        # Regression: a "back" breadcrumb (or any navigation/control param) must
+        # not flip load_features on. Doing so made overview pages such as the
+        # geodataset detail view request the full features layer, which the API
+        # rejects (HTTP 400) for large datasets.
+        request = self.factory.get("/?back=/maps/list/?scope=published")
+        self.view.request = request
+        self.assertNotIn("load_features", self.view.get_override_params())
+
+    def test_filter_param_forces_feature_loading(self):
+        request = self.factory.get("/?gattung_deutsch=Linde")
+        self.view.request = request
+        self.assertTrue(self.view.get_override_params().get("load_features"))
+
+    def test_empty_filter_value_does_not_force_feature_loading(self):
+        request = self.factory.get("/?gattung_deutsch=")
+        self.view.request = request
+        self.assertNotIn("load_features", self.view.get_override_params())
+
     @patch("maps.views.reverse")
     def get_features_layer_details_url_template(self, mock_reverse):
         self.view.features_layer_details_url_template = "test-url"

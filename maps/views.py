@@ -17,7 +17,10 @@ from django_filters.views import FilterView
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.views import APIView, Response
 
-from maps.mixins import get_unbounded_geojson_rejection_response
+from maps.mixins import (
+    GEOJSON_CONTROL_QUERY_PARAMS,
+    get_unbounded_geojson_rejection_response,
+)
 from maps.runtime_adapters import get_dataset_runtime_adapter
 from maps.serializers import (
     LauRegionOptionSerializer,
@@ -111,6 +114,19 @@ def build_local_relation_filter_form(column_policies, data=None, filter_options=
     form.helper = FormHelper()
     form.helper.form_tag = False
     return form
+
+
+# Query parameters that are navigation/control hints rather than dataset
+# filters. Their mere presence must not force the features layer to load
+# (e.g. a "back" breadcrumb on a detail page, or layer toggles handled below).
+NON_FILTER_QUERY_PARAMS = GEOJSON_CONTROL_QUERY_PARAMS | {
+    "back",
+    "load_region",
+    "load_catchment",
+    "load_features",
+    "map_config_id",
+    "show_composed_of",
+}
 
 
 class MapMixin:
@@ -287,10 +303,14 @@ class MapMixin:
     def get_override_params(self):
         params = {}
 
-        # If any filter parameters besides the scope parameter are set, assume that features should be loaded
-        if self.request.GET:
-            if any(key not in ["scope"] for key in self.request.GET):
-                params["load_features"] = True
+        # If any actual filter parameters are set, assume that features should
+        # be loaded. Navigation/control params (e.g. "back") do not count.
+        if any(
+            self.request.GET.get(key)
+            for key in self.request.GET
+            if key not in NON_FILTER_QUERY_PARAMS
+        ):
+            params["load_features"] = True
 
         # Previous assumption can be overridden by explicitly setting the load_features parameter.
         for key in ["load_region", "load_catchment", "load_features"]:

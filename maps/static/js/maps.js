@@ -760,6 +760,10 @@ function renderSummaryContainer(summary, summary_container) {
 function renderSummaries(featureInfos) {
     // Empty summary container from previous content
     const outer_summary_container = document.getElementById('summary-container');
+    if (!outer_summary_container) {
+        // No summary container on this page (e.g. overview maps without a results panel)
+        return;
+    }
     outer_summary_container.textContent = '';
 
     if ('summaries' in featureInfos) {
@@ -881,6 +885,9 @@ function formatUrls(urlString) {
 
 function renderFeatureDetails(data) {
     const container = document.getElementById('summary-container');
+    if (!container) {
+        return;
+    }
 
     container.innerHTML = '';
 
