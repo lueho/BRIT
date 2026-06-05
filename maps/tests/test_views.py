@@ -227,19 +227,36 @@ class MapMixinTestCase(TestCase):
             map_config["featuresLayerDetailsUrlTemplate"], "/maps/api/catchment/"
         )
 
-    def test_object_pk_does_not_leak_into_features_id(self):
-        # Regression: a DetailView-style map (self.object is the dataset/region,
-        # not a feature) must not inject self.object.pk as the features layer id.
-        # Doing so previously appended ?id=<object pk> to the features GeoJSON
-        # request, which filtered the features down to a single (usually missing)
-        # primary key and made the map appear empty.
+    def test_detail_view_scopes_features_to_its_object(self):
+        # A detail page shows its object as the map feature, so by default the
+        # features layer is scoped to that object's pk (e.g. a collection detail
+        # page must show only that collection, not every collection).
         self.view.object = SimpleNamespace(pk=999)
         request = self.factory.get(f"/?map_config_id={self.map_config.id}")
         self.view.request = request
 
         map_config = self.view.get_context_data()["map_config"]
 
-        # featuresId comes from the layer configuration ("1"), never the object pk.
+        self.assertEqual(map_config["featuresId"], 999)
+
+    def test_container_view_does_not_scope_features_to_object(self):
+        # Regression: container maps (dataset/region detail, filtered maps) set
+        # self.object to a container, not a feature. They override
+        # get_features_feature_id to None so the dataset pk does not leak into
+        # the features request as ?id=<pk> (which collapsed the layer to a
+        # single, usually missing, primary key).
+        class ContainerMapView(DummyMapView):
+            def get_features_feature_id(self):
+                return None
+
+        view = ContainerMapView()
+        view.object = SimpleNamespace(pk=999)
+        request = self.factory.get(f"/?map_config_id={self.map_config.id}")
+        view.request = request
+
+        map_config = view.get_context_data()["map_config"]
+
+        # featuresId falls back to the layer configuration ("1"), not the pk.
         self.assertEqual(map_config["featuresId"], "1")
         self.assertNotEqual(map_config["featuresId"], 999)
 

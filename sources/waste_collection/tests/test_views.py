@@ -3360,6 +3360,15 @@ class CollectionDetailChainAwareValuesTestCase(ViewWithPermissionsTestCase):
         vals = response.context["collection_property_values"]
         self.assertTrue(any(v.pk == self.review_anchor_value.pk for v in vals))
 
+    def test_map_config_scopes_features_to_this_collection(self):
+        # Regression: the collection detail map must request only this
+        # collection (?id=<pk>), not every collection.
+        response = self.client.get(reverse(self.url_name, kwargs={"pk": self.root.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["map_config"]["loadFeatures"])
+        self.assertEqual(response.context["map_config"]["featuresId"], self.root.pk)
+
 
 class CollectionFrequencyDisplayTestCase(TestCase):
     @classmethod

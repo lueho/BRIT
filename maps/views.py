@@ -167,8 +167,14 @@ class MapMixin:
         return None
 
     def get_features_feature_id(self):
-        """Override to provide a custom feature ID"""
-        return None
+        """Feature id used to scope the features layer.
+
+        Detail views display a single object as the features layer feature, so
+        the default is that object's pk. Views whose ``object`` is not itself a
+        features-layer feature (e.g. dataset/region containers, filtered maps)
+        override this to return ``None`` so the whole layer is shown/filtered.
+        """
+        return getattr(getattr(self, "object", None), "pk", None)
 
     def get_features_layer_api_basename(self):
         if self.features_layer_api_basename:
@@ -530,6 +536,10 @@ class GeoDataSetDetailView(MapMixin, UserCreatedObjectDetailView):
     def get_region_feature_id(self):
         return self.object.region_id
 
+    def get_features_feature_id(self):
+        # The detail page object is the dataset container, not a map feature.
+        return None
+
     def get_map_configuration(self):
         if self._cached_map_configuration is not None:
             return self._cached_map_configuration
@@ -650,6 +660,11 @@ class GeoDataSetRuntimePermissionMixin:
 class FilteredMapMixin(MapMixin):
     model_name = None  # TODO: Remove this for pk
     template_name = "filtered_map.html"
+
+    def get_features_feature_id(self):
+        # Filtered maps show the whole (filtered) features layer, not a single
+        # feature, even though ``self.object`` may be set to the dataset.
+        return None
 
     def get_dataset(self):
         dataset_pk = self.kwargs.get("pk")
@@ -1078,6 +1093,11 @@ class RegionDetailView(MapMixin, UserCreatedObjectDetailView):
 
     def get_region_feature_id(self):
         return self.object.pk
+
+    def get_features_feature_id(self):
+        # The region is shown via the region layer (regionId); the features
+        # layer is only used for composed-of borders, not a single feature.
+        return None
 
     def get_override_params(self):
         params = super().get_override_params()
