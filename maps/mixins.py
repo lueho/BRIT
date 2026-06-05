@@ -136,6 +136,18 @@ class CachedGeoJSONMixin:
         .get("TIMEOUT", 3600)
     )  # Default 1 hour fallback
 
+    # Throttle classes applied only to the (expensive, public) `geojson` action.
+    # ViewSets opt in by setting this; other actions keep their normal throttles.
+    geojson_throttle_classes = None
+
+    def get_throttles(self):
+        if (
+            getattr(self, "action", None) == "geojson"
+            and self.geojson_throttle_classes is not None
+        ):
+            return [throttle() for throttle in self.geojson_throttle_classes]
+        return super().get_throttles()
+
     def _parse_bbox(self, request):
         """Parse bounding box from request query params.
 

@@ -239,6 +239,10 @@ REST_FRAMEWORK = {
         "anon": "10/minute",
         "user": "60/minute",
         "waste_atlas": "300/minute",
+        # Per-subnet limit for anonymous GeoJSON requests. Keeps map browsing
+        # comfortable for real users while throttling crawlers that hammer the
+        # large geometry endpoints from a whole network block.
+        "geojson_anon": "60/minute",
     },
 }
 

@@ -1,6 +1,9 @@
 import io
 from unittest.mock import Mock, patch
 
+from django.conf import settings
+from django.contrib.gis.geos import MultiPolygon, Polygon
+from django.core.cache import caches
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase
@@ -9,6 +12,7 @@ from utils.object_management.models import get_default_owner
 from utils.properties.models import Unit
 
 from ..models import Region, RegionAttributeValue, RegionProperty
+from ..utils import get_region_cache_key
 
 
 class RegionAttributeValueUnitBackfillCommandTests(TestCase):
@@ -194,3 +198,46 @@ class WarmGeojsonCacheCommandTests(TestCase):
 
         warmer.apply.assert_called_once_with()
         self.assertIn("Roadside Trees: 2 features cached", out.getvalue())
+
+
+class WarmGeojsonCacheRegionsTests(TestCase):
+    def setUp(self):
+        self.geojson_cache = caches[getattr(settings, "GEOJSON_CACHE", "default")]
+        self.geojson_cache.clear()
+
+    @staticmethod
+    def _make_region(name, num_vertices=4):
+        # Build a closed ring with the requested number of distinct vertices so
+        # regions can be ordered by geometry point count.
+        ring = [(0, 0)]
+        ring += [(i + 1, (i % 2) + 1) for i in range(max(num_vertices - 1, 1))]
+        ring.append((0, 0))
+        region = Region(name=name)
+        region.geom = MultiPolygon(Polygon(tuple(ring)))
+        region.save()
+        return region
+
+    def test_regions_flag_warms_largest_region_geojson_cache(self):
+        region = self._make_region("Warmed Region")
+        out = io.StringIO()
+
+        call_command("warm_geojson_cache", regions=True, regions_limit=10, stdout=out)
+
+        cached = self.geojson_cache.get(get_region_cache_key(region_id=region.id))
+        self.assertIsNotNone(cached)
+        self.assertEqual(len(cached["features"]), 1)
+        self.assertIn("Region cache warmup complete!", out.getvalue())
+
+    def test_regions_limit_only_warms_largest_regions(self):
+        big = self._make_region("Big Region", num_vertices=20)
+        small = self._make_region("Small Region", num_vertices=4)
+        out = io.StringIO()
+
+        call_command("warm_geojson_cache", regions=True, regions_limit=1, stdout=out)
+
+        self.assertIsNotNone(
+            self.geojson_cache.get(get_region_cache_key(region_id=big.id))
+        )
+        self.assertIsNone(
+            self.geojson_cache.get(get_region_cache_key(region_id=small.id))
+        )

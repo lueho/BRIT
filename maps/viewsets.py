@@ -19,6 +19,7 @@ from .serializers import (
     RegionGeoFeatureModelSerializer,
     RegionModelSerializer,
 )
+from .throttling import GeoJSONAnonThrottle
 from .utils import (
     get_catchment_cache_key,
     get_nuts_region_cache_key,
@@ -56,6 +57,7 @@ class RegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     queryset = Region.objects.select_related("borders").all()
     serializer_class = RegionModelSerializer
     filterset_class = RegionFilterSet
+    geojson_throttle_classes = (GeoJSONAnonThrottle,)
     custom_permission_required = {
         "list": None,
         "retrieve": None,
@@ -87,6 +89,7 @@ class CatchmentViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     queryset = Catchment.objects.select_related("region", "region__borders").all()
     serializer_class = CatchmentModelSerializer
     filterset_class = CatchmentFilterSet
+    geojson_throttle_classes = (GeoJSONAnonThrottle,)
     custom_permission_required = {
         "list": None,
         "retrieve": None,
@@ -143,6 +146,7 @@ class NutsRegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     )
     serializer_class = NutsRegionSummarySerializer
     filterset_fields = ("id", "levl_code", "cntr_code", "parent_id")
+    geojson_throttle_classes = (GeoJSONAnonThrottle,)
     custom_permission_required = {
         "list": None,
         "retrieve": None,
