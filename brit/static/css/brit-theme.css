@@ -7398,6 +7398,14 @@ body {
   position: relative;
   z-index: 0;
 }
+.detail-layout-card .detail-uploaded-image {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: min(22rem, 50vh);
+  height: auto;
+  object-fit: contain;
+}
 
 h1, .h1,
 h2,
