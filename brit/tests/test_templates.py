@@ -668,7 +668,10 @@ class StickyFilterOffsetAssetTests(SimpleTestCase):
     def test_filtered_list_minified_css_mirrors_source(self):
         minified = self._read_asset("css/filtered-list.min.css")
 
-        self.assertIn("--brit-sticky-offset:calc(var(--brit-topnav-height)", minified)
+        self.assertRegex(
+            minified,
+            r"--brit-sticky-offset:\s*calc\(var\(--brit-topnav-height\)",
+        )
         self.assertIn(
             ".filter-sticky{position:sticky;top:var(--brit-sticky-offset)", minified
         )
