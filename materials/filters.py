@@ -9,7 +9,10 @@ from django_filters import rest_framework as rf_filters
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
 
-from utils.filters import UserCreatedObjectScopedFilterSet
+from utils.filters import (
+    FreeTextSearchFilterMixin,
+    UserCreatedObjectScopedFilterSet,
+)
 from utils.object_management.permissions import (
     apply_scope_filter,
     filter_queryset_for_user,
@@ -37,7 +40,9 @@ class MaterialFilterSet(rf_filters.FilterSet):
         fields = {"name": ["iexact", "icontains"], "categories": ["iexact"]}
 
 
-class MaterialListFilter(UserCreatedObjectScopedFilterSet):
+class MaterialListFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
+    search_fields = ("name", "abbreviation", "description")
+
     name = ModelChoiceFilter(
         queryset=Material.objects.none(),
         field_name="name",
@@ -83,6 +88,7 @@ class MaterialListFilter(UserCreatedObjectScopedFilterSet):
     class Meta:
         model = Material
         fields = (
+            "q",
             "scope",
             "name",
             "category",
@@ -217,7 +223,9 @@ class CompositionFilterSet(rf_filters.FilterSet):
         )
 
 
-class SampleFilter(UserCreatedObjectScopedFilterSet):
+class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
+    search_fields = ("name", "description", "material__name", "location")
+
     name = ModelChoiceFilter(
         queryset=Sample.objects.none(),
         field_name="name",
@@ -342,6 +350,7 @@ class SampleFilter(UserCreatedObjectScopedFilterSet):
     class Meta:
         model = Sample
         fields = (
+            "q",
             "scope",
             "name",
             "substrate_material",

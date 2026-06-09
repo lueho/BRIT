@@ -1,6 +1,7 @@
 from crispy_forms.helper import FormHelper
+from django.db.models import Q
 from django.forms import HiddenInput
-from django_filters import ChoiceFilter, FilterSet, RangeFilter
+from django_filters import CharFilter, ChoiceFilter, FilterSet, RangeFilter
 
 from utils.fields import NullablePercentageRangeField, NullableRangeField
 from utils.object_management.permissions import apply_scope_filter
@@ -20,6 +21,45 @@ class BaseCrispyFilterSet(FilterSet):
             form.helper = self.get_form_helper()
         form.helper.form_tag = False
         return form
+
+
+class FreeTextSearchFilterMixin(FilterSet):
+    """Adds a ``q`` free-text filter that ORs ``icontains`` across ``search_fields``.
+
+    Subclasses declare the fields to search, e.g.::
+
+        class SampleFilter(FreeTextSearchFilterMixin, ...):
+            search_fields = ("name", "description", "material__name")
+
+    The filter is safe against empty/whitespace-only input and composes with
+    every other filter in the FilterSet (scope, dropdowns, pagination). Because
+    ``q`` is a regular declared filter, it renders through the shared crispy
+    filter form and its value persists in the URL automatically.
+    """
+
+    search_fields: tuple[str, ...] = ()
+    search_label = "Search"
+    search_placeholder = "Search by name, description, ..."
+
+    q = CharFilter(method="filter_q", label=search_label)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        q_filter = self.filters.get("q")
+        if q_filter is not None:
+            q_filter.field.label = self.search_label
+            widget = q_filter.field.widget
+            widget.input_type = "search"
+            widget.attrs.setdefault("placeholder", self.search_placeholder)
+
+    def filter_q(self, queryset, name, value):
+        value = (value or "").strip()
+        if not value or not self.search_fields:
+            return queryset
+        lookup = Q()
+        for field in self.search_fields:
+            lookup |= Q(**{f"{field}__icontains": value})
+        return queryset.filter(lookup).distinct()
 
 
 class NullableRangeFilter(RangeFilter):

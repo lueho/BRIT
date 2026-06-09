@@ -4,7 +4,7 @@ from django.test import TestCase
 
 from utils.properties.models import Unit
 
-from ..filters import SampleFilter
+from ..filters import MaterialListFilter, SampleFilter
 from ..models import (
     ComponentMeasurement,
     Material,
@@ -229,3 +229,112 @@ class SampleFilterTestCase(TestCase):
         self.assertTrue(
             MaterialCategory.objects.filter(name=substrate_category_name).exists()
         )
+
+    def test_filter_form_contains_free_text_search_field(self):
+        filtr = SampleFilter(queryset=Sample.objects.all())
+
+        self.assertIn("q", filtr.form.fields)
+        self.assertEqual(filtr.form.fields["q"].label, "Search")
+
+    def test_q_matches_sample_name(self):
+        filtr = SampleFilter(
+            data={"q": "Sample B"},
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertEqual(list(filtr.qs), [self.sample_non_substrate])
+
+    def test_q_matches_related_material_name(self):
+        filtr = SampleFilter(
+            data={"q": "Food"},
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertCountEqual(
+            list(filtr.qs),
+            [self.sample_substrate, self.sample_equivalent],
+        )
+
+    def test_q_combines_with_other_filters(self):
+        filtr = SampleFilter(
+            data={
+                "q": "Sample",
+                "substrate_material": str(self.substrate_material.pk),
+            },
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertCountEqual(
+            list(filtr.qs),
+            [self.sample_substrate, self.sample_equivalent],
+        )
+
+    def test_q_blank_value_returns_all_samples(self):
+        filtr = SampleFilter(
+            data={"q": "   "},
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertCountEqual(list(filtr.qs), list(Sample.objects.all()))
+
+    def test_q_no_match_returns_empty(self):
+        filtr = SampleFilter(
+            data={"q": "no-such-sample"},
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertEqual(list(filtr.qs), [])
+
+
+class MaterialListFilterFreeTextSearchTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.compost = Material.objects.create(
+            name="Compost Mix",
+            description="rich organic blend",
+        )
+        cls.sludge = Material.objects.create(
+            name="Sewage Cake",
+            abbreviation="SWC",
+        )
+
+    def test_filter_form_contains_free_text_search_field(self):
+        filtr = MaterialListFilter(queryset=Material.objects.all())
+
+        self.assertIn("q", filtr.form.fields)
+
+    def test_q_matches_description(self):
+        filtr = MaterialListFilter(
+            data={"q": "organic"},
+            queryset=Material.objects.all(),
+        )
+
+        self.assertIn(self.compost, filtr.qs)
+        self.assertNotIn(self.sludge, filtr.qs)
+
+    def test_q_matches_abbreviation(self):
+        filtr = MaterialListFilter(
+            data={"q": "SWC"},
+            queryset=Material.objects.all(),
+        )
+
+        self.assertIn(self.sludge, filtr.qs)
+        self.assertNotIn(self.compost, filtr.qs)
+
+    def test_q_blank_value_does_not_filter(self):
+        filtr = MaterialListFilter(
+            data={"q": "   "},
+            queryset=Material.objects.all(),
+        )
+
+        self.assertIn(self.compost, filtr.qs)
+        self.assertIn(self.sludge, filtr.qs)
+
+    def test_q_no_match_excludes_both(self):
+        filtr = MaterialListFilter(
+            data={"q": "no-such-material"},
+            queryset=Material.objects.all(),
+        )
+
+        self.assertNotIn(self.compost, filtr.qs)
+        self.assertNotIn(self.sludge, filtr.qs)
