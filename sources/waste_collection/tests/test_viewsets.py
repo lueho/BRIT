@@ -148,6 +148,18 @@ class CollectionViewSetTestCase(APITestCase):
         self.assertIn(self.published_collection.pk, feature_ids)
         self.assertIn(self.other_user_published_collection.pk, feature_ids)
 
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "collector-geojson-throttle-test",
+            },
+            "geojson": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "collector-geojson-cache-test",
+            },
+        },
+    )
     def test_collector_geojson_endpoint_is_throttled(self):
         cache.clear()
         url = reverse("api-collector-geojson")
