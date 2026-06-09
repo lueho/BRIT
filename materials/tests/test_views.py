@@ -1850,6 +1850,48 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, "Showing the image from the linked sample series")
         self.assertContains(response, sample.name)
 
+    def test_list_marks_list_segment_active(self):
+        response = self.client.get(reverse("sample-list"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        # Representation switcher is present.
+        self.assertContains(response, 'aria-label="View toggle"')
+        # The list segment is the active/current one on the list page.
+        self.assertContains(response, 'aria-current="page"')
+        self.assertContains(response, 'title="View as list"')
+        # The featured (gallery) view is reachable as a peer.
+        self.assertContains(response, 'title="View as featured gallery"')
+        self.assertContains(response, reverse("sample-gallery"))
+
+    def test_gallery_marks_featured_segment_active(self):
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'aria-label="View toggle"')
+        # Active segment links to the current path (gallery), list is a peer link.
+        self.assertContains(response, 'aria-current="page"')
+        self.assertContains(response, reverse("sample-list"))
+
+    def test_detail_exposes_switcher_with_no_active_segment(self):
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        # The same peer-view switcher appears on the detail header.
+        self.assertContains(response, 'aria-label="View toggle"')
+        self.assertContains(response, reverse("sample-list"))
+        self.assertContains(response, reverse("sample-gallery"))
+        # Detail is not a list representation, so no segment is marked active.
+        self.assertNotContains(response, 'aria-pressed="true"')
+
+    def test_detail_keeps_explorer_separate_from_switcher(self):
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        # Explorer remains reachable as a distinct, secondary affordance and is
+        # not folded into the representation switcher.
+        self.assertContains(response, reverse("materials-explorer"))
+        self.assertContains(response, "Open Explorer (dashboard)")
+
 
 class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     modal_create_view = True

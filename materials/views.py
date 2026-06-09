@@ -799,6 +799,30 @@ class SampleSeriesAutoCompleteView(UserCreatedObjectAutocompleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+def _reverse_or_none(name):
+    try:
+        return reverse(name)
+    except NoReverseMatch:
+        return None
+
+
+def get_sample_representation_urls():
+    """Return the URLs for the sample representation switcher.
+
+    The switcher offers true peer representations of the same sample dataset
+    (list and featured gallery). The Explorer dashboard is a separate
+    navigation level and is intentionally not part of this set.
+    """
+    return {
+        "public_url": _reverse_or_none("sample-list"),
+        "private_url": _reverse_or_none("sample-list-owned"),
+        "review_url": _reverse_or_none("sample-list-review"),
+        "public_gallery_url": _reverse_or_none("sample-gallery"),
+        "private_gallery_url": _reverse_or_none("sample-gallery-owned"),
+        "review_gallery_url": _reverse_or_none("sample-gallery-review"),
+    }
+
+
 class SampleRepresentationMixin:
     model = Sample
     filterset_class = SampleFilter
@@ -813,25 +837,11 @@ class SampleRepresentationMixin:
         )
 
     def get_gallery_context_urls(self):
-        try:
-            public_gallery_url = reverse("sample-gallery")
-        except NoReverseMatch:
-            public_gallery_url = None
-
-        try:
-            private_gallery_url = reverse("sample-gallery-owned")
-        except NoReverseMatch:
-            private_gallery_url = None
-
-        try:
-            review_gallery_url = reverse("sample-gallery-review")
-        except NoReverseMatch:
-            review_gallery_url = None
-
+        urls = get_sample_representation_urls()
         return {
-            "public_gallery_url": public_gallery_url,
-            "private_gallery_url": private_gallery_url,
-            "review_gallery_url": review_gallery_url,
+            "public_gallery_url": urls["public_gallery_url"],
+            "private_gallery_url": urls["private_gallery_url"],
+            "review_gallery_url": urls["review_gallery_url"],
         }
 
     def get_context_data(self, **kwargs):
@@ -1116,6 +1126,22 @@ class SampleDetailView(UserCreatedObjectDetailView):
                 "sample_completeness": sample_completeness,
                 "sample_workflow": sample_workflow,
                 "sample_layout_mode": sample_layout_mode,
+            }
+        )
+
+        # Representation switcher context (List / Featured) so the detail header
+        # exposes the same peer-view navigation as the list and gallery pages.
+        # No segment is marked active on a detail page (representation_mode is
+        # neither 'list' nor 'gallery'). Samples have no map representation.
+        context.update(get_sample_representation_urls())
+        context.update(
+            {
+                "representation_mode": "detail",
+                "list_type": "published",
+                "dashboard_url": reverse_lazy("materials-explorer"),
+                "public_map_url": None,
+                "private_map_url": None,
+                "review_map_url": None,
             }
         )
 

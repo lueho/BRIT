@@ -1,0 +1,141 @@
+{% comment %}
+Reusable representation switcher for List / Featured (gallery) / Map.
+
+These are true peer representations of the SAME dataset, so they belong in one
+segmented control. The Explorer (module dashboard) is a different navigation
+level and is deliberately NOT part of this switcher.
+
+Expected context:
+- representation_mode: 'list' | 'gallery' | 'map' | anything else (e.g. 'detail')
+  Determines which segment is marked active. On detail pages pass a value that
+  matches none (e.g. 'detail') so no segment is active.
+- list_type: 'published' | 'private' | 'review' (active scope; defaults to published)
+- public_url / private_url / review_url: list-view base URLs
+- public_gallery_url / private_gallery_url / review_gallery_url: gallery base URLs
+- public_map_url / private_map_url / review_map_url: map base URLs (optional)
+- request: implicitly available; current GET params are preserved across views.
+
+The switcher renders only when at least one gallery or map URL is available.
+{% endcomment %}
+{% if public_gallery_url or private_gallery_url or review_gallery_url or public_map_url or private_map_url or review_map_url %}
+  <div class="btn-group btn-group-sm" role="group" aria-label="View toggle">
+    {% if representation_mode == 'list' %}
+      <a class="btn btn-outline-secondary active disabled"
+         aria-current="page"
+         role="button"
+         aria-pressed="true"
+         aria-disabled="true"
+         tabindex="-1"
+         title="View as list"
+         href="{{ request.get_full_path }}"><i class="fas fa-list"></i></a>
+    {% else %}
+      {% if list_type == 'private' %}
+        {% with list_base=private_url %}
+          <a class="btn btn-outline-secondary"
+             role="button"
+             aria-pressed="false"
+             title="View as list"
+             href="{{ list_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private"><i class="fas fa-list"></i></a>
+        {% endwith %}
+      {% elif list_type == 'review' %}
+        {% with list_base=review_url %}
+          <a class="btn btn-outline-secondary"
+             role="button"
+             aria-pressed="false"
+             title="View as list"
+             href="{{ list_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review"><i class="fas fa-list"></i></a>
+        {% endwith %}
+      {% else %}
+        {% with list_base=public_url %}
+          <a class="btn btn-outline-secondary"
+             role="button"
+             aria-pressed="false"
+             title="View as list"
+             href="{{ list_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published"><i class="fas fa-list"></i></a>
+        {% endwith %}
+      {% endif %}
+    {% endif %}
+    {% if public_gallery_url or private_gallery_url or review_gallery_url %}
+      {% if representation_mode == 'gallery' %}
+        <a class="btn btn-outline-secondary active disabled"
+           aria-current="page"
+           role="button"
+           aria-pressed="true"
+           aria-disabled="true"
+           tabindex="-1"
+           title="View as featured gallery"
+           href="{{ request.get_full_path }}"><i class="fas fa-image"></i></a>
+      {% elif list_type == 'private' %}
+        {% with gallery_base=private_gallery_url %}
+          {% if gallery_base %}
+            <a class="btn btn-outline-secondary"
+               role="button"
+               aria-pressed="false"
+               title="View as featured gallery"
+               href="{{ gallery_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private"><i class="fas fa-image"></i></a>
+          {% endif %}
+        {% endwith %}
+      {% elif list_type == 'review' %}
+        {% with gallery_base=review_gallery_url %}
+          {% if gallery_base %}
+            <a class="btn btn-outline-secondary"
+               role="button"
+               aria-pressed="false"
+               title="View as featured gallery"
+               href="{{ gallery_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review"><i class="fas fa-image"></i></a>
+          {% endif %}
+        {% endwith %}
+      {% else %}
+        {% with gallery_base=public_gallery_url %}
+          {% if gallery_base %}
+            <a class="btn btn-outline-secondary"
+               role="button"
+               aria-pressed="false"
+               title="View as featured gallery"
+               href="{{ gallery_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published"><i class="fas fa-image"></i></a>
+          {% endif %}
+        {% endwith %}
+      {% endif %}
+    {% endif %}
+    {% if representation_mode == 'map' %}
+      <a class="btn btn-outline-secondary active disabled"
+         aria-current="page"
+         role="button"
+         aria-pressed="true"
+         aria-disabled="true"
+         tabindex="-1"
+         title="View as map"
+         href="{{ request.get_full_path }}"><i class="fas fa-map"></i></a>
+    {% elif list_type == 'private' %}
+      {% with map_base=private_map_url %}
+        {% if map_base %}
+          <a class="btn btn-outline-secondary"
+             role="button"
+             aria-pressed="false"
+             title="View as map"
+             href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private&load_features=true"><i class="fas fa-map"></i></a>
+        {% endif %}
+      {% endwith %}
+    {% elif list_type == 'review' %}
+      {% with map_base=review_map_url %}
+        {% if map_base %}
+          <a class="btn btn-outline-secondary"
+             role="button"
+             aria-pressed="false"
+             title="View as map"
+             href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review&load_features=true"><i class="fas fa-map"></i></a>
+        {% endif %}
+      {% endwith %}
+    {% else %}
+      {% with map_base=public_map_url %}
+        {% if map_base %}
+          <a class="btn btn-outline-secondary"
+             role="button"
+             aria-pressed="false"
+             title="View as map"
+             href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published&load_features=true"><i class="fas fa-map"></i></a>
+        {% endif %}
+      {% endwith %}
+    {% endif %}
+  </div>
+{% endif %}

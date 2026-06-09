@@ -207,36 +207,24 @@
   </div>
 {% endblock detail_body %}
 {% block detail_header_primary_actions %}
-  <div class="btn-group me-2" role="group">
-    {% with back_url=request.GET.back %}
-      {% if back_url %}
-        <a class="btn btn-sm btn-outline-secondary"
-           href="{{ back_url }}"
-           title="Back to results">
-          <i class="fas fa-arrow-left"></i>
-          <span class="d-none d-md-inline">Back to results</span>
-        </a>
-      {% endif %}
-    {% endwith %}
-    {% if object.list_url %}
-      <a class="btn btn-sm btn-outline-secondary"
-         href="{{ object.list_url }}"
-         title="List">
-        <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">List</span>
-      </a>
-    {% else %}
-      <a class="btn btn-sm btn-outline-secondary"
-         href="{% url 'sample-list' %}"
-         title="List">
-        <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">List</span>
+  {% with back_url=request.GET.back %}
+    {% if back_url %}
+      <a class="btn btn-sm btn-outline-secondary me-2"
+         href="{{ back_url }}"
+         title="Back to results">
+        <i class="fas fa-arrow-left"></i>
+        <span class="d-none d-md-inline">Back to results</span>
       </a>
     {% endif %}
-    <a class="btn btn-sm btn-outline-secondary"
-       href="{% url 'materials-explorer' %}"
-       title="Open Explorer (dashboard)">
-      <i class="fas fa-table-cells-large"></i> <span class="d-none d-md-inline">Explorer</span>
-    </a>
-  </div>
+  {% endwith %}
+  {# Peer representations of the sample dataset (List / Featured). #}
+  <div class="me-2">{% include "partials/representation_switcher.html" %}</div>
+  {# Explorer is a separate navigation level (module dashboard), not a peer view. #}
+  <a class="btn btn-sm btn-outline-secondary me-2"
+     href="{% url 'materials-explorer' %}"
+     title="Open Explorer (dashboard)">
+    <i class="fas fa-table-cells-large"></i> <span class="d-none d-md-inline">Explorer</span>
+  </a>
   {% if sample_summary.component_measurement_count or sample_summary.property_value_count %}
     <a class="btn btn-sm btn-primary me-2"
        href="#sample-measurements-tabs"
