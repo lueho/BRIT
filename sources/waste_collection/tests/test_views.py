@@ -1,5 +1,7 @@
 import codecs
 import csv
+import json
+import re
 import time
 from collections import namedtuple
 from datetime import date, timedelta
@@ -4028,6 +4030,16 @@ class WasteAtlasMapViewsTestCase(TestCase):
     def setUp(self):
         self.client.force_login(self.user)
 
+    def _map_config(self, response):
+        """Extract the JSON map config injected by the generic map template."""
+        match = re.search(
+            r'<script id="atlas-config" type="application/json">(.*?)</script>',
+            response.content.decode(),
+            re.S,
+        )
+        self.assertIsNotNone(match, "no atlas-config JSON found in response")
+        return json.loads(match.group(1))
+
     def test_map_selection_registry_uses_nested_region_theme_route_shape(self):
         from sources.waste_collection.waste_atlas.map_selection import (
             WASTE_ATLAS_MAP_SELECTIONS,
@@ -4147,11 +4159,12 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, title)
-                self.assertContains(response, data_url)
-                self.assertContains(response, "nutsPrefix: 'ES51'")
-                self.assertContains(response, "nutsLevel: parseInt('3', 10)")
+                cfg = self._map_config(response)
+                self.assertEqual(cfg["dataUrl"], data_url)
+                self.assertEqual(cfg["nutsPrefix"], "ES51")
+                self.assertEqual(cfg["nutsLevel"], 3)
                 if route_name == "waste-atlas-catalonia-biowaste-impurity-map":
-                    self.assertContains(response, "collectionYear: 2024")
+                    self.assertEqual(cfg["collectionYear"], 2024)
 
     def test_catalonia_selector_includes_new_collection_system_maps(self):
         response = self.client.get(
@@ -4183,8 +4196,9 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "Administrative level of waste collection")
         self.assertContains(response, "Map overview")
         self.assertContains(response, "Theme")
-        self.assertContains(response, "nutsPrefix: 'ITH10'")
-        self.assertContains(response, "nutsLevel: parseInt('3', 10)")
+        cfg = self._map_config(response)
+        self.assertEqual(cfg["nutsPrefix"], "ITH10")
+        self.assertEqual(cfg["nutsLevel"], 3)
 
     def test_bw_rp_orga_level_map_uses_bundesland_border_scope(self):
         response = self.client.get(reverse("waste-atlas-bw-rp-orga-level-map"))
@@ -4194,28 +4208,31 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(
             response, "selected>Baden-Württemberg &amp; Rheinland-Pfalz</option>"
         )
-        self.assertContains(response, "nutsPrefix: 'DE1,DEB'")
-        self.assertContains(response, "nutsLevel:")
-        self.assertContains(response, "parseInt('1', 10)")
+        cfg = self._map_config(response)
+        self.assertEqual(cfg["nutsPrefix"], "DE1,DEB")
+        self.assertEqual(cfg["nutsLevel"], 1)
 
     def test_bw_rp_combined_fee_system_classifies_valid_fee_combinations(self):
         response = self.client.get(reverse("waste-atlas-bw-rp-combined-fee-system-map"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "BWB & RWB: Flexible")
-        self.assertContains(response, "BWB: No fee | RWB: Flexible")
-        self.assertContains(response, "BWB & RWB: PAYT")
-        self.assertContains(response, "BWB: Flexible | RWB: PAYT")
-        self.assertContains(response, "BWB: No fee | RWB: PAYT")
-        self.assertContains(response, "BWB: Flexible | RWB: Flexible+")
-        self.assertContains(response, "Other combinations")
-        self.assertContains(response, "flex_flex_plus")
-        self.assertContains(response, "other_combined")
-        self.assertContains(response, "exportLegendBottomColumns: 2")
-        self.assertNotContains(response, "No fee / Flexible")
-        self.assertNotContains(response, "Flexible / PAYT")
-        self.assertNotContains(response, "No fee / PAYT")
-        self.assertNotContains(response, "Flexible / Flexible+")
+        cfg = self._map_config(response)
+        labels = [category["label"] for category in cfg["categories"]]
+        values = [category["value"] for category in cfg["categories"]]
+        self.assertIn("BWB & RWB: Flexible", labels)
+        self.assertIn("BWB: No fee | RWB: Flexible", labels)
+        self.assertIn("BWB & RWB: PAYT", labels)
+        self.assertIn("BWB: Flexible | RWB: PAYT", labels)
+        self.assertIn("BWB: No fee | RWB: PAYT", labels)
+        self.assertIn("BWB: Flexible | RWB: Flexible+", labels)
+        self.assertIn("Other combinations", labels)
+        self.assertIn("flex_flex_plus", values)
+        self.assertIn("other_combined", values)
+        self.assertEqual(cfg["exportLegendBottomColumns"], 2)
+        self.assertNotIn("No fee / Flexible", labels)
+        self.assertNotIn("Flexible / PAYT", labels)
+        self.assertNotIn("No fee / PAYT", labels)
+        self.assertNotIn("Flexible / Flexible+", labels)
 
     def test_country_specific_orga_level_maps_default_to_expected_country(self):
         """Country-specific orga-level maps default to expected country and year."""
@@ -4287,27 +4304,21 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertNotContains(response, "nutsLevel:")
                 self.assertContains(response, "Map overview")
 
-    def test_catalonia_generated_views_reuse_germany_metadata(self):
-        from sources.waste_collection.waste_atlas import views as atlas_views
+    def test_catalonia_pages_reuse_germany_map_metadata(self):
+        from sources.waste_collection.waste_atlas.pages import MAP_PAGES
 
-        self.assertEqual(
-            atlas_views.CataloniaResidualRequiredBinCapacityMapView.template_name,
-            atlas_views.GermanyResidualRequiredBinCapacityMapView.template_name,
-        )
-        self.assertEqual(
-            atlas_views.CataloniaResidualRequiredBinCapacityMapView.map_title,
-            atlas_views.GermanyResidualRequiredBinCapacityMapView.map_title,
-        )
-        self.assertEqual(
-            atlas_views.CataloniaResidualRequiredBinCapacityMapView.map_route_key,
-            atlas_views.GermanyResidualRequiredBinCapacityMapView.map_route_key,
-        )
-        self.assertTrue(
-            issubclass(
-                atlas_views.CataloniaResidualRequiredBinCapacityMapView,
-                atlas_views.CataloniaAtlasMapView,
-            )
-        )
+        pages_by_name = {page["name"]: page for page in MAP_PAGES}
+        catalonia = pages_by_name[
+            "waste-atlas-catalonia-residual-required-bin-capacity-map"
+        ]
+        germany = pages_by_name[
+            "waste-atlas-germany-residual-required-bin-capacity-map"
+        ]
+
+        self.assertEqual(catalonia["config_key"], germany["config_key"])
+        self.assertEqual(catalonia["title"], germany["title"])
+        self.assertEqual(catalonia["theme"], germany["theme"])
+        self.assertEqual(catalonia["selector_set"], "ES-CT")
 
     def test_italy_orga_level_map_ignores_country_and_nuts_query_overrides(self):
         response = self.client.get(
@@ -4329,8 +4340,9 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="IT-ST"')
-        self.assertContains(response, "nutsPrefix: 'ITH10'")
-        self.assertContains(response, "nutsLevel: parseInt('3', 10)")
+        cfg = self._map_config(response)
+        self.assertEqual(cfg["nutsPrefix"], "ITH10")
+        self.assertEqual(cfg["nutsLevel"], 3)
 
     def test_generic_map_forwards_nuts_prefix_to_atlas_loader(self):
         response = self.client.get(
@@ -4341,7 +4353,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="IT-ST"')
         self.assertContains(response, 'value="2024" selected')
-        self.assertContains(response, "nutsPrefix: 'ITH10'")
+        self.assertEqual(self._map_config(response)["nutsPrefix"], "ITH10")
 
     def test_collection_count_ratio_map_is_available_generically(self):
         response = self.client.get(reverse("waste-atlas-collection-count-ratio-map"))
@@ -4386,8 +4398,9 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, 'value="IT-ST"')
                 self.assertContains(response, 'value="2024" selected')
-                self.assertContains(response, "nutsPrefix: 'ITH10'")
-                self.assertContains(response, "nutsLevel: parseInt('3', 10)")
+                cfg = self._map_config(response)
+                self.assertEqual(cfg["nutsPrefix"], "ITH10")
+                self.assertEqual(cfg["nutsLevel"], 3)
                 self.assertContains(response, "Map overview")
 
     def test_sweden_bin_configuration_map_defaults_to_se_2023_and_english_labels(self):
@@ -4410,9 +4423,15 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "selected>Sweden</option>")
         self.assertContains(response, 'value="2024" selected')
         self.assertContains(response, "Population density")
-        self.assertContains(response, "/waste_collection/api/waste-atlas/population/")
-        self.assertContains(response, "dataField:   'population_density'")
-        self.assertContains(response, "Urban (> 1 500 / km²)")
+        cfg = self._map_config(response)
+        self.assertEqual(
+            cfg["dataUrl"], "/waste_collection/api/waste-atlas/population/"
+        )
+        self.assertEqual(cfg["transformName"], "populationDensity")
+        self.assertIn(
+            "Urban (> 1 500 / km²)",
+            [category["label"] for category in cfg["categories"]],
+        )
         self.assertContains(response, "Map overview")
 
     def test_belgium_flanders_orga_level_map_defaults_to_be_2022_and_english_labels(
@@ -4796,7 +4815,7 @@ class GenericMapTemplateTests(TestCase):
         waste_atlas_group, _ = Group.objects.get_or_create(name="waste_atlas")
         cls.user.groups.add(waste_atlas_group)
 
-    def _render_generic(self, map_route_key, query=None):
+    def _render_generic(self, config_key, query=None):
         from django.test import RequestFactory
 
         from sources.waste_collection.waste_atlas.views import AtlasMapView
@@ -4805,12 +4824,19 @@ class GenericMapTemplateTests(TestCase):
         request = factory.get("/", query or {})
         request.user = self.user
 
-        class TestMapView(AtlasMapView):
-            template_name = "waste_atlas/map.html"
-
-        TestMapView.map_route_key = map_route_key
-
-        view = TestMapView.as_view()
+        page = {
+            "region": "generic",
+            "theme": "orga_level",
+            "title": "Test map",
+            "path": "map/test/",
+            "name": "waste-atlas-test-map",
+            "config_key": config_key,
+            "selector_set": None,
+            "country": "DE",
+            "year": "2024",
+            "lock": False,
+        }
+        view = AtlasMapView.as_view(page=page)
         response = view(request)
         return response.render().content.decode("utf-8")
 

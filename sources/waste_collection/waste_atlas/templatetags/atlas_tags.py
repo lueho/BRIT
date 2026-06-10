@@ -8,15 +8,17 @@ register = template.Library()
 
 
 @register.simple_tag(takes_context=True)
-def atlas_js_config(context, map_route_key):
-    """Return the merged choropleth config dict for ``map_route_key``.
+def atlas_js_config(context, config_key):
+    """Return the merged choropleth config dict for ``config_key``.
 
-    Registry values from ``MAP_CONFIGS`` are merged with runtime context
-    (country, year, nutsPrefix, nutsLevel) and hard-coded DOM ids.
-    The result is intended to be passed through Django's ``json_script``
-    filter in the template for safe JSON injection.
+    Registry values from ``MAP_CONFIGS`` are merged with per-page overrides
+    (``map_config_overrides``), runtime context (country, year, nutsPrefix,
+    nutsLevel), and hard-coded DOM ids.  The result is intended to be passed
+    through Django's ``json_script`` filter in the template for safe JSON
+    injection.
     """
-    config = dict(MAP_CONFIGS.get(map_route_key, {}))
+    config = dict(MAP_CONFIGS.get(config_key, {}))
+    config.update(context.get("map_config_overrides") or {})
 
     # DOM ids shared by every map
     config.setdefault("svgId", "atlas-svg")
