@@ -16,7 +16,6 @@ from .models import (
     ProcessLink,
     ProcessMaterial,
     ProcessOperatingParameter,
-    ProcessReference,
 )
 
 
@@ -156,37 +155,11 @@ class ProcessInfoResourceSerializer(serializers.ModelSerializer):
         read_only_fields = ["process", "target_url"]
 
 
-class ProcessReferenceSerializer(serializers.ModelSerializer):
-    """Serializer for ProcessReference."""
-
-    source = SourceModelSerializer(read_only=True)
-    source_id = serializers.PrimaryKeyRelatedField(
-        source="source",
-        queryset=serializers.SerializerMethodField(),
-        write_only=True,
-        required=False,
-        allow_null=True,
-    )
-
-    class Meta:
-        model = ProcessReference
-        fields = [
-            "id",
-            "process",
-            "source",
-            "source_id",
-            "title",
-            "url",
-            "reference_type",
-            "order",
-        ]
-        read_only_fields = ["process"]
-
-
 class ProcessListSerializer(serializers.ModelSerializer):
     """Simplified serializer for Process list views."""
 
     categories = ProcessCategorySerializer(many=True, read_only=True)
+    sources = SourceModelSerializer(many=True, read_only=True)
     owner_name = serializers.CharField(source="owner.username", read_only=True)
     parent_name = serializers.CharField(source="parent.name", read_only=True)
 
@@ -200,6 +173,7 @@ class ProcessListSerializer(serializers.ModelSerializer):
             "categories",
             "short_description",
             "authors",
+            "sources",
             "mechanism",
             "image",
             "publication_status",
@@ -215,6 +189,7 @@ class ProcessDetailSerializer(serializers.ModelSerializer):
     """Comprehensive serializer for Process detail views."""
 
     categories = ProcessCategorySerializer(many=True, read_only=True)
+    sources = SourceModelSerializer(many=True, read_only=True)
     owner_name = serializers.CharField(source="owner.username", read_only=True)
     parent_name = serializers.CharField(source="parent.name", read_only=True)
 
@@ -225,12 +200,10 @@ class ProcessDetailSerializer(serializers.ModelSerializer):
     )
     links = ProcessLinkSerializer(many=True, read_only=True)
     info_resources = ProcessInfoResourceSerializer(many=True, read_only=True)
-    references = ProcessReferenceSerializer(many=True, read_only=True)
 
     # Convenience properties
     input_materials = serializers.SerializerMethodField()
     output_materials = serializers.SerializerMethodField()
-    sources = serializers.SerializerMethodField()
 
     class Meta:
         model = Process
@@ -256,7 +229,6 @@ class ProcessDetailSerializer(serializers.ModelSerializer):
             "operating_parameters",
             "links",
             "info_resources",
-            "references",
             # Convenience fields
             "input_materials",
             "output_materials",
@@ -271,10 +243,3 @@ class ProcessDetailSerializer(serializers.ModelSerializer):
     def get_output_materials(self, obj):
         """Get list of output materials."""
         return [{"id": m.id, "name": m.name} for m in obj.output_materials]
-
-    def get_sources(self, obj):
-        """Get distinct literature sources."""
-        return [
-            {"id": s.id, "title": s.title, "abbreviation": s.abbreviation}
-            for s in obj.sources
-        ]

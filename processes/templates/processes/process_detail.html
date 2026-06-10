@@ -190,19 +190,14 @@
         </ul>
     {% endif %}
     <!-- Bibliography -->
-    {% if bibliography_references %}
+    {% if bibliography_sources %}
         <h6 class="mb-3 mt-4">Bibliography</h6>
         <ul class="list-unstyled">
-            {% for ref in bibliography_references %}
+            {% for source in bibliography_sources %}
                 <li>
-                    {% if ref.source %}
-                        <a href="{% url 'source-detail-modal' ref.source.pk %}"
-                           class="modal-link"
-                           title="{{ ref.source.title|default:ref.source.abbreviation }}">{{ ref.source.abbreviation|default:ref.source.title|default:"Source" }}</a>
-                    {% else %}
-                        {{ ref.title }}
-                    {% endif %}
-                    {% if ref.url %}<a href="{{ ref.url }}" target="_blank"><i class="bi bi-link-45deg"></i></a>{% endif %}
+                    <a href="{% url 'source-detail-modal' source.pk %}"
+                       class="modal-link"
+                       title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:source.title|default:"Source" }}</a>
                 </li>
             {% endfor %}
         </ul>

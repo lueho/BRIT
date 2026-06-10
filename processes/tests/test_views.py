@@ -18,7 +18,6 @@ from ..models import (
     ProcessCategory,
     ProcessInfoResource,
     ProcessMaterial,
-    ProcessReference,
 )
 
 
@@ -273,7 +272,6 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         - ProcessOperatingParameter: operating_parameters
         - ProcessLink: links
         - ProcessInfoResource: info_resources
-        - ProcessReference: references
         """
         return {
             "categories": [self.test_category.pk],
@@ -297,11 +295,6 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
             "info_resources-INITIAL_FORMS": "0",
             "info_resources-MIN_NUM_FORMS": "0",
             "info_resources-MAX_NUM_FORMS": "1000",
-            # ProcessReferenceInline (related_name='references')
-            "references-TOTAL_FORMS": "0",
-            "references-INITIAL_FORMS": "0",
-            "references-MIN_NUM_FORMS": "0",
-            "references-MAX_NUM_FORMS": "1000",
         }
 
     @classmethod
@@ -409,7 +402,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
             owner=self.owner_user,
             publication_status="published",
         )
-        ProcessReference.objects.create(process=self.published_object, source=source)
+        self.published_object.sources.add(source)
         self.client.force_login(self.owner_user)
 
         response = self.client.get(
@@ -437,16 +430,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
             owner=self.owner_user,
             publication_status="published",
         )
-        ProcessReference.objects.create(
-            process=self.published_object,
-            source=zebra_source,
-            order=1,
-        )
-        ProcessReference.objects.create(
-            process=self.published_object,
-            source=alpha_source,
-            order=2,
-        )
+        self.published_object.sources.add(zebra_source, alpha_source)
         self.client.force_login(self.owner_user)
 
         response = self.client.get(
@@ -461,6 +445,29 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
             response.content.decode().index("Alpha"),
             response.content.decode().index("Zebra"),
         )
+
+    def test_modal_delete_ignores_detail_next_url(self):
+        """Deleting from the detail modal must not redirect to the deleted object."""
+        process = Process.objects.create(
+            name="Detail modal delete target",
+            owner=self.owner_user,
+            publication_status="private",
+        )
+        detail_url = reverse(self.view_detail_name, kwargs={"pk": process.pk})
+        delete_url = (
+            f"{reverse(self.view_delete_name, kwargs={'pk': process.pk})}"
+            f"?next={detail_url}"
+        )
+
+        self.client.force_login(self.owner_user)
+        response = self.client.post(delete_url, {"next": detail_url})
+
+        self.assertRedirects(
+            response,
+            f"{reverse(self.view_private_list_name)}?scope=private",
+            fetch_redirect_response=False,
+        )
+        self.assertFalse(Process.objects.filter(pk=process.pk).exists())
 
     def test_update_view_prefills_inline_select_values(self):
         material = Material.objects.create(
@@ -534,10 +541,6 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
                 "info_resources-INITIAL_FORMS": "0",
                 "info_resources-MIN_NUM_FORMS": "0",
                 "info_resources-MAX_NUM_FORMS": "1000",
-                "references-TOTAL_FORMS": "0",
-                "references-INITIAL_FORMS": "0",
-                "references-MIN_NUM_FORMS": "0",
-                "references-MAX_NUM_FORMS": "1000",
             },
         )
 

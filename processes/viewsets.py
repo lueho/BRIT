@@ -63,7 +63,8 @@ class ProcessViewSet(viewsets.ModelViewSet):
 
         if self.action == "list":
             queryset = queryset.select_related("owner", "parent").prefetch_related(
-                "categories"
+                "categories",
+                "sources",
             )
         elif self.action == "retrieve":
             queryset = queryset.select_related("owner", "parent").prefetch_related(
@@ -81,7 +82,7 @@ class ProcessViewSet(viewsets.ModelViewSet):
                 ),
                 "links",
                 "info_resources",
-                "references__source",
+                "sources",
             )
 
         return queryset

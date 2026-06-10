@@ -7,7 +7,6 @@ from .models import (
     ProcessLink,
     ProcessMaterial,
     ProcessOperatingParameter,
-    ProcessReference,
 )
 
 
@@ -31,11 +30,6 @@ class ProcessInfoResourceInline(admin.TabularInline):
     extra = 1
 
 
-class ProcessReferenceInline(admin.TabularInline):
-    model = ProcessReference
-    extra = 1
-
-
 @admin.register(Process)
 class ProcessAdmin(admin.ModelAdmin):
     list_display = ("name", "author_list", "owner", "parent", "publication_status")
@@ -54,9 +48,8 @@ class ProcessAdmin(admin.ModelAdmin):
         ProcessOperatingParameterInline,
         ProcessLinkInline,
         ProcessInfoResourceInline,
-        ProcessReferenceInline,
     ]
-    filter_horizontal = ("categories", "authors")
+    filter_horizontal = ("categories", "authors", "sources")
 
     @admin.display(description="Authors")
     def author_list(self, obj):
@@ -113,10 +106,3 @@ class ProcessInfoResourceAdmin(admin.ModelAdmin):
     list_display = ("title", "process", "resource_type", "order")
     list_filter = ("resource_type",)
     search_fields = ("title", "description", "process__name")
-
-
-@admin.register(ProcessReference)
-class ProcessReferenceAdmin(admin.ModelAdmin):
-    list_display = ("__str__", "process", "reference_type", "order")
-    list_filter = ("reference_type",)
-    search_fields = ("title", "source__title", "process__name")

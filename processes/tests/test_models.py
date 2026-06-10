@@ -17,7 +17,6 @@ from ..models import (
     ProcessLink,
     ProcessMaterial,
     ProcessOperatingParameter,
-    ProcessReference,
     validate_internal_or_external_url,
 )
 
@@ -244,19 +243,14 @@ class ProcessModelTestCase(TestCase):
         self.assertEqual(input_names, [self.material_in.name])
         self.assertEqual(output_names, [self.material_out.name])
 
-    def test_process_sources_property_aggregates_references(self):
+    def test_process_sources_accepts_bibliography_sources(self):
         process = Process.objects.create(name="Composting", owner=self.owner)
         source = Source.objects.create(
             title="Reference Title",
             abbreviation="Ref01",
             owner=self.owner,
         )
-        ProcessReference.objects.create(process=process, source=source)
-        ProcessReference.objects.create(
-            process=process,
-            title="Custom reference",
-            url="https://example.com/reference",
-        )
+        process.sources.add(source)
 
         self.assertEqual(
             list(process.sources.order_by("id").values_list("pk", flat=True)),
@@ -316,26 +310,6 @@ class ProcessModelTestCase(TestCase):
 
         internal_resource.url = "/internal/path/"
         internal_resource.full_clean()
-
-    def test_process_reference_requires_source_or_title(self):
-        process = Process.objects.create(name="Fermentation", owner=self.owner)
-        reference = ProcessReference(process=process)
-        with self.assertRaises(ValidationError):
-            reference.full_clean()
-
-        custom_reference = ProcessReference(
-            process=process,
-            title="Example reference",
-        )
-        custom_reference.full_clean()
-
-        source = Source.objects.create(
-            title="Reference Title",
-            abbreviation="Ref02",
-            owner=self.owner,
-        )
-        source_reference = ProcessReference(process=process, source=source)
-        source_reference.full_clean()
 
     def test_process_hierarchy(self):
         """Test that processes can have parent-child relationships."""
@@ -552,33 +526,3 @@ class ProcessModelTestCase(TestCase):
         )
         self.assertEqual(internal.target_url, "/internal/path/")
         self.assertEqual(external.target_url, "https://example.com/resource")
-
-    def test_process_reference_str_with_source(self):
-        """Test string representation when reference has a source."""
-        process = Process.objects.create(name="Process", owner=self.owner)
-        source = Source.objects.create(
-            title="Test Source", abbreviation="TS01", owner=self.owner
-        )
-        reference = ProcessReference.objects.create(process=process, source=source)
-        self.assertEqual(str(reference), "TS01")
-
-    def test_process_reference_str_with_custom_title(self):
-        """Test string representation when reference has custom title."""
-        process = Process.objects.create(name="Process", owner=self.owner)
-        reference = ProcessReference.objects.create(
-            process=process, title="Custom Reference Title"
-        )
-        self.assertEqual(str(reference), "Custom Reference Title")
-
-    def test_process_reference_ordering(self):
-        """Test that references are ordered by order field then id."""
-        process = Process.objects.create(name="Process", owner=self.owner)
-        ref2 = ProcessReference.objects.create(
-            process=process, title="Second Ref", order=2
-        )
-        ref1 = ProcessReference.objects.create(
-            process=process, title="First Ref", order=1
-        )
-        refs = list(process.references.all())
-        self.assertEqual(refs[0], ref1)
-        self.assertEqual(refs[1], ref2)
