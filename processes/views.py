@@ -221,7 +221,7 @@ class ProcessCategoryDetailView(UserCreatedObjectDetailView):
             category_queryset = category_queryset.filter(publication_status="published")
             process_count_status = "published"
         processes = process_queryset.select_related("owner").prefetch_related(
-            "categories"
+            "authors", "categories"
         )
         context["processes"] = processes
         context["related_categories"] = with_process_count(
@@ -323,7 +323,7 @@ class ProcessPublishedFilterView(PublishedObjectFilterView):
             super()
             .get_queryset()
             .select_related("owner", "parent")
-            .prefetch_related("categories", "process_materials__material")
+            .prefetch_related("authors", "categories", "process_materials__material")
         )
 
 
@@ -379,6 +379,7 @@ class ProcessDetailView(UserCreatedObjectDetailView):
             .select_related("owner", "parent")
             .prefetch_related(
                 "categories",
+                "authors",
                 "variants",
                 Prefetch(
                     "process_materials",

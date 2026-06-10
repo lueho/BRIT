@@ -14,9 +14,16 @@
                 </div>
             {% endif %}
         {% endif %}
-        {% if object.author or object.author_institution or object.contact_email %}
+        {% if object.authors.exists or object.author_institution or object.contact_email %}
             <div class="text-muted mb-3">
-                {% if object.author %}<div>{{ object.author }}</div>{% endif %}
+                {% if object.authors.exists %}
+                    <div>
+                        {% for author in object.authors.all %}
+                            {{ author }}
+                            {% if not forloop.last %},{% endif %}
+                        {% endfor %}
+                    </div>
+                {% endif %}
                 {% if object.author_institution %}<div>{{ object.author_institution }}</div>{% endif %}
                 {% if object.contact_email %}
                     <div>
@@ -92,7 +99,9 @@
                                     <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
                                 </strong>
                                 {% if pm.quantity_value %}
-                                    <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
+                                    <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}
+                                        {% if pm.quantity_unit %}{{ pm.quantity_unit.name }}{% endif %}
+                                    </span>
                                 {% endif %}
                                 {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes }}</p>{% endif %}
                             </li>
@@ -110,7 +119,9 @@
                                     <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
                                 </strong>
                                 {% if pm.quantity_value %}
-                                    <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
+                                    <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}
+                                        {% if pm.quantity_unit %}{{ pm.quantity_unit.name }}{% endif %}
+                                    </span>
                                 {% endif %}
                                 {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes }}</p>{% endif %}
                             </li>

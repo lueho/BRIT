@@ -5,6 +5,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from bibliography.models import Author
 from materials.models import Material
 from utils.properties.models import Unit
 
@@ -119,6 +120,8 @@ class ProcessListSerializerTestCase(TestCase):
         self.category = ProcessCategory.objects.create(
             name="Thermochemical", owner=self.owner
         )
+        self.author_1 = Author.objects.create(first_names="Ada", last_names="Lovelace")
+        self.author_2 = Author.objects.create(first_names="Grace", last_names="Hopper")
 
         self.process = Process.objects.create(
             name="Pyrolysis",
@@ -128,6 +131,7 @@ class ProcessListSerializerTestCase(TestCase):
             publication_status="published",
         )
         self.process.categories.add(self.category)
+        self.process.authors.add(self.author_1, self.author_2)
 
     def test_serialize_process_list(self):
         """List serializer should include basic process info."""
@@ -139,6 +143,7 @@ class ProcessListSerializerTestCase(TestCase):
         self.assertEqual(data["mechanism"], "Thermal Decomposition")
         self.assertEqual(data["owner_name"], "test_user")
         self.assertEqual(len(data["categories"]), 1)
+        self.assertEqual(data["authors"], [self.author_1.pk, self.author_2.pk])
 
 
 class ProcessDetailSerializerTestCase(TestCase):
@@ -149,6 +154,8 @@ class ProcessDetailSerializerTestCase(TestCase):
         self.category = ProcessCategory.objects.create(
             name="Thermochemical", owner=self.owner
         )
+        self.author_1 = Author.objects.create(first_names="Ada", last_names="Lovelace")
+        self.author_2 = Author.objects.create(first_names="Grace", last_names="Hopper")
 
         self.process = Process.objects.create(
             name="Pyrolysis",
@@ -159,6 +166,7 @@ class ProcessDetailSerializerTestCase(TestCase):
             publication_status="published",
         )
         self.process.categories.add(self.category)
+        self.process.authors.add(self.author_1, self.author_2)
 
         # Add materials
         self.material_in = Material.objects.create(name="Wood Chips", owner=self.owner)
@@ -182,6 +190,7 @@ class ProcessDetailSerializerTestCase(TestCase):
 
         self.assertEqual(data["name"], "Pyrolysis")
         self.assertEqual(data["description"], "Detailed description")
+        self.assertEqual(data["authors"], [self.author_1.pk, self.author_2.pk])
         self.assertEqual(len(data["input_materials"]), 1)
         self.assertEqual(len(data["output_materials"]), 1)
         self.assertEqual(data["input_materials"][0]["name"], "Wood Chips")

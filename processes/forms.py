@@ -88,14 +88,14 @@ class ProcessModelForm(SimpleModelForm):
         config=TomSelectConfig(url="processes:processcategory-autocomplete"),
         label="Categories",
     )
-    author = TomSelectModelChoiceField(
+    authors = TomSelectModelMultipleChoiceField(
         queryset=Author.objects.all(),
         required=False,
         config=TomSelectConfig(
             url="author-autocomplete",
             label_field="label",
         ),
-        label="Author",
+        label="Authors",
     )
 
     class Meta:
@@ -104,7 +104,7 @@ class ProcessModelForm(SimpleModelForm):
             "name",
             "parent",
             "categories",
-            "author",
+            "authors",
             "author_institution",
             "contact_email",
             "short_description",
@@ -127,7 +127,7 @@ class ProcessModelForm(SimpleModelForm):
         super().__init__(*args, **kwargs)
         # Override TomSelect field validation to use queryset instead of URL endpoint
         # This fixes form validation in tests while maintaining autocomplete in production
-        for field_name in ["parent", "categories", "author"]:
+        for field_name in ["parent", "categories", "authors"]:
             field = self.fields[field_name]
 
             # Override validation methods to use queryset
@@ -151,7 +151,7 @@ class ProcessModelForm(SimpleModelForm):
             "name",
             "parent",
             "categories",
-            "author",
+            "authors",
             "author_institution",
             "contact_email",
             "short_description",
