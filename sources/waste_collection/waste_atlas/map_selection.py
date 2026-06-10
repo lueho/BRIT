@@ -1,652 +1,76 @@
-WASTE_ATLAS_MAP_SELECTIONS = {
-    "BE": {
-        "label": "Belgium",
-        "themes": {
-            "orga_level": {
-                "label": "Administrative level",
-                "route_name": "waste-atlas-orga-level-belgium-map",
-            }
-        },
-    },
-    "BE-FL-BR": {
-        "label": "Flanders + Brussels",
-        "themes": {
-            "orga_level": {
-                "label": "Administrative level",
-                "route_name": "waste-atlas-orga-level-belgium-flanders-map",
-            }
-        },
-    },
-    "DE": {
-        "label": "Germany",
-        "themes": {
-            "biowaste_collection_amount": {
-                "label": "Biowaste amount",
-                "route_name": "waste-atlas-germany-biowaste-collection-amount-map",
-            },
-            "biowaste_collection_count": {
-                "label": "Biowaste collection count",
-                "route_name": "waste-atlas-germany-biowaste-collection-count-map",
-            },
-            "biowaste_fee_system": {
-                "label": "Biowaste fees",
-                "route_name": "waste-atlas-germany-biowaste-fee-system-map",
-            },
-            "biowaste_frequency": {
-                "label": "Biowaste schedule",
-                "route_name": "waste-atlas-germany-biowaste-frequency-map",
-            },
-            "biowaste_min_bin_size": {
-                "label": "Biowaste bin size",
-                "route_name": "waste-atlas-germany-biowaste-min-bin-size-map",
-            },
-            "biowaste_required_bin_capacity": {
-                "label": "Biowaste bin capacity",
-                "route_name": "waste-atlas-germany-biowaste-required-bin-capacity-map",
-            },
-            "collection_count_ratio": {
-                "label": "Collection-count ratio",
-                "route_name": "waste-atlas-germany-collection-count-ratio-map",
-            },
-            "collection_point_count": {
-                "label": "Collection points",
-                "route_name": "waste-atlas-germany-collection-point-count-map",
-            },
-            "collection_support": {
-                "label": "Collection aids",
-                "route_name": "waste-atlas-germany-collection-support-map",
-            },
-            "collection_system": {
-                "label": "Biowaste collection systems",
-                "route_name": "waste-atlas-germany-collection-system-map",
-                "change_route_name": "waste-atlas-germany-collection-system-change-map",
-            },
-            "combined_collection_count": {
-                "label": "Combined collection count",
-                "route_name": "waste-atlas-germany-combined-collection-count-map",
-            },
-            "combined_fee_system": {
-                "label": "Combined fees",
-                "route_name": "waste-atlas-germany-combined-fee-system-map",
-            },
-            "combined_frequency": {
-                "label": "Combined schedule",
-                "route_name": "waste-atlas-germany-combined-frequency-map",
-            },
-            "connection_rate": {
-                "label": "Connection rate",
-                "route_name": "waste-atlas-germany-connection-rate-map",
-            },
-            "food_waste_category": {
-                "label": "Accepted food waste",
-                "route_name": "waste-atlas-germany-food-waste-category-map",
-            },
-            "green_waste_collection_amount": {
-                "label": "Green waste amount",
-                "route_name": "waste-atlas-germany-green-waste-collection-amount-map",
-            },
-            "green_waste_collection_system_count": {
-                "label": "Green waste system count",
-                "route_name": "waste-atlas-germany-green-waste-collection-system-count-map",
-            },
-            "orga_level": {
-                "label": "Administrative level",
-                "route_name": "waste-atlas-germany-orga-level-map",
-            },
-            "organic_collection_amount": {
-                "label": "Organic-fraction amount",
-                "route_name": "waste-atlas-germany-organic-collection-amount-map",
-            },
-            "organic_waste_ratio": {
-                "label": "Organic-fraction share",
-                "route_name": "waste-atlas-germany-organic-waste-ratio-map",
-            },
-            "paper_bags": {
-                "label": "Paper products",
-                "route_name": "waste-atlas-germany-paper-bags-map",
-            },
-            "plastic_bags": {
-                "label": "Plastic bags",
-                "route_name": "waste-atlas-germany-plastic-bags-map",
-            },
-            "population_density": {
-                "label": "Population density",
-                "route_name": "waste-atlas-germany-population-density-map",
-            },
-            "residual_collection_amount": {
-                "label": "Residual waste amount",
-                "route_name": "waste-atlas-germany-residual-collection-amount-map",
-            },
-            "residual_collection_count": {
-                "label": "Residual waste collection count",
-                "route_name": "waste-atlas-germany-residual-collection-count-map",
-            },
-            "residual_fee_system": {
-                "label": "Residual waste fees",
-                "route_name": "waste-atlas-germany-residual-fee-system-map",
-            },
-            "residual_frequency": {
-                "label": "Residual waste schedule",
-                "route_name": "waste-atlas-germany-residual-frequency-map",
-            },
-            "residual_min_bin_size": {
-                "label": "Residual waste bin size",
-                "route_name": "waste-atlas-germany-residual-min-bin-size-map",
-            },
-            "residual_required_bin_capacity": {
-                "label": "Residual waste bin capacity",
-                "route_name": "waste-atlas-germany-residual-required-bin-capacity-map",
-            },
-            "waste_ratio": {
-                "label": "Amount ratio",
-                "route_name": "waste-atlas-germany-waste-ratio-map",
-            },
-        },
-    },
-    "DE-BW-RP": {
-        "label": "Baden-Württemberg & Rheinland-Pfalz",
-        "themes": {
-            "biowaste_collection_amount": {
-                "label": "Biowaste amount",
-                "route_name": "waste-atlas-bw-rp-biowaste-collection-amount-map",
-            },
-            "biowaste_collection_count": {
-                "label": "Biowaste collection count",
-                "route_name": "waste-atlas-bw-rp-biowaste-collection-count-map",
-            },
-            "biowaste_fee_system": {
-                "label": "Biowaste fees",
-                "route_name": "waste-atlas-bw-rp-biowaste-fee-system-map",
-            },
-            "biowaste_frequency": {
-                "label": "Biowaste schedule",
-                "route_name": "waste-atlas-bw-rp-biowaste-frequency-map",
-            },
-            "biowaste_min_bin_size": {
-                "label": "Biowaste bin size",
-                "route_name": "waste-atlas-bw-rp-biowaste-min-bin-size-map",
-            },
-            "biowaste_required_bin_capacity": {
-                "label": "Biowaste bin capacity",
-                "route_name": "waste-atlas-bw-rp-biowaste-required-bin-capacity-map",
-            },
-            "collection_count_ratio": {
-                "label": "Collection-count ratio",
-                "route_name": "waste-atlas-bw-rp-collection-count-ratio-map",
-            },
-            "collection_support": {
-                "label": "Collection aids",
-                "route_name": "waste-atlas-bw-rp-collection-support-map",
-            },
-            "collection_system": {
-                "label": "Biowaste collection systems",
-                "route_name": "waste-atlas-bw-rp-collection-system-map",
-            },
-            "combined_collection_count": {
-                "label": "Combined collection count",
-                "route_name": "waste-atlas-bw-rp-combined-collection-count-map",
-            },
-            "combined_fee_system": {
-                "label": "Combined fees",
-                "route_name": "waste-atlas-bw-rp-combined-fee-system-map",
-            },
-            "combined_frequency": {
-                "label": "Combined schedule",
-                "route_name": "waste-atlas-bw-rp-combined-frequency-map",
-            },
-            "connection_rate": {
-                "label": "Connection rate",
-                "route_name": "waste-atlas-bw-rp-connection-rate-map",
-            },
-            "food_waste_category": {
-                "label": "Accepted food waste",
-                "route_name": "waste-atlas-bw-rp-food-waste-category-map",
-            },
-            "green_waste_collection_amount": {
-                "label": "Green waste amount",
-                "route_name": "waste-atlas-bw-rp-green-waste-collection-amount-map",
-            },
-            "green_waste_collection_system_count": {
-                "label": "Green waste system count",
-                "route_name": "waste-atlas-bw-rp-green-waste-collection-system-count-map",
-            },
-            "orga_level": {
-                "label": "Administrative level",
-                "route_name": "waste-atlas-bw-rp-orga-level-map",
-            },
-            "organic_collection_amount": {
-                "label": "Organic-fraction amount",
-                "route_name": "waste-atlas-bw-rp-organic-collection-amount-map",
-            },
-            "organic_waste_ratio": {
-                "label": "Organic-fraction share",
-                "route_name": "waste-atlas-bw-rp-organic-waste-ratio-map",
-            },
-            "paper_bags": {
-                "label": "Paper products",
-                "route_name": "waste-atlas-bw-rp-paper-bags-map",
-            },
-            "plastic_bags": {
-                "label": "Plastic bags",
-                "route_name": "waste-atlas-bw-rp-plastic-bags-map",
-            },
-            "population_density": {
-                "label": "Population density",
-                "route_name": "waste-atlas-bw-rp-population-density-map",
-            },
-            "residual_collection_amount": {
-                "label": "Residual waste amount",
-                "route_name": "waste-atlas-bw-rp-residual-collection-amount-map",
-            },
-            "residual_collection_count": {
-                "label": "Residual waste collection count",
-                "route_name": "waste-atlas-bw-rp-residual-collection-count-map",
-            },
-            "residual_fee_system": {
-                "label": "Residual waste fees",
-                "route_name": "waste-atlas-bw-rp-residual-fee-system-map",
-            },
-            "residual_frequency": {
-                "label": "Residual waste schedule",
-                "route_name": "waste-atlas-bw-rp-residual-frequency-map",
-            },
-            "residual_min_bin_size": {
-                "label": "Residual waste bin size",
-                "route_name": "waste-atlas-bw-rp-residual-min-bin-size-map",
-            },
-            "residual_required_bin_capacity": {
-                "label": "Residual waste bin capacity",
-                "route_name": "waste-atlas-bw-rp-residual-required-bin-capacity-map",
-            },
-            "waste_ratio": {
-                "label": "Amount ratio",
-                "route_name": "waste-atlas-bw-rp-waste-ratio-map",
-            },
-        },
-    },
-    "DK": {
-        "label": "Denmark",
-        "themes": {
-            "collection_support": {
-                "label": "Collection aids",
-                "route_name": "waste-atlas-denmark-collection-support-map",
-            },
-            "food_waste_category": {
-                "label": "Accepted food waste",
-                "route_name": "waste-atlas-denmark-food-waste-category-map",
-            },
-            "orga_level": {
-                "label": "Administrative level",
-                "route_name": "waste-atlas-orga-level-denmark-map",
-            },
-            "paper_bags": {
-                "label": "Paper products",
-                "route_name": "waste-atlas-denmark-paper-bags-map",
-            },
-            "plastic_bags": {
-                "label": "Plastic bags",
-                "route_name": "waste-atlas-denmark-plastic-bags-map",
-            },
-        },
-    },
-    "ES-CT": {
-        "label": "Catalonia",
-        "themes": {
-            "access_control": {
-                "label": "Access control",
-                "route_name": "waste-atlas-catalonia-access-control-map",
-            },
-            "biowaste_collection_amount": {
-                "label": "Biowaste amount",
-                "route_name": "waste-atlas-catalonia-biowaste-collection-amount-map",
-            },
-            "biowaste_collection_count": {
-                "label": "Biowaste collection count",
-                "route_name": "waste-atlas-catalonia-biowaste-collection-count-map",
-            },
-            "biowaste_collection_system": {
-                "label": "Biowaste collection system",
-                "route_name": "waste-atlas-catalonia-biowaste-collection-system-map",
-            },
-            "biowaste_fee_system": {
-                "label": "Biowaste fees",
-                "route_name": "waste-atlas-catalonia-biowaste-fee-system-map",
-            },
-            "biowaste_frequency": {
-                "label": "Biowaste schedule",
-                "route_name": "waste-atlas-catalonia-biowaste-frequency-map",
-            },
-            "biowaste_impurity": {
-                "label": "Biowaste impurity",
-                "route_name": "waste-atlas-catalonia-biowaste-impurity-map",
-            },
-            "biowaste_min_bin_size": {
-                "label": "Biowaste bin size",
-                "route_name": "waste-atlas-catalonia-biowaste-min-bin-size-map",
-            },
-            "biowaste_required_bin_capacity": {
-                "label": "Biowaste bin capacity",
-                "route_name": "waste-atlas-catalonia-biowaste-required-bin-capacity-map",
-            },
-            "collection_count_ratio": {
-                "label": "Collection-count ratio",
-                "route_name": "waste-atlas-catalonia-collection-count-ratio-map",
-            },
-            "collection_point_count": {
-                "label": "Collection points",
-                "route_name": "waste-atlas-catalonia-collection-point-count-map",
-            },
-            "collection_support": {
-                "label": "Collection aids",
-                "route_name": "waste-atlas-catalonia-collection-support-map",
-            },
-            "collection_system": {
-                "label": "Biowaste collection systems",
-                "route_name": "waste-atlas-catalonia-collection-system-map",
-            },
-            "combined_collection_count": {
-                "label": "Combined collection count",
-                "route_name": "waste-atlas-catalonia-combined-collection-count-map",
-            },
-            "combined_collection_system": {
-                "label": "Combined collection system",
-                "route_name": "waste-atlas-catalonia-combined-collection-system-map",
-            },
-            "combined_fee_system": {
-                "label": "Combined fees",
-                "route_name": "waste-atlas-catalonia-combined-fee-system-map",
-            },
-            "combined_frequency": {
-                "label": "Combined schedule",
-                "route_name": "waste-atlas-catalonia-combined-frequency-map",
-            },
-            "connection_rate": {
-                "label": "Connection rate",
-                "route_name": "waste-atlas-catalonia-connection-rate-map",
-            },
-            "food_waste_category": {
-                "label": "Accepted food waste",
-                "route_name": "waste-atlas-catalonia-food-waste-category-map",
-            },
-            "green_waste_collection_amount": {
-                "label": "Green waste amount",
-                "route_name": "waste-atlas-catalonia-green-waste-collection-amount-map",
-            },
-            "green_waste_collection_system_count": {
-                "label": "Green waste system count",
-                "route_name": "waste-atlas-catalonia-green-waste-collection-system-count-map",
-            },
-            "orga_level": {
-                "label": "Administrative level",
-                "route_name": "waste-atlas-catalonia-orga-level-map",
-            },
-            "organic_collection_amount": {
-                "label": "Organic-fraction amount",
-                "route_name": "waste-atlas-catalonia-organic-collection-amount-map",
-            },
-            "organic_waste_ratio": {
-                "label": "Organic-fraction share",
-                "route_name": "waste-atlas-catalonia-organic-waste-ratio-map",
-            },
-            "paper_bags": {
-                "label": "Paper products",
-                "route_name": "waste-atlas-catalonia-paper-bags-map",
-            },
-            "plastic_bags": {
-                "label": "Plastic bags",
-                "route_name": "waste-atlas-catalonia-plastic-bags-map",
-            },
-            "population_density": {
-                "label": "Population density",
-                "route_name": "waste-atlas-catalonia-population-density-map",
-            },
-            "residual_collection_amount": {
-                "label": "Residual waste amount",
-                "route_name": "waste-atlas-catalonia-residual-collection-amount-map",
-            },
-            "residual_collection_count": {
-                "label": "Residual waste collection count",
-                "route_name": "waste-atlas-catalonia-residual-collection-count-map",
-            },
-            "residual_collection_system": {
-                "label": "Residual waste collection system",
-                "route_name": "waste-atlas-catalonia-residual-collection-system-map",
-            },
-            "residual_fee_system": {
-                "label": "Residual waste fees",
-                "route_name": "waste-atlas-catalonia-residual-fee-system-map",
-            },
-            "residual_frequency": {
-                "label": "Residual waste schedule",
-                "route_name": "waste-atlas-catalonia-residual-frequency-map",
-            },
-            "residual_min_bin_size": {
-                "label": "Residual waste bin size",
-                "route_name": "waste-atlas-catalonia-residual-min-bin-size-map",
-            },
-            "residual_required_bin_capacity": {
-                "label": "Residual waste bin capacity",
-                "route_name": "waste-atlas-catalonia-residual-required-bin-capacity-map",
-            },
-            "system_access_control": {
-                "label": "System + access/use control",
-                "route_name": "waste-atlas-catalonia-system-access-control-map",
-            },
-            "waste_ratio": {
-                "label": "Amount ratio",
-                "route_name": "waste-atlas-catalonia-waste-ratio-map",
-            },
-        },
-    },
-    "IT": {
-        "label": "Italy",
-        "themes": {
-            "biowaste_collection_amount": {
-                "label": "Biowaste amount",
-                "route_name": "waste-atlas-italy-biowaste-collection-amount-map",
-            },
-            "biowaste_collection_count": {
-                "label": "Biowaste collection count",
-                "route_name": "waste-atlas-italy-biowaste-collection-count-map",
-            },
-            "biowaste_frequency": {
-                "label": "Biowaste schedule",
-                "route_name": "waste-atlas-italy-biowaste-frequency-map",
-            },
-            "collection_point_count": {
-                "label": "Collection points",
-                "route_name": "waste-atlas-italy-collection-point-count-map",
-            },
-            "collection_system": {
-                "label": "Biowaste collection systems",
-                "route_name": "waste-atlas-italy-collection-system-map",
-            },
-            "green_waste_collection_amount": {
-                "label": "Green waste amount",
-                "route_name": "waste-atlas-italy-green-waste-collection-amount-map",
-            },
-            "green_waste_collection_system_count": {
-                "label": "Green waste system count",
-                "route_name": "waste-atlas-italy-green-waste-collection-system-count-map",
-            },
-            "orga_level": {
-                "label": "Administrative level",
-                "route_name": "waste-atlas-orga-level-italy-map",
-            },
-            "organic_collection_amount": {
-                "label": "Organic-fraction amount",
-                "route_name": "waste-atlas-italy-organic-collection-amount-map",
-            },
-            "organic_waste_ratio": {
-                "label": "Organic-fraction share",
-                "route_name": "waste-atlas-italy-organic-waste-ratio-map",
-            },
-            "residual_collection_amount": {
-                "label": "Residual waste amount",
-                "route_name": "waste-atlas-italy-residual-collection-amount-map",
-            },
-            "residual_collection_count": {
-                "label": "Residual waste collection count",
-                "route_name": "waste-atlas-italy-residual-collection-count-map",
-            },
-            "residual_frequency": {
-                "label": "Residual waste schedule",
-                "route_name": "waste-atlas-italy-residual-frequency-map",
-            },
-        },
-    },
-    "IT-ST": {
-        "label": "South Tyrol",
-        "themes": {
-            "biowaste_collection_amount": {
-                "label": "Biowaste amount",
-                "route_name": "waste-atlas-south-tyrol-biowaste-collection-amount-map",
-            },
-            "biowaste_collection_count": {
-                "label": "Biowaste collection count",
-                "route_name": "waste-atlas-south-tyrol-biowaste-collection-count-map",
-            },
-            "biowaste_collection_point_count": {
-                "label": "Biowaste collection points",
-                "route_name": "waste-atlas-south-tyrol-biowaste-collection-point-count-map",
-            },
-            "biowaste_fee_system": {
-                "label": "Biowaste fees",
-                "route_name": "waste-atlas-south-tyrol-biowaste-fee-system-map",
-            },
-            "biowaste_frequency": {
-                "label": "Biowaste schedule",
-                "route_name": "waste-atlas-south-tyrol-biowaste-frequency-map",
-            },
-            "biowaste_min_bin_size": {
-                "label": "Biowaste bin size",
-                "route_name": "waste-atlas-south-tyrol-biowaste-min-bin-size-map",
-            },
-            "collection_count_ratio": {
-                "label": "Collection-count ratio",
-                "route_name": "waste-atlas-south-tyrol-collection-count-ratio-map",
-            },
-            "collection_point_count": {
-                "label": "Collection points",
-                "route_name": "waste-atlas-south-tyrol-collection-point-count-map",
-            },
-            "collection_point_count_ratio": {
-                "label": "Collection-point ratio",
-                "route_name": "waste-atlas-south-tyrol-collection-point-count-ratio-map",
-            },
-            "collection_system": {
-                "label": "Biowaste collection systems",
-                "route_name": "waste-atlas-south-tyrol-collection-system-map",
-            },
-            "combined_collection_count": {
-                "label": "Combined collection count",
-                "route_name": "waste-atlas-south-tyrol-combined-collection-count-map",
-            },
-            "combined_fee_system": {
-                "label": "Combined fees",
-                "route_name": "waste-atlas-south-tyrol-combined-fee-system-map",
-            },
-            "combined_frequency": {
-                "label": "Combined schedule",
-                "route_name": "waste-atlas-south-tyrol-combined-frequency-map",
-            },
-            "green_waste_collection_amount": {
-                "label": "Green waste amount",
-                "route_name": "waste-atlas-south-tyrol-green-waste-collection-amount-map",
-            },
-            "green_waste_collection_system_count": {
-                "label": "Green waste system count",
-                "route_name": "waste-atlas-south-tyrol-green-waste-collection-system-count-map",
-            },
-            "min_bin_size_ratio": {
-                "label": "Minimum bin-size ratio",
-                "route_name": "waste-atlas-south-tyrol-min-bin-size-ratio-map",
-            },
-            "orga_level": {
-                "label": "Administrative level",
-                "route_name": "waste-atlas-south-tyrol-orga-level-map",
-            },
-            "organic_collection_amount": {
-                "label": "Organic-fraction amount",
-                "route_name": "waste-atlas-south-tyrol-organic-collection-amount-map",
-            },
-            "organic_waste_ratio": {
-                "label": "Organic-fraction share",
-                "route_name": "waste-atlas-south-tyrol-organic-waste-ratio-map",
-            },
-            "residual_collection_amount": {
-                "label": "Residual waste amount",
-                "route_name": "waste-atlas-south-tyrol-residual-collection-amount-map",
-            },
-            "residual_collection_count": {
-                "label": "Residual waste collection count",
-                "route_name": "waste-atlas-south-tyrol-residual-collection-count-map",
-            },
-            "residual_collection_point_count": {
-                "label": "Residual waste collection points",
-                "route_name": "waste-atlas-south-tyrol-residual-collection-point-count-map",
-            },
-            "residual_fee_system": {
-                "label": "Residual waste fees",
-                "route_name": "waste-atlas-south-tyrol-residual-fee-system-map",
-            },
-            "residual_frequency": {
-                "label": "Residual waste schedule",
-                "route_name": "waste-atlas-south-tyrol-residual-frequency-map",
-            },
-            "residual_min_bin_size": {
-                "label": "Residual waste bin size",
-                "route_name": "waste-atlas-south-tyrol-residual-min-bin-size-map",
-            },
-        },
-    },
-    "NL": {
-        "label": "The Netherlands",
-        "themes": {
-            "biowaste_collection_amount": {
-                "label": "Biowaste amount",
-                "route_name": "waste-atlas-biowaste-collection-amount-netherlands-map",
-            },
-            "biowaste_frequency": {
-                "label": "Biowaste schedule",
-                "route_name": "waste-atlas-biowaste-frequency-netherlands-map",
-            },
-            "collection_system": {
-                "label": "Biowaste collection systems",
-                "route_name": "waste-atlas-collection-system-netherlands-map",
-            },
-            "orga_level": {
-                "label": "Administrative level",
-                "route_name": "waste-atlas-orga-level-netherlands-map",
-            },
-            "organic_collection_amount": {
-                "label": "Organic-fraction amount",
-                "route_name": "waste-atlas-organic-collection-amount-netherlands-map",
-            },
-            "organic_waste_ratio": {
-                "label": "Organic-fraction share",
-                "route_name": "waste-atlas-organic-waste-ratio-netherlands-map",
-            },
-        },
-    },
-    "SE": {
-        "label": "Sweden",
-        "themes": {
-            "bin_configuration": {
-                "label": "Bin configuration",
-                "route_name": "waste-atlas-bin-configuration-sweden-map",
-            },
-            "orga_level": {
-                "label": "Administrative level",
-                "route_name": "waste-atlas-orga-level-sweden-map",
-            },
-            "population_density": {
-                "label": "Population density",
-                "route_name": "waste-atlas-sweden-population-density-map",
-            },
-        },
-    },
+"""Region/theme selection registry for the Waste Atlas map selector.
+
+``WASTE_ATLAS_MAP_SELECTIONS`` is derived from the page registry in
+``pages.py`` so that every routed map page automatically appears in the
+selector with a consistent label.
+"""
+
+from .pages import MAP_PAGES, MAP_SET_LABELS
+
+# Short selector label per theme key.
+THEME_LABELS = {
+    "access_control": "Access control",
+    "bin_configuration": "Bin configuration",
+    "biowaste_collection_amount": "Biowaste amount",
+    "biowaste_collection_count": "Biowaste collection count",
+    "biowaste_collection_point_count": "Biowaste collection points",
+    "biowaste_collection_system": "Biowaste collection system",
+    "biowaste_fee_system": "Biowaste fees",
+    "biowaste_frequency": "Biowaste schedule",
+    "biowaste_impurity": "Biowaste impurity",
+    "biowaste_min_bin_size": "Biowaste bin size",
+    "biowaste_required_bin_capacity": "Biowaste bin capacity",
+    "collection_count_ratio": "Collection-count ratio",
+    "collection_point_count": "Collection points",
+    "collection_point_count_ratio": "Collection-point ratio",
+    "collection_support": "Collection aids",
+    "collection_system": "Biowaste collection systems",
+    "combined_collection_count": "Combined collection count",
+    "combined_collection_system": "Combined collection system",
+    "combined_fee_system": "Combined fees",
+    "combined_frequency": "Combined schedule",
+    "connection_rate": "Connection rate",
+    "food_waste_category": "Accepted food waste",
+    "green_waste_collection_amount": "Green waste amount",
+    "green_waste_collection_system_count": "Green waste system count",
+    "min_bin_size_ratio": "Minimum bin-size ratio",
+    "orga_level": "Administrative level",
+    "organic_collection_amount": "Organic-fraction amount",
+    "organic_waste_ratio": "Organic-fraction share",
+    "paper_bags": "Paper products",
+    "plastic_bags": "Plastic bags",
+    "population_density": "Population density",
+    "residual_collection_amount": "Residual waste amount",
+    "residual_collection_count": "Residual waste collection count",
+    "residual_collection_point_count": "Residual waste collection points",
+    "residual_collection_system": "Residual waste collection system",
+    "residual_fee_system": "Residual waste fees",
+    "residual_frequency": "Residual waste schedule",
+    "residual_min_bin_size": "Residual waste bin size",
+    "residual_required_bin_capacity": "Residual waste bin capacity",
+    "system_access_control": "System + access/use control",
+    "waste_ratio": "Amount ratio",
+    "weekly_bp_access_days": "Bring-point access days",
 }
+
+
+def _build_selections():
+    """Build the map-set/theme selection registry from ``MAP_PAGES``."""
+    selections = {}
+    for page in MAP_PAGES:
+        map_set = page["selector_set"]
+        if not map_set:
+            continue
+        themes = selections.setdefault(
+            map_set, {"label": MAP_SET_LABELS[map_set], "themes": {}}
+        )["themes"]
+        entry = themes.setdefault(page["theme"], {"label": THEME_LABELS[page["theme"]]})
+        route_key = "change_route_name" if page.get("change") else "route_name"
+        entry[route_key] = page["name"]
+    return dict(sorted(selections.items()))
+
+
+WASTE_ATLAS_MAP_SELECTIONS = _build_selections()
 
 MAP_SELECTION_YEARS = ("2020", "2021", "2022", "2023", "2024")
 

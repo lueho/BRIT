@@ -11,8 +11,8 @@ real-world process data:
   time, yield and custom metrics – each with explicit units
 * material flows expose richer annotations such as stage/stream labels and
   optional quantity data
-* literature references are normalised through :class:`ProcessReference`
-  entries to avoid duplicated Source relations, while call-to-action links and
+* literature references link directly to bibliography :class:`Source` records,
+  while call-to-action links and
   supporting resources provide validated URLs or uploads.
 
 The models continue to lean on the object management helpers that are shared
@@ -139,6 +139,12 @@ class Process(NamedUserCreatedObject):
         related_name="processes",
         blank=True,
     )
+    sources = models.ManyToManyField(
+        Source,
+        blank=True,
+        related_name="processes",
+        help_text="Bibliography sources used by this process.",
+    )
     image = models.ImageField(
         upload_to="processes/process_images/",
         blank=True,
@@ -175,12 +181,6 @@ class Process(NamedUserCreatedObject):
             ("can_moderate_process", "Can moderate processes"),
         ]
         verbose_name_plural = "Processes"
-
-    @property
-    def sources(self):
-        """Return distinct literature sources referenced by this process."""
-
-        return Source.objects.filter(process_references__process=self).distinct()
 
     def _material_links_for_role(self, role: ProcessMaterial.Role):
         """Return prefetched material links for ``role`` if available."""
@@ -521,55 +521,4 @@ class ProcessInfoResource(models.Model):
         return self.url
 
     def __str__(self):
-        return self.title
-
-
-class ProcessReference(models.Model):
-    """Stores literature references for a process."""
-
-    process = models.ForeignKey(
-        Process,
-        on_delete=models.CASCADE,
-        related_name="references",
-    )
-    source = models.ForeignKey(
-        Source,
-        on_delete=models.PROTECT,
-        blank=True,
-        null=True,
-        related_name="process_references",
-    )
-    title = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text="Custom title for references that are not stored as sources.",
-    )
-    url = models.URLField(
-        blank=True,
-        help_text="Optional URL for the custom reference.",
-    )
-    reference_type = models.CharField(
-        max_length=50,
-        blank=True,
-        help_text="Type/category of the reference (e.g. website, article).",
-    )
-    order = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        ordering = ["order", "id"]
-
-    def clean(self):
-        super().clean()
-        if not self.source and not self.title:
-            raise ValidationError(
-                {
-                    "title": _(
-                        "Provide either a bibliographic reference or a custom reference title."
-                    )
-                }
-            )
-
-    def __str__(self):
-        if self.source:
-            return str(self.source)
         return self.title

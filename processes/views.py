@@ -44,14 +44,12 @@ from .forms import (
     ProcessModalModelForm,
     ProcessModelForm,
     ProcessOperatingParameterInline,
-    ProcessReferenceInline,
 )
 from .models import (
     Process,
     ProcessCategory,
     ProcessMaterial,
     ProcessOperatingParameter,
-    ProcessReference,
 )
 from .querysets import with_process_count, with_published_process_count
 
@@ -293,7 +291,6 @@ class ProcessCreateView(UserCreatedObjectCreateWithInlinesView):
         ProcessOperatingParameterInline,
         ProcessLinkInline,
         ProcessInfoResourceInline,
-        ProcessReferenceInline,
     ]
 
     def get_success_url(self):
@@ -393,10 +390,7 @@ class ProcessDetailView(UserCreatedObjectDetailView):
                 ),
                 "links",
                 "info_resources",
-                Prefetch(
-                    "references",
-                    queryset=ProcessReference.objects.select_related("source"),
-                ),
+                "sources",
             )
         )
 
@@ -427,13 +421,9 @@ class ProcessDetailView(UserCreatedObjectDetailView):
         context["process_links"] = list(self.object.links.all())
         context["process_info_resources"] = list(self.object.info_resources.all())
         context["process_variants"] = list(self.object.variants.all())
-        context["bibliography_references"] = sorted(
-            self.object.references.all(),
-            key=lambda ref: (
-                (ref.source.abbreviation or ref.source.title)
-                if ref.source
-                else ref.title
-            ).casefold(),
+        context["bibliography_sources"] = sorted(
+            self.object.sources.all(),
+            key=lambda source: (source.abbreviation or source.title or "").casefold(),
         )
 
         return context
@@ -456,7 +446,6 @@ class ProcessUpdateView(UserCreatedObjectUpdateWithInlinesView):
         ProcessOperatingParameterInline,
         ProcessLinkInline,
         ProcessInfoResourceInline,
-        ProcessReferenceInline,
     ]
 
     def get_success_url(self):
@@ -467,6 +456,13 @@ class ProcessModalDeleteView(UserCreatedObjectModalDeleteView):
     """Delete a Process."""
 
     model = Process
+
+    def get_success_url(self):
+        if self.object.publication_status == "published":
+            return f"{self.model.public_list_url()}?scope=published"
+        if self.object.publication_status == "review":
+            return f"{self.model.review_list_url()}?scope=review"
+        return f"{self.model.private_list_url()}?scope=private"
 
 
 class ProcessAutocompleteView(UserCreatedObjectAutocompleteView):

@@ -48,7 +48,7 @@ The main process detail view aggregates the current process data model, includin
 - Input and output materials
 - Operating parameters grouped by parameter type
 - External links and supporting resources
-- Literature references and derived `sources`
+- Bibliography `sources`
 
 ### Review and moderation workflow
 
@@ -72,16 +72,15 @@ This follows the shared four-eyes review pattern used across BRIT.
 - `ProcessOperatingParameter`
 - `ProcessLink`
 - `ProcessInfoResource`
-- `ProcessReference`
 
 ### Important model behavior
 
 - `Process` supports parent/child variant relationships
 - `Process` groups materials through the `ProcessMaterial` through-model
-- `Process` exposes convenience accessors such as `input_materials`, `output_materials`, and `sources`
+- `Process` exposes convenience accessors such as `input_materials` and `output_materials`
 - `ProcessOperatingParameter` stores typed parameters with optional nominal and range values
 - `ProcessLink` and `ProcessInfoResource` validate internal and external URLs
-- `ProcessReference` normalizes bibliography links without requiring duplicate direct source relations on `Process`
+- `Process` links directly to existing bibliography `Source` records
 
 ## Forms and autocomplete
 

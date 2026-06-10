@@ -28,7 +28,6 @@ from .models import (
     ProcessLink,
     ProcessMaterial,
     ProcessOperatingParameter,
-    ProcessReference,
 )
 
 
@@ -97,6 +96,15 @@ class ProcessModelForm(SimpleModelForm):
         ),
         label="Authors",
     )
+    sources = TomSelectModelMultipleChoiceField(
+        queryset=Source.objects.filter(publication_status="published"),
+        required=False,
+        config=TomSelectConfig(
+            url="source-autocomplete",
+            label_field="label",
+        ),
+        label="Bibliography sources",
+    )
 
     class Meta:
         model = Process
@@ -105,6 +113,7 @@ class ProcessModelForm(SimpleModelForm):
             "parent",
             "categories",
             "authors",
+            "sources",
             "short_description",
             "mechanism",
             "description",
@@ -125,7 +134,7 @@ class ProcessModelForm(SimpleModelForm):
         super().__init__(*args, **kwargs)
         # Override TomSelect field validation to use queryset instead of URL endpoint
         # This fixes form validation in tests while maintaining autocomplete in production
-        for field_name in ["parent", "categories", "authors"]:
+        for field_name in ["parent", "categories", "authors", "sources"]:
             field = self.fields[field_name]
 
             # Override validation methods to use queryset
@@ -150,6 +159,7 @@ class ProcessModelForm(SimpleModelForm):
             "parent",
             "categories",
             "authors",
+            "sources",
             "short_description",
             "mechanism",
             "description",
@@ -292,29 +302,6 @@ class ProcessInfoResourceInlineForm(forms.ModelForm):
 class ProcessInfoResourceInline(InlineFormSetFactory):
     model = ProcessInfoResource
     form_class = ProcessInfoResourceInlineForm
-    factory_kwargs = {"extra": 1, "can_delete": True}
-    formset_helper_class = DynamicTableInlineFormSetHelper
-
-
-class ProcessReferenceInlineForm(forms.ModelForm):
-    source = TomSelectModelChoiceField(
-        queryset=Source.objects.filter(publication_status="published"),
-        required=False,
-        config=TomSelectConfig(
-            url="source-autocomplete",
-            label_field="label",
-        ),
-        label="Source",
-    )
-
-    class Meta:
-        model = ProcessReference
-        fields = ("source", "title", "url", "reference_type")
-
-
-class ProcessReferenceInline(InlineFormSetFactory):
-    model = ProcessReference
-    form_class = ProcessReferenceInlineForm
     factory_kwargs = {"extra": 1, "can_delete": True}
     formset_helper_class = DynamicTableInlineFormSetHelper
 
