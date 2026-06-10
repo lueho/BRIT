@@ -136,6 +136,12 @@ class DynamicFormset {
     initTomSelectWidgets(row) {
         // First clean up any existing TomSelect wrappers
         row.querySelectorAll(".ts-wrapper").forEach((w) => w.remove());
+        row.querySelectorAll("select[data-tomselect]").forEach((select) => {
+            // Cloned empty-form selects keep TomSelect's hidden classes, but not
+            // the JS instance. Reset them before asking django-tomselect to bind.
+            select.classList.remove("tomselected", "ts-hidden-accessible");
+            select.removeAttribute("tabindex");
+        });
 
         // Execute any scripts in the row to ensure configuration is set up
         this.executeScripts(row);

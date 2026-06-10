@@ -59,7 +59,7 @@
     {% comment %}Table layout with labels only in the header{% endcomment %}
     
     <table{% if form_id %} id="{{ form_id }}_table"{% endif %} class="table {% if table_class %}{{ table_class }}{% else %}table-sm mb-0{% endif %}"
-           {% if formset_helper and formset_helper.formset_type == 'tomselect' or formset_type == 'tomselect' %}
+           {% if helper.formset_type == 'tomselect' or formset_helper.formset_type == 'tomselect' or formset_type == 'tomselect' %}
                data-formset-type="tomselect"
            {% else %}
                data-formset-type="standard"
