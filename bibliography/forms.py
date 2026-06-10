@@ -20,7 +20,7 @@ from .models import Author, Licence, Source, SourceAuthor
 class AuthorModelForm(SimpleModelForm):
     class Meta:
         model = Author
-        fields = ("first_names", "last_names")
+        fields = ("first_names", "last_names", "institution", "contact_email")
 
 
 class AuthorModalModelForm(ModalModelFormMixin, AuthorModelForm):

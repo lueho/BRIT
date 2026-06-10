@@ -1,33 +1,53 @@
 <div class="modal-header">
     <h5 class="modal-title">Author Details</h5>
-    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <button type="button"
+            class="btn-close"
+            data-bs-dismiss="modal"
+            aria-label="Close"></button>
 </div>
 <div class="modal-body">
     {% if object.last_names %}
-        <p><strong>Last names:</strong><br>
+        <p>
+            <strong>Last names:</strong>
+            <br>
             {{ object.last_names }}
         </p>
     {% endif %}
     {% if object.first_names %}
-        <p><strong>First names:</strong><br>
+        <p>
+            <strong>First names:</strong>
+            <br>
             {{ object.first_names }}
         </p>
     {% endif %}
+    {% if object.institution %}
+        <p>
+            <strong>Institution:</strong>
+            <br>
+            {{ object.institution }}
+        </p>
+    {% endif %}
+    {% if object.contact_email %}
+        <p>
+            <strong>Contact email:</strong>
+            <br>
+            <a href="mailto:{{ object.contact_email }}">{{ object.contact_email }}</a>
+        </p>
+    {% endif %}
     {% if object.sources %}
-        <p><strong>Publications:</strong><br>
-        <ul>
-            {% for publication in object.sources.all %}
-                <li><a href="{{ publication.get_absolute_url }}">{{ publication.title }}</a></li>
-            {% endfor %}
-        </ul>
+        <p>
+            <strong>Publications:</strong>
+            <br>
+            <ul>
+                {% for publication in object.sources.all %}
+                    <li>
+                        <a href="{{ publication.get_absolute_url }}">{{ publication.title }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
         </p>
     {% endif %}
 </div>
-
 <div class="modal-footer">
     <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
 </div>
-
-
-
-

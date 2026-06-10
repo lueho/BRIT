@@ -38,14 +38,14 @@ class ProcessReferenceInline(admin.TabularInline):
 
 @admin.register(Process)
 class ProcessAdmin(admin.ModelAdmin):
-    list_display = ("name", "author", "owner", "parent", "publication_status")
+    list_display = ("name", "author_list", "owner", "parent", "publication_status")
     list_filter = ("categories", "publication_status")
     search_fields = (
         "name",
-        "author__first_names",
-        "author__last_names",
-        "author_institution",
-        "contact_email",
+        "authors__first_names",
+        "authors__last_names",
+        "authors__institution",
+        "authors__contact_email",
         "short_description",
         "mechanism",
     )
@@ -56,7 +56,11 @@ class ProcessAdmin(admin.ModelAdmin):
         ProcessInfoResourceInline,
         ProcessReferenceInline,
     ]
-    filter_horizontal = ("categories",)
+    filter_horizontal = ("categories", "authors")
+
+    @admin.display(description="Authors")
+    def author_list(self, obj):
+        return ", ".join(str(author) for author in obj.authors.all())
 
 
 @admin.register(ProcessCategory)

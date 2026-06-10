@@ -3,6 +3,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from bibliography.models import Author
 from materials.models import Material
 from utils.properties.models import Unit
 
@@ -56,6 +57,14 @@ class ProcessFormTestCase(TestCase):
 
     def setUp(self):
         self.category = ProcessCategory.objects.create(name="Test Category")
+        self.author_1 = Author.objects.create(
+            first_names="Ada",
+            last_names="Lovelace",
+        )
+        self.author_2 = Author.objects.create(
+            first_names="Grace",
+            last_names="Hopper",
+        )
 
     def test_valid_form(self):
         """Valid data should create a valid form."""
@@ -65,9 +74,13 @@ class ProcessFormTestCase(TestCase):
                 "short_description": "Short desc",
                 "mechanism": "Test mechanism",
                 "categories": [self.category.pk],
+                "authors": [self.author_1.pk, self.author_2.pk],
             }
         )
         self.assertTrue(form.is_valid())
+        self.assertEqual(
+            list(form.cleaned_data["authors"]), [self.author_1, self.author_2]
+        )
 
     def test_invalid_empty_name(self):
         """Empty name should be invalid."""

@@ -3,8 +3,16 @@ from django.test import TestCase
 
 from sources.waste_collection.models import WasteFlyer
 
-from ..forms import SourceAuthorFormSet, SourceModelForm
+from ..forms import AuthorModelForm, SourceAuthorFormSet, SourceModelForm
 from ..models import Source, SourceAuthor
+
+
+class AuthorModelFormTestCase(TestCase):
+    def test_form_exposes_contact_detail_fields(self):
+        form = AuthorModelForm()
+
+        self.assertIn("institution", form.fields)
+        self.assertIn("contact_email", form.fields)
 
 
 class SourceAuthorFormSetRegressionTestCase(TestCase):
