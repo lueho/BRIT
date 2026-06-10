@@ -18,6 +18,8 @@ class Author(UserCreatedObject):
     last_names = models.CharField(max_length=1023, null=True, blank=True)
     suffix = models.CharField(max_length=100, null=True, blank=True)
     preferred_citation = models.CharField(max_length=2046, null=True, blank=True)
+    institution = models.CharField(max_length=255, blank=True)
+    contact_email = models.EmailField(blank=True)
 
     class Meta:
         ordering = ["last_names", "first_names"]

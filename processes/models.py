@@ -124,15 +124,6 @@ class Process(NamedUserCreatedObject):
         related_name="processes",
         help_text="Authors or contributors shown on the process detail page.",
     )
-    author_institution = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text="Institutional affiliation for the process author.",
-    )
-    contact_email = models.EmailField(
-        blank=True,
-        help_text="Contact email address for the process author.",
-    )
     mechanism = models.CharField(
         max_length=255,
         blank=True,

@@ -14,22 +14,15 @@
                 </div>
             {% endif %}
         {% endif %}
-        {% if object.authors.exists or object.author_institution or object.contact_email %}
+        {% if object.authors.exists %}
             <div class="text-muted mb-3">
-                {% if object.authors.exists %}
+                {% for author in object.authors.all %}
                     <div>
-                        {% for author in object.authors.all %}
-                            {{ author }}
-                            {% if not forloop.last %},{% endif %}
-                        {% endfor %}
+                        {{ author }}
+                        {% if author.institution %}<span>({{ author.institution }})</span>{% endif %}
+                        {% if author.contact_email %}<a href="mailto:{{ author.contact_email }}">{{ author.contact_email }}</a>{% endif %}
                     </div>
-                {% endif %}
-                {% if object.author_institution %}<div>{{ object.author_institution }}</div>{% endif %}
-                {% if object.contact_email %}
-                    <div>
-                        <a href="mailto:{{ object.contact_email }}">{{ object.contact_email }}</a>
-                    </div>
-                {% endif %}
+                {% endfor %}
             </div>
         {% endif %}
         <p class="lead mb-3">{{ object.short_description|default:"No short description" }}</p>

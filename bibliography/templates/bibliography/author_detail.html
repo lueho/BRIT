@@ -1,5 +1,4 @@
 {% extends "detail_with_options.html" %}
-
 {% block detail_body %}
     {% if object.last_names %}
         <p class="card-text">
@@ -34,6 +33,20 @@
             <strong>Preferred citation:</strong>
             <br>
             {{ object.preferred_citation }}
+        </p>
+    {% endif %}
+    {% if object.institution %}
+        <p class="card-text">
+            <strong>Institution:</strong>
+            <br>
+            {{ object.institution }}
+        </p>
+    {% endif %}
+    {% if object.contact_email %}
+        <p class="card-text">
+            <strong>Contact email:</strong>
+            <br>
+            <a href="mailto:{{ object.contact_email }}">{{ object.contact_email }}</a>
         </p>
     {% endif %}
     {% if object.sources %}

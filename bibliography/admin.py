@@ -14,8 +14,21 @@ class SourceAuthorInline(admin.TabularInline):
 
 @admin.register(Author)
 class AuthorAdmin(admin.ModelAdmin):
-    list_display = ("last_names", "first_names", "owner", "publication_status")
-    search_fields = ("last_names", "first_names", "middle_names")
+    list_display = (
+        "last_names",
+        "first_names",
+        "institution",
+        "contact_email",
+        "owner",
+        "publication_status",
+    )
+    search_fields = (
+        "last_names",
+        "first_names",
+        "middle_names",
+        "institution",
+        "contact_email",
+    )
     list_filter = ("publication_status",)
     ordering = ("last_names", "first_names")
 
