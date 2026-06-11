@@ -1,0 +1,54 @@
+{% load custom_tags %}
+{% load moderation_tags %}
+<div class="modal-header">
+  <h5 class="modal-title">Collector Detail</h5>
+  <button type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"></button>
+</div>
+<div class="modal-body">
+  <p class="card-text">
+    <strong>Name:</strong>
+    <br>
+    {{ object.name }}
+  </p>
+  {% if object.website %}
+    <p class="card-text">
+      <strong>Website:</strong>
+      <br>
+      <a href="{{ object.website }}" target="_blank">{{ object.website }}</a>
+    </p>
+  {% endif %}
+  {% if object.catchment %}
+    <p class="card-text">
+      <strong>Catchment:</strong>
+      <br>
+      {{ object.catchment.name }}
+    </p>
+  {% endif %}
+  {% if object.description %}
+    <p class="card-text">
+      <strong>Comments:</strong>
+      <br>
+      {{ object.description|markdown_to_html }}
+    </p>
+  {% endif %}
+  <p class="card-text">
+    <strong>Collections:</strong>
+  </p>
+  {% if object.collection_set.exists %}
+    <ul>
+      {% for collection in object.collection_set.all %}
+        <li>{{ collection.name }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="card-text text-muted">No collections so far</p>
+  {% endif %}
+</div>
+<div class="modal-footer">
+  <a href="{% detail_or_review_url object use_back=True %}"
+     class="btn btn-primary">More</a>
+  <button type="button" class="btn btn-default" data-bs-dismiss="modal">Close</button>
+</div>
