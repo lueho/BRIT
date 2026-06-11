@@ -19,6 +19,9 @@ This index is the entry point for project documentation. Each topic has a clear 
 - **Design rationale and historical decisions**
   Use [Design Decisions](04_design_decisions/README.md).
 
+- **Technical agenda and architectural workstreams**
+  Use the [Platform Consolidation Roadmap](05_roadmap/README.md).
+
 ## Documentation Rules
 
 - **Commands live in one place**

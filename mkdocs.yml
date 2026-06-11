@@ -21,6 +21,8 @@ nav:
       - Operations Guide: 03_operations/operations.md
   - Design Decisions:
       - Overview: 04_design_decisions/README.md
+  - Roadmap:
+      - Platform Consolidation: 05_roadmap/README.md
 
 theme:
   name: material
