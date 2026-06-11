@@ -36,6 +36,7 @@ from .filters import ProcessFilter
 from .forms import (
     ProcessAddMaterialForm,
     ProcessAddParameterForm,
+    ProcessAuthorInline,
     ProcessCategoryModalModelForm,
     ProcessCategoryModelForm,
     ProcessInfoResourceInline,
@@ -44,12 +45,15 @@ from .forms import (
     ProcessModalModelForm,
     ProcessModelForm,
     ProcessOperatingParameterInline,
+    ProcessSourceInline,
 )
 from .models import (
     Process,
+    ProcessAuthor,
     ProcessCategory,
     ProcessMaterial,
     ProcessOperatingParameter,
+    ProcessSource,
 )
 from .querysets import with_process_count, with_published_process_count
 
@@ -289,6 +293,8 @@ class ProcessCreateView(UserCreatedObjectCreateWithInlinesView):
     inlines = [
         ProcessMaterialInline,
         ProcessOperatingParameterInline,
+        ProcessAuthorInline,
+        ProcessSourceInline,
         ProcessLinkInline,
         ProcessInfoResourceInline,
     ]
@@ -376,7 +382,10 @@ class ProcessDetailView(UserCreatedObjectDetailView):
             .select_related("owner", "parent")
             .prefetch_related(
                 "categories",
-                "authors",
+                Prefetch(
+                    "process_authors",
+                    queryset=ProcessAuthor.objects.select_related("author"),
+                ),
                 "variants",
                 Prefetch(
                     "process_materials",
@@ -390,7 +399,10 @@ class ProcessDetailView(UserCreatedObjectDetailView):
                 ),
                 "links",
                 "info_resources",
-                "sources",
+                Prefetch(
+                    "process_sources",
+                    queryset=ProcessSource.objects.select_related("source"),
+                ),
             )
         )
 
@@ -421,10 +433,8 @@ class ProcessDetailView(UserCreatedObjectDetailView):
         context["process_links"] = list(self.object.links.all())
         context["process_info_resources"] = list(self.object.info_resources.all())
         context["process_variants"] = list(self.object.variants.all())
-        context["bibliography_sources"] = sorted(
-            self.object.sources.all(),
-            key=lambda source: (source.abbreviation or source.title or "").casefold(),
-        )
+        context["process_authors"] = self.object.ordered_authors()
+        context["bibliography_sources"] = self.object.sources_ordered()
 
         return context
 
@@ -444,6 +454,8 @@ class ProcessUpdateView(UserCreatedObjectUpdateWithInlinesView):
     inlines = [
         ProcessMaterialInline,
         ProcessOperatingParameterInline,
+        ProcessAuthorInline,
+        ProcessSourceInline,
         ProcessLinkInline,
         ProcessInfoResourceInline,
     ]

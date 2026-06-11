@@ -4,7 +4,9 @@ import types
 
 from crispy_forms.layout import HTML, Div, Field, Layout
 from django import forms
-from django.forms import inlineformset_factory
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.forms import BaseInlineFormSet, inlineformset_factory
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.forms import (
     TomSelectModelChoiceField,
@@ -23,11 +25,13 @@ from utils.properties.models import Unit
 
 from .models import (
     Process,
+    ProcessAuthor,
     ProcessCategory,
     ProcessInfoResource,
     ProcessLink,
     ProcessMaterial,
     ProcessOperatingParameter,
+    ProcessSource,
 )
 
 
@@ -50,6 +54,41 @@ def image_metadata_section():
         ),
         css_class="card border mb-3",
     )
+
+
+def queryset_valid_value(self, value):
+    """Validate TomSelect values against the configured queryset."""
+
+    return self.queryset.filter(pk=value).exists()
+
+
+def queryset_check_values(self, value):
+    """Check TomSelect multiple values against the configured queryset."""
+
+    if isinstance(value, list | tuple):
+        pks = [v for v in value if v]
+        return list(self.queryset.filter(pk__in=pks))
+    return []
+
+
+class QuerysetTomSelectModelChoiceField(TomSelectModelChoiceField):
+    """TomSelect field that validates submitted pks against its queryset."""
+
+    def clean(self, value):
+        if value in self.empty_values:
+            if self.required:
+                raise ValidationError(self.error_messages["required"], code="required")
+            return None
+
+        try:
+            key = self.to_field_name or "pk"
+            return self.queryset.get(**{key: value})
+        except (TypeError, ValueError, self.queryset.model.DoesNotExist) as exc:
+            raise ValidationError(
+                self.error_messages["invalid_choice"],
+                code="invalid_choice",
+                params={"value": value},
+            ) from exc
 
 
 # ==============================================================================
@@ -87,24 +126,6 @@ class ProcessModelForm(SimpleModelForm):
         config=TomSelectConfig(url="processes:processcategory-autocomplete"),
         label="Categories",
     )
-    authors = TomSelectModelMultipleChoiceField(
-        queryset=Author.objects.all(),
-        required=False,
-        config=TomSelectConfig(
-            url="author-autocomplete",
-            label_field="label",
-        ),
-        label="Authors",
-    )
-    sources = TomSelectModelMultipleChoiceField(
-        queryset=Source.objects.filter(publication_status="published"),
-        required=False,
-        config=TomSelectConfig(
-            url="source-autocomplete",
-            label_field="label",
-        ),
-        label="Bibliography sources",
-    )
 
     class Meta:
         model = Process
@@ -112,8 +133,6 @@ class ProcessModelForm(SimpleModelForm):
             "name",
             "parent",
             "categories",
-            "authors",
-            "sources",
             "short_description",
             "mechanism",
             "description",
@@ -134,21 +153,8 @@ class ProcessModelForm(SimpleModelForm):
         super().__init__(*args, **kwargs)
         # Override TomSelect field validation to use queryset instead of URL endpoint
         # This fixes form validation in tests while maintaining autocomplete in production
-        for field_name in ["parent", "categories", "authors", "sources"]:
+        for field_name in ["parent", "categories"]:
             field = self.fields[field_name]
-
-            # Override validation methods to use queryset
-            def queryset_valid_value(self, value):
-                """Validate using queryset instead of URL endpoint."""
-                return self.queryset.filter(pk=value).exists()
-
-            def queryset_check_values(self, value):
-                """Check values using queryset instead of URL endpoint."""
-                # For ModelMultipleChoiceField, value is a list of PKs
-                if isinstance(value, list | tuple):
-                    pks = [v for v in value if v]
-                    return list(self.queryset.filter(pk__in=pks))
-                return []
 
             # Bind methods to the field instance
             field.valid_value = types.MethodType(queryset_valid_value, field)
@@ -158,8 +164,6 @@ class ProcessModelForm(SimpleModelForm):
             "name",
             "parent",
             "categories",
-            "authors",
-            "sources",
             "short_description",
             "mechanism",
             "description",
@@ -181,6 +185,126 @@ class ProcessModalModelForm(ModalModelFormMixin, ProcessModelForm):
 # ==============================================================================
 # Inline form helpers
 # ==============================================================================
+
+
+class OrderedUniqueInlineFormSet(BaseInlineFormSet):
+    related_field_name = None
+    position_field_name = "position"
+    duplicate_message = "Each item can only be added once."
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        seen = []
+        for form in self.forms:
+            if form.cleaned_data and not form.cleaned_data.get("DELETE", False):
+                related_object = form.cleaned_data.get(self.related_field_name)
+                if related_object:
+                    if related_object in seen:
+                        raise ValidationError(self.duplicate_message)
+                    seen.append(related_object)
+
+    def save(self, commit=True):
+        with transaction.atomic():
+            valid_forms = [
+                form
+                for form in self.forms
+                if form.cleaned_data
+                and not form.cleaned_data.get("DELETE", False)
+                and form.cleaned_data.get(self.related_field_name)
+            ]
+
+            if not commit:
+                return [form.save(commit=False) for form in valid_forms]
+
+            saved_objects = []
+            for position, form in enumerate(valid_forms, 1):
+                setattr(form.instance, self.position_field_name, position)
+                saved_objects.append(form.save(commit=True))
+
+            for form in self.forms:
+                if (
+                    form.cleaned_data
+                    and form.cleaned_data.get("DELETE", False)
+                    and form.instance.pk
+                ):
+                    form.instance.delete()
+
+            self._normalize_positions()
+            return saved_objects
+
+    def _normalize_positions(self):
+        if not self.instance.pk:
+            return
+
+        related_manager = getattr(
+            self.instance, self.fk.remote_field.get_accessor_name()
+        )
+        objects = list(related_manager.all().order_by(self.position_field_name, "id"))
+        for position, obj in enumerate(objects, 1):
+            if getattr(obj, self.position_field_name) != position:
+                setattr(obj, self.position_field_name, position)
+                obj.save(update_fields=[self.position_field_name])
+
+
+class ProcessAuthorInlineForm(forms.ModelForm):
+    author = QuerysetTomSelectModelChoiceField(
+        queryset=Author.objects.all(),
+        config=TomSelectConfig(
+            url="author-autocomplete",
+            label_field="label",
+        ),
+        label="Author",
+    )
+
+    class Meta:
+        model = ProcessAuthor
+        fields = ("author",)
+
+
+class ProcessAuthorFormSet(OrderedUniqueInlineFormSet):
+    related_field_name = "author"
+    position_field_name = "position"
+    duplicate_message = "Each author can only be added once."
+
+
+class ProcessAuthorInline(InlineFormSetFactory):
+    model = ProcessAuthor
+    form_class = ProcessAuthorInlineForm
+    formset_class = ProcessAuthorFormSet
+    factory_kwargs = {"extra": 1, "can_delete": True}
+    formset_helper_class = DynamicTableInlineFormSetHelper
+
+
+class ProcessSourceInlineForm(forms.ModelForm):
+    source = QuerysetTomSelectModelChoiceField(
+        queryset=Source.objects.filter(publication_status="published"),
+        config=TomSelectConfig(
+            url="source-autocomplete",
+            label_field="label",
+        ),
+        label="Source",
+    )
+
+    class Meta:
+        model = ProcessSource
+        fields = ("source",)
+
+
+class ProcessSourceFormSet(OrderedUniqueInlineFormSet):
+    related_field_name = "source"
+    position_field_name = "order"
+    duplicate_message = "Each source can only be added once."
+
+
+class ProcessSourceInline(InlineFormSetFactory):
+    model = ProcessSource
+    form_class = ProcessSourceInlineForm
+    formset_class = ProcessSourceFormSet
+    factory_kwargs = {"extra": 1, "can_delete": True}
+    formset_helper_class = DynamicTableInlineFormSetHelper
 
 
 class ProcessMaterialInlineForm(forms.ModelForm):

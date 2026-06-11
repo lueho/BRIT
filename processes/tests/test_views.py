@@ -270,6 +270,8 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         Formset prefixes are based on the related_name attribute of ForeignKey fields:
         - ProcessMaterial: process_materials
         - ProcessOperatingParameter: operating_parameters
+        - ProcessAuthor: process_authors
+        - ProcessSource: process_sources
         - ProcessLink: links
         - ProcessInfoResource: info_resources
         """
@@ -285,6 +287,16 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
             "operating_parameters-INITIAL_FORMS": "0",
             "operating_parameters-MIN_NUM_FORMS": "0",
             "operating_parameters-MAX_NUM_FORMS": "1000",
+            # ProcessAuthorInline (related_name='process_authors')
+            "process_authors-TOTAL_FORMS": "0",
+            "process_authors-INITIAL_FORMS": "0",
+            "process_authors-MIN_NUM_FORMS": "0",
+            "process_authors-MAX_NUM_FORMS": "1000",
+            # ProcessSourceInline (related_name='process_sources')
+            "process_sources-TOTAL_FORMS": "0",
+            "process_sources-INITIAL_FORMS": "0",
+            "process_sources-MIN_NUM_FORMS": "0",
+            "process_sources-MAX_NUM_FORMS": "1000",
             # ProcessLinkInline (related_name='links')
             "links-TOTAL_FORMS": "0",
             "links-INITIAL_FORMS": "0",
@@ -417,6 +429,21 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.assertContains(response, "modal-link")
         self.assertContains(response, "Ref01")
 
+    def test_detail_view_private_process_as_superuser_without_staff_flag(self):
+        superuser = self.owner_user.__class__.objects.create_user(
+            username="superuser-no-staff",
+            is_superuser=True,
+            is_staff=False,
+        )
+        self.client.force_login(superuser)
+
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": self.unpublished_object.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.unpublished_object.name)
+
     def test_detail_view_sorts_bibliography_alphabetically(self):
         zebra_source = Source.objects.create(
             title="Zebra Source",
@@ -533,6 +560,14 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
                 "operating_parameters-INITIAL_FORMS": "0",
                 "operating_parameters-MIN_NUM_FORMS": "0",
                 "operating_parameters-MAX_NUM_FORMS": "1000",
+                "process_authors-TOTAL_FORMS": "0",
+                "process_authors-INITIAL_FORMS": "0",
+                "process_authors-MIN_NUM_FORMS": "0",
+                "process_authors-MAX_NUM_FORMS": "1000",
+                "process_sources-TOTAL_FORMS": "0",
+                "process_sources-INITIAL_FORMS": "0",
+                "process_sources-MIN_NUM_FORMS": "0",
+                "process_sources-MAX_NUM_FORMS": "1000",
                 "links-TOTAL_FORMS": "0",
                 "links-INITIAL_FORMS": "0",
                 "links-MIN_NUM_FORMS": "0",

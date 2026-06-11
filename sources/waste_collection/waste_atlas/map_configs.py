@@ -30,7 +30,7 @@ ADMINISTRATIVE_LEVEL_CATEGORIES_DE = [
 ADMINISTRATIVE_LEVEL_CATEGORIES_EU = [
     {
         "value": "nuts",
-        "label": "NUTS level",
+        "label": "NUTS 3 / county level",
         "color": "#93d163",
     },
     {

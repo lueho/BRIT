@@ -14,14 +14,16 @@
                 </div>
             {% endif %}
         {% endif %}
-        {% if object.authors.exists %}
+        {% if process_authors %}
             <div class="text-muted mb-3">
-                {% for author in object.authors.all %}
-                    <div>
-                        {{ author }}
-                        {% if author.institution %}<span>({{ author.institution }})</span>{% endif %}
-                        {% if author.contact_email %}<a href="mailto:{{ author.contact_email }}">{{ author.contact_email }}</a>{% endif %}
-                    </div>
+                {% for process_author in process_authors %}
+                    {% with author=process_author.author %}
+                        <div>
+                            {{ author }}
+                            {% if author.institution %}<span>({{ author.institution }})</span>{% endif %}
+                            {% if author.contact_email %}<a href="mailto:{{ author.contact_email }}">{{ author.contact_email }}</a>{% endif %}
+                        </div>
+                    {% endwith %}
                 {% endfor %}
             </div>
         {% endif %}
@@ -92,9 +94,7 @@
                                     <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
                                 </strong>
                                 {% if pm.quantity_value %}
-                                    <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}
-                                        {% if pm.quantity_unit %}{{ pm.quantity_unit.name }}{% endif %}
-                                    </span>
+                                    <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
                                 {% endif %}
                                 {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes }}</p>{% endif %}
                             </li>
@@ -112,9 +112,7 @@
                                     <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
                                 </strong>
                                 {% if pm.quantity_value %}
-                                    <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}
-                                        {% if pm.quantity_unit %}{{ pm.quantity_unit.name }}{% endif %}
-                                    </span>
+                                    <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
                                 {% endif %}
                                 {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes }}</p>{% endif %}
                             </li>

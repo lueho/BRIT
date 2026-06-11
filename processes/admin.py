@@ -2,11 +2,13 @@ from django.contrib import admin
 
 from .models import (
     Process,
+    ProcessAuthor,
     ProcessCategory,
     ProcessInfoResource,
     ProcessLink,
     ProcessMaterial,
     ProcessOperatingParameter,
+    ProcessSource,
 )
 
 
@@ -18,6 +20,18 @@ class ProcessMaterialInline(admin.TabularInline):
 class ProcessOperatingParameterInline(admin.TabularInline):
     model = ProcessOperatingParameter
     extra = 1
+
+
+class ProcessAuthorInline(admin.TabularInline):
+    model = ProcessAuthor
+    extra = 1
+    autocomplete_fields = ("author",)
+
+
+class ProcessSourceInline(admin.TabularInline):
+    model = ProcessSource
+    extra = 1
+    autocomplete_fields = ("source",)
 
 
 class ProcessLinkInline(admin.TabularInline):
@@ -46,10 +60,12 @@ class ProcessAdmin(admin.ModelAdmin):
     inlines = [
         ProcessMaterialInline,
         ProcessOperatingParameterInline,
+        ProcessAuthorInline,
+        ProcessSourceInline,
         ProcessLinkInline,
         ProcessInfoResourceInline,
     ]
-    filter_horizontal = ("categories", "authors", "sources")
+    filter_horizontal = ("categories",)
 
     @admin.display(description="Authors")
     def author_list(self, obj):

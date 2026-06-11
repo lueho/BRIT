@@ -375,7 +375,9 @@ def get_object_policy(user, obj, request=None, review_mode=False):
 
     # Basic identity flags
     is_authenticated = bool(user and getattr(user, "is_authenticated", False))
-    is_staff = bool(getattr(user, "is_staff", False))
+    is_staff = bool(
+        getattr(user, "is_staff", False) or getattr(user, "is_superuser", False)
+    )
     is_owner = bool(
         is_authenticated and getattr(obj, "owner_id", None) == getattr(user, "id", None)
     )

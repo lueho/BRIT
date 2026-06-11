@@ -121,6 +121,7 @@ class Process(NamedUserCreatedObject):
     authors = models.ManyToManyField(
         Author,
         blank=True,
+        through="ProcessAuthor",
         related_name="processes",
         help_text="Authors or contributors shown on the process detail page.",
     )
@@ -142,6 +143,7 @@ class Process(NamedUserCreatedObject):
     sources = models.ManyToManyField(
         Source,
         blank=True,
+        through="ProcessSource",
         related_name="processes",
         help_text="Bibliography sources used by this process.",
     )
@@ -221,6 +223,76 @@ class Process(NamedUserCreatedObject):
         return self.operating_parameters.filter(parameter=parameter).order_by(
             "order", "id"
         )
+
+    def ordered_authors(self):
+        return self.process_authors.order_by(
+            "position", "author_id", "id"
+        ).select_related("author")
+
+    def authors_ordered(self):
+        return [process_author.author for process_author in self.ordered_authors()]
+
+    def ordered_sources(self):
+        return self.process_sources.order_by("order", "id").select_related("source")
+
+    def sources_ordered(self):
+        return [process_source.source for process_source in self.ordered_sources()]
+
+
+class ProcessAuthor(models.Model):
+    """Ordered author/contributor assignment for a process."""
+
+    process = models.ForeignKey(
+        Process,
+        on_delete=models.CASCADE,
+        related_name="process_authors",
+    )
+    author = models.ForeignKey(
+        Author,
+        on_delete=models.PROTECT,
+        related_name="process_author_links",
+    )
+    position = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        ordering = ["position", "author_id", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["process", "author"],
+                name="processes_processauthor_unique_author",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.process}: {self.author}"
+
+
+class ProcessSource(models.Model):
+    """Bibliography source assignment for a process."""
+
+    process = models.ForeignKey(
+        Process,
+        on_delete=models.CASCADE,
+        related_name="process_sources",
+    )
+    source = models.ForeignKey(
+        Source,
+        on_delete=models.PROTECT,
+        related_name="process_source_links",
+    )
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["process", "source"],
+                name="processes_processsource_unique_source",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.process}: {self.source}"
 
 
 class ProcessMaterial(models.Model):

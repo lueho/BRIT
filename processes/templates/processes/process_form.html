@@ -80,6 +80,32 @@
                     </div>
                 </div>
             </div>
+            <!-- Authors -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>Authors</h5>
+                        </div>
+                        <div class="card-body">
+                            {% include "bootstrap5/formset_base.html" with formset=inlines.2 layout="div" form_id="process-authors" owner_form_id="process-form" %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Bibliography -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>Bibliography</h5>
+                        </div>
+                        <div class="card-body">
+                            {% include "bootstrap5/formset_base.html" with formset=inlines.3 layout="div" form_id="process-sources" owner_form_id="process-form" %}
+                        </div>
+                    </div>
+                </div>
+            </div>
             <!-- Links -->
             <div class="row mb-4">
                 <div class="col-12">
@@ -88,7 +114,7 @@
                             <h5>Links</h5>
                         </div>
                         <div class="card-body">
-                            {% include "bootstrap5/formset_base.html" with formset=inlines.2 layout="div" form_id="links" owner_form_id="process-form" %}
+                            {% include "bootstrap5/formset_base.html" with formset=inlines.4 layout="div" form_id="links" owner_form_id="process-form" %}
                         </div>
                     </div>
                 </div>
@@ -101,7 +127,7 @@
                             <h5>Information Resources</h5>
                         </div>
                         <div class="card-body">
-                            {% include "bootstrap5/formset_base.html" with formset=inlines.3 layout="div" form_id="resources" owner_form_id="process-form" %}
+                            {% include "bootstrap5/formset_base.html" with formset=inlines.5 layout="div" form_id="resources" owner_form_id="process-form" %}
                         </div>
                     </div>
                 </div>

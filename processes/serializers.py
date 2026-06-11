@@ -160,6 +160,7 @@ class ProcessListSerializer(serializers.ModelSerializer):
 
     categories = ProcessCategorySerializer(many=True, read_only=True)
     sources = SourceModelSerializer(many=True, read_only=True)
+    authors = serializers.SerializerMethodField()
     owner_name = serializers.CharField(source="owner.username", read_only=True)
     parent_name = serializers.CharField(source="parent.name", read_only=True)
 
@@ -184,12 +185,18 @@ class ProcessListSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["owner", "created_at", "lastmodified_at"]
 
+    def get_authors(self, obj):
+        """Get author ids in explicit process author order."""
+
+        return [author.pk for author in obj.authors_ordered()]
+
 
 class ProcessDetailSerializer(serializers.ModelSerializer):
     """Comprehensive serializer for Process detail views."""
 
     categories = ProcessCategorySerializer(many=True, read_only=True)
     sources = SourceModelSerializer(many=True, read_only=True)
+    authors = serializers.SerializerMethodField()
     owner_name = serializers.CharField(source="owner.username", read_only=True)
     parent_name = serializers.CharField(source="parent.name", read_only=True)
 
@@ -235,6 +242,11 @@ class ProcessDetailSerializer(serializers.ModelSerializer):
             "sources",
         ]
         read_only_fields = ["owner", "created_at", "lastmodified_at"]
+
+    def get_authors(self, obj):
+        """Get author ids in explicit process author order."""
+
+        return [author.pk for author in obj.authors_ordered()]
 
     def get_input_materials(self, obj):
         """Get list of input materials."""

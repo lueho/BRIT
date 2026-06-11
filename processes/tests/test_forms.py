@@ -1,6 +1,7 @@
 """Form tests for the processes module."""
 
 from django.contrib.auth import get_user_model
+from django.forms import inlineformset_factory
 from django.test import TestCase
 
 from bibliography.models import Author, Source
@@ -10,18 +11,24 @@ from utils.properties.models import Unit
 from ..forms import (
     ProcessAddMaterialForm,
     ProcessAddParameterForm,
+    ProcessAuthorFormSet,
+    ProcessAuthorInlineForm,
     ProcessCategoryModalModelForm,
     ProcessCategoryModelForm,
     ProcessModalModelForm,
     ProcessModelForm,
+    ProcessSourceFormSet,
+    ProcessSourceInlineForm,
     build_process_material_formset,
     build_process_operating_parameter_formset,
 )
 from ..models import (
     Process,
+    ProcessAuthor,
     ProcessCategory,
     ProcessMaterial,
     ProcessOperatingParameter,
+    ProcessSource,
 )
 
 
@@ -84,17 +91,69 @@ class ProcessFormTestCase(TestCase):
                 "short_description": "Short desc",
                 "mechanism": "Test mechanism",
                 "categories": [self.category.pk],
-                "authors": [self.author_1.pk, self.author_2.pk],
-                "sources": [self.source_1.pk, self.source_2.pk],
             }
         )
         self.assertTrue(form.is_valid())
-        self.assertEqual(
-            list(form.cleaned_data["authors"]), [self.author_1, self.author_2]
+
+    def test_author_formset_assigns_explicit_order(self):
+        process = Process.objects.create(name="Test Process")
+        formset_class = inlineformset_factory(
+            Process,
+            ProcessAuthor,
+            form=ProcessAuthorInlineForm,
+            formset=ProcessAuthorFormSet,
+            extra=0,
+            can_delete=True,
         )
-        self.assertEqual(
-            list(form.cleaned_data["sources"]), [self.source_1, self.source_2]
+        formset = formset_class(
+            data={
+                "process_authors-TOTAL_FORMS": "2",
+                "process_authors-INITIAL_FORMS": "0",
+                "process_authors-MIN_NUM_FORMS": "0",
+                "process_authors-MAX_NUM_FORMS": "1000",
+                "process_authors-0-author": str(self.author_2.pk),
+                "process_authors-1-author": str(self.author_1.pk),
+            },
+            instance=process,
+            prefix="process_authors",
         )
+
+        self.assertTrue(formset.is_valid(), formset.errors)
+        formset.save()
+
+        self.assertEqual(
+            list(
+                ProcessAuthor.objects.filter(process=process).values_list(
+                    "author", "position"
+                )
+            ),
+            [(self.author_2.pk, 1), (self.author_1.pk, 2)],
+        )
+
+    def test_source_formset_rejects_duplicate_sources(self):
+        process = Process.objects.create(name="Test Process")
+        formset_class = inlineformset_factory(
+            Process,
+            ProcessSource,
+            form=ProcessSourceInlineForm,
+            formset=ProcessSourceFormSet,
+            extra=0,
+            can_delete=True,
+        )
+        formset = formset_class(
+            data={
+                "process_sources-TOTAL_FORMS": "2",
+                "process_sources-INITIAL_FORMS": "0",
+                "process_sources-MIN_NUM_FORMS": "0",
+                "process_sources-MAX_NUM_FORMS": "1000",
+                "process_sources-0-source": str(self.source_1.pk),
+                "process_sources-1-source": str(self.source_1.pk),
+            },
+            instance=process,
+            prefix="process_sources",
+        )
+
+        self.assertFalse(formset.is_valid())
 
     def test_invalid_empty_name(self):
         """Empty name should be invalid."""
