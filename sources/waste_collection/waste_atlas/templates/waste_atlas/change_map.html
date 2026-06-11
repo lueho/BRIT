@@ -1,0 +1,17 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+{% load atlas_tags %}
+
+{% block atlas_selector %}
+  {% include "waste_atlas/includes/change_map_selector.html" with atlas_selector_bootstrap=False atlas_selector_button_label="Compare" %}
+{% endblock atlas_selector %}
+
+{% block atlas_config %}
+  {% atlas_js_config map_config_key as atlas_cfg %}
+  {{ atlas_cfg|json_script:"atlas-config" }}
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var cfg = JSON.parse(document.getElementById('atlas-config').textContent);
+      WasteAtlasChoropleth.init(cfg);
+    });
+  </script>
+{% endblock atlas_config %}

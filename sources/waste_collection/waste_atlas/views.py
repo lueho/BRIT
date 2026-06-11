@@ -1,10 +1,12 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.http import Http404
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
 from .map_selection import build_map_selection_context
+from .pages import MAP_PAGES
 
 WASTE_ATLAS_GROUP_NAME = "waste_atlas"
 
@@ -76,20 +78,39 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
 
 
 class AtlasChangeMapView(AtlasMapView):
-    """Change map page comparing two years of a waste atlas map.
+    """Generic change map comparing a map theme between two years.
 
-    Supports ``from_year`` and ``to_year`` query params; the page entry
-    provides ``data_url`` and its own template.
+    The page entry is resolved from the ``map_set``/``theme`` URL kwargs.
+    The client fetches the theme's data endpoint for both years and
+    classifies each catchment as no-change/changed/new/removed.
+    Supports ``from_year`` and ``to_year`` query params.
     """
+
+    template_name = "waste_atlas/change_map.html"
+
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        self.page = self._resolve_page(kwargs["map_set"], kwargs["theme"])
+
+    @staticmethod
+    def _resolve_page(map_set, theme):
+        for page in MAP_PAGES:
+            if page["selector_set"] == map_set and page["theme"] == theme:
+                return page
+        raise Http404(f"No waste atlas map for {map_set}/{theme}")
+
+    def get_template_names(self):
+        return [self.template_name]
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["map_overview_url"] = "waste-atlas-change-map-overview"
         ctx["from_year"] = self.request.GET.get("from_year", "2023")
         ctx["to_year"] = self.request.GET.get("to_year", "2024")
+        ctx["year"] = ctx["to_year"]
         ctx["default_from_year"] = ctx["from_year"]
         ctx["default_to_year"] = ctx["to_year"]
-        ctx["data_url"] = self.page["data_url"]
+        ctx["map_title"] = f"{self.page['title']} — changes"
         return ctx
 
 

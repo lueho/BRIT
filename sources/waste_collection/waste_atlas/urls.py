@@ -1,4 +1,5 @@
-from django.urls import include, path
+from django.urls import include, path, reverse_lazy
+from django.views.generic import RedirectView
 
 from .pages import MAP_PAGES
 from .router import router
@@ -25,6 +26,22 @@ urlpatterns = [
         name="waste-atlas-change-map-overview",
     ),
     path(
+        "map/changes/<str:map_set>/<str:theme>/",
+        AtlasChangeMapView.as_view(),
+        name="waste-atlas-change-map",
+    ),
+    # Legacy URL of the formerly hand-built Germany change map
+    path(
+        "map/germany/collection-system-change/",
+        RedirectView.as_view(
+            url=reverse_lazy(
+                "waste-atlas-change-map", args=["DE", "collection_system"]
+            ),
+            query_string=True,
+        ),
+        name="waste-atlas-germany-collection-system-change-map",
+    ),
+    path(
         "map/europe-data-coverage/",
         EuropeDataCoverageMapView.as_view(),
         name="waste-atlas-europe-data-coverage-map",
@@ -42,10 +59,6 @@ urlpatterns = [
 ]
 
 urlpatterns += [
-    path(
-        page["path"],
-        (AtlasChangeMapView if page.get("change") else AtlasMapView).as_view(page=page),
-        name=page["name"],
-    )
+    path(page["path"], AtlasMapView.as_view(page=page), name=page["name"])
     for page in MAP_PAGES
 ]

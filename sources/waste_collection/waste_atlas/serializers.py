@@ -62,15 +62,6 @@ class CatchmentCollectionSystemSerializer(serializers.Serializer):
     collection_system = serializers.CharField()
 
 
-class CatchmentCollectionSystemChangeSerializer(serializers.Serializer):
-    """Flat JSON serializer for catchment collection system change."""
-
-    catchment_id = serializers.IntegerField()
-    change_type = serializers.CharField()
-    from_system = serializers.CharField(allow_null=True)
-    to_system = serializers.CharField(allow_null=True)
-
-
 class CatchmentCombinedCollectionSystemSerializer(serializers.Serializer):
     catchment_id = serializers.IntegerField()
     bio_collection_system = serializers.CharField(allow_null=True)

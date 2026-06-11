@@ -111,10 +111,12 @@ var WasteAtlasChoropleth = (function () {
     var nuts0Url = '/maps/api/nuts_region/geojson/?levl_code=0&cntr_code=' + cfg.country;
     var nutsLevel = cfg.nutsLevel || 1;
     var nutsRegionUrl = '/maps/api/nuts_region/geojson/?levl_code=' + nutsLevel + '&cntr_code=' + cfg.country;
-    var fromYearSuffix = cfg.fromYear ? '&from_year=' + encodeURIComponent(cfg.fromYear) : '';
-    var dataUrl = cfg.dataUrl + '?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix + collectionYearSuffix + fromYearSuffix;
+    var dataUrl = cfg.dataUrl + '?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix + collectionYearSuffix;
     var outlineUrl = cfg.outlineGeoJsonUrl
       ? cfg.outlineGeoJsonUrl + '?country=' + cfg.country + '&year=' + collectionYear + nutsSuffix
+      : null;
+    var fromDataUrl = cfg.changeMode
+      ? cfg.dataUrl + '?country=' + cfg.country + '&year=' + cfg.fromYear + nutsSuffix
       : null;
     var requests = [
       _fetchJSON(catchUrl),
@@ -123,6 +125,7 @@ var WasteAtlasChoropleth = (function () {
       _fetchJSON(nutsRegionUrl)
     ];
     if (outlineUrl) requests.push(_fetchJSON(outlineUrl));
+    if (fromDataUrl) requests.push(_fetchJSON(fromDataUrl));
 
     return Promise.all(requests).then(function (results) {
       var bundeslaender = results[3];
@@ -145,7 +148,68 @@ var WasteAtlasChoropleth = (function () {
         bundeslaender: bundeslaender,
         allCatchments: results[0],
         acpvOutlines: outlineUrl ? results[4] : null,
+        fromThematicData: fromDataUrl ? results[outlineUrl ? 5 : 4] : null,
       };
+    });
+  }
+
+  // ---- change maps (two-year diff) ------------------------------------------
+
+  function _changeCategories(toYear) {
+    return [
+      { value: 'no_change', label: 'No change', color: '#c8e6c9' },
+      { value: 'changed', label: 'Changed', color: '#ffb74d' },
+      { value: 'new', label: 'New in ' + toYear, color: '#64b5f6' },
+      { value: 'removed', label: 'Removed in ' + toYear, color: '#bdbdbd' }
+    ];
+  }
+
+  function _recordList(raw) {
+    if (Array.isArray(raw)) return raw;
+    return (raw && raw.results) || [];
+  }
+
+  function _classifyRecords(cfg, raw) {
+    var records = _recordList(raw);
+    if (typeof cfg.transformData === 'function') {
+      records = cfg.transformData(records);
+    } else if (cfg.transformName && transforms[cfg.transformName]) {
+      records = transforms[cfg.transformName](records);
+    }
+    var classes = {};
+    records.forEach(function (r) {
+      var value = r[cfg.dataField];
+      classes[r.catchment_id] = value == null ? null : value;
+    });
+    return classes;
+  }
+
+  function _changeRecords(cfg, fromRaw, toRaw) {
+    var fromClasses = _classifyRecords(cfg, fromRaw);
+    var toClasses = _classifyRecords(cfg, toRaw);
+    var ids = {};
+    Object.keys(fromClasses).forEach(function (id) { ids[id] = true; });
+    Object.keys(toClasses).forEach(function (id) { ids[id] = true; });
+    return Object.keys(ids).map(function (id) {
+      var from = fromClasses[id];
+      var to = toClasses[id];
+      var change = null;
+      if (from != null && to != null) change = from === to ? 'no_change' : 'changed';
+      else if (to != null) change = 'new';
+      else if (from != null) change = 'removed';
+      return { catchment_id: parseInt(id, 10) || id, change_type: change };
+    });
+  }
+
+  function _changeRenderConfig(loadCfg, baseTitle) {
+    return Object.assign({}, loadCfg, {
+      dataField: 'change_type',
+      transformName: null,
+      transformData: null,
+      categories: _changeCategories(loadCfg.year),
+      legendTitle: 'Change',
+      noDataLabel: 'No data',
+      title: (baseTitle || '') + ' — changes (' + loadCfg.fromYear + ' → ' + loadCfg.year + ')'
     });
   }
 
@@ -173,11 +237,9 @@ var WasteAtlasChoropleth = (function () {
 
   function _selectorNavigationTarget(url, year, fromYear) {
     if (!url || _isCurrentPath(url)) return null;
-    var isChangeMap = window.location.pathname.indexOf('-change') !== -1;
-    var targetIsChangeMap = url.indexOf('-change') !== -1;
-    if (isChangeMap && !targetIsChangeMap) return null;
-    var params = 'year=' + encodeURIComponent(year);
-    if (fromYear) params += '&from_year=' + encodeURIComponent(fromYear);
+    var params = fromYear
+      ? 'from_year=' + encodeURIComponent(fromYear) + '&to_year=' + encodeURIComponent(year)
+      : 'year=' + encodeURIComponent(year);
     return url + '?' + params;
   }
 
@@ -208,7 +270,9 @@ var WasteAtlasChoropleth = (function () {
 
     function selectedRouteUrl() {
       var selectedOption = themeSelect.options[themeSelect.selectedIndex];
-      return selectedOption ? selectedOption.getAttribute('data-url') : null;
+      if (!selectedOption) return null;
+      var attr = options.useChangeUrls ? 'data-change-url' : 'data-url';
+      return selectedOption.getAttribute(attr);
     }
 
     function ensureVisibleSelection() {
@@ -545,537 +609,537 @@ var WasteAtlasChoropleth = (function () {
   // ---- named transform registry -------------------------------------------
   var transforms = {
     biowasteCollectionAmount: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (r.no_collection) {
-            cls = 'no_bio';
-          } else if (r.amount === null) {
-            cls = null;
-          } else if (r.amount > 150) {
-            cls = 'very_high';
-          } else if (r.amount > 100) {
-            cls = 'high';
-          } else if (r.amount > 50) {
-            cls = 'medium';
-          } else {
-            cls = 'low';
-          }
-          return {
-            catchment_id: r.catchment_id,
-            _classified: cls,
-            _has_acpv_overlay: r.value_source === 'acpv',
-            _acpv_group_key: r.acpv_group_key
-          };
-        });
-      },
-    biowasteCollectionCount: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (r.is_door_to_door === false) {
-            cls = 'no_door_to_door';
-          } else if (r.collection_count === null) {
-            cls = null;
-          } else if (r.has_seasonal_variation) {
-            cls = 'seasonal';
-          } else if (r.collection_count >= 104) {
-            cls = 'twice_weekly';
-          } else if (r.collection_count >= 52) {
-            cls = 'weekly';
-          } else if (r.collection_count >= 26) {
-            cls = 'biweekly';
-          } else {
-            cls = 'less_frequent';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
-    biowasteCollectionPointCount: function (records) {
-        return records.map(function (r) {
-          var value = r.collection_point_count;
-          var cls;
-          if (value === null || value === undefined) {
-            cls = r.is_door_to_door ? 'full_dtd' : null;
-          } else if (value >= 59) {
-            cls = 'very_high';
-          } else if (value >= 10) {
-            cls = 'high';
-          } else if (value >= 2) {
-            cls = 'medium';
-          } else {
-            cls = 'very_low';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
-    biowasteFrequency: function (records) {
-        var NO_BIO = ['No separate collection', 'Bring point', 'Recycling centre',
-                      'On demand kerbside collection', 'Home-composting'];
-        return records.map(function (r) {
-          var cls = NO_BIO.indexOf(r.frequency_type) !== -1
-            ? 'no_bio_collection'
-            : r.frequency_type;
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
-    biowasteImpurity: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (r.no_collection) {
-            cls = 'no_collection';
-          } else if (r.impurity_rate === null) {
-            cls = null;
-          } else if (r.impurity_rate <= 5) {
-            cls = 'very_low';
-          } else if (r.impurity_rate <= 10) {
-            cls = 'low';
-          } else if (r.impurity_rate <= 20) {
-            cls = 'medium';
-          } else if (r.impurity_rate <= 40) {
-            cls = 'high';
-          } else {
-            cls = 'very_high';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
-    biowasteMinBinSize: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (r.is_door_to_door === false) {
-            cls = 'no_door_to_door';
-          } else if (r.min_bin_size === null) {
-            cls = null;
-          } else if (r.min_bin_size <= 26.5) {
-            cls = 'xs';
-          } else if (r.min_bin_size <= 60) {
-            cls = 'small';
-          } else if (r.min_bin_size <= 120) {
-            cls = 'medium';
-          } else {
-            cls = 'large';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
-    biowasteRequiredBinCapacity: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (r.is_door_to_door === false) {
-            cls = 'no_door_to_door';
-          } else if (r.required_bin_capacity === null) {
-            cls = null;
-          } else if (r.required_bin_capacity <= 5) {
-            cls = 'very_low';
-          } else if (r.required_bin_capacity <= 10) {
-            cls = 'low';
-          } else if (r.required_bin_capacity <= 20) {
-            cls = 'medium';
-          } else if (r.required_bin_capacity <= 60) {
-            cls = 'high';
-          } else {
-            cls = 'very_high';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
-    collectionCountRatio: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (r.bio_is_door_to_door === false ||
-              (r.bio_is_door_to_door == null && r.residual_count != null)) {
-            cls = 'no_bio';
-          } else if (r.bio_has_seasonal_variation) {
-            cls = 'seasonal';
-          } else if (r.bio_count === null || r.bio_count === undefined) {
-            cls = null;
-          } else if (r.ratio === null || r.ratio === undefined) {
-            cls = null;
-          } else if (r.ratio > 1.5) {
-            cls = 'bio_2x';
-          } else if (r.ratio < 0.67) {
-            cls = 'bio_half';
-          } else {
-            cls = 'same';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
-    collectionPointCount: function (records) {
-        return records.map(function (r) {
-          var value = r.collection_point_count;
-          var cls;
-          if (value === null || value === undefined) {
-            cls = r.is_door_to_door ? 'full_dtd' : null;
-          } else if (value > 10) {
-            cls = 'high';
-          } else if (value > 5) {
-            cls = 'medium';
-          } else if (value > 1) {
-            cls = 'low';
-          } else {
-            cls = 'very_low';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
-    collectionPointCountRatio: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (r.bio_is_door_to_door === false ||
-              (r.bio_is_door_to_door == null && r.residual_count != null)) {
-            cls = 'no_bio';
-          } else if (r.bio_count === null || r.bio_count === undefined) {
-            cls = null;
-          } else if (r.ratio === null || r.ratio === undefined) {
-            cls = null;
-          } else if (r.ratio > 1.05) {
-            cls = 'bio_more';
-          } else if (r.ratio < 0.95) {
-            cls = 'bio_less';
-          } else {
-            cls = 'same';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
-    collectionSupport: function (records) {
-        var KEY_MAP = {
-          'allowed':  'a',
-          'forbidden': 'f',
-          'no_data':  'n'
-        };
-        return records.map(function (r) {
-          var cls;
-          if (r.paper_bags === 'no_collection') {
-            cls = 'no_collection';
-          } else {
-            var p = KEY_MAP[r.paper_bags] || 'n';
-            var b = KEY_MAP[r.plastic_bags] || 'n';
-            cls = 'paper_' + p + '_plastic_' + b;
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
-    combinedCollectionCount: function (records) {
-        function bucket(count) {
-          if (count === null || count === undefined) return null;
-          if (count > 26) return 'more';
-          if (count >= 24) return 'bi';
-          return 'less';
+      return records.map(function (r) {
+        var cls;
+        if (r.no_collection) {
+          cls = 'no_bio';
+        } else if (r.amount === null) {
+          cls = null;
+        } else if (r.amount > 150) {
+          cls = 'very_high';
+        } else if (r.amount > 100) {
+          cls = 'high';
+        } else if (r.amount > 50) {
+          cls = 'medium';
+        } else {
+          cls = 'low';
         }
-        return records.map(function (r) {
-          var b = bucket(r.bio_count);
-          var re = bucket(r.residual_count);
-          var cls;
-          if (r.bio_is_door_to_door === false ||
-              (r.bio_is_door_to_door == null && r.residual_count != null)) {
-            cls = 'no_bio';
-          } else if (b === null) {
-            cls = null;
-          } else if (re === null) {
-            cls = null;
-          } else {
-            cls = 'bio_' + b + '_res_' + re;
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
+        return {
+          catchment_id: r.catchment_id,
+          _classified: cls,
+          _has_acpv_overlay: r.value_source === 'acpv',
+          _acpv_group_key: r.acpv_group_key
+        };
+      });
+    },
+    biowasteCollectionCount: function (records) {
+      return records.map(function (r) {
+        var cls;
+        if (r.is_door_to_door === false) {
+          cls = 'no_door_to_door';
+        } else if (r.collection_count === null) {
+          cls = null;
+        } else if (r.has_seasonal_variation) {
+          cls = 'seasonal';
+        } else if (r.collection_count >= 104) {
+          cls = 'twice_weekly';
+        } else if (r.collection_count >= 52) {
+          cls = 'weekly';
+        } else if (r.collection_count >= 26) {
+          cls = 'biweekly';
+        } else {
+          cls = 'less_frequent';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
+    biowasteCollectionPointCount: function (records) {
+      return records.map(function (r) {
+        var value = r.collection_point_count;
+        var cls;
+        if (value === null || value === undefined) {
+          cls = r.is_door_to_door ? 'full_dtd' : null;
+        } else if (value >= 59) {
+          cls = 'very_high';
+        } else if (value >= 10) {
+          cls = 'high';
+        } else if (value >= 2) {
+          cls = 'medium';
+        } else {
+          cls = 'very_low';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
+    biowasteFrequency: function (records) {
+      var NO_BIO = ['No separate collection', 'Bring point', 'Recycling centre',
+        'On demand kerbside collection', 'Home-composting'];
+      return records.map(function (r) {
+        var cls = NO_BIO.indexOf(r.frequency_type) !== -1
+          ? 'no_bio_collection'
+          : r.frequency_type;
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
+    biowasteImpurity: function (records) {
+      return records.map(function (r) {
+        var cls;
+        if (r.no_collection) {
+          cls = 'no_collection';
+        } else if (r.impurity_rate === null) {
+          cls = null;
+        } else if (r.impurity_rate <= 5) {
+          cls = 'very_low';
+        } else if (r.impurity_rate <= 10) {
+          cls = 'low';
+        } else if (r.impurity_rate <= 20) {
+          cls = 'medium';
+        } else if (r.impurity_rate <= 40) {
+          cls = 'high';
+        } else {
+          cls = 'very_high';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
+    biowasteMinBinSize: function (records) {
+      return records.map(function (r) {
+        var cls;
+        if (r.is_door_to_door === false) {
+          cls = 'no_door_to_door';
+        } else if (r.min_bin_size === null) {
+          cls = null;
+        } else if (r.min_bin_size <= 26.5) {
+          cls = 'xs';
+        } else if (r.min_bin_size <= 60) {
+          cls = 'small';
+        } else if (r.min_bin_size <= 120) {
+          cls = 'medium';
+        } else {
+          cls = 'large';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
+    biowasteRequiredBinCapacity: function (records) {
+      return records.map(function (r) {
+        var cls;
+        if (r.is_door_to_door === false) {
+          cls = 'no_door_to_door';
+        } else if (r.required_bin_capacity === null) {
+          cls = null;
+        } else if (r.required_bin_capacity <= 5) {
+          cls = 'very_low';
+        } else if (r.required_bin_capacity <= 10) {
+          cls = 'low';
+        } else if (r.required_bin_capacity <= 20) {
+          cls = 'medium';
+        } else if (r.required_bin_capacity <= 60) {
+          cls = 'high';
+        } else {
+          cls = 'very_high';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
+    collectionCountRatio: function (records) {
+      return records.map(function (r) {
+        var cls;
+        if (r.bio_is_door_to_door === false ||
+          (r.bio_is_door_to_door == null && r.residual_count != null)) {
+          cls = 'no_bio';
+        } else if (r.bio_has_seasonal_variation) {
+          cls = 'seasonal';
+        } else if (r.bio_count === null || r.bio_count === undefined) {
+          cls = null;
+        } else if (r.ratio === null || r.ratio === undefined) {
+          cls = null;
+        } else if (r.ratio > 1.5) {
+          cls = 'bio_2x';
+        } else if (r.ratio < 0.67) {
+          cls = 'bio_half';
+        } else {
+          cls = 'same';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
+    collectionPointCount: function (records) {
+      return records.map(function (r) {
+        var value = r.collection_point_count;
+        var cls;
+        if (value === null || value === undefined) {
+          cls = r.is_door_to_door ? 'full_dtd' : null;
+        } else if (value > 10) {
+          cls = 'high';
+        } else if (value > 5) {
+          cls = 'medium';
+        } else if (value > 1) {
+          cls = 'low';
+        } else {
+          cls = 'very_low';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
+    collectionPointCountRatio: function (records) {
+      return records.map(function (r) {
+        var cls;
+        if (r.bio_is_door_to_door === false ||
+          (r.bio_is_door_to_door == null && r.residual_count != null)) {
+          cls = 'no_bio';
+        } else if (r.bio_count === null || r.bio_count === undefined) {
+          cls = null;
+        } else if (r.ratio === null || r.ratio === undefined) {
+          cls = null;
+        } else if (r.ratio > 1.05) {
+          cls = 'bio_more';
+        } else if (r.ratio < 0.95) {
+          cls = 'bio_less';
+        } else {
+          cls = 'same';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
+    collectionSupport: function (records) {
+      var KEY_MAP = {
+        'allowed': 'a',
+        'forbidden': 'f',
+        'no_data': 'n'
+      };
+      return records.map(function (r) {
+        var cls;
+        if (r.paper_bags === 'no_collection') {
+          cls = 'no_collection';
+        } else {
+          var p = KEY_MAP[r.paper_bags] || 'n';
+          var b = KEY_MAP[r.plastic_bags] || 'n';
+          cls = 'paper_' + p + '_plastic_' + b;
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
+    combinedCollectionCount: function (records) {
+      function bucket(count) {
+        if (count === null || count === undefined) return null;
+        if (count > 26) return 'more';
+        if (count >= 24) return 'bi';
+        return 'less';
+      }
+      return records.map(function (r) {
+        var b = bucket(r.bio_count);
+        var re = bucket(r.residual_count);
+        var cls;
+        if (r.bio_is_door_to_door === false ||
+          (r.bio_is_door_to_door == null && r.residual_count != null)) {
+          cls = 'no_bio';
+        } else if (b === null) {
+          cls = null;
+        } else if (re === null) {
+          cls = null;
+        } else {
+          cls = 'bio_' + b + '_res_' + re;
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
     combinedCollectionSystem: function (records) {
-        return records.map(function (r) {
-          var bio = r.bio_collection_system;
-          var residual = r.residual_collection_system;
-          return {
-            catchment_id: r.catchment_id,
-            _classified: bio && residual ? bio + ' / ' + residual : null
-          };
-        });
-      },
+      return records.map(function (r) {
+        var bio = r.bio_collection_system;
+        var residual = r.residual_collection_system;
+        return {
+          catchment_id: r.catchment_id,
+          _classified: bio && residual ? bio + ' / ' + residual : null
+        };
+      });
+    },
     combinedFeeSystem: function (records) {
-        return records.map(function (r) {
-          var cls;
-          var noSep = ['No separate collection', 'Recycling centre', 'Bring point'];
-          if (noSep.indexOf(r.bio_fee) !== -1) {
-            cls = 'no_bio';
-          } else if (r.bio_fee === 'Flexible' && r.residual_fee === 'Flexible') {
-            cls = 'flex_flex';
-          } else if (r.bio_fee === 'No fee' && r.residual_fee === 'Flexible') {
-            cls = 'no_fee_flex';
-          } else if (r.bio_fee === 'No fee' && r.residual_fee === 'Pay as you throw (PAYT)') {
-            cls = 'no_fee_payt';
-          } else if (r.bio_fee === 'Pay as you throw (PAYT)' && r.residual_fee === 'Pay as you throw (PAYT)') {
-            cls = 'payt_payt';
-          } else if (r.bio_fee === 'Flexible' && r.residual_fee === 'Pay as you throw (PAYT)') {
-            cls = 'flex_payt';
-          } else if (r.bio_fee === 'Flexible' && r.residual_fee === 'Flexible+') {
-            cls = 'flex_flex_plus';
-          } else if (r.bio_fee && r.residual_fee && r.bio_fee !== 'no_data' && r.residual_fee !== 'no_data') {
-            cls = 'other_combined';
-          } else {
-            cls = null;
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
+      return records.map(function (r) {
+        var cls;
+        var noSep = ['No separate collection', 'Recycling centre', 'Bring point'];
+        if (noSep.indexOf(r.bio_fee) !== -1) {
+          cls = 'no_bio';
+        } else if (r.bio_fee === 'Flexible' && r.residual_fee === 'Flexible') {
+          cls = 'flex_flex';
+        } else if (r.bio_fee === 'No fee' && r.residual_fee === 'Flexible') {
+          cls = 'no_fee_flex';
+        } else if (r.bio_fee === 'No fee' && r.residual_fee === 'Pay as you throw (PAYT)') {
+          cls = 'no_fee_payt';
+        } else if (r.bio_fee === 'Pay as you throw (PAYT)' && r.residual_fee === 'Pay as you throw (PAYT)') {
+          cls = 'payt_payt';
+        } else if (r.bio_fee === 'Flexible' && r.residual_fee === 'Pay as you throw (PAYT)') {
+          cls = 'flex_payt';
+        } else if (r.bio_fee === 'Flexible' && r.residual_fee === 'Flexible+') {
+          cls = 'flex_flex_plus';
+        } else if (r.bio_fee && r.residual_fee && r.bio_fee !== 'no_data' && r.residual_fee !== 'no_data') {
+          cls = 'other_combined';
+        } else {
+          cls = null;
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
     combinedFrequency: function (records) {
-        var TYPE_KEY = {
-          'Fixed':          'fixed',
-          'Fixed-Flexible': 'flexible',
-          'Fixed-Seasonal': 'seasonal'
-        };
-        var NO_BIO = ['No separate collection', 'Bring point', 'Recycling centre',
-                      'On demand kerbside collection', 'Home-composting'];
-        return records.map(function (r) {
-          var cls;
-          if (NO_BIO.indexOf(r.bio_frequency) !== -1) {
-            cls = 'no_bio_collection';
-          } else {
-            var b = TYPE_KEY[r.bio_frequency] || 'unknown';
-            var re = TYPE_KEY[r.residual_frequency] || 'unknown';
-            cls = 'bio_' + b + '_res_' + re;
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
+      var TYPE_KEY = {
+        'Fixed': 'fixed',
+        'Fixed-Flexible': 'flexible',
+        'Fixed-Seasonal': 'seasonal'
+      };
+      var NO_BIO = ['No separate collection', 'Bring point', 'Recycling centre',
+        'On demand kerbside collection', 'Home-composting'];
+      return records.map(function (r) {
+        var cls;
+        if (NO_BIO.indexOf(r.bio_frequency) !== -1) {
+          cls = 'no_bio_collection';
+        } else {
+          var b = TYPE_KEY[r.bio_frequency] || 'unknown';
+          var re = TYPE_KEY[r.residual_frequency] || 'unknown';
+          cls = 'bio_' + b + '_res_' + re;
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
     connectionRate: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (!r.is_door_to_door) {
-            cls = 'no_d2d';
-          } else if (r.connection_rate == null) {
-            cls = null;
-          } else if (r.connection_rate >= 0.75) {
-            cls = '75-100';
-          } else if (r.connection_rate >= 0.50) {
-            cls = '50-74';
-          } else if (r.connection_rate >= 0.25) {
-            cls = '25-49';
-          } else {
-            cls = '0-24';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
+      return records.map(function (r) {
+        var cls;
+        if (!r.is_door_to_door) {
+          cls = 'no_d2d';
+        } else if (r.connection_rate == null) {
+          cls = null;
+        } else if (r.connection_rate >= 0.75) {
+          cls = '75-100';
+        } else if (r.connection_rate >= 0.50) {
+          cls = '50-74';
+        } else if (r.connection_rate >= 0.25) {
+          cls = '25-49';
+        } else {
+          cls = '0-24';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
     denmarkCollectionSupport: function (records) {
-        var KEY_MAP = {
-          'allowed':  'a',
-          'forbidden': 'f',
-          'no_data':  'n'
-        };
-        return records.map(function (r) {
-          var cls;
-          if (r.paper_bags === 'no_collection') {
-            cls = 'no_collection';
-          } else {
-            var p = KEY_MAP[r.paper_bags] || 'n';
-            var b = KEY_MAP[r.plastic_bags] || 'n';
-            cls = 'paper_' + p + '_plastic_' + b;
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
+      var KEY_MAP = {
+        'allowed': 'a',
+        'forbidden': 'f',
+        'no_data': 'n'
+      };
+      return records.map(function (r) {
+        var cls;
+        if (r.paper_bags === 'no_collection') {
+          cls = 'no_collection';
+        } else {
+          var p = KEY_MAP[r.paper_bags] || 'n';
+          var b = KEY_MAP[r.plastic_bags] || 'n';
+          cls = 'paper_' + p + '_plastic_' + b;
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
     greenWasteCollectionAmount: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (r.no_collection) {
-            cls = 'no_green';
-          } else if (r.amount === null) {
-            cls = null;
-          } else if (r.amount > 150) {
-            cls = 'very_high';
-          } else if (r.amount > 100) {
-            cls = 'high';
-          } else if (r.amount > 50) {
-            cls = 'medium';
-          } else {
-            cls = 'low';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
+      return records.map(function (r) {
+        var cls;
+        if (r.no_collection) {
+          cls = 'no_green';
+        } else if (r.amount === null) {
+          cls = null;
+        } else if (r.amount > 150) {
+          cls = 'very_high';
+        } else if (r.amount > 100) {
+          cls = 'high';
+        } else if (r.amount > 50) {
+          cls = 'medium';
+        } else {
+          cls = 'low';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
     minBinSizeRatio: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (r.bio_is_door_to_door === false ||
-              (r.bio_is_door_to_door == null && r.residual_min_bin_size != null)) {
-            cls = 'no_bio';
-          } else if (r.bio_min_bin_size === null || r.bio_min_bin_size === undefined) {
-            cls = null;
-          } else if (r.ratio === null || r.ratio === undefined) {
-            cls = null;
-          } else if (r.ratio > 1.05) {
-            cls = 'bio_larger';
-          } else if (r.ratio < 0.95) {
-            cls = 'bio_smaller';
-          } else {
-            cls = 'same';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
+      return records.map(function (r) {
+        var cls;
+        if (r.bio_is_door_to_door === false ||
+          (r.bio_is_door_to_door == null && r.residual_min_bin_size != null)) {
+          cls = 'no_bio';
+        } else if (r.bio_min_bin_size === null || r.bio_min_bin_size === undefined) {
+          cls = null;
+        } else if (r.ratio === null || r.ratio === undefined) {
+          cls = null;
+        } else if (r.ratio > 1.05) {
+          cls = 'bio_larger';
+        } else if (r.ratio < 0.95) {
+          cls = 'bio_smaller';
+        } else {
+          cls = 'same';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
     organicCollectionAmount: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (r.amount === null) {
-            cls = null;
-          } else if (r.amount > 300) {
-            cls = 'very_high';
-          } else if (r.amount > 200) {
-            cls = 'high';
-          } else if (r.amount > 100) {
-            cls = 'medium';
-          } else if (r.amount > 50) {
-            cls = 'low';
-          } else {
-            cls = 'very_low';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
+      return records.map(function (r) {
+        var cls;
+        if (r.amount === null) {
+          cls = null;
+        } else if (r.amount > 300) {
+          cls = 'very_high';
+        } else if (r.amount > 200) {
+          cls = 'high';
+        } else if (r.amount > 100) {
+          cls = 'medium';
+        } else if (r.amount > 50) {
+          cls = 'low';
+        } else {
+          cls = 'very_low';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
     organicWasteRatio: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (r.ratio === null) {
-            cls = null;
-          } else if (r.ratio > 0.66) {
-            cls = 'very_high';
-          } else if (r.ratio > 0.50) {
-            cls = 'high';
-          } else if (r.ratio > 0.33) {
-            cls = 'medium';
-          } else {
-            cls = 'low';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
+      return records.map(function (r) {
+        var cls;
+        if (r.ratio === null) {
+          cls = null;
+        } else if (r.ratio > 0.66) {
+          cls = 'very_high';
+        } else if (r.ratio > 0.50) {
+          cls = 'high';
+        } else if (r.ratio > 0.33) {
+          cls = 'medium';
+        } else {
+          cls = 'low';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
     residualCollectionAmount: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (r.amount === null) {
-            cls = null;
-          } else if (r.amount > 225) {
-            cls = 'high';
-          } else if (r.amount > 150) {
-            cls = 'medium';
-          } else if (r.amount > 75) {
-            cls = 'low';
-          } else {
-            cls = 'very_low';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
+      return records.map(function (r) {
+        var cls;
+        if (r.amount === null) {
+          cls = null;
+        } else if (r.amount > 225) {
+          cls = 'high';
+        } else if (r.amount > 150) {
+          cls = 'medium';
+        } else if (r.amount > 75) {
+          cls = 'low';
+        } else {
+          cls = 'very_low';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
     residualCollectionCount: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (r.has_seasonal_variation) {
-            cls = 'seasonal';
-          } else if (r.collection_count >= 104) {
-            cls = 'twice_weekly';
-          } else if (r.collection_count >= 52) {
-            cls = 'weekly';
-          } else if (r.collection_count >= 26) {
-            cls = 'biweekly';
-          } else {
-            cls = 'less_frequent';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
+      return records.map(function (r) {
+        var cls;
+        if (r.has_seasonal_variation) {
+          cls = 'seasonal';
+        } else if (r.collection_count >= 104) {
+          cls = 'twice_weekly';
+        } else if (r.collection_count >= 52) {
+          cls = 'weekly';
+        } else if (r.collection_count >= 26) {
+          cls = 'biweekly';
+        } else {
+          cls = 'less_frequent';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
     residualCollectionPointCount: function (records) {
-        return records.map(function (r) {
-          var value = r.collection_point_count;
-          var cls;
-          if (value === null || value === undefined) {
-            cls = r.is_door_to_door ? 'full_dtd' : null;
-          } else if (value >= 121) {
-            cls = 'very_high';
-          } else if (value >= 59) {
-            cls = 'high';
-          } else if (value >= 8) {
-            cls = 'medium';
-          } else {
-            cls = 'low';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
+      return records.map(function (r) {
+        var value = r.collection_point_count;
+        var cls;
+        if (value === null || value === undefined) {
+          cls = r.is_door_to_door ? 'full_dtd' : null;
+        } else if (value >= 121) {
+          cls = 'very_high';
+        } else if (value >= 59) {
+          cls = 'high';
+        } else if (value >= 8) {
+          cls = 'medium';
+        } else {
+          cls = 'low';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
     residualMinBinSize: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (r.min_bin_size === null) {
-            cls = null;
-          } else if (r.min_bin_size <= 30) {
-            cls = 'xs';
-          } else if (r.min_bin_size <= 60) {
-            cls = 'small';
-          } else if (r.min_bin_size <= 120) {
-            cls = 'medium';
-          } else {
-            cls = 'large';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
+      return records.map(function (r) {
+        var cls;
+        if (r.min_bin_size === null) {
+          cls = null;
+        } else if (r.min_bin_size <= 30) {
+          cls = 'xs';
+        } else if (r.min_bin_size <= 60) {
+          cls = 'small';
+        } else if (r.min_bin_size <= 120) {
+          cls = 'medium';
+        } else {
+          cls = 'large';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
     residualRequiredBinCapacity: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (r.required_bin_capacity === null) {
-            cls = null;
-          } else if (r.required_bin_capacity <= 10) {
-            cls = 'very_low';
-          } else if (r.required_bin_capacity <= 20) {
-            cls = 'low';
-          } else if (r.required_bin_capacity <= 40) {
-            cls = 'medium';
-          } else if (r.required_bin_capacity <= 80) {
-            cls = 'high';
-          } else {
-            cls = 'very_high';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
+      return records.map(function (r) {
+        var cls;
+        if (r.required_bin_capacity === null) {
+          cls = null;
+        } else if (r.required_bin_capacity <= 10) {
+          cls = 'very_low';
+        } else if (r.required_bin_capacity <= 20) {
+          cls = 'low';
+        } else if (r.required_bin_capacity <= 40) {
+          cls = 'medium';
+        } else if (r.required_bin_capacity <= 80) {
+          cls = 'high';
+        } else {
+          cls = 'very_high';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
     wasteRatio: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (r.ratio === null) {
-            if (r.bio_amount === null && r.residual_amount !== null) {
-              cls = 'no_bio';
-            } else {
-              cls = null;
-            }
-          } else if (r.ratio > 0.66) {
-            cls = 'very_high';
-          } else if (r.ratio > 0.50) {
-            cls = 'high';
-          } else if (r.ratio > 0.33) {
-            cls = 'low';
+      return records.map(function (r) {
+        var cls;
+        if (r.ratio === null) {
+          if (r.bio_amount === null && r.residual_amount !== null) {
+            cls = 'no_bio';
           } else {
-            cls = 'very_low';
-          }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
-    weeklyBpAccessDays: function (records) {
-        return records.map(function (r) {
-          var cls;
-          if (!r.has_bring_point) {
-            cls = 'no_bp';
-          } else if (r.weekly_access_days === null) {
             cls = null;
-          } else if (r.weekly_access_days >= 7) {
-            cls = '7';
-          } else if (r.weekly_access_days >= 5) {
-            cls = '5_6';
-          } else if (r.weekly_access_days >= 3) {
-            cls = '3_4';
-          } else {
-            cls = '1_2';
           }
-          return { catchment_id: r.catchment_id, _classified: cls };
-        });
-      },
+        } else if (r.ratio > 0.66) {
+          cls = 'very_high';
+        } else if (r.ratio > 0.50) {
+          cls = 'high';
+        } else if (r.ratio > 0.33) {
+          cls = 'low';
+        } else {
+          cls = 'very_low';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
+    weeklyBpAccessDays: function (records) {
+      return records.map(function (r) {
+        var cls;
+        if (!r.has_bring_point) {
+          cls = 'no_bp';
+        } else if (r.weekly_access_days === null) {
+          cls = null;
+        } else if (r.weekly_access_days >= 7) {
+          cls = '7';
+        } else if (r.weekly_access_days >= 5) {
+          cls = '5_6';
+        } else if (r.weekly_access_days >= 3) {
+          cls = '3_4';
+        } else {
+          cls = '1_2';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
     greenWasteCollectionSystemCount: function (records) {
       return records.map(function (r) {
         var v = r.collection_system_count;
@@ -1603,8 +1667,14 @@ var WasteAtlasChoropleth = (function () {
     var loadingEl = document.getElementById(cfg.loadingId);
     var btnSVG = document.getElementById('btn-export-svg');
     var btnPNG = document.getElementById('btn-export-png');
-    var btnLoad = document.getElementById('btn-load');
     var fileBase = cfg.fileBase || 'waste_atlas_map';
+
+    function _exportFileBase() {
+      if (cfg.changeMode && _lastLoadCfg) {
+        return fileBase + '_change_' + _lastLoadCfg.fromYear + '_' + _lastLoadCfg.year;
+      }
+      return fileBase;
+    }
 
     function load(country, year, preserveScope, fromYear) {
       _show(loadingEl);
@@ -1615,12 +1685,26 @@ var WasteAtlasChoropleth = (function () {
         && country === cfg.country;
       var loadCfg = _configForSelection(cfg, country, year, preserveScope || isConfiguredMultiRegion);
       if (fromYear) loadCfg.fromYear = fromYear;
+      if (loadCfg.changeMode) {
+        // ACPV overlays/outlines are not meaningful for two-year diffs.
+        delete loadCfg.outlineGeoJsonUrl;
+        delete loadCfg.overlayPatternField;
+        delete loadCfg.overlayPatternLegendLabel;
+        delete loadCfg.exportOverlayPatternLegendLabel;
+      }
 
       _fetchAll(loadCfg)
         .then(function (data) {
+          var renderCfg = loadCfg;
+          if (loadCfg.changeMode) {
+            data = Object.assign({}, data, {
+              thematicData: _changeRecords(loadCfg, data.fromThematicData, data.thematicData)
+            });
+            renderCfg = _changeRenderConfig(loadCfg, cfg.title);
+          }
           _lastData = data;
-          _lastLoadCfg = loadCfg;
-          _render(data, loadCfg);
+          _lastLoadCfg = renderCfg;
+          _render(data, renderCfg);
           _hide(loadingEl);
           if (btnSVG) btnSVG.disabled = false;
           if (btnPNG) btnPNG.disabled = false;
@@ -1637,26 +1721,12 @@ var WasteAtlasChoropleth = (function () {
 
     load(cfg.country, cfg.year, true);
 
-    if (cfg.fromYear) {
-      var fromYearSelect = document.getElementById('sel-from-year');
-      var toYearSelect = document.getElementById('sel-to-year');
-      if (btnLoad) {
-        btnLoad.addEventListener('click', function (event) {
-          if (event && event.preventDefault) event.preventDefault();
-          if (event && event.stopPropagation) event.stopPropagation();
-          var fromYear = fromYearSelect ? parseInt(fromYearSelect.value, 10) || cfg.fromYear : cfg.fromYear;
-          var year = toYearSelect ? parseInt(toYearSelect.value, 10) || cfg.year : cfg.year;
-          load(cfg.country, year, true, fromYear);
-        });
-      }
-    } else {
-      initSelectorControls(function (_selectedMapSet, year) {
-        load(cfg.country, year, true);
-      });
-    }
+    initSelectorControls(function (_selectedMapSet, year, _preserveScope, fromYear) {
+      load(cfg.country, year, true, fromYear);
+    }, { useChangeUrls: !!cfg.changeMode });
 
-    if (btnSVG) btnSVG.addEventListener('click', function () { exportSVG(fileBase + '.svg'); });
-    if (btnPNG) btnPNG.addEventListener('click', function () { exportPNG(fileBase + '.png'); });
+    if (btnSVG) btnSVG.addEventListener('click', function () { exportSVG(_exportFileBase() + '.svg'); });
+    if (btnPNG) btnPNG.addEventListener('click', function () { exportPNG(_exportFileBase() + '.png'); });
   }
 
   return {

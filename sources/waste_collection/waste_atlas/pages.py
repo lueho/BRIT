@@ -719,17 +719,6 @@ MAP_PAGES = [
         "map/germany/collection-system/",
         "waste-atlas-germany-collection-system-map",
     ),
-    # change map (uses its own template + selector)
-    _page(
-        "germany",
-        "collection_system",
-        "Biowaste collection system changes",
-        "map/germany/collection-system-change/",
-        "waste-atlas-germany-collection-system-change-map",
-        change=True,
-        data_url="/waste_collection/api/waste-atlas/collection-system-change/",
-        template="waste_atlas/karte50_biowaste_collection_system_change.html",
-    ),
     _page(
         "germany",
         "connection_rate",

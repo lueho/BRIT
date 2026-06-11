@@ -64,9 +64,10 @@ def _build_selections():
         themes = selections.setdefault(
             map_set, {"label": MAP_SET_LABELS[map_set], "themes": {}}
         )["themes"]
-        entry = themes.setdefault(page["theme"], {"label": THEME_LABELS[page["theme"]]})
-        route_key = "change_route_name" if page.get("change") else "route_name"
-        entry[route_key] = page["name"]
+        themes[page["theme"]] = {
+            "label": THEME_LABELS[page["theme"]],
+            "route_name": page["name"],
+        }
     return dict(sorted(selections.items()))
 
 
@@ -191,9 +192,9 @@ def build_map_selection_context(
                 "waste_category": _selection_waste_category(theme),
                 "label": _selection_theme_label(theme, theme_selection),
                 "url": reverse_func(theme_selection["route_name"]),
-                "change_url": reverse_func(theme_selection["change_route_name"])
-                if "change_route_name" in theme_selection
-                else None,
+                "change_url": reverse_func(
+                    "waste-atlas-change-map", args=[map_set, theme]
+                ),
             }
             for theme, theme_selection in sorted(
                 map_selection["themes"].items(), key=_theme_sort_key
