@@ -62,6 +62,19 @@ var WasteAtlasChoropleth = (function () {
       });
   }
 
+  function _isNoDataValue(value, categories) {
+    if (value == null) return true;
+    for (var i = 0; i < categories.length; i++) {
+      var cat = categories[i];
+      if (typeof cat.test === 'function') {
+        if (cat.test(value)) return false;
+      } else if (cat.value === value) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   function _colorFor(value, categories, noDataColor) {
     if (value == null) return noDataColor || '#e0e0e0';
     for (var i = 0; i < categories.length; i++) {
@@ -73,6 +86,39 @@ var WasteAtlasChoropleth = (function () {
       }
     }
     return noDataColor || '#e0e0e0';
+  }
+
+  /**
+   * Merge thematic records into the catchment features and flag on the
+   * config whether any rendered feature falls back to the no-data color.
+   * Idempotent; used by both the screen render and the export layout so
+   * the "No data" legend entry is only drawn when such features exist.
+   */
+  function _annotateFeatures(data, cfg) {
+    var records = Array.isArray(data.thematicData) ? data.thematicData
+      : (data.thematicData.results || []);
+    if (typeof cfg.transformData === 'function') {
+      records = cfg.transformData(records);
+    } else if (cfg.transformName && transforms[cfg.transformName]) {
+      records = transforms[cfg.transformName](records);
+    }
+    var lookup = {};
+    records.forEach(function (r) { lookup[r.catchment_id] = r; });
+
+    var hasNoData = false;
+    if (data.catchments.features) {
+      data.catchments.features.forEach(function (f) {
+        var rec = lookup[f.properties.catchment_id];
+        f.properties._thematic_value = rec ? rec[cfg.dataField] : null;
+        f.properties._overlay_pattern = rec && cfg.overlayPatternField
+          ? Boolean(rec[cfg.overlayPatternField])
+          : false;
+        if (_isNoDataValue(f.properties._thematic_value, cfg.categories)) {
+          hasNoData = true;
+        }
+      });
+    }
+    cfg._hasNoData = hasNoData;
   }
 
   function _overlayPatternId(cfg) {
@@ -401,7 +447,7 @@ var WasteAtlasChoropleth = (function () {
       if (!exportMode) return item;
       return Object.assign({}, item, { label: _exportLegendLabel(item) });
     });
-    if (cfg.noDataLabel) {
+    if (cfg.noDataLabel && cfg._hasNoData !== false) {
       items.push({
         label: exportMode && cfg.exportNoDataLabel ? cfg.exportNoDataLabel : cfg.noDataLabel,
         color: cfg.noDataColor || '#e0e0e0'
@@ -498,6 +544,8 @@ var WasteAtlasChoropleth = (function () {
   }
 
   function _exportLayout(data, cfg) {
+    // Ensure cfg._hasNoData is up to date before measuring the legend.
+    _annotateFeatures(data, cfg);
     var margin = 46;
     var titleBlock = 46;
     var gap = 46;
@@ -1169,27 +1217,8 @@ var WasteAtlasChoropleth = (function () {
 
   function _render(data, cfg, options) {
     options = options || {};
-    // Build lookup: catchment_id -> thematic record
-    var records = Array.isArray(data.thematicData) ? data.thematicData
-      : (data.thematicData.results || []);
-    if (typeof cfg.transformData === 'function') {
-      records = cfg.transformData(records);
-    } else if (cfg.transformName && transforms[cfg.transformName]) {
-      records = transforms[cfg.transformName](records);
-    }
-    var lookup = {};
-    records.forEach(function (r) { lookup[r.catchment_id] = r; });
-
     // Merge thematic data into catchment features
-    if (data.catchments.features) {
-      data.catchments.features.forEach(function (f) {
-        var rec = lookup[f.properties.catchment_id];
-        f.properties._thematic_value = rec ? rec[cfg.dataField] : null;
-        f.properties._overlay_pattern = rec && cfg.overlayPatternField
-          ? Boolean(rec[cfg.overlayPatternField])
-          : false;
-      });
-    }
+    _annotateFeatures(data, cfg);
 
     // SVG dimensions
     var container = document.getElementById(cfg.containerId);
@@ -1423,7 +1452,7 @@ var WasteAtlasChoropleth = (function () {
 
     items = cfg.categories.slice();
     legendRows = items.length + (hasOverlayLegend ? 1 : 0);
-    if (cfg.noDataLabel) {
+    if (cfg.noDataLabel && cfg._hasNoData !== false) {
       items.push({ label: cfg.noDataLabel, color: cfg.noDataColor || '#e0e0e0' });
       legendRows += 1;
     }
