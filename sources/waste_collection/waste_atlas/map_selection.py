@@ -21,6 +21,7 @@ THEME_LABELS = {
     "biowaste_min_bin_size": "Biowaste bin size",
     "biowaste_required_bin_capacity": "Biowaste bin capacity",
     "collection_count_ratio": "Collection-count ratio",
+    "collection_orga_level": "Collections: administrative level",
     "collection_point_count": "Collection points",
     "collection_point_count_ratio": "Collection-point ratio",
     "collection_support": "Collection aids",
@@ -34,7 +35,7 @@ THEME_LABELS = {
     "green_waste_collection_amount": "Green waste amount",
     "green_waste_collection_system_count": "Green waste system count",
     "min_bin_size_ratio": "Minimum bin-size ratio",
-    "orga_level": "Administrative level",
+    "orga_level": "Collectors: administrative level",
     "organic_collection_amount": "Organic-fraction amount",
     "organic_waste_ratio": "Organic-fraction share",
     "paper_bags": "Paper products",
@@ -77,6 +78,7 @@ MAP_SELECTION_YEARS = ("2020", "2021", "2022", "2023", "2024")
 
 MAP_SELECTION_THEME_ORDER = {
     "orga_level": 10,
+    "collection_orga_level": 11,
     "population_density": 20,
     "collection_system": 100,
     "food_waste_category": 110,

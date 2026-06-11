@@ -30,6 +30,7 @@ from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import (
     GeoDataset,
+    LauRegion,
     MapConfiguration,
     MapLayerConfiguration,
     MapLayerStyle,
@@ -4053,6 +4054,14 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
         self.assertEqual(germany_selection["label"], "Germany")
         self.assertEqual(
+            germany_selection["themes"]["orga_level"]["label"],
+            "Collectors: administrative level",
+        )
+        self.assertEqual(
+            germany_selection["themes"]["collection_orga_level"]["label"],
+            "Collections: administrative level",
+        )
+        self.assertEqual(
             collection_system_selection["label"], "Biowaste collection systems"
         )
         self.assertEqual(
@@ -4060,6 +4069,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
             "waste-atlas-germany-collection-system-map",
         )
         self.assertEqual(germany_themes[0]["value"], "orga_level")
+        self.assertEqual(germany_themes[1]["value"], "collection_orga_level")
         self.assertEqual(
             germany_themes[
                 [theme["value"] for theme in germany_themes].index("collection_system")
@@ -4075,6 +4085,14 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(
             germany_themes[
                 [theme["value"] for theme in germany_themes].index("orga_level")
+            ]["waste_category"],
+            "general",
+        )
+        self.assertEqual(
+            germany_themes[
+                [theme["value"] for theme in germany_themes].index(
+                    "collection_orga_level"
+                )
             ]["waste_category"],
             "general",
         )
@@ -4098,7 +4116,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
             response,
             f'data-url="{reverse("waste-atlas-south-tyrol-orga-level-map")}"',
         )
-        self.assertContains(response, "Administrative level of waste collection")
+        self.assertContains(response, "Administrative level of collectors")
         self.assertContains(response, "Map overview")
         self.assertContains(response, "Theme")
         self.assertContains(response, "No data")
@@ -4193,7 +4211,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
             f'data-url="{reverse("waste-atlas-orga-level-italy-map")}"',
         )
         self.assertContains(response, 'value="2024" selected')
-        self.assertContains(response, "Administrative level of waste collection")
+        self.assertContains(response, "Administrative level of collectors")
         self.assertContains(response, "Map overview")
         self.assertContains(response, "Theme")
         cfg = self._map_config(response)
@@ -4251,11 +4269,106 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, f'value="{expected_country}"')
                 self.assertContains(response, f'value="{expected_year}" selected')
-                self.assertContains(
-                    response, "Administrative level of waste collection"
-                )
+                self.assertContains(response, "Administrative level of collectors")
                 self.assertContains(response, "Map overview")
                 self.assertContains(response, "No data")
+
+    def test_sweden_orga_level_map_uses_collector_orga_level_api(self):
+        response = self.client.get(reverse("waste-atlas-orga-level-sweden-map"))
+
+        self.assertEqual(response.status_code, 200)
+        cfg = self._map_config(response)
+        self.assertEqual(
+            cfg["dataUrl"], "/waste_collection/api/waste-atlas/collector-orga-level/"
+        )
+        self.assertEqual(
+            cfg["catchmentDataUrl"],
+            "/waste_collection/api/waste-atlas/catchment/collector-geojson/",
+        )
+        self.assertEqual(cfg["dataField"], "orga_level")
+        self.assertEqual(cfg["country"], "SE")
+        self.assertEqual(cfg["year"], 2024)
+
+    def test_sweden_collection_orga_level_map_uses_collection_catchments(self):
+        response = self.client.get(
+            reverse("waste-atlas-collection-orga-level-sweden-map")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Administrative level of collections")
+        cfg = self._map_config(response)
+        self.assertEqual(
+            cfg["dataUrl"], "/waste_collection/api/waste-atlas/collection-orga-level/"
+        )
+        self.assertEqual(
+            cfg["catchmentDataUrl"],
+            "/waste_collection/api/waste-atlas/catchment/collection-geojson/",
+        )
+        self.assertEqual(cfg["dataField"], "orga_level")
+        self.assertEqual(cfg["country"], "SE")
+        self.assertEqual(cfg["year"], 2024)
+
+    def test_orga_level_api_classifies_collector_catchment_region(self):
+        country = NutsRegion.objects.create(
+            nuts_id="SE",
+            cntr_code="SE",
+            levl_code=0,
+            name_latn="Sweden",
+            nuts_name="Sweden",
+        )
+        nuts_region = NutsRegion.objects.create(
+            nuts_id="SE1",
+            cntr_code="SE",
+            levl_code=1,
+            name_latn="Swedish NUTS",
+            nuts_name="Swedish NUTS",
+            parent=country,
+        )
+        lau_region = LauRegion.objects.create(
+            cntr_code="SE",
+            lau_id="0180",
+            lau_name="Stockholm",
+            nuts_parent=nuts_region,
+        )
+        Region.objects.filter(pk=lau_region.pk).update(country="SE")
+        collector_catchment = CollectionCatchment.objects.create(
+            name="Collector catchment",
+            region=lau_region.region_ptr,
+        )
+        collection_catchment = CollectionCatchment.objects.create(
+            name="Collection catchment",
+            region=Region.objects.create(name="Operational area", country="SE"),
+        )
+        collector = Collector.objects.create(
+            name="Collector",
+            catchment=collector_catchment,
+        )
+        Collection.objects.create(
+            name="Collection",
+            collector=collector,
+            catchment=collection_catchment,
+            valid_from=date(2024, 1, 1),
+        )
+
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/orga-level/?country=SE&year=2024"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            [{"catchment_id": collector_catchment.pk, "orga_level": "lau"}],
+        )
+
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/collection-orga-level/?country=SE&year=2024"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            [{"catchment_id": collection_catchment.pk, "orga_level": "individual"}],
+        )
 
     def test_netherlands_bundle_maps_default_to_nl_2024(self):
         """Dedicated Netherlands bundle maps default to country NL and year 2024."""
@@ -4446,7 +4559,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, 'value="BE-FL-BR"')
         self.assertContains(response, "selected>Flanders + Brussels</option>")
         self.assertContains(response, 'value="2022" selected')
-        self.assertContains(response, "Administrative level of waste collection")
+        self.assertContains(response, "Administrative level of collectors")
         self.assertContains(response, "Map overview")
         self.assertContains(response, "No data")
         self.assertContains(response, "BE1,BE2")
@@ -4491,7 +4604,15 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, reverse("waste-atlas-orga-level-italy-map"))
         self.assertContains(
             response,
-            "Administrative level of waste collection",
+            reverse("waste-atlas-collection-orga-level-italy-map"),
+        )
+        self.assertContains(
+            response,
+            "Collectors: administrative level",
+        )
+        self.assertContains(
+            response,
+            "Collections: administrative level",
         )
         self.assertContains(
             response, reverse("waste-atlas-italy-collection-system-map")
@@ -4515,7 +4636,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, reverse("waste-atlas-south-tyrol-orga-level-map"))
         self.assertContains(
             response,
-            "Administrative level of waste collection",
+            reverse("waste-atlas-south-tyrol-collection-orga-level-map"),
         )
         self.assertContains(
             response,
@@ -4540,7 +4661,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, reverse("waste-atlas-orga-level-sweden-map"))
         self.assertContains(
             response,
-            "Administrative level",
+            reverse("waste-atlas-collection-orga-level-sweden-map"),
         )
         self.assertContains(
             response, reverse("waste-atlas-bin-configuration-sweden-map")
@@ -4568,7 +4689,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, reverse("waste-atlas-orga-level-denmark-map"))
         self.assertContains(
             response,
-            "Administrative level",
+            reverse("waste-atlas-collection-orga-level-denmark-map"),
         )
         self.assertContains(
             response,
@@ -4612,7 +4733,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            "Administrative level",
+            reverse("waste-atlas-collection-orga-level-netherlands-map"),
         )
         self.assertContains(
             response,
@@ -4660,7 +4781,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            "Administrative level",
+            reverse("waste-atlas-collection-orga-level-belgium-flanders-map"),
         )
         self.assertContains(
             response,
@@ -4897,7 +5018,12 @@ class GenericMapTemplateTests(TestCase):
     def test_orga_level_renders_categories_in_json_config(self):
         content = self._render_generic("orga_level")
         self.assertIn(
-            '"dataUrl": "/waste_collection/api/waste-atlas/orga-level/"', content
+            '"dataUrl": "/waste_collection/api/waste-atlas/collector-orga-level/"',
+            content,
+        )
+        self.assertIn(
+            '"catchmentDataUrl": "/waste_collection/api/waste-atlas/catchment/collector-geojson/"',
+            content,
         )
         self.assertIn('"dataField": "orga_level"', content)
         self.assertIn('"value": "nuts"', content)

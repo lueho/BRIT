@@ -107,7 +107,8 @@ var WasteAtlasChoropleth = (function () {
     var nutsSuffix = cfg.nutsPrefix ? '&nuts_prefix=' + encodeURIComponent(cfg.nutsPrefix) : '';
     var collectionYear = cfg.collectionYear || cfg.year;
     var collectionYearSuffix = cfg.collectionYear ? '&collection_year=' + encodeURIComponent(cfg.collectionYear) : '';
-    var catchUrl = base + 'catchment/geojson/?country=' + cfg.country + '&year=' + collectionYear + nutsSuffix;
+    var catchmentDataUrl = cfg.catchmentDataUrl || (base + 'catchment/geojson/');
+    var catchUrl = catchmentDataUrl + '?country=' + cfg.country + '&year=' + collectionYear + nutsSuffix;
     var nuts0Url = '/maps/api/nuts_region/geojson/?levl_code=0&cntr_code=' + cfg.country;
     var nutsLevel = cfg.nutsLevel || 1;
     var nutsRegionUrl = '/maps/api/nuts_region/geojson/?levl_code=' + nutsLevel + '&cntr_code=' + cfg.country;

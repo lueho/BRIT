@@ -16,6 +16,7 @@ from .viewsets import (
     CatchmentPopulationViewSet,
     CatchmentViewSet,
     CollectionCountRatioViewSet,
+    CollectionOrgaLevelViewSet,
     CollectionPointCountRatioViewSet,
     CollectionPointCountViewSet,
     CollectionSupportViewSet,
@@ -59,6 +60,16 @@ router.register(
     "orga-level",
     OrgaLevelViewSet,
     basename="api-waste-atlas-orga-level",
+)
+router.register(
+    "collector-orga-level",
+    OrgaLevelViewSet,
+    basename="api-waste-atlas-collector-orga-level",
+)
+router.register(
+    "collection-orga-level",
+    CollectionOrgaLevelViewSet,
+    basename="api-waste-atlas-collection-orga-level",
 )
 router.register(
     "collection-system",

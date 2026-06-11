@@ -9,6 +9,42 @@ into the generic ``map.html`` template as JSON.
 ``static/js/waste_atlas_choropleth.js``.
 """
 
+ADMINISTRATIVE_LEVEL_CATEGORIES_DE = [
+    {
+        "value": "nuts",
+        "label": "Districts and district-free cities",
+        "color": "#93d163",
+    },
+    {
+        "value": "lau",
+        "label": "Municipal level",
+        "color": "#72a0dd",
+    },
+    {
+        "value": "individual",
+        "label": "Other administrative level",
+        "color": "#d491f3",
+    },
+]
+
+ADMINISTRATIVE_LEVEL_CATEGORIES_EU = [
+    {
+        "value": "nuts",
+        "label": "NUTS level",
+        "color": "#93d163",
+    },
+    {
+        "value": "lau",
+        "label": "LAU / municipal level",
+        "color": "#72a0dd",
+    },
+    {
+        "value": "individual",
+        "label": "Other administrative level",
+        "color": "#d491f3",
+    },
+]
+
 MAP_CONFIGS = {
     "access_control": {
         "title": "Access control for biowaste collection",
@@ -1237,56 +1273,48 @@ MAP_CONFIGS = {
         "fileBase": "min_bin_size_ratio",
     },
     "orga_level": {
-        "title": "Administrative level of waste collection",
-        "dataUrl": "/waste_collection/api/waste-atlas/orga-level/",
+        "title": "Administrative level of collectors",
+        "dataUrl": "/waste_collection/api/waste-atlas/collector-orga-level/",
+        "catchmentDataUrl": "/waste_collection/api/waste-atlas/catchment/collector-geojson/",
         "dataField": "orga_level",
-        "categories": [
-            {
-                "value": "nuts",
-                "label": "Districts and district-free cities",
-                "color": "#93d163",
-            },
-            {
-                "value": "lau",
-                "label": "Municipal level",
-                "color": "#72a0dd",
-            },
-            {
-                "value": "individual",
-                "label": "Other administrative level",
-                "color": "#d491f3",
-            },
-        ],
+        "categories": ADMINISTRATIVE_LEVEL_CATEGORIES_DE,
         "noDataColor": "#e0e0e0",
         "noDataLabel": "No data",
         "legendTitle": "Administrative level",
-        "fileBase": "administrative_level",
+        "fileBase": "collector_administrative_level",
     },
     "orga_level_eu": {
-        "title": "Administrative level of waste collection",
-        "dataUrl": "/waste_collection/api/waste-atlas/orga-level/",
+        "title": "Administrative level of collectors",
+        "dataUrl": "/waste_collection/api/waste-atlas/collector-orga-level/",
+        "catchmentDataUrl": "/waste_collection/api/waste-atlas/catchment/collector-geojson/",
         "dataField": "orga_level",
-        "categories": [
-            {
-                "value": "nuts",
-                "label": "NUTS level",
-                "color": "#93d163",
-            },
-            {
-                "value": "lau",
-                "label": "LAU / municipal level",
-                "color": "#72a0dd",
-            },
-            {
-                "value": "individual",
-                "label": "Other administrative level",
-                "color": "#d491f3",
-            },
-        ],
+        "categories": ADMINISTRATIVE_LEVEL_CATEGORIES_EU,
         "noDataColor": "#e0e0e0",
         "noDataLabel": "No data",
         "legendTitle": "Administrative level",
         "fileBase": "map29_orga_level_italy",
+    },
+    "collection_orga_level": {
+        "title": "Administrative level of collections",
+        "dataUrl": "/waste_collection/api/waste-atlas/collection-orga-level/",
+        "catchmentDataUrl": "/waste_collection/api/waste-atlas/catchment/collection-geojson/",
+        "dataField": "orga_level",
+        "categories": ADMINISTRATIVE_LEVEL_CATEGORIES_DE,
+        "noDataColor": "#e0e0e0",
+        "noDataLabel": "No data",
+        "legendTitle": "Administrative level",
+        "fileBase": "collection_administrative_level",
+    },
+    "collection_orga_level_eu": {
+        "title": "Administrative level of collections",
+        "dataUrl": "/waste_collection/api/waste-atlas/collection-orga-level/",
+        "catchmentDataUrl": "/waste_collection/api/waste-atlas/catchment/collection-geojson/",
+        "dataField": "orga_level",
+        "categories": ADMINISTRATIVE_LEVEL_CATEGORIES_EU,
+        "noDataColor": "#e0e0e0",
+        "noDataLabel": "No data",
+        "legendTitle": "Administrative level",
+        "fileBase": "collection_administrative_level",
     },
     "organic_collection_amount": {
         "title": "Aggregated collected amount of organic fractions (kg/cap/a)",

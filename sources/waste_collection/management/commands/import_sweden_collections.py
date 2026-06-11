@@ -32,8 +32,6 @@ from urllib.request import Request, urlopen
 import openpyxl
 from django.core.management.base import BaseCommand, CommandError
 
-from ...sweden_2024_map_data import load_map_import_details
-
 # ---------------------------------------------------------------------------
 # Default file paths (local, relative to cwd)
 # ---------------------------------------------------------------------------
@@ -42,10 +40,8 @@ _PDF_2022 = Path("husha-llsavfall-i-siffror-2022.pdf")
 _PDF_2023 = Path("husha-llsavfall-i-siffror-2023.pdf")
 _PDF_2024 = Path("husha-llsavfall-i-siffror-2024.pdf")
 _MUNICIPALITIES_CSV = Path("sweden_municipalities.csv")
-_MAP_DATA_2024 = Path("sweden_2024_map_data.json")
 _BATCH_SIZE = 50
 _VALID_STATUSES = ("private", "review")
-_SWEDEN_2024_REVIEW_NOTE_PREFIX = "Sweden 2024 map-data review note"
 
 # ---------------------------------------------------------------------------
 # Authoritative source URLs for Avfall Sverige annual reports
@@ -767,65 +763,6 @@ def _parse_excel_2021(path: Path) -> list[dict]:
     return records
 
 
-def _apply_2024_map_details(
-    records: list[dict], map_details_by_lau: dict[str, dict[str, object]]
-) -> list[dict]:
-    if not map_details_by_lau:
-        return records
-
-    updated_records = []
-    for record in records:
-        if record.get("waste_category") != _WASTE_CATEGORY_FOOD:
-            updated_records.append(record)
-            continue
-
-        lau_id = (record.get("nuts_or_lau_id") or "").strip().zfill(4)
-        details = map_details_by_lau.get(lau_id)
-        if not lau_id or not details:
-            updated_records.append(record)
-            continue
-
-        updated_record = dict(record)
-        if details.get("no_collection"):
-            updated_record["collection_system"] = _COLLECTION_SYSTEM_NONE
-            updated_record["bin_configuration"] = ""
-            updated_record["allowed_materials"] = ""
-            updated_record["property_values"] = []
-        else:
-            updated_record["bin_configuration"] = details.get("bin_configuration") or ""
-            updated_record["allowed_materials"] = details.get("bag_material") or ""
-        review_comment = _build_2024_manual_review_comment(details)
-        if review_comment:
-            existing_review_comment = (
-                updated_record.get("review_comment") or ""
-            ).strip()
-            updated_record["review_comment"] = (
-                f"{existing_review_comment}\n\n{review_comment}"
-                if existing_review_comment
-                else review_comment
-            )
-        updated_records.append(updated_record)
-
-    return updated_records
-
-
-def _build_2024_manual_review_comment(details: dict[str, object]) -> str:
-    if not details.get("needs_manual_review"):
-        return ""
-    review_reasons = [
-        str(reason).strip()
-        for reason in (details.get("review_reasons") or [])
-        if str(reason).strip()
-    ]
-    if not review_reasons:
-        return ""
-    return (
-        f"{_SWEDEN_2024_REVIEW_NOTE_PREFIX}: imported from the reviewed Sweden "
-        f"2024 map artifact with unresolved issues. Please verify and resolve: "
-        f"{'; '.join(review_reasons)}."
-    )
-
-
 def _parse_pdf(path: Path, data_year: int) -> list[dict]:
     """Parse an Avfall Sverige annual PDF and return importer records."""
     try:
@@ -1298,19 +1235,6 @@ class Command(BaseCommand):
                 f"(default: {_MUNICIPALITIES_CSV})."
             ),
         )
-        parser.add_argument(
-            "--map-data-2024",
-            type=str,
-            default="",
-            help=(
-                "Optional Sweden 2024 map-data artifact from "
-                "prepare_sweden_2024_map_data. Prefer the reviewed CSV after "
-                "manual corrections; the raw JSON provenance artifact is also "
-                "accepted. Rows still flagged for manual review are imported "
-                "when possible and receive a review comment describing the "
-                "remaining issues."
-            ),
-        )
 
     # ------------------------------------------------------------------
     # Auth helpers
@@ -1401,23 +1325,6 @@ class Command(BaseCommand):
                 f"Warning: No collector website mappings loaded (CSV not found or empty: {csv_path}).\n"
             )
 
-        prepared_map_details: dict[str, dict[str, object]] = {}
-        map_data_2024 = (options.get("map_data_2024") or "").strip()
-        if map_data_2024:
-            map_data_path = Path(map_data_2024)
-            if not map_data_path.exists():
-                raise CommandError(f"2024 map-data file not found: {map_data_path}")
-            prepared_map_details = load_map_import_details(map_data_path)
-            manual_review_count = sum(
-                1
-                for details in prepared_map_details.values()
-                if details.get("needs_manual_review")
-            )
-            self.stdout.write(
-                f"Loaded 2024 map details for {len(prepared_map_details)} municipalities "
-                f"({manual_review_count} still flagged for manual review).\n"
-            )
-
         # Resolve auth token
         token = options.get("token")
         if not token:
@@ -1456,8 +1363,6 @@ class Command(BaseCommand):
                     records = _parse_excel_2021(path)
                 else:
                     records = _parse_pdf(path, year)
-                    if year == 2024 and prepared_map_details:
-                        records = _apply_2024_map_details(records, prepared_map_details)
             except CommandError:
                 raise
             except Exception as exc:

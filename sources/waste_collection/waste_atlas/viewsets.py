@@ -32,6 +32,7 @@ from sources.waste_collection.models import (
     Collection,
     CollectionCatchment,
     CollectionPropertyValue,
+    Collector,
 )
 
 from .serializers import (
@@ -309,6 +310,32 @@ def _select_primary_collections(
     return best
 
 
+def _catchment_orga_level_case(catchment_path="catchment__"):
+    """Classify the administrative type of the catchment region on a queryset."""
+    nuts_exists = Exists(
+        NutsRegion.objects.filter(region_ptr_id=OuterRef(f"{catchment_path}region_id"))
+    )
+    lau_exists = Exists(
+        LauRegion.objects.filter(region_ptr_id=OuterRef(f"{catchment_path}region_id"))
+    )
+    return Case(
+        When(nuts_exists, then=Value("nuts")),
+        When(lau_exists, then=Value("lau")),
+        default=Value("individual"),
+        output_field=CharField(),
+    )
+
+
+def _active_collector_scope(country, year, nuts_prefixes):
+    """Return collectors with collection records in the selected atlas year."""
+    qs = Collector.objects.filter(
+        _country_filter_q("catchment__", country),
+        catchment__isnull=False,
+        collection__valid_from__year=year,
+    )
+    return _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+
+
 class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
     """Read-only viewset returning GeoJSON for catchments that have waste collections.
 
@@ -343,7 +370,50 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
     @action(detail=False, methods=["get"])
     def geojson(self, request, *args, **kwargs):
         """Return a GeoJSON FeatureCollection of matching catchments."""
-        queryset = self.filter_queryset(self.get_queryset())
+        return self._geojson_response(
+            request, self.filter_queryset(self.get_queryset())
+        )
+
+    @action(detail=False, methods=["get"], url_path="collection-geojson")
+    def collection_geojson(self, request, *args, **kwargs):
+        """Return GeoJSON for catchments assigned directly to collections."""
+        return self._geojson_response(
+            request, self.filter_queryset(self.get_queryset())
+        )
+
+    def _geojson_response(self, request, queryset):
+        rejection_response = get_unbounded_geojson_rejection_response(
+            request,
+            queryset.count(),
+            bounded_query_params={"country", "id", "nuts_prefix", "year"},
+        )
+        if rejection_response is not None:
+            return rejection_response
+
+        queryset = queryset.annotate(
+            simplified_geom=SimplifyPreserveTopology(
+                F("region__borders__geom"),
+                GEOMETRY_SIMPLIFY_TOLERANCE,
+            )
+        )
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="collector-geojson")
+    def collector_geojson(self, request, *args, **kwargs):
+        """Return GeoJSON for catchments assigned directly to collectors."""
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        collector_scope = _active_collector_scope(country, year, nuts_prefixes).filter(
+            catchment__region__borders__isnull=False
+        )
+        queryset = (
+            CollectionCatchment.objects.filter(
+                id__in=collector_scope.values("catchment_id")
+            )
+            .distinct()
+            .select_related("region", "region__borders")
+        )
         rejection_response = get_unbounded_geojson_rejection_response(
             request,
             queryset.count(),
@@ -363,11 +433,12 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
 
 
 class OrgaLevelViewSet(WasteAtlasViewSet):
-    """Return the organizational level for catchments with waste collections (Karte 1).
+    """Return the organizational level for active collectors.
 
-    Determines whether each catchment's region is a NUTS region
-    (Landkreise & kreisfreie Städte), a LAU region (Kommunalebene),
-    or an individual catchment.
+    Start from collectors active in the selected atlas year, follow their
+    assigned catchment, and classify that catchment's region as NUTS, LAU, or
+    individual. This keeps the collector-level map separate from collection
+    records that use a different operational catchment.
 
     Supports query parameters:
 
@@ -376,7 +447,7 @@ class OrgaLevelViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/orga-level/?country=DE&year=2022
+        GET /waste_collection/api/waste-atlas/collector-orga-level/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -386,55 +457,51 @@ class OrgaLevelViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
 
-        collection_scope = Collection.objects.filter(
-            _country_filter_q("catchment__", country),
-            valid_from__year=year,
-            collector_id__isnull=False,
-        )
-        collection_scope = _apply_nuts_prefix_filter(
-            collection_scope, nuts_prefixes, catchment_path="catchment__"
-        )
-        shared_collector_ids = (
-            collection_scope.values("collector_id")
-            .annotate(catchment_count=Count("catchment_id", distinct=True))
-            .filter(catchment_count__gt=1)
-            .values_list("collector_id", flat=True)
-        )
-        shared_collector_catchment_ids = collection_scope.filter(
-            collector_id__in=shared_collector_ids
-        ).values_list("catchment_id", flat=True)
-
-        nuts_exists = Exists(
-            NutsRegion.objects.filter(region_ptr_id=OuterRef("region_id"))
-        )
-        lau_exists = Exists(
-            LauRegion.objects.filter(region_ptr_id=OuterRef("region_id"))
-        )
-
         qs = (
-            CollectionCatchment.objects.filter(
-                _country_filter_q("", country),
-                collections__valid_from__year=year,
-            )
+            _active_collector_scope(country, year, nuts_prefixes)
             .distinct()
-            .annotate(
-                orga_level=Case(
-                    When(
-                        id__in=shared_collector_catchment_ids,
-                        then=Value("individual"),
-                    ),
-                    When(nuts_exists, then=Value("nuts")),
-                    When(lau_exists, then=Value("lau")),
-                    default=Value("individual"),
-                    output_field=CharField(),
-                )
-            )
-            .values("id", "orga_level")
+            .annotate(orga_level=_catchment_orga_level_case())
+            .values("catchment_id", "orga_level")
         )
-        qs = _apply_nuts_prefix_filter(qs, nuts_prefixes)
 
         data = [
-            {"catchment_id": row["id"], "orga_level": row["orga_level"]} for row in qs
+            {"catchment_id": row["catchment_id"], "orga_level": row["orga_level"]}
+            for row in qs
+        ]
+        serializer = CatchmentOrgaLevelSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class CollectionOrgaLevelViewSet(WasteAtlasViewSet):
+    """Return the organizational level for collection catchments.
+
+    This theme starts from collection records in the selected atlas year and
+    classifies the regions of those collection catchments. It is intentionally
+    separate from the collector-level catchment map.
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        """Return a JSON array of {catchment_id, orga_level}."""
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+
+        qs = Collection.objects.filter(
+            _country_filter_q("catchment__", country),
+            catchment__isnull=False,
+            valid_from__year=year,
+        )
+        qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+        qs = (
+            qs.annotate(orga_level=_catchment_orga_level_case())
+            .values("catchment_id", "orga_level")
+            .distinct()
+        )
+
+        data = [
+            {"catchment_id": row["catchment_id"], "orga_level": row["orga_level"]}
+            for row in qs
         ]
         serializer = CatchmentOrgaLevelSerializer(data, many=True)
         return Response(serializer.data)
