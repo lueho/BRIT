@@ -190,6 +190,14 @@ MAP_CONFIGS = {
         "exportOverlayPatternLegendLabel": "Hatched = ACPV",
         "numericField": "amount",
         "quartileColors": ["#d9f0d3", "#a6d96a", "#66bd63", "#1a9850"],
+        "quartileSpecialCases": [
+            {
+                "field": "no_collection",
+                "classValue": "no_bio",
+                "label": "No separate biowaste collection",
+                "color": "#fff696",
+            }
+        ],
     },
     "biowaste_collection_count": {
         "title": "Annual biowaste collection count",
@@ -421,6 +429,14 @@ MAP_CONFIGS = {
         "collectionYear": 2024,
         "numericField": "impurity_rate",
         "quartileColors": ["#1a9850", "#66bd63", "#f46d43", "#d73027"],
+        "quartileSpecialCases": [
+            {
+                "field": "no_collection",
+                "classValue": "no_collection",
+                "label": "No separate biowaste collection",
+                "color": "#fff696",
+            }
+        ],
     },
     "biowaste_min_bin_size": {
         "title": "Smallest available bin size for biowaste (L)",
@@ -1230,6 +1246,14 @@ MAP_CONFIGS = {
         "fileBase": "green_waste_collection_amount",
         "numericField": "amount",
         "quartileColors": ["#d9f0d3", "#a6d854", "#66a61e", "#1b9e77"],
+        "quartileSpecialCases": [
+            {
+                "field": "no_collection",
+                "classValue": "no_green",
+                "label": "No separate green waste collection",
+                "color": "#fff696",
+            }
+        ],
     },
     "green_waste_collection_system_count": {
         "title": "Number of green waste collection systems per catchment",

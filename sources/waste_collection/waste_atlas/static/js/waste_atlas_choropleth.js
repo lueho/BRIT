@@ -335,7 +335,11 @@ var WasteAtlasChoropleth = (function () {
         if (isVisible && !firstVisibleOption) firstVisibleOption = option;
       });
       if (themeSelect.selectedOptions.length && !themeSelect.selectedOptions[0].disabled) return;
-      if (firstVisibleOption) themeSelect.selectedIndex = firstVisibleOption.index;
+      if (firstVisibleOption) {
+        themeSelect.selectedIndex = firstVisibleOption.index;
+      } else {
+        themeSelect.selectedIndex = -1;
+      }
     }
 
     function navigateOrLoad(event) {
@@ -697,14 +701,39 @@ var WasteAtlasChoropleth = (function () {
     var values = records.map(function (r) { return r[baseCfg.numericField]; });
     var categories = _computeQuartileCategories(values, baseCfg.quartileColors);
     if (!categories) return baseCfg;
+
+    var specialCases = baseCfg.quartileSpecialCases || [];
+    var allCategories = specialCases.map(function (sc) {
+      return { value: sc.classValue, label: sc.label, color: sc.color };
+    }).concat(categories);
+
     return Object.assign({}, baseCfg, {
-      categories: categories,
+      categories: allCategories,
       transformName: null,
       transformData: function (records) {
         return records.map(function (r) {
-          var v = r[baseCfg.numericField];
-          var cls = _quartileClassify(v, categories);
-          return { catchment_id: r.catchment_id, _classified: cls };
+          var result = Object.assign({}, r);
+          // Preserve ACPV overlay metadata used by the renderer
+          if (r.value_source !== undefined) {
+            result._has_acpv_overlay = r.value_source === 'acpv';
+          }
+          if (r.acpv_group_key !== undefined) {
+            result._acpv_group_key = r.acpv_group_key;
+          }
+          var cls = null;
+          for (var i = 0; i < specialCases.length; i++) {
+            var sc = specialCases[i];
+            if (r[sc.field]) {
+              cls = sc.classValue;
+              break;
+            }
+          }
+          if (cls === null) {
+            var v = r[baseCfg.numericField];
+            cls = _quartileClassify(v, categories);
+          }
+          result._classified = cls;
+          return result;
         });
       }
     });
