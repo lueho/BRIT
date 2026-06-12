@@ -107,6 +107,7 @@ var WasteAtlasChoropleth = (function () {
     records.forEach(function (r) { lookup[r.catchment_id] = r; });
 
     var hasNoData = false;
+    var hasOverlayPattern = false;
     if (data.catchments.features) {
       data.catchments.features.forEach(function (f) {
         var rec = lookup[f.properties.catchment_id];
@@ -114,12 +115,16 @@ var WasteAtlasChoropleth = (function () {
         f.properties._overlay_pattern = rec && cfg.overlayPatternField
           ? Boolean(rec[cfg.overlayPatternField])
           : false;
+        if (f.properties._overlay_pattern) {
+          hasOverlayPattern = true;
+        }
         if (_isNoDataValue(f.properties._thematic_value, cfg.categories)) {
           hasNoData = true;
         }
       });
     }
     cfg._hasNoData = hasNoData;
+    cfg._hasOverlayPattern = hasOverlayPattern;
   }
 
   function _overlayPatternId(cfg) {
@@ -458,7 +463,7 @@ var WasteAtlasChoropleth = (function () {
         color: cfg.noDataColor || '#e0e0e0'
       });
     }
-    if (cfg.overlayPatternField && cfg.overlayPatternLegendLabel) {
+    if (cfg.overlayPatternField && cfg.overlayPatternLegendLabel && cfg._hasOverlayPattern) {
       items.push({
         label: exportMode && cfg.exportOverlayPatternLegendLabel
           ? cfg.exportOverlayPatternLegendLabel
@@ -1498,7 +1503,7 @@ var WasteAtlasChoropleth = (function () {
   function _drawLegend(width, height, cfg, layout) {
     var swatchW = 22, swatchH = 16, gap = 6;
     var items = _legendItems(cfg);
-    var hasOverlayLegend = cfg.overlayPatternField && cfg.overlayPatternLegendLabel;
+    var hasOverlayLegend = cfg.overlayPatternField && cfg.overlayPatternLegendLabel && cfg._hasOverlayPattern;
     var legendRows = items.length + (hasOverlayLegend ? 1 : 0);
 
     if (layout.exportMode) {
@@ -1536,6 +1541,7 @@ var WasteAtlasChoropleth = (function () {
 
     items = cfg.categories.slice();
     legendRows = items.length + (hasOverlayLegend ? 1 : 0);
+
     if (cfg.noDataLabel && cfg._hasNoData !== false) {
       items.push({ label: cfg.noDataLabel, color: cfg.noDataColor || '#e0e0e0' });
       legendRows += 1;
