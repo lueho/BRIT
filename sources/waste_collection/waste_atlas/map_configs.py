@@ -188,6 +188,8 @@ MAP_CONFIGS = {
         "overlayPatternField": "_has_acpv_overlay",
         "overlayPatternLegendLabel": "Hatched = aggregated value (ACPV)",
         "exportOverlayPatternLegendLabel": "Hatched = ACPV",
+        "numericField": "amount",
+        "quartileColors": ["#d9f0d3", "#a6d96a", "#66bd63", "#1a9850"],
     },
     "biowaste_collection_count": {
         "title": "Annual biowaste collection count",
@@ -230,6 +232,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Collection count",
         "fileBase": "biowaste_collection_count",
+        "numericField": "collection_count",
+        "quartileColors": ["#4b2a60", "#66CDAA", "#1E90FF", "#08519c"],
     },
     "biowaste_collection_point_count": {
         "title": "Number of biowaste collection points",
@@ -267,6 +271,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Biowaste collection points",
         "fileBase": "biowaste_collection_point_count",
+        "numericField": "collection_point_count",
+        "quartileColors": ["#edf8e9", "#74c476", "#31a354", "#005a32"],
     },
     "biowaste_collection_system": {
         "title": "Biowaste collection system",
@@ -413,6 +419,8 @@ MAP_CONFIGS = {
         "legendTitle": "Impurity rate (%)",
         "fileBase": "biowaste_impurity",
         "collectionYear": 2024,
+        "numericField": "impurity_rate",
+        "quartileColors": ["#1a9850", "#66bd63", "#f46d43", "#d73027"],
     },
     "biowaste_min_bin_size": {
         "title": "Smallest available bin size for biowaste (L)",
@@ -450,6 +458,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Min. bin size (L)",
         "fileBase": "biowaste_min_bin_size",
+        "numericField": "min_bin_size",
+        "quartileColors": ["#d9f0d3", "#a6d96a", "#1a9850", "#006837"],
     },
     "biowaste_required_bin_capacity": {
         "title": "Required bin capacity for biowaste (L/reference unit)",
@@ -492,6 +502,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Minimum bin capacity (L/unit)",
         "fileBase": "biowaste_required_bin_capacity",
+        "numericField": "required_bin_capacity",
+        "quartileColors": ["#d9f0d3", "#a6d96a", "#1a9850", "#006837"],
     },
     "collection_count_ratio": {
         "title": "Annual collection-count ratio: biowaste vs residual waste",
@@ -534,6 +546,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Bio : residual count",
         "fileBase": "collection_count_ratio",
+        "numericField": "ratio",
+        "quartileColors": ["#d95f02", "#7570b3", "#1b9e77", "#5ab4ac"],
     },
     "collection_point_count": {
         "title": "Number of collection points",
@@ -571,6 +585,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Collection points",
         "fileBase": "collection_point_count",
+        "numericField": "collection_point_count",
+        "quartileColors": ["#ffffd4", "#fed98e", "#fe9929", "#d95f0e"],
     },
     "collection_point_count_ratio": {
         "title": "Collection points: biowaste vs residual waste",
@@ -607,6 +623,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Bio / residual points",
         "fileBase": "collection_point_count_ratio",
+        "numericField": "ratio",
+        "quartileColors": ["#d95f02", "#7570b3", "#1b9e77", "#5ab4ac"],
     },
     "collection_support": {
         "title": "Accepted materials for biowaste collection aids",
@@ -1000,6 +1018,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Connection rate",
         "fileBase": "connection_rate",
+        "numericField": "connection_rate",
+        "quartileColors": ["#d1e7e6", "#7fcce9", "#0090cb", "#00608e"],
     },
     "denmark_collection_support": {
         "title": "Accepted materials for biowaste collection aids",
@@ -1208,6 +1228,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Collected amount (kg/cap/a)",
         "fileBase": "green_waste_collection_amount",
+        "numericField": "amount",
+        "quartileColors": ["#d9f0d3", "#a6d854", "#66a61e", "#1b9e77"],
     },
     "green_waste_collection_system_count": {
         "title": "Number of green waste collection systems per catchment",
@@ -1271,6 +1293,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Biowaste / Residual waste",
         "fileBase": "min_bin_size_ratio",
+        "numericField": "ratio",
+        "quartileColors": ["#d95f02", "#7570b3", "#1b9e77", "#5ab4ac"],
     },
     "orga_level": {
         "title": "Administrative level of collectors",
@@ -1352,6 +1376,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Organic-fraction amount (kg/cap/a)",
         "fileBase": "organic_collection_amount",
+        "numericField": "amount",
+        "quartileColors": ["#d9f0d3", "#a6d96a", "#66bd63", "#1a9850"],
     },
     "organic_waste_ratio": {
         "title": "Share of organic fractions in total waste (Organic / (organic + residual))",
@@ -1388,6 +1414,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Organic / (organic + residual)",
         "fileBase": "organic_waste_ratio",
+        "numericField": "ratio",
+        "quartileColors": ["#bae4bc", "#7bccc4", "#43a2ca", "#0868ac"],
     },
     "paper_bags": {
         "title": "Use of paper bags for biowaste collection",
@@ -1467,6 +1495,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Population density",
         "fileBase": "population_density",
+        "numericField": "population_density",
+        "quartileColors": ["#00204d", "#7d7c78", "#ffea46", "#fff59d"],
     },
     "residual_collection_amount": {
         "title": "Specifically collected amount of residual waste",
@@ -1499,6 +1529,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Collected amount (kg/cap/a)",
         "fileBase": "residual_collection_amount",
+        "numericField": "amount",
+        "quartileColors": ["#ffffd4", "#fed98e", "#fe9929", "#d95f0e"],
     },
     "residual_collection_count": {
         "title": "Annual residual waste collection count",
@@ -1536,6 +1568,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Collection count",
         "fileBase": "residual_collection_count",
+        "numericField": "collection_count",
+        "quartileColors": ["#FDBF6F", "#9ECAE1", "#4292C6", "#08306B"],
     },
     "residual_collection_point_count": {
         "title": "Number of residual waste collection points",
@@ -1573,6 +1607,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Residual collection points",
         "fileBase": "residual_collection_point_count",
+        "numericField": "collection_point_count",
+        "quartileColors": ["#fee0d2", "#fc9272", "#cb181d", "#67000d"],
     },
     "residual_collection_system": {
         "title": "Residual waste collection system",
@@ -1692,6 +1728,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Min. bin size (L)",
         "fileBase": "residual_min_bin_size",
+        "numericField": "min_bin_size",
+        "quartileColors": ["#fde0dd", "#fc9272", "#de2d26", "#67000d"],
     },
     "residual_required_bin_capacity": {
         "title": "Required bin capacity for residual waste (L/reference unit)",
@@ -1729,6 +1767,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Minimum bin capacity (L/unit)",
         "fileBase": "residual_required_bin_capacity",
+        "numericField": "required_bin_capacity",
+        "quartileColors": ["#fde0dd", "#fc9272", "#a50f15", "#67000d"],
     },
     "system_access_control": {
         "title": "Collection system and access/use control",
@@ -1809,6 +1849,8 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Biowaste / (Biowaste + Residual waste)",
         "fileBase": "waste_amount_ratio",
+        "numericField": "ratio",
+        "quartileColors": ["#bae4bc", "#7bccc4", "#43a2ca", "#0868ac"],
     },
     "weekly_bp_access_days": {
         "title": "Weekly bring-point access days",
@@ -1846,5 +1888,7 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Weekly access days",
         "fileBase": "weekly_bp_access_days",
+        "numericField": "weekly_access_days",
+        "quartileColors": ["#d9f0d3", "#a6d96a", "#66bd63", "#1a9850"],
     },
 }

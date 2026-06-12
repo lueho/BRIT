@@ -47,6 +47,7 @@ var WasteAtlasChoropleth = (function () {
   var _svg;
   var _lastData = null;
   var _lastLoadCfg = null;
+  var _baseLoadCfg = null;
   var _measureCtx = null;
 
   // ---- helpers --------------------------------------------------------------
@@ -653,6 +654,60 @@ var WasteAtlasChoropleth = (function () {
       subtitleFontSize: 22,
       legend: best.legend
     };
+  }
+
+  // ---- quartile helpers -----------------------------------------------------
+
+  function _computeQuartileCategories(values, colors) {
+    var valid = values.filter(function (v) { return v != null && !isNaN(v); });
+    if (valid.length < 4) return null;
+    var sorted = valid.slice().sort(function (a, b) { return a - b; });
+    var q1 = d3.quantile(sorted, 0.25);
+    var q2 = d3.quantile(sorted, 0.50);
+    var q3 = d3.quantile(sorted, 0.75);
+    var min = sorted[0];
+    var max = sorted[sorted.length - 1];
+    colors = colors || ['#d9f0d3', '#a6d96a', '#66bd63', '#1a9850'];
+
+    function fmt(v) {
+      if (v == null) return '';
+      if (Math.abs(v) >= 100) return Math.round(v).toString();
+      if (Math.abs(v) >= 10) return v.toFixed(1);
+      return v.toFixed(2);
+    }
+
+    return [
+      { value: 'q1', label: fmt(min) + ' – ' + fmt(q1) + ' (Q1)', color: colors[0], threshold: q1 },
+      { value: 'q2', label: fmt(q1) + ' – ' + fmt(q2) + ' (Q2)', color: colors[1], threshold: q2 },
+      { value: 'q3', label: fmt(q2) + ' – ' + fmt(q3) + ' (Q3)', color: colors[2], threshold: q3 },
+      { value: 'q4', label: fmt(q3) + ' – ' + fmt(max) + ' (Q4)', color: colors[3], threshold: Infinity }
+    ];
+  }
+
+  function _quartileClassify(value, categories) {
+    if (value == null || isNaN(value)) return null;
+    if (value <= categories[0].threshold) return 'q1';
+    if (value <= categories[1].threshold) return 'q2';
+    if (value <= categories[2].threshold) return 'q3';
+    return 'q4';
+  }
+
+  function _applyQuartiles(baseCfg, records) {
+    if (!baseCfg.numericField) return baseCfg;
+    var values = records.map(function (r) { return r[baseCfg.numericField]; });
+    var categories = _computeQuartileCategories(values, baseCfg.quartileColors);
+    if (!categories) return baseCfg;
+    return Object.assign({}, baseCfg, {
+      categories: categories,
+      transformName: null,
+      transformData: function (records) {
+        return records.map(function (r) {
+          var v = r[baseCfg.numericField];
+          var cls = _quartileClassify(v, categories);
+          return { catchment_id: r.catchment_id, _classified: cls };
+        });
+      }
+    });
   }
 
   // ---- named transform registry -------------------------------------------
@@ -1698,6 +1753,7 @@ var WasteAtlasChoropleth = (function () {
     var btnSVG = document.getElementById('btn-export-svg');
     var btnPNG = document.getElementById('btn-export-png');
     var fileBase = cfg.fileBase || 'waste_atlas_map';
+    var isQuartileMode = false;
 
     function _exportFileBase() {
       if (cfg.changeMode && _lastLoadCfg) {
@@ -1732,6 +1788,11 @@ var WasteAtlasChoropleth = (function () {
             });
             renderCfg = _changeRenderConfig(loadCfg, cfg.title);
           }
+          _baseLoadCfg = renderCfg;
+          if (isQuartileMode) {
+            var records = _recordList(data.thematicData);
+            renderCfg = _applyQuartiles(renderCfg, records);
+          }
           _lastData = data;
           _lastLoadCfg = renderCfg;
           _render(data, renderCfg);
@@ -1754,6 +1815,37 @@ var WasteAtlasChoropleth = (function () {
     initSelectorControls(function (_selectedMapSet, year, _preserveScope, fromYear) {
       load(cfg.country, year, true, fromYear);
     }, { useChangeUrls: !!cfg.changeMode });
+
+    var atlasControls = document.getElementById('atlas-controls');
+    if (atlasControls && cfg.numericField && !cfg.changeMode) {
+      var toggleWrap = document.createElement('label');
+      toggleWrap.style.display = 'inline-flex';
+      toggleWrap.style.alignItems = 'center';
+      toggleWrap.style.gap = '0.4rem';
+      toggleWrap.style.fontWeight = '600';
+      toggleWrap.style.cursor = 'pointer';
+      toggleWrap.style.fontSize = '0.875rem';
+
+      var toggleCheckbox = document.createElement('input');
+      toggleCheckbox.type = 'checkbox';
+      toggleCheckbox.checked = false;
+      toggleCheckbox.addEventListener('change', function () {
+        isQuartileMode = toggleCheckbox.checked;
+        if (_lastData && _baseLoadCfg) {
+          if (isQuartileMode) {
+            var records = _recordList(_lastData.thematicData);
+            _lastLoadCfg = _applyQuartiles(_baseLoadCfg, records);
+          } else {
+            _lastLoadCfg = _baseLoadCfg;
+          }
+          _render(_lastData, _lastLoadCfg);
+        }
+      });
+
+      toggleWrap.appendChild(toggleCheckbox);
+      toggleWrap.appendChild(document.createTextNode('Quartile boundaries'));
+      atlasControls.appendChild(toggleWrap);
+    }
 
     if (btnSVG) btnSVG.addEventListener('click', function () { exportSVG(_exportFileBase() + '.svg'); });
     if (btnPNG) btnPNG.addEventListener('click', function () { exportPNG(_exportFileBase() + '.png'); });
