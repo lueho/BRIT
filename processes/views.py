@@ -434,7 +434,10 @@ class ProcessDetailView(UserCreatedObjectDetailView):
         context["process_info_resources"] = list(self.object.info_resources.all())
         context["process_variants"] = list(self.object.variants.all())
         context["process_authors"] = self.object.ordered_authors()
-        context["bibliography_sources"] = self.object.sources_ordered()
+        context["bibliography_sources"] = sorted(
+            self.object.sources_ordered(),
+            key=lambda source: (source.abbreviation or source.title or "").casefold(),
+        )
 
         return context
 
