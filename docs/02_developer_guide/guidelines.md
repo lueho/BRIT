@@ -110,9 +110,11 @@ docker compose exec web python manage.py test utils.tests.test_example.ExampleTe
 - **Tests**
   Use Django's test framework.
 
-- **Public boundary check**
-  Run `make public-boundary-check` before publishing changes that add scripts,
-  data files, operations material, or automation config.
+- **Repository boundary**
+  Treat the public app versus private data/ops split as a review responsibility,
+  not as something a simple pattern check can prove. When adding scripts, data
+  files, operations material, or automation config, verify the intended home in
+  [Repository Boundaries](repository_boundaries.md).
 
 ## Deployment Handoff
 

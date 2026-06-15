@@ -83,4 +83,3 @@ data/processed/
 # reintroduced explicitly if a runtime build ever needs them.
 scripts/*
 !scripts/build_assets.mjs
-!scripts/check_public_boundary.sh

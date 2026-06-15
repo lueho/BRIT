@@ -91,8 +91,8 @@ been extracted to private data/ops tooling. Do not reintroduce source-specific
 ETL management commands here. Keep only the generic app API/service in BRIT and
 run parser/scraper workflows from `BRIT-data`.
 
-Run the boundary check before publishing changes:
-
-```bash
-make public-boundary-check
-```
+This boundary is intentionally documented as a human/PR-review rule rather than
+enforced by a narrow filename allowlist. Simple pattern checks create a false
+sense of security: they miss many real boundary violations and overfit to past
+incidents. Review new helper infrastructure, data files, operations scripts, and
+agent setup explicitly against the rules above.

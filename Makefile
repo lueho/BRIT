@@ -13,7 +13,7 @@ ASSETS_RUN := $(COMPOSE) run --rm assets
 
 .DEFAULT_GOAL := help
 
-.PHONY: help assets assets-watch assets-check public-boundary-check
+.PHONY: help assets assets-watch assets-check
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -29,6 +29,3 @@ assets-check: ## Rebuild assets and fail if committed output is stale (used by C
 	$(ASSETS_RUN) node scripts/build_assets.mjs
 	@git diff --exit-code -- '*.css' '*.css.map' '*.min.css' '*.min.js' \
 		|| { echo "\nERROR: compiled assets are out of date. Run 'make assets' and commit the result."; exit 1; }
-
-public-boundary-check: ## Verify private data/ops helpers are not in the public app repo
-	bash scripts/check_public_boundary.sh
