@@ -7,7 +7,15 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
 
-from .models import Catchment, GeoPolygon, LauRegion, NutsRegion, Region
+from .models import (
+    Catchment,
+    GeoPolygon,
+    LauRegion,
+    NutsRegion,
+    Region,
+    RegionAttributeTextValue,
+    RegionAttributeValue,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +85,20 @@ def invalidate_region_cache(sender, instance, **kwargs):
     # Invalidate NUTS cache if the region has an associated NUTS region.
     if hasattr(instance, "nutsregion"):
         clear_geojson_cache_pattern("nuts_geojson:*")
+
+
+@receiver(post_save, sender=RegionAttributeValue)
+@receiver(post_delete, sender=RegionAttributeValue)
+@receiver(post_save, sender=RegionAttributeTextValue)
+@receiver(post_delete, sender=RegionAttributeTextValue)
+def invalidate_region_attribute_cache(sender, instance, **kwargs):
+    """
+    Invalidate cached Region GeoJSON when values rendered for a region change.
+    """
+    geojson_cache = get_geojson_cache()
+    if instance.region_id:
+        safe_cache_delete(geojson_cache, f"region_geojson:id:{instance.region_id}")
+    clear_geojson_cache_pattern("region_geojson:*")
 
 
 @receiver(post_save, sender=GeoPolygon)
