@@ -163,29 +163,35 @@ REGISTRATION_FORM = "users.forms.UserRegistrationForm"
 LOGIN_REDIRECT_URL = "home"
 LOGIN_URL = "/users/login/"
 
+
+def _build_redis_cache_options(redis_url, **extra_options):
+    options = {
+        "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
+        "IGNORE_EXCEPTIONS": True,
+        **extra_options,
+    }
+    if redis_url and redis_url.startswith("rediss://"):
+        options["CONNECTION_POOL_KWARGS"] = {"ssl_cert_reqs": ssl.CERT_NONE}
+    return options
+
+
 # Redis and Caching
+REDIS_URL = os.environ.get("REDIS_URL")
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.environ.get("REDIS_URL"),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
-            "IGNORE_EXCEPTIONS": True,
-            "CONNECTION_POOL_KWARGS": {"ssl_cert_reqs": None},
-        },
+        "LOCATION": REDIS_URL,
+        "OPTIONS": _build_redis_cache_options(REDIS_URL),
     },
     "geojson": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.environ.get("REDIS_URL"),
+        "LOCATION": REDIS_URL,
         "TIMEOUT": 86400,  # 24 hours
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
-            "IGNORE_EXCEPTIONS": True,
-            "CONNECTION_POOL_KWARGS": {"ssl_cert_reqs": None},
-            "KEY_PREFIX": "geojson",  # Differentiate keys for the geojson cache
-        },
+        "OPTIONS": _build_redis_cache_options(
+            REDIS_URL,
+            KEY_PREFIX="geojson",  # Differentiate keys for the geojson cache
+        ),
     },
 }
 
@@ -281,8 +287,8 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 COOKIE_CONSENT_NAME = "cookie_consent"
 
-CELERY_BROKER_URL = os.environ.get("REDIS_URL")
-CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
 CELERY_REDIS_BACKEND_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
 
