@@ -312,6 +312,9 @@ var WasteAtlasChoropleth = (function () {
     if (!countrySelect || !themeSelect || !yearSelectEl || !btnLoad) return null;
 
     var themeOptions = Array.prototype.slice.call(themeSelect.options);
+    var hasDefaultSelectedTheme = themeOptions.some(function (option) {
+      return option.defaultSelected;
+    });
 
     function selectedYear() {
       return parseInt(yearSelectEl.value, 10) || 2024;
@@ -328,9 +331,7 @@ var WasteAtlasChoropleth = (function () {
       return selectedOption.getAttribute(attr);
     }
 
-    function ensureVisibleSelection() {
-      var selectedMapSet = countrySelect.value;
-      var selectedWasteCategory = wasteCategorySelect ? wasteCategorySelect.value : null;
+    function updateThemeVisibility(selectedMapSet, selectedWasteCategory) {
       var firstVisibleOption = null;
       themeOptions.forEach(function (option) {
         var isVisible = option.getAttribute('data-map-set') === selectedMapSet
@@ -339,8 +340,23 @@ var WasteAtlasChoropleth = (function () {
         option.disabled = !isVisible;
         if (isVisible && !firstVisibleOption) firstVisibleOption = option;
       });
+      return firstVisibleOption;
+    }
+
+    function ensureVisibleSelection() {
+      var selectedMapSet = countrySelect.value;
+      var selectedWasteCategory = wasteCategorySelect ? wasteCategorySelect.value : null;
+      var firstVisibleOption = updateThemeVisibility(selectedMapSet, selectedWasteCategory);
+      var usingCategoryFallback = false;
+      if (!firstVisibleOption && selectedWasteCategory) {
+        // Some generic maps are valid for regions that do not have that
+        // theme in the route selector; keep the dropdown populated but
+        // avoid silently selecting an unrelated route.
+        firstVisibleOption = updateThemeVisibility(selectedMapSet, null);
+        usingCategoryFallback = true;
+      }
       if (themeSelect.selectedOptions.length && !themeSelect.selectedOptions[0].disabled) return;
-      if (firstVisibleOption) {
+      if (firstVisibleOption && !usingCategoryFallback && hasDefaultSelectedTheme) {
         themeSelect.selectedIndex = firstVisibleOption.index;
       } else {
         themeSelect.selectedIndex = -1;

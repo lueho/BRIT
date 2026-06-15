@@ -4147,6 +4147,48 @@ class WasteAtlasMapViewsTestCase(TestCase):
             f'data-url="{reverse("waste-atlas-germany-collection-system-map")}"',
         )
 
+    def test_selector_includes_current_generic_theme_when_missing_in_region(
+        self,
+    ):
+        from sources.waste_collection.waste_atlas.map_selection import (
+            build_map_selection_context,
+        )
+
+        selection_context = build_map_selection_context(
+            reverse,
+            selected_map_set="SE",
+            selected_theme="biowaste_collection_amount",
+        )
+
+        sweden_themes = selection_context["map_selection_themes_by_map_set"]["SE"]
+        selected_theme = next(
+            theme
+            for theme in sweden_themes
+            if theme["value"] == "biowaste_collection_amount"
+        )
+        self.assertEqual(selection_context["selected_waste_category"], "biowaste")
+        self.assertEqual(selected_theme["waste_category"], "biowaste")
+        self.assertEqual(
+            selected_theme["url"],
+            reverse("waste-atlas-biowaste-collection-amount-map"),
+        )
+
+    def test_generic_map_page_selects_current_theme_for_regions_without_dedicated_route(
+        self,
+    ):
+        response = self.client.get(
+            reverse("waste-atlas-biowaste-collection-amount-map"),
+            {"country": "SE"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertRegex(
+            response.content.decode(),
+            r'<option value="biowaste_collection_amount"'
+            r'[^>]*data-map-set="SE"'
+            r"[^>]*selected",
+        )
+
     def test_catalonia_collection_system_maps_render(self):
         map_names = {
             "waste-atlas-catalonia-biowaste-collection-system-map": (

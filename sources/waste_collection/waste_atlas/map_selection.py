@@ -181,6 +181,60 @@ def _theme_sort_key(theme_item):
     )
 
 
+def _selected_waste_category(selected_map_set, selected_theme, themes_by_map_set):
+    selected_category = _selection_waste_category(selected_theme)
+    available_categories = {
+        theme["waste_category"] for theme in themes_by_map_set.get(selected_map_set, [])
+    }
+    if selected_category in available_categories:
+        return selected_category
+    for category in MAP_SELECTION_WASTE_CATEGORIES:
+        if category in available_categories:
+            return category
+    return selected_category
+
+
+def _theme_context_sort_key(theme_selection):
+    return (
+        MAP_SELECTION_THEME_ORDER.get(theme_selection["value"], 1000),
+        theme_selection["label"],
+    )
+
+
+def _add_selected_generic_theme(
+    themes_by_map_set, reverse_func, selected_map_set, selected_theme
+):
+    selected_themes = themes_by_map_set.get(selected_map_set)
+    if not selected_themes or any(
+        theme["value"] == selected_theme for theme in selected_themes
+    ):
+        return
+    generic_page = next(
+        (
+            page
+            for page in MAP_PAGES
+            if page["selector_set"] is None and page["theme"] == selected_theme
+        ),
+        None,
+    )
+    if not generic_page:
+        return
+    selected_themes.append(
+        {
+            "value": selected_theme,
+            "theme_group": _selection_theme_group(selected_theme),
+            "waste_category": _selection_waste_category(selected_theme),
+            "label": _selection_theme_label(
+                selected_theme,
+                {"label": THEME_LABELS[selected_theme]},
+            ),
+            "url": reverse_func(generic_page["name"]),
+            "change_url": "",
+        }
+    )
+    selected_themes.sort(key=_theme_context_sort_key)
+
+
 def build_map_selection_context(
     reverse_func, selected_map_set="DE", selected_theme="orga_level"
 ):
@@ -209,6 +263,9 @@ def build_map_selection_context(
                 "selected": map_set == selected_map_set,
             }
         )
+    _add_selected_generic_theme(
+        themes_by_map_set, reverse_func, selected_map_set, selected_theme
+    )
     return {
         "map_selection_map_sets": map_sets,
         "map_selection_themes_by_map_set": themes_by_map_set,
@@ -216,5 +273,7 @@ def build_map_selection_context(
         "map_selection_years": MAP_SELECTION_YEARS,
         "selected_map_set": selected_map_set,
         "selected_map_theme": selected_theme,
-        "selected_waste_category": _selection_waste_category(selected_theme),
+        "selected_waste_category": _selected_waste_category(
+            selected_map_set, selected_theme, themes_by_map_set
+        ),
     }
