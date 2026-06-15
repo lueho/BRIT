@@ -435,7 +435,12 @@ var WasteAtlasChoropleth = (function () {
 
   function _exportLegendLabel(item) {
     if (item.exportLabel) return item.exportLabel;
-    return String(item.label)
+    var label = String(item.label);
+    if (label.indexOf('No separate biowaste collection') !== -1 ||
+      label.indexOf('No separate door-to-door collection') !== -1) {
+      return label;
+    }
+    return label
       .replace(/Biowaste/g, 'Bio')
       .replace(/biowaste/g, 'bio')
       .replace(/Residual waste/g, 'residual')
@@ -446,10 +451,10 @@ var WasteAtlasChoropleth = (function () {
       .replace(/collected equally often/g, 'equal')
       .replace(/collected more/g, 'more')
       .replace(/collected less/g, 'less')
-      .replace(/No door to door biowaste collection/g, 'No D2D bio')
-      .replace(/No door-to-door bio collection/g, 'No D2D bio')
-      .replace(/No separate biowaste collection/g, 'No separate bio')
-      .replace(/No separate bio collection/g, 'No separate bio');
+      .replace(/No door to door biowaste collection/g, 'No separate door-to-door collection')
+      .replace(/No door-to-door bio collection/g, 'No separate door-to-door collection')
+      .replace(/No separate biowaste collection/g, 'No separate biowaste collection')
+      .replace(/No separate bio collection/g, 'No separate biowaste collection');
   }
 
   function _legendItems(cfg, exportMode) {
@@ -701,15 +706,53 @@ var WasteAtlasChoropleth = (function () {
     return 'q4';
   }
 
+  function _isQuartileEnabled(cfg) {
+    return cfg.numericField && cfg.quartileColors && cfg.enableQuartiles !== false;
+  }
+
+  function _legacyRecordLookup(baseCfg, records) {
+    var legacyRecords = records;
+    if (typeof baseCfg.transformData === 'function') {
+      legacyRecords = baseCfg.transformData(records);
+    } else if (baseCfg.transformName && transforms[baseCfg.transformName]) {
+      legacyRecords = transforms[baseCfg.transformName](records);
+    }
+    var lookup = {};
+    legacyRecords.forEach(function (r) { lookup[r.catchment_id] = r; });
+    return lookup;
+  }
+
   function _applyQuartiles(baseCfg, records) {
-    if (!baseCfg.numericField) return baseCfg;
-    var values = records.map(function (r) { return r[baseCfg.numericField]; });
+    if (!_isQuartileEnabled(baseCfg)) return baseCfg;
+    var specialCases = baseCfg.quartileSpecialCases || [];
+    var preserveClasses = baseCfg.quartilePreserveClasses || [];
+    var preserveClassLookup = {};
+    preserveClasses.forEach(function (value) { preserveClassLookup[value] = true; });
+    var preservedCategories = baseCfg.categories.filter(function (cat) {
+      return preserveClassLookup[cat.value];
+    });
+    var legacyLookup = preserveClasses.length ? _legacyRecordLookup(baseCfg, records) : {};
+
+    function isPreservedRecord(r) {
+      var legacy = legacyLookup[r.catchment_id];
+      var legacyClass = legacy ? legacy[baseCfg.dataField] : null;
+      return Boolean(legacyClass && preserveClassLookup[legacyClass]);
+    }
+
+    function isSpecialCaseRecord(r) {
+      return specialCases.some(function (sc) { return Boolean(r[sc.field]); });
+    }
+
+    var values = records
+      .filter(function (r) { return !isPreservedRecord(r) && !isSpecialCaseRecord(r); })
+      .map(function (r) { return r[baseCfg.numericField]; });
     var categories = _computeQuartileCategories(values, baseCfg.quartileColors);
     if (!categories) return baseCfg;
 
-    var specialCases = baseCfg.quartileSpecialCases || [];
-    var allCategories = specialCases.map(function (sc) {
+    var allCategories = preservedCategories.concat(specialCases.map(function (sc) {
       return { value: sc.classValue, label: sc.label, color: sc.color };
+    })).filter(function (cat, index, items) {
+      return items.findIndex(function (item) { return item.value === cat.value; }) === index;
     }).concat(categories);
 
     return Object.assign({}, baseCfg, {
@@ -726,9 +769,14 @@ var WasteAtlasChoropleth = (function () {
             result._acpv_group_key = r.acpv_group_key;
           }
           var cls = null;
+          var legacy = legacyLookup[r.catchment_id];
+          var legacyClass = legacy ? legacy[baseCfg.dataField] : null;
+          if (legacyClass && preserveClassLookup[legacyClass]) {
+            cls = legacyClass;
+          }
           for (var i = 0; i < specialCases.length; i++) {
             var sc = specialCases[i];
-            if (r[sc.field]) {
+            if (cls === null && r[sc.field]) {
               cls = sc.classValue;
               break;
             }
@@ -1852,7 +1900,7 @@ var WasteAtlasChoropleth = (function () {
     }, { useChangeUrls: !!cfg.changeMode });
 
     var atlasControls = document.getElementById('atlas-controls');
-    if (atlasControls && cfg.numericField && !cfg.changeMode) {
+    if (atlasControls && _isQuartileEnabled(cfg) && !cfg.changeMode) {
       var toggleWrap = document.createElement('label');
       toggleWrap.style.display = 'inline-flex';
       toggleWrap.style.alignItems = 'center';

@@ -232,7 +232,7 @@ MAP_CONFIGS = {
             },
             {
                 "value": "no_door_to_door",
-                "label": "No door-to-door biowaste collection",
+                "label": "No separate door-to-door collection",
                 "color": "#FFF696",
             },
         ],
@@ -242,6 +242,7 @@ MAP_CONFIGS = {
         "fileBase": "biowaste_collection_count",
         "numericField": "collection_count",
         "quartileColors": ["#4b2a60", "#66CDAA", "#1E90FF", "#08519c"],
+        "quartilePreserveClasses": ["seasonal", "no_door_to_door"],
     },
     "biowaste_collection_point_count": {
         "title": "Number of biowaste collection points",
@@ -281,6 +282,7 @@ MAP_CONFIGS = {
         "fileBase": "biowaste_collection_point_count",
         "numericField": "collection_point_count",
         "quartileColors": ["#edf8e9", "#74c476", "#31a354", "#005a32"],
+        "quartilePreserveClasses": ["full_dtd"],
     },
     "biowaste_collection_system": {
         "title": "Biowaste collection system",
@@ -376,7 +378,7 @@ MAP_CONFIGS = {
             },
             {
                 "value": "no_bio_collection",
-                "label": "No door-to-door biowaste collection",
+                "label": "No separate door-to-door collection",
                 "color": "#fff696",
             },
         ],
@@ -466,7 +468,7 @@ MAP_CONFIGS = {
             },
             {
                 "value": "no_door_to_door",
-                "label": "No door-to-door biowaste collection",
+                "label": "No separate door-to-door collection",
                 "color": "#fff696",
             },
         ],
@@ -476,6 +478,7 @@ MAP_CONFIGS = {
         "fileBase": "biowaste_min_bin_size",
         "numericField": "min_bin_size",
         "quartileColors": ["#d9f0d3", "#a6d96a", "#1a9850", "#006837"],
+        "quartilePreserveClasses": ["no_door_to_door"],
     },
     "biowaste_required_bin_capacity": {
         "title": "Required bin capacity for biowaste (L/reference unit)",
@@ -510,7 +513,7 @@ MAP_CONFIGS = {
             },
             {
                 "value": "no_door_to_door",
-                "label": "No door-to-door biowaste collection",
+                "label": "No separate door-to-door collection",
                 "color": "#fff696",
             },
         ],
@@ -520,6 +523,7 @@ MAP_CONFIGS = {
         "fileBase": "biowaste_required_bin_capacity",
         "numericField": "required_bin_capacity",
         "quartileColors": ["#d9f0d3", "#a6d96a", "#1a9850", "#006837"],
+        "quartilePreserveClasses": ["no_door_to_door"],
     },
     "collection_count_ratio": {
         "title": "Annual collection-count ratio: biowaste vs residual waste",
@@ -553,8 +557,8 @@ MAP_CONFIGS = {
             },
             {
                 "value": "no_bio",
-                "label": "No door-to-door biowaste collection",
-                "exportLabel": "No D2D bio",
+                "label": "No separate door-to-door collection",
+                "exportLabel": "No separate door-to-door collection",
                 "color": "#fff696",
             },
         ],
@@ -562,8 +566,6 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Bio : residual count",
         "fileBase": "collection_count_ratio",
-        "numericField": "ratio",
-        "quartileColors": ["#d95f02", "#7570b3", "#1b9e77", "#5ab4ac"],
     },
     "collection_point_count": {
         "title": "Number of collection points",
@@ -603,6 +605,7 @@ MAP_CONFIGS = {
         "fileBase": "collection_point_count",
         "numericField": "collection_point_count",
         "quartileColors": ["#ffffd4", "#fed98e", "#fe9929", "#d95f0e"],
+        "quartilePreserveClasses": ["full_dtd"],
     },
     "collection_point_count_ratio": {
         "title": "Collection points: biowaste vs residual waste",
@@ -639,8 +642,6 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Bio / residual points",
         "fileBase": "collection_point_count_ratio",
-        "numericField": "ratio",
-        "quartileColors": ["#d95f02", "#7570b3", "#1b9e77", "#5ab4ac"],
     },
     "collection_support": {
         "title": "Accepted materials for biowaste collection aids",
@@ -787,8 +788,8 @@ MAP_CONFIGS = {
             },
             {
                 "value": "no_bio",
-                "label": "No door-to-door biowaste collection",
-                "exportLabel": "No D2D bio",
+                "label": "No separate door-to-door collection",
+                "exportLabel": "No separate door-to-door collection",
                 "color": "#fff696",
             },
         ],
@@ -926,8 +927,8 @@ MAP_CONFIGS = {
             },
             {
                 "value": "no_bio",
-                "label": "No door-to-door biowaste collection",
-                "exportLabel": "No D2D bio",
+                "label": "No separate door-to-door collection",
+                "exportLabel": "No separate door-to-door collection",
                 "color": "#fff696",
             },
             {
@@ -987,8 +988,8 @@ MAP_CONFIGS = {
             },
             {
                 "value": "no_bio_collection",
-                "label": "No door-to-door biowaste collection",
-                "exportLabel": "No D2D bio",
+                "label": "No separate door-to-door collection",
+                "exportLabel": "No separate door-to-door collection",
                 "color": "#fff696",
             },
         ],
@@ -1026,7 +1027,7 @@ MAP_CONFIGS = {
             },
             {
                 "value": "no_d2d",
-                "label": "No door-to-door biowaste collection",
+                "label": "No separate door-to-door collection",
                 "color": "#fff696",
             },
         ],
@@ -1036,6 +1037,7 @@ MAP_CONFIGS = {
         "fileBase": "connection_rate",
         "numericField": "connection_rate",
         "quartileColors": ["#d1e7e6", "#7fcce9", "#0090cb", "#00608e"],
+        "quartilePreserveClasses": ["no_d2d"],
     },
     "denmark_collection_support": {
         "title": "Accepted materials for biowaste collection aids",
@@ -1308,8 +1310,8 @@ MAP_CONFIGS = {
             },
             {
                 "value": "no_bio",
-                "label": "No door-to-door biowaste collection",
-                "exportLabel": "No D2D bio",
+                "label": "No separate door-to-door collection",
+                "exportLabel": "No separate door-to-door collection",
                 "color": "#fff696",
             },
         ],
@@ -1317,8 +1319,6 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Biowaste / Residual waste",
         "fileBase": "min_bin_size_ratio",
-        "numericField": "ratio",
-        "quartileColors": ["#d95f02", "#7570b3", "#1b9e77", "#5ab4ac"],
     },
     "orga_level": {
         "title": "Administrative level of collectors",
@@ -1594,6 +1594,7 @@ MAP_CONFIGS = {
         "fileBase": "residual_collection_count",
         "numericField": "collection_count",
         "quartileColors": ["#FDBF6F", "#9ECAE1", "#4292C6", "#08306B"],
+        "quartilePreserveClasses": ["seasonal"],
     },
     "residual_collection_point_count": {
         "title": "Number of residual waste collection points",
@@ -1633,6 +1634,7 @@ MAP_CONFIGS = {
         "fileBase": "residual_collection_point_count",
         "numericField": "collection_point_count",
         "quartileColors": ["#fee0d2", "#fc9272", "#cb181d", "#67000d"],
+        "quartilePreserveClasses": ["full_dtd"],
     },
     "residual_collection_system": {
         "title": "Residual waste collection system",
@@ -1865,7 +1867,7 @@ MAP_CONFIGS = {
             {
                 "value": "no_bio",
                 "label": "No separate biowaste collection",
-                "exportLabel": "No separate bio",
+                "exportLabel": "No separate biowaste collection",
                 "color": "#fff696",
             },
         ],
@@ -1875,6 +1877,7 @@ MAP_CONFIGS = {
         "fileBase": "waste_amount_ratio",
         "numericField": "ratio",
         "quartileColors": ["#bae4bc", "#7bccc4", "#43a2ca", "#0868ac"],
+        "quartilePreserveClasses": ["no_bio"],
     },
     "weekly_bp_access_days": {
         "title": "Weekly bring-point access days",
@@ -1914,5 +1917,6 @@ MAP_CONFIGS = {
         "fileBase": "weekly_bp_access_days",
         "numericField": "weekly_access_days",
         "quartileColors": ["#d9f0d3", "#a6d96a", "#66bd63", "#1a9850"],
+        "quartilePreserveClasses": ["no_bp"],
     },
 }
