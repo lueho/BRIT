@@ -16,6 +16,10 @@ This section contains developer-facing documentation for BRIT. Workflow instruct
 - **Architecture**
   Read [Architecture Overview](architecture.md) and [Applications Overview](applications.md).
 
+- **Repository boundaries**
+  Read [Repository Boundaries](repository_boundaries.md) before adding data
+  tooling, operations scripts, or helper infrastructure.
+
 - **Deployment context**
   Read [Deployment Overview](architecture/deployment.md), then use [Operations](../03_operations/operations.md) for the actual deployment and runtime procedures.
 
@@ -33,7 +37,7 @@ This section contains developer-facing documentation for BRIT. Workflow instruct
 - **Deployment and runtime procedures**
   Keep in [Operations](../03_operations/operations.md).
 
-- **Architecture and boundaries**
+- **Architecture and repository boundaries**
   Keep in overview pages in this section.
 
 - **App-specific behavior**
@@ -42,4 +46,4 @@ This section contains developer-facing documentation for BRIT. Workflow instruct
 - **Agent memories and context pointers**
   Keep durable project knowledge in repository docs and keep agent memories short, selective, and pointer-oriented. See [Context Retention](context_retention.md).
 
-_Last updated: 2026-04-28_
+_Last updated: 2026-06-15_

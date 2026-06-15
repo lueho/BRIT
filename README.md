@@ -15,6 +15,15 @@ by the BIEM research group.
 BRIT is under constant development. Please feel free to leave any kind of feedback at
 [info@bioresource-tools.net](mailto:info@bioresource-tools.net)
 
+## Repository boundaries
+
+This repository is the published open-source BRIT application. Raw data,
+production repair scripts, one-off SQL, country-specific ETL clients, deployment
+overlays, and agent-local workflows are intentionally kept outside the public app
+repository. See
+[Repository Boundaries](docs/02_developer_guide/repository_boundaries.md) before
+adding helper infrastructure or data-management tooling.
+
 ## The SOILCOM project
 
 ![SOILCOM Logo](brit/static/img/interreg_with_soilcom_logo_300.png)
@@ -56,4 +65,3 @@ To find out more about the group and its most recent research, visit https://www
 
 The BIEM group operates a platform to disseminate the tools, lectures and info
 material from the various projects it is involved in: https://www.bioresource-tools.net
-

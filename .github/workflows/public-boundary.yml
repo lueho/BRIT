@@ -1,0 +1,17 @@
+name: public-boundary
+
+# Verifies that internal data, one-off operations helpers, and agent-local files
+# do not enter the published open-source app repository.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify-public-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check public repository boundary
+        run: bash scripts/check_public_boundary.sh

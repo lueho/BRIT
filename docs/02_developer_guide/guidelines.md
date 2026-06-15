@@ -87,7 +87,8 @@ docker compose exec web python manage.py test utils.tests.test_example.ExampleTe
   Use Django migrations for schema changes.
 
 - **Data changes and backfills**
-  Prepare SQL to be run manually instead of shipping data migrations.
+  Keep one-off SQL and production repair scripts outside the public app
+  repository. See [Repository Boundaries](repository_boundaries.md).
 
 - **Initial data and default objects**
   Keep initial data creation in per-app idempotent `ensure_initial_data()` functions. See [Initial Data Management](initial_data_management.md).
@@ -109,6 +110,10 @@ docker compose exec web python manage.py test utils.tests.test_example.ExampleTe
 - **Tests**
   Use Django's test framework.
 
+- **Public boundary check**
+  Run `make public-boundary-check` before publishing changes that add scripts,
+  data files, operations material, or automation config.
+
 ## Deployment Handoff
 
 - **Deployment path**
@@ -120,4 +125,4 @@ docker compose exec web python manage.py test utils.tests.test_example.ExampleTe
 - **Where deployment instructions live**
   See [Operations](../03_operations/operations.md) for canonical deployment and runtime guidance.
 
-_Last updated: 2026-04-28_
+_Last updated: 2026-06-15_

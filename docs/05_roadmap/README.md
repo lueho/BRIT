@@ -137,10 +137,10 @@ The atlas is the largest product surface and the largest concentration of duplic
    (`_get_collection_amount`, `_get_green_waste_collection_amount`,
    `_get_organic_amounts`). Unify behind one function with pluggable fallback chain
    (ACPV → CPV → derived), tested against known fixtures.
-4. **Materialized-view lifecycle.** The green-waste MVs exist only as manual SQL in
-   `docs/03_operations/sql/`. Move creation into a migration, add a
-   `refresh_green_waste_acpvs` management command plus scheduled (Celery beat) refresh,
-   and document staleness expectations.
+4. **Materialized-view lifecycle.** Green-waste MV work started as private
+   operations SQL outside the public app repository. Move creation into a
+   migration, add a `refresh_green_waste_acpvs` management command plus
+   scheduled (Celery beat) refresh, and document staleness expectations.
 5. **Caching & throttling.** Atlas endpoints recompute aggregations per request and use
    plain `ScopedRateThrottle` while `maps.throttling` already provides subnet-aware
    GeoJSON throttling. Cache per (country, year, prefix) with invalidation on
@@ -161,13 +161,12 @@ Duplication is concentrated in three patterns; fix the pattern in L0 once, then 
    serializers/renderers/exports/routers/tasks (~45% overlap, ~500 lines). Create
    `sources/base/` (or extend utils) with the shared bases; new source domains then
    ship only models + domain logic + a plugin declaration.
-3. **Importer framework.** Country importer commands
-   (`import_sweden_collections.py` 1,539 lines, catalonia 1,217, bw 580, denmark 623)
-   share CLI args, API client, batching, dry-run, and value maps. Extract
-   `CountryImportCommand` base + shared crosswalk/vocabulary normalization (overlap
-   between `crosswalk.py` and `vocabulary.py`). New country = parser + mapping table.
-   Bulk-import path must also suspend per-row derived-value signals
-   (`signals.py:155-179`) in favor of a post-import batch recompute.
+3. **Importer framework.** Source-specific importer commands were extracted to
+   the private `BRIT-data` tooling boundary. Continue consolidating their shared
+   CLI args, API client, batching, dry-run, and value maps there. Keep only the
+   generic bulk-import API/service in BRIT. The bulk-import path should suspend
+   per-row derived-value signals (`signals.py:155-179`) in favor of a post-import
+   batch recompute.
 4. **Shared form/filter snippets.** Duplicated `image_metadata_section()`
    (materials/processes forms), repeated scope-initialization logic in filtersets —
    move to `utils.forms` / a base `FilterSet`.
