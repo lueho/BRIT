@@ -99,6 +99,7 @@ class CatchmentConnectionRateSerializer(serializers.Serializer):
     catchment_id = serializers.IntegerField()
     connection_rate = serializers.FloatField(allow_null=True)
     is_door_to_door = serializers.BooleanField()
+    reporting_year = serializers.IntegerField(allow_null=True)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
