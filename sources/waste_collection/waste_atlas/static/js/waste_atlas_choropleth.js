@@ -313,9 +313,6 @@ var WasteAtlasChoropleth = (function () {
     if (!countrySelect || !themeSelect || !yearSelectEl || !btnLoad) return null;
 
     var themeOptions = Array.prototype.slice.call(themeSelect.options);
-    var hasDefaultSelectedTheme = themeOptions.some(function (option) {
-      return option.defaultSelected;
-    });
 
     function selectedYear() {
       return parseInt(yearSelectEl.value, 10) || 2024;
@@ -332,6 +329,11 @@ var WasteAtlasChoropleth = (function () {
       return selectedOption.getAttribute(attr);
     }
 
+    function selectedThemeGroup() {
+      var selectedOption = themeSelect.options[themeSelect.selectedIndex];
+      return selectedOption ? selectedOption.getAttribute('data-theme-group') : null;
+    }
+
     function updateThemeVisibility(selectedMapSet, selectedWasteCategory) {
       var firstVisibleOption = null;
       themeOptions.forEach(function (option) {
@@ -344,7 +346,22 @@ var WasteAtlasChoropleth = (function () {
       return firstVisibleOption;
     }
 
+    function findThemeOption(selectedMapSet, selectedWasteCategory, selectedThemeGroup) {
+      var fallbackOption = null;
+      for (var i = 0; i < themeOptions.length; i++) {
+        var option = themeOptions[i];
+        if (option.disabled || option.getAttribute('data-map-set') !== selectedMapSet) continue;
+        if (selectedWasteCategory && option.getAttribute('data-waste-category') !== selectedWasteCategory) continue;
+        if (!fallbackOption) fallbackOption = option;
+        if (selectedThemeGroup && option.getAttribute('data-theme-group') === selectedThemeGroup) {
+          return option;
+        }
+      }
+      return fallbackOption;
+    }
+
     function ensureVisibleSelection() {
+      var currentThemeGroup = selectedThemeGroup();
       var selectedMapSet = countrySelect.value;
       var selectedWasteCategory = wasteCategorySelect ? wasteCategorySelect.value : null;
       var firstVisibleOption = updateThemeVisibility(selectedMapSet, selectedWasteCategory);
@@ -357,8 +374,12 @@ var WasteAtlasChoropleth = (function () {
         usingCategoryFallback = true;
       }
       if (themeSelect.selectedOptions.length && !themeSelect.selectedOptions[0].disabled) return;
-      if (firstVisibleOption && !usingCategoryFallback && hasDefaultSelectedTheme) {
-        themeSelect.selectedIndex = firstVisibleOption.index;
+      var nextOption = null;
+      if (firstVisibleOption && !usingCategoryFallback) {
+        nextOption = findThemeOption(selectedMapSet, selectedWasteCategory, currentThemeGroup);
+      }
+      if (nextOption) {
+        themeSelect.selectedIndex = nextOption.index;
       } else {
         themeSelect.selectedIndex = -1;
       }

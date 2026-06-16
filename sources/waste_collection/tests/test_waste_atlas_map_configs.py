@@ -89,6 +89,22 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         self.assertNotIn("label: '51 – 100 kg/cap/a'", template)
         self.assertNotIn("label: '0 – 50 kg/cap/a'", template)
 
+    def test_selector_keeps_matching_theme_group_when_region_or_category_changes(self):
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+
+        script = script_path.read_text()
+
+        self.assertIn("function selectedThemeGroup()", script)
+        self.assertIn("function findThemeOption(", script)
+        self.assertIn("selectedThemeGroup", script)
+        self.assertIn("data-theme-group", script)
+
     def _forbidden_unit_tokens(self, legend_title):
         for unit, forbidden_tokens in self.UNIT_LABEL_FORBIDDEN_TOKENS.items():
             if f"({unit})" in legend_title:
