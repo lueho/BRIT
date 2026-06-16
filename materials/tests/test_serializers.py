@@ -158,6 +158,45 @@ class SampleSerializerTestCase(TestCase):
             "Dry Matter",
         )
 
+    def test_properties_prefetches_sources(self):
+        request = RequestFactory().get(
+            reverse("sample-detail", kwargs={"pk": self.sample.id})
+        )
+        first_value = self.sample.property_values.get(property__name="Dry Matter")
+        with mute_signals(post_save):
+            first_source = Source.objects.create(
+                title="First Property Source",
+                citation_key="FPS",
+            )
+            second_source = Source.objects.create(
+                title="Second Property Source",
+                citation_key="SPS",
+            )
+        first_value.sources.add(first_source)
+        second_property = MaterialProperty.objects.create(
+            name="Ash",
+            unit="%",
+            owner=self.owner,
+        )
+        second_value = MaterialPropertyValue.objects.create(
+            sample=self.sample,
+            property=second_property,
+            unit=first_value.unit,
+            average=Decimal("10.0"),
+            owner=self.owner,
+        )
+        second_value.sources.add(second_source)
+
+        serializer = SampleModelSerializer(context={"request": request})
+        with self.assertNumQueries(2):
+            data = serializer.get_properties(self.sample)
+
+        self.assertEqual(len(data), 2)
+        self.assertEqual(
+            {source["citation_key"] for prop in data for source in prop["sources"]},
+            {"FPS", "SPS"},
+        )
+
     def test_serializer_uses_shared_normalized_compositions(self):
         self.sample.compositions.all().delete()
         unit = Unit.objects.filter(name="%").first()

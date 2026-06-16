@@ -171,7 +171,7 @@ class SampleModelSerializer(ModelSerializer):
             "basis_component",
             "analytical_method",
             "unit",
-        )
+        ).prefetch_related("sources")
         return MaterialPropertyValueModelSerializer(
             queryset.order_by("property__name", "id"),
             many=True,
