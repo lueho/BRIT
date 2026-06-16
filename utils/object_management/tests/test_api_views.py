@@ -21,13 +21,13 @@ from sources.waste_collection.models import (
     CollectionSeason,
     WasteFlyer,
 )
-from utils.object_management.api_views import _serialize_collection_update_context
-from utils.object_management.models import ReviewAction, UserCreatedObject
-from utils.object_management.review_context import (
-    _is_collection,
-    _is_collection_property_value,
-    build_review_context,
+from sources.waste_collection.review_hooks import (
+    is_collection,
+    is_collection_property_value,
+    serialize_collection_update_context,
 )
+from utils.object_management.models import ReviewAction, UserCreatedObject
+from utils.object_management.review_context import build_review_context
 from utils.properties.models import Property, Unit
 
 
@@ -280,13 +280,34 @@ class ReviewAPIViewsTests(TestCase):
         moderator_context = moderator_response.json()["context"]["collection_update"]
         self.assertFalse(moderator_context["available"])
 
+    def test_review_context_uses_registered_update_context_key(self):
+        url = reverse(
+            "object_management:api_review_context",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.review_collection.id,
+            },
+        )
+
+        self.client.force_login(self.owner)
+        with patch(
+            "utils.object_management.api_views.get_review_update_context",
+            return_value={"generic_update": {"available": True}},
+        ):
+            response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        context = response.json()["context"]
+        self.assertEqual(context["generic_update"], {"available": True})
+        self.assertNotIn("collection_update", context)
+
     def test_collection_update_context_ignores_legacy_soilcom_label(self):
         soilcom_collection = SimpleNamespace(
             _meta=SimpleNamespace(app_label="soilcom", model_name="collection")
         )
 
         self.assertIsNone(
-            _serialize_collection_update_context(self.owner, soilcom_collection)
+            serialize_collection_update_context(self.owner, soilcom_collection)
         )
 
     def test_review_context_collection_helpers_require_waste_collection_label(self):
@@ -309,10 +330,10 @@ class ReviewAPIViewsTests(TestCase):
             )
         )
 
-        self.assertFalse(_is_collection(soilcom_collection))
-        self.assertFalse(_is_collection_property_value(soilcom_cpv))
-        self.assertTrue(_is_collection(waste_collection))
-        self.assertTrue(_is_collection_property_value(waste_collection_cpv))
+        self.assertFalse(is_collection(soilcom_collection))
+        self.assertFalse(is_collection_property_value(soilcom_cpv))
+        self.assertTrue(is_collection(waste_collection))
+        self.assertTrue(is_collection_property_value(waste_collection_cpv))
 
     def test_review_context_rejects_invalid_history_limit(self):
         """history_limit must be parseable as integer."""
@@ -478,7 +499,7 @@ class ReviewAPIViewsTests(TestCase):
         )
 
     @patch(
-        "utils.object_management.review_context.import_module",
+        "sources.waste_collection.review_hooks.import_module",
         side_effect=ModuleNotFoundError("sources.waste_collection.frequency_service"),
     )
     def test_review_context_frequency_display_degrades_safely_without_plugin_service(

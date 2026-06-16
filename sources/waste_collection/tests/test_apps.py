@@ -1,6 +1,6 @@
 from importlib import import_module
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.test import SimpleTestCase
 
@@ -13,10 +13,19 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
         self.app_config = WasteCollectionConfig("sources.waste_collection", app_module)
 
     def test_ready_logs_and_returns_when_signal_import_fails(self):
+        review_hooks = SimpleNamespace(register_review_hooks=Mock())
+
+        def import_side_effect(module_name):
+            if module_name == "sources.waste_collection.signals":
+                raise RuntimeError("boom")
+            if module_name == "sources.waste_collection.review_hooks":
+                return review_hooks
+            return SimpleNamespace()
+
         with (
             patch(
                 "sources.waste_collection.apps.import_module",
-                side_effect=RuntimeError("boom"),
+                side_effect=import_side_effect,
             ),
             patch("sources.waste_collection.apps.logger") as logger,
         ):
@@ -25,18 +34,27 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
         logger.exception.assert_called_once_with(
             "Failed to import waste_collection signal handlers."
         )
+        review_hooks.register_review_hooks.assert_called_once_with()
 
     def test_ready_connects_collection_property_value_signal_handlers(self):
         signal_module = SimpleNamespace(
             sync_derived_cpv_on_save=object(),
             sync_derived_cpv_on_delete=object(),
         )
+        review_hooks = SimpleNamespace(register_review_hooks=Mock())
         collection_property_value_model = object()
+
+        def import_side_effect(module_name):
+            if module_name == "sources.waste_collection.signals":
+                return signal_module
+            if module_name == "sources.waste_collection.review_hooks":
+                return review_hooks
+            return SimpleNamespace()
 
         with (
             patch(
                 "sources.waste_collection.apps.import_module",
-                return_value=signal_module,
+                side_effect=import_side_effect,
             ),
             patch.object(
                 self.app_config,
@@ -48,6 +66,7 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
         ):
             self.app_config.ready()
 
+        review_hooks.register_review_hooks.assert_called_once_with()
         post_save_connect.assert_called_once_with(
             signal_module.sync_derived_cpv_on_save,
             sender=collection_property_value_model,
@@ -64,11 +83,19 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
             sync_derived_cpv_on_save=object(),
             sync_derived_cpv_on_delete=object(),
         )
+        review_hooks = SimpleNamespace(register_review_hooks=Mock())
+
+        def import_side_effect(module_name):
+            if module_name == "sources.waste_collection.signals":
+                return signal_module
+            if module_name == "sources.waste_collection.review_hooks":
+                return review_hooks
+            return SimpleNamespace()
 
         with (
             patch(
                 "sources.waste_collection.apps.import_module",
-                return_value=signal_module,
+                side_effect=import_side_effect,
             ),
             patch.object(
                 self.app_config,
@@ -79,18 +106,29 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
         ):
             self.app_config.ready()
 
+        review_hooks.register_review_hooks.assert_called_once_with()
         logger.warning.assert_called_once_with(
             "Waste collection signal registration skipped because CollectionPropertyValue could not be resolved."
         )
 
     def test_ready_imports_research_metrics_patch(self):
+        review_hooks = SimpleNamespace(register_review_hooks=Mock())
+        signal_module = SimpleNamespace(
+            sync_derived_cpv_on_save=object(),
+            sync_derived_cpv_on_delete=object(),
+        )
+
+        def import_side_effect(module_name):
+            if module_name == "sources.waste_collection.signals":
+                return signal_module
+            if module_name == "sources.waste_collection.review_hooks":
+                return review_hooks
+            return SimpleNamespace()
+
         with (
             patch(
                 "sources.waste_collection.apps.import_module",
-                return_value=SimpleNamespace(
-                    sync_derived_cpv_on_save=object(),
-                    sync_derived_cpv_on_delete=object(),
-                ),
+                side_effect=import_side_effect,
             ) as import_module_mock,
             patch.object(self.app_config, "get_model", return_value=object()),
             patch("django.db.models.signals.post_save.connect"),
@@ -103,3 +141,4 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
             "sources.waste_collection.patches.disable_research_metrics",
             imported_modules,
         )
+        self.assertIn("sources.waste_collection.review_hooks", imported_modules)

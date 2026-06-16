@@ -18,6 +18,12 @@ class WasteCollectionConfig(AppConfig):
             pass
 
         try:
+            review_hooks = import_module("sources.waste_collection.review_hooks")
+            review_hooks.register_review_hooks()
+        except Exception:
+            logger.exception("Failed to register waste_collection review hooks.")
+
+        try:
             signal_module = import_module("sources.waste_collection.signals")
         except Exception:
             logger.exception("Failed to import waste_collection signal handlers.")
