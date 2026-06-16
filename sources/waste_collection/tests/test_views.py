@@ -5121,6 +5121,8 @@ class GenericMapTemplateTests(TestCase):
             '"dataUrl": "/waste_collection/api/waste-atlas/connection-rate/"', content
         )
         self.assertIn('"transformName": "connectionRate"', content)
+        self.assertIn('"tooltipFields": [{"field": "reporting_year"', content)
+        self.assertIn('"label": "Reporting year"}]', content)
         self.assertIn("WasteAtlasChoropleth.init", content)
 
     def test_collection_amount_renders_overlay_config(self):

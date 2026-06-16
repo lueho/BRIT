@@ -2375,6 +2375,75 @@ class CollectionPointCountViewSetTests(APITestCase):
         )
 
 
+class ConnectionRateViewSetTests(APITestCase):
+    endpoint = "/waste_collection/api/waste-atlas/connection-rate/"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region.objects.create(name="Connection Rate Region", country="DE")
+        cls.catchment = CollectionCatchment.objects.create(
+            name="Connection Rate Catchment",
+            region=cls.region,
+        )
+        cls.d2d = CollectionSystem.objects.create(name="Door to door")
+        cls.bio_category = WasteCategory.objects.create(name="Biowaste")
+        cls.prop, _ = Property.objects.get_or_create(
+            id=4,
+            defaults={"name": "Connection rate"},
+        )
+        cls.unit, _ = Unit.objects.get_or_create(
+            name="%",
+            defaults={"dimensionless": True},
+        )
+        cls.prop.allowed_units.add(cls.unit)
+
+        cls.previous_collection = Collection.objects.create(
+            name="Previous connection rate collection",
+            catchment=cls.catchment,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2020, 1, 1),
+        )
+        cls.current_collection = Collection.objects.create(
+            name="Current connection rate collection",
+            catchment=cls.catchment,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2024, 1, 1),
+        )
+        cls.current_collection.predecessors.add(cls.previous_collection)
+        CollectionPropertyValue.objects.create(
+            collection=cls.previous_collection,
+            property=cls.prop,
+            unit=cls.unit,
+            year=2021,
+            average=40,
+        )
+        CollectionPropertyValue.objects.create(
+            collection=cls.previous_collection,
+            property=cls.prop,
+            unit=cls.unit,
+            year=2023,
+            average=86,
+        )
+
+    def test_uses_latest_connection_rate_from_collection_version_chain(self):
+        response = self.client.get(self.endpoint, {"country": "DE", "year": 2024})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data,
+            [
+                {
+                    "catchment_id": self.catchment.id,
+                    "connection_rate": 0.9,
+                    "is_door_to_door": True,
+                    "reporting_year": 2023,
+                }
+            ],
+        )
+
+
 class WasteAtlasPrimarySelectionTests(APITestCase):
     @classmethod
     def setUpTestData(cls):

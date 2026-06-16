@@ -310,6 +310,95 @@ def _select_primary_collections(
     return best
 
 
+def _collection_version_chains(collection_ids):
+    selected_ids = {collection_id for collection_id in collection_ids if collection_id}
+    chains = {collection_id: {collection_id} for collection_id in selected_ids}
+    if not selected_ids:
+        return chains
+
+    through = Collection.predecessors.through
+    seen_ids = set(selected_ids)
+    frontier_ids = set(selected_ids)
+    edges = set()
+
+    while frontier_ids:
+        relation_rows = through.objects.filter(
+            Q(from_collection_id__in=frontier_ids)
+            | Q(to_collection_id__in=frontier_ids)
+        ).values_list("from_collection_id", "to_collection_id")
+
+        next_frontier_ids = set()
+        for left_id, right_id in relation_rows:
+            edges.add((left_id, right_id))
+            if left_id not in seen_ids:
+                next_frontier_ids.add(left_id)
+            if right_id not in seen_ids:
+                next_frontier_ids.add(right_id)
+
+        seen_ids.update(next_frontier_ids)
+        frontier_ids = next_frontier_ids
+
+    adjacency = {collection_id: set() for collection_id in seen_ids}
+    for left_id, right_id in edges:
+        adjacency.setdefault(left_id, set()).add(right_id)
+        adjacency.setdefault(right_id, set()).add(left_id)
+
+    for selected_id in selected_ids:
+        chain_ids = set()
+        stack = [selected_id]
+        while stack:
+            collection_id = stack.pop()
+            if collection_id in chain_ids:
+                continue
+            chain_ids.add(collection_id)
+            stack.extend(adjacency.get(collection_id, ()))
+        chains[selected_id] = chain_ids
+
+    return chains
+
+
+def _latest_connection_rate_values(collection_ids):
+    version_chains = _collection_version_chains(collection_ids)
+    if not version_chains:
+        return {}
+
+    all_chain_ids = set()
+    for chain_ids in version_chains.values():
+        all_chain_ids.update(chain_ids)
+
+    cpv_rows = CollectionPropertyValue.objects.filter(
+        collection_id__in=all_chain_ids,
+        property_id=CONNECTION_RATE_PROPERTY_ID,
+        average__isnull=False,
+    ).values("id", "collection_id", "average", "year")
+
+    values_by_collection_id = {}
+    for row in cpv_rows:
+        values_by_collection_id.setdefault(row["collection_id"], []).append(row)
+
+    latest_by_selected_id = {}
+    for selected_id, chain_ids in version_chains.items():
+        latest = None
+        for chain_id in chain_ids:
+            for candidate in values_by_collection_id.get(chain_id, ()):
+                candidate_key = (
+                    candidate["year"] is not None,
+                    candidate["year"] or 0,
+                    candidate["id"],
+                )
+                if latest is None:
+                    latest = candidate
+                    latest_key = candidate_key
+                    continue
+                if candidate_key > latest_key:
+                    latest = candidate
+                    latest_key = candidate_key
+        if latest is not None:
+            latest_by_selected_id[selected_id] = latest
+
+    return latest_by_selected_id
+
+
 def _catchment_orga_level_case(catchment_path="catchment__"):
     """Classify the administrative type of the catchment region on a queryset."""
     nuts_exists = Exists(
@@ -2595,8 +2684,8 @@ class ConnectionRateViewSet(WasteAtlasViewSet):
     """Return the connection rate for biowaste door-to-door collections (Karte 3).
 
     For each catchment, selects the primary biowaste/food-waste collection
-    (door-to-door preferred) and returns its connection rate from
-    ``CollectionPropertyValue`` (property: 'Connection rate').
+    (door-to-door preferred) and returns the latest connection rate from the
+    collection's version chain.
 
     Supports query parameters:
 
@@ -2611,7 +2700,7 @@ class ConnectionRateViewSet(WasteAtlasViewSet):
     permission_classes = [permissions.AllowAny]
 
     def list(self, request):
-        """Return a JSON array of {catchment_id, connection_rate, is_door_to_door}."""
+        """Return a JSON array with connection rate and reporting year."""
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
 
@@ -2622,31 +2711,22 @@ class ConnectionRateViewSet(WasteAtlasViewSet):
             nuts_prefixes,
         )
 
-        # Step 2: batch-fetch connection rate values for the selected collections
         collection_ids = [row["collection_id"] for row in best.values()]
-        cpv_qs = (
-            CollectionPropertyValue.objects.filter(
-                collection_id__in=collection_ids,
-                property_id=CONNECTION_RATE_PROPERTY_ID,
-            )
-            .order_by("collection_id", "-year")
-            .distinct("collection_id")
-            .values_list("collection_id", "average")
-        )
-        rate_lookup = dict(cpv_qs)
+        rate_lookup = _latest_connection_rate_values(collection_ids)
 
-        # Step 3: build response
         data = []
         for cid, row in best.items():
             col_id = row["collection_id"]
             system = row["collection_system"]
             is_d2d = system == "Door to door"
-            avg = rate_lookup.get(col_id)
+            rate = rate_lookup.get(col_id)
+            avg = rate["average"] if rate is not None else None
             data.append(
                 {
                     "catchment_id": cid,
                     "connection_rate": avg / 100.0 if avg is not None else None,
                     "is_door_to_door": is_d2d,
+                    "reporting_year": rate["year"] if rate is not None else None,
                 }
             )
 
