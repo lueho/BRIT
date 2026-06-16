@@ -544,8 +544,6 @@ class SourcesFieldMixin:
     """
 
     def __init__(self, *args, **kwargs):
-        # Import here to avoid circular imports
-        from bibliography.models import Source
         from utils.widgets import SourceListWidget
 
         # Capture data BEFORE calling super().__init__ (parent consumes it)
@@ -568,12 +566,15 @@ class SourcesFieldMixin:
         if "sources" not in self.fields:
             return  # Field not included in this form, skip mixin logic
 
+        sources_field = self.fields["sources"]
+        source_model = sources_field.queryset.model
+
         # Configure the sources field
-        self.fields["sources"].required = False  # Sources are optional
+        sources_field.required = False  # Sources are optional
 
         # Set widget if not already customized
-        if not isinstance(self.fields["sources"].widget, SourceListWidget):
-            self.fields["sources"].widget = SourceListWidget(
+        if not isinstance(sources_field.widget, SourceListWidget):
+            sources_field.widget = SourceListWidget(
                 autocomplete_url="source-autocomplete", label_field="label"
             )
 
@@ -593,6 +594,6 @@ class SourcesFieldMixin:
 
         # Set queryset to include all relevant sources (permission check in clean())
         if source_ids:
-            self.fields["sources"].queryset = Source.objects.filter(id__in=source_ids)
+            sources_field.queryset = source_model.objects.filter(id__in=source_ids)
         else:
-            self.fields["sources"].queryset = Source.objects.none()
+            sources_field.queryset = source_model.objects.none()

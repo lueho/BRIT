@@ -89,6 +89,7 @@ class MaterialPropertyValueModelSerializer(
     )
     basis_component = ReadOnlyField(source="basis_component.name")
     analytical_method = StringRelatedField()
+    sources = SourceAbbreviationSerializer(many=True, read_only=True)
 
     class Meta:
         model = MaterialPropertyValue

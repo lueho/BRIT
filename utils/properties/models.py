@@ -5,7 +5,6 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Q
 
-from bibliography.models import Source
 from utils.object_management.models import NamedUserCreatedObject, get_default_owner
 from utils.properties.units import (
     UnitConversionError,
@@ -227,12 +226,6 @@ class PropertyValue(NumericMeasurementMixin, NamedUserCreatedObject):
     )
     average = models.FloatField()
     standard_deviation = models.FloatField(blank=True, null=True)
-    sources = models.ManyToManyField(
-        Source,
-        blank=True,
-        help_text="Sources or references for this property value.",
-    )
-
     class Meta:
         abstract = True
         ordering = ["property__name"]

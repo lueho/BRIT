@@ -42,8 +42,8 @@ Non-test code only; test-code coupling is tracked separately in WS6.
 
 | # | Violation | Where | Fix direction |
 |---|---|---|---|
-| V1 | `utils.object_management` hardcodes `waste_collection.Collection` knowledge | `utils/object_management/api_views.py:182-233`, `views.py:78,536-546`, `review_context.py:66-345` | Review-context/search-field plugin hooks; domain registers enrichers (WS1-A) |
-| V2 | `utils.properties` imports `bibliography` | `utils/properties/models.py:8`, `serializers.py:3`; also `utils/forms.py:548` | Decide: promote `bibliography` to an explicit L0 dependency of properties, or invert via swappable source relation (WS1-B) |
+| V1 | Resolved: `utils.object_management` no longer hardcodes `waste_collection.Collection` knowledge | PR #179 moved review-context/search-field/update-context hooks behind source-owned registration | Keep domain-specific review context in source app hooks (WS1-A) |
+| V2 | `utils.properties` imports `bibliography` | `utils/properties/models.py:8`, `serializers.py:3`; also `utils/forms.py:548` | Invert attribution ownership: domains with bibliography-backed `sources` fields own those fields/serializers; shared utils infer form field models without importing bibliography (WS1-B) |
 | V3 | `utils.file_export` discovers `sources` plugins | `utils/file_export/registry_init.py` | Invert: source apps push exports into `export_registry` from their own `AppConfig.ready()` (WS1-C) |
 | V4 | `maps` imports `sources.registry` | `maps/urls.py:3`, `maps/tasks.py:11`, `maps/runtime_adapters.py:12`, `maps/management/commands/warm_geojson_cache.py` | Move the *contract* (map mounts, cache warmers, runtime compatibility) into `maps`; source apps register themselves (WS1-D) |
 | V5 | `maps` hardcodes domain dataset names | `maps/models.py:33-39` (`GIS_SOURCE_MODELS` incl. `WasteCollection`), legacy `GeoDataset.model_name` | Finish runtime-configuration migration, delete legacy name dispatch (WS1-D, overlaps #85) |
@@ -67,11 +67,13 @@ The single most important arc. Sub-items in implementation order:
    `review_context.py`/`api_views.py`/`views.py` into
    `sources/waste_collection/review_hooks.py`, registered in its `AppConfig.ready()`.
    Outcome: the review dashboard scales to any future domain without touching utils.
+   **Status:** completed in PR #179.
 2. **B. Properties/bibliography (V2).** `PropertyValue.sources` (M2M to
-   `bibliography.Source`) makes `utils.properties` depend on L1. Pragmatic decision:
-   declare `bibliography` a documented dependency of `utils.properties` and move both
-   into L0/L1 adjacency, OR extract the sources M2M into the domain models that need
-   attribution. Decide once, document in architecture.md, enforce.
+   `bibliography.Source`) makes `utils.properties` depend on L1. Decision:
+   bibliography-backed attribution belongs to the concrete domain models that need it.
+   `utils.properties` keeps numeric measurement contracts only, while shared source-form
+   helpers derive the source model from the form field instead of importing
+   `bibliography`.
 3. **C. Export registry inversion (V3).** Delete `utils/file_export/registry_init.py`;
    each source app calls `register_export(...)` in its own `ready()`. The
    `sources.contracts.SourceDomainExport` dataclass moves to
