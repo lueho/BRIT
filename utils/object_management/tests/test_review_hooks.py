@@ -34,6 +34,23 @@ class ReviewHookRegistryTests(SimpleTestCase):
             {"plugin_label": "thing"},
         )
 
+    def test_context_enricher_errors_do_not_block_other_enrichers(self):
+        obj = SimpleNamespace(_meta=SimpleNamespace(app_label="demo", model_name="thing"))
+
+        def failing_enricher(review_obj):
+            raise RuntimeError("boom")
+
+        register_review_context_enricher("demo.thing", failing_enricher)
+        register_review_context_enricher(
+            "demo.thing",
+            lambda review_obj: {"plugin_label": review_obj._meta.model_name},
+        )
+
+        with self.assertLogs("utils.object_management.review_hooks", level="ERROR"):
+            context = get_review_context_enrichments(obj)
+
+        self.assertEqual(context, {"plugin_label": "thing"})
+
     def test_search_fields_are_resolved_by_model_label(self):
         model = SimpleNamespace(
             _meta=SimpleNamespace(app_label="demo", model_name="thing")

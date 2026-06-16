@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 
 ReviewContextEnricher = Callable[[object], Mapping[str, object]]
 ReviewUpdateContextBuilder = Callable[[object, object], Mapping[str, object] | None]
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -34,7 +37,13 @@ def register_review_context_enricher(
 def get_review_context_enrichments(obj: object) -> dict[str, object]:
     context: dict[str, object] = {}
     for enricher in _review_context_enrichers.get(_model_label_for(obj), []):
-        context.update(enricher(obj))
+        try:
+            context.update(enricher(obj))
+        except Exception:
+            logger.exception(
+                "Failed to build review context enrichment for %s.",
+                _model_label_for(obj),
+            )
     return context
 
 
