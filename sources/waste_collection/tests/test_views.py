@@ -4272,6 +4272,35 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(cfg["nutsPrefix"], "DE1,DEB")
         self.assertEqual(cfg["nutsLevel"], 1)
 
+    def test_nrw_map_set_matches_germany_themes_and_uses_bundesland_scope(self):
+        from sources.waste_collection.waste_atlas.map_selection import (
+            WASTE_ATLAS_MAP_SELECTIONS,
+        )
+
+        germany_themes = WASTE_ATLAS_MAP_SELECTIONS["DE"]["themes"]
+        nrw_themes = WASTE_ATLAS_MAP_SELECTIONS["DE-NW"]["themes"]
+
+        self.assertEqual(set(nrw_themes), set(germany_themes))
+        self.assertEqual(
+            nrw_themes["collection_system"]["route_name"],
+            "waste-atlas-nrw-collection-system-map",
+        )
+
+        response = self.client.get(reverse("waste-atlas-nrw-orga-level-map"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="DE-NW"')
+        self.assertContains(response, "selected>Nordrhein-Westfalen</option>")
+        cfg = self._map_config(response)
+        self.assertEqual(cfg["nutsPrefix"], "DEA")
+        self.assertEqual(cfg["nutsLevel"], 1)
+
+        overview = self.client.get(reverse("waste-atlas-overview"))
+        self.assertContains(overview, "Nordrhein-Westfalen")
+        self.assertContains(
+            overview, f'data-url="{reverse("waste-atlas-nrw-collection-system-map")}"'
+        )
+
     def test_bw_rp_combined_fee_system_classifies_valid_fee_combinations(self):
         response = self.client.get(reverse("waste-atlas-bw-rp-combined-fee-system-map"))
 
