@@ -89,6 +89,7 @@ class MaterialPropertyValueModelSerializer(
     )
     basis_component = ReadOnlyField(source="basis_component.name")
     analytical_method = StringRelatedField()
+    sources = SourceAbbreviationSerializer(many=True, read_only=True)
 
     class Meta:
         model = MaterialPropertyValue
@@ -170,7 +171,7 @@ class SampleModelSerializer(ModelSerializer):
             "basis_component",
             "analytical_method",
             "unit",
-        )
+        ).prefetch_related("sources")
         return MaterialPropertyValueModelSerializer(
             queryset.order_by("property__name", "id"),
             many=True,

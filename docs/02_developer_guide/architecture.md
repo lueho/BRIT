@@ -35,6 +35,16 @@ This document provides a durable, high-level view of BRIT architecture. It is in
 - **Modular domains**
   Keep domain logic inside app boundaries.
 
+- **Layered imports**
+  Lower-level apps define generic contracts; higher-level/domain apps fill them in
+  through concrete models, serializers, or app-startup registration. Shared utilities
+  must not import source-domain or reference-data apps for optional domain features.
+
+- **Bibliography-backed attribution**
+  Models that expose `sources` relations own those `bibliography.Source` fields in their
+  concrete app. `utils.properties` provides numeric measurement helpers only and does
+  not define or serialize bibliography attribution.
+
 - **Reusable base abstractions**
   Shared object lifecycle, ownership, permissions, and export behavior are implemented centrally and reused across apps.
 
@@ -55,4 +65,4 @@ This document provides a durable, high-level view of BRIT architecture. It is in
 - **Detailed data flow**
   See [architecture/data_flow.md](architecture/data_flow.md).
 
-_Last updated: 2026-03-06_
+_Last updated: 2026-06-16_
