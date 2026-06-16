@@ -112,6 +112,7 @@ var WasteAtlasChoropleth = (function () {
       data.catchments.features.forEach(function (f) {
         var rec = lookup[f.properties.catchment_id];
         f.properties._thematic_value = rec ? rec[cfg.dataField] : null;
+        f.properties._thematic_record = rec || null;
         f.properties._overlay_pattern = rec && cfg.overlayPatternField
           ? Boolean(rec[cfg.overlayPatternField])
           : false;
@@ -1118,7 +1119,7 @@ var WasteAtlasChoropleth = (function () {
         } else {
           cls = '0-24';
         }
-        return { catchment_id: r.catchment_id, _classified: cls };
+        return Object.assign({}, r, { _classified: cls });
       });
     },
     denmarkCollectionSupport: function (records) {
@@ -1440,7 +1441,16 @@ var WasteAtlasChoropleth = (function () {
         .text(function (d) {
           var p = d.properties;
           var val = p._thematic_value != null ? String(p._thematic_value) : 'no data';
-          return p.catchment_name + ' — ' + val;
+          var tooltip = p.catchment_name + ' — ' + val;
+          if (Array.isArray(cfg.tooltipFields) && p._thematic_record) {
+            cfg.tooltipFields.forEach(function (field) {
+              var fieldValue = p._thematic_record[field.field];
+              if (fieldValue != null && fieldValue !== '') {
+                tooltip += '\n' + field.label + ': ' + fieldValue;
+              }
+            });
+          }
+          return tooltip;
         });
     }
 
