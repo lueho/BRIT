@@ -31,6 +31,7 @@ THEME_LABELS = {
     "combined_fee_system": "Combined fees",
     "combined_frequency": "Combined schedule",
     "connection_rate": "Connection rate",
+    "connection_type": "Participation Policy",
     "food_waste_category": "Accepted food waste",
     "green_waste_collection_amount": "Green waste amount",
     "green_waste_collection_system_count": "Green waste system count",
@@ -111,6 +112,7 @@ MAP_SELECTION_THEME_ORDER = {
     "waste_ratio": 640,
     "organic_waste_ratio": 650,
     "connection_rate": 700,
+    "connection_type": 710,
 }
 
 MAP_SELECTION_WASTE_CATEGORIES = {
@@ -145,6 +147,7 @@ MAP_SELECTION_WASTE_CATEGORY_PREFIXES = (
 MAP_SELECTION_WASTE_CATEGORY_OVERRIDES = {
     "collection_system": "biowaste",
     "connection_rate": "biowaste",
+    "connection_type": "biowaste",
     "food_waste_category": "biowaste",
     "paper_bags": "biowaste",
     "plastic_bags": "biowaste",

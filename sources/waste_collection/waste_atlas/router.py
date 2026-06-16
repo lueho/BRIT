@@ -26,6 +26,7 @@ from .viewsets import (
     CombinedFeeSystemViewSet,
     CombinedFrequencyTypeViewSet,
     ConnectionRateViewSet,
+    ConnectionTypeViewSet,
     FoodWasteCategoryViewSet,
     GreenWasteCollectionAmountViewSet,
     GreenWasteCollectionSystemCountViewSet,
@@ -115,6 +116,11 @@ router.register(
     "connection-rate",
     ConnectionRateViewSet,
     basename="api-waste-atlas-connection-rate",
+)
+router.register(
+    "connection-type",
+    ConnectionTypeViewSet,
+    basename="api-waste-atlas-connection-type",
 )
 router.register(
     "food-waste-category",

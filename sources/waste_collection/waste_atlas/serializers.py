@@ -107,6 +107,11 @@ class CatchmentConnectionRateSerializer(serializers.Serializer):
         return data
 
 
+class CatchmentConnectionTypeSerializer(serializers.Serializer):
+    catchment_id = serializers.IntegerField()
+    connection_type = serializers.CharField(allow_blank=True, allow_null=True)
+
+
 class CatchmentFoodWasteCategorySerializer(serializers.Serializer):
     """Flat JSON serializer for allowed food waste in biowaste (Karte 4)."""
 

@@ -53,6 +53,7 @@ from .serializers import (
     CatchmentCombinedFeeSystemSerializer,
     CatchmentCombinedFrequencySerializer,
     CatchmentConnectionRateSerializer,
+    CatchmentConnectionTypeSerializer,
     CatchmentFeeSystemSerializer,
     CatchmentFoodWasteCategorySerializer,
     CatchmentFrequencyTypeSerializer,
@@ -2731,6 +2732,27 @@ class ConnectionRateViewSet(WasteAtlasViewSet):
             )
 
         serializer = CatchmentConnectionRateSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class ConnectionTypeViewSet(WasteAtlasViewSet):
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+
+        data = [
+            {"catchment_id": cid, "connection_type": row["connection_type"]}
+            for cid, row in _select_primary_collections(
+                country,
+                year,
+                ["Biowaste", "Food waste"],
+                nuts_prefixes,
+                extra_fields=("connection_type",),
+            ).items()
+        ]
+        serializer = CatchmentConnectionTypeSerializer(data, many=True)
         return Response(serializer.data)
 
 
