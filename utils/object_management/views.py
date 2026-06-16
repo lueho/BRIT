@@ -47,6 +47,10 @@ from utils.object_management.permissions import (
     user_is_moderator_for_model,
 )
 from utils.object_management.review_filtering import ReviewItemFilter
+from utils.object_management.review_hooks import (
+    get_breadcrumb_module,
+    get_review_search_fields,
+)
 
 from ..forms import (
     DynamicTableInlineFormSetHelper,
@@ -74,13 +78,6 @@ DEFAULT_BREADCRUMB_MODULES = {
     "properties": {"label": "Properties", "url_name": "properties-dashboard"},
     "sources": {"label": "Sources", "url_name": "sources-explorer"},
     "utils": {"label": "Utilities", "url_name": "utils-dashboard"},
-    # Source-domain plugins render nested under the Sources explorer.
-    "waste_collection": {
-        "label": "Waste Collection",
-        "url_name": "wastecollection-explorer",
-        "parent_label": "Sources",
-        "parent_url_name": "sources-explorer",
-    },
     "greenhouses": {
         "label": "Greenhouses",
         "url_name": None,
@@ -109,7 +106,18 @@ def _get_breadcrumb_model(view):
 def _get_default_breadcrumb_module_config(model):
     if model is None:
         return None
-    return DEFAULT_BREADCRUMB_MODULES.get(model._meta.app_label)
+    config = DEFAULT_BREADCRUMB_MODULES.get(model._meta.app_label)
+    if config is not None:
+        return config
+    registered_config = get_breadcrumb_module(model._meta.app_label)
+    if registered_config is None:
+        return None
+    return {
+        "label": registered_config.label,
+        "url_name": registered_config.url_name,
+        "parent_label": registered_config.parent_label,
+        "parent_url_name": registered_config.parent_url_name,
+    }
 
 
 def _get_default_breadcrumb_module(model):
@@ -533,16 +541,9 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         except FieldDoesNotExist:
             pass
 
-        if (
-            model_class._meta.model_name == "collection"
-            and model_class._meta.app_label == "waste_collection"
-        ):
-            search_filters.extend(
-                [
-                    Q(catchment__name__icontains=search),
-                    Q(waste_category__name__icontains=search),
-                    Q(collection_system__name__icontains=search),
-                ]
+        for field_name in get_review_search_fields(model_class):
+            search_filters.append(
+                Q(**{f"{field_name}__icontains": search})
             )
 
         if not search_filters:
