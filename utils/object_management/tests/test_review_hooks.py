@@ -73,9 +73,10 @@ class ReviewHookRegistryTests(SimpleTestCase):
                 "user_id": review_user.id,
                 "model": review_obj._meta.model_name,
             },
+            context_key="thing_update",
         )
 
         self.assertEqual(
             get_review_update_context(user, obj),
-            {"user_id": 1, "model": "thing"},
+            {"thing_update": {"user_id": 1, "model": "thing"}},
         )

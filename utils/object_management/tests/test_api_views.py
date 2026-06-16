@@ -280,6 +280,27 @@ class ReviewAPIViewsTests(TestCase):
         moderator_context = moderator_response.json()["context"]["collection_update"]
         self.assertFalse(moderator_context["available"])
 
+    def test_review_context_uses_registered_update_context_key(self):
+        url = reverse(
+            "object_management:api_review_context",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": self.review_collection.id,
+            },
+        )
+
+        self.client.force_login(self.owner)
+        with patch(
+            "utils.object_management.api_views.get_review_update_context",
+            return_value={"generic_update": {"available": True}},
+        ):
+            response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        context = response.json()["context"]
+        self.assertEqual(context["generic_update"], {"available": True})
+        self.assertNotIn("collection_update", context)
+
     def test_collection_update_context_ignores_legacy_soilcom_label(self):
         soilcom_collection = SimpleNamespace(
             _meta=SimpleNamespace(app_label="soilcom", model_name="collection")

@@ -42,6 +42,7 @@ def register_review_hooks() -> None:
     register_review_update_context(
         "waste_collection.collection",
         serialize_collection_update_context,
+        context_key="collection_update",
     )
 
 

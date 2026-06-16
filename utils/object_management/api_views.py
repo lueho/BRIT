@@ -157,9 +157,7 @@ class ReviewContextAPIView(APIView):
             include_history=include_history,
             history_limit=max(1, min(history_limit, 50)),
         )
-        update_context = get_review_update_context(request.user, obj)
-        if update_context is not None:
-            context["collection_update"] = update_context
+        context.update(get_review_update_context(request.user, obj))
 
         return Response(
             {

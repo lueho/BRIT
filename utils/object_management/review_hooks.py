@@ -18,9 +18,15 @@ class BreadcrumbModule:
     parent_url_name: str | None = None
 
 
+@dataclass(frozen=True)
+class ReviewUpdateContextHook:
+    context_key: str
+    builder: ReviewUpdateContextBuilder
+
+
 _review_context_enrichers: dict[str, list[ReviewContextEnricher]] = {}
 _review_search_fields: dict[str, tuple[str, ...]] = {}
-_review_update_context_builders: dict[str, ReviewUpdateContextBuilder] = {}
+_review_update_context_builders: dict[str, ReviewUpdateContextHook] = {}
 _breadcrumb_modules: dict[str, BreadcrumbModule] = {}
 
 
@@ -61,15 +67,22 @@ def get_review_search_fields(model_class: object) -> tuple[str, ...]:
 def register_review_update_context(
     model_label: str,
     fn: ReviewUpdateContextBuilder,
+    *,
+    context_key: str = "update_context",
 ) -> None:
-    _review_update_context_builders[_normalize_model_label(model_label)] = fn
+    _review_update_context_builders[_normalize_model_label(model_label)] = (
+        ReviewUpdateContextHook(context_key=context_key, builder=fn)
+    )
 
 
-def get_review_update_context(user: object, obj: object) -> Mapping[str, object] | None:
-    builder = _review_update_context_builders.get(_model_label_for(obj))
-    if builder is None:
-        return None
-    return builder(user, obj)
+def get_review_update_context(user: object, obj: object) -> dict[str, object]:
+    hook = _review_update_context_builders.get(_model_label_for(obj))
+    if hook is None:
+        return {}
+    update_context = hook.builder(user, obj)
+    if update_context is None:
+        return {}
+    return {hook.context_key: update_context}
 
 
 def register_breadcrumb_module(
@@ -95,7 +108,7 @@ def get_breadcrumb_module(app_label: str) -> BreadcrumbModule | None:
 def snapshot_review_hooks_for_tests() -> tuple[
     dict[str, list[ReviewContextEnricher]],
     dict[str, tuple[str, ...]],
-    dict[str, ReviewUpdateContextBuilder],
+    dict[str, ReviewUpdateContextHook],
     dict[str, BreadcrumbModule],
 ]:
     return (
@@ -110,7 +123,7 @@ def restore_review_hooks_for_tests(
     snapshot: tuple[
         dict[str, list[ReviewContextEnricher]],
         dict[str, tuple[str, ...]],
-        dict[str, ReviewUpdateContextBuilder],
+        dict[str, ReviewUpdateContextHook],
         dict[str, BreadcrumbModule],
     ],
 ) -> None:
