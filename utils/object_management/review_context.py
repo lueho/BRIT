@@ -12,13 +12,13 @@ from __future__ import annotations
 import logging
 from datetime import date, datetime
 from decimal import Decimal
-from importlib import import_module
 from typing import Any
 
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
 from .models import ReviewAction
+from .review_hooks import get_review_context_enrichments
 
 logger = logging.getLogger(__name__)
 
@@ -57,16 +57,7 @@ def build_review_context(
         ),
     }
 
-    # CPV-specific enrichments
-    if _is_collection_property_value(obj):
-        context["parent_collection"] = _serialize_parent_collection(obj)
-        if not getattr(obj, "is_derived", False):
-            context["value_timeline"] = _serialize_cpv_timeline(obj)
-
-    # Collection-specific enrichments
-    if _is_collection(obj):
-        context["flyers"] = _serialize_collection_flyers(obj)
-        context["frequency_display"] = _serialize_collection_frequency(obj)
+    context.update(get_review_context_enrichments(obj))
 
     if include_history:
         history = (
@@ -174,22 +165,6 @@ def validate_draft_payload(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _is_collection_property_value(obj: Any) -> bool:
-    """Check whether *obj* is a CollectionPropertyValue instance."""
-    return (
-        obj._meta.app_label == "waste_collection"
-        and obj._meta.model_name == "collectionpropertyvalue"
-    )
-
-
-def _is_collection(obj: Any) -> bool:
-    """Check whether *obj* is a Collection instance."""
-    return (
-        obj._meta.app_label == "waste_collection"
-        and obj._meta.model_name == "collection"
-    )
-
-
 def _serialize_m2m_sources(obj: Any) -> list[dict[str, Any]]:
     """Serialize the ``sources`` M2M relation into JSON-safe dicts."""
     if not hasattr(obj, "sources"):
@@ -225,127 +200,6 @@ def _serialize_related_display(obj: Any) -> dict[str, str | None]:
         else:
             display[field.name] = None
     return display
-
-
-def _serialize_cpv_timeline(obj: Any) -> list[dict[str, Any]]:
-    """Return historical values for the same property on the same collection chain.
-
-    Helps assess plausibility by comparing a value against its trend
-    across years. Only called for non-derived CollectionPropertyValues.
-    """
-    try:
-        collection = obj.collection
-        chain_ids = collection.version_chain_ids
-        model_class = obj.__class__
-        siblings = (
-            model_class.objects.filter(
-                collection_id__in=chain_ids,
-                property_id=obj.property_id,
-                is_derived=False,
-            )
-            .exclude(pk=obj.pk)
-            .select_related("unit")
-            .order_by("year", "pk")
-        )
-        return [
-            {
-                "id": sibling.pk,
-                "year": sibling.year,
-                "average": sibling.average,
-                "standard_deviation": sibling.standard_deviation,
-                "unit": str(sibling.unit) if sibling.unit else None,
-                "publication_status": getattr(sibling, "publication_status", None),
-            }
-            for sibling in siblings
-        ]
-    except Exception:
-        logger.debug("Could not build CPV timeline for %s", obj.pk, exc_info=True)
-        return []
-
-
-def _serialize_parent_collection(obj: Any) -> dict[str, Any]:
-    """Serialize the parent collection of a CPV with its sources and flyers."""
-    try:
-        collection = obj.collection
-        return {
-            "id": collection.pk,
-            "name": str(collection),
-            "sources": _serialize_m2m_sources(collection),
-            "flyers": _serialize_collection_flyers(collection),
-        }
-    except Exception:
-        logger.debug(
-            "Could not serialize parent collection for CPV %s",
-            obj.pk,
-            exc_info=True,
-        )
-        return {}
-
-
-def _serialize_collection_flyers(obj: Any) -> list[dict[str, Any]]:
-    """Serialize the ``flyers`` M2M on a Collection."""
-    if not hasattr(obj, "flyers"):
-        return []
-    return [
-        {
-            "id": flyer.pk,
-            "url": getattr(flyer, "url", None),
-            "url_valid": getattr(flyer, "url_valid", None),
-            "url_checked": _serialize_value(getattr(flyer, "url_checked", None)),
-            "url_valid_is_advisory": True,
-            "title": getattr(flyer, "title", ""),
-        }
-        for flyer in obj.flyers.order_by("pk")
-    ]
-
-
-def _serialize_collection_frequency(obj: Any) -> dict[str, Any] | None:
-    frequency = getattr(obj, "frequency", None)
-    if frequency is None:
-        return None
-    try:
-        schedule_service = _get_collection_frequency_schedule_service()
-        if schedule_service is None:
-            raise LookupError("Collection frequency schedule service is unavailable")
-        rows = schedule_service.rows_from_frequency(frequency)
-        display_rows = schedule_service.display_rows(frequency)
-        is_year_round = (
-            len(display_rows) == 1 and display_rows[0]["segment"] == "All year"
-        )
-        return {
-            "id": frequency.pk,
-            "canonical_label": frequency.name,
-            "type": getattr(frequency, "type", None),
-            "schedule_summary": schedule_service.summary(rows),
-            "rows": display_rows,
-            "is_year_round": is_year_round,
-            "summary": display_rows[0]["standard"] if is_year_round else None,
-            "options": display_rows[0]["options"] if is_year_round else None,
-        }
-    except Exception:
-        logger.debug(
-            "Could not serialize collection frequency for %s",
-            obj.pk,
-            exc_info=True,
-        )
-        return {
-            "id": frequency.pk,
-            "canonical_label": frequency.name,
-            "type": getattr(frequency, "type", None),
-            "schedule_summary": None,
-            "rows": [],
-            "is_year_round": False,
-            "summary": None,
-            "options": [],
-        }
-
-
-def _get_collection_frequency_schedule_service():
-    try:
-        module = import_module("sources.waste_collection.frequency_service")
-    except (ImportError, ModuleNotFoundError):
-        return None
-    return getattr(module, "CollectionFrequencyScheduleService", None)
 
 
 def _serialize_model_fields(obj: Any) -> dict[str, Any]:
