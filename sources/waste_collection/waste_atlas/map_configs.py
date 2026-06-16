@@ -1043,6 +1043,37 @@ MAP_CONFIGS = {
         "quartileColors": ["#d1e7e6", "#7fcce9", "#0090cb", "#00608e"],
         "quartilePreserveClasses": ["no_d2d"],
     },
+    "connection_type": {
+        "title": "Participation Policy",
+        "dataUrl": "/waste_collection/api/waste-atlas/connection-type/",
+        "dataField": "connection_type",
+        "categories": [
+            {
+                "value": "MANDATORY",
+                "label": "Mandatory",
+                "color": "#00608e",
+            },
+            {
+                "value": "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION",
+                "label": "Mandatory, except home composters",
+                "color": "#0090cb",
+            },
+            {
+                "value": "VOLUNTARY",
+                "label": "Voluntary",
+                "color": "#7fcce9",
+            },
+            {
+                "value": "not_specified",
+                "label": "Not specified",
+                "color": "#d1e7e6",
+            },
+        ],
+        "noDataColor": NO_DATA_COLOR,
+        "noDataLabel": "No data",
+        "legendTitle": "Participation Policy",
+        "fileBase": "connection_type",
+    },
     "denmark_collection_support": {
         "title": "Accepted materials for biowaste collection aids",
         "dataUrl": "/waste_collection/api/waste-atlas/regular-plastic-collection-support/",

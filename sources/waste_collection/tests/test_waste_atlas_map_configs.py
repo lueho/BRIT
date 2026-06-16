@@ -7,6 +7,13 @@ from sources.waste_collection.waste_atlas.map_configs import (
     MAP_CONFIGS,
     NO_DATA_COLOR,
 )
+from sources.waste_collection.waste_atlas.map_selection import (
+    MAP_SELECTION_THEME_ORDER,
+    MAP_SELECTION_WASTE_CATEGORY_OVERRIDES,
+    THEME_LABELS,
+    WASTE_ATLAS_MAP_SELECTIONS,
+)
+from sources.waste_collection.waste_atlas.pages import MAP_PAGES
 
 
 class WasteAtlasMapConfigTests(SimpleTestCase):
@@ -104,6 +111,67 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         self.assertIn("function findThemeOption(", script)
         self.assertIn("selectedThemeGroup", script)
         self.assertIn("data-theme-group", script)
+
+    def test_participation_policy_map_config_displays_connection_type(self):
+        config = MAP_CONFIGS["connection_type"]
+
+        self.assertEqual(config["title"], "Participation Policy")
+        self.assertEqual(
+            config["dataUrl"], "/waste_collection/api/waste-atlas/connection-type/"
+        )
+        self.assertEqual(config["dataField"], "connection_type")
+        self.assertEqual(config["legendTitle"], "Participation Policy")
+        self.assertEqual(config["fileBase"], "connection_type")
+        self.assertEqual(
+            [entry["value"] for entry in config["categories"]],
+            [
+                "MANDATORY",
+                "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION",
+                "VOLUNTARY",
+                "not_specified",
+            ],
+        )
+
+    def test_participation_policy_map_pages_match_connection_rate_scopes(self):
+        connection_rate_pages = {
+            page["region"]: page
+            for page in MAP_PAGES
+            if page["theme"] == "connection_rate"
+        }
+        connection_type_pages = {
+            page["region"]: page
+            for page in MAP_PAGES
+            if page["theme"] == "connection_type"
+        }
+
+        self.assertEqual(connection_type_pages.keys(), connection_rate_pages.keys())
+        self.assertEqual(
+            connection_type_pages["nrw"]["path"], "map/nrw/participation-policy/"
+        )
+        self.assertEqual(
+            connection_type_pages["nrw"]["name"],
+            "waste-atlas-nrw-participation-policy-map",
+        )
+        for page in connection_type_pages.values():
+            with self.subTest(region=page["region"]):
+                self.assertEqual(page["title"], "Participation Policy")
+                self.assertEqual(page["config_key"], "connection_type")
+
+    def test_participation_policy_map_is_available_as_biowaste_theme(self):
+        self.assertEqual(THEME_LABELS["connection_type"], "Participation Policy")
+        self.assertEqual(
+            MAP_SELECTION_WASTE_CATEGORY_OVERRIDES["connection_type"], "biowaste"
+        )
+        self.assertLess(
+            MAP_SELECTION_THEME_ORDER["connection_rate"],
+            MAP_SELECTION_THEME_ORDER["connection_type"],
+        )
+
+        for map_set in ("DE", "DE-NW", "DE-BW-RP", "ES-CT"):
+            with self.subTest(map_set=map_set):
+                self.assertIn(
+                    "connection_type", WASTE_ATLAS_MAP_SELECTIONS[map_set]["themes"]
+                )
 
     def _forbidden_unit_tokens(self, legend_title):
         for unit, forbidden_tokens in self.UNIT_LABEL_FORBIDDEN_TOKENS.items():

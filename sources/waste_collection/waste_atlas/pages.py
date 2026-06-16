@@ -611,6 +611,13 @@ MAP_PAGES = [
     ),
     _page(
         "generic",
+        "connection_type",
+        "Participation Policy",
+        "map/participation-policy/",
+        "waste-atlas-participation-policy-map",
+    ),
+    _page(
+        "generic",
         "food_waste_category",
         "Accepted food-waste categories in biowaste",
         "map/food-waste-category/",
@@ -812,6 +819,13 @@ MAP_PAGES = [
         "Connection rates for door-to-door biowaste collection",
         "map/germany/connection-rate/",
         "waste-atlas-germany-connection-rate-map",
+    ),
+    _page(
+        "germany",
+        "connection_type",
+        "Participation Policy",
+        "map/germany/participation-policy/",
+        "waste-atlas-germany-participation-policy-map",
     ),
     _page(
         "germany",
@@ -1030,6 +1044,13 @@ MAP_PAGES = [
         "Connection rates for door-to-door biowaste collection",
         "map/nrw/connection-rate/",
         "waste-atlas-nrw-connection-rate-map",
+    ),
+    _page(
+        "nrw",
+        "connection_type",
+        "Participation Policy",
+        "map/nrw/participation-policy/",
+        "waste-atlas-nrw-participation-policy-map",
     ),
     _page(
         "nrw",
@@ -1286,6 +1307,13 @@ MAP_PAGES = [
     ),
     _page(
         "catalonia",
+        "connection_type",
+        "Participation Policy",
+        "map/catalonia/participation-policy/",
+        "waste-atlas-catalonia-participation-policy-map",
+    ),
+    _page(
+        "catalonia",
         "food_waste_category",
         "Accepted food-waste categories in biowaste",
         "map/catalonia/food-waste-category/",
@@ -1515,6 +1543,13 @@ MAP_PAGES = [
         "Connection rates for door-to-door biowaste collection",
         "map/bw-rp/connection-rate/",
         "waste-atlas-bw-rp-connection-rate-map",
+    ),
+    _page(
+        "bw_rp",
+        "connection_type",
+        "Participation Policy",
+        "map/bw-rp/participation-policy/",
+        "waste-atlas-bw-rp-participation-policy-map",
     ),
     _page(
         "bw_rp",

@@ -2410,6 +2410,7 @@ class ConnectionRateViewSetTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
+            connection_type="MANDATORY",
         )
         cls.current_collection.predecessors.add(cls.previous_collection)
         CollectionPropertyValue.objects.create(
@@ -2439,6 +2440,23 @@ class ConnectionRateViewSetTests(APITestCase):
                     "connection_rate": 0.9,
                     "is_door_to_door": True,
                     "reporting_year": 2023,
+                }
+            ],
+        )
+
+    def test_connection_type_endpoint_returns_selected_collection_value(self):
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/connection-type/",
+            {"country": "DE", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data,
+            [
+                {
+                    "catchment_id": self.catchment.id,
+                    "connection_type": "MANDATORY",
                 }
             ],
         )
