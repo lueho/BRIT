@@ -5,7 +5,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
-from .map_selection import build_map_selection_context
+from .map_selection import build_map_selection_context, resolve_map_set
 from .pages import MAP_PAGES
 
 WASTE_ATLAS_GROUP_NAME = "waste_atlas"
@@ -51,9 +51,13 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
     def get_selected_map_set(self):
         if self.page["selector_set"]:
             return self.page["selector_set"]
-        if self.get_country() == "IT" and self.get_nuts_prefix() == "ITH10":
+        country = self.get_country()
+        if country == "IT" and self.get_nuts_prefix() == "ITH10":
             return "IT-ST"
-        return self.get_country()
+        return (
+            resolve_map_set(country, self.get_nuts_prefix(), self.get_nuts_level())
+            or country
+        )
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)

@@ -4198,6 +4198,40 @@ class WasteAtlasMapViewsTestCase(TestCase):
             reverse("waste-atlas-biowaste-collection-amount-map"),
         )
 
+    def test_map_set_options_expose_region_scope(self):
+        from sources.waste_collection.waste_atlas.map_selection import (
+            build_map_selection_context,
+        )
+
+        selection_context = build_map_selection_context(
+            reverse,
+            selected_map_set="DE-NW",
+            selected_theme="connection_type",
+        )
+
+        map_sets_by_value = {
+            map_set["value"]: map_set
+            for map_set in selection_context["map_selection_map_sets"]
+        }
+        self.assertEqual(map_sets_by_value["DE-NW"]["country"], "DE")
+        self.assertEqual(map_sets_by_value["DE-NW"]["nuts_prefix"], "DEA")
+        self.assertEqual(map_sets_by_value["DE-NW"]["nuts_level"], "1")
+        self.assertEqual(map_sets_by_value["SE"]["country"], "SE")
+        self.assertEqual(map_sets_by_value["SE"]["nuts_prefix"], "")
+        self.assertEqual(map_sets_by_value["SE"]["nuts_level"], "")
+
+    def test_generic_map_preserves_nuts_region_in_selector(self):
+        response = self.client.get(
+            reverse("waste-atlas-biowaste-collection-amount-map"),
+            {"country": "DE", "nuts_prefix": "DEA", "nuts_level": "1"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "selected>Nordrhein-Westfalen</option>")
+        cfg = self._map_config(response)
+        self.assertEqual(cfg["nutsPrefix"], "DEA")
+        self.assertEqual(cfg["nutsLevel"], 1)
+
     def test_generic_map_page_selects_current_theme_for_regions_without_dedicated_route(
         self,
     ):

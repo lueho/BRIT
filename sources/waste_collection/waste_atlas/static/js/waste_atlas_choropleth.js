@@ -289,12 +289,14 @@ var WasteAtlasChoropleth = (function () {
     return window.location.pathname.replace(/\/$/, '') === path.replace(/\/$/, '');
   }
 
-  function _selectorNavigationTarget(url, year, fromYear, country) {
+  function _selectorNavigationTarget(url, year, fromYear, region) {
     if (!url || _isCurrentPath(url)) return null;
     var params = fromYear
       ? 'from_year=' + encodeURIComponent(fromYear) + '&to_year=' + encodeURIComponent(year)
       : 'year=' + encodeURIComponent(year);
-    if (country) params += '&country=' + encodeURIComponent(country);
+    if (region && region.country) params += '&country=' + encodeURIComponent(region.country);
+    if (region && region.nutsPrefix) params += '&nuts_prefix=' + encodeURIComponent(region.nutsPrefix);
+    if (region && region.nutsLevel) params += '&nuts_level=' + encodeURIComponent(region.nutsLevel);
     return url + '?' + params;
   }
 
@@ -333,6 +335,16 @@ var WasteAtlasChoropleth = (function () {
     function selectedThemeGroup() {
       var selectedOption = themeSelect.options[themeSelect.selectedIndex];
       return selectedOption ? selectedOption.getAttribute('data-theme-group') : null;
+    }
+
+    function selectedRegion() {
+      var selectedOption = countrySelect.options[countrySelect.selectedIndex];
+      if (!selectedOption) return { country: countrySelect.value };
+      return {
+        country: selectedOption.getAttribute('data-country') || countrySelect.value,
+        nutsPrefix: selectedOption.getAttribute('data-nuts-prefix') || '',
+        nutsLevel: selectedOption.getAttribute('data-nuts-level') || ''
+      };
     }
 
     function updateThemeVisibility(selectedMapSet, selectedWasteCategory) {
@@ -392,7 +404,7 @@ var WasteAtlasChoropleth = (function () {
       var url = selectedRouteUrl();
       var year = selectedYear();
       var fromYear = selectedFromYear();
-      var navigationTarget = _selectorNavigationTarget(url, year, fromYear, countrySelect.value);
+      var navigationTarget = _selectorNavigationTarget(url, year, fromYear, selectedRegion());
       if (navigationTarget && !disableNavigation) {
         window.location.href = navigationTarget;
         return;

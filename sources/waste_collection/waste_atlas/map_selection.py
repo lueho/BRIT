@@ -75,6 +75,45 @@ def _build_selections():
 
 WASTE_ATLAS_MAP_SELECTIONS = _build_selections()
 
+
+def _build_map_set_region_scopes():
+    """Map each map-set key to its region scope (country/NUTS) from ``MAP_PAGES``.
+
+    The scope lets the selector preserve the chosen region when navigating to a
+    generic (country-agnostic) theme page: the map-set key itself is not a valid
+    ``country`` filter for NUTS-subset sets (e.g. ``DE-NW``), so the real country
+    plus ``nuts_prefix``/``nuts_level`` is forwarded instead.
+    """
+    scopes = {}
+    for page in MAP_PAGES:
+        map_set = page["selector_set"]
+        if not map_set or map_set in scopes:
+            continue
+        scopes[map_set] = {
+            "country": page["country"],
+            "nuts_prefix": page.get("nuts_prefix", ""),
+            "nuts_level": str(page.get("nuts_level", "")),
+        }
+    return scopes
+
+
+MAP_SET_REGION_SCOPES = _build_map_set_region_scopes()
+
+
+def resolve_map_set(country, nuts_prefix="", nuts_level=""):
+    """Return the map-set key whose region scope matches the given parameters.
+
+    Used to map a generic page's resolved ``country``/``nuts_*`` back to the
+    selector region so the region dropdown reflects the rendered scope.
+    Returns ``None`` when no map set matches exactly.
+    """
+    target = (country, nuts_prefix or "", str(nuts_level or ""))
+    for map_set, scope in MAP_SET_REGION_SCOPES.items():
+        if (scope["country"], scope["nuts_prefix"], scope["nuts_level"]) == target:
+            return map_set
+    return None
+
+
 MAP_SELECTION_YEARS = ("2020", "2021", "2022", "2023", "2024")
 
 MAP_SELECTION_THEME_ORDER = {
@@ -259,11 +298,15 @@ def build_map_selection_context(
                 map_selection["themes"].items(), key=_theme_sort_key
             )
         ]
+        scope = MAP_SET_REGION_SCOPES.get(map_set, {})
         map_sets.append(
             {
                 "value": map_set,
                 "label": map_selection["label"],
                 "selected": map_set == selected_map_set,
+                "country": scope.get("country", map_set),
+                "nuts_prefix": scope.get("nuts_prefix", ""),
+                "nuts_level": scope.get("nuts_level", ""),
             }
         )
     _add_generic_theme_fallbacks(themes_by_map_set, reverse_func)
