@@ -145,6 +145,23 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
                 with self.subTest(map_set=map_set, waste_category=waste_category):
                     self.assertEqual(len(labels), len(set(labels)))
 
+    def test_selector_js_supports_search_status_and_empty_states(self):
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+        script = script_path.read_text()
+
+        self.assertIn("sel-theme-search", script)
+        self.assertIn("atlas-selector-status", script)
+        self.assertIn("optionMatchesSearch", script)
+        self.assertIn("visibleThemeCount", script)
+        self.assertIn("atlas-selector-empty", script)
+        self.assertIn("form.addEventListener('submit', navigateOrLoad)", script)
+
     def test_participation_policy_map_config_displays_connection_type(self):
         config = MAP_CONFIGS["connection_type"]
 

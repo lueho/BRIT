@@ -4130,8 +4130,13 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, '<label for="sel-country">Region</label>')
         self.assertContains(
             response,
-            "Region means the map scope, not an individual municipality.",
+            "Map scope, not an individual municipality.",
         )
+        self.assertContains(response, 'id="atlas-selection-form"')
+        self.assertContains(response, "Map navigation")
+        self.assertContains(response, "Find another map")
+        self.assertContains(response, 'id="sel-theme-search"')
+        self.assertContains(response, 'id="atlas-selector-status"')
         self.assertContains(response, '<label for="sel-theme">Theme</label>')
         self.assertContains(
             response, '<label for="sel-waste-category">Waste category</label>'
@@ -4914,6 +4919,18 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, 'id="sel-country"')
         self.assertContains(response, 'id="sel-waste-category"')
         self.assertContains(response, 'id="sel-theme"')
+
+    def test_change_map_page_renders_searchable_navigation_widget(self):
+        response = self.client.get(
+            reverse("waste-atlas-change-map", args=["DE", "collection_system"])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Change-map navigation")
+        self.assertContains(response, "Compare another map")
+        self.assertContains(response, 'id="sel-theme-search"')
+        self.assertContains(response, 'id="atlas-selector-status"')
+        self.assertContains(response, "comparison maps available")
 
     def test_change_map_overview_defaults_from_year_to_second_last(self):
         response = self.client.get(reverse("waste-atlas-change-map-overview"))

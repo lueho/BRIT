@@ -9,18 +9,120 @@
 {% block custom_style %}
   <style>
   #atlas-controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 1rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+    gap: .75rem;
     margin-bottom: 1rem;
   }
-  #atlas-controls label { font-weight: 600; margin-right: .25rem; }
-  #atlas-controls select,
-  #atlas-controls input[type="number"] {
-    padding: .25rem .5rem;
+  .atlas-selector-form {
+    background: linear-gradient(135deg, #f8fbf9 0%, #ffffff 100%);
+    border: 1px solid #d8e4dc;
+    border-radius: .75rem;
+    box-shadow: 0 .35rem 1rem rgba(35, 57, 42, .06);
+    padding: 1rem;
+  }
+  .atlas-selector-header {
+    align-items: start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-bottom: .85rem;
+  }
+  .atlas-selector-eyebrow {
+    color: #5c7b64;
+    font-size: .72rem;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .atlas-selector-title {
+    font-size: 1.05rem;
+    margin: .1rem 0 0;
+  }
+  .atlas-selector-help {
+    color: #5f6f64;
+    font-size: .86rem;
+    margin: 0;
+    max-width: 27rem;
+  }
+  .atlas-selector-grid {
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: minmax(10rem, 1.1fr) minmax(10rem, 1.05fr) minmax(9rem, .95fr) minmax(13rem, 1.45fr) minmax(5rem, .45fr) auto;
+  }
+  .atlas-selector-grid--compare {
+    grid-template-columns: minmax(9rem, 1.1fr) minmax(9rem, 1fr) minmax(8rem, .9fr) minmax(12rem, 1.35fr) minmax(4.8rem, .4fr) minmax(4.8rem, .4fr) auto;
+  }
+  .atlas-selector-field {
+    min-width: 0;
+  }
+  .atlas-selector-field label {
+    color: #344b39;
+    display: block;
+    font-size: .78rem;
+    font-weight: 800;
+    margin-bottom: .25rem;
+  }
+  .atlas-selector-field select,
+  .atlas-selector-field input {
+    background-color: #fff;
     border: 1px solid #ced4da;
-    border-radius: .25rem;
+    border-radius: .45rem;
+    min-height: 2.35rem;
+    padding: .36rem .55rem;
+    width: 100%;
+  }
+  .atlas-selector-field small {
+    color: #6c757d;
+    display: block;
+    font-size: .74rem;
+    margin-top: .18rem;
+  }
+  .atlas-selector-submit {
+    align-self: end;
+    min-height: 2.35rem;
+    white-space: nowrap;
+  }
+  .atlas-selector-footer {
+    color: #5f6f64;
+    font-size: .82rem;
+    margin-top: .65rem;
+  }
+  .atlas-selector-empty #sel-theme {
+    border-color: #dc3545;
+  }
+  #atlas-controls > a {
+    align-self: start;
+    border-radius: .65rem;
+    white-space: nowrap;
+  }
+  @media (max-width: 1199.98px) {
+    #atlas-controls,
+    .atlas-selector-header {
+      display: block;
+    }
+    .atlas-selector-help {
+      margin-top: .35rem;
+      max-width: none;
+    }
+    .atlas-selector-grid,
+    .atlas-selector-grid--compare {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .atlas-selector-submit {
+      width: 100%;
+    }
+    #atlas-controls > a {
+      display: inline-block;
+      margin-top: .75rem;
+    }
+  }
+  @media (max-width: 575.98px) {
+    .atlas-selector-grid,
+    .atlas-selector-grid--compare {
+      grid-template-columns: 1fr;
+    }
   }
   .atlas-year-input { width: 5.5rem; }
   #map-container {

@@ -389,17 +389,20 @@ var WasteAtlasChoropleth = (function () {
     var disableNavigation = options.disableNavigation || false;
     var countrySelect = document.getElementById('sel-country');
     var wasteCategorySelect = document.getElementById('sel-waste-category');
+    var themeSearchInput = document.getElementById('sel-theme-search');
     var themeSelect = document.getElementById('sel-theme');
     var yearSelect = document.getElementById('sel-year');
     var fromYearSelect = document.getElementById('sel-from-year');
     var toYearSelect = document.getElementById('sel-to-year');
     var btnLoad = document.getElementById('btn-load');
     var form = document.getElementById('atlas-selection-form');
+    var statusEl = document.getElementById('atlas-selector-status');
 
     var yearSelectEl = toYearSelect || yearSelect;
     if (!countrySelect || !themeSelect || !yearSelectEl || !btnLoad) return null;
 
     var themeOptions = Array.prototype.slice.call(themeSelect.options);
+    var visibleThemeCount = 0;
 
     function selectedYear() {
       return parseInt(yearSelectEl.value, 10) || 2024;
@@ -421,14 +424,30 @@ var WasteAtlasChoropleth = (function () {
       return selectedOption ? selectedOption.getAttribute('data-theme-group') : null;
     }
 
+    function searchQuery() {
+      return themeSearchInput ? themeSearchInput.value.trim().toLowerCase() : '';
+    }
+
+    function optionMatchesSearch(option, query) {
+      if (!query) return true;
+      var haystack = option.getAttribute('data-search') || option.textContent || '';
+      return haystack.toLowerCase().indexOf(query) !== -1;
+    }
+
     function updateThemeVisibility(selectedMapSet, selectedWasteCategory) {
       var firstVisibleOption = null;
+      var query = searchQuery();
+      visibleThemeCount = 0;
       themeOptions.forEach(function (option) {
         var isVisible = option.getAttribute('data-map-set') === selectedMapSet
-          && (!selectedWasteCategory || option.getAttribute('data-waste-category') === selectedWasteCategory);
+          && (!selectedWasteCategory || option.getAttribute('data-waste-category') === selectedWasteCategory)
+          && optionMatchesSearch(option, query);
         option.hidden = !isVisible;
         option.disabled = !isVisible;
-        if (isVisible && !firstVisibleOption) firstVisibleOption = option;
+        if (isVisible) {
+          visibleThemeCount += 1;
+          if (!firstVisibleOption) firstVisibleOption = option;
+        }
       });
       return firstVisibleOption;
     }
@@ -447,6 +466,31 @@ var WasteAtlasChoropleth = (function () {
       return fallbackOption;
     }
 
+    function selectedText(selectEl) {
+      var selectedOption = selectEl && selectEl.options[selectEl.selectedIndex];
+      return selectedOption ? selectedOption.textContent.trim() : '';
+    }
+
+    function updateSelectorStatus() {
+      var hasMatches = visibleThemeCount > 0;
+      var message = '';
+      if (hasMatches) {
+        message = visibleThemeCount + ' ' + (
+          visibleThemeCount === 1
+            ? (form && form.dataset.countSingular || 'map available')
+            : (form && form.dataset.countPlural || 'maps available')
+        );
+        message += ' for ' + selectedText(countrySelect);
+        if (wasteCategorySelect) message += ' · ' + selectedText(wasteCategorySelect);
+      } else {
+        message = form && form.dataset.emptyMessage || 'No maps match these filters.';
+      }
+      if (statusEl) statusEl.textContent = message;
+      if (form) form.classList.toggle('atlas-selector-empty', !hasMatches);
+      themeSelect.disabled = !hasMatches;
+      btnLoad.disabled = !hasMatches;
+    }
+
     function ensureVisibleSelection() {
       var currentThemeGroup = selectedThemeGroup();
       var selectedMapSet = countrySelect.value;
@@ -460,16 +504,20 @@ var WasteAtlasChoropleth = (function () {
         firstVisibleOption = updateThemeVisibility(selectedMapSet, null);
         usingCategoryFallback = true;
       }
-      if (themeSelect.selectedOptions.length && !themeSelect.selectedOptions[0].disabled) return;
-      var nextOption = null;
-      if (firstVisibleOption && !usingCategoryFallback) {
-        nextOption = findThemeOption(selectedMapSet, selectedWasteCategory, currentThemeGroup);
+      if (!(themeSelect.selectedOptions.length && !themeSelect.selectedOptions[0].disabled)) {
+        var nextOption = null;
+        if (firstVisibleOption && !usingCategoryFallback) {
+          nextOption = findThemeOption(selectedMapSet, selectedWasteCategory, currentThemeGroup);
+        }
+        if (nextOption) {
+          themeSelect.selectedIndex = nextOption.index;
+        } else if (firstVisibleOption) {
+          themeSelect.selectedIndex = firstVisibleOption.index;
+        } else {
+          themeSelect.selectedIndex = -1;
+        }
       }
-      if (nextOption) {
-        themeSelect.selectedIndex = nextOption.index;
-      } else {
-        themeSelect.selectedIndex = -1;
-      }
+      updateSelectorStatus();
     }
 
     function navigateOrLoad(event) {
@@ -488,9 +536,13 @@ var WasteAtlasChoropleth = (function () {
 
     countrySelect.addEventListener('change', ensureVisibleSelection);
     if (wasteCategorySelect) wasteCategorySelect.addEventListener('change', ensureVisibleSelection);
+    if (themeSearchInput) themeSearchInput.addEventListener('input', ensureVisibleSelection);
     themeSelect.addEventListener('change', ensureVisibleSelection);
-    if (form) form.addEventListener('submit', navigateOrLoad);
-    btnLoad.addEventListener('click', navigateOrLoad);
+    if (form) {
+      form.addEventListener('submit', navigateOrLoad);
+    } else {
+      btnLoad.addEventListener('click', navigateOrLoad);
+    }
     ensureVisibleSelection();
 
     return {
