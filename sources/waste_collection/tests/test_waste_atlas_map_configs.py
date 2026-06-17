@@ -111,6 +111,8 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         self.assertIn("function findThemeOption(", script)
         self.assertIn("selectedThemeGroup", script)
         self.assertIn("data-theme-group", script)
+        self.assertIn("&country=", script)
+        self.assertIn("countrySelect.value", script)
 
     def test_participation_policy_map_config_displays_connection_type(self):
         config = MAP_CONFIGS["connection_type"]

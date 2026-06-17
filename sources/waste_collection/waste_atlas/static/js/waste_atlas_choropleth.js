@@ -289,11 +289,12 @@ var WasteAtlasChoropleth = (function () {
     return window.location.pathname.replace(/\/$/, '') === path.replace(/\/$/, '');
   }
 
-  function _selectorNavigationTarget(url, year, fromYear) {
+  function _selectorNavigationTarget(url, year, fromYear, country) {
     if (!url || _isCurrentPath(url)) return null;
     var params = fromYear
       ? 'from_year=' + encodeURIComponent(fromYear) + '&to_year=' + encodeURIComponent(year)
       : 'year=' + encodeURIComponent(year);
+    if (country) params += '&country=' + encodeURIComponent(country);
     return url + '?' + params;
   }
 
@@ -391,7 +392,7 @@ var WasteAtlasChoropleth = (function () {
       var url = selectedRouteUrl();
       var year = selectedYear();
       var fromYear = selectedFromYear();
-      var navigationTarget = _selectorNavigationTarget(url, year, fromYear);
+      var navigationTarget = _selectorNavigationTarget(url, year, fromYear, countrySelect.value);
       if (navigationTarget && !disableNavigation) {
         window.location.href = navigationTarget;
         return;
