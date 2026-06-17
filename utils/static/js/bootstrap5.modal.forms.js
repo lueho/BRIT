@@ -9,14 +9,6 @@ function resolveModalSettings(options) {
         isDeleteForm: false,
         errorClass: 'is-invalid',
         asyncUpdate: false,
-        asyncSettings: {
-            closeOnSubmit: false,
-            successMessage: null,
-            dataUrl: null,
-            dataElementId: null,
-            dataKey: null,
-            addModalFormFunction: null,
-        },
         ...options,
         asyncSettings: {
             closeOnSubmit: false,

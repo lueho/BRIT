@@ -1049,6 +1049,11 @@ MAP_CONFIGS = {
         "dataField": "connection_type",
         "categories": [
             {
+                "value": "no_bio_collection",
+                "label": "No separate biowaste collection",
+                "color": BIOWASTE_NO_COLLECTION_COLOR,
+            },
+            {
                 "value": "MANDATORY",
                 "label": "Mandatory",
                 "color": "#00608e",
@@ -1064,9 +1069,9 @@ MAP_CONFIGS = {
                 "color": "#7fcce9",
             },
             {
-                "value": "no_bio_collection",
-                "label": "No separate biowaste collection",
-                "color": BIOWASTE_NO_COLLECTION_COLOR,
+                "value": "not_specified",
+                "label": "Not specified",
+                "color": NO_DATA_COLOR,
             },
         ],
         "noDataColor": NO_DATA_COLOR,

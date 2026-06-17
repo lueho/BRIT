@@ -81,8 +81,9 @@ class AtlasChangeMapView(AtlasMapView):
     """Generic change map comparing a map theme between two years.
 
     The page entry is resolved from the ``map_set``/``theme`` URL kwargs.
-    The client fetches the theme's data endpoint for both years and
-    classifies each catchment as no-change/changed/new/removed.
+    The client fetches the theme's data endpoint for both years. Numeric
+    themes are classified by value difference; categorical themes are
+    classified as no-change/changed/new/removed.
     Supports ``from_year`` and ``to_year`` query params.
     """
 

@@ -212,9 +212,20 @@ var WasteAtlasChoropleth = (function () {
   function _changeCategories(toYear) {
     return [
       { value: 'no_change', label: 'No change', color: '#c8e6c9' },
-      { value: 'changed', label: 'Changed', color: '#ffb74d' },
+      { value: 'changed', label: 'Category changed', color: '#ffb74d' },
       { value: 'new', label: 'New in ' + toYear, color: '#64b5f6' },
       { value: 'removed', label: 'Removed in ' + toYear, color: '#bdbdbd' }
+    ];
+  }
+
+  function _numericChangeCategories(toYear) {
+    return [
+      { value: 'decrease', label: 'Decrease', color: '#d73027' },
+      { value: 'no_change', label: 'No numeric change', color: '#c8e6c9' },
+      { value: 'increase', label: 'Increase', color: '#1a9850' },
+      { value: 'changed', label: 'Category changed', color: '#ffb74d' },
+      { value: 'new', label: 'New value in ' + toYear, color: '#64b5f6' },
+      { value: 'removed', label: 'Value removed in ' + toYear, color: '#bdbdbd' }
     ];
   }
 
@@ -238,7 +249,26 @@ var WasteAtlasChoropleth = (function () {
     return classes;
   }
 
+  function _recordLookup(raw) {
+    var lookup = {};
+    _recordList(raw).forEach(function (r) {
+      lookup[r.catchment_id] = r;
+    });
+    return lookup;
+  }
+
+  function _numericValue(record, field) {
+    if (!record) return null;
+    var value = record[field];
+    if (value === null || value === undefined || value === '') return null;
+    var number = Number(value);
+    return isNaN(number) ? null : number;
+  }
+
   function _changeRecords(cfg, fromRaw, toRaw) {
+    if (cfg.numericField) {
+      return _numericChangeRecords(cfg, fromRaw, toRaw);
+    }
     var fromClasses = _classifyRecords(cfg, fromRaw);
     var toClasses = _classifyRecords(cfg, toRaw);
     var ids = {};
@@ -255,16 +285,73 @@ var WasteAtlasChoropleth = (function () {
     });
   }
 
+  function _numericChangeRecords(cfg, fromRaw, toRaw) {
+    var fromRecords = _recordLookup(fromRaw);
+    var toRecords = _recordLookup(toRaw);
+    var fromClasses = _classifyRecords(cfg, fromRaw);
+    var toClasses = _classifyRecords(cfg, toRaw);
+    var ids = {};
+    Object.keys(fromRecords).forEach(function (id) { ids[id] = true; });
+    Object.keys(toRecords).forEach(function (id) { ids[id] = true; });
+    Object.keys(fromClasses).forEach(function (id) { ids[id] = true; });
+    Object.keys(toClasses).forEach(function (id) { ids[id] = true; });
+
+    return Object.keys(ids).map(function (id) {
+      var fromValue = _numericValue(fromRecords[id], cfg.numericField);
+      var toValue = _numericValue(toRecords[id], cfg.numericField);
+      var difference = null;
+      var change = null;
+
+      if (fromValue != null && toValue != null) {
+        difference = toValue - fromValue;
+        if (Math.abs(difference) < 1e-9) {
+          change = 'no_change';
+        } else {
+          change = difference > 0 ? 'increase' : 'decrease';
+        }
+      } else if (toValue != null) {
+        change = 'new';
+      } else if (fromValue != null) {
+        change = 'removed';
+      } else if (fromClasses[id] != null && toClasses[id] != null) {
+        change = fromClasses[id] === toClasses[id] ? 'no_change' : 'changed';
+      } else if (toClasses[id] != null) {
+        change = 'new';
+      } else if (fromClasses[id] != null) {
+        change = 'removed';
+      }
+
+      return {
+        catchment_id: parseInt(id, 10) || id,
+        change_type: change,
+        from_value: fromValue,
+        to_value: toValue,
+        difference: difference
+      };
+    });
+  }
+
   function _changeRenderConfig(loadCfg, baseTitle) {
-    return Object.assign({}, loadCfg, {
+    var isNumericChange = Boolean(loadCfg.numericField);
+    var renderCfg = Object.assign({}, loadCfg, {
       dataField: 'change_type',
       transformName: null,
       transformData: null,
-      categories: _changeCategories(loadCfg.year),
-      legendTitle: 'Change',
+      categories: isNumericChange
+        ? _numericChangeCategories(loadCfg.year)
+        : _changeCategories(loadCfg.year),
+      legendTitle: isNumericChange ? 'Difference' : 'Change',
       noDataLabel: 'No data',
       title: (baseTitle || '') + ' — changes (' + loadCfg.fromYear + ' → ' + loadCfg.year + ')'
     });
+    if (isNumericChange) {
+      renderCfg.tooltipFields = [
+        { field: 'from_value', label: String(loadCfg.fromYear) },
+        { field: 'to_value', label: String(loadCfg.year) },
+        { field: 'difference', label: 'Difference' }
+      ];
+    }
+    return renderCfg;
   }
 
   function _configForSelection(cfg, country, year, preserveScope) {

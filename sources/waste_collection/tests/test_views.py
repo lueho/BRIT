@@ -4074,7 +4074,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
             germany_themes[
                 [theme["value"] for theme in germany_themes].index("collection_system")
             ]["label"],
-            "Collection system",
+            "Primary collection system",
         )
         self.assertEqual(
             germany_themes[
@@ -4886,6 +4886,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, '<select class="form-select" id="sel-from-year">')
         self.assertContains(response, '<select class="form-select" id="sel-to-year">')
         self.assertContains(response, 'id="sel-country"')
+        self.assertContains(response, 'id="sel-waste-category"')
         self.assertContains(response, 'id="sel-theme"')
 
     def test_change_map_overview_defaults_from_year_to_second_last(self):

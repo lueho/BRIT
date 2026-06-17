@@ -1,6 +1,6 @@
 {% if atlas_selector_bootstrap %}
   <div class="row g-3 align-items-end">
-    <div class="col-md-3">
+    <div class="col-md-2">
       <label class="form-label" for="sel-country">Region</label>
       <select class="form-select" id="sel-country">
         {% for option in map_selection_map_sets %}
@@ -9,6 +9,15 @@
         {% endfor %}
       </select>
       <div class="form-text">Region means the map scope, not an individual municipality.</div>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label" for="sel-waste-category">Waste category</label>
+      <select class="form-select" id="sel-waste-category">
+        {% for value, label in map_selection_waste_categories.items %}
+          <option value="{{ value }}"
+                  {% if value == selected_waste_category %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
     </div>
     <div class="col-md-3">
       <label class="form-label" for="sel-theme">Theme</label>
@@ -46,7 +55,7 @@
         {% endfor %}
       </select>
     </div>
-    <div class="col-md-2">
+    <div class="col-md-1">
       <button class="btn btn-primary w-100" id="btn-load" type="submit">
         {{ atlas_selector_button_label|default:"Compare" }}
       </button>
@@ -62,6 +71,15 @@
       {% endfor %}
     </select>
     <small class="text-muted d-block">Region means the map scope, not an individual municipality.</small>
+  </div>
+  <div>
+    <label for="sel-waste-category">Waste category</label>
+    <select id="sel-waste-category">
+      {% for value, label in map_selection_waste_categories.items %}
+        <option value="{{ value }}"
+                {% if value == selected_waste_category %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
   </div>
   <div>
     <label for="sel-theme">Theme</label>

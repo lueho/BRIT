@@ -12,6 +12,7 @@ from sources.waste_collection.waste_atlas.map_selection import (
     MAP_SELECTION_WASTE_CATEGORY_OVERRIDES,
     THEME_LABELS,
     WASTE_ATLAS_MAP_SELECTIONS,
+    build_map_selection_context,
 )
 from sources.waste_collection.waste_atlas.pages import MAP_PAGES
 
@@ -111,6 +112,38 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         self.assertIn("function findThemeOption(", script)
         self.assertIn("selectedThemeGroup", script)
         self.assertIn("data-theme-group", script)
+
+    def test_change_maps_use_numeric_difference_for_numeric_configs(self):
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+
+        script = script_path.read_text()
+
+        self.assertIn("function _numericChangeRecords(", script)
+        self.assertIn("cfg.numericField", script)
+        self.assertIn("change = difference > 0 ? 'increase' : 'decrease'", script)
+        self.assertIn("legendTitle: isNumericChange ? 'Difference' : 'Change'", script)
+
+    def test_selector_labels_are_unique_per_map_set_and_waste_category(self):
+        context = build_map_selection_context(
+            lambda route_name, args=None: f"/{route_name}/{'/'.join(args or [])}"
+        )
+
+        for map_set, themes in context["map_selection_themes_by_map_set"].items():
+            by_waste_category = {}
+            for theme in themes:
+                by_waste_category.setdefault(theme["waste_category"], []).append(
+                    theme["label"]
+                )
+
+            for waste_category, labels in by_waste_category.items():
+                with self.subTest(map_set=map_set, waste_category=waste_category):
+                    self.assertEqual(len(labels), len(set(labels)))
 
     def test_participation_policy_map_config_displays_connection_type(self):
         config = MAP_CONFIGS["connection_type"]
