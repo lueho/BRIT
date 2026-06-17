@@ -1666,6 +1666,38 @@ class CollectionMutationApiTestCase(APITestCase):
             ).exists()
         )
 
+    def test_update_collection_legacy_endpoint_alias_enriches_existing_collection(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-update-collection",
+                kwargs={"pk": self.private_predecessor.pk},
+            ),
+            {
+                "expected_catchment": str(self.private_predecessor.catchment),
+                "expected_waste_category": str(
+                    self.private_predecessor.effective_waste_category
+                ),
+                "expected_collection_system": str(
+                    self.private_predecessor.collection_system
+                ),
+                "expected_publication_status": self.private_predecessor.publication_status,
+                "expected_valid_from": self.private_predecessor.valid_from.isoformat(),
+                "description": "updated through legacy MCP alias",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["updated"])
+
+        self.private_predecessor.refresh_from_db()
+        self.assertEqual(
+            self.private_predecessor.description,
+            "updated through legacy MCP alias",
+        )
+
     def test_update_endpoint_replaces_sources_when_provided(self):
         self.client.force_login(self.owner)
         stale_source = Source.objects.create(

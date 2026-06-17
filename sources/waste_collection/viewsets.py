@@ -838,6 +838,16 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         )
 
     @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+        url_path="update_collection",
+        url_name="update-collection",
+    )
+    def update_collection_legacy(self, request, pk=None):
+        return self.update_collection(request, pk=pk)
+
+    @action(
         detail=False,
         methods=["get"],
         permission_classes=[permissions.AllowAny],
