@@ -125,11 +125,20 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         self.assertEqual(
             [entry["value"] for entry in config["categories"]],
             [
+                "no_bio_collection",
                 "MANDATORY",
                 "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION",
                 "VOLUNTARY",
                 "not_specified",
             ],
+        )
+        self.assertEqual(
+            config["categories"][0],
+            {
+                "value": "no_bio_collection",
+                "label": "No separate biowaste collection",
+                "color": BIOWASTE_NO_COLLECTION_COLOR,
+            },
         )
 
     def test_participation_policy_map_pages_match_connection_rate_scopes(self):

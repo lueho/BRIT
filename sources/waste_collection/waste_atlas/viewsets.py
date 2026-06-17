@@ -2742,16 +2742,20 @@ class ConnectionTypeViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
 
-        data = [
-            {"catchment_id": cid, "connection_type": row["connection_type"]}
-            for cid, row in _select_primary_collections(
-                country,
-                year,
-                ["Biowaste", "Food waste"],
-                nuts_prefixes,
-                extra_fields=("connection_type",),
-            ).items()
-        ]
+        data = []
+        for cid, row in _select_primary_collections(
+            country,
+            year,
+            ["Biowaste", "Food waste"],
+            nuts_prefixes,
+            extra_fields=("connection_type",),
+        ).items():
+            value = (
+                "no_bio_collection"
+                if row["collection_system"] == "No separate collection"
+                else row["connection_type"]
+            )
+            data.append({"catchment_id": cid, "connection_type": value})
         serializer = CatchmentConnectionTypeSerializer(data, many=True)
         return Response(serializer.data)
 

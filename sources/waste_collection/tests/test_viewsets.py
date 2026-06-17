@@ -2534,6 +2534,7 @@ class WasteAtlasPrimarySelectionTests(APITestCase):
             "collection_system": "/waste_collection/api/waste-atlas/collection-system/",
             "paper_bags": "/waste_collection/api/waste-atlas/paper-bags/",
             "connection_rate": "/waste_collection/api/waste-atlas/connection-rate/",
+            "connection_type": "/waste_collection/api/waste-atlas/connection-type/",
         }
         responses = {
             name: self.client.get(endpoint, {"country": "DE", "year": 2024})
@@ -2552,6 +2553,10 @@ class WasteAtlasPrimarySelectionTests(APITestCase):
         }
         rate_by_catchment = {
             row["catchment_id"]: row for row in responses["connection_rate"].data
+        }
+        connection_type_by_catchment = {
+            row["catchment_id"]: row["connection_type"]
+            for row in responses["connection_type"].data
         }
 
         d2d_catchment_ids = {
@@ -2576,6 +2581,10 @@ class WasteAtlasPrimarySelectionTests(APITestCase):
         )
         self.assertFalse(
             rate_by_catchment[self.no_collection_catchment.id]["is_door_to_door"]
+        )
+        self.assertEqual(
+            connection_type_by_catchment[self.no_collection_catchment.id],
+            "no_bio_collection",
         )
 
     def test_primary_selection_query_count_is_bounded(self):
