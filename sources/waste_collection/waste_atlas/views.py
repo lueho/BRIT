@@ -106,7 +106,7 @@ class AtlasChangeMapView(AtlasMapView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["map_overview_url"] = "waste-atlas-change-map-overview"
-        ctx["from_year"] = self.request.GET.get("from_year", "2023")
+        ctx["from_year"] = self.request.GET.get("from_year", "2024")
         ctx["to_year"] = self.request.GET.get("to_year", "2024")
         ctx["year"] = ctx["to_year"]
         ctx["default_from_year"] = ctx["from_year"]
@@ -141,7 +141,7 @@ class WasteAtlasChangeMapOverviewView(WasteAtlasGroupMixin, TemplateView):
         years = list(selection_ctx["map_selection_years"])
         ctx.update(selection_ctx)
         ctx["default_from_year"] = self.request.GET.get(
-            "from_year", years[-2] if len(years) > 1 else years[0]
+            "from_year", years[-1] if years else "2024"
         )
         ctx["default_to_year"] = self.request.GET.get(
             "to_year", years[-1] if years else "2024"

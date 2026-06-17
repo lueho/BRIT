@@ -4328,7 +4328,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         map_defaults = {
             "waste-atlas-orga-level-italy-map": ("IT", "2024"),
             "waste-atlas-orga-level-sweden-map": ("SE", "2024"),
-            "waste-atlas-orga-level-denmark-map": ("DK", "2023"),
+            "waste-atlas-orga-level-denmark-map": ("DK", "2024"),
             "waste-atlas-orga-level-netherlands-map": ("NL", "2024"),
             "waste-atlas-orga-level-belgium-map": ("BE", "2024"),
         }
@@ -4587,14 +4587,14 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertEqual(cfg["nutsLevel"], 3)
                 self.assertContains(response, "Map overview")
 
-    def test_sweden_bin_configuration_map_defaults_to_se_2023_and_english_labels(self):
-        """Sweden bin-configuration map defaults to country SE and year 2023."""
+    def test_sweden_bin_configuration_map_defaults_to_se_2024_and_english_labels(self):
+        """Sweden bin-configuration map defaults to country SE and year 2024."""
         response = self.client.get(reverse("waste-atlas-bin-configuration-sweden-map"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="SE"')
         self.assertContains(response, "selected>Sweden</option>")
-        self.assertContains(response, 'value="2023" selected')
+        self.assertContains(response, 'value="2024" selected')
         self.assertContains(response, "Bin configuration of waste fractions")
         self.assertContains(response, "Map overview")
         self.assertContains(response, "No data")
@@ -4618,10 +4618,10 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(response, "Map overview")
 
-    def test_belgium_flanders_orga_level_map_defaults_to_be_2022_and_english_labels(
+    def test_belgium_flanders_orga_level_map_defaults_to_be_2024_and_english_labels(
         self,
     ):
-        """Belgium Flanders+Brussels orga-level map defaults to country BE, year 2022, English."""
+        """Belgium Flanders+Brussels orga-level map defaults to country BE, year 2024, English."""
         response = self.client.get(
             reverse("waste-atlas-orga-level-belgium-flanders-map")
         )
@@ -4629,7 +4629,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="BE-FL-BR"')
         self.assertContains(response, "selected>Flanders + Brussels</option>")
-        self.assertContains(response, 'value="2022" selected')
+        self.assertContains(response, 'value="2024" selected')
         self.assertContains(response, "Administrative level of collectors")
         self.assertContains(response, "Map overview")
         self.assertContains(response, "No data")
@@ -4743,19 +4743,19 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-collection-system-map')}?country=SE&amp;year=2023",
+            f"{reverse('waste-atlas-collection-system-map')}?country=SE&amp;year=2024",
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-connection-rate-map')}?country=SE&amp;year=2023",
+            f"{reverse('waste-atlas-connection-rate-map')}?country=SE&amp;year=2024",
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-biowaste-collection-amount-map')}?country=SE&amp;year=2023",
+            f"{reverse('waste-atlas-biowaste-collection-amount-map')}?country=SE&amp;year=2024",
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-organic-waste-ratio-map')}?country=SE&amp;year=2023",
+            f"{reverse('waste-atlas-organic-waste-ratio-map')}?country=SE&amp;year=2024",
         )
         self.assertContains(response, reverse("waste-atlas-orga-level-denmark-map"))
         self.assertContains(
@@ -4764,11 +4764,11 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-collection-system-map')}?country=DK&amp;year=2023",
+            f"{reverse('waste-atlas-collection-system-map')}?country=DK&amp;year=2024",
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-biowaste-frequency-map')}?country=DK&amp;year=2023",
+            f"{reverse('waste-atlas-biowaste-frequency-map')}?country=DK&amp;year=2024",
         )
         self.assertContains(
             response,
@@ -4788,15 +4788,15 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-biowaste-collection-amount-map')}?country=DK&amp;year=2023",
+            f"{reverse('waste-atlas-biowaste-collection-amount-map')}?country=DK&amp;year=2024",
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-organic-collection-amount-map')}?country=DK&amp;year=2023",
+            f"{reverse('waste-atlas-organic-collection-amount-map')}?country=DK&amp;year=2024",
         )
         self.assertContains(
             response,
-            f"{reverse('waste-atlas-organic-waste-ratio-map')}?country=DK&amp;year=2023",
+            f"{reverse('waste-atlas-organic-waste-ratio-map')}?country=DK&amp;year=2024",
         )
         self.assertContains(
             response,
@@ -4952,7 +4952,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         cfg = self._map_config(response)
         self.assertTrue(cfg["changeMode"])
-        self.assertEqual(cfg["fromYear"], 2023)
+        self.assertEqual(cfg["fromYear"], 2024)
         self.assertEqual(cfg["year"], 2024)
         self.assertEqual(
             cfg["dataUrl"], "/waste_collection/api/waste-atlas/collection-system/"

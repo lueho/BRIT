@@ -54,7 +54,7 @@ REGIONS = {
         "nuts_level": "3",
         "lock": True,
     },
-    "denmark": {"selector_set": "DK", "country": "DK", "year": "2023", "lock": True},
+    "denmark": {"selector_set": "DK", "country": "DK", "year": "2024", "lock": True},
     "sweden": {"selector_set": "SE", "country": "SE", "year": "2024", "lock": False},
     "netherlands": {
         "selector_set": "NL",
@@ -66,7 +66,7 @@ REGIONS = {
     "belgium_flanders": {
         "selector_set": "BE-FL-BR",
         "country": "BE",
-        "year": "2022",
+        "year": "2024",
         "nuts_prefix": "BE1,BE2",
         "lock": False,
     },
@@ -440,7 +440,6 @@ MAP_PAGES = [
         "Bin configuration of waste fractions",
         "map/bin-configuration-sweden/",
         "waste-atlas-bin-configuration-sweden-map",
-        year="2023",
     ),
     # ── denmark ──
     _page(
