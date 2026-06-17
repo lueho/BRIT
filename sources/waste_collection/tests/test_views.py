@@ -4157,34 +4157,32 @@ class WasteAtlasMapViewsTestCase(TestCase):
         selection_context = build_map_selection_context(
             reverse,
             selected_map_set="SE",
-            selected_theme="biowaste_collection_amount",
+            selected_theme="biowaste_frequency",
         )
 
         sweden_themes = selection_context["map_selection_themes_by_map_set"]["SE"]
         selected_theme = next(
-            theme
-            for theme in sweden_themes
-            if theme["value"] == "biowaste_collection_amount"
+            theme for theme in sweden_themes if theme["value"] == "biowaste_frequency"
         )
         self.assertEqual(selection_context["selected_waste_category"], "biowaste")
         self.assertEqual(selected_theme["waste_category"], "biowaste")
         self.assertEqual(
             selected_theme["url"],
-            reverse("waste-atlas-biowaste-collection-amount-map"),
+            reverse("waste-atlas-biowaste-frequency-map"),
         )
 
     def test_generic_map_page_selects_current_theme_for_regions_without_dedicated_route(
         self,
     ):
         response = self.client.get(
-            reverse("waste-atlas-biowaste-collection-amount-map"),
+            reverse("waste-atlas-biowaste-frequency-map"),
             {"country": "SE"},
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertRegex(
             response.content.decode(),
-            r'<option value="biowaste_collection_amount"'
+            r'<option value="biowaste_frequency"'
             r'[^>]*data-map-set="SE"'
             r"[^>]*selected",
         )
@@ -4598,6 +4596,34 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "Bin configuration of waste fractions")
         self.assertContains(response, "Map overview")
         self.assertContains(response, "No data")
+
+    def test_sweden_bundle_maps_default_to_se_2024(self):
+        map_names = [
+            "waste-atlas-sweden-collection-system-map",
+            "waste-atlas-sweden-connection-rate-map",
+            "waste-atlas-sweden-paper-bags-map",
+            "waste-atlas-sweden-plastic-bags-map",
+            "waste-atlas-sweden-collection-support-map",
+            "waste-atlas-sweden-residual-collection-amount-map",
+            "waste-atlas-sweden-biowaste-collection-amount-map",
+            "waste-atlas-sweden-waste-ratio-map",
+            "waste-atlas-sweden-organic-collection-amount-map",
+            "waste-atlas-sweden-organic-waste-ratio-map",
+        ]
+
+        for url_name in map_names:
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name))
+
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'value="SE"')
+                self.assertContains(response, "selected>Sweden</option>")
+                self.assertContains(response, 'value="2024" selected')
+                cfg = self._map_config(response)
+                self.assertEqual(cfg["country"], "SE")
+                self.assertEqual(cfg["year"], 2024)
+                self.assertTrue(cfg["fileBase"].startswith("sweden_"))
+                self.assertContains(response, "Map overview")
 
     def test_sweden_population_density_map_defaults_to_se_and_uses_population_api(self):
         response = self.client.get(reverse("waste-atlas-sweden-population-density-map"))

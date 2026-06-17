@@ -186,7 +186,10 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
             if page["theme"] == "connection_type"
         }
 
-        self.assertEqual(connection_type_pages.keys(), connection_rate_pages.keys())
+        self.assertEqual(
+            set(connection_type_pages),
+            set(connection_rate_pages) - {"sweden"},
+        )
         self.assertEqual(
             connection_type_pages["nrw"]["path"], "map/nrw/participation-policy/"
         )
@@ -214,6 +217,89 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
                 self.assertIn(
                     "connection_type", WASTE_ATLAS_MAP_SELECTIONS[map_set]["themes"]
                 )
+
+    def test_sweden_query_maps_are_dedicated_selector_pages(self):
+        expected_themes = {
+            "collection_system": "waste-atlas-sweden-collection-system-map",
+            "connection_rate": "waste-atlas-sweden-connection-rate-map",
+            "paper_bags": "waste-atlas-sweden-paper-bags-map",
+            "plastic_bags": "waste-atlas-sweden-plastic-bags-map",
+            "collection_support": "waste-atlas-sweden-collection-support-map",
+            "residual_collection_amount": (
+                "waste-atlas-sweden-residual-collection-amount-map"
+            ),
+            "biowaste_collection_amount": (
+                "waste-atlas-sweden-biowaste-collection-amount-map"
+            ),
+            "waste_ratio": "waste-atlas-sweden-waste-ratio-map",
+            "organic_collection_amount": (
+                "waste-atlas-sweden-organic-collection-amount-map"
+            ),
+            "organic_waste_ratio": ("waste-atlas-sweden-organic-waste-ratio-map"),
+        }
+        sweden_themes = WASTE_ATLAS_MAP_SELECTIONS["SE"]["themes"]
+        pages_by_route = {page["name"]: page for page in MAP_PAGES}
+
+        for theme, route_name in expected_themes.items():
+            with self.subTest(theme=theme):
+                self.assertIn(theme, sweden_themes)
+                self.assertEqual(sweden_themes[theme]["route_name"], route_name)
+                self.assertEqual(pages_by_route[route_name]["year"], "2024")
+
+    def test_legend_reordering_helper_exists_in_js(self):
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+        script = script_path.read_text()
+
+        self.assertIn("function _isNoCollectionCategory(item)", script)
+        self.assertIn("label.indexOf('No separate biowaste collection')", script)
+        self.assertIn("label.indexOf('No separate door-to-door collection')", script)
+        self.assertIn("label.indexOf('No separate collection')", script)
+        self.assertIn("label.indexOf('No separate green waste collection')", script)
+        self.assertIn("label.indexOf('No door-to-door')", script)
+
+    def test_legend_items_reorders_no_collection_before_no_data(self):
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+        script = script_path.read_text()
+
+        # _legendItems must call _isNoCollectionCategory
+        self.assertIn("_isNoCollectionCategory(item)", script)
+        # In _legendItems, overlay is pushed before noData
+        legend_items_fn = script.split("function _legendItems(cfg, exportMode)")[1]
+        overlay_idx = legend_items_fn.find("cfg.overlayPatternField")
+        no_data_idx = legend_items_fn.find("cfg.noDataLabel")
+        self.assertLess(overlay_idx, no_data_idx)
+
+    def test_screen_legend_renders_no_data_last(self):
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+        script = script_path.read_text()
+
+        draw_legend_fn = script.split(
+            "function _drawLegend(width, height, cfg, layout)"
+        )[1]
+        # _drawLegend must separate categories with _isNoCollectionCategory
+        self.assertIn("_isNoCollectionCategory(item)", draw_legend_fn)
+        # noData rendering must come after overlay rendering in screen mode
+        overlay_idx = draw_legend_fn.find("cfg.overlayPatternLegendLabel")
+        no_data_idx = draw_legend_fn.find("cfg.noDataLabel")
+        self.assertLess(overlay_idx, no_data_idx)
 
     def _forbidden_unit_tokens(self, legend_title):
         for unit, forbidden_tokens in self.UNIT_LABEL_FORBIDDEN_TOKENS.items():

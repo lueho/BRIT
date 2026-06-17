@@ -582,17 +582,34 @@ var WasteAtlasChoropleth = (function () {
       .replace(/No separate bio collection/g, 'No separate biowaste collection');
   }
 
+  function _isNoCollectionCategory(item) {
+    var label = String(item.label || '');
+    return (
+      label.indexOf('No separate biowaste collection') !== -1 ||
+      label.indexOf('No separate door-to-door collection') !== -1 ||
+      label.indexOf('No separate collection') !== -1 ||
+      label.indexOf('No separate green waste collection') !== -1 ||
+      label.indexOf('No door-to-door') !== -1
+    );
+  }
+
   function _legendItems(cfg, exportMode) {
-    var items = cfg.categories.map(function (item) {
-      if (!exportMode) return item;
-      return Object.assign({}, item, { label: _exportLegendLabel(item) });
+    var normal = [];
+    var noCollection = [];
+    cfg.categories.forEach(function (item) {
+      if (_isNoCollectionCategory(item)) {
+        noCollection.push(item);
+      } else {
+        normal.push(item);
+      }
     });
-    if (cfg.noDataLabel && cfg._hasNoData !== false) {
-      items.push({
-        label: exportMode && cfg.exportNoDataLabel ? cfg.exportNoDataLabel : cfg.noDataLabel,
-        color: cfg.noDataColor || '#e0e0e0'
-      });
-    }
+    var items = [];
+    normal.forEach(function (item) {
+      items.push(exportMode ? Object.assign({}, item, { label: _exportLegendLabel(item) }) : item);
+    });
+    noCollection.forEach(function (item) {
+      items.push(exportMode ? Object.assign({}, item, { label: _exportLegendLabel(item) }) : item);
+    });
     if (cfg.overlayPatternField && cfg.overlayPatternLegendLabel && cfg._hasOverlayPattern) {
       items.push({
         label: exportMode && cfg.exportOverlayPatternLegendLabel
@@ -600,6 +617,12 @@ var WasteAtlasChoropleth = (function () {
           : cfg.overlayPatternLegendLabel,
         color: '#f8f9fa',
         pattern: true
+      });
+    }
+    if (cfg.noDataLabel && cfg._hasNoData !== false) {
+      items.push({
+        label: exportMode && cfg.exportNoDataLabel ? cfg.exportNoDataLabel : cfg.noDataLabel,
+        color: cfg.noDataColor || '#e0e0e0'
       });
     }
     return items;
@@ -1721,11 +1744,19 @@ var WasteAtlasChoropleth = (function () {
       return;
     }
 
-    items = cfg.categories.slice();
+    var normalCats = [];
+    var noCollectionCats = [];
+    cfg.categories.forEach(function (item) {
+      if (_isNoCollectionCategory(item)) {
+        noCollectionCats.push(item);
+      } else {
+        normalCats.push(item);
+      }
+    });
+    items = normalCats.concat(noCollectionCats);
     legendRows = items.length + (hasOverlayLegend ? 1 : 0);
 
     if (cfg.noDataLabel && cfg._hasNoData !== false) {
-      items.push({ label: cfg.noDataLabel, color: cfg.noDataColor || '#e0e0e0' });
       legendRows += 1;
     }
 
@@ -1759,22 +1790,35 @@ var WasteAtlasChoropleth = (function () {
         .text(cat.label);
     });
 
+    var currentY = items.length * (swatchH + gap);
     if (hasOverlayLegend) {
-      var overlayY = items.length * (swatchH + gap);
       g.append('rect')
-        .attr('x', 0).attr('y', overlayY + 4)
+        .attr('x', 0).attr('y', currentY + 4)
         .attr('width', swatchW).attr('height', swatchH)
         .attr('fill', '#f8f9fa').attr('stroke', '#333');
       g.append('rect')
-        .attr('x', 0).attr('y', overlayY + 4)
+        .attr('x', 0).attr('y', currentY + 4)
         .attr('width', swatchW).attr('height', swatchH)
         .attr('fill', 'url(#' + _overlayPatternId(cfg) + ')')
         .attr('stroke', 'none');
       g.append('text')
-        .attr('x', swatchW + 8).attr('y', overlayY + 4 + swatchH - 3)
+        .attr('x', swatchW + 8).attr('y', currentY + 4 + swatchH - 3)
         .attr('font-size', 12)
         .attr('font-family', "'Nunito', sans-serif")
         .text(cfg.overlayPatternLegendLabel);
+      currentY += swatchH + gap;
+    }
+
+    if (cfg.noDataLabel && cfg._hasNoData !== false) {
+      g.append('rect')
+        .attr('x', 0).attr('y', currentY + 4)
+        .attr('width', swatchW).attr('height', swatchH)
+        .attr('fill', cfg.noDataColor || '#e0e0e0').attr('stroke', '#333');
+      g.append('text')
+        .attr('x', swatchW + 8).attr('y', currentY + 4 + swatchH - 3)
+        .attr('font-size', 12)
+        .attr('font-family', "'Nunito', sans-serif")
+        .text(cfg.noDataLabel);
     }
   }
 
