@@ -636,7 +636,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 sources=data.get("sources") if "sources" in data else None,
                 flyer_urls=data.get("flyer_urls") if "flyer_urls" in data else None,
                 replace_sources="sources" in data,
-                replace_flyers="flyer_urls" in data,
+                replace_flyers=data.get("replace_flyer_urls", False),
             )
 
     @staticmethod
