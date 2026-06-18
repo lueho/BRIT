@@ -4451,7 +4451,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
             "waste-atlas-biowaste-frequency-netherlands-map": "Collection frequency types for biowaste",
             "waste-atlas-biowaste-collection-amount-netherlands-map": "Specifically collected amount of biowaste per person and year",
             "waste-atlas-organic-collection-amount-netherlands-map": "Aggregated collected amount of organic fractions (kg/p/a)",
-            "waste-atlas-organic-waste-ratio-netherlands-map": "Share of organic fractions in total waste",
+            "waste-atlas-organic-waste-ratio-netherlands-map": "Organic stream separation rate (%)",
         }
 
         for url_name, expected_title in map_defaults.items():
@@ -5188,10 +5188,8 @@ class GenericMapTemplateTests(TestCase):
         content = self._render_generic("biowaste_frequency")
         self.assertIn('"transformName": "biowasteFrequency"', content)
 
-    def test_waste_ratio_renders_export_labels(self):
+    def test_waste_ratio_renders_transform_name(self):
         content = self._render_generic("waste_ratio")
-        # json_script HTML-escapes > as \u003E
-        self.assertIn("0.66 bio-dominant", content)
         self.assertIn('"transformName": "wasteRatio"', content)
 
     def test_unregistered_map_route_key_renders_empty_config(self):

@@ -217,7 +217,7 @@ MAP_PAGES = [
     _page(
         "italy",
         "organic_waste_ratio",
-        "Share of organic fractions in total waste",
+        "Organic stream separation rate (%)",
         "map/italy/organic-waste-ratio/",
         "waste-atlas-italy-organic-waste-ratio-map",
     ),
@@ -383,7 +383,7 @@ MAP_PAGES = [
     _page(
         "south_tyrol",
         "organic_waste_ratio",
-        "Share of organic fractions in total waste",
+        "Organic stream separation rate (%)",
         "map/south-tyrol/organic-waste-ratio/",
         "waste-atlas-south-tyrol-organic-waste-ratio-map",
     ),
@@ -500,7 +500,7 @@ MAP_PAGES = [
     _page(
         "sweden",
         "waste_ratio",
-        "Biowaste share of total waste",
+        "Biobin stream separation rate (%)",
         "map/sweden/waste-ratio/",
         "waste-atlas-sweden-waste-ratio-map",
         overrides={"fileBase": "sweden_waste_ratio"},
@@ -516,7 +516,7 @@ MAP_PAGES = [
     _page(
         "sweden",
         "organic_waste_ratio",
-        "Share of organic fractions in total waste",
+        "Organic stream separation rate (%)",
         "map/sweden/organic-waste-ratio/",
         "waste-atlas-sweden-organic-waste-ratio-map",
         overrides={"fileBase": "sweden_organic_waste_ratio"},
@@ -624,7 +624,7 @@ MAP_PAGES = [
     _page(
         "netherlands",
         "organic_waste_ratio",
-        "Share of organic fractions in total waste",
+        "Organic stream separation rate (%)",
         "map/organic-waste-ratio-netherlands/",
         "waste-atlas-organic-waste-ratio-netherlands-map",
     ),
@@ -817,7 +817,7 @@ MAP_PAGES = [
     _page(
         "generic",
         "waste_ratio",
-        "Biowaste share of total waste",
+        "Biobin stream separation rate (%)",
         "map/waste-ratio/",
         "waste-atlas-waste-ratio-map",
     ),
@@ -838,7 +838,7 @@ MAP_PAGES = [
     _page(
         "generic",
         "organic_waste_ratio",
-        "Share of organic fractions in total waste",
+        "Organic stream separation rate (%)",
         "map/organic-waste-ratio/",
         "waste-atlas-organic-waste-ratio-map",
     ),
@@ -1063,7 +1063,7 @@ MAP_PAGES = [
     _page(
         "germany",
         "waste_ratio",
-        "Biowaste share of total waste",
+        "Biobin stream separation rate (%)",
         "map/germany/waste-ratio/",
         "waste-atlas-germany-waste-ratio-map",
     ),
@@ -1091,7 +1091,7 @@ MAP_PAGES = [
     _page(
         "germany",
         "organic_waste_ratio",
-        "Share of organic fractions in total waste",
+        "Organic stream separation rate (%)",
         "map/germany/organic-waste-ratio/",
         "waste-atlas-germany-organic-waste-ratio-map",
     ),
@@ -1288,7 +1288,7 @@ MAP_PAGES = [
     _page(
         "nrw",
         "waste_ratio",
-        "Biowaste share of total waste",
+        "Biobin stream separation rate (%)",
         "map/nrw/waste-ratio/",
         "waste-atlas-nrw-waste-ratio-map",
     ),
@@ -1316,7 +1316,7 @@ MAP_PAGES = [
     _page(
         "nrw",
         "organic_waste_ratio",
-        "Share of organic fractions in total waste",
+        "Organic stream separation rate (%)",
         "map/nrw/organic-waste-ratio/",
         "waste-atlas-nrw-organic-waste-ratio-map",
     ),
@@ -1548,7 +1548,7 @@ MAP_PAGES = [
     _page(
         "catalonia",
         "waste_ratio",
-        "Biowaste share of total waste",
+        "Biobin stream separation rate (%)",
         "map/catalonia/waste-ratio/",
         "waste-atlas-catalonia-waste-ratio-map",
     ),
@@ -1576,7 +1576,7 @@ MAP_PAGES = [
     _page(
         "catalonia",
         "organic_waste_ratio",
-        "Share of organic fractions in total waste",
+        "Organic stream separation rate (%)",
         "map/catalonia/organic-waste-ratio/",
         "waste-atlas-catalonia-organic-waste-ratio-map",
     ),
@@ -1780,7 +1780,7 @@ MAP_PAGES = [
     _page(
         "bw_rp",
         "waste_ratio",
-        "Biowaste share of total waste",
+        "Biobin stream separation rate (%)",
         "map/bw-rp/waste-ratio/",
         "waste-atlas-bw-rp-waste-ratio-map",
     ),
@@ -1808,7 +1808,7 @@ MAP_PAGES = [
     _page(
         "bw_rp",
         "organic_waste_ratio",
-        "Share of organic fractions in total waste",
+        "Organic stream separation rate (%)",
         "map/bw-rp/organic-waste-ratio/",
         "waste-atlas-bw-rp-organic-waste-ratio-map",
     ),

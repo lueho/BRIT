@@ -38,7 +38,7 @@ THEME_LABELS = {
     "min_bin_size_ratio": "Minimum bin-size ratio",
     "orga_level": "Collectors: administrative level",
     "organic_collection_amount": "Organic-fraction amount",
-    "organic_waste_ratio": "Organic-fraction share",
+    "organic_waste_ratio": "Organic separation rate",
     "paper_bags": "Paper products",
     "plastic_bags": "Plastic bags",
     "population_density": "Population density",
@@ -51,7 +51,7 @@ THEME_LABELS = {
     "residual_min_bin_size": "Residual waste bin size",
     "residual_required_bin_capacity": "Residual waste bin capacity",
     "system_access_control": "System + access/use control",
-    "waste_ratio": "Amount ratio",
+    "waste_ratio": "Biobin separation rate",
     "weekly_bp_access_days": "Bring-point access days",
 }
 
