@@ -1827,6 +1827,10 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "materials_sampleseries/series-image.jpg")
+        self.assertContains(response, 'loading="lazy"')
+        self.assertContains(response, 'decoding="async"')
+        self.assertContains(response, 'width="800"')
+        self.assertContains(response, 'height="450"')
         self.assertContains(response, "Using series image")
         self.assertContains(response, sample.name)
 

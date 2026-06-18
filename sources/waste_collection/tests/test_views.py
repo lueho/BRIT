@@ -1390,6 +1390,22 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         self.assertIn(sample, response.context["samples"])
         self.assertContains(response, "Detail Sample")
 
+    def test_detail_shows_empty_state_messages_for_empty_sections(self):
+        collection = Collection.objects.create(
+            **self.related_objects,
+            valid_from=date.today(),
+            publication_status="published",
+        )
+
+        response = self.client.get(self.get_detail_url(collection.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No allowed materials specified.")
+        self.assertContains(response, "No forbidden materials specified.")
+        self.assertContains(response, "No collection properties available.")
+        self.assertContains(response, "No aggregated collection properties available.")
+        self.assertContains(response, "No samples linked to this collection.")
+
     def test_uses_custom_template(self):
         self.client.force_login(self.owner_user)
         response = self.client.get(self.get_update_url(self.unpublished_object.pk))
