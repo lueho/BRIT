@@ -4167,6 +4167,10 @@ class WasteAtlasMapViewsTestCase(TestCase):
             response,
             f'data-url="{reverse("waste-atlas-germany-collection-system-map")}"',
         )
+        self.assertContains(
+            response,
+            f'data-change-url="{reverse("waste-atlas-change-map", args=["DE", "collection_system"])}"',
+        )
         self.assertContains(response, 'id="btn-toggle-change"')
         self.assertContains(response, "View changes for this map")
         self.assertContains(

@@ -105,6 +105,7 @@
                       data-waste-category="{{ option.waste_category }}"
                       data-search="{{ option.label|lower }} {{ option.value|lower }} {{ option.theme_group|lower }}"
                       data-url="{{ option.url }}"
+                      {% if option.change_url %}data-change-url="{{ option.change_url }}"{% endif %}
                       {% if map_set == selected_map_set and option.value == selected_map_theme %}selected{% endif %}>
                 {{ option.label }}
               </option>
