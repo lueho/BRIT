@@ -2,6 +2,7 @@ from importlib import import_module
 
 from django.apps import apps
 from django.core.cache import cache
+from django.core.exceptions import ImproperlyConfigured
 
 from maps.registry import register_source_domain_map_contracts
 from sources.contracts import (
@@ -233,25 +234,45 @@ def _discover_source_domain_plugins() -> tuple[SourceDomainPlugin, ...]:
     return discovered_plugins
 
 
-_SOURCE_DOMAIN_PLUGINS: tuple[SourceDomainPlugin, ...] = (
-    _discover_source_domain_plugins()
-)
-
-for plugin in _SOURCE_DOMAIN_PLUGINS:
-    register_source_domain_map_contracts(
-        slug=plugin.slug,
-        map_mount=plugin.map_mount,
-        geojson_cache_warmer=plugin.get_geojson_cache_warmer(),
-        dataset_runtime_compatibilities=plugin.dataset_runtime_compatibilities,
-    )
+_SOURCE_DOMAIN_PLUGINS: tuple[SourceDomainPlugin, ...] = ()
+_SOURCE_DOMAIN_REGISTRY_INITIALIZED = False
 
 
-def get_source_domain_plugins() -> tuple[SourceDomainPlugin, ...]:
+def initialize_source_domain_registry() -> None:
+    global _SOURCE_DOMAIN_PLUGINS, _SOURCE_DOMAIN_REGISTRY_INITIALIZED
+
+    if _SOURCE_DOMAIN_REGISTRY_INITIALIZED:
+        return
+
+    plugins = _discover_source_domain_plugins()
+    for plugin in plugins:
+        register_source_domain_map_contracts(
+            slug=plugin.slug,
+            map_mount=plugin.map_mount,
+            geojson_cache_warmer=plugin.get_geojson_cache_warmer(),
+            dataset_runtime_compatibilities=plugin.dataset_runtime_compatibilities,
+        )
+
+    _SOURCE_DOMAIN_PLUGINS = plugins
+    _SOURCE_DOMAIN_REGISTRY_INITIALIZED = True
+
+
+def _get_initialized_source_domain_plugins() -> tuple[SourceDomainPlugin, ...]:
+    if not _SOURCE_DOMAIN_REGISTRY_INITIALIZED:
+        raise ImproperlyConfigured(
+            "Source domain registry has not been initialized. "
+            "Call sources.registry.initialize_source_domain_registry() from "
+            "SourcesConfig.ready() before accessing source-domain plugins."
+        )
     return _SOURCE_DOMAIN_PLUGINS
 
 
+def get_source_domain_plugins() -> tuple[SourceDomainPlugin, ...]:
+    return _get_initialized_source_domain_plugins()
+
+
 def get_source_domain_plugin(slug: str) -> SourceDomainPlugin:
-    for plugin in _SOURCE_DOMAIN_PLUGINS:
+    for plugin in _get_initialized_source_domain_plugins():
         if plugin.slug == slug:
             return plugin
 
@@ -259,13 +280,17 @@ def get_source_domain_plugin(slug: str) -> SourceDomainPlugin:
 
 
 def get_hub_source_domain_plugins() -> tuple[SourceDomainPlugin, ...]:
-    return tuple(plugin for plugin in _SOURCE_DOMAIN_PLUGINS if plugin.mount_in_hub)
+    return tuple(
+        plugin
+        for plugin in _get_initialized_source_domain_plugins()
+        if plugin.mount_in_hub
+    )
 
 
 def get_source_domain_explorer_cards() -> tuple[dict[str, object], ...]:
     cards: list[dict[str, object]] = []
 
-    for plugin in _SOURCE_DOMAIN_PLUGINS:
+    for plugin in _get_initialized_source_domain_plugins():
         if plugin.explorer_card is None:
             continue
 
@@ -296,7 +321,7 @@ def get_source_domain_explorer_cards() -> tuple[dict[str, object], ...]:
 def get_source_domain_legacy_redirects() -> tuple[SourceDomainLegacyRedirects, ...]:
     redirects: list[SourceDomainLegacyRedirects] = []
 
-    for plugin in _SOURCE_DOMAIN_PLUGINS:
+    for plugin in _get_initialized_source_domain_plugins():
         if plugin.legacy_redirects is None:
             continue
         redirects.append(plugin.legacy_redirects)
@@ -307,7 +332,7 @@ def get_source_domain_legacy_redirects() -> tuple[SourceDomainLegacyRedirects, .
 def get_source_domain_map_mounts() -> tuple[SourceDomainMapMount, ...]:
     map_mounts: list[SourceDomainMapMount] = []
 
-    for plugin in _SOURCE_DOMAIN_PLUGINS:
+    for plugin in _get_initialized_source_domain_plugins():
         if plugin.map_mount is None:
             continue
         map_mounts.append(plugin.map_mount)
@@ -322,7 +347,7 @@ def get_source_domain_map_mounts() -> tuple[SourceDomainMapMount, ...]:
 def get_source_domain_public_mounts() -> tuple[SourceDomainPublicMount, ...]:
     public_mounts: list[SourceDomainPublicMount] = []
 
-    for plugin in _SOURCE_DOMAIN_PLUGINS:
+    for plugin in _get_initialized_source_domain_plugins():
         if plugin.public_mount is None:
             continue
         public_mounts.append(plugin.public_mount)
@@ -336,7 +361,7 @@ def get_source_domain_sitemap_items() -> tuple[str, ...]:
     sitemap_items: list[str] = []
     seen_items: set[str] = set()
 
-    for plugin in _SOURCE_DOMAIN_PLUGINS:
+    for plugin in _get_initialized_source_domain_plugins():
         for item in plugin.sitemap_items:
             if item in seen_items:
                 continue
@@ -349,7 +374,7 @@ def get_source_domain_sitemap_items() -> tuple[str, ...]:
 def get_source_domain_geojson_cache_warmers() -> tuple[tuple[str, object], ...]:
     warmers: list[tuple[str, object]] = []
 
-    for plugin in _SOURCE_DOMAIN_PLUGINS:
+    for plugin in _get_initialized_source_domain_plugins():
         warmer = plugin.get_geojson_cache_warmer()
         if warmer is None:
             continue
@@ -363,7 +388,7 @@ def get_source_domain_dataset_runtime_compatibilities() -> (
 ):
     compatibilities: list[SourceDomainDatasetRuntimeCompatibility] = []
 
-    for plugin in _SOURCE_DOMAIN_PLUGINS:
+    for plugin in _get_initialized_source_domain_plugins():
         compatibilities.extend(plugin.dataset_runtime_compatibilities)
 
     return tuple(

@@ -45,7 +45,7 @@ Non-test code only; test-code coupling is tracked separately in WS6.
 | V1 | Resolved: `utils.object_management` no longer hardcodes `waste_collection.Collection` knowledge | PR #179 moved review-context/search-field/update-context hooks behind source-owned registration | Keep domain-specific review context in source app hooks (WS1-A) |
 | V2 | Resolved: `utils.properties` and shared form helpers no longer import `bibliography` | PR #183 moved bibliography-backed `sources` fields to concrete domain models and made shared source-form helpers infer the source model from the form field | Keep attribution ownership in domain models (WS1-B) |
 | V3 | Resolved: `utils.file_export` no longer discovers `sources` plugins | PR #190 moved export registration into source app `AppConfig.ready()` methods | Keep source export specs source-owned (WS1-C) |
-| V4 | `maps` imports `sources.registry` | `maps/urls.py:3`, `maps/tasks.py:11`, `maps/runtime_adapters.py:12`, `maps/management/commands/warm_geojson_cache.py` | Move the *contract* (map mounts, cache warmers, runtime compatibility) into `maps`; source apps register themselves (WS1-D) |
+| V4 | Resolved: `maps` no longer imports `sources.registry` | PR #194 moved map mounts, cache warmers, and runtime compatibility behind `maps.contracts` / `maps.registry` with source-owned registration | Keep map integration through maps-owned contracts (WS1-D start) |
 | V5 | `maps` hardcodes domain dataset names | `maps/models.py:33-39` (`GIS_SOURCE_MODELS` incl. `WasteCollection`), legacy `GeoDataset.model_name` | Finish runtime-configuration migration, delete legacy name dispatch (WS1-D, overlaps #85) |
 | V6 | `layer_manager` imports `inventories`, `materials`, `distributions` | `layer_manager/models.py:6-8` | Merge `layer_manager` into `inventories` (it is its private result store) or genericize via contenttypes (WS8) |
 | V7 | `inventories` discovers algorithms via `pkgutil` over `sources` + DB dotted paths | `inventories/models.py:31-36,88-106,158-163` | Replace with the source-domain plugin registry; drop `flexibi_hamburg` aliases (WS8) |
@@ -88,9 +88,11 @@ The single most important arc. Sub-items in implementation order:
    string-dispatch (migration + data backfill to `GeoDatasetRuntimeConfiguration`).
    Existing issue #86 ("Sources plugin decoupling: finish remaining phases") is the
    umbrella; #85 (geodataset harmonization) is the data side.
+   **Status:** V4 contract move completed in PR #194; V5 legacy runtime cleanup remains.
 5. **E. Registry robustness.** `sources/registry.py:235` runs discovery at import time.
    Move initialization to `AppConfig.ready()` with an explicit, validated lifecycle so
    a broken plugin yields a clear startup error, not an import-order heisenbug.
+   **Status:** in progress in the next focused PR after #194.
 6. **F. Enforcement.** Add import-linter (or a dedicated test) encoding the table in
    §1, run in CI. From then on the layering is a build invariant, not a convention.
 
@@ -300,8 +302,8 @@ consolidation that pays compounding dividends.
 **Phase 1 — Foundation inversion (next, ~1 month)**
 5. Object-management hooks; strip waste_collection out of utils (WS1-A)
 6. Properties/bibliography attribution inversion (WS1-B)
-7. Export-registry inversion (WS1-C) and maps/sources contract move (WS1-D start)
-8. Registry init in `ready()` (WS1-E); layering check in CI (WS1-F)
+7. Export-registry inversion (WS1-C) and maps/sources contract move (WS1-D start) — completed through PR #194
+8. Registry init in `ready()` (WS1-E); layering check in CI (WS1-F) — in progress
 9. Decide inventories future (WS8)
 
 **Phase 2 — Consolidation (months 2–3)**
