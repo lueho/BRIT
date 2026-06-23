@@ -1,6 +1,7 @@
 from django.urls import include, path
 
-from maps.registry import get_source_domain_map_mounts
+from maps.contracts import SourceDomainMapMount
+from maps.registry import register_source_domain_map_mount_listener
 
 from .router import router
 from .views import (
@@ -326,10 +327,27 @@ urlpatterns = [
         NutsAndLauCatchmentPedigreeAPI.as_view(),
         name="data.nuts_lau_catchment_options",
     ),
-    *[
-        path(map_mount.mount_path, include(map_mount.urlconf))
-        for map_mount in get_source_domain_map_mounts()
-    ],
+]
+
+_SOURCE_DOMAIN_MAP_MOUNT_INSERT_INDEX = len(urlpatterns)
+_SOURCE_DOMAIN_MAP_MOUNT_PATTERN_KEYS: list[tuple[str, str]] = []
+
+
+def _append_source_domain_map_mount_pattern(map_mount: SourceDomainMapMount) -> None:
+    pattern_key = (map_mount.mount_path, map_mount.urlconf)
+    if pattern_key in _SOURCE_DOMAIN_MAP_MOUNT_PATTERN_KEYS:
+        return
+    insert_index = (
+        _SOURCE_DOMAIN_MAP_MOUNT_INSERT_INDEX
+        + len(_SOURCE_DOMAIN_MAP_MOUNT_PATTERN_KEYS)
+    )
+    _SOURCE_DOMAIN_MAP_MOUNT_PATTERN_KEYS.append(pattern_key)
+    urlpatterns.insert(insert_index, path(map_mount.mount_path, include(map_mount.urlconf)))
+
+
+register_source_domain_map_mount_listener(_append_source_domain_map_mount_pattern)
+
+urlpatterns += [
     path("locations/", LocationPublishedListView.as_view(), name="location-list"),
     path(
         "locations/user/", LocationPrivateListView.as_view(), name="location-list-owned"

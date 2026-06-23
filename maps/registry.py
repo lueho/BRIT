@@ -1,11 +1,15 @@
+from collections.abc import Callable
+
 from maps.contracts import (
     SourceDomainDatasetRuntimeCompatibility,
     SourceDomainMapMount,
 )
 
 DatasetRuntimeCompatibilities = tuple[SourceDomainDatasetRuntimeCompatibility, ...]
+SourceDomainMapMountListener = Callable[[SourceDomainMapMount], None]
 
 _MAP_MOUNTS: list[SourceDomainMapMount] = []
+_MAP_MOUNT_LISTENERS: list[SourceDomainMapMountListener] = []
 _GEOJSON_CACHE_WARMERS: dict[str, object] = {}
 _DATASET_RUNTIME_COMPATIBILITIES: dict[
     str, SourceDomainDatasetRuntimeCompatibility
@@ -26,9 +30,11 @@ def register_source_domain_map_contracts(
     geojson_cache_warmer=None,
     dataset_runtime_compatibilities: DatasetRuntimeCompatibilities = (),
 ) -> None:
+    new_map_mount = None
     if map_mount is not None:
         if map_mount not in _MAP_MOUNTS:
             _MAP_MOUNTS.append(map_mount)
+            new_map_mount = map_mount
     if geojson_cache_warmer is not None:
         _register_unique(
             _GEOJSON_CACHE_WARMERS,
@@ -43,6 +49,18 @@ def register_source_domain_map_contracts(
             compatibility,
             label="dataset runtime compatibility",
         )
+    if new_map_mount is not None:
+        for listener in _MAP_MOUNT_LISTENERS:
+            listener(new_map_mount)
+
+
+def register_source_domain_map_mount_listener(
+    listener: SourceDomainMapMountListener,
+) -> None:
+    if listener not in _MAP_MOUNT_LISTENERS:
+        _MAP_MOUNT_LISTENERS.append(listener)
+    for map_mount in get_source_domain_map_mounts():
+        listener(map_mount)
 
 
 def get_source_domain_map_mounts() -> tuple[SourceDomainMapMount, ...]:
