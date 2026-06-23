@@ -3,7 +3,7 @@ from unittest.mock import patch
 from django.contrib.staticfiles import finders
 from django.core.cache import cache
 from django.template.loader import get_template
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase
 from django.urls import resolve, reverse
 
 from sources.registry import (
@@ -178,6 +178,12 @@ class SourceDomainHubRoutingTestCase(SimpleTestCase):
 
 
 class RoadsideTreesPluginIntegrationTestCase(SimpleTestCase):
+    @staticmethod
+    def legacy_redirect_response(path):
+        url_match = resolve(path)
+        request = RequestFactory().get(path)
+        return url_match.func(request, **url_match.kwargs)
+
     def test_roadside_trees_plugin_contract_marks_hub_mount(self):
         plugin = get_source_domain_plugin("roadside_trees")
 
@@ -244,17 +250,15 @@ class RoadsideTreesPluginIntegrationTestCase(SimpleTestCase):
         )
 
     def test_legacy_hamburg_urls_redirect_to_sources(self):
-        response = self.client.get(
-            "/case_studies/hamburg/roadside_trees/map/",
-            follow=False,
+        response = self.legacy_redirect_response(
+            "/case_studies/hamburg/roadside_trees/map/"
         )
         self.assertEqual(response.status_code, 301)
         self.assertEqual(response["Location"], "/sources/roadside_trees/map/")
 
     def test_legacy_hamburg_api_urls_redirect_to_sources(self):
-        response = self.client.get(
-            "/case_studies/hamburg/api/hamburg_roadside_trees/",
-            follow=False,
+        response = self.legacy_redirect_response(
+            "/case_studies/hamburg/api/hamburg_roadside_trees/"
         )
         self.assertEqual(response.status_code, 301)
         self.assertEqual(
