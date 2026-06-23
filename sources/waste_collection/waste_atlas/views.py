@@ -5,7 +5,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
-from .map_selection import build_map_selection_context
+from .map_selection import build_map_selection_context, build_related_maps_context
 from .pages import MAP_PAGES
 
 WASTE_ATLAS_GROUP_NAME = "waste_atlas"
@@ -58,6 +58,7 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         page = self.page
+        selected_map_set = self.get_selected_map_set()
         ctx["country"] = self.get_country()
         ctx["year"] = self.request.GET.get("year", page["year"])
         ctx["nuts_prefix"] = self.get_nuts_prefix()
@@ -70,10 +71,26 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
         ctx.update(
             build_map_selection_context(
                 reverse,
-                selected_map_set=self.get_selected_map_set(),
+                selected_map_set=selected_map_set,
                 selected_theme=page["theme"],
             )
         )
+        ctx.update(build_related_maps_context(selected_map_set, page["theme"], reverse))
+        selected_theme_option = next(
+            (
+                theme
+                for theme in ctx["map_selection_themes_by_map_set"].get(
+                    selected_map_set, []
+                )
+                if theme["value"] == page["theme"]
+            ),
+            None,
+        )
+        ctx["is_change_map"] = False
+        ctx["map_toggle_url"] = (
+            selected_theme_option["change_url"] if selected_theme_option else ""
+        )
+        ctx["map_toggle_label"] = "View changes for this map"
         return ctx
 
 
@@ -112,6 +129,9 @@ class AtlasChangeMapView(AtlasMapView):
         ctx["default_from_year"] = ctx["from_year"]
         ctx["default_to_year"] = ctx["to_year"]
         ctx["map_title"] = f"{self.page['title']} — changes"
+        ctx["is_change_map"] = True
+        ctx["map_toggle_url"] = reverse(self.page["name"])
+        ctx["map_toggle_label"] = "View current map"
         return ctx
 
 

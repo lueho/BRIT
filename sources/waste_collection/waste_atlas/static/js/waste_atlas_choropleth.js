@@ -378,11 +378,29 @@ var WasteAtlasChoropleth = (function () {
 
   function _selectorNavigationTarget(url, year, fromYear, country) {
     if (!url || _isCurrentPath(url)) return null;
+    return url + '?' + _selectorQueryString(year, fromYear, country);
+  }
+
+  function _selectorQueryString(year, fromYear, country) {
     var params = fromYear
       ? 'from_year=' + encodeURIComponent(fromYear) + '&to_year=' + encodeURIComponent(year)
       : 'year=' + encodeURIComponent(year);
     if (country) params += '&country=' + encodeURIComponent(country);
-    return url + '?' + params;
+    return params;
+  }
+
+  function _replaceSelectorUrl(url, year, fromYear, country) {
+    if (!window.history || !window.history.replaceState) return;
+    var path = url || window.location.pathname;
+    window.history.replaceState(null, '', path + '?' + _selectorQueryString(year, fromYear, country));
+  }
+
+  function _debounce(fn, delay) {
+    var timer = null;
+    return function () {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(fn, delay);
+    };
   }
 
   function initSelectorControls(loadCurrent, options) {
@@ -396,6 +414,7 @@ var WasteAtlasChoropleth = (function () {
     var fromYearSelect = document.getElementById('sel-from-year');
     var toYearSelect = document.getElementById('sel-to-year');
     var btnLoad = document.getElementById('btn-load');
+    var btnToggleChange = document.getElementById('btn-toggle-change');
     var form = document.getElementById('atlas-selection-form');
     var statusEl = document.getElementById('atlas-selector-status');
 
@@ -422,6 +441,13 @@ var WasteAtlasChoropleth = (function () {
       var selectedOption = themeSelect.options[themeSelect.selectedIndex];
       if (!selectedOption) return null;
       var attr = options.useChangeUrls ? 'data-change-url' : 'data-url';
+      return selectedOption.getAttribute(attr);
+    }
+
+    function selectedCrossLinkUrl() {
+      var selectedOption = themeSelect.options[themeSelect.selectedIndex];
+      if (!selectedOption) return null;
+      var attr = options.useChangeUrls ? 'data-url' : 'data-change-url';
       return selectedOption.getAttribute(attr);
     }
 
@@ -497,6 +523,23 @@ var WasteAtlasChoropleth = (function () {
       btnLoad.disabled = !hasMatches;
     }
 
+    function updateToggleChangeLink() {
+      if (!btnToggleChange) return;
+      var url = selectedCrossLinkUrl();
+      if (!url) {
+        btnToggleChange.style.display = 'none';
+        btnToggleChange.removeAttribute('href');
+        return;
+      }
+      var year = selectedYear();
+      var fromYear = selectedFromYear();
+      var params = options.useChangeUrls
+        ? 'year=' + encodeURIComponent(year)
+        : 'from_year=' + encodeURIComponent(fromYear || year) + '&to_year=' + encodeURIComponent(year);
+      btnToggleChange.href = url + '?' + params;
+      btnToggleChange.style.display = '';
+    }
+
     function ensureVisibleSelection() {
       var currentThemeGroup = selectedThemeGroup();
       var selectedMapSet = countrySelect.value;
@@ -524,6 +567,7 @@ var WasteAtlasChoropleth = (function () {
         }
       }
       updateSelectorStatus();
+      updateToggleChangeLink();
     }
 
     function navigateOrLoad(event) {
@@ -538,13 +582,22 @@ var WasteAtlasChoropleth = (function () {
         window.location.href = navigationTarget;
         return;
       }
-      if (loadCurrent) loadCurrent(country, year, false, fromYear);
+      if (loadCurrent) loadCurrent(country, year, false, fromYear, !disableNavigation, url);
+    }
+
+    var debouncedNavigateOrLoad = _debounce(navigateOrLoad, options.yearReloadDelay || 250);
+    function autoReloadYear() {
+      updateToggleChangeLink();
+      debouncedNavigateOrLoad();
     }
 
     countrySelect.addEventListener('change', ensureVisibleSelection);
     if (wasteCategorySelect) wasteCategorySelect.addEventListener('change', ensureVisibleSelection);
     if (themeSearchInput) themeSearchInput.addEventListener('input', ensureVisibleSelection);
     themeSelect.addEventListener('change', ensureVisibleSelection);
+    if (yearSelect) yearSelect.addEventListener('change', autoReloadYear);
+    if (fromYearSelect) fromYearSelect.addEventListener('change', autoReloadYear);
+    if (toYearSelect) toYearSelect.addEventListener('change', autoReloadYear);
     if (form) {
       form.addEventListener('submit', navigateOrLoad);
     } else {
@@ -555,7 +608,8 @@ var WasteAtlasChoropleth = (function () {
     return {
       selectedYear: selectedYear,
       selectedFromYear: selectedFromYear,
-      selectedRouteUrl: selectedRouteUrl
+      selectedRouteUrl: selectedRouteUrl,
+      updateToggleChangeLink: updateToggleChangeLink
     };
   }
 
@@ -2082,7 +2136,8 @@ var WasteAtlasChoropleth = (function () {
       return fileBase;
     }
 
-    function load(country, year, preserveScope, fromYear) {
+    function load(country, year, preserveScope, fromYear, replaceUrl, selectorUrl) {
+      if (replaceUrl) _replaceSelectorUrl(selectorUrl, year, fromYear, country);
       _show(loadingEl);
       if (btnSVG) btnSVG.disabled = true;
       if (btnPNG) btnPNG.disabled = true;
@@ -2132,8 +2187,8 @@ var WasteAtlasChoropleth = (function () {
 
     load(cfg.country, cfg.year, true);
 
-    initSelectorControls(function (country, year, _preserveScope, fromYear) {
-      load(country, year, true, fromYear);
+    initSelectorControls(function (country, year, _preserveScope, fromYear, replaceUrl, selectorUrl) {
+      load(country, year, true, fromYear, replaceUrl, selectorUrl);
     }, { useChangeUrls: !!cfg.changeMode });
 
     var atlasControls = document.getElementById('atlas-controls');

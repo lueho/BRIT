@@ -97,6 +97,59 @@
     border-radius: .65rem;
     white-space: nowrap;
   }
+  .atlas-control-links {
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+  }
+  .atlas-control-links .btn {
+    border-radius: .65rem;
+    white-space: nowrap;
+  }
+  .atlas-topic-admin { --atlas-color: #5b6c8f; --atlas-bg: #f0f3fa; --atlas-border: #bcc8df; }
+  .atlas-topic-system { --atlas-color: #24796f; --atlas-bg: #edf8f6; --atlas-border: #9ed2ca; }
+  .atlas-topic-material { --atlas-color: #4c8c2b; --atlas-bg: #f1f8ed; --atlas-border: #b7dba7; }
+  .atlas-topic-schedule { --atlas-color: #8a63a8; --atlas-bg: #f6f0fa; --atlas-border: #cfb8df; }
+  .atlas-topic-count { --atlas-color: #6b55a3; --atlas-bg: #f2f0fb; --atlas-border: #bfb5df; }
+  .atlas-topic-fee { --atlas-color: #b06f1f; --atlas-bg: #fff6e8; --atlas-border: #e4be87; }
+  .atlas-topic-amount-residual { --atlas-color: #b75a42; --atlas-bg: #fff1ed; --atlas-border: #e2aa9c; }
+  .atlas-topic-amount-bio { --atlas-color: #3f8f4b; --atlas-bg: #eef8f0; --atlas-border: #a7d8ae; }
+  .atlas-topic-amount-organic { --atlas-color: #65a832; --atlas-bg: #f3faed; --atlas-border: #bedf9f; }
+  .atlas-topic-amount-ratio { --atlas-color: #598b64; --atlas-bg: #eef7f0; --atlas-border: #a9d1b2; }
+  .atlas-topic-bin { --atlas-color: #2f78a5; --atlas-bg: #eef6fb; --atlas-border: #9fc8df; }
+  .atlas-topic-coverage { --atlas-color: #5c6975; --atlas-bg: #f3f5f7; --atlas-border: #c3cbd2; }
+  .atlas-related-maps {
+    background: #fff;
+    border: 1px solid #d8e4dc;
+    border-radius: .75rem;
+    box-shadow: 0 .25rem .85rem rgba(35, 57, 42, .05);
+    margin: -.25rem 0 1rem;
+    padding: .85rem 1rem;
+  }
+  .atlas-related-group + .atlas-related-group {
+    margin-top: .75rem;
+  }
+  .atlas-related-heading {
+    color: #5c7b64;
+    font-size: .76rem;
+    font-weight: 800;
+    letter-spacing: .06em;
+    margin-bottom: .4rem;
+    text-transform: uppercase;
+  }
+  .atlas-related-chip {
+    background: var(--atlas-bg, #fff);
+    border-color: var(--atlas-border, currentColor);
+    color: var(--atlas-color, inherit);
+    font-weight: 700;
+  }
+  .atlas-related-chip:hover,
+  .atlas-related-chip:focus {
+    background: var(--atlas-color, #0d6efd);
+    border-color: var(--atlas-color, #0d6efd);
+    color: #fff;
+  }
   @media (max-width: 1199.98px) {
     #atlas-controls,
     .atlas-selector-header {
@@ -113,7 +166,7 @@
     .atlas-selector-submit {
       width: 100%;
     }
-    #atlas-controls > a {
+    .atlas-control-links {
       display: inline-block;
       margin-top: .75rem;
     }
@@ -156,11 +209,25 @@
     {% block atlas_selector %}
       {% include "waste_atlas/includes/map_selector.html" with atlas_selector_bootstrap=False atlas_selector_button_label="Load" %}
     {% endblock atlas_selector %}
-    <a href="{% url map_overview_url %}"
-       class="btn btn-outline-secondary btn-sm">
-      <i class="fas fa-th-list"></i> {{ map_overview_label|default:"Map overview" }}
-    </a>
+    <div class="atlas-control-links">
+      <a href="{{ map_toggle_url }}"
+         class="btn btn-outline-primary btn-sm"
+         id="btn-toggle-change"
+         {% if not map_toggle_url %}style="display: none;"{% endif %}>
+        {% if is_change_map %}
+          <i class="fas fa-map"></i>
+        {% else %}
+          <i class="fas fa-exchange-alt"></i>
+        {% endif %}
+        {{ map_toggle_label }}
+      </a>
+      <a href="{% url map_overview_url %}"
+         class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-th-list"></i> {{ map_overview_label|default:"Map overview" }}
+      </a>
+    </div>
   </div>
+  {% include "waste_atlas/includes/related_maps.html" %}
   <div id="map-container">
     <div id="loading-overlay">
       <i class="fas fa-spinner fa-spin me-2"></i> Loading map data…
