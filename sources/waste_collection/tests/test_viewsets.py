@@ -1,5 +1,6 @@
 from datetime import date
 from unittest.mock import patch
+from uuid import uuid4
 
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
@@ -2145,6 +2146,7 @@ class WasteAtlasThrottleTests(APITestCase):
     endpoint = "/waste_collection/api/waste-atlas/green-waste-collection-system-count/"
 
     def setUp(self):
+        self.client.defaults["REMOTE_ADDR"] = f"waste-atlas-throttle-test-{uuid4()}"
         cache.clear()
 
     def tearDown(self):

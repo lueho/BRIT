@@ -1,6 +1,7 @@
 import ssl
 import subprocess
 import sys
+from importlib import import_module
 
 from django.conf import settings
 from django.test import SimpleTestCase
@@ -13,6 +14,8 @@ from brit.settings.settings import (
 
 class RedisSettingsTests(SimpleTestCase):
     def test_configured_test_database_settings_include_atomic_requests_default(self):
+        import_module("brit.settings.local")
+
         self.assertFalse(settings.DATABASES["default"]["ATOMIC_REQUESTS"])
 
     def test_raw_testrunner_database_settings_include_atomic_requests_default(self):

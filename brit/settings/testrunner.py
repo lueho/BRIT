@@ -20,16 +20,18 @@ ALLOWED_HOSTS = ["localhost", "127.0.0.1", "testserver"]
 
 INTERNAL_IPS = ["127.0.0.1"]
 
-DATABASES["default"] = {
-    "ENGINE": "django.contrib.gis.db.backends.postgis",
-    "NAME": "test_brit_db",
-    "USER": os.environ.get("POSTGRES_USER", "postgres"),
-    "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "postgres"),
-    "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
-    "PORT": os.environ.get("POSTGRES_PORT", "5432"),
-    "ATOMIC_REQUESTS": False,
-    "TEST": {
-        "NAME": "test_brit_test_db",
+DATABASES = {
+    "default": {
+        "ENGINE": "django.contrib.gis.db.backends.postgis",
+        "NAME": "test_brit_db",
+        "USER": os.environ.get("POSTGRES_USER", "postgres"),
+        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "postgres"),
+        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        "ATOMIC_REQUESTS": False,
+        "TEST": {
+            "NAME": "test_brit_test_db",
+        },
     },
 }
 
