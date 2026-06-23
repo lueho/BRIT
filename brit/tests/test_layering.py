@@ -27,6 +27,21 @@ class LayeringContractTests(SimpleTestCase):
             [("utils/offender.py:1 imports sources.registry (L0 utils -> L4 sources)")],
         )
 
+    def test_scanner_ignores_relative_imports(self):
+        with TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            package_dir = repo_root / "utils"
+            package_dir.mkdir()
+            internal_import = package_dir / "internal_import.py"
+            internal_import.write_text("from .sources import helper\n")
+
+            violations = find_layering_violations(
+                repo_root,
+                LayeringContract(layers={"utils": 0, "sources": 4}),
+            )
+
+        self.assertEqual(violations, [])
+
     def test_non_test_code_only_imports_same_or_lower_layers(self):
         repo_root = Path(__file__).resolve().parents[2]
 

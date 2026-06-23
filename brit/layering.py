@@ -57,7 +57,11 @@ def _iter_imports(tree: ast.AST) -> list[tuple[str, int]]:
         if isinstance(node, ast.Import):
             for alias in node.names:
                 imports.append((alias.name, node.lineno))
-        elif isinstance(node, ast.ImportFrom) and node.module is not None:
+        elif (
+            isinstance(node, ast.ImportFrom)
+            and node.module is not None
+            and node.level == 0
+        ):
             imports.append((node.module, node.lineno))
 
     return imports
