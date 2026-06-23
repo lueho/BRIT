@@ -6,6 +6,8 @@
         {% for option in map_selection_map_sets %}
           <option value="{{ option.value }}"
                   data-country="{{ option.country }}"
+                  data-nuts-prefix="{{ option.nuts_prefix }}"
+                  data-nuts-level="{{ option.nuts_level }}"
                   {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
         {% endfor %}
       </select>
@@ -73,6 +75,8 @@
           {% for option in map_selection_map_sets %}
             <option value="{{ option.value }}"
                     data-country="{{ option.country }}"
+                    data-nuts-prefix="{{ option.nuts_prefix }}"
+                    data-nuts-level="{{ option.nuts_level }}"
                     {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
           {% endfor %}
         </select>

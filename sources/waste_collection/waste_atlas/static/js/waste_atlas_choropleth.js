@@ -354,8 +354,34 @@ var WasteAtlasChoropleth = (function () {
     return renderCfg;
   }
 
-  function _configForSelection(cfg, country, year, preserveScope) {
+  function _regionCountry(region) {
+    return region && typeof region === 'object' ? region.country : region;
+  }
+
+  function _regionNutsPrefix(region) {
+    return region && typeof region === 'object' ? region.nutsPrefix : '';
+  }
+
+  function _regionNutsLevel(region) {
+    return region && typeof region === 'object' ? region.nutsLevel : '';
+  }
+
+  function _configForSelection(cfg, region, year, preserveScope) {
+    var country = _regionCountry(region);
     var loadCfg = Object.assign({}, cfg, { country: country, year: year });
+    var nutsPrefix = _regionNutsPrefix(region);
+    var nutsLevel = _regionNutsLevel(region);
+
+    if (region && typeof region === 'object') {
+      if (nutsPrefix) {
+        loadCfg.nutsPrefix = nutsPrefix;
+        if (nutsLevel) loadCfg.nutsLevel = parseInt(nutsLevel, 10);
+      } else {
+        delete loadCfg.nutsPrefix;
+        delete loadCfg.nutsLevel;
+      }
+      return loadCfg;
+    }
 
     if (country === 'IT-ST') {
       return Object.assign(loadCfg, {
@@ -376,23 +402,28 @@ var WasteAtlasChoropleth = (function () {
     return window.location.pathname.replace(/\/$/, '') === path.replace(/\/$/, '');
   }
 
-  function _selectorNavigationTarget(url, year, fromYear, country) {
+  function _selectorNavigationTarget(url, year, fromYear, region) {
     if (!url || _isCurrentPath(url)) return null;
-    return url + '?' + _selectorQueryString(year, fromYear, country);
+    return url + '?' + _selectorQueryString(year, fromYear, region);
   }
 
-  function _selectorQueryString(year, fromYear, country) {
+  function _selectorQueryString(year, fromYear, region) {
     var params = fromYear
       ? 'from_year=' + encodeURIComponent(fromYear) + '&to_year=' + encodeURIComponent(year)
       : 'year=' + encodeURIComponent(year);
+    var country = _regionCountry(region);
+    var nutsPrefix = _regionNutsPrefix(region);
+    var nutsLevel = _regionNutsLevel(region);
     if (country) params += '&country=' + encodeURIComponent(country);
+    if (nutsPrefix) params += '&nuts_prefix=' + encodeURIComponent(nutsPrefix);
+    if (nutsLevel) params += '&nuts_level=' + encodeURIComponent(nutsLevel);
     return params;
   }
 
-  function _replaceSelectorUrl(url, year, fromYear, country) {
+  function _replaceSelectorUrl(url, year, fromYear, region) {
     if (!window.history || !window.history.replaceState) return;
     var path = url || window.location.pathname;
-    window.history.replaceState(null, '', path + '?' + _selectorQueryString(year, fromYear, country));
+    window.history.replaceState(null, '', path + '?' + _selectorQueryString(year, fromYear, region));
   }
 
   function _debounce(fn, delay) {
@@ -445,9 +476,17 @@ var WasteAtlasChoropleth = (function () {
       return numericYear ? String(numericYear - 1) : value;
     }
 
-    function selectedCountryCode() {
+    function selectedRegion() {
       var selectedOption = countrySelect.options[countrySelect.selectedIndex];
-      return selectedOption ? selectedOption.getAttribute('data-country') || countrySelect.value : countrySelect.value;
+      return {
+        country: selectedOption ? selectedOption.getAttribute('data-country') || countrySelect.value : countrySelect.value,
+        nutsPrefix: selectedOption ? selectedOption.getAttribute('data-nuts-prefix') || '' : '',
+        nutsLevel: selectedOption ? selectedOption.getAttribute('data-nuts-level') || '' : ''
+      };
+    }
+
+    function selectedCountryCode() {
+      return selectedRegion().country;
     }
 
     function selectedRouteUrl() {
@@ -589,7 +628,7 @@ var WasteAtlasChoropleth = (function () {
       var url = selectedRouteUrl();
       var year = selectedYear();
       var fromYear = selectedFromYear();
-      var country = selectedCountryCode();
+      var country = selectedRegion();
       var navigationTarget = _selectorNavigationTarget(url, year, fromYear, country);
       if (navigationTarget && !disableNavigation) {
         window.location.href = navigationTarget;
