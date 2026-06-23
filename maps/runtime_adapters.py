@@ -9,7 +9,7 @@ from django.http import Http404
 
 from maps.filters import NutsRegionFilterSet
 from maps.models import NutsRegion
-from sources.registry import get_source_domain_dataset_runtime_compatibility
+from maps.registry import get_source_domain_dataset_runtime_compatibility
 
 LEGACY_DATASET_RUNTIME_COMPATIBILITY = {
     "NutsRegion": {

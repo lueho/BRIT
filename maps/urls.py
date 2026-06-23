@@ -1,6 +1,6 @@
 from django.urls import include, path
 
-from sources.registry import get_source_domain_map_mounts
+from maps.registry import get_source_domain_map_mounts
 
 from .router import router
 from .views import (

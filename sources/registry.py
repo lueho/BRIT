@@ -3,6 +3,7 @@ from importlib import import_module
 from django.apps import apps
 from django.core.cache import cache
 
+from maps.registry import register_source_domain_map_contracts
 from sources.contracts import (
     SourceDomainDatasetRuntimeCompatibility,
     SourceDomainExplorerCard,
@@ -235,6 +236,14 @@ def _discover_source_domain_plugins() -> tuple[SourceDomainPlugin, ...]:
 _SOURCE_DOMAIN_PLUGINS: tuple[SourceDomainPlugin, ...] = (
     _discover_source_domain_plugins()
 )
+
+for plugin in _SOURCE_DOMAIN_PLUGINS:
+    register_source_domain_map_contracts(
+        slug=plugin.slug,
+        map_mount=plugin.map_mount,
+        geojson_cache_warmer=plugin.get_geojson_cache_warmer(),
+        dataset_runtime_compatibilities=plugin.dataset_runtime_compatibilities,
+    )
 
 
 def get_source_domain_plugins() -> tuple[SourceDomainPlugin, ...]:

@@ -44,7 +44,7 @@ Non-test code only; test-code coupling is tracked separately in WS6.
 |---|---|---|---|
 | V1 | Resolved: `utils.object_management` no longer hardcodes `waste_collection.Collection` knowledge | PR #179 moved review-context/search-field/update-context hooks behind source-owned registration | Keep domain-specific review context in source app hooks (WS1-A) |
 | V2 | Resolved: `utils.properties` and shared form helpers no longer import `bibliography` | PR #183 moved bibliography-backed `sources` fields to concrete domain models and made shared source-form helpers infer the source model from the form field | Keep attribution ownership in domain models (WS1-B) |
-| V3 | `utils.file_export` discovers `sources` plugins | `utils/file_export/registry_init.py` | Invert: source apps push exports into `export_registry` from their own `AppConfig.ready()` (WS1-C) |
+| V3 | Resolved: `utils.file_export` no longer discovers `sources` plugins | PR #190 moved export registration into source app `AppConfig.ready()` methods | Keep source export specs source-owned (WS1-C) |
 | V4 | `maps` imports `sources.registry` | `maps/urls.py:3`, `maps/tasks.py:11`, `maps/runtime_adapters.py:12`, `maps/management/commands/warm_geojson_cache.py` | Move the *contract* (map mounts, cache warmers, runtime compatibility) into `maps`; source apps register themselves (WS1-D) |
 | V5 | `maps` hardcodes domain dataset names | `maps/models.py:33-39` (`GIS_SOURCE_MODELS` incl. `WasteCollection`), legacy `GeoDataset.model_name` | Finish runtime-configuration migration, delete legacy name dispatch (WS1-D, overlaps #85) |
 | V6 | `layer_manager` imports `inventories`, `materials`, `distributions` | `layer_manager/models.py:6-8` | Merge `layer_manager` into `inventories` (it is its private result store) or genericize via contenttypes (WS8) |
@@ -79,6 +79,7 @@ The single most important arc. Sub-items in implementation order:
    each source app calls `register_export(...)` in its own `ready()`. The
    `sources.contracts.SourceDomainExport` dataclass moves to
    `utils.file_export.contracts` (it is a core contract, not a domain one).
+   **Status:** completed in PR #190.
 4. **D. Maps/sources inversion (V4, V5).** Move the mount/warmer/runtime-compat
    contracts from `sources/registry.py` into `maps.contracts` (or a new tiny
    `core_registry`), keep discovery in `sources` but have `maps` consume only its own
@@ -347,4 +348,4 @@ decoupling), #87 (soilcom cleanup), #139/#141/#145 (GeoJSON/serialization
 performance & cache warmup), #142 (collector NOT NULL), #143 (normalization bug),
 #106 (legacy unit field).
 
-_Last updated: 2026-06-09_
+_Last updated: 2026-06-23_
