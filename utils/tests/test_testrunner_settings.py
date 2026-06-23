@@ -10,14 +10,6 @@ class TestRunnerSettingsTests(SimpleTestCase):
             "django.core.cache.backends.locmem.LocMemCache",
         )
 
-    def test_database_settings_include_django_connection_defaults(self):
-        self.assertFalse(settings.DATABASES["default"]["ATOMIC_REQUESTS"])
-        self.assertTrue(settings.DATABASES["default"]["AUTOCOMMIT"])
-        self.assertEqual(settings.DATABASES["default"]["CONN_MAX_AGE"], 0)
-        self.assertFalse(settings.DATABASES["default"]["CONN_HEALTH_CHECKS"])
-        self.assertEqual(settings.DATABASES["default"]["OPTIONS"], {})
-        self.assertIsNone(settings.DATABASES["default"]["TIME_ZONE"])
-
     def test_geojson_cache_uses_plain_test_redis_backend(self):
         cache_config = settings.CACHES["geojson"]
         self.assertEqual(

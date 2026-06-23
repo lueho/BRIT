@@ -21,6 +21,12 @@ from sources.roadside_trees.views import HamburgRoadsideTreesListFileExportView
 from utils.tests.testcases import ViewWithPermissionsTestCase
 
 
+def legacy_redirect_response(path):
+    url_match = resolve(path)
+    request = RequestFactory().get(path)
+    return url_match.func(request, **url_match.kwargs)
+
+
 class SourcesExplorerViewTestCase(ViewWithPermissionsTestCase):
     url_name = "sources-explorer"
 
@@ -178,12 +184,6 @@ class SourceDomainHubRoutingTestCase(SimpleTestCase):
 
 
 class RoadsideTreesPluginIntegrationTestCase(SimpleTestCase):
-    @staticmethod
-    def legacy_redirect_response(path):
-        url_match = resolve(path)
-        request = RequestFactory().get(path)
-        return url_match.func(request, **url_match.kwargs)
-
     def test_roadside_trees_plugin_contract_marks_hub_mount(self):
         plugin = get_source_domain_plugin("roadside_trees")
 
@@ -250,14 +250,12 @@ class RoadsideTreesPluginIntegrationTestCase(SimpleTestCase):
         )
 
     def test_legacy_hamburg_urls_redirect_to_sources(self):
-        response = self.legacy_redirect_response(
-            "/case_studies/hamburg/roadside_trees/map/"
-        )
+        response = legacy_redirect_response("/case_studies/hamburg/roadside_trees/map/")
         self.assertEqual(response.status_code, 301)
         self.assertEqual(response["Location"], "/sources/roadside_trees/map/")
 
     def test_legacy_hamburg_api_urls_redirect_to_sources(self):
-        response = self.legacy_redirect_response(
+        response = legacy_redirect_response(
             "/case_studies/hamburg/api/hamburg_roadside_trees/"
         )
         self.assertEqual(response.status_code, 301)
@@ -294,10 +292,7 @@ class UrbanGreenSpacesPluginIntegrationTestCase(SimpleTestCase):
         )
 
     def test_legacy_hamburg_green_areas_url_redirects_to_maps(self):
-        response = self.client.get(
-            "/case_studies/hamburg/green_areas/map/",
-            follow=False,
-        )
+        response = legacy_redirect_response("/case_studies/hamburg/green_areas/map/")
 
         self.assertEqual(response.status_code, 301)
         self.assertEqual(response["Location"], "/maps/hamburg/green_areas/map/")
