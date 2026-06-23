@@ -33,33 +33,6 @@
   --atlas-shadow: 0 .35rem 1rem rgba(0, 0, 0, .4);
 }
 
-/* ---- Topic color tokens (shared by hub chips, related maps, legend) ---- */
-.atlas-topic-admin { --atlas-color: #5b6c8f; --atlas-bg: #f0f3fa; --atlas-border-c: #bcc8df; }
-.atlas-topic-system { --atlas-color: #24796f; --atlas-bg: #edf8f6; --atlas-border-c: #9ed2ca; }
-.atlas-topic-material { --atlas-color: #4c8c2b; --atlas-bg: #f1f8ed; --atlas-border-c: #b7dba7; }
-.atlas-topic-schedule { --atlas-color: #8a63a8; --atlas-bg: #f6f0fa; --atlas-border-c: #cfb8df; }
-.atlas-topic-count { --atlas-color: #6b55a3; --atlas-bg: #f2f0fb; --atlas-border-c: #bfb5df; }
-.atlas-topic-fee { --atlas-color: #b06f1f; --atlas-bg: #fff6e8; --atlas-border-c: #e4be87; }
-.atlas-topic-amount-residual { --atlas-color: #b75a42; --atlas-bg: #fff1ed; --atlas-border-c: #e2aa9c; }
-.atlas-topic-amount-bio { --atlas-color: #3f8f4b; --atlas-bg: #eef8f0; --atlas-border-c: #a7d8ae; }
-.atlas-topic-amount-organic { --atlas-color: #65a832; --atlas-bg: #f3faed; --atlas-border-c: #bedf9f; }
-.atlas-topic-amount-ratio { --atlas-color: #598b64; --atlas-bg: #eef7f0; --atlas-border-c: #a9d1b2; }
-.atlas-topic-bin { --atlas-color: #2f78a5; --atlas-bg: #eef6fb; --atlas-border-c: #9fc8df; }
-.atlas-topic-coverage { --atlas-color: #5c6975; --atlas-bg: #f3f5f7; --atlas-border-c: #c3cbd2; }
-
-[data-bs-theme="dark"] .atlas-topic-admin { --atlas-color: #9fb0d6; --atlas-bg: #2b3242; }
-[data-bs-theme="dark"] .atlas-topic-system { --atlas-color: #74c6ba; --atlas-bg: #1f3733; }
-[data-bs-theme="dark"] .atlas-topic-material { --atlas-color: #97c97c; --atlas-bg: #243520; }
-[data-bs-theme="dark"] .atlas-topic-schedule { --atlas-color: #c4a4dd; --atlas-bg: #322a3c; }
-[data-bs-theme="dark"] .atlas-topic-count { --atlas-color: #b1a2e0; --atlas-bg: #2c2840; }
-[data-bs-theme="dark"] .atlas-topic-fee { --atlas-color: #e1b06a; --atlas-bg: #3a3020; }
-[data-bs-theme="dark"] .atlas-topic-amount-residual { --atlas-color: #e09a85; --atlas-bg: #3b2a25; }
-[data-bs-theme="dark"] .atlas-topic-amount-bio { --atlas-color: #84c98f; --atlas-bg: #21351f; }
-[data-bs-theme="dark"] .atlas-topic-amount-organic { --atlas-color: #a8d27c; --atlas-bg: #2a3520; }
-[data-bs-theme="dark"] .atlas-topic-amount-ratio { --atlas-color: #97c2a1; --atlas-bg: #233429; }
-[data-bs-theme="dark"] .atlas-topic-bin { --atlas-color: #7cbbe0; --atlas-bg: #1f3340; }
-[data-bs-theme="dark"] .atlas-topic-coverage { --atlas-color: #aab6c2; --atlas-bg: #2d3338; }
-
 /* ============================ Hub / overview ============================ */
 .atlas-hero {
   margin-bottom: 1.5rem;
@@ -167,6 +140,37 @@
   color: #fff !important;
   transform: translateY(-1px);
 }
+
+/*
+ * Topic color tokens (shared by hub chips, related maps, legend).
+ * Declared after the .atlas-topic-key / .atlas-map-link base rules above so the
+ * topic-specific custom properties win the cascade (equal specificity, later wins).
+ */
+.atlas-topic-admin { --atlas-color: #5b6c8f; --atlas-bg: #f0f3fa; --atlas-border-c: #bcc8df; }
+.atlas-topic-system { --atlas-color: #24796f; --atlas-bg: #edf8f6; --atlas-border-c: #9ed2ca; }
+.atlas-topic-material { --atlas-color: #4c8c2b; --atlas-bg: #f1f8ed; --atlas-border-c: #b7dba7; }
+.atlas-topic-schedule { --atlas-color: #8a63a8; --atlas-bg: #f6f0fa; --atlas-border-c: #cfb8df; }
+.atlas-topic-count { --atlas-color: #6b55a3; --atlas-bg: #f2f0fb; --atlas-border-c: #bfb5df; }
+.atlas-topic-fee { --atlas-color: #b06f1f; --atlas-bg: #fff6e8; --atlas-border-c: #e4be87; }
+.atlas-topic-amount-residual { --atlas-color: #b75a42; --atlas-bg: #fff1ed; --atlas-border-c: #e2aa9c; }
+.atlas-topic-amount-bio { --atlas-color: #3f8f4b; --atlas-bg: #eef8f0; --atlas-border-c: #a7d8ae; }
+.atlas-topic-amount-organic { --atlas-color: #65a832; --atlas-bg: #f3faed; --atlas-border-c: #bedf9f; }
+.atlas-topic-amount-ratio { --atlas-color: #598b64; --atlas-bg: #eef7f0; --atlas-border-c: #a9d1b2; }
+.atlas-topic-bin { --atlas-color: #2f78a5; --atlas-bg: #eef6fb; --atlas-border-c: #9fc8df; }
+.atlas-topic-coverage { --atlas-color: #5c6975; --atlas-bg: #f3f5f7; --atlas-border-c: #c3cbd2; }
+
+[data-bs-theme="dark"] .atlas-topic-admin { --atlas-color: #9fb0d6; --atlas-bg: #2b3242; --atlas-border-c: #3d4863; }
+[data-bs-theme="dark"] .atlas-topic-system { --atlas-color: #74c6ba; --atlas-bg: #1f3733; --atlas-border-c: #2f5750; }
+[data-bs-theme="dark"] .atlas-topic-material { --atlas-color: #97c97c; --atlas-bg: #243520; --atlas-border-c: #3a5532; }
+[data-bs-theme="dark"] .atlas-topic-schedule { --atlas-color: #c4a4dd; --atlas-bg: #322a3c; --atlas-border-c: #51445f; }
+[data-bs-theme="dark"] .atlas-topic-count { --atlas-color: #b1a2e0; --atlas-bg: #2c2840; --atlas-border-c: #463f63; }
+[data-bs-theme="dark"] .atlas-topic-fee { --atlas-color: #e1b06a; --atlas-bg: #3a3020; --atlas-border-c: #5c4c2f; }
+[data-bs-theme="dark"] .atlas-topic-amount-residual { --atlas-color: #e09a85; --atlas-bg: #3b2a25; --atlas-border-c: #5e4239; }
+[data-bs-theme="dark"] .atlas-topic-amount-bio { --atlas-color: #84c98f; --atlas-bg: #21351f; --atlas-border-c: #345331; }
+[data-bs-theme="dark"] .atlas-topic-amount-organic { --atlas-color: #a8d27c; --atlas-bg: #2a3520; --atlas-border-c: #425532; }
+[data-bs-theme="dark"] .atlas-topic-amount-ratio { --atlas-color: #97c2a1; --atlas-bg: #233429; --atlas-border-c: #375140; }
+[data-bs-theme="dark"] .atlas-topic-bin { --atlas-color: #7cbbe0; --atlas-bg: #1f3340; --atlas-border-c: #305063; }
+[data-bs-theme="dark"] .atlas-topic-coverage { --atlas-color: #aab6c2; --atlas-bg: #2d3338; --atlas-border-c: #454e57; }
 
 /* ============================ Map page ============================ */
 #atlas-controls {
