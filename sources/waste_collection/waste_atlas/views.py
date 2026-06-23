@@ -9,6 +9,7 @@ from .map_selection import (
     MAP_SELECTION_YEARS,
     build_map_selection_context,
     build_related_maps_context,
+    resolve_map_set,
 )
 from .pages import MAP_PAGES
 
@@ -66,9 +67,11 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
     def get_selected_map_set(self):
         if self.page["selector_set"]:
             return self.page["selector_set"]
-        if self.get_country() == "IT" and self.get_nuts_prefix() == "ITH10":
-            return "IT-ST"
-        return self.get_country()
+        return resolve_map_set(
+            self.get_country(),
+            self.get_nuts_prefix(),
+            self.get_nuts_level(),
+        )
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)

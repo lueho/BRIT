@@ -114,6 +114,8 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         self.assertIn("data-theme-group", script)
         self.assertIn("&country=", script)
         self.assertIn("countrySelect.value", script)
+        self.assertIn("&nuts_prefix=", script)
+        self.assertIn("&nuts_level=", script)
 
     def test_selector_navigation_passes_iso_country_code_not_map_set_id(self):
         """The ``country`` query param must be an ISO code, not a map-set ID.
@@ -134,6 +136,18 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         self.assertIn("selectedCountryCode", script)
         self.assertIn("data-country", script)
 
+    def test_selector_load_config_clears_missing_nuts_level(self):
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+        script = script_path.read_text()
+
+        self.assertIn("else delete loadCfg.nutsLevel;", script)
+
     def test_load_current_uses_passed_country_instead_of_cfg_country(self):
         """The ``loadCurrent`` callback in ``init()`` must use the country
         argument from the selector, not the hard-coded ``cfg.country``.
@@ -149,14 +163,16 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
 
         init_section = script.split("function init(cfg)")[1]
         init_selector_call = init_section[
-            init_section.index("initSelectorControls(") :
-            init_section.index("initSelectorControls(") + 200
+            init_section.index("initSelectorControls(") : init_section.index(
+                "initSelectorControls("
+            )
+            + 200
         ]
         self.assertNotIn("cfg.country", init_selector_call)
         self.assertIn("country", init_selector_call)
 
-    def test_map_selection_context_includes_country_code_per_map_set(self):
-        """Each map-set entry must carry its ISO country code."""
+    def test_map_selection_context_includes_region_scope_per_map_set(self):
+        """Each map-set entry must carry its full region scope."""
         from sources.waste_collection.waste_atlas.pages import MAP_SET_COUNTRIES
 
         context = build_map_selection_context(
@@ -167,6 +183,18 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
             with self.subTest(map_set=entry["value"]):
                 self.assertIn("country", entry)
                 self.assertEqual(entry["country"], MAP_SET_COUNTRIES[entry["value"]])
+                self.assertIn("nuts_prefix", entry)
+                self.assertIn("nuts_level", entry)
+
+        map_sets_by_value = {
+            entry["value"]: entry for entry in context["map_selection_map_sets"]
+        }
+        self.assertEqual(map_sets_by_value["DE-NW"]["country"], "DE")
+        self.assertEqual(map_sets_by_value["DE-NW"]["nuts_prefix"], "DEA")
+        self.assertEqual(map_sets_by_value["DE-NW"]["nuts_level"], "1")
+        self.assertEqual(map_sets_by_value["SE"]["country"], "SE")
+        self.assertEqual(map_sets_by_value["SE"]["nuts_prefix"], "")
+        self.assertEqual(map_sets_by_value["SE"]["nuts_level"], "")
 
     def test_change_maps_use_numeric_difference_for_numeric_configs(self):
         script_path = (

@@ -4255,6 +4255,18 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertNotIn(f"{food_waste_url}?country=IT", south_tyrol_same_region_urls)
 
+    def test_generic_map_preserves_nuts_region_in_selector(self):
+        response = self.client.get(
+            reverse("waste-atlas-biowaste-collection-amount-map"),
+            {"country": "DE", "nuts_prefix": "DEA", "nuts_level": "1"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "selected>Nordrhein-Westfalen</option>")
+        cfg = self._map_config(response)
+        self.assertEqual(cfg["nutsPrefix"], "DEA")
+        self.assertEqual(cfg["nutsLevel"], 1)
+
     def test_selector_includes_current_generic_theme_when_missing_in_region(
         self,
     ):

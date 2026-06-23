@@ -7,7 +7,7 @@ selector with a consistent label.
 
 from urllib.parse import urlencode
 
-from .pages import MAP_PAGES, MAP_SET_COUNTRIES, MAP_SET_LABELS
+from .pages import MAP_PAGES, MAP_SET_LABELS
 
 # Short selector label per theme key.
 THEME_LABELS = {
@@ -76,6 +76,23 @@ def _build_selections():
 
 
 WASTE_ATLAS_MAP_SELECTIONS = _build_selections()
+
+
+def _build_map_set_region_scopes():
+    scopes = {}
+    for page in MAP_PAGES:
+        map_set = page["selector_set"]
+        if not map_set or map_set in scopes:
+            continue
+        scopes[map_set] = {
+            "country": page["country"],
+            "nuts_prefix": page.get("nuts_prefix", ""),
+            "nuts_level": str(page.get("nuts_level", "") or ""),
+        }
+    return scopes
+
+
+MAP_SET_REGION_SCOPES = _build_map_set_region_scopes()
 
 MAP_SELECTION_YEARS = ("2020", "2021", "2022", "2023", "2024")
 
@@ -294,14 +311,14 @@ def _related_map_entry(page, reverse_func, label=None):
 
 
 def _map_set_scope_params(map_set):
-    page = next((page for page in MAP_PAGES if page["selector_set"] == map_set), None)
-    if not page:
+    scope = MAP_SET_REGION_SCOPES.get(map_set)
+    if not scope:
         return {}
-    params = {"country": page["country"]}
-    if page.get("nuts_prefix"):
-        params["nuts_prefix"] = page["nuts_prefix"]
-    if page.get("nuts_level"):
-        params["nuts_level"] = page["nuts_level"]
+    params = {"country": scope["country"]}
+    if scope["nuts_prefix"]:
+        params["nuts_prefix"] = scope["nuts_prefix"]
+    if scope["nuts_level"]:
+        params["nuts_level"] = scope["nuts_level"]
     return params
 
 
@@ -311,6 +328,18 @@ def _url_with_map_set_scope(url, map_set):
         return url
     separator = "&" if "?" in url else "?"
     return f"{url}{separator}{urlencode(params)}"
+
+
+def resolve_map_set(country, nuts_prefix="", nuts_level=""):
+    nuts_level = str(nuts_level or "")
+    for map_set, scope in MAP_SET_REGION_SCOPES.items():
+        if (
+            scope["country"] == country
+            and scope["nuts_prefix"] == (nuts_prefix or "")
+            and scope["nuts_level"] == nuts_level
+        ):
+            return map_set
+    return country
 
 
 def build_related_maps_context(selected_map_set, selected_theme, reverse_func):
@@ -397,7 +426,9 @@ def build_map_selection_context(
             {
                 "value": map_set,
                 "label": map_selection["label"],
-                "country": MAP_SET_COUNTRIES[map_set],
+                "country": MAP_SET_REGION_SCOPES[map_set]["country"],
+                "nuts_prefix": MAP_SET_REGION_SCOPES[map_set]["nuts_prefix"],
+                "nuts_level": MAP_SET_REGION_SCOPES[map_set]["nuts_level"],
                 "selected": map_set == selected_map_set,
             }
         )
