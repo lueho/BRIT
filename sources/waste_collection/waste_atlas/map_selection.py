@@ -5,7 +5,7 @@
 selector with a consistent label.
 """
 
-from .pages import MAP_PAGES, MAP_SET_LABELS
+from .pages import MAP_PAGES, MAP_SET_COUNTRIES, MAP_SET_LABELS
 
 # Short selector label per theme key.
 THEME_LABELS = {
@@ -211,38 +211,38 @@ def _theme_context_sort_key(theme_selection):
     )
 
 
-def _add_selected_generic_theme(
-    themes_by_map_set, reverse_func, selected_map_set, selected_theme
-):
-    selected_themes = themes_by_map_set.get(selected_map_set)
-    if not selected_themes or any(
-        theme["value"] == selected_theme for theme in selected_themes
-    ):
-        return
-    generic_page = next(
-        (
-            page
-            for page in MAP_PAGES
-            if page["selector_set"] is None and page["theme"] == selected_theme
-        ),
-        None,
-    )
-    if not generic_page:
-        return
-    selected_themes.append(
+def _generic_theme_options(reverse_func):
+    generic_pages_by_theme = {}
+    for page in MAP_PAGES:
+        if page["selector_set"] is None:
+            generic_pages_by_theme.setdefault(page["theme"], page)
+
+    return [
         {
-            "value": selected_theme,
-            "theme_group": _selection_theme_group(selected_theme),
-            "waste_category": _selection_waste_category(selected_theme),
+            "value": theme,
+            "theme_group": _selection_theme_group(theme),
+            "waste_category": _selection_waste_category(theme),
             "label": _selection_theme_label(
-                selected_theme,
-                {"label": THEME_LABELS[selected_theme]},
+                theme,
+                {"label": THEME_LABELS[theme]},
             ),
-            "url": reverse_func(generic_page["name"]),
+            "url": reverse_func(page["name"]),
             "change_url": "",
         }
-    )
-    selected_themes.sort(key=_theme_context_sort_key)
+        for theme, page in generic_pages_by_theme.items()
+    ]
+
+
+def _add_generic_theme_fallbacks(themes_by_map_set, reverse_func):
+    generic_theme_options = _generic_theme_options(reverse_func)
+    for selected_themes in themes_by_map_set.values():
+        existing_themes = {theme["value"] for theme in selected_themes}
+        selected_themes.extend(
+            theme.copy()
+            for theme in generic_theme_options
+            if theme["value"] not in existing_themes
+        )
+        selected_themes.sort(key=_theme_context_sort_key)
 
 
 def build_map_selection_context(
@@ -270,12 +270,11 @@ def build_map_selection_context(
             {
                 "value": map_set,
                 "label": map_selection["label"],
+                "country": MAP_SET_COUNTRIES[map_set],
                 "selected": map_set == selected_map_set,
             }
         )
-    _add_selected_generic_theme(
-        themes_by_map_set, reverse_func, selected_map_set, selected_theme
-    )
+    _add_generic_theme_fallbacks(themes_by_map_set, reverse_func)
     return {
         "map_selection_map_sets": map_sets,
         "map_selection_themes_by_map_set": themes_by_map_set,

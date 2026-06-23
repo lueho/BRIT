@@ -112,6 +112,61 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         self.assertIn("function findThemeOption(", script)
         self.assertIn("selectedThemeGroup", script)
         self.assertIn("data-theme-group", script)
+        self.assertIn("&country=", script)
+        self.assertIn("countrySelect.value", script)
+
+    def test_selector_navigation_passes_iso_country_code_not_map_set_id(self):
+        """The ``country`` query param must be an ISO code, not a map-set ID.
+
+        Regression: navigating from a sub-region page (e.g. DE-NW) to a
+        generic fallback theme passed "DE-NW" as ``&country=`` which the
+        API cannot resolve.
+        """
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+        script = script_path.read_text()
+
+        self.assertIn("selectedCountryCode", script)
+        self.assertIn("data-country", script)
+
+    def test_load_current_uses_passed_country_instead_of_cfg_country(self):
+        """The ``loadCurrent`` callback in ``init()`` must use the country
+        argument from the selector, not the hard-coded ``cfg.country``.
+        """
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+        script = script_path.read_text()
+
+        init_section = script.split("function init(cfg)")[1]
+        init_selector_call = init_section[
+            init_section.index("initSelectorControls(") :
+            init_section.index("initSelectorControls(") + 200
+        ]
+        self.assertNotIn("cfg.country", init_selector_call)
+        self.assertIn("country", init_selector_call)
+
+    def test_map_selection_context_includes_country_code_per_map_set(self):
+        """Each map-set entry must carry its ISO country code."""
+        from sources.waste_collection.waste_atlas.pages import MAP_SET_COUNTRIES
+
+        context = build_map_selection_context(
+            lambda route_name, args=None: f"/{route_name}/{'/'.join(args or [])}"
+        )
+
+        for entry in context["map_selection_map_sets"]:
+            with self.subTest(map_set=entry["value"]):
+                self.assertIn("country", entry)
+                self.assertEqual(entry["country"], MAP_SET_COUNTRIES[entry["value"]])
 
     def test_change_maps_use_numeric_difference_for_numeric_configs(self):
         script_path = (

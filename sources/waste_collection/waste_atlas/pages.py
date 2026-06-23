@@ -72,6 +72,12 @@ REGIONS = {
     },
 }
 
+MAP_SET_COUNTRIES = {
+    cfg["selector_set"]: cfg["country"]
+    for cfg in REGIONS.values()
+    if cfg["selector_set"] is not None
+}
+
 MAP_SET_LABELS = {
     "BE": "Belgium",
     "BE-FL-BR": "Flanders + Brussels",

@@ -376,11 +376,12 @@ var WasteAtlasChoropleth = (function () {
     return window.location.pathname.replace(/\/$/, '') === path.replace(/\/$/, '');
   }
 
-  function _selectorNavigationTarget(url, year, fromYear) {
+  function _selectorNavigationTarget(url, year, fromYear, country) {
     if (!url || _isCurrentPath(url)) return null;
     var params = fromYear
       ? 'from_year=' + encodeURIComponent(fromYear) + '&to_year=' + encodeURIComponent(year)
       : 'year=' + encodeURIComponent(year);
+    if (country) params += '&country=' + encodeURIComponent(country);
     return url + '?' + params;
   }
 
@@ -410,6 +411,11 @@ var WasteAtlasChoropleth = (function () {
 
     function selectedFromYear() {
       return fromYearSelect ? parseInt(fromYearSelect.value, 10) || 2023 : null;
+    }
+
+    function selectedCountryCode() {
+      var selectedOption = countrySelect.options[countrySelect.selectedIndex];
+      return selectedOption ? selectedOption.getAttribute('data-country') || countrySelect.value : countrySelect.value;
     }
 
     function selectedRouteUrl() {
@@ -526,12 +532,13 @@ var WasteAtlasChoropleth = (function () {
       var url = selectedRouteUrl();
       var year = selectedYear();
       var fromYear = selectedFromYear();
-      var navigationTarget = _selectorNavigationTarget(url, year, fromYear);
+      var country = selectedCountryCode();
+      var navigationTarget = _selectorNavigationTarget(url, year, fromYear, country);
       if (navigationTarget && !disableNavigation) {
         window.location.href = navigationTarget;
         return;
       }
-      if (loadCurrent) loadCurrent(countrySelect.value, year, false, fromYear);
+      if (loadCurrent) loadCurrent(country, year, false, fromYear);
     }
 
     countrySelect.addEventListener('change', ensureVisibleSelection);
@@ -2125,8 +2132,8 @@ var WasteAtlasChoropleth = (function () {
 
     load(cfg.country, cfg.year, true);
 
-    initSelectorControls(function (_selectedMapSet, year, _preserveScope, fromYear) {
-      load(cfg.country, year, true, fromYear);
+    initSelectorControls(function (country, year, _preserveScope, fromYear) {
+      load(country, year, true, fromYear);
     }, { useChangeUrls: !!cfg.changeMode });
 
     var atlasControls = document.getElementById('atlas-controls');

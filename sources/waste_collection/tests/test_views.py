@@ -4192,6 +4192,31 @@ class WasteAtlasMapViewsTestCase(TestCase):
             reverse("waste-atlas-biowaste-frequency-map"),
         )
 
+
+    def test_selector_includes_generic_biowaste_themes_for_sweden_from_nrw_context(
+        self,
+    ):
+        from sources.waste_collection.waste_atlas.map_selection import (
+            build_map_selection_context,
+        )
+
+        selection_context = build_map_selection_context(
+            reverse,
+            selected_map_set="DE-NW",
+            selected_theme="connection_type",
+        )
+
+        sweden_biowaste_themes = {
+            theme["value"]: theme
+            for theme in selection_context["map_selection_themes_by_map_set"]["SE"]
+            if theme["waste_category"] == "biowaste"
+        }
+        self.assertIn("biowaste_collection_amount", sweden_biowaste_themes)
+        self.assertEqual(
+            sweden_biowaste_themes["biowaste_collection_amount"]["url"],
+            reverse("waste-atlas-biowaste-collection-amount-map"),
+        )
+
     def test_generic_map_page_selects_current_theme_for_regions_without_dedicated_route(
         self,
     ):
