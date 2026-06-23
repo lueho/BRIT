@@ -27,6 +27,12 @@ DATABASES["default"] = {
     "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "postgres"),
     "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
     "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+    "ATOMIC_REQUESTS": False,
+    "AUTOCOMMIT": True,
+    "CONN_MAX_AGE": 0,
+    "CONN_HEALTH_CHECKS": False,
+    "OPTIONS": {},
+    "TIME_ZONE": None,
     "TEST": {
         "NAME": "test_brit_test_db",
     },
