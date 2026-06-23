@@ -4192,7 +4192,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
             reverse("waste-atlas-biowaste-frequency-map"),
         )
 
-
     def test_selector_includes_generic_biowaste_themes_for_sweden_from_nrw_context(
         self,
     ):
