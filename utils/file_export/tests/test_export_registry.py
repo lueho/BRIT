@@ -1,4 +1,3 @@
-import importlib
 from collections import OrderedDict, namedtuple
 from io import BytesIO
 from unittest.mock import MagicMock, patch
@@ -7,7 +6,7 @@ from django.contrib.auth.models import AnonymousUser, User
 from django.test import RequestFactory, SimpleTestCase, TestCase
 from openpyxl import load_workbook
 
-from sources.contracts import SourceDomainExport, SourceDomainPlugin
+from utils.file_export.contracts import SourceDomainExport
 
 from ..export_registry import (
     EXPORT_REGISTRY,
@@ -68,74 +67,22 @@ class ExportRegistryTestCase(SimpleTestCase):
         spec = get_export_spec("auth.User")
         self.assertIs(spec.serializer, new_serializer)
 
-    def test_registry_init_uses_sources_export_adapters(self):
-        """Registry init should import export classes through the sources adapters."""
-        from utils.file_export import registry_init
+    def test_source_domain_export_contract_carries_registry_arguments(self):
+        filterset = object()
+        serializer = object()
+        renderers = {"xlsx": object(), "csv": object()}
 
-        greenhouse_export = SourceDomainExport(
+        export = SourceDomainExport(
             model_label="greenhouses.NantesGreenhouses",
-            filterset=object(),
-            serializer=object(),
-            renderers={"xlsx": object(), "csv": object()},
-        )
-        waste_collection_export = SourceDomainExport(
-            model_label="waste_collection.Collection",
-            filterset=object(),
-            serializer=object(),
-            renderers={"xlsx": object(), "csv": object()},
-        )
-        plugin = SourceDomainPlugin(
-            slug="greenhouses",
-            verbose_name="Greenhouses",
-            app_config="sources.greenhouses.apps.GreenhousesConfig",
-            urlconf="sources.greenhouses.urls",
-            capabilities=("exports",),
-        )
-        waste_collection_plugin = SourceDomainPlugin(
-            slug="waste_collection",
-            verbose_name="Waste Collection",
-            app_config="sources.waste_collection.apps.WasteCollectionConfig",
-            urlconf="sources.waste_collection.urls",
-            capabilities=("exports",),
+            filterset=filterset,
+            serializer=serializer,
+            renderers=renderers,
         )
 
-        with (
-            patch(
-                "utils.file_export.export_registry.register_export"
-            ) as mock_register_export,
-            patch(
-                "sources.registry.get_source_domain_plugins",
-                return_value=(plugin, waste_collection_plugin),
-            ),
-            patch(
-                "importlib.import_module",
-                side_effect=[
-                    MagicMock(EXPORTS=(greenhouse_export,)),
-                    MagicMock(EXPORTS=(waste_collection_export,)),
-                ],
-            ),
-        ):
-            importlib.reload(registry_init)
-
-        self.assertEqual(mock_register_export.call_count, 2)
-        self.assertEqual(
-            mock_register_export.call_args_list[0].args,
-            (
-                greenhouse_export.model_label,
-                greenhouse_export.filterset,
-                greenhouse_export.serializer,
-                greenhouse_export.renderers,
-            ),
-        )
-        self.assertEqual(
-            mock_register_export.call_args_list[1].args,
-            (
-                waste_collection_export.model_label,
-                waste_collection_export.filterset,
-                waste_collection_export.serializer,
-                waste_collection_export.renderers,
-            ),
-        )
+        self.assertEqual(export.model_label, "greenhouses.NantesGreenhouses")
+        self.assertIs(export.filterset, filterset)
+        self.assertIs(export.serializer, serializer)
+        self.assertEqual(export.renderers, renderers)
 
 
 class BaseXLSXRendererTestCase(SimpleTestCase):

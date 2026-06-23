@@ -124,7 +124,7 @@ Source-domain apps should follow a similar internal shape so they stay easy to u
 - `selectors.py`
   - small read-model helpers such as published counts and explorer statistics
 - `exports.py`
-  - `SourceDomainExport` registrations for file export
+  - source-domain registrations for `utils.file_export`
 - `renderers.py`
   - domain-specific export renderers
 - `tasks.py`
@@ -257,7 +257,7 @@ The currently stable integration surfaces are:
 - `sources.contracts.SourceDomainLegacyRedirects`
 - `sources.contracts.SourceDomainMapMount`
 - `sources.contracts.SourceDomainPublicMount`
-- `sources.contracts.SourceDomainExport`
+- `utils.file_export.contracts.SourceDomainExport`
 - the `<app>.plugin` discovery convention
 - the optional `<app>.exports` convention for plugins with the `exports` capability
 - hub mounting through `mount_in_hub` and `mount_path`
@@ -280,7 +280,8 @@ At the moment, the `sources` hub provides a small but useful set of integration 
   - `SourceDomainLegacyRedirects` defines plugin-owned compatibility redirects
   - `SourceDomainMapMount` defines plugin-owned map URL mounts
   - `SourceDomainPublicMount` defines plugin-owned root-level public mounts
-  - `SourceDomainExport` defines export registrations
+- export contracts in `utils.file_export.contracts`
+  - `SourceDomainExport` defines source-domain file export registrations
 - registry functions in `sources.registry`
   - `get_source_domain_plugins()` returns all discovered plugins
   - `get_source_domain_plugin(slug)` resolves a plugin by slug
@@ -306,8 +307,8 @@ At the moment, the `sources` hub provides a small but useful set of integration 
   - plugin-declared sitemap entries are appended dynamically through the registry
 - GeoJSON warming in `maps.tasks` and `maps.management.commands.warm_geojson_cache`
   - core orchestration iterates plugin-declared warmers instead of importing domain tasks directly
-- export discovery through `utils.file_export.registry_init`
-  - plugins with the `exports` capability can register file exports without core hard-coded imports
+- export registration from source-domain `AppConfig.ready()`
+  - plugins with the `exports` capability register file exports from their own app startup code without core hard-coded imports
 
 These helpers should be preferred over custom cross-app glue when integrating a new source-domain app.
 
@@ -428,7 +429,7 @@ Optional plugin metadata should be used only when the plugin actually participat
 - `geojson_cache_warmer`
   - let maps orchestration warm plugin-owned GeoJSON caches without direct imports
 - `exports` capability plus `<app>.exports`
-  - register plugin-owned file exports through the shared export discovery path
+  - register plugin-owned file exports from the source-domain app startup path
 
 ## Required behavior
 
@@ -454,7 +455,7 @@ Optional plugin metadata should be used only when the plugin actually participat
 ## Optional `exports.py` contract
 
 Plugins that declare the `exports` capability may expose an `EXPORTS` iterable in `<app>.exports`.
-Each entry must be a `SourceDomainExport` instance with:
+Each entry must be a `utils.file_export.contracts.SourceDomainExport` instance with:
 
 - `model_label`
 - `filterset`

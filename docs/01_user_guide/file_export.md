@@ -17,24 +17,40 @@ This guide describes how to use, extend, and test the generic export workflow fo
   - It reconstructs the queryset using the context (e.g., published/owned restriction), applies filters, serializes, and renders the export file.
 
 - **Registry:**
-  - All exportable models must be registered in `utils/file_export/registry_init.py`.
+  - Exportable models must register themselves with `utils.file_export.export_registry.register_export`.
+  - Source-domain apps should call their export registration from `AppConfig.ready()`.
 
 ---
 
 ## How to Register a New Model for Export
 
 1. **Create/Reuse FilterSet, Serializer, and Renderer** for your model.
-2. **Register in the export registry** (`utils/file_export/registry_init.py`):
+2. **Register in the export registry** from the owning app:
 
 ```python
-register_export(
-    'myapp.MyModel',
-    MyModelFilterSet,
-    MyModelFlatSerializer,
-    {'xlsx': MyModelXLSXRenderer, 'csv': MyModelCSVRenderer}
-)
+from utils.file_export.export_registry import register_export
+
+
+def register_exports():
+    register_export(
+        'myapp.MyModel',
+        MyModelFilterSet,
+        MyModelFlatSerializer,
+        {'xlsx': MyModelXLSXRenderer, 'csv': MyModelCSVRenderer}
+    )
 ```
-3. **Create a view** for export:
+3. **Call registration from the owning `AppConfig.ready()`**:
+
+```python
+class MyAppConfig(AppConfig):
+    name = 'myapp'
+
+    def ready(self):
+        from myapp.exports import register_exports
+
+        register_exports()
+```
+4. **Create a view** for export:
 
 ```python
 from utils.file_export.views import GenericUserCreatedObjectExportView
@@ -43,7 +59,7 @@ class MyModelListFileExportView(GenericUserCreatedObjectExportView):
     model_label = 'myapp.MyModel'
 ```
 
-4. **Add a URL pattern** pointing to your new view.
+5. **Add a URL pattern** pointing to your new view.
 
 ---
 
@@ -88,7 +104,7 @@ This approach is fully general and supports any number of extra parameters or fi
 ---
 
 ## Troubleshooting
-- If you get an error about missing registry entry, make sure your model is registered in `registry_init.py`.
+- If you get an error about a missing registry entry, make sure the owning app calls its export registration from `AppConfig.ready()`.
 - If the export file is empty, check your filter logic and filters.
 - For permission issues, ensure the view is subclassing `GenericUserCreatedObjectExportView` and your model has `owner` and `publication_status` fields.
 
