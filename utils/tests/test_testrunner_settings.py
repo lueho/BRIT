@@ -24,4 +24,5 @@ class TestRunnerSettingsTests(SimpleTestCase):
             "CONNECTION_POOL_KWARGS",
             cache_config.get("OPTIONS", {}),
         )
+        self.assertFalse(cache_config["OPTIONS"]["IGNORE_EXCEPTIONS"])
         self.assertTrue(callable(getattr(caches["geojson"], "delete_pattern", None)))
