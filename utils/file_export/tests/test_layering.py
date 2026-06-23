@@ -6,7 +6,7 @@ from django.test import SimpleTestCase
 
 class FileExportLayeringTests(SimpleTestCase):
     def test_file_export_does_not_import_sources(self):
-        file_export_dir = Path("utils/file_export")
+        file_export_dir = Path(__file__).resolve().parent.parent
 
         for file_path in file_export_dir.rglob("*.py"):
             with self.subTest(path=file_path):
