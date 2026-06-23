@@ -5,7 +5,7 @@
 selector with a consistent label.
 """
 
-from .pages import MAP_PAGES, MAP_SET_LABELS
+from .pages import MAP_PAGES, MAP_SET_COUNTRIES, MAP_SET_LABELS
 
 # Short selector label per theme key.
 THEME_LABELS = {
@@ -270,6 +270,7 @@ def build_map_selection_context(
             {
                 "value": map_set,
                 "label": map_selection["label"],
+                "country": MAP_SET_COUNTRIES[map_set],
                 "selected": map_set == selected_map_set,
             }
         )
