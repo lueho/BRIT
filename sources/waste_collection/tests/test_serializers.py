@@ -28,6 +28,7 @@ from ..serializers import (
     CollectionFrequencyMutationSerializer,
     CollectionImportRecordSerializer,
     CollectionModelSerializer,
+    CollectionResearchSerializer,
 )
 
 
@@ -349,6 +350,33 @@ class CollectionFlatSerializerTestCase(TestCase):
             "lastmodified_at",
         }
         self.assertTrue(static_keys.issubset(set(serializer.data.keys())))
+
+    def test_connection_type_serializes_stored_values(self):
+        self.collection_nuts.connection_type = "MANDATORY"
+        self.collection_nuts.save(update_fields=["connection_type"])
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        self.assertEqual(serializer.data["connection_type"], "MANDATORY")
+
+        self.collection_nuts.connection_type = "not_specified"
+        self.collection_nuts.save(update_fields=["connection_type"])
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        self.assertEqual(serializer.data["connection_type"], "not_specified")
+
+        self.collection_nuts.connection_type = None
+        self.collection_nuts.save(update_fields=["connection_type"])
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        self.assertIsNone(serializer.data["connection_type"])
+
+        self.collection_nuts.connection_type = ""
+        self.collection_nuts.save(update_fields=["connection_type"])
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        self.assertEqual(serializer.data["connection_type"], "")
+
+    def test_research_serializer_preserves_unset_connection_type(self):
+        self.collection_nuts.connection_type = None
+        self.collection_nuts.save(update_fields=["connection_type"])
+        serializer = CollectionResearchSerializer(self.collection_nuts)
+        self.assertIsNone(serializer.data["connection_type"])
 
     def test_required_bin_capacity_field_label(self):
         serializer = CollectionFlatSerializer(self.collection_nuts)

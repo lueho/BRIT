@@ -446,7 +446,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     required_bin_capacity_reference = serializers.CharField(
         required=False, allow_null=True
     )
-    connection_type = serializers.CharField(required=False, allow_null=True)
+    connection_type = serializers.SerializerMethodField(label="Connection type")
     access_control_bp = serializers.BooleanField(required=False, allow_null=True)
     access_control_pap = serializers.BooleanField(required=False, allow_null=True)
     comments = serializers.SerializerMethodField(source="description", label="Comments")
@@ -506,6 +506,10 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     def get_waste_category(obj):
         category = obj.effective_waste_category
         return str(category) if category else ""
+
+    @staticmethod
+    def get_connection_type(obj):
+        return obj.connection_type
 
     @staticmethod
     def get_flyer_urls(obj):

@@ -4192,7 +4192,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
             reverse("waste-atlas-biowaste-frequency-map"),
         )
 
-
     def test_selector_includes_generic_biowaste_themes_for_sweden_from_nrw_context(
         self,
     ):
@@ -6211,13 +6210,14 @@ class CollectionCSVRendererTestCase(TestCase):
         catchment = CollectionCatchment.objects.create(
             name="Test catchment", region=nuts.region_ptr
         )
-        for i in range(1, 3):
+        for i, connection_type in enumerate(["MANDATORY", "not_specified"], start=1):
             collection = Collection.objects.create(
                 name=f"collection{i}",
                 catchment=catchment,
                 collector=Collector.objects.create(name=f"collector{1}"),
                 collection_system=CollectionSystem.objects.create(name="Test system"),
                 waste_category=waste_category,
+                connection_type=connection_type,
                 fee_system=FeeSystem.objects.create(name="Fixed fee"),
                 frequency=frequency,
                 valid_from=date(2020, 1, 1),
@@ -6262,16 +6262,14 @@ class CollectionCSVRendererTestCase(TestCase):
         renderer.render(self.file, self.content)
         self.file.seek(0)
         reader = csv.DictReader(codecs.getreader("utf-8")(self.file), delimiter="\t")
-        valid_labels = [
-            "Compulsory",
-            "Voluntary",
-            "Mandatory",
-            "Mandatory with exception for home composters",
-            "Not specified",
-            "",
+        valid_values = [
+            "MANDATORY",
+            "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION",
+            "VOLUNTARY",
+            "not_specified",
         ]
         for row in reader:
-            self.assertIn(row["Connection type"], valid_labels)
+            self.assertIn(row["Connection type"], valid_values)
 
     def test_allowed_materials_formatted_as_comma_separated_list_in_one_field(self):
         renderer = CollectionCSVRenderer()
