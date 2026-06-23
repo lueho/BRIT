@@ -1,0 +1,31 @@
+name: deploy
+
+# Fast-forwards the `deploy` branch to `main` only when the CI workflow
+# succeeds. Heroku auto-deploys from `deploy`, so this gates production
+# deploys on passing tests, lint, and migration checks.
+
+on:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  update-deploy-branch:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fast-forward deploy to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout deploy
+          git merge --ff-only origin/main
+          git push origin deploy
