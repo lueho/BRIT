@@ -166,12 +166,16 @@ class SampleModelSerializer(ModelSerializer):
 
     def get_properties(self, obj):
         request = self.context.get("request")
-        queryset = obj.get_property_values_queryset().select_related(
-            "property",
-            "basis_component",
-            "analytical_method",
-            "unit",
-        ).prefetch_related("sources")
+        queryset = (
+            obj.get_property_values_queryset()
+            .select_related(
+                "property",
+                "basis_component",
+                "analytical_method",
+                "unit",
+            )
+            .prefetch_related("sources")
+        )
         return MaterialPropertyValueModelSerializer(
             queryset.order_by("property__name", "id"),
             many=True,

@@ -337,12 +337,13 @@ def _append_source_domain_map_mount_pattern(map_mount: SourceDomainMapMount) -> 
     pattern_key = (map_mount.mount_path, map_mount.urlconf)
     if pattern_key in _SOURCE_DOMAIN_MAP_MOUNT_PATTERN_KEYS:
         return
-    insert_index = (
-        _SOURCE_DOMAIN_MAP_MOUNT_INSERT_INDEX
-        + len(_SOURCE_DOMAIN_MAP_MOUNT_PATTERN_KEYS)
+    insert_index = _SOURCE_DOMAIN_MAP_MOUNT_INSERT_INDEX + len(
+        _SOURCE_DOMAIN_MAP_MOUNT_PATTERN_KEYS
     )
     _SOURCE_DOMAIN_MAP_MOUNT_PATTERN_KEYS.append(pattern_key)
-    urlpatterns.insert(insert_index, path(map_mount.mount_path, include(map_mount.urlconf)))
+    urlpatterns.insert(
+        insert_index, path(map_mount.mount_path, include(map_mount.urlconf))
+    )
 
 
 register_source_domain_map_mount_listener(_append_source_domain_map_mount_pattern)

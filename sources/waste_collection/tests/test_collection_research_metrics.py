@@ -11,15 +11,18 @@ class CollectionResearchPerformanceTests(CollectionViewSetTestCase):
     def test_list_endpoint_skips_expensive_collection_metrics(self):
         self.client.force_login(self.regular_user)
 
-        with patch.object(
-            Collection,
-            "collectionpropertyvalues_for_display",
-            side_effect=AssertionError("collection metrics should not be loaded"),
-        ), patch.object(
-            Collection,
-            "aggregatedcollectionpropertyvalues_for_display",
-            side_effect=AssertionError(
-                "aggregated collection metrics should not be loaded"
+        with (
+            patch.object(
+                Collection,
+                "collectionpropertyvalues_for_display",
+                side_effect=AssertionError("collection metrics should not be loaded"),
+            ),
+            patch.object(
+                Collection,
+                "aggregatedcollectionpropertyvalues_for_display",
+                side_effect=AssertionError(
+                    "aggregated collection metrics should not be loaded"
+                ),
             ),
         ):
             response = self.client.get(

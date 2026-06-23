@@ -92,9 +92,11 @@ The single most important arc. Sub-items in implementation order:
 5. **E. Registry robustness.** `sources/registry.py:235` runs discovery at import time.
    Move initialization to `AppConfig.ready()` with an explicit, validated lifecycle so
    a broken plugin yields a clear startup error, not an import-order heisenbug.
-   **Status:** in progress in the next focused PR after #194.
+   **Status:** completed in PR #196.
 6. **F. Enforcement.** Add import-linter (or a dedicated test) encoding the table in
    §1, run in CI. From then on the layering is a build invariant, not a convention.
+   **Status:** in progress in the next focused PR after #196, starting with a scoped
+   dedicated test for resolved boundaries and documented short-term exceptions.
 
 ### WS2 — Harden the user-created object lifecycle (utils.object_management)
 
@@ -303,7 +305,7 @@ consolidation that pays compounding dividends.
 5. Object-management hooks; strip waste_collection out of utils (WS1-A)
 6. Properties/bibliography attribution inversion (WS1-B)
 7. Export-registry inversion (WS1-C) and maps/sources contract move (WS1-D start) — completed through PR #194
-8. Registry init in `ready()` (WS1-E); layering check in CI (WS1-F) — in progress
+8. Registry init in `ready()` (WS1-E) — completed in PR #196; layering check in CI (WS1-F) — in progress
 9. Decide inventories future (WS8)
 
 **Phase 2 — Consolidation (months 2–3)**
