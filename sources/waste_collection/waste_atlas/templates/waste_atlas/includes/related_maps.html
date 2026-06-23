@@ -1,0 +1,27 @@
+{% if same_theme_other_regions or same_region_same_category %}
+  <section class="atlas-related-maps" aria-label="Related maps">
+    <h3 class="h6 mb-2">Related maps</h3>
+    {% if same_theme_other_regions %}
+      <div class="atlas-related-group">
+        <div class="atlas-related-heading">Same theme in other regions</div>
+        <div class="d-flex flex-wrap gap-2">
+          {% for map in same_theme_other_regions %}
+            <a class="btn btn-outline-primary btn-sm atlas-related-chip {{ map.topic_color_class }}"
+               href="{{ map.url }}">{{ map.label }}</a>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+    {% if same_region_same_category %}
+      <div class="atlas-related-group">
+        <div class="atlas-related-heading">Same waste category in {{ same_region_same_category.0.region_label }}</div>
+        <div class="d-flex flex-wrap gap-2">
+          {% for map in same_region_same_category %}
+            <a class="btn btn-outline-primary btn-sm atlas-related-chip {{ map.topic_color_class }}"
+               href="{{ map.url }}">{{ map.label }}</a>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </section>
+{% endif %}

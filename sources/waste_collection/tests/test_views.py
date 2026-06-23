@@ -4167,6 +4167,93 @@ class WasteAtlasMapViewsTestCase(TestCase):
             response,
             f'data-url="{reverse("waste-atlas-germany-collection-system-map")}"',
         )
+        self.assertContains(
+            response,
+            f'data-change-url="{reverse("waste-atlas-change-map", args=["DE", "collection_system"])}"',
+        )
+        self.assertContains(response, 'id="btn-toggle-change"')
+        self.assertContains(response, "View changes for this map")
+        self.assertContains(
+            response,
+            f'href="{reverse("waste-atlas-change-map", args=["DE", "collection_system"])}?from_year=2023&amp;to_year=2024"',
+        )
+
+    def test_change_map_page_renders_current_map_cross_link(self):
+        response = self.client.get(
+            reverse("waste-atlas-change-map", args=["DE", "collection_system"])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="btn-toggle-change"')
+        self.assertContains(response, "View current map")
+        self.assertContains(
+            response,
+            f'href="{reverse("waste-atlas-germany-collection-system-map")}"',
+        )
+
+    def test_related_maps_context_links_theme_regions_and_region_category(self):
+        from sources.waste_collection.waste_atlas.map_selection import (
+            build_related_maps_context,
+        )
+
+        related_maps = build_related_maps_context(
+            "DE",
+            "biowaste_collection_amount",
+            reverse,
+        )
+
+        same_theme_urls = {
+            entry["url"] for entry in related_maps["same_theme_other_regions"]
+        }
+        same_region_urls = {
+            entry["url"] for entry in related_maps["same_region_same_category"]
+        }
+        self.assertIn(
+            reverse("waste-atlas-bw-rp-biowaste-collection-amount-map"),
+            same_theme_urls,
+        )
+        self.assertIn(
+            reverse("waste-atlas-germany-green-waste-collection-amount-map"),
+            same_region_urls,
+        )
+        self.assertNotIn(
+            reverse("waste-atlas-biowaste-collection-amount-map"),
+            same_theme_urls,
+        )
+
+    def test_related_maps_generic_same_region_links_preserve_region_scope(self):
+        from sources.waste_collection.waste_atlas.map_selection import (
+            build_related_maps_context,
+        )
+
+        related_maps = build_related_maps_context(
+            "SE",
+            "biowaste_collection_amount",
+            reverse,
+        )
+
+        same_region_urls = {
+            entry["url"] for entry in related_maps["same_region_same_category"]
+        }
+        generic_url = reverse("waste-atlas-biowaste-frequency-map")
+        self.assertIn(f"{generic_url}?country=SE", same_region_urls)
+        self.assertNotIn(generic_url, same_region_urls)
+
+        south_tyrol_related_maps = build_related_maps_context(
+            "IT-ST",
+            "biowaste_collection_amount",
+            reverse,
+        )
+        south_tyrol_same_region_urls = {
+            entry["url"]
+            for entry in south_tyrol_related_maps["same_region_same_category"]
+        }
+        food_waste_url = reverse("waste-atlas-food-waste-category-map")
+        self.assertIn(
+            f"{food_waste_url}?country=IT&nuts_prefix=ITH10&nuts_level=3",
+            south_tyrol_same_region_urls,
+        )
+        self.assertNotIn(f"{food_waste_url}?country=IT", south_tyrol_same_region_urls)
 
     def test_selector_includes_current_generic_theme_when_missing_in_region(
         self,
@@ -4213,7 +4300,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertIn("biowaste_collection_amount", sweden_biowaste_themes)
         self.assertEqual(
             sweden_biowaste_themes["biowaste_collection_amount"]["url"],
-            reverse("waste-atlas-biowaste-collection-amount-map"),
+            reverse("waste-atlas-sweden-biowaste-collection-amount-map"),
         )
 
     def test_generic_map_page_selects_current_theme_for_regions_without_dedicated_route(
