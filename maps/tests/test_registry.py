@@ -14,12 +14,13 @@ class SourceDomainMapRegistryTests(SimpleTestCase):
         self.original_urlpattern_keys = list(urls._SOURCE_DOMAIN_MAP_MOUNT_PATTERN_KEYS)
         registry._MAP_MOUNTS.clear()
         registry._MAP_MOUNT_LISTENERS.clear()
-        urls.urlpatterns[:] = urls.urlpatterns[
-            : urls._SOURCE_DOMAIN_MAP_MOUNT_INSERT_INDEX
-        ] + urls.urlpatterns[
-            urls._SOURCE_DOMAIN_MAP_MOUNT_INSERT_INDEX
-            + len(urls._SOURCE_DOMAIN_MAP_MOUNT_PATTERN_KEYS) :
-        ]
+        urls.urlpatterns[:] = (
+            urls.urlpatterns[: urls._SOURCE_DOMAIN_MAP_MOUNT_INSERT_INDEX]
+            + urls.urlpatterns[
+                urls._SOURCE_DOMAIN_MAP_MOUNT_INSERT_INDEX
+                + len(urls._SOURCE_DOMAIN_MAP_MOUNT_PATTERN_KEYS) :
+            ]
+        )
         urls._SOURCE_DOMAIN_MAP_MOUNT_PATTERN_KEYS.clear()
 
     def tearDown(self):

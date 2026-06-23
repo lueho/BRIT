@@ -69,7 +69,9 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
                 return_value=collection_property_value_model,
             ),
             patch("django.db.models.signals.post_save.connect") as post_save_connect,
-            patch("django.db.models.signals.post_delete.connect") as post_delete_connect,
+            patch(
+                "django.db.models.signals.post_delete.connect"
+            ) as post_delete_connect,
         ):
             self.app_config.ready()
 

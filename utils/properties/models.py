@@ -226,6 +226,7 @@ class PropertyValue(NumericMeasurementMixin, NamedUserCreatedObject):
     )
     average = models.FloatField()
     standard_deviation = models.FloatField(blank=True, null=True)
+
     class Meta:
         abstract = True
         ordering = ["property__name"]

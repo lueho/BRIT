@@ -542,9 +542,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             pass
 
         for field_name in get_review_search_fields(model_class):
-            search_filters.append(
-                Q(**{f"{field_name}__icontains": search})
-            )
+            search_filters.append(Q(**{f"{field_name}__icontains": search}))
 
         if not search_filters:
             return queryset.none()

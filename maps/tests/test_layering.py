@@ -15,7 +15,10 @@ class MapsLayeringTests(SimpleTestCase):
                 continue
             tree = ast.parse(path.read_text(), filename=str(path))
             for node in ast.walk(tree):
-                if isinstance(node, ast.ImportFrom) and node.module == "sources.registry":
+                if (
+                    isinstance(node, ast.ImportFrom)
+                    and node.module == "sources.registry"
+                ):
                     offenders.append(str(relative_path))
                 elif isinstance(node, ast.Import):
                     for alias in node.names:
