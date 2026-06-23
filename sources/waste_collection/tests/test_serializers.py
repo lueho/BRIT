@@ -350,6 +350,22 @@ class CollectionFlatSerializerTestCase(TestCase):
         }
         self.assertTrue(static_keys.issubset(set(serializer.data.keys())))
 
+    def test_connection_type_serializes_choice_or_not_specified(self):
+        self.collection_nuts.connection_type = "MANDATORY"
+        self.collection_nuts.save(update_fields=["connection_type"])
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        self.assertEqual(serializer.data["connection_type"], "MANDATORY")
+
+        self.collection_nuts.connection_type = None
+        self.collection_nuts.save(update_fields=["connection_type"])
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        self.assertEqual(serializer.data["connection_type"], "not_specified")
+
+        self.collection_nuts.connection_type = ""
+        self.collection_nuts.save(update_fields=["connection_type"])
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        self.assertEqual(serializer.data["connection_type"], "not_specified")
+
     def test_required_bin_capacity_field_label(self):
         serializer = CollectionFlatSerializer(self.collection_nuts)
         self.assertEqual(
