@@ -509,7 +509,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_connection_type(obj):
-        return obj.connection_type or "not_specified"
+        return obj.connection_type
 
     @staticmethod
     def get_flyer_urls(obj):

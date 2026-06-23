@@ -6211,13 +6211,14 @@ class CollectionCSVRendererTestCase(TestCase):
         catchment = CollectionCatchment.objects.create(
             name="Test catchment", region=nuts.region_ptr
         )
-        for i in range(1, 3):
+        for i, connection_type in enumerate(["MANDATORY", "not_specified"], start=1):
             collection = Collection.objects.create(
                 name=f"collection{i}",
                 catchment=catchment,
                 collector=Collector.objects.create(name=f"collector{1}"),
                 collection_system=CollectionSystem.objects.create(name="Test system"),
                 waste_category=waste_category,
+                connection_type=connection_type,
                 fee_system=FeeSystem.objects.create(name="Fixed fee"),
                 frequency=frequency,
                 valid_from=date(2020, 1, 1),
