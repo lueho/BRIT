@@ -43,7 +43,7 @@ Non-test code only; test-code coupling is tracked separately in WS6.
 | # | Violation | Where | Fix direction |
 |---|---|---|---|
 | V1 | Resolved: `utils.object_management` no longer hardcodes `waste_collection.Collection` knowledge | PR #179 moved review-context/search-field/update-context hooks behind source-owned registration | Keep domain-specific review context in source app hooks (WS1-A) |
-| V2 | `utils.properties` imports `bibliography` | `utils/properties/models.py:8`, `serializers.py:3`; also `utils/forms.py:548` | Invert attribution ownership: domains with bibliography-backed `sources` fields own those fields/serializers; shared utils infer form field models without importing bibliography (WS1-B) |
+| V2 | Resolved: `utils.properties` and shared form helpers no longer import `bibliography` | PR #183 moved bibliography-backed `sources` fields to concrete domain models and made shared source-form helpers infer the source model from the form field | Keep attribution ownership in domain models (WS1-B) |
 | V3 | `utils.file_export` discovers `sources` plugins | `utils/file_export/registry_init.py` | Invert: source apps push exports into `export_registry` from their own `AppConfig.ready()` (WS1-C) |
 | V4 | `maps` imports `sources.registry` | `maps/urls.py:3`, `maps/tasks.py:11`, `maps/runtime_adapters.py:12`, `maps/management/commands/warm_geojson_cache.py` | Move the *contract* (map mounts, cache warmers, runtime compatibility) into `maps`; source apps register themselves (WS1-D) |
 | V5 | `maps` hardcodes domain dataset names | `maps/models.py:33-39` (`GIS_SOURCE_MODELS` incl. `WasteCollection`), legacy `GeoDataset.model_name` | Finish runtime-configuration migration, delete legacy name dispatch (WS1-D, overlaps #85) |
@@ -74,6 +74,7 @@ The single most important arc. Sub-items in implementation order:
    `utils.properties` keeps numeric measurement contracts only, while shared source-form
    helpers derive the source model from the form field instead of importing
    `bibliography`.
+   **Status:** completed in PR #183.
 3. **C. Export registry inversion (V3).** Delete `utils/file_export/registry_init.py`;
    each source app calls `register_export(...)` in its own `ready()`. The
    `sources.contracts.SourceDomainExport` dataclass moves to
@@ -297,21 +298,22 @@ consolidation that pays compounding dividends.
 
 **Phase 1 — Foundation inversion (next, ~1 month)**
 5. Object-management hooks; strip waste_collection out of utils (WS1-A)
-6. Export-registry inversion (WS1-C) and maps/sources contract move (WS1-D start)
-7. Registry init in `ready()` (WS1-E); layering check in CI (WS1-F)
-8. Decide bibliography/properties placement (WS1-B); decide inventories future (WS8)
+6. Properties/bibliography attribution inversion (WS1-B)
+7. Export-registry inversion (WS1-C) and maps/sources contract move (WS1-D start)
+8. Registry init in `ready()` (WS1-E); layering check in CI (WS1-F)
+9. Decide inventories future (WS8)
 
 **Phase 2 — Consolidation (months 2–3)**
-9. CRUD view factory + migrate materials, processes, waste_collection (WS4.1)
-10. Atlas config-as-data + viewset decomposition (WS3.2–3.3)
-11. N+1/index/caching program with query-budget tests (WS5)
-12. Source-app toolkit + importer framework (WS4.2–4.3)
+10. CRUD view factory + migrate materials, processes, waste_collection (WS4.1)
+11. Atlas config-as-data + viewset decomposition (WS3.2–3.3)
+12. N+1/index/caching program with query-budget tests (WS5)
+13. Source-app toolkit + importer framework (WS4.2–4.3)
 
 **Phase 3 — Expansion enablers (months 3–6)**
-13. Finish GeoDataset runtime migration; delete legacy model_name dispatch (WS1-D end, #85/#86)
-14. Inventories modernization or containment per WS8 decision
-15. Review-workflow notifications + dashboard decomposition (WS2.4–2.5)
-16. Documentation of the "add a new domain" golden path (WS10)
+14. Finish GeoDataset runtime migration; delete legacy model_name dispatch (WS1-D end, #85/#86)
+15. Inventories modernization or containment per WS8 decision
+16. Review-workflow notifications + dashboard decomposition (WS2.4–2.5)
+17. Documentation of the "add a new domain" golden path (WS10)
 
 **Definition of done for the foundation:** a new source domain (models + plugin +
 spec entries) can be added without modifying `utils`, `maps`, `brit` (beyond

@@ -5,14 +5,6 @@ from django.utils.module_loading import import_string
 
 
 @dataclass(frozen=True)
-class SourceDomainExport:
-    model_label: str
-    filterset: object
-    serializer: object
-    renderers: dict[str, object]
-
-
-@dataclass(frozen=True)
 class SourceDomainExplorerCard:
     title: str
     description: str

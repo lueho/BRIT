@@ -7,7 +7,6 @@ from django.test import SimpleTestCase
 
 from sources.contracts import (
     SourceDomainDatasetRuntimeCompatibility,
-    SourceDomainExport,
 )
 from sources.greenhouses.models import (
     Culture,
@@ -33,6 +32,7 @@ from sources.waste_collection.models import (
     Collector,
     WasteFlyer,
 )
+from utils.file_export.contracts import SourceDomainExport
 
 
 class SourceDomainPluginContractTestCase(SimpleTestCase):

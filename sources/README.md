@@ -306,8 +306,8 @@ At the moment, the `sources` hub provides a small but useful set of integration 
   - plugin-declared sitemap entries are appended dynamically through the registry
 - GeoJSON warming in `maps.tasks` and `maps.management.commands.warm_geojson_cache`
   - core orchestration iterates plugin-declared warmers instead of importing domain tasks directly
-- export discovery through `utils.file_export.registry_init`
-  - plugins with the `exports` capability can register file exports without core hard-coded imports
+- export registration from source-domain `AppConfig.ready()`
+  - plugins with the `exports` capability register file exports from their own app startup code without core hard-coded imports
 
 These helpers should be preferred over custom cross-app glue when integrating a new source-domain app.
 

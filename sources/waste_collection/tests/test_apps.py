@@ -14,12 +14,15 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
 
     def test_ready_logs_and_returns_when_signal_import_fails(self):
         review_hooks = SimpleNamespace(register_review_hooks=Mock())
+        exports = SimpleNamespace(register_exports=Mock())
 
         def import_side_effect(module_name):
             if module_name == "sources.waste_collection.signals":
                 raise RuntimeError("boom")
             if module_name == "sources.waste_collection.review_hooks":
                 return review_hooks
+            if module_name == "sources.waste_collection.exports":
+                return exports
             return SimpleNamespace()
 
         with (
@@ -34,6 +37,7 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
         logger.exception.assert_called_once_with(
             "Failed to import waste_collection signal handlers."
         )
+        exports.register_exports.assert_called_once_with()
         review_hooks.register_review_hooks.assert_called_once_with()
 
     def test_ready_connects_collection_property_value_signal_handlers(self):
@@ -42,6 +46,7 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
             sync_derived_cpv_on_delete=object(),
         )
         review_hooks = SimpleNamespace(register_review_hooks=Mock())
+        exports = SimpleNamespace(register_exports=Mock())
         collection_property_value_model = object()
 
         def import_side_effect(module_name):
@@ -49,6 +54,8 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
                 return signal_module
             if module_name == "sources.waste_collection.review_hooks":
                 return review_hooks
+            if module_name == "sources.waste_collection.exports":
+                return exports
             return SimpleNamespace()
 
         with (
@@ -67,6 +74,7 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
             self.app_config.ready()
 
         review_hooks.register_review_hooks.assert_called_once_with()
+        exports.register_exports.assert_called_once_with()
         post_save_connect.assert_called_once_with(
             signal_module.sync_derived_cpv_on_save,
             sender=collection_property_value_model,
@@ -84,12 +92,15 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
             sync_derived_cpv_on_delete=object(),
         )
         review_hooks = SimpleNamespace(register_review_hooks=Mock())
+        exports = SimpleNamespace(register_exports=Mock())
 
         def import_side_effect(module_name):
             if module_name == "sources.waste_collection.signals":
                 return signal_module
             if module_name == "sources.waste_collection.review_hooks":
                 return review_hooks
+            if module_name == "sources.waste_collection.exports":
+                return exports
             return SimpleNamespace()
 
         with (
@@ -107,12 +118,14 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
             self.app_config.ready()
 
         review_hooks.register_review_hooks.assert_called_once_with()
+        exports.register_exports.assert_called_once_with()
         logger.warning.assert_called_once_with(
             "Waste collection signal registration skipped because CollectionPropertyValue could not be resolved."
         )
 
     def test_ready_imports_research_metrics_patch(self):
         review_hooks = SimpleNamespace(register_review_hooks=Mock())
+        exports = SimpleNamespace(register_exports=Mock())
         signal_module = SimpleNamespace(
             sync_derived_cpv_on_save=object(),
             sync_derived_cpv_on_delete=object(),
@@ -123,6 +136,8 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
                 return signal_module
             if module_name == "sources.waste_collection.review_hooks":
                 return review_hooks
+            if module_name == "sources.waste_collection.exports":
+                return exports
             return SimpleNamespace()
 
         with (
@@ -141,4 +156,6 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
             "sources.waste_collection.patches.disable_research_metrics",
             imported_modules,
         )
+        self.assertIn("sources.waste_collection.exports", imported_modules)
         self.assertIn("sources.waste_collection.review_hooks", imported_modules)
+        exports.register_exports.assert_called_once_with()

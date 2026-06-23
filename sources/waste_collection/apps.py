@@ -18,6 +18,12 @@ class WasteCollectionConfig(AppConfig):
             pass
 
         try:
+            exports = import_module("sources.waste_collection.exports")
+            exports.register_exports()
+        except Exception:
+            logger.exception("Failed to register waste_collection exports.")
+
+        try:
             review_hooks = import_module("sources.waste_collection.review_hooks")
             review_hooks.register_review_hooks()
         except Exception:
