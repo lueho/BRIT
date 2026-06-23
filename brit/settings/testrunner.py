@@ -64,6 +64,7 @@ STORAGES["staticfiles"] = {
 MEDIA_URL = "/media/"
 AWS_STORAGE_BUCKET_NAME = "tests"
 AWS_S3_CUSTOM_DOMAIN = "tests.invalid"
+FILE_EXPORT_USE_LOCAL_STORAGE = True
 
 COOKIE_CONSENT_ENABLED = False
 

@@ -1,5 +1,6 @@
 import os
 import sys
+from pathlib import Path
 
 from .settings import *
 
@@ -8,6 +9,10 @@ SITE_ID = 1
 DEBUG = True
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "host.docker.internal", "testserver"]
+
+MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
+MEDIA_URL = "/media/"
+FILE_EXPORT_USE_LOCAL_STORAGE = True
 
 # Only install debug toolbar if not running tests
 TESTING = "test" in sys.argv
