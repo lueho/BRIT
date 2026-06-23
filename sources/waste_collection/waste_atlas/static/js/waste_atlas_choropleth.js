@@ -376,6 +376,7 @@ var WasteAtlasChoropleth = (function () {
       if (nutsPrefix) {
         loadCfg.nutsPrefix = nutsPrefix;
         if (nutsLevel) loadCfg.nutsLevel = parseInt(nutsLevel, 10);
+        else delete loadCfg.nutsLevel;
       } else {
         delete loadCfg.nutsPrefix;
         delete loadCfg.nutsLevel;

@@ -136,6 +136,18 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         self.assertIn("selectedCountryCode", script)
         self.assertIn("data-country", script)
 
+    def test_selector_load_config_clears_missing_nuts_level(self):
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+        script = script_path.read_text()
+
+        self.assertIn("else delete loadCfg.nutsLevel;", script)
+
     def test_load_current_uses_passed_country_instead_of_cfg_country(self):
         """The ``loadCurrent`` callback in ``init()`` must use the country
         argument from the selector, not the hard-coded ``cfg.country``.
