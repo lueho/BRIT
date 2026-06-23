@@ -8,7 +8,7 @@ class FileExportLayeringTests(SimpleTestCase):
     def test_file_export_does_not_import_sources(self):
         file_export_dir = Path("utils/file_export")
 
-        for file_path in file_export_dir.glob("*.py"):
+        for file_path in file_export_dir.rglob("*.py"):
             with self.subTest(path=file_path):
                 tree = ast.parse(file_path.read_text())
                 imported_modules = set()
