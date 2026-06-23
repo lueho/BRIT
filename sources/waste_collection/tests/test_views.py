@@ -4835,6 +4835,13 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, 'id="atlas-region-tabs"')
         self.assertContains(response, 'data-bs-toggle="tab"')
         self.assertContains(response, "Browse by region")
+        for anchor_id in (
+            "atlas-germany",
+            "atlas-catalonia",
+            "atlas-italy-south-tyrol",
+            "atlas-other-countries",
+        ):
+            self.assertContains(response, f'id="{anchor_id}"')
         # Every regional directory link is still present in the rendered DOM.
         self.assertContains(
             response,

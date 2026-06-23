@@ -22,7 +22,9 @@ class ReviewHookRegistryTests(SimpleTestCase):
         restore_review_hooks_for_tests(self.registry_snapshot)
 
     def test_context_enrichers_are_resolved_by_model_label(self):
-        obj = SimpleNamespace(_meta=SimpleNamespace(app_label="demo", model_name="thing"))
+        obj = SimpleNamespace(
+            _meta=SimpleNamespace(app_label="demo", model_name="thing")
+        )
 
         register_review_context_enricher(
             "demo.thing",
@@ -35,7 +37,9 @@ class ReviewHookRegistryTests(SimpleTestCase):
         )
 
     def test_context_enricher_errors_do_not_block_other_enrichers(self):
-        obj = SimpleNamespace(_meta=SimpleNamespace(app_label="demo", model_name="thing"))
+        obj = SimpleNamespace(
+            _meta=SimpleNamespace(app_label="demo", model_name="thing")
+        )
 
         def failing_enricher(review_obj):
             raise RuntimeError("boom")
@@ -65,7 +69,9 @@ class ReviewHookRegistryTests(SimpleTestCase):
 
     def test_update_context_hook_is_resolved_by_model_label(self):
         user = SimpleNamespace(id=1)
-        obj = SimpleNamespace(_meta=SimpleNamespace(app_label="demo", model_name="thing"))
+        obj = SimpleNamespace(
+            _meta=SimpleNamespace(app_label="demo", model_name="thing")
+        )
 
         register_review_update_context(
             "demo.thing",

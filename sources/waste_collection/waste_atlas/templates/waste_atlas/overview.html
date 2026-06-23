@@ -30,23 +30,23 @@
          <h2 class="atlas-section-title" id="atlas-directory-title">Browse by region</h2>
          <ul class="nav atlas-region-tabs" id="atlas-region-tabs" role="tablist">
             <li class="nav-item" role="presentation">
-               <button class="nav-link" id="tab-europe" data-bs-toggle="tab" data-bs-target="#pane-europe" type="button" role="tab" aria-controls="pane-europe" aria-selected="false">Europe</button>
+               <button class="nav-link" id="tab-europe" data-bs-toggle="tab" data-bs-target="#atlas-europe" type="button" role="tab" aria-controls="atlas-europe" aria-selected="false">Europe</button>
             </li>
             <li class="nav-item" role="presentation">
-               <button class="nav-link active" id="tab-germany" data-bs-toggle="tab" data-bs-target="#pane-germany" type="button" role="tab" aria-controls="pane-germany" aria-selected="true">Germany &amp; BW/RP</button>
+               <button class="nav-link active" id="tab-germany" data-bs-toggle="tab" data-bs-target="#atlas-germany" type="button" role="tab" aria-controls="atlas-germany" aria-selected="true">Germany &amp; BW/RP</button>
             </li>
             <li class="nav-item" role="presentation">
-               <button class="nav-link" id="tab-catalonia" data-bs-toggle="tab" data-bs-target="#pane-catalonia" type="button" role="tab" aria-controls="pane-catalonia" aria-selected="false">Catalonia</button>
+               <button class="nav-link" id="tab-catalonia" data-bs-toggle="tab" data-bs-target="#atlas-catalonia" type="button" role="tab" aria-controls="atlas-catalonia" aria-selected="false">Catalonia</button>
             </li>
             <li class="nav-item" role="presentation">
-               <button class="nav-link" id="tab-italy-south-tyrol" data-bs-toggle="tab" data-bs-target="#pane-italy-south-tyrol" type="button" role="tab" aria-controls="pane-italy-south-tyrol" aria-selected="false">Italy &amp; South Tyrol</button>
+               <button class="nav-link" id="tab-italy-south-tyrol" data-bs-toggle="tab" data-bs-target="#atlas-italy-south-tyrol" type="button" role="tab" aria-controls="atlas-italy-south-tyrol" aria-selected="false">Italy &amp; South Tyrol</button>
             </li>
             <li class="nav-item" role="presentation">
-               <button class="nav-link" id="tab-other-countries" data-bs-toggle="tab" data-bs-target="#pane-other-countries" type="button" role="tab" aria-controls="pane-other-countries" aria-selected="false">Other countries</button>
+               <button class="nav-link" id="tab-other-countries" data-bs-toggle="tab" data-bs-target="#atlas-other-countries" type="button" role="tab" aria-controls="atlas-other-countries" aria-selected="false">Other countries</button>
             </li>
          </ul>
       <div class="tab-content" id="atlas-region-tab-content">
-      <div class="tab-pane fade atlas-region-pane" id="pane-europe" role="tabpanel" aria-labelledby="tab-europe">
+      <div class="tab-pane fade atlas-region-pane" id="atlas-europe" role="tabpanel" aria-labelledby="tab-europe">
          <p class="atlas-region-lead">Coverage and European comparison indicators.</p>
          <div class="atlas-map-list">
             <a class="atlas-map-link"
@@ -55,7 +55,7 @@
                href="{% url 'waste-atlas-europe-biowaste-collection-amount-map' %}">Biowaste amount</a>
          </div>
       </div>
-      <div class="tab-pane fade show active atlas-region-pane" id="pane-germany" role="tabpanel" aria-labelledby="tab-germany">
+      <div class="tab-pane fade show active atlas-region-pane" id="atlas-germany" role="tabpanel" aria-labelledby="tab-germany">
          <p class="atlas-region-lead">Complete thematic map set with the Baden-Württemberg &amp; Rheinland-Pfalz case study.</p>
          <div class="row g-3">
             <div class="col-lg-6">
@@ -239,7 +239,7 @@
             </div>
          </div>
       </div>
-      <div class="tab-pane fade atlas-region-pane" id="pane-catalonia" role="tabpanel" aria-labelledby="tab-catalonia">
+      <div class="tab-pane fade atlas-region-pane" id="atlas-catalonia" role="tabpanel" aria-labelledby="tab-catalonia">
          <p class="atlas-region-lead">Complete thematic map set for Catalonia.</p>
          <div class="row g-3">
             <div class="col-lg-12">
@@ -335,7 +335,7 @@
             </div>
          </div>
       </div>
-      <div class="tab-pane fade atlas-region-pane" id="pane-italy-south-tyrol" role="tabpanel" aria-labelledby="tab-italy-south-tyrol">
+      <div class="tab-pane fade atlas-region-pane" id="atlas-italy-south-tyrol" role="tabpanel" aria-labelledby="tab-italy-south-tyrol">
          <p class="atlas-region-lead">Route-specific map sets for Italy and South Tyrol.</p>
          <div class="row g-3">
             <div class="col-lg-6">
@@ -465,7 +465,7 @@
             </div>
          </div>
       </div>
-      <div class="tab-pane fade atlas-region-pane" id="pane-other-countries" role="tabpanel" aria-labelledby="tab-other-countries">
+      <div class="tab-pane fade atlas-region-pane" id="atlas-other-countries" role="tabpanel" aria-labelledby="tab-other-countries">
          <p class="atlas-region-lead">Sweden, Denmark, the Netherlands, and Belgium.</p>
          <div class="row g-3">
             <div class="col-lg-6">

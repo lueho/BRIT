@@ -83,9 +83,7 @@ def serialize_collection_update_context(
     if not is_collection(obj):
         return None
 
-    is_owner = bool(
-        user and user.is_authenticated and obj.owner_id == user.id
-    )
+    is_owner = bool(user and user.is_authenticated and obj.owner_id == user.id)
     if not is_owner:
         return {
             "available": False,
