@@ -4828,12 +4828,12 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertContains(response, "css/waste_atlas")
 
     def test_overview_uses_tabbed_region_directory(self):
-        """The overview groups regional map sets into Bootstrap tab navigation."""
+        """The overview groups regional map sets into clean, unified tab navigation."""
         response = self.client.get(reverse("waste-atlas-overview"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="atlas-region-tabs"')
-        self.assertContains(response, 'data-bs-toggle="pill"')
+        self.assertContains(response, 'data-bs-toggle="tab"')
         self.assertContains(response, "Browse by region")
         # Every regional directory link is still present in the rendered DOM.
         self.assertContains(
@@ -4848,6 +4848,19 @@ class WasteAtlasMapViewsTestCase(TestCase):
             response,
             reverse("waste-atlas-orga-level-belgium-flanders-map"),
         )
+
+    def test_overview_uses_clean_unified_layout(self):
+        """The overview drops the noisy topic-color legend and colored pill/badge chips."""
+        response = self.client.get(reverse("waste-atlas-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        # Map links render as a calm typographic list, not colored buttons.
+        self.assertContains(response, "atlas-map-list")
+        self.assertNotContains(response, "btn-outline-primary")
+        # The standalone topic-color legend row is gone.
+        self.assertNotContains(response, "atlas-topic-legend")
+        # The per-link topic color classes that created the visual noise are removed.
+        self.assertNotContains(response, "atlas-topic-admin")
 
     def test_waste_atlas_overview_includes_italy_orga_level_entry(self):
         """Overview page lists all country-specific organizational-level maps."""
