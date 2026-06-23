@@ -5,10 +5,25 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
-from .map_selection import build_map_selection_context, build_related_maps_context
+from .map_selection import (
+    MAP_SELECTION_YEARS,
+    build_map_selection_context,
+    build_related_maps_context,
+)
 from .pages import MAP_PAGES
 
 WASTE_ATLAS_GROUP_NAME = "waste_atlas"
+
+
+def _previous_selection_year(year):
+    year = str(year)
+    if year in MAP_SELECTION_YEARS:
+        index = MAP_SELECTION_YEARS.index(year)
+        return MAP_SELECTION_YEARS[index - 1] if index else year
+    try:
+        return str(int(year) - 1)
+    except ValueError:
+        return year
 
 
 class WasteAtlasGroupMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -87,8 +102,13 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
             None,
         )
         ctx["is_change_map"] = False
-        ctx["map_toggle_url"] = (
+        change_url = (
             selected_theme_option["change_url"] if selected_theme_option else ""
+        )
+        ctx["map_toggle_url"] = (
+            f"{change_url}?from_year={_previous_selection_year(ctx['year'])}&to_year={ctx['year']}"
+            if change_url
+            else ""
         )
         ctx["map_toggle_label"] = "View changes for this map"
         return ctx

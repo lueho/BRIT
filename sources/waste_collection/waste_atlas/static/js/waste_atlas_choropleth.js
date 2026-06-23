@@ -432,6 +432,19 @@ var WasteAtlasChoropleth = (function () {
       return fromYearSelect ? parseInt(fromYearSelect.value, 10) || 2023 : null;
     }
 
+    function previousChangeYear(year) {
+      var value = String(year);
+      if (yearSelect) {
+        for (var i = 0; i < yearSelect.options.length; i++) {
+          if (yearSelect.options[i].value === value) {
+            return i > 0 ? yearSelect.options[i - 1].value : value;
+          }
+        }
+      }
+      var numericYear = parseInt(value, 10);
+      return numericYear ? String(numericYear - 1) : value;
+    }
+
     function selectedCountryCode() {
       var selectedOption = countrySelect.options[countrySelect.selectedIndex];
       return selectedOption ? selectedOption.getAttribute('data-country') || countrySelect.value : countrySelect.value;
@@ -535,7 +548,7 @@ var WasteAtlasChoropleth = (function () {
       var fromYear = selectedFromYear();
       var params = options.useChangeUrls
         ? 'year=' + encodeURIComponent(year)
-        : 'from_year=' + encodeURIComponent(fromYear || year) + '&to_year=' + encodeURIComponent(year);
+        : 'from_year=' + encodeURIComponent(fromYear || previousChangeYear(year)) + '&to_year=' + encodeURIComponent(year);
       btnToggleChange.href = url + '?' + params;
       btnToggleChange.style.display = '';
     }

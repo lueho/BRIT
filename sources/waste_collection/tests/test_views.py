@@ -4175,7 +4175,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "View changes for this map")
         self.assertContains(
             response,
-            f'href="{reverse("waste-atlas-change-map", args=["DE", "collection_system"])}"',
+            f'href="{reverse("waste-atlas-change-map", args=["DE", "collection_system"])}?from_year=2023&amp;to_year=2024"',
         )
 
     def test_change_map_page_renders_current_map_cross_link(self):
@@ -4220,6 +4220,40 @@ class WasteAtlasMapViewsTestCase(TestCase):
             reverse("waste-atlas-biowaste-collection-amount-map"),
             same_theme_urls,
         )
+
+    def test_related_maps_generic_same_region_links_preserve_region_scope(self):
+        from sources.waste_collection.waste_atlas.map_selection import (
+            build_related_maps_context,
+        )
+
+        related_maps = build_related_maps_context(
+            "SE",
+            "biowaste_collection_amount",
+            reverse,
+        )
+
+        same_region_urls = {
+            entry["url"] for entry in related_maps["same_region_same_category"]
+        }
+        generic_url = reverse("waste-atlas-biowaste-frequency-map")
+        self.assertIn(f"{generic_url}?country=SE", same_region_urls)
+        self.assertNotIn(generic_url, same_region_urls)
+
+        south_tyrol_related_maps = build_related_maps_context(
+            "IT-ST",
+            "biowaste_collection_amount",
+            reverse,
+        )
+        south_tyrol_same_region_urls = {
+            entry["url"]
+            for entry in south_tyrol_related_maps["same_region_same_category"]
+        }
+        food_waste_url = reverse("waste-atlas-food-waste-category-map")
+        self.assertIn(
+            f"{food_waste_url}?country=IT&nuts_prefix=ITH10&nuts_level=3",
+            south_tyrol_same_region_urls,
+        )
+        self.assertNotIn(f"{food_waste_url}?country=IT", south_tyrol_same_region_urls)
 
     def test_selector_includes_current_generic_theme_when_missing_in_region(
         self,
