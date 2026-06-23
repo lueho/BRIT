@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 from importlib import import_module
 
-from django.utils.module_loading import import_string
+from maps.contracts import (
+    SourceDomainDatasetRuntimeCompatibility,
+    SourceDomainMapMount,
+)
 
 
 @dataclass(frozen=True)
@@ -23,31 +26,9 @@ class SourceDomainLegacyRedirects:
 
 
 @dataclass(frozen=True)
-class SourceDomainMapMount:
-    mount_path: str
-    urlconf: str
-
-
-@dataclass(frozen=True)
 class SourceDomainPublicMount:
     mount_path: str
     urlconf: str
-
-
-@dataclass(frozen=True)
-class SourceDomainDatasetRuntimeCompatibility:
-    runtime_model_name: str
-    model: str
-    filterset_class: str
-    template_name: str
-    features_api_basename: str
-    apply_user_visibility_filter: bool = True
-
-    def resolve_model(self):
-        return import_string(self.model)
-
-    def resolve_filterset_class(self):
-        return import_string(self.filterset_class)
 
 
 @dataclass(frozen=True)

@@ -8,7 +8,7 @@ import logging
 
 from celery import shared_task
 
-from sources.registry import get_source_domain_geojson_cache_warmers
+from maps.registry import get_source_domain_geojson_cache_warmers
 
 logger = logging.getLogger(__name__)
 

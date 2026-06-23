@@ -27,12 +27,12 @@ from django.core.cache import caches
 from django.core.management.base import BaseCommand
 
 from maps.models import NutsRegion, Region
+from maps.registry import get_source_domain_geojson_cache_warmers
 from maps.serializers import (
     NutsRegionGeometrySerializer,
     RegionGeoFeatureModelSerializer,
 )
 from maps.utils import get_region_cache_key
-from sources.registry import get_source_domain_geojson_cache_warmers
 
 # Number of largest regions to warm by default. The H27 "Client Request
 # Interrupted" warnings come almost entirely from crawlers fetching the few
