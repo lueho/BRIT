@@ -3,71 +3,16 @@
 {% block title %}
    Waste Atlas — Map overview
 {% endblock title %}
-{% block custom_style %}
-   <style>
-    .atlas-topic-legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: .5rem;
-      margin-bottom: 1rem;
-    }
-    .atlas-topic-key,
-    .atlas-map-link {
-      --atlas-color: #6c757d;
-      --atlas-bg: #f8f9fa;
-      --atlas-border: rgba(108, 117, 125, .35);
-      border-color: var(--atlas-border) !important;
-      border-left: .35rem solid var(--atlas-color) !important;
-      background: var(--atlas-bg) !important;
-      color: #1f2933 !important;
-    }
-    .atlas-map-link:hover,
-    .atlas-map-link:focus {
-      border-color: var(--atlas-color) !important;
-      box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--atlas-color) 20%, transparent);
-      transform: translateY(-1px);
-    }
-    .atlas-topic-key {
-      border-radius: 999px;
-      font-size: .8rem;
-      padding: .25rem .65rem;
-    }
-    .atlas-link-group {
-      border-left: 1px solid #dee2e6;
-      margin-bottom: 1rem;
-      padding-left: .75rem;
-    }
-    .atlas-link-group:last-child {
-      margin-bottom: 0;
-    }
-    .atlas-link-group-title {
-      color: #6c757d;
-      font-size: .78rem;
-      font-weight: 700;
-      letter-spacing: .04em;
-      margin-bottom: .35rem;
-      text-transform: uppercase;
-    }
-    .atlas-topic-admin { --atlas-color: #5b6c8f; --atlas-bg: #f0f3fa; --atlas-border: #bcc8df; }
-    .atlas-topic-system { --atlas-color: #24796f; --atlas-bg: #edf8f6; --atlas-border: #9ed2ca; }
-    .atlas-topic-material { --atlas-color: #4c8c2b; --atlas-bg: #f1f8ed; --atlas-border: #b7dba7; }
-    .atlas-topic-schedule { --atlas-color: #8a63a8; --atlas-bg: #f6f0fa; --atlas-border: #cfb8df; }
-    .atlas-topic-count { --atlas-color: #6b55a3; --atlas-bg: #f2f0fb; --atlas-border: #bfb5df; }
-    .atlas-topic-fee { --atlas-color: #b06f1f; --atlas-bg: #fff6e8; --atlas-border: #e4be87; }
-    .atlas-topic-amount-residual { --atlas-color: #b75a42; --atlas-bg: #fff1ed; --atlas-border: #e2aa9c; }
-    .atlas-topic-amount-bio { --atlas-color: #3f8f4b; --atlas-bg: #eef8f0; --atlas-border: #a7d8ae; }
-    .atlas-topic-amount-organic { --atlas-color: #65a832; --atlas-bg: #f3faed; --atlas-border: #bedf9f; }
-    .atlas-topic-amount-ratio { --atlas-color: #598b64; --atlas-bg: #eef7f0; --atlas-border: #a9d1b2; }
-    .atlas-topic-bin { --atlas-color: #2f78a5; --atlas-bg: #eef6fb; --atlas-border: #9fc8df; }
-    .atlas-topic-coverage { --atlas-color: #5c6975; --atlas-bg: #f3f5f7; --atlas-border: #c3cbd2; }
-   </style>
-{% endblock custom_style %}
+{% block style_sheets %}
+   <link href="{% static 'css/waste_atlas.min.css' %}" rel="stylesheet">
+{% endblock style_sheets %}
 {% block content %}
    <div class="container mt-4">
-      <div class="mb-4">
-         <h1>Waste Atlas — Map overview</h1>
+      <div class="atlas-hero">
+         <div class="atlas-eyebrow">Waste Atlas</div>
+         <h1 class="mb-1">Map overview</h1>
          <p class="lead mb-2">Map directory by region and topic.</p>
-         <p class="text-muted">
+         <p class="text-muted mb-0">
             Choose a region first, then the information you need: collection systems and bins, schedule organization and resulting collection counts, fees, or collected amounts.
          </p>
       </div>
@@ -95,60 +40,36 @@
          <span class="atlas-topic-key atlas-topic-amount-ratio">Separation rates &amp; shares</span>
          <span class="atlas-topic-key atlas-topic-bin">Bins</span>
       </div>
-      <div class="row g-3 mb-4">
-         <div class="col-md-6 col-xl-3">
-            <div class="card h-100">
-               <div class="card-body">
-                  <h2 class="h5">Europe</h2>
-                  <p class="small text-muted">Coverage and European comparison indicators.</p>
-                  <div class="d-grid gap-2">
-                     <a class="btn btn-outline-primary btn-sm text-start atlas-map-link atlas-topic-coverage"
-                        href="{% url 'waste-atlas-europe-data-coverage-map' %}">Data coverage</a>
-                     <a class="btn btn-outline-primary btn-sm text-start atlas-map-link atlas-topic-amount-bio"
-                        href="{% url 'waste-atlas-europe-biowaste-collection-amount-map' %}">Biowaste amount</a>
-                  </div>
-               </div>
-            </div>
-         </div>
-         <div class="col-md-6 col-xl-3">
-            <div class="card h-100">
-               <div class="card-body">
-                  <h2 class="h5">Germany</h2>
-                  <p class="small text-muted">Complete thematic map set with Baden-Württemberg &amp; Rheinland-Pfalz case study.</p>
-                  <a class="btn btn-primary btn-sm" href="#atlas-germany">Show Germany maps</a>
-               </div>
-            </div>
-         </div>
-         <div class="col-md-6 col-xl-3">
-            <div class="card h-100">
-               <div class="card-body">
-                  <h2 class="h5">Catalonia</h2>
-                  <p class="small text-muted">Complete thematic map set for Catalonia.</p>
-                  <a class="btn btn-primary btn-sm" href="#atlas-catalonia">Show Catalonia maps</a>
-               </div>
-            </div>
-         </div>
-         <div class="col-md-6 col-xl-3">
-            <div class="card h-100">
-               <div class="card-body">
-                  <h2 class="h5">Italy &amp; South Tyrol</h2>
-                  <p class="small text-muted">Route-specific map sets for Italy and South Tyrol.</p>
-                  <a class="btn btn-primary btn-sm" href="#atlas-italy-south-tyrol">Show Italy/South Tyrol</a>
-               </div>
-            </div>
-         </div>
-         <div class="col-md-6 col-xl-3">
-            <div class="card h-100">
-               <div class="card-body">
-                  <h2 class="h5">Other countries</h2>
-                  <p class="small text-muted">Sweden, Denmark, the Netherlands, and Belgium.</p>
-                  <a class="btn btn-primary btn-sm" href="#atlas-other-countries">Show other countries</a>
-               </div>
-            </div>
+      <h2 class="h4 mb-2">Browse by region</h2>
+      <ul class="nav nav-pills atlas-region-tabs" id="atlas-region-tabs" role="tablist">
+         <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-europe" data-bs-toggle="pill" data-bs-target="#pane-europe" type="button" role="tab" aria-controls="pane-europe" aria-selected="false">Europe</button>
+         </li>
+         <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-germany" data-bs-toggle="pill" data-bs-target="#pane-germany" type="button" role="tab" aria-controls="pane-germany" aria-selected="true">Germany &amp; BW/RP</button>
+         </li>
+         <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-catalonia" data-bs-toggle="pill" data-bs-target="#pane-catalonia" type="button" role="tab" aria-controls="pane-catalonia" aria-selected="false">Catalonia</button>
+         </li>
+         <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-italy-south-tyrol" data-bs-toggle="pill" data-bs-target="#pane-italy-south-tyrol" type="button" role="tab" aria-controls="pane-italy-south-tyrol" aria-selected="false">Italy &amp; South Tyrol</button>
+         </li>
+         <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-other-countries" data-bs-toggle="pill" data-bs-target="#pane-other-countries" type="button" role="tab" aria-controls="pane-other-countries" aria-selected="false">Other countries</button>
+         </li>
+      </ul>
+      <div class="tab-content" id="atlas-region-tab-content">
+      <div class="tab-pane fade atlas-region-pane" id="pane-europe" role="tabpanel" aria-labelledby="tab-europe">
+         <p class="atlas-region-lead">Coverage and European comparison indicators.</p>
+         <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-coverage"
+               href="{% url 'waste-atlas-europe-data-coverage-map' %}">Data coverage</a>
+            <a class="btn btn-outline-primary btn-sm atlas-map-link atlas-topic-amount-bio"
+               href="{% url 'waste-atlas-europe-biowaste-collection-amount-map' %}">Biowaste amount</a>
          </div>
       </div>
-      <section id="atlas-germany" class="mb-4">
-         <h2 class="h4 mb-3">Germany &amp; Baden-Württemberg/Rheinland-Pfalz</h2>
+      <div class="tab-pane fade show active atlas-region-pane" id="pane-germany" role="tabpanel" aria-labelledby="tab-germany">
+         <p class="atlas-region-lead">Complete thematic map set with the Baden-Württemberg &amp; Rheinland-Pfalz case study.</p>
          <div class="row g-3">
             <div class="col-lg-6">
                <div class="card h-100">
@@ -330,9 +251,9 @@
                </div>
             </div>
          </div>
-      </section>
-      <section id="atlas-catalonia" class="mb-4">
-         <h2 class="h4 mb-3">Catalonia</h2>
+      </div>
+      <div class="tab-pane fade atlas-region-pane" id="pane-catalonia" role="tabpanel" aria-labelledby="tab-catalonia">
+         <p class="atlas-region-lead">Complete thematic map set for Catalonia.</p>
          <div class="row g-3">
             <div class="col-lg-12">
                <div class="card h-100">
@@ -426,9 +347,9 @@
                </div>
             </div>
          </div>
-      </section>
-      <section id="atlas-italy-south-tyrol" class="mb-4">
-         <h2 class="h4 mb-3">Italy &amp; South Tyrol</h2>
+      </div>
+      <div class="tab-pane fade atlas-region-pane" id="pane-italy-south-tyrol" role="tabpanel" aria-labelledby="tab-italy-south-tyrol">
+         <p class="atlas-region-lead">Route-specific map sets for Italy and South Tyrol.</p>
          <div class="row g-3">
             <div class="col-lg-6">
                <div class="card h-100">
@@ -556,9 +477,9 @@
                </div>
             </div>
          </div>
-      </section>
-      <section id="atlas-other-countries" class="mb-4">
-         <h2 class="h4 mb-3">Other countries and regions</h2>
+      </div>
+      <div class="tab-pane fade atlas-region-pane" id="pane-other-countries" role="tabpanel" aria-labelledby="tab-other-countries">
+         <p class="atlas-region-lead">Sweden, Denmark, the Netherlands, and Belgium.</p>
          <div class="row g-3">
             <div class="col-lg-6">
                <div class="card h-100">
@@ -744,7 +665,8 @@
                </div>
             </div>
          </div>
-      </section>
+      </div>
+      </div>
    </div>
 {% endblock content %}
 {% block javascript %}

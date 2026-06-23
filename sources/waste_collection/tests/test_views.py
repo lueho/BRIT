@@ -4815,6 +4815,40 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "WasteAtlasChoropleth.exportElementSVG")
         self.assertContains(response, "WasteAtlasChoropleth.exportElementPNG")
 
+    def test_atlas_pages_link_shared_stylesheet(self):
+        """Atlas pages load the shared waste_atlas stylesheet instead of inline CSS."""
+        for url_name in (
+            "waste-atlas-overview",
+            "waste-atlas-change-map-overview",
+            "waste-atlas-germany-collection-system-map",
+        ):
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name))
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "css/waste_atlas")
+
+    def test_overview_uses_tabbed_region_directory(self):
+        """The overview groups regional map sets into Bootstrap tab navigation."""
+        response = self.client.get(reverse("waste-atlas-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="atlas-region-tabs"')
+        self.assertContains(response, 'data-bs-toggle="pill"')
+        self.assertContains(response, "Browse by region")
+        # Every regional directory link is still present in the rendered DOM.
+        self.assertContains(
+            response,
+            reverse("waste-atlas-germany-collection-system-map"),
+        )
+        self.assertContains(
+            response,
+            reverse("waste-atlas-catalonia-collection-system-map"),
+        )
+        self.assertContains(
+            response,
+            reverse("waste-atlas-orga-level-belgium-flanders-map"),
+        )
+
     def test_waste_atlas_overview_includes_italy_orga_level_entry(self):
         """Overview page lists all country-specific organizational-level maps."""
         response = self.client.get(reverse("waste-atlas-overview"))

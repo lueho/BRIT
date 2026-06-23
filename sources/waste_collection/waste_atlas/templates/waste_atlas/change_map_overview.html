@@ -3,10 +3,14 @@
 {% block title %}
    Waste Atlas — Change maps
 {% endblock title %}
+{% block style_sheets %}
+   <link href="{% static 'css/waste_atlas.min.css' %}" rel="stylesheet">
+{% endblock style_sheets %}
 {% block content %}
    <div class="container mt-4">
-      <div class="mb-4">
-         <h1>Waste Atlas — Change maps</h1>
+      <div class="atlas-hero">
+         <div class="atlas-eyebrow">Waste Atlas</div>
+         <h1 class="mb-1">Change maps</h1>
          <p class="lead mb-2">Compare waste atlas data between two years.</p>
          <p class="text-muted">
             Select a region, theme, and two years to visualize how waste collection data has changed over time.
