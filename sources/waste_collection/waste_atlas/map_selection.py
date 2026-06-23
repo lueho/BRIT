@@ -38,7 +38,7 @@ THEME_LABELS = {
     "min_bin_size_ratio": "Minimum bin-size ratio",
     "orga_level": "Collectors: administrative level",
     "organic_collection_amount": "Organic-fraction amount",
-    "organic_waste_ratio": "Organic-fraction share",
+    "organic_waste_ratio": "Organic separation rate",
     "paper_bags": "Paper products",
     "plastic_bags": "Plastic bags",
     "population_density": "Population density",
@@ -51,7 +51,7 @@ THEME_LABELS = {
     "residual_min_bin_size": "Residual waste bin size",
     "residual_required_bin_capacity": "Residual waste bin capacity",
     "system_access_control": "System + access/use control",
-    "waste_ratio": "Amount ratio",
+    "waste_ratio": "Biobin separation rate",
     "weekly_bp_access_days": "Bring-point access days",
 }
 
@@ -136,6 +136,11 @@ MAP_SELECTION_THEME_LABELS = {
     "required_bin_capacity": "Bin capacity",
 }
 
+MAP_SELECTION_EXACT_THEME_LABELS = {
+    "collection_system": "Primary collection system",
+    "biowaste_collection_system": "Biowaste collection system",
+}
+
 MAP_SELECTION_WASTE_CATEGORY_PREFIXES = (
     ("green_waste_", "green_waste"),
     ("residual_", "residual"),
@@ -172,6 +177,8 @@ def _selection_theme_group(theme):
 
 
 def _selection_theme_label(theme, theme_selection):
+    if theme in MAP_SELECTION_EXACT_THEME_LABELS:
+        return MAP_SELECTION_EXACT_THEME_LABELS[theme]
     theme_group = _selection_theme_group(theme)
     return MAP_SELECTION_THEME_LABELS.get(theme_group, theme_selection["label"])
 

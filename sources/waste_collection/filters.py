@@ -12,7 +12,6 @@ from django_filters import (
     DateFilter,
     ModelChoiceFilter,
     ModelMultipleChoiceFilter,
-    OrderingFilter,
 )
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
@@ -295,7 +294,6 @@ class CollectionFilterFormHelper(FormHelper):
                 "collection_system",
                 "waste_category",
                 "publication_status",
-                "ordering",
             ),
             FilterAccordionGroup(
                 "Advanced filters",
@@ -550,15 +548,6 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         field_name="required_bin_capacity_reference",
         help_text="Defines the unit (person, household, property) for which the required bin capacity applies. Leave blank if not specified.",
     )
-    ordering = OrderingFilter(
-        label="Sort by",
-        choices=(
-            ("-lastmodified_at", "Last changed (newest)"),
-            ("lastmodified_at", "Last changed (oldest)"),
-            ("name", "Name (A–Z)"),
-            ("-name", "Name (Z–A)"),
-        ),
-    )
 
     class Meta:
         model = Collection
@@ -584,7 +573,6 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
             "publication_status",
             "owner",
             "scope",
-            "ordering",
         )
         order_by = ["catchment_filter"]
         form_helper = CollectionFilterFormHelper

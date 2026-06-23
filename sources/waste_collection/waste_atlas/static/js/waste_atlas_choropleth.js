@@ -212,9 +212,20 @@ var WasteAtlasChoropleth = (function () {
   function _changeCategories(toYear) {
     return [
       { value: 'no_change', label: 'No change', color: '#c8e6c9' },
-      { value: 'changed', label: 'Changed', color: '#ffb74d' },
+      { value: 'changed', label: 'Category changed', color: '#ffb74d' },
       { value: 'new', label: 'New in ' + toYear, color: '#64b5f6' },
       { value: 'removed', label: 'Removed in ' + toYear, color: '#bdbdbd' }
+    ];
+  }
+
+  function _numericChangeCategories(toYear) {
+    return [
+      { value: 'decrease', label: 'Decrease', color: '#d73027' },
+      { value: 'no_change', label: 'No numeric change', color: '#c8e6c9' },
+      { value: 'increase', label: 'Increase', color: '#1a9850' },
+      { value: 'changed', label: 'Category changed', color: '#ffb74d' },
+      { value: 'new', label: 'New value in ' + toYear, color: '#64b5f6' },
+      { value: 'removed', label: 'Value removed in ' + toYear, color: '#bdbdbd' }
     ];
   }
 
@@ -238,7 +249,26 @@ var WasteAtlasChoropleth = (function () {
     return classes;
   }
 
+  function _recordLookup(raw) {
+    var lookup = {};
+    _recordList(raw).forEach(function (r) {
+      lookup[r.catchment_id] = r;
+    });
+    return lookup;
+  }
+
+  function _numericValue(record, field) {
+    if (!record) return null;
+    var value = record[field];
+    if (value === null || value === undefined || value === '') return null;
+    var number = Number(value);
+    return isNaN(number) ? null : number;
+  }
+
   function _changeRecords(cfg, fromRaw, toRaw) {
+    if (cfg.numericField) {
+      return _numericChangeRecords(cfg, fromRaw, toRaw);
+    }
     var fromClasses = _classifyRecords(cfg, fromRaw);
     var toClasses = _classifyRecords(cfg, toRaw);
     var ids = {};
@@ -255,16 +285,73 @@ var WasteAtlasChoropleth = (function () {
     });
   }
 
+  function _numericChangeRecords(cfg, fromRaw, toRaw) {
+    var fromRecords = _recordLookup(fromRaw);
+    var toRecords = _recordLookup(toRaw);
+    var fromClasses = _classifyRecords(cfg, fromRaw);
+    var toClasses = _classifyRecords(cfg, toRaw);
+    var ids = {};
+    Object.keys(fromRecords).forEach(function (id) { ids[id] = true; });
+    Object.keys(toRecords).forEach(function (id) { ids[id] = true; });
+    Object.keys(fromClasses).forEach(function (id) { ids[id] = true; });
+    Object.keys(toClasses).forEach(function (id) { ids[id] = true; });
+
+    return Object.keys(ids).map(function (id) {
+      var fromValue = _numericValue(fromRecords[id], cfg.numericField);
+      var toValue = _numericValue(toRecords[id], cfg.numericField);
+      var difference = null;
+      var change = null;
+
+      if (fromValue != null && toValue != null) {
+        difference = toValue - fromValue;
+        if (Math.abs(difference) < 1e-9) {
+          change = 'no_change';
+        } else {
+          change = difference > 0 ? 'increase' : 'decrease';
+        }
+      } else if (toValue != null) {
+        change = 'new';
+      } else if (fromValue != null) {
+        change = 'removed';
+      } else if (fromClasses[id] != null && toClasses[id] != null) {
+        change = fromClasses[id] === toClasses[id] ? 'no_change' : 'changed';
+      } else if (toClasses[id] != null) {
+        change = 'new';
+      } else if (fromClasses[id] != null) {
+        change = 'removed';
+      }
+
+      return {
+        catchment_id: parseInt(id, 10) || id,
+        change_type: change,
+        from_value: fromValue,
+        to_value: toValue,
+        difference: difference
+      };
+    });
+  }
+
   function _changeRenderConfig(loadCfg, baseTitle) {
-    return Object.assign({}, loadCfg, {
+    var isNumericChange = Boolean(loadCfg.numericField);
+    var renderCfg = Object.assign({}, loadCfg, {
       dataField: 'change_type',
       transformName: null,
       transformData: null,
-      categories: _changeCategories(loadCfg.year),
-      legendTitle: 'Change',
+      categories: isNumericChange
+        ? _numericChangeCategories(loadCfg.year)
+        : _changeCategories(loadCfg.year),
+      legendTitle: isNumericChange ? 'Difference' : 'Change',
       noDataLabel: 'No data',
       title: (baseTitle || '') + ' — changes (' + loadCfg.fromYear + ' → ' + loadCfg.year + ')'
     });
+    if (isNumericChange) {
+      renderCfg.tooltipFields = [
+        { field: 'from_value', label: String(loadCfg.fromYear) },
+        { field: 'to_value', label: String(loadCfg.year) },
+        { field: 'difference', label: 'Difference' }
+      ];
+    }
+    return renderCfg;
   }
 
   function _configForSelection(cfg, country, year, preserveScope) {
@@ -303,17 +390,20 @@ var WasteAtlasChoropleth = (function () {
     var disableNavigation = options.disableNavigation || false;
     var countrySelect = document.getElementById('sel-country');
     var wasteCategorySelect = document.getElementById('sel-waste-category');
+    var themeSearchInput = document.getElementById('sel-theme-search');
     var themeSelect = document.getElementById('sel-theme');
     var yearSelect = document.getElementById('sel-year');
     var fromYearSelect = document.getElementById('sel-from-year');
     var toYearSelect = document.getElementById('sel-to-year');
     var btnLoad = document.getElementById('btn-load');
     var form = document.getElementById('atlas-selection-form');
+    var statusEl = document.getElementById('atlas-selector-status');
 
     var yearSelectEl = toYearSelect || yearSelect;
     if (!countrySelect || !themeSelect || !yearSelectEl || !btnLoad) return null;
 
     var themeOptions = Array.prototype.slice.call(themeSelect.options);
+    var visibleThemeCount = 0;
 
     function selectedYear() {
       return parseInt(yearSelectEl.value, 10) || 2024;
@@ -335,14 +425,30 @@ var WasteAtlasChoropleth = (function () {
       return selectedOption ? selectedOption.getAttribute('data-theme-group') : null;
     }
 
+    function searchQuery() {
+      return themeSearchInput ? themeSearchInput.value.trim().toLowerCase() : '';
+    }
+
+    function optionMatchesSearch(option, query) {
+      if (!query) return true;
+      var haystack = option.getAttribute('data-search') || option.textContent || '';
+      return haystack.toLowerCase().indexOf(query) !== -1;
+    }
+
     function updateThemeVisibility(selectedMapSet, selectedWasteCategory) {
       var firstVisibleOption = null;
+      var query = searchQuery();
+      visibleThemeCount = 0;
       themeOptions.forEach(function (option) {
         var isVisible = option.getAttribute('data-map-set') === selectedMapSet
-          && (!selectedWasteCategory || option.getAttribute('data-waste-category') === selectedWasteCategory);
+          && (!selectedWasteCategory || option.getAttribute('data-waste-category') === selectedWasteCategory)
+          && optionMatchesSearch(option, query);
         option.hidden = !isVisible;
         option.disabled = !isVisible;
-        if (isVisible && !firstVisibleOption) firstVisibleOption = option;
+        if (isVisible) {
+          visibleThemeCount += 1;
+          if (!firstVisibleOption) firstVisibleOption = option;
+        }
       });
       return firstVisibleOption;
     }
@@ -361,6 +467,31 @@ var WasteAtlasChoropleth = (function () {
       return fallbackOption;
     }
 
+    function selectedText(selectEl) {
+      var selectedOption = selectEl && selectEl.options[selectEl.selectedIndex];
+      return selectedOption ? selectedOption.textContent.trim() : '';
+    }
+
+    function updateSelectorStatus() {
+      var hasMatches = visibleThemeCount > 0;
+      var message = '';
+      if (hasMatches) {
+        message = visibleThemeCount + ' ' + (
+          visibleThemeCount === 1
+            ? (form && form.dataset.countSingular || 'map available')
+            : (form && form.dataset.countPlural || 'maps available')
+        );
+        message += ' for ' + selectedText(countrySelect);
+        if (wasteCategorySelect) message += ' · ' + selectedText(wasteCategorySelect);
+      } else {
+        message = form && form.dataset.emptyMessage || 'No maps match these filters.';
+      }
+      if (statusEl) statusEl.textContent = message;
+      if (form) form.classList.toggle('atlas-selector-empty', !hasMatches);
+      themeSelect.disabled = !hasMatches;
+      btnLoad.disabled = !hasMatches;
+    }
+
     function ensureVisibleSelection() {
       var currentThemeGroup = selectedThemeGroup();
       var selectedMapSet = countrySelect.value;
@@ -374,16 +505,20 @@ var WasteAtlasChoropleth = (function () {
         firstVisibleOption = updateThemeVisibility(selectedMapSet, null);
         usingCategoryFallback = true;
       }
-      if (themeSelect.selectedOptions.length && !themeSelect.selectedOptions[0].disabled) return;
-      var nextOption = null;
-      if (firstVisibleOption && !usingCategoryFallback) {
-        nextOption = findThemeOption(selectedMapSet, selectedWasteCategory, currentThemeGroup);
+      if (!(themeSelect.selectedOptions.length && !themeSelect.selectedOptions[0].disabled)) {
+        var nextOption = null;
+        if (firstVisibleOption && !usingCategoryFallback) {
+          nextOption = findThemeOption(selectedMapSet, selectedWasteCategory, currentThemeGroup);
+        }
+        if (nextOption) {
+          themeSelect.selectedIndex = nextOption.index;
+        } else if (firstVisibleOption) {
+          themeSelect.selectedIndex = firstVisibleOption.index;
+        } else {
+          themeSelect.selectedIndex = -1;
+        }
       }
-      if (nextOption) {
-        themeSelect.selectedIndex = nextOption.index;
-      } else {
-        themeSelect.selectedIndex = -1;
-      }
+      updateSelectorStatus();
     }
 
     function navigateOrLoad(event) {
@@ -402,9 +537,13 @@ var WasteAtlasChoropleth = (function () {
 
     countrySelect.addEventListener('change', ensureVisibleSelection);
     if (wasteCategorySelect) wasteCategorySelect.addEventListener('change', ensureVisibleSelection);
+    if (themeSearchInput) themeSearchInput.addEventListener('input', ensureVisibleSelection);
     themeSelect.addEventListener('change', ensureVisibleSelection);
-    if (form) form.addEventListener('submit', navigateOrLoad);
-    btnLoad.addEventListener('click', navigateOrLoad);
+    if (form) {
+      form.addEventListener('submit', navigateOrLoad);
+    } else {
+      btnLoad.addEventListener('click', navigateOrLoad);
+    }
     ensureVisibleSelection();
 
     return {
@@ -496,17 +635,34 @@ var WasteAtlasChoropleth = (function () {
       .replace(/No separate bio collection/g, 'No separate biowaste collection');
   }
 
+  function _isNoCollectionCategory(item) {
+    var label = String(item.label || '');
+    return (
+      label.indexOf('No separate biowaste collection') !== -1 ||
+      label.indexOf('No separate door-to-door collection') !== -1 ||
+      label.indexOf('No separate collection') !== -1 ||
+      label.indexOf('No separate green waste collection') !== -1 ||
+      label.indexOf('No door-to-door') !== -1
+    );
+  }
+
   function _legendItems(cfg, exportMode) {
-    var items = cfg.categories.map(function (item) {
-      if (!exportMode) return item;
-      return Object.assign({}, item, { label: _exportLegendLabel(item) });
+    var normal = [];
+    var noCollection = [];
+    cfg.categories.forEach(function (item) {
+      if (_isNoCollectionCategory(item)) {
+        noCollection.push(item);
+      } else {
+        normal.push(item);
+      }
     });
-    if (cfg.noDataLabel && cfg._hasNoData !== false) {
-      items.push({
-        label: exportMode && cfg.exportNoDataLabel ? cfg.exportNoDataLabel : cfg.noDataLabel,
-        color: cfg.noDataColor || '#e0e0e0'
-      });
-    }
+    var items = [];
+    normal.forEach(function (item) {
+      items.push(exportMode ? Object.assign({}, item, { label: _exportLegendLabel(item) }) : item);
+    });
+    noCollection.forEach(function (item) {
+      items.push(exportMode ? Object.assign({}, item, { label: _exportLegendLabel(item) }) : item);
+    });
     if (cfg.overlayPatternField && cfg.overlayPatternLegendLabel && cfg._hasOverlayPattern) {
       items.push({
         label: exportMode && cfg.exportOverlayPatternLegendLabel
@@ -514,6 +670,12 @@ var WasteAtlasChoropleth = (function () {
           : cfg.overlayPatternLegendLabel,
         color: '#f8f9fa',
         pattern: true
+      });
+    }
+    if (cfg.noDataLabel && cfg._hasNoData !== false) {
+      items.push({
+        label: exportMode && cfg.exportNoDataLabel ? cfg.exportNoDataLabel : cfg.noDataLabel,
+        color: cfg.noDataColor || '#e0e0e0'
       });
     }
     return items;
@@ -1635,11 +1797,19 @@ var WasteAtlasChoropleth = (function () {
       return;
     }
 
-    items = cfg.categories.slice();
+    var normalCats = [];
+    var noCollectionCats = [];
+    cfg.categories.forEach(function (item) {
+      if (_isNoCollectionCategory(item)) {
+        noCollectionCats.push(item);
+      } else {
+        normalCats.push(item);
+      }
+    });
+    items = normalCats.concat(noCollectionCats);
     legendRows = items.length + (hasOverlayLegend ? 1 : 0);
 
     if (cfg.noDataLabel && cfg._hasNoData !== false) {
-      items.push({ label: cfg.noDataLabel, color: cfg.noDataColor || '#e0e0e0' });
       legendRows += 1;
     }
 
@@ -1673,22 +1843,35 @@ var WasteAtlasChoropleth = (function () {
         .text(cat.label);
     });
 
+    var currentY = items.length * (swatchH + gap);
     if (hasOverlayLegend) {
-      var overlayY = items.length * (swatchH + gap);
       g.append('rect')
-        .attr('x', 0).attr('y', overlayY + 4)
+        .attr('x', 0).attr('y', currentY + 4)
         .attr('width', swatchW).attr('height', swatchH)
         .attr('fill', '#f8f9fa').attr('stroke', '#333');
       g.append('rect')
-        .attr('x', 0).attr('y', overlayY + 4)
+        .attr('x', 0).attr('y', currentY + 4)
         .attr('width', swatchW).attr('height', swatchH)
         .attr('fill', 'url(#' + _overlayPatternId(cfg) + ')')
         .attr('stroke', 'none');
       g.append('text')
-        .attr('x', swatchW + 8).attr('y', overlayY + 4 + swatchH - 3)
+        .attr('x', swatchW + 8).attr('y', currentY + 4 + swatchH - 3)
         .attr('font-size', 12)
         .attr('font-family', "'Nunito', sans-serif")
         .text(cfg.overlayPatternLegendLabel);
+      currentY += swatchH + gap;
+    }
+
+    if (cfg.noDataLabel && cfg._hasNoData !== false) {
+      g.append('rect')
+        .attr('x', 0).attr('y', currentY + 4)
+        .attr('width', swatchW).attr('height', swatchH)
+        .attr('fill', cfg.noDataColor || '#e0e0e0').attr('stroke', '#333');
+      g.append('text')
+        .attr('x', swatchW + 8).attr('y', currentY + 4 + swatchH - 3)
+        .attr('font-size', 12)
+        .attr('font-family', "'Nunito', sans-serif")
+        .text(cfg.noDataLabel);
     }
   }
 

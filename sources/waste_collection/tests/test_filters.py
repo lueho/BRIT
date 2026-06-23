@@ -681,6 +681,12 @@ class CollectionFilterTestCase(TestCase):
         filtr = CollectionFilterSet(queryset=Collection.objects.all())
         self.assertFalse(filtr.form.helper.form_tag)
 
+    def test_filter_form_omits_obsolete_ordering_control(self):
+        filtr = CollectionFilterSet(queryset=Collection.objects.all())
+
+        self.assertNotIn("ordering", filtr.filters)
+        self.assertNotIn("ordering", filtr.form.fields)
+
     def test_valid_on_filter(self):
         self.data["valid_on"] = timezone.now().date()
         qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs

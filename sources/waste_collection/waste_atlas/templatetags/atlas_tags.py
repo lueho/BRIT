@@ -37,7 +37,7 @@ def atlas_js_config(context, config_key):
     if nuts_level:
         config["nutsLevel"] = int(nuts_level)
 
-    # Change maps compare the theme between two years client-side
+    # Change maps compare category or numeric value differences client-side
     from_year = context.get("from_year")
     if from_year:
         config["changeMode"] = True

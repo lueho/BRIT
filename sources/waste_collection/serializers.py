@@ -1163,7 +1163,19 @@ class CollectionMutationUpdateSerializer(
     sources = serializers.PrimaryKeyRelatedField(
         queryset=Source.objects.all(), many=True, required=False
     )
-    flyer_urls = FlexibleUrlListField(child=serializers.URLField(), required=False)
+    flyer_urls = FlexibleUrlListField(
+        child=serializers.URLField(),
+        required=False,
+        help_text=(
+            "Flyer URLs to append. Existing URLs are preserved unless "
+            "replace_flyer_urls is true."
+        ),
+    )
+    replace_flyer_urls = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text="Replace all existing flyer URLs instead of appending.",
+    )
 
     established = serializers.IntegerField(
         required=False, allow_null=True, min_value=1800, max_value=2100

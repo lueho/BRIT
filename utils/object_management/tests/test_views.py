@@ -1170,6 +1170,55 @@ class ReviewDashboardViewTests(TestCase):
         for item in review_items:
             self.assertIsInstance(item, Collection)
 
+    def test_dashboard_ignores_invalid_filter_values(self):
+        self.client.force_login(self.moderator_user)
+        baseline_response = self.client.get(
+            reverse("object_management:review_dashboard")
+        )
+        baseline_ids = {
+            (item._meta.label_lower, item.pk)
+            for item in baseline_response.context["review_items"]
+        }
+
+        response = self.client.get(
+            reverse("object_management:review_dashboard"),
+            {
+                "model_type": ["not-a-content-type"],
+                "owner": "not-a-user",
+                "submitted_after": "not-a-date",
+                "submitted_before": "2026-99-99",
+                "ordering": "not-a-sort-field",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertSetEqual(
+            {
+                (item._meta.label_lower, item.pk)
+                for item in response.context["review_items"]
+            },
+            baseline_ids,
+        )
+
+    def test_dashboard_pagination_clamps_invalid_and_out_of_range_pages(self):
+        self.client.force_login(self.moderator_user)
+        dashboard_url = reverse("object_management:review_dashboard")
+
+        with patch.object(ReviewDashboardView, "paginate_by", 1):
+            first_page = self.client.get(dashboard_url, {"page": "invalid"})
+            second_page = self.client.get(dashboard_url, {"page": 2})
+            out_of_range_page = self.client.get(dashboard_url, {"page": 999})
+
+        self.assertEqual(first_page.status_code, 200)
+        self.assertEqual(first_page.context["page_obj"].number, 1)
+        self.assertEqual(second_page.status_code, 200)
+        self.assertEqual(second_page.context["page_obj"].number, 2)
+        self.assertEqual(out_of_range_page.status_code, 200)
+        self.assertEqual(
+            out_of_range_page.context["page_obj"].number,
+            out_of_range_page.context["paginator"].num_pages,
+        )
+
     def test_model_type_filter_hides_models_with_only_own_review_items(self):
         owner = User.objects.create_user(
             username="collector_owner_only", password="test123"

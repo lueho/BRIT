@@ -112,6 +112,19 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
     def __init__(self, *args, **kwargs):
         # Extract available_models from kwargs before passing to parent
         self.available_models = kwargs.pop("available_models", [])
+
+        # TomSelect resolves bound model-choice values while rendering. A malformed
+        # owner value would otherwise reach an integer primary-key lookup and turn
+        # a harmless query parameter into a server error.
+        data = kwargs.get("data", args[0] if args else None)
+        if data and (owner := data.get("owner")) and not str(owner).isdigit():
+            normalized_data = data.copy()
+            normalized_data.pop("owner", None)
+            if "data" in kwargs:
+                kwargs["data"] = normalized_data
+            else:
+                args = (normalized_data, *args[1:])
+
         super().__init__(*args, **kwargs)
 
         # Set model_type queryset to available ContentTypes

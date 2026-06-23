@@ -198,11 +198,11 @@ def _resolved_population_density_attribute_id():
 def _parse_country_year(request):
     """Extract and validate country/year query params with defaults."""
     country = request.query_params.get("country", "DE")
-    year = request.query_params.get("year", "2022")
+    year = request.query_params.get("year", "2024")
     try:
         year = int(year)
     except (TypeError, ValueError):
-        year = 2022
+        year = 2024
     return country, year
 
 

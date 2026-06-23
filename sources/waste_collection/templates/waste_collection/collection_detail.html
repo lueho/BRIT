@@ -219,6 +219,8 @@
         </li>
       {% endfor %}
     </ul>
+  {% else %}
+    <p class="card-text text-muted">No allowed materials specified.</p>
   {% endif %}
   {% if forbidden_materials %}
     <p class="card-text">
@@ -231,6 +233,8 @@
         </li>
       {% endfor %}
     </ul>
+  {% else %}
+    <p class="card-text text-muted">No forbidden materials specified.</p>
   {% endif %}
   {% if object.frequency and frequency_display %}
     {% if frequency_display.is_year_round %}
@@ -324,6 +328,8 @@
         {% endfor %}
       </ul>
     {% endfor %}
+  {% else %}
+    <p class="card-text text-muted">No collection properties available.</p>
   {% endif %}
   {% if aggregated_collection_property_values %}
     {% regroup aggregated_collection_property_values by property as property_list %}
@@ -381,6 +387,8 @@
         {% endfor %}
       </ul>
     {% endfor %}
+  {% else %}
+    <p class="card-text text-muted">No aggregated collection properties available.</p>
   {% endif %}
   {% if samples %}
     <p class="card-text">
@@ -393,6 +401,8 @@
         </li>
       {% endfor %}
     </ul>
+  {% else %}
+    <p class="card-text text-muted">No samples linked to this collection.</p>
   {% endif %}
   {% if all_sources %}
     <p class="card-text">
