@@ -3,8 +3,11 @@ from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 from django.apps import apps
+from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase
 
+from sources import registry as source_domain_registry
+from sources.apps import SourcesConfig
 from sources.contracts import (
     SourceDomainDatasetRuntimeCompatibility,
 )
@@ -36,6 +39,93 @@ from utils.file_export.contracts import SourceDomainExport
 
 
 class SourceDomainPluginContractTestCase(SimpleTestCase):
+    def test_sources_config_ready_initializes_registry(self):
+        sources_module = importlib.import_module("sources")
+        config = SourcesConfig("sources", sources_module)
+
+        with patch(
+            "sources.registry.initialize_source_domain_registry"
+        ) as mock_initialize:
+            config.ready()
+
+        mock_initialize.assert_called_once_with()
+
+    def test_getters_require_ready_lifecycle_instead_of_import_time_discovery(self):
+        with (
+            patch("sources.registry._SOURCE_DOMAIN_PLUGINS", ()),
+            patch(
+                "sources.registry._SOURCE_DOMAIN_REGISTRY_INITIALIZED",
+                False,
+                create=True,
+            ),
+            patch(
+                "sources.registry._discover_source_domain_plugins"
+            ) as mock_discover_source_domain_plugins,
+        ):
+            with self.assertRaisesMessage(
+                ImproperlyConfigured,
+                "Source domain registry has not been initialized",
+            ):
+                get_source_domain_plugins()
+
+        mock_discover_source_domain_plugins.assert_not_called()
+
+    def test_initialize_source_domain_registry_discovers_and_registers_maps_contracts(
+        self,
+    ):
+        plugin = get_source_domain_plugin("roadside_trees")
+
+        with (
+            patch("sources.registry._SOURCE_DOMAIN_PLUGINS", ()),
+            patch(
+                "sources.registry._SOURCE_DOMAIN_REGISTRY_INITIALIZED",
+                False,
+                create=True,
+            ),
+            patch(
+                "sources.registry._discover_source_domain_plugins",
+                return_value=(plugin,),
+            ) as mock_discover_source_domain_plugins,
+            patch(
+                "sources.registry.register_source_domain_map_contracts"
+            ) as mock_register_map_contracts,
+        ):
+            source_domain_registry.initialize_source_domain_registry()
+
+            self.assertEqual(get_source_domain_plugins(), (plugin,))
+
+        mock_discover_source_domain_plugins.assert_called_once_with()
+        mock_register_map_contracts.assert_called_once_with(
+            slug=plugin.slug,
+            map_mount=plugin.map_mount,
+            geojson_cache_warmer=plugin.get_geojson_cache_warmer(),
+            dataset_runtime_compatibilities=plugin.dataset_runtime_compatibilities,
+        )
+
+    def test_initialize_source_domain_registry_is_idempotent(self):
+        plugin = get_source_domain_plugin("roadside_trees")
+
+        with (
+            patch("sources.registry._SOURCE_DOMAIN_PLUGINS", ()),
+            patch(
+                "sources.registry._SOURCE_DOMAIN_REGISTRY_INITIALIZED",
+                False,
+                create=True,
+            ),
+            patch(
+                "sources.registry._discover_source_domain_plugins",
+                return_value=(plugin,),
+            ) as mock_discover_source_domain_plugins,
+            patch(
+                "sources.registry.register_source_domain_map_contracts"
+            ) as mock_register_map_contracts,
+        ):
+            source_domain_registry.initialize_source_domain_registry()
+            source_domain_registry.initialize_source_domain_registry()
+
+        mock_discover_source_domain_plugins.assert_called_once_with()
+        mock_register_map_contracts.assert_called_once()
+
     def test_registered_source_domain_plugins_expose_stable_slugs(self):
         self.assertEqual(
             tuple(plugin.slug for plugin in get_source_domain_plugins()),

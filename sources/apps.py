@@ -6,4 +6,6 @@ class SourcesConfig(AppConfig):
     name = "sources"
 
     def ready(self):
-        from sources import registry  # noqa: F401
+        from sources.registry import initialize_source_domain_registry
+
+        initialize_source_domain_registry()
