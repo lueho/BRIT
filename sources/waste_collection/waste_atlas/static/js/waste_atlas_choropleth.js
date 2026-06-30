@@ -2322,7 +2322,7 @@ var WasteAtlasChoropleth = (function () {
           _lastData = data;
           _lastLoadCfg = renderCfg;
           var conflictPromise = _conflictEnabled
-            ? _loadConflicts(loadCfg, country, year, fromYear)
+            ? _loadConflicts(loadCfg, loadCfg.country, loadCfg.year, fromYear)
             : Promise.resolve(null);
           conflictPromise
             .then(function () {
