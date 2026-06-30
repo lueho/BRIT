@@ -33,7 +33,7 @@ THEME_LABELS = {
     "combined_fee_system": "Combined fees",
     "combined_frequency": "Combined schedule",
     "connection_rate": "Connection rate",
-    "connection_type": "Participation Policy",
+    "participation_policy": "Participation Policy",
     "food_waste_category": "Accepted food waste",
     "green_waste_collection_amount": "Green waste amount",
     "green_waste_collection_system_count": "Green waste system count",
@@ -131,7 +131,7 @@ MAP_SELECTION_THEME_ORDER = {
     "waste_ratio": 640,
     "organic_waste_ratio": 650,
     "connection_rate": 700,
-    "connection_type": 710,
+    "participation_policy": 710,
 }
 
 MAP_SELECTION_WASTE_CATEGORIES = {
@@ -171,7 +171,7 @@ MAP_SELECTION_WASTE_CATEGORY_PREFIXES = (
 MAP_SELECTION_WASTE_CATEGORY_OVERRIDES = {
     "collection_system": "biowaste",
     "connection_rate": "biowaste",
-    "connection_type": "biowaste",
+    "participation_policy": "biowaste",
     "food_waste_category": "biowaste",
     "paper_bags": "biowaste",
     "plastic_bags": "biowaste",
@@ -185,7 +185,7 @@ TOPIC_COLOR_CLASSES = {
     "collection_system": "atlas-topic-system",
     "collection_system_count": "atlas-topic-system",
     "connection_rate": "atlas-topic-system",
-    "connection_type": "atlas-topic-coverage",
+    "participation_policy": "atlas-topic-coverage",
     "food_waste_category": "atlas-topic-material",
     "paper_bags": "atlas-topic-material",
     "plastic_bags": "atlas-topic-material",

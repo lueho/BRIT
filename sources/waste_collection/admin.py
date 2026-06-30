@@ -109,7 +109,7 @@ class CollectionAdmin(admin.ModelAdmin):
     search_fields = ("name", "collector__name", "catchment__name")
     list_filter = (
         "publication_status",
-        "connection_type",
+        "participation_policy",
         "collection_system",
         "bin_configuration",
     )

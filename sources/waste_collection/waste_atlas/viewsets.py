@@ -53,7 +53,6 @@ from .serializers import (
     CatchmentCombinedFeeSystemSerializer,
     CatchmentCombinedFrequencySerializer,
     CatchmentConnectionRateSerializer,
-    CatchmentConnectionTypeSerializer,
     CatchmentFeeSystemSerializer,
     CatchmentFoodWasteCategorySerializer,
     CatchmentFrequencyTypeSerializer,
@@ -63,6 +62,7 @@ from .serializers import (
     CatchmentMinBinSizeSerializer,
     CatchmentOrgaLevelSerializer,
     CatchmentOrganicRatioSerializer,
+    CatchmentParticipationPolicySerializer,
     CatchmentPopulationSerializer,
     CatchmentRequiredBinCapacitySerializer,
     CatchmentWasteRatioSerializer,
@@ -2735,7 +2735,7 @@ class ConnectionRateViewSet(WasteAtlasViewSet):
         return Response(serializer.data)
 
 
-class ConnectionTypeViewSet(WasteAtlasViewSet):
+class ParticipationPolicyViewSet(WasteAtlasViewSet):
     permission_classes = [permissions.AllowAny]
 
     def list(self, request):
@@ -2748,15 +2748,15 @@ class ConnectionTypeViewSet(WasteAtlasViewSet):
             year,
             ["Biowaste", "Food waste"],
             nuts_prefixes,
-            extra_fields=("connection_type",),
+            extra_fields=("participation_policy",),
         ).items():
             value = (
                 "no_bio_collection"
                 if row["collection_system"] == "No separate collection"
-                else row["connection_type"]
+                else row["participation_policy"]
             )
-            data.append({"catchment_id": cid, "connection_type": value})
-        serializer = CatchmentConnectionTypeSerializer(data, many=True)
+            data.append({"catchment_id": cid, "participation_policy": value})
+        serializer = CatchmentParticipationPolicySerializer(data, many=True)
         return Response(serializer.data)
 
 

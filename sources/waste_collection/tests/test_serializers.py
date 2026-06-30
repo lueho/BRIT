@@ -196,22 +196,22 @@ class CollectionModelSerializerTestCase(TestCase):
                 ),
             )
 
-    def test_connection_type_serialization_handles_none_and_empty_string(self):
+    def test_participation_policy_serialization_handles_none_and_empty_string(self):
         # None case
-        self.collection.connection_type = None
+        self.collection.participation_policy = None
         self.collection.save()
         serializer = CollectionModelSerializer(self.collection)
         data = serializer.data
-        self.assertIn("connection_type", data)
-        self.assertIsNone(data["connection_type"])
+        self.assertIn("participation_policy", data)
+        self.assertIsNone(data["participation_policy"])
 
         # Empty string case
-        self.collection.connection_type = ""
+        self.collection.participation_policy = ""
         self.collection.save()
         serializer = CollectionModelSerializer(self.collection)
         data = serializer.data
-        self.assertIn("connection_type", data)
-        self.assertIn(data["connection_type"], [None, ""])
+        self.assertIn("participation_policy", data)
+        self.assertIn(data["participation_policy"], [None, ""])
 
 
 class CollectionFlatSerializerTestCase(TestCase):
@@ -332,7 +332,7 @@ class CollectionFlatSerializerTestCase(TestCase):
             "bin_configuration",
             "country",
             "waste_category",
-            "connection_type",
+            "participation_policy",
             "allowed_materials",
             "forbidden_materials",
             "fee_system",
@@ -351,32 +351,32 @@ class CollectionFlatSerializerTestCase(TestCase):
         }
         self.assertTrue(static_keys.issubset(set(serializer.data.keys())))
 
-    def test_connection_type_serializes_stored_values(self):
-        self.collection_nuts.connection_type = "MANDATORY"
-        self.collection_nuts.save(update_fields=["connection_type"])
+    def test_participation_policy_serializes_stored_values(self):
+        self.collection_nuts.participation_policy = "MANDATORY"
+        self.collection_nuts.save(update_fields=["participation_policy"])
         serializer = CollectionFlatSerializer(self.collection_nuts)
-        self.assertEqual(serializer.data["connection_type"], "MANDATORY")
+        self.assertEqual(serializer.data["participation_policy"], "MANDATORY")
 
-        self.collection_nuts.connection_type = "not_specified"
-        self.collection_nuts.save(update_fields=["connection_type"])
+        self.collection_nuts.participation_policy = "not_specified"
+        self.collection_nuts.save(update_fields=["participation_policy"])
         serializer = CollectionFlatSerializer(self.collection_nuts)
-        self.assertEqual(serializer.data["connection_type"], "not_specified")
+        self.assertEqual(serializer.data["participation_policy"], "not_specified")
 
-        self.collection_nuts.connection_type = None
-        self.collection_nuts.save(update_fields=["connection_type"])
+        self.collection_nuts.participation_policy = None
+        self.collection_nuts.save(update_fields=["participation_policy"])
         serializer = CollectionFlatSerializer(self.collection_nuts)
-        self.assertIsNone(serializer.data["connection_type"])
+        self.assertIsNone(serializer.data["participation_policy"])
 
-        self.collection_nuts.connection_type = ""
-        self.collection_nuts.save(update_fields=["connection_type"])
+        self.collection_nuts.participation_policy = ""
+        self.collection_nuts.save(update_fields=["participation_policy"])
         serializer = CollectionFlatSerializer(self.collection_nuts)
-        self.assertEqual(serializer.data["connection_type"], "")
+        self.assertEqual(serializer.data["participation_policy"], "")
 
-    def test_research_serializer_preserves_unset_connection_type(self):
-        self.collection_nuts.connection_type = None
-        self.collection_nuts.save(update_fields=["connection_type"])
+    def test_research_serializer_preserves_unset_participation_policy(self):
+        self.collection_nuts.participation_policy = None
+        self.collection_nuts.save(update_fields=["participation_policy"])
         serializer = CollectionResearchSerializer(self.collection_nuts)
-        self.assertIsNone(serializer.data["connection_type"])
+        self.assertIsNone(serializer.data["participation_policy"])
 
     def test_required_bin_capacity_field_label(self):
         serializer = CollectionFlatSerializer(self.collection_nuts)

@@ -50,7 +50,7 @@ from sources.waste_collection.filters import (
     WasteFlyerFilter,
 )
 from sources.waste_collection.forms import (
-    CONNECTION_TYPE_CHOICES,
+    PARTICIPATION_POLICY_CHOICES,
     REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
     AggregatedCollectionPropertyValueModelForm,
     BinConfigurationModalModelForm,
@@ -262,7 +262,7 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
         )
 
     def test_waste_collection_forms_are_owned_by_sources(self):
-        self.assertTrue(CONNECTION_TYPE_CHOICES)
+        self.assertTrue(PARTICIPATION_POLICY_CHOICES)
         self.assertTrue(REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES)
         self.assertEqual(
             AggregatedCollectionPropertyValueModelForm.__module__,

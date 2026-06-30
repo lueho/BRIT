@@ -919,7 +919,7 @@ class CollectionImporterWorkflowTestCase(APITestCase):
             "collector": None,
             "fee_system": None,
             "frequency": None,
-            "connection_type": None,
+            "participation_policy": None,
             "min_bin_size": None,
             "required_bin_capacity": None,
             "required_bin_capacity_reference": None,
@@ -2482,7 +2482,7 @@ class ConnectionRateViewSetTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
-            connection_type="MANDATORY",
+            participation_policy="MANDATORY",
         )
         cls.current_collection.predecessors.add(cls.previous_collection)
         CollectionPropertyValue.objects.create(
@@ -2516,9 +2516,9 @@ class ConnectionRateViewSetTests(APITestCase):
             ],
         )
 
-    def test_connection_type_endpoint_returns_selected_collection_value(self):
+    def test_participation_policy_endpoint_returns_selected_collection_value(self):
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/connection-type/",
+            "/waste_collection/api/waste-atlas/participation-policy/",
             {"country": "DE", "year": 2024},
         )
 
@@ -2528,7 +2528,7 @@ class ConnectionRateViewSetTests(APITestCase):
             [
                 {
                     "catchment_id": self.catchment.id,
-                    "connection_type": "MANDATORY",
+                    "participation_policy": "MANDATORY",
                 }
             ],
         )
@@ -2606,7 +2606,7 @@ class WasteAtlasPrimarySelectionTests(APITestCase):
             "collection_system": "/waste_collection/api/waste-atlas/collection-system/",
             "paper_bags": "/waste_collection/api/waste-atlas/paper-bags/",
             "connection_rate": "/waste_collection/api/waste-atlas/connection-rate/",
-            "connection_type": "/waste_collection/api/waste-atlas/connection-type/",
+            "participation_policy": "/waste_collection/api/waste-atlas/participation-policy/",
         }
         responses = {
             name: self.client.get(endpoint, {"country": "DE", "year": 2024})
@@ -2626,9 +2626,9 @@ class WasteAtlasPrimarySelectionTests(APITestCase):
         rate_by_catchment = {
             row["catchment_id"]: row for row in responses["connection_rate"].data
         }
-        connection_type_by_catchment = {
-            row["catchment_id"]: row["connection_type"]
-            for row in responses["connection_type"].data
+        participation_policy_by_catchment = {
+            row["catchment_id"]: row["participation_policy"]
+            for row in responses["participation_policy"].data
         }
 
         d2d_catchment_ids = {
@@ -2655,7 +2655,7 @@ class WasteAtlasPrimarySelectionTests(APITestCase):
             rate_by_catchment[self.no_collection_catchment.id]["is_door_to_door"]
         )
         self.assertEqual(
-            connection_type_by_catchment[self.no_collection_catchment.id],
+            participation_policy_by_catchment[self.no_collection_catchment.id],
             "no_bio_collection",
         )
 

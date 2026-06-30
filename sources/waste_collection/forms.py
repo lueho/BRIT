@@ -35,7 +35,7 @@ from sources.waste_collection.frequency_service import (
     CollectionFrequencyScheduleService,
 )
 from sources.waste_collection.models import (
-    CONNECTION_TYPE_CHOICES,
+    PARTICIPATION_POLICY_CHOICES,
     REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
     AggregatedCollectionPropertyValue,
     BinConfiguration,
@@ -521,7 +521,7 @@ class CollectionModelFormHelper(FormHelper):
             ForeignkeyField("collection_system"),
             Field("bin_configuration"),
             ForeignkeyField("waste_category"),
-            Field("connection_type"),
+            Field("participation_policy"),
             Field("allowed_materials"),
             Field("forbidden_materials"),
             Field("samples"),
@@ -644,10 +644,10 @@ class CollectionModelForm(
         required=False,
     )
     fee_system = ModelChoiceField(queryset=FeeSystem.objects.all(), required=False)
-    connection_type = ChoiceField(
-        choices=[("", "---------")] + list(CONNECTION_TYPE_CHOICES),
+    participation_policy = ChoiceField(
+        choices=[("", "---------")] + list(PARTICIPATION_POLICY_CHOICES),
         required=False,
-        label="Connection type",
+        label="Participation policy",
         help_text="Indicates whether connection to the collection system is mandatory, voluntary, or not specified. Leave blank for never set; select 'not specified' for explicit user choice.",
     )
     min_bin_size = DecimalField(
@@ -692,7 +692,7 @@ class CollectionModelForm(
             "collection_system",
             "bin_configuration",
             "waste_category",
-            "connection_type",
+            "participation_policy",
             "allowed_materials",
             "forbidden_materials",
             "frequency",
@@ -709,13 +709,13 @@ class CollectionModelForm(
         )
         labels = {
             "description": "Comments",
-            "connection_type": "Connection type",
+            "participation_policy": "Participation policy",
         }
         help_texts = {"description": MARKDOWN_HELP_TEXT}
         widgets = {
             "valid_from": DateInput(attrs={"type": "date"}),
             "valid_until": DateInput(attrs={"type": "date"}),
-            "connection_type": RadioSelect,
+            "participation_policy": RadioSelect,
         }
         form_helper_class = CollectionModelFormHelper
 
@@ -831,7 +831,7 @@ __all__ = [
     "CollectionSystemModelForm",
     "CollectorModalModelForm",
     "CollectorModelForm",
-    "CONNECTION_TYPE_CHOICES",
+    "PARTICIPATION_POLICY_CHOICES",
     "FeeSystemModalModelForm",
     "FeeSystemModelForm",
     "REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES",

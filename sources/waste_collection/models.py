@@ -343,7 +343,7 @@ class CollectionQuerySet(UserCreatedObjectQuerySet):
         return queryset
 
 
-CONNECTION_TYPE_CHOICES = [
+PARTICIPATION_POLICY_CHOICES = [
     ("MANDATORY", "mandatory"),
     (
         "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION",
@@ -442,13 +442,13 @@ class Collection(NamedUserCreatedObject):
         verbose_name="Year established",
         help_text="Year when this collection scheme was first introduced.",
     )
-    connection_type = models.CharField(
+    participation_policy = models.CharField(
         max_length=40,
         blank=True,
         null=True,
-        choices=CONNECTION_TYPE_CHOICES,
+        choices=PARTICIPATION_POLICY_CHOICES,
         default=None,
-        verbose_name="Connection type",
+        verbose_name="Participation policy",
         help_text="Indicates whether connection to the collection system is mandatory, voluntary, or not specified. Leave blank for never set; select 'not specified' for explicit user choice.",
     )
     access_control_bp = models.BooleanField(
@@ -517,7 +517,7 @@ class Collection(NamedUserCreatedObject):
         "sources",
         "flyer_urls",
         "established",
-        "connection_type",
+        "participation_policy",
         "access_control_bp",
         "access_control_pap",
         "min_bin_size",
@@ -733,7 +733,7 @@ class Collection(NamedUserCreatedObject):
             "fee_system": self.fee_system_id,
             "bin_configuration": self.bin_configuration_id,
             "established": self.established,
-            "connection_type": self.connection_type,
+            "participation_policy": self.participation_policy,
             "access_control_bp": self.access_control_bp,
             "access_control_pap": self.access_control_pap,
             "min_bin_size": self.min_bin_size,

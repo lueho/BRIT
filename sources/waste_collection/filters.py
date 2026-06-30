@@ -17,7 +17,7 @@ from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
 
 from sources.waste_collection.models import (
-    CONNECTION_TYPE_CHOICES,
+    PARTICIPATION_POLICY_CHOICES,
     REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
     Collection,
     CollectionCatchment,
@@ -297,7 +297,7 @@ class CollectionFilterFormHelper(FormHelper):
             ),
             FilterAccordionGroup(
                 "Advanced filters",
-                "connection_type",
+                "participation_policy",
                 "allowed_materials",
                 "forbidden_materials",
                 RangeSliderField("connection_rate"),
@@ -531,9 +531,9 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         widget=DateInput(attrs={"type": "date"}),
         label="Valid on",
     )
-    connection_type = ChoiceFilter(
-        choices=CONNECTION_TYPE_CHOICES,
-        label="Connection type",
+    participation_policy = ChoiceFilter(
+        choices=PARTICIPATION_POLICY_CHOICES,
+        label="Participation policy",
     )
     min_bin_size = MinBinSizeRangeFilter(
         label="Smallest available bin size (L)",
@@ -557,7 +557,7 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
             "collector",
             "collection_system",
             "waste_category",
-            "connection_type",
+            "participation_policy",
             "allowed_materials",
             "forbidden_materials",
             "connection_rate",
