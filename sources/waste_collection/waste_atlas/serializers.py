@@ -300,3 +300,17 @@ class CatchmentWeeklyBpAccessDaysSerializer(serializers.Serializer):
         data = super().to_representation(instance)
         data["weekly_access_days"] = _round_one_decimal(data.get("weekly_access_days"))
         return data
+
+
+class CatchmentConflictSerializer(serializers.Serializer):
+    """Maintainer aid: a catchment where a theme has conflicting values.
+
+    ``distinct_count`` is the number of distinct theme values that the
+    dataset holds for this catchment; a value greater than one means the
+    theme's deterministic triage/aggregation hides all but one of them.
+    """
+
+    catchment_id = serializers.IntegerField()
+    collection_count = serializers.IntegerField()
+    distinct_count = serializers.IntegerField()
+    distinct_values = serializers.ListField(child=serializers.CharField())

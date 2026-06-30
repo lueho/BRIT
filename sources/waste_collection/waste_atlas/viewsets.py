@@ -52,6 +52,7 @@ from .serializers import (
     CatchmentCombinedCollectionSystemSerializer,
     CatchmentCombinedFeeSystemSerializer,
     CatchmentCombinedFrequencySerializer,
+    CatchmentConflictSerializer,
     CatchmentConnectionRateSerializer,
     CatchmentConnectionTypeSerializer,
     CatchmentFeeSystemSerializer,
@@ -2954,4 +2955,98 @@ class WeeklyBpAccessDaysViewSet(WasteAtlasViewSet):
             )
 
         serializer = CatchmentWeeklyBpAccessDaysSerializer(data, many=True)
+        return Response(serializer.data)
+
+
+def _collection_system_conflicts(country, year, nuts_prefixes, waste_categories):
+    """Catchments where >1 distinct collection system competes for one slot.
+
+    Mirrors the scope of the ``collection_system`` theme family
+    (``_select_primary_collections``): biowaste/food-waste collections for the
+    given country/year/NUTS scope.  A catchment is a conflict when the dataset
+    holds more than one distinct ``collection_system`` name for it, because the
+    map can only display a single (priority-triaged) system per catchment.
+    """
+    qs = Collection.objects.filter(
+        _country_filter_q("catchment__", country),
+        valid_from__year=year,
+    )
+    qs = _filter_by_waste_categories(qs, waste_categories)
+    qs = _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
+
+    rows = qs.order_by("catchment_id").values_list(
+        "catchment_id",
+        "collection_system__name",
+    )
+
+    by_catchment: dict[int, dict] = {}
+    for catchment_id, system_name in rows:
+        bucket = by_catchment.setdefault(
+            catchment_id, {"collection_count": 0, "systems": []}
+        )
+        bucket["collection_count"] += 1
+        if system_name not in bucket["systems"]:
+            bucket["systems"].append(system_name)
+
+    conflicts = []
+    for catchment_id, bucket in by_catchment.items():
+        if len(bucket["systems"]) > 1:
+            conflicts.append(
+                {
+                    "catchment_id": catchment_id,
+                    "collection_count": bucket["collection_count"],
+                    "distinct_count": len(bucket["systems"]),
+                    "distinct_values": list(bucket["systems"]),
+                }
+            )
+    return conflicts
+
+
+# Theme → conflict detector.  Each detector returns a list of conflict dicts
+# shaped for ``CatchmentConflictSerializer``.  Themes not listed here have no
+# maintainer conflict aid yet and resolve to an empty result.
+_CONFLICT_DETECTORS = {
+    "collection_system": lambda country, year, nuts_prefixes: (
+        _collection_system_conflicts(
+            country, year, nuts_prefixes, ["Biowaste", "Food waste"]
+        )
+    ),
+}
+
+
+class CollectionConflictViewSet(WasteAtlasViewSet):
+    """Maintainer aid: catchments where a theme has conflicting values.
+
+    The waste atlas choropleth maps can display only one value per catchment
+    per theme.  Where the dataset holds several collections with *different*
+    theme values for the same catchment, the theme's deterministic
+    triage/aggregation picks one and hides the rest.  This endpoint surfaces
+    those catchments so data maintainers can see where the single-value
+    assumption breaks down.
+
+    Supports query parameters:
+
+    - ``theme``: theme key (e.g. ``collection_system``); defaults to
+      ``collection_system``.  Unsupported themes return an empty list.
+    - ``country``: ISO country code filter (default: ``DE``)
+    - ``year``: Year of ``valid_from`` on the collection (default: ``2024``)
+    - ``nuts_prefix``: comma-separated NUTS-ID prefixes to narrow the scope
+
+    Example::
+
+        GET /waste_collection/api/waste-atlas/collection-conflicts/?theme=collection_system&country=DE&year=2024
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        """Return catchments with conflicting theme values."""
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        theme = request.query_params.get("theme", "collection_system")
+
+        detector = _CONFLICT_DETECTORS.get(theme)
+        conflicts = detector(country, year, nuts_prefixes) if detector else []
+
+        serializer = CatchmentConflictSerializer(conflicts, many=True)
         return Response(serializer.data)

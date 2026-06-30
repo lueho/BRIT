@@ -2141,6 +2141,136 @@ class GreenWasteCollectionSystemCountViewSetTests(APITestCase):
         self.assertEqual(len(count_by_catchment), 2)
 
 
+class CollectionConflictViewSetTests(APITestCase):
+    """Maintainer aid: catchments where >1 collection conflicts for a theme.
+
+    The waste atlas maps can only display one value per catchment per theme.
+    This endpoint highlights catchments where the dataset contains several
+    collections with *different* theme values, so only one can be shown and
+    the others are hidden by the theme's triage/aggregation.
+    """
+
+    endpoint = "/waste_collection/api/waste-atlas/collection-conflicts/"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region.objects.create(name="Region DE", country="DE")
+        cls.catchment_conflict = CollectionCatchment.objects.create(
+            name="Conflict",
+            region=cls.region,
+        )
+        cls.catchment_same_system = CollectionCatchment.objects.create(
+            name="Same system",
+            region=cls.region,
+        )
+        cls.catchment_single = CollectionCatchment.objects.create(
+            name="Single",
+            region=cls.region,
+        )
+        cls.catchment_other_category = CollectionCatchment.objects.create(
+            name="Other category",
+            region=cls.region,
+        )
+        cls.catchment_other_year = CollectionCatchment.objects.create(
+            name="Other year",
+            region=cls.region,
+        )
+
+        cls.d2d = CollectionSystem.objects.create(name="Door to door")
+        cls.bring_point = CollectionSystem.objects.create(name="Bring point")
+
+        cls.bio_category = WasteCategory.objects.create(name="Biowaste")
+        cls.food_category = WasteCategory.objects.create(name="Food waste")
+        cls.residual_category = WasteCategory.objects.create(name="Residual waste")
+
+        # Conflict: two biowaste collections with different systems.
+        cls._collection(cls.catchment_conflict, cls.bio_category, cls.d2d, 2024)
+        cls._collection(cls.catchment_conflict, cls.bio_category, cls.bring_point, 2024)
+
+        # No conflict: two biowaste collections with the same system.
+        cls._collection(cls.catchment_same_system, cls.bio_category, cls.d2d, 2024)
+        cls._collection(cls.catchment_same_system, cls.bio_category, cls.d2d, 2024)
+
+        # No conflict: a single biowaste collection.
+        cls._collection(cls.catchment_single, cls.bio_category, cls.d2d, 2024)
+
+        # No conflict for collection_system theme: only one biowaste collection;
+        # the residual collection belongs to a different waste category scope.
+        cls._collection(cls.catchment_other_category, cls.bio_category, cls.d2d, 2024)
+        cls._collection(
+            cls.catchment_other_category, cls.residual_category, cls.bring_point, 2024
+        )
+
+        # No conflict: a biowaste + a food-waste collection with the same system
+        # (food waste is part of the collection_system theme scope).
+        cls._collection(cls.catchment_other_year, cls.bio_category, cls.d2d, 2024)
+        cls._collection(cls.catchment_other_year, cls.food_category, cls.d2d, 2024)
+        # Different year must be ignored for year=2024.
+        cls._collection(
+            cls.catchment_other_year, cls.bio_category, cls.bring_point, 2022
+        )
+
+    @classmethod
+    def _collection(cls, catchment, waste_category, collection_system, year):
+        return Collection.objects.create(
+            name=f"{catchment.name}-{collection_system.name}-{year}",
+            catchment=catchment,
+            waste_category=waste_category,
+            collection_system=collection_system,
+            valid_from=date(year, 1, 1),
+        )
+
+    def _conflict_ids(self, **params):
+        params.setdefault("country", "DE")
+        params.setdefault("year", 2024)
+        params.setdefault("theme", "collection_system")
+        response = self.client.get(self.endpoint, params)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return {row["catchment_id"]: row for row in response.data}
+
+    def test_returns_only_catchments_with_conflicting_systems(self):
+        conflicts = self._conflict_ids()
+
+        self.assertIn(self.catchment_conflict.id, conflicts)
+        self.assertNotIn(self.catchment_same_system.id, conflicts)
+        self.assertNotIn(self.catchment_single.id, conflicts)
+        self.assertNotIn(self.catchment_other_category.id, conflicts)
+        self.assertNotIn(self.catchment_other_year.id, conflicts)
+
+    def test_conflict_row_reports_distinct_values_and_count(self):
+        conflicts = self._conflict_ids()
+        row = conflicts[self.catchment_conflict.id]
+
+        self.assertEqual(row["distinct_count"], 2)
+        self.assertEqual(
+            sorted(row["distinct_values"]),
+            ["Bring point", "Door to door"],
+        )
+        self.assertEqual(row["collection_count"], 2)
+
+    def test_food_waste_is_part_of_collection_system_scope(self):
+        """A biowaste + food-waste collection with different systems conflict."""
+        catchment = CollectionCatchment.objects.create(
+            name="Bio+Food conflict", region=self.region
+        )
+        self._collection(catchment, self.bio_category, self.d2d, 2024)
+        self._collection(catchment, self.food_category, self.bring_point, 2024)
+
+        conflicts = self._conflict_ids()
+        self.assertIn(catchment.id, conflicts)
+        self.assertEqual(conflicts[catchment.id]["distinct_count"], 2)
+
+    def test_year_filter_is_honoured(self):
+        conflicts = self._conflict_ids(year=2022)
+        # Only the 2022 bring-point collection in catchment_other_year exists,
+        # which is a single value → no conflict for year=2022.
+        self.assertNotIn(self.catchment_conflict.id, conflicts)
+
+    def test_unsupported_theme_returns_empty(self):
+        conflicts = self._conflict_ids(theme="unsupported_theme")
+        self.assertEqual(conflicts, {})
+
+
 class WasteAtlasThrottleTests(APITestCase):
     endpoint = "/waste_collection/api/waste-atlas/green-waste-collection-system-count/"
 

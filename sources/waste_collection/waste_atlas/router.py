@@ -15,6 +15,7 @@ from .viewsets import (
     CataloniaSystemAccessControlViewSet,
     CatchmentPopulationViewSet,
     CatchmentViewSet,
+    CollectionConflictViewSet,
     CollectionCountRatioViewSet,
     CollectionOrgaLevelViewSet,
     CollectionPointCountRatioViewSet,
@@ -111,6 +112,11 @@ router.register(
     "green-waste-collection-system-count",
     GreenWasteCollectionSystemCountViewSet,
     basename="api-waste-atlas-green-waste-collection-system-count",
+)
+router.register(
+    "collection-conflicts",
+    CollectionConflictViewSet,
+    basename="api-waste-atlas-collection-conflicts",
 )
 router.register(
     "connection-rate",
