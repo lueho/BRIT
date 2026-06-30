@@ -2981,6 +2981,10 @@ def _collection_system_conflicts(country, year, nuts_prefixes, waste_categories)
 
     by_catchment: dict[int, dict] = {}
     for catchment_id, system_name in rows:
+        # A collection without a system never wins the displayed slot
+        # (see ``_select_primary_collections``), so it cannot compete.
+        if system_name is None:
+            continue
         bucket = by_catchment.setdefault(
             catchment_id, {"collection_count": 0, "systems": []}
         )

@@ -2237,6 +2237,26 @@ class CollectionConflictViewSetTests(APITestCase):
         self.assertNotIn(self.catchment_other_category.id, conflicts)
         self.assertNotIn(self.catchment_other_year.id, conflicts)
 
+    def test_ignores_null_collection_system_in_conflict_detection(self):
+        null_system_catchment = CollectionCatchment.objects.create(
+            name="Null system",
+            region=self.region,
+        )
+        self._collection(null_system_catchment, self.bio_category, self.d2d, 2024)
+        Collection.objects.create(
+            name="Null system-null-2024",
+            catchment=null_system_catchment,
+            waste_category=self.bio_category,
+            collection_system=None,
+            valid_from=date(2024, 1, 1),
+        )
+
+        conflicts = self._conflict_ids()
+
+        self.assertNotIn(null_system_catchment.id, conflicts)
+        for row in conflicts.values():
+            self.assertNotIn("None", row["distinct_values"])
+
     def test_conflict_row_reports_distinct_values_and_count(self):
         conflicts = self._conflict_ids()
         row = conflicts[self.catchment_conflict.id]
