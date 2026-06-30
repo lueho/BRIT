@@ -1800,7 +1800,7 @@ var WasteAtlasChoropleth = (function () {
               }
             });
           }
-          if (_conflictDetails && _conflictDetails[p.catchment_id]) {
+          if (!layout.exportMode && _conflictDetails && _conflictDetails[p.catchment_id]) {
             var detail = _conflictDetails[p.catchment_id];
             tooltip += '\n⚠ Conflicting collections (' + detail.distinct_count + '): '
               + detail.distinct_values.join(', ');
@@ -1839,7 +1839,9 @@ var WasteAtlasChoropleth = (function () {
 
     // Maintainer aid: outline catchments whose theme value is ambiguous
     // (more than one collection competes for the single displayed slot).
-    if (_conflictCatchments && _conflictCatchments.size && data.catchments.features) {
+    // Screen-only: the export legend carries no conflict entry, so drawing
+    // the outlines in exports would leave them unexplained.
+    if (!layout.exportMode && _conflictCatchments && _conflictCatchments.size && data.catchments.features) {
       _svg.append('g').attr('class', 'layer-catchments-conflict')
         .selectAll('path')
         .data(data.catchments.features.filter(function (d) {
