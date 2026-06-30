@@ -1800,7 +1800,7 @@ var WasteAtlasChoropleth = (function () {
               }
             });
           }
-          if (!layout.exportMode && _conflictDetails && _conflictDetails[p.catchment_id]) {
+          if (_conflictEnabled && !layout.exportMode && _conflictDetails && _conflictDetails[p.catchment_id]) {
             var detail = _conflictDetails[p.catchment_id];
             tooltip += '\n⚠ Conflicting collections (' + detail.distinct_count + '): '
               + detail.distinct_values.join(', ');
@@ -1841,7 +1841,7 @@ var WasteAtlasChoropleth = (function () {
     // (more than one collection competes for the single displayed slot).
     // Screen-only: the export legend carries no conflict entry, so drawing
     // the outlines in exports would leave them unexplained.
-    if (!layout.exportMode && _conflictCatchments && _conflictCatchments.size && data.catchments.features) {
+    if (_conflictEnabled && !layout.exportMode && _conflictCatchments && _conflictCatchments.size && data.catchments.features) {
       _svg.append('g').attr('class', 'layer-catchments-conflict')
         .selectAll('path')
         .data(data.catchments.features.filter(function (d) {
@@ -1953,7 +1953,7 @@ var WasteAtlasChoropleth = (function () {
     var swatchW = 22, swatchH = 16, gap = 6;
     var items = _legendItems(cfg);
     var hasOverlayLegend = cfg.overlayPatternField && cfg.overlayPatternLegendLabel && cfg._hasOverlayPattern;
-    var hasConflictLegend = !!(cfg.conflictOverlayLabel
+    var hasConflictLegend = !!(_conflictEnabled && cfg.conflictOverlayLabel
       && _conflictCatchments && _conflictCatchments.size);
     var legendRows = items.length + (hasOverlayLegend ? 1 : 0)
       + (hasConflictLegend ? 1 : 0);
