@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 from django.contrib.staticfiles import finders
+from django.core.cache import cache
 from django.template.loader import get_template
 from django.test import SimpleTestCase
 from django.urls import resolve, reverse
@@ -418,7 +419,16 @@ class SourceDomainExplorerCardRegistryTestCase(SimpleTestCase):
         side_effect=[7, 13],
     )
     def test_registry_returns_sorted_explorer_cards_with_counts(self, _mock_count):
-        cards = get_source_domain_explorer_cards()
+        cache_keys = [
+            "source_domain:greenhouses:published_count",
+            "source_domain:waste_collection:published_count",
+        ]
+        cache.delete_many(cache_keys)
+
+        try:
+            cards = get_source_domain_explorer_cards()
+        finally:
+            cache.delete_many(cache_keys)
 
         self.assertEqual(
             [card["slug"] for card in cards], ["waste_collection", "greenhouses"]
