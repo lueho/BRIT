@@ -13,9 +13,12 @@ from brit.settings.settings import (
 
 
 class RedisSettingsTests(SimpleTestCase):
-    def test_configured_test_database_settings_include_atomic_requests_default(self):
-        import_module("brit.settings.local")
+    def test_importing_local_settings_does_not_mutate_testrunner_database_settings(
+        self,
+    ):
+        local_settings = import_module("brit.settings.local")
 
+        self.assertIsNot(settings.DATABASES, local_settings.DATABASES)
         self.assertFalse(settings.DATABASES["default"]["ATOMIC_REQUESTS"])
 
     def test_raw_testrunner_database_settings_include_atomic_requests_default(self):
