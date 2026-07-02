@@ -923,6 +923,9 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        cls.owner.user_permissions.add(
+            Permission.objects.get(codename="change_materialpropertyvalue")
+        )
         cls.unit = Unit.objects.create(name="mg/L", owner=cls.owner)
         cls.default_basis = MaterialComponent.objects.create(
             owner=cls.owner,
@@ -1192,6 +1195,9 @@ class ComponentMeasurementUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        cls.owner.user_permissions.add(
+            Permission.objects.get(codename="change_componentmeasurement")
+        )
         cls.unit = Unit.objects.filter(name="%").first()
         if cls.unit is None:
             cls.unit = Unit.objects.create(
@@ -2415,6 +2421,9 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
             material=cls.material,
             series=cls.series,
             timestep=timestep,
+        )
+        cls.sample.owner.user_permissions.add(
+            Permission.objects.get(codename="change_sample")
         )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):

@@ -440,11 +440,25 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         getattr(obj, "modal_delete_url", None) or getattr(obj, "delete_url", None)
     )
 
-    # Edit: staff always; owners if not published; never when archived
+    # Model-level change permission (change_<modelname>), staff always pass
+    try:
+        _meta = obj.__class__._meta
+        change_perm = f"{_meta.app_label}.change_{_meta.model_name}"
+        has_change_permission = is_staff or bool(
+            is_authenticated and user.has_perm(change_perm)
+        )
+    except Exception:
+        logger.exception(
+            "Failed checking change permission in get_object_policy", exc_info=True
+        )
+        has_change_permission = is_staff
+
+    # Edit: staff always; owners with change permission if not published;
+    # never when archived
     can_edit = (
         has_update_url
         and not is_archived
-        and (is_staff or (is_owner and not is_published))
+        and (is_staff or (is_owner and not is_published and has_change_permission))
     )
 
     # Delete:
@@ -534,6 +548,7 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         "is_published": is_published,
         "is_declined": is_declined,
         "is_archived": is_archived,
+        "has_change_permission": has_change_permission,
         "can_edit": can_edit,
         "can_manage_samples": can_manage_samples,
         "can_add_property": can_add_property,

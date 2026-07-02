@@ -1814,6 +1814,7 @@ class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
     owner_field = "owner"
     published_status = "published"
     permission_denied_message = "You do not have permission to access this object."
+    object_policy_action = "edit"
 
     def test_func(self):
         user = self.request.user
@@ -1840,11 +1841,26 @@ class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
             )
 
         policy = get_object_policy(user, obj, request=self.request)
+        if self.object_policy_action == "delete":
+            if policy["can_delete"]:
+                return True
+            # Fallback for models without delete URLs in the policy
+            return not policy["is_archived"] and (
+                policy["is_staff"]
+                or (policy["is_owner"] and not policy["is_published"])
+            )
+
         if policy["can_edit"]:
             return True
 
+        # Fallback for models without update URLs in the policy
         return not policy["is_archived"] and (
-            policy["is_staff"] or (policy["is_owner"] and not policy["is_published"])
+            policy["is_staff"]
+            or (
+                policy["is_owner"]
+                and not policy["is_published"]
+                and policy["has_change_permission"]
+            )
         )
 
 
@@ -2275,18 +2291,8 @@ class UserCreatedObjectModalDetailView(
 
 
 class UserCreatedObjectUpdateView(
-    PermissionRequiredMixin,
-    UserCreatedObjectWriteAccessMixin,
-    NextOrSuccessUrlMixin,
-    UpdateView,
+    UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, UpdateView
 ):
-    permission_required = ()
-
-    def has_permission(self):
-        if self.request.user.is_staff:
-            return True
-        return super().has_permission()
-
     def get_form_kwargs(self):
         """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
         kwargs = super().get_form_kwargs()
@@ -2390,18 +2396,9 @@ class UserCreatedObjectCreateWithInlinesView(
 
 
 class UserCreatedObjectUpdateWithInlinesView(
-    PermissionRequiredMixin,
-    UserCreatedObjectWriteAccessMixin,
-    NextOrSuccessUrlMixin,
-    UpdateWithInlinesView,
+    UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView
 ):
-    permission_required = ()
     formset_helper_class = DynamicTableInlineFormSetHelper
-
-    def has_permission(self):
-        if self.request.user.is_staff:
-            return True
-        return super().has_permission()
 
     def get_form_kwargs(self):
         """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
@@ -2454,19 +2451,10 @@ class UserCreatedObjectUpdateWithInlinesView(
 
 
 class UserCreatedObjectModalUpdateView(
-    PermissionRequiredMixin,
-    UserCreatedObjectWriteAccessMixin,
-    NextOrSuccessUrlMixin,
-    BSModalUpdateView,
+    UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, BSModalUpdateView
 ):
-    permission_required = ()
     template_name = "modal_form.html"
     success_message = "Successfully updated."
-
-    def has_permission(self):
-        if self.request.user.is_staff:
-            return True
-        return super().has_permission()
 
     def get_form_kwargs(self):
         """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
@@ -2534,6 +2522,7 @@ class UserCreatedObjectModalArchiveView(
 class UserCreatedObjectModalDeleteView(
     UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, BSModalDeleteView
 ):
+    object_policy_action = "delete"
     template_name = "modal_delete.html"
     success_message = "Successfully deleted."
 

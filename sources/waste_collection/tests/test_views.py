@@ -1098,6 +1098,14 @@ class CollectionCatchmentCRUDViewsTestCase(
     update_object_data = {"name": "Updated Test Catchment"}
 
     @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        # The update view operates on the concrete Catchment model
+        cls.owner_user.user_permissions.add(
+            Permission.objects.get(codename="change_catchment")
+        )
+
+    @classmethod
     def create_related_objects(cls):
         return {
             "region": Region.objects.create(

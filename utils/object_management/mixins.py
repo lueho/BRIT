@@ -55,7 +55,12 @@ class _BaseUserCreatedObjectAccessMixin(UserPassesTestMixin):
             return True
         # Fallback for models without update URLs in the policy
         return not policy["is_archived"] and (
-            policy["is_staff"] or (policy["is_owner"] and not policy["is_published"])
+            policy["is_staff"]
+            or (
+                policy["is_owner"]
+                and not policy["is_published"]
+                and policy["has_change_permission"]
+            )
         )
 
 

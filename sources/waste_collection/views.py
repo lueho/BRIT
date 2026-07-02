@@ -263,13 +263,11 @@ class CollectorModalDetailView(UserCreatedObjectModalDetailView):
 class CollectorUpdateView(UserCreatedObjectUpdateView):
     model = Collector
     form_class = CollectorModelForm
-    permission_required = "waste_collection.change_collector"
 
 
 class CollectorModalUpdateView(UserCreatedObjectModalUpdateView):
     model = Collector
     form_class = CollectorModalModelForm
-    permission_required = "waste_collection.change_collector"
 
 
 class CollectorModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -325,13 +323,11 @@ class CollectionSystemModalDetailView(UserCreatedObjectModalDetailView):
 class CollectionSystemUpdateView(UserCreatedObjectUpdateView):
     model = CollectionSystem
     form_class = CollectionSystemModelForm
-    permission_required = "waste_collection.change_collectionsystem"
 
 
 class CollectionSystemModalUpdateView(UserCreatedObjectModalUpdateView):
     model = CollectionSystem
     form_class = CollectionSystemModalModelForm
-    permission_required = "waste_collection.change_collectionsystem"
 
 
 class CollectionSystemModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -379,13 +375,11 @@ class WasteCategoryModalDetailView(UserCreatedObjectModalDetailView):
 class WasteCategoryUpdateView(UserCreatedObjectUpdateView):
     model = WasteCategory
     form_class = WasteCategoryModelForm
-    permission_required = "waste_collection.change_wastecategory"
 
 
 class WasteCategoryModalUpdateView(UserCreatedObjectModalUpdateView):
     model = WasteCategory
     form_class = WasteCategoryModalModelForm
-    permission_required = "waste_collection.change_wastecategory"
 
 
 class WasteCategoryModalDeleteView(UserCreatedObjectModalDeleteView):
