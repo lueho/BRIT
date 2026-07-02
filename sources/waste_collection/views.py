@@ -1776,9 +1776,7 @@ class CollectionAddPropertyValueView(
 ):
     def test_func(self):
         try:
-            self.parent_collection = Collection.objects.get(
-                pk=self.kwargs.get("pk")
-            )
+            self.parent_collection = Collection.objects.get(pk=self.kwargs.get("pk"))
         except Collection.DoesNotExist:
             raise PermissionDenied("Invalid parent collection.") from None
         policy = get_object_policy(

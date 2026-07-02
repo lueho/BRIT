@@ -2275,7 +2275,10 @@ class UserCreatedObjectModalDetailView(
 
 
 class UserCreatedObjectUpdateView(
-    PermissionRequiredMixin, UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, UpdateView
+    PermissionRequiredMixin,
+    UserCreatedObjectWriteAccessMixin,
+    NextOrSuccessUrlMixin,
+    UpdateView,
 ):
     permission_required = ()
 
@@ -2387,7 +2390,10 @@ class UserCreatedObjectCreateWithInlinesView(
 
 
 class UserCreatedObjectUpdateWithInlinesView(
-    PermissionRequiredMixin, UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView
+    PermissionRequiredMixin,
+    UserCreatedObjectWriteAccessMixin,
+    NextOrSuccessUrlMixin,
+    UpdateWithInlinesView,
 ):
     permission_required = ()
     formset_helper_class = DynamicTableInlineFormSetHelper
@@ -2448,7 +2454,10 @@ class UserCreatedObjectUpdateWithInlinesView(
 
 
 class UserCreatedObjectModalUpdateView(
-    PermissionRequiredMixin, UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, BSModalUpdateView
+    PermissionRequiredMixin,
+    UserCreatedObjectWriteAccessMixin,
+    NextOrSuccessUrlMixin,
+    BSModalUpdateView,
 ):
     permission_required = ()
     template_name = "modal_form.html"
