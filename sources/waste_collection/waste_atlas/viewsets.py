@@ -458,9 +458,10 @@ def _active_collector_scope(country, year, nuts_prefixes, user=None):
     """Return collectors with collection records in the selected atlas year."""
     qs = Collector.objects.filter(
         _country_filter_q("catchment__", country),
+        _publication_q(user, prefix="collection__"),
         catchment__isnull=False,
         collection__valid_from__year=year,
-    ).filter(_publication_q(user, prefix="collection__"))
+    )
     return _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
 
 
@@ -488,10 +489,10 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
         qs = (
             CollectionCatchment.objects.filter(
                 _country_filter_q("", country),
+                _publication_q(user, prefix="collections__"),
                 collections__valid_from__year=year,
                 region__borders__isnull=False,
             )
-            .filter(_publication_q(user, prefix="collections__"))
             .distinct()
             .select_related("region", "region__borders")
         )
@@ -1866,10 +1867,9 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
         _apply_nuts_prefix_filter(
             CollectionCatchment.objects.filter(
                 _country_filter_q("", country),
+                _publication_q(user, prefix="collections__"),
                 collections__valid_from__year=year,
-            )
-            .filter(_publication_q(user, prefix="collections__"))
-            .distinct(),
+            ).distinct(),
             nuts_prefixes,
         ).values_list("id", flat=True)
     )
@@ -2945,9 +2945,9 @@ class CatchmentPopulationViewSet(WasteAtlasViewSet):
         qs = (
             CollectionCatchment.objects.filter(
                 _country_filter_q("", country),
+                _publication_q(user, prefix="collections__"),
                 collections__valid_from__year=year,
             )
-            .filter(_publication_q(user, prefix="collections__"))
             .distinct()
             .values_list("id", flat=False)
         )
@@ -2968,9 +2968,9 @@ class CatchmentPopulationViewSet(WasteAtlasViewSet):
         qs = (
             CollectionCatchment.objects.filter(
                 _country_filter_q("", country),
+                _publication_q(user, prefix="collections__"),
                 collections__valid_from__year=year,
             )
-            .filter(_publication_q(user, prefix="collections__"))
             .distinct()
             .annotate(
                 population=Subquery(pop_sq, output_field=FloatField()),
