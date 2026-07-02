@@ -4484,7 +4484,7 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         "catchment_geojson": "/waste_collection/api/waste-atlas/catchment/geojson/",
         "collector_orga_level": "/waste_collection/api/waste-atlas/collector-orga-level/",
         "collection_orga_level": "/waste_collection/api/waste-atlas/collection-orga-level/",
-        "connection_type": "/waste_collection/api/waste-atlas/connection-type/",
+        "participation_policy": "/waste_collection/api/waste-atlas/participation-policy/",
         "conflicts": "/waste_collection/api/waste-atlas/collection-conflicts/",
     }
 
@@ -4598,8 +4598,8 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         self.assertNotIn(self.private_catchment.id, ids)
         self.assertNotIn(self.review_catchment.id, ids)
 
-    def test_connection_type_excludes_non_published(self):
-        response = self._get("connection_type")
+    def test_participation_policy_excludes_non_published(self):
+        response = self._get("participation_policy")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         ids = self._catchment_ids(response)
         self.assertIn(self.published_catchment.id, ids)
@@ -4610,5 +4610,47 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         response = self._get("conflicts", theme="collection_system")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         ids = self._catchment_ids(response)
+        self.assertNotIn(self.private_catchment.id, ids)
+        self.assertNotIn(self.review_catchment.id, ids)
+
+    # --- Staff bypass tests ---
+
+    def test_staff_sees_private_and_review_in_collection_system(self):
+        staff = User.objects.create_user("staffuser", is_staff=True)
+        self.client.force_login(staff)
+        response = self._get("collection_system")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = self._catchment_ids(response)
+        self.assertIn(self.published_catchment.id, ids)
+        self.assertIn(self.private_catchment.id, ids)
+        self.assertIn(self.review_catchment.id, ids)
+
+    def test_staff_sees_private_and_review_in_catchment_geojson(self):
+        staff = User.objects.create_user("staffuser2", is_staff=True)
+        self.client.force_login(staff)
+        response = self._get("catchment_geojson")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = self._catchment_ids(response)
+        self.assertIn(self.published_catchment.id, ids)
+        self.assertIn(self.private_catchment.id, ids)
+        self.assertIn(self.review_catchment.id, ids)
+
+    def test_staff_sees_private_and_review_in_collection_orga_level(self):
+        staff = User.objects.create_user("staffuser3", is_staff=True)
+        self.client.force_login(staff)
+        response = self._get("collection_orga_level")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = self._catchment_ids(response)
+        self.assertIn(self.published_catchment.id, ids)
+        self.assertIn(self.private_catchment.id, ids)
+        self.assertIn(self.review_catchment.id, ids)
+
+    def test_anonymous_still_excluded_after_staff_bypass(self):
+        """Ensure anonymous users still only see published after staff bypass."""
+        self.client.logout()
+        response = self._get("collection_system")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = self._catchment_ids(response)
+        self.assertIn(self.published_catchment.id, ids)
         self.assertNotIn(self.private_catchment.id, ids)
         self.assertNotIn(self.review_catchment.id, ids)
