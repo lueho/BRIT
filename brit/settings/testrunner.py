@@ -155,6 +155,11 @@ LOGGING = {
             "level": "ERROR",
             "propagate": False,
         },
+        "inventories.evaluations": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
     },
 }
 
