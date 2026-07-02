@@ -35,6 +35,7 @@ from sources.waste_collection.models import (
     Collector,
 )
 from utils.object_management.models import UserCreatedObject
+
 from .serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
     CatchmentAccessControlSerializer,
