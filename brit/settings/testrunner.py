@@ -147,6 +147,11 @@ LOGGING = {
             "level": "ERROR",
             "propagate": False,
         },
+        "celery.backends.redis": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
     },
 }
 
