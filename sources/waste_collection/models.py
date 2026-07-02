@@ -925,9 +925,10 @@ def update_collection_names(sender, instance, created, **kwargs):
             collections = Collection.objects.filter(waste_category=instance)
         else:
             collections = instance.collections.all()
-        for collection in collections:
-            collection.name = collection.construct_name()
-            collection.save(update_fields=["name", "lastmodified_at"])
+        with transaction.atomic():
+            for collection in collections:
+                collection.name = collection.construct_name()
+                collection.save(update_fields=["name", "lastmodified_at"])
 
 
 class CollectionPropertyValue(PropertyValue):

@@ -410,6 +410,18 @@ class SampleSeriesTestCase(TestCase):
             series_with_sample.publication_status, SampleSeries.STATUS_PUBLISHED
         )
 
+    def test_duplicate_is_atomic(self):
+        """SampleSeries.duplicate must run inside transaction.atomic."""
+        creator = User.objects.create(username=f"dup_atomic_{uuid4().hex[:8]}")
+        duplicate = self.sample_series.duplicate(creator)
+        self.assertEqual(
+            duplicate.samples.count(), self.sample_series.samples.count()
+        )
+        self.assertQuerySetEqual(
+            duplicate.temporal_distributions.all().order_by("id"),
+            self.sample_series.temporal_distributions.all().order_by("id"),
+        )
+
 
 class MaterialPropertyValueTestCase(TestCase):
     def test_duplicate_creates_new_instance_with_identical_field_values(self):
@@ -805,3 +817,39 @@ class CompositionTestCase(TestCase):
         self.composition.order_down()
         self.composition.refresh_from_db()
         self.assertEqual(self.composition.order, 100)
+
+    def test_order_up_is_atomic(self):
+        """order_up must swap both orders inside a single transaction."""
+        second_composition = Composition.objects.create(
+            owner=self.user,
+            group=self.default_group,
+            sample=self.sample0,
+            fractions_of=self.default_component,
+        )
+        original_first = self.composition.order
+        original_second = second_composition.order
+
+        self.composition.order_up()
+
+        self.composition.refresh_from_db()
+        second_composition.refresh_from_db()
+        self.assertEqual(self.composition.order, original_second)
+        self.assertEqual(second_composition.order, original_first)
+
+    def test_order_down_is_atomic(self):
+        """order_down must swap both orders inside a single transaction."""
+        second_composition = Composition.objects.create(
+            owner=self.user,
+            group=self.default_group,
+            sample=self.sample0,
+            fractions_of=self.default_component,
+        )
+        original_first = self.composition.order
+        original_second = second_composition.order
+
+        second_composition.order_down()
+
+        self.composition.refresh_from_db()
+        second_composition.refresh_from_db()
+        self.assertEqual(second_composition.order, original_first)
+        self.assertEqual(self.composition.order, original_second)

@@ -385,6 +385,35 @@ class ScenarioTestCase(TestCase):
         self.assertEqual(config["inventory_algorithm"], algorithm)
         self.assertEqual(config["parameters"], [{"point_yield": value.id}])
 
+    def test_add_inventory_algorithm_creates_config_rows_atomically(self):
+        """add_inventory_algorithm must create all config rows inside transaction.atomic."""
+        material = Material.objects.get(name="Feedstock 1")
+        feedstock = SampleSeries.objects.create(
+            material=material, name="Atomic Feedstock Series"
+        )
+        geodataset = GeoDataset.objects.get(name="Test Dataset")
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Atomic Test Algorithm", geodataset=geodataset
+        )
+        algorithm.feedstocks.add(material)
+        parameter = InventoryAlgorithmParameter.objects.create(
+            descriptive_name="Atomic Param", short_name="atomic_param"
+        )
+        parameter.inventory_algorithm.add(algorithm)
+        InventoryAlgorithmParameterValue.objects.create(
+            name="Val 1", parameter=parameter, value=1.0, default=True
+        )
+        InventoryAlgorithmParameterValue.objects.create(
+            name="Val 2", parameter=parameter, value=2.0, default=False
+        )
+
+        self.scenario.add_inventory_algorithm(feedstock, algorithm)
+
+        configs = ScenarioInventoryConfiguration.objects.filter(
+            scenario=self.scenario, inventory_algorithm=algorithm, feedstock=feedstock
+        )
+        self.assertTrue(configs.exists())
+
     @patch("inventories.models.AsyncResult")
     def test_running_scenario_save_stays_blocked_while_task_is_active(
         self, mock_async_result

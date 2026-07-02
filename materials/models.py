@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Max, Q
 from django.db.models.functions import Lower
 from django.db.models.signals import post_save, pre_save
@@ -450,24 +450,25 @@ class SampleSeries(NamedUserCreatedObject):
         return self.group_ids
 
     def duplicate(self, creator, **kwargs):
-        post_save.disconnect(add_default_temporal_distribution, sender=SampleSeries)
+        with transaction.atomic():
+            post_save.disconnect(add_default_temporal_distribution, sender=SampleSeries)
+            try:
+                duplicate = SampleSeries.objects.create(
+                    owner=creator,
+                    name=kwargs.get("name", self.name),
+                    material=kwargs.get("material", self.material),
+                )
 
-        duplicate = SampleSeries.objects.create(
-            owner=creator,
-            name=kwargs.get("name", self.name),
-            material=kwargs.get("material", self.material),
-        )
+                for sample in self.samples.all():
+                    sample_duplicate = sample.duplicate(creator)
+                    sample_duplicate.series = duplicate
+                    sample_duplicate.save()
 
-        for sample in self.samples.all():
-            sample_duplicate = sample.duplicate(creator)
-            sample_duplicate.series = duplicate
-            sample_duplicate.save()
+                duplicate.temporal_distributions.set(self.temporal_distributions.all())
+            finally:
+                post_save.connect(add_default_temporal_distribution, sender=SampleSeries)
 
-        duplicate.temporal_distributions.set(self.temporal_distributions.all())
-
-        post_save.connect(add_default_temporal_distribution, sender=SampleSeries)
-
-        return duplicate
+            return duplicate
 
     @property
     def full_name(self):
@@ -961,30 +962,34 @@ class Composition(NamedUserCreatedObject):
         self.sample.series.remove_temporal_distribution(distribution)
 
     def order_up(self):
-        current_order = self.order
-        next_composition = (
-            self.sample.compositions.filter(order__gt=self.order)
-            .order_by("order")
-            .first()
-        )
-        if next_composition:
-            self.order = next_composition.order
-            next_composition.order = current_order
-            next_composition.save()
-            self.save()
+        with transaction.atomic():
+            current_order = self.order
+            next_composition = (
+                self.sample.compositions.select_for_update()
+                .filter(order__gt=self.order)
+                .order_by("order")
+                .first()
+            )
+            if next_composition:
+                self.order = next_composition.order
+                next_composition.order = current_order
+                next_composition.save(update_fields=["order"])
+                self.save(update_fields=["order"])
 
     def order_down(self):
-        current_order = self.order
-        previous_composition = (
-            self.sample.compositions.filter(order__lt=self.order)
-            .order_by("-order")
-            .first()
-        )
-        if previous_composition:
-            self.order = previous_composition.order
-            previous_composition.order = current_order
-            previous_composition.save()
-            self.save()
+        with transaction.atomic():
+            current_order = self.order
+            previous_composition = (
+                self.sample.compositions.select_for_update()
+                .filter(order__lt=self.order)
+                .order_by("-order")
+                .first()
+            )
+            if previous_composition:
+                self.order = previous_composition.order
+                previous_composition.order = current_order
+                previous_composition.save(update_fields=["order"])
+                self.save(update_fields=["order"])
 
     def duplicate(self, creator):
         post_save.disconnect(add_next_order_value, sender=Composition)
@@ -1112,6 +1117,11 @@ def set_default_material(sender, instance, **kwargs):
 @receiver(post_save, sender=Composition)
 def add_next_order_value(sender, instance, created, **kwargs):
     if created:
-        compositions = Composition.objects.filter(sample=instance.sample)
-        instance.order = compositions.aggregate(Max("order"))["order__max"] + 10
-        instance.save()
+        with transaction.atomic():
+            max_order = (
+                Composition.objects.select_for_update()
+                .filter(sample=instance.sample)
+                .aggregate(Max("order"))["order__max"]
+            )
+            instance.order = max_order + 10
+            instance.save(update_fields=["order"])
