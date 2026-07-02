@@ -2,11 +2,14 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, Permission
+from django.contrib.contenttypes.models import ContentType
 from django.test import SimpleTestCase, TestCase
+from django.urls import reverse
 
 from maps.models import Catchment, GeoDataset, Region
 from materials.models import Material, SampleSeries
+from utils.object_management.models import User
 from utils.object_management.views import (
     UserCreatedObjectAutocompleteView,
     get_tomselect_filter_pairs,
@@ -253,3 +256,142 @@ class ScenarioResultCRUDViewsTestCase(
                 publication_status="published",
             ),
         }
+
+
+# ----------- Issue #204: Unauthenticated endpoint tests --------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class ScenarioDownloadSummaryAuthTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner", password="pass")
+        cls.other_user = User.objects.create_user(username="other", password="pass")
+        region = Region.objects.create(name="R", publication_status="published")
+        catchment = Catchment.objects.create(
+            name="C", region=region, parent_region=region, publication_status="published"
+        )
+        cls.scenario = Scenario.objects.create(
+            name="S", owner=cls.owner, region=region, catchment=catchment
+        )
+
+    def test_anonymous_is_denied(self):
+        url = reverse("scenario-download-summary", kwargs={"scenario_pk": self.scenario.pk})
+        response = self.client.get(url)
+        self.assertNotEqual(response.status_code, 200)
+
+    def test_non_owner_non_staff_is_denied(self):
+        self.client.force_login(self.other_user)
+        url = reverse("scenario-download-summary", kwargs={"scenario_pk": self.scenario.pk})
+        response = self.client.get(url)
+        self.assertIn(response.status_code, [302, 403])
+
+    def test_owner_can_download(self):
+        self.client.force_login(self.owner)
+        url = reverse("scenario-download-summary", kwargs={"scenario_pk": self.scenario.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+
+class ScenarioDownloadResultSummaryAuthTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner", password="pass")
+        cls.other_user = User.objects.create_user(username="other", password="pass")
+        region = Region.objects.create(name="R", publication_status="published")
+        catchment = Catchment.objects.create(
+            name="C", region=region, parent_region=region, publication_status="published"
+        )
+        cls.scenario = Scenario.objects.create(
+            name="S", owner=cls.owner, region=region, catchment=catchment
+        )
+
+    def test_anonymous_is_denied(self):
+        url = reverse(
+            "scenario-download-result-summary",
+            kwargs={"scenario_pk": self.scenario.pk},
+        )
+        response = self.client.get(url)
+        self.assertNotEqual(response.status_code, 200)
+
+    def test_non_owner_non_staff_is_denied(self):
+        self.client.force_login(self.other_user)
+        url = reverse(
+            "scenario-download-result-summary",
+            kwargs={"scenario_pk": self.scenario.pk},
+        )
+        response = self.client.get(url)
+        self.assertIn(response.status_code, [302, 403])
+
+    def test_owner_can_download(self):
+        self.client.force_login(self.owner)
+        url = reverse(
+            "scenario-download-result-summary",
+            kwargs={"scenario_pk": self.scenario.pk},
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+
+class EvaluationStatusAuthTests(TestCase):
+    @patch("inventories.views.AsyncResult")
+    def test_anonymous_is_denied(self, mock_async):
+        mock_async.return_value.status = "PENDING"
+        mock_async.return_value.result = None
+        mock_async.return_value.info = None
+        url = reverse("scenario-evaluation-status", kwargs={"task_id": "fake-task-id"})
+        response = self.client.get(url)
+        self.assertNotEqual(response.status_code, 200)
+
+    @patch("inventories.views.AsyncResult")
+    def test_authenticated_can_access(self, mock_async):
+        mock_async.return_value.status = "PENDING"
+        mock_async.return_value.result = None
+        mock_async.return_value.info = None
+        user = User.objects.create_user(username="u", password="pass")
+        self.client.force_login(user)
+        url = reverse("scenario-evaluation-status", kwargs={"task_id": "fake-task-id"})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+
+# ----------- Issue #205: Authorization bypass test --------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class ScenarioAddAlgorithmAuthBypassTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner_a = User.objects.create_user(username="owner_a", password="pass")
+        cls.owner_b = User.objects.create_user(username="owner_b", password="pass")
+        region = Region.objects.create(name="R", publication_status="published")
+        catchment = Catchment.objects.create(
+            name="C", region=region, parent_region=region, publication_status="published"
+        )
+        cls.scenario_a = Scenario.objects.create(
+            name="A", owner=cls.owner_a, region=region, catchment=catchment
+        )
+        cls.scenario_b = Scenario.objects.create(
+            name="B", owner=cls.owner_b, region=region, catchment=catchment
+        )
+
+    def test_post_uses_url_pk_not_body_scenario(self):
+        """post() must use the URL pk, ignoring any 'scenario' field in POST body."""
+        from unittest.mock import patch
+
+        self.client.force_login(self.owner_a)
+        url = reverse(
+            "scenario-add-configuration",
+            kwargs={"pk": self.scenario_a.pk},
+        )
+        # Patch add_inventory_algorithm to capture which scenario it was called on
+        with patch.object(Scenario, "add_inventory_algorithm") as mock_add:
+            mock_add.return_value = None
+            # Supply scenario_b in POST body, but the view should use scenario_a
+            # from the URL pk. We need valid-looking POST data for feedstock/algo.
+            from materials.models import SampleSeries
+
+            with self.assertRaises(SampleSeries.DoesNotExist):
+                self.client.post(url, {"scenario": self.scenario_b.pk})
+            # add_inventory_algorithm should NOT have been called with scenario_b
+            mock_add.assert_not_called()

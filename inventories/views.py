@@ -2,8 +2,9 @@ import io
 import json
 
 from celery.result import AsyncResult
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DetailView, TemplateView, View
@@ -170,6 +171,7 @@ class ScenarioAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Scenario
 
 
+@login_required
 def get_evaluation_status(request, task_id=None):
     task_result = AsyncResult(task_id)
     result = {
@@ -197,10 +199,8 @@ class ScenarioAddInventoryAlgorithmView(
         policy = get_object_policy(self.request.user, scenario, request=self.request)
         return policy["can_edit"]
 
-    @staticmethod
-    def post(request, *args, **kwargs):
-        scenario_id = request.POST.get("scenario")
-        scenario = Scenario.objects.get(id=scenario_id)
+    def post(self, request, *args, **kwargs):
+        scenario = Scenario.objects.get(id=self.kwargs.get("pk"))
         feedstock = SampleSeries.objects.get(id=request.POST.get("feedstock"))
         algorithm_id = request.POST.get("inventory_algorithm")
         algorithm = InventoryAlgorithm.objects.get(id=algorithm_id)
@@ -215,7 +215,7 @@ class ScenarioAddInventoryAlgorithmView(
                     InventoryAlgorithmParameterValue.objects.get(id=value_id)
                 )
         scenario.add_inventory_algorithm(feedstock, algorithm, values)
-        return redirect("scenario-detail", pk=scenario_id)
+        return redirect("scenario-detail", pk=scenario.pk)
 
     def get_object(self, **kwargs):
         return Scenario.objects.get(pk=self.kwargs.get("pk"))
@@ -442,9 +442,16 @@ class InventoryAlgorithmParametersAPIView(APIView):
         return Response(serializer.data)
 
 
+@login_required
 def download_scenario_summary(request, scenario_pk):
+    try:
+        scenario = Scenario.objects.get(id=scenario_pk)
+    except Scenario.DoesNotExist:
+        raise Http404
+    policy = get_object_policy(request.user, scenario, request=request)
+    if not (policy["is_owner"] or policy["is_published"] or request.user.is_staff):
+        return HttpResponseForbidden()
     file_name = f"scenario_{scenario_pk}_summary.json"
-    scenario = Scenario.objects.get(id=scenario_pk)
     with io.StringIO(json.dumps(scenario.summary_dict(), indent=4)) as file:
         response = HttpResponse(file, content_type="application/json")
         response["Content-Disposition"] = f"attachment; filename={file_name}"
@@ -551,8 +558,15 @@ class ScenarioResultDetailMapView(MapMixin, DetailView):
         return f"{self.object.scenario.name}: {self.object.algorithm.geodataset.name}"
 
 
+@login_required
 def download_scenario_result_summary(request, scenario_pk):
-    scenario = Scenario.objects.get(id=scenario_pk)
+    try:
+        scenario = Scenario.objects.get(id=scenario_pk)
+    except Scenario.DoesNotExist:
+        raise Http404
+    policy = get_object_policy(request.user, scenario, request=request)
+    if not (policy["is_owner"] or policy["is_published"] or request.user.is_staff):
+        return HttpResponseForbidden()
     result = ScenarioResult(scenario)
     with io.StringIO(json.dumps(result.summary_dict(), indent=4)) as file:
         response = HttpResponse(file, content_type="application/json")
