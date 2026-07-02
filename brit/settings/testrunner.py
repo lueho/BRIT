@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from .settings import *
 
@@ -32,22 +32,32 @@ DATABASES["default"] = {
     },
 }
 
-_test_redis_url = os.environ.get("TEST_REDIS_URL")
-if _test_redis_url:
-    CELERY_BROKER_URL = _test_redis_url
-    CELERY_RESULT_BACKEND = _test_redis_url
-else:
-    _parsed_redis_url = urlparse(os.environ.get("REDIS_URL", "redis://redis:6379/0"))
-    _test_redis_url = urlunparse(
-        _parsed_redis_url._replace(scheme="redis", path="/15", query="")
+
+def _test_redis_database_url(redis_url: str, database: int) -> str:
+    parsed_redis_url = urlparse(redis_url)
+    query = dict(parse_qsl(parsed_redis_url.query, keep_blank_values=True))
+    if parsed_redis_url.scheme == "rediss":
+        query.setdefault("ssl_cert_reqs", "none")
+    return urlunparse(
+        parsed_redis_url._replace(path=f"/{database}", query=urlencode(query))
     )
-    CELERY_BROKER_URL = _test_redis_url
-    CELERY_RESULT_BACKEND = _test_redis_url
+
+
+_test_redis_url = os.environ.get("TEST_REDIS_URL")
+if not _test_redis_url:
+    _test_redis_url = _test_redis_database_url(
+        os.environ.get("REDIS_URL", "redis://redis:6379/0"), 15
+    )
+
+CELERY_BROKER_URL = _test_redis_url
+CELERY_RESULT_BACKEND = _test_redis_url
 
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_BROKER_USE_SSL = None
 CELERY_REDIS_BACKEND_USE_SSL = None
+
+_test_cache_redis_url = _test_redis_database_url(_test_redis_url, 14)
 
 CACHES = {
     "default": {
@@ -55,10 +65,15 @@ CACHES = {
         "LOCATION": "brit-test-default",
     },
     "geojson": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "brit-test-geojson",
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": _test_cache_redis_url,
         "TIMEOUT": 86400,
         "KEY_PREFIX": "geojson",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
+            "IGNORE_EXCEPTIONS": False,
+        },
     },
 }
 
