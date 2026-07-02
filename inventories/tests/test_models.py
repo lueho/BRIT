@@ -526,9 +526,7 @@ class ScenarioResultHomogenizeTimestepsTestCase(TestCase):
             name="TS Algorithm", geodataset=geodataset
         )
         cls.algorithm.feedstocks.add(material)
-        cls.feedstock = SampleSeries.objects.create(
-            name="TS Series", material=material
-        )
+        cls.feedstock = SampleSeries.objects.create(name="TS Series", material=material)
 
     def tearDown(self):
         for name in list(apps.all_models["layer_manager"]):
@@ -546,16 +544,22 @@ class ScenarioResultHomogenizeTimestepsTestCase(TestCase):
         ts2 = Timestep.objects.create(name="TS T2", distribution=dist2)
 
         layer1 = Layer.objects.create(
-            name="L1", geom_type="Point", table_name="test_ts_layer1",
-            scenario=self.scenario, feedstock=self.feedstock,
+            name="L1",
+            geom_type="Point",
+            table_name="test_ts_layer1",
+            scenario=self.scenario,
+            feedstock=self.feedstock,
             algorithm=self.algorithm,
         )
         LayerAggregatedDistribution.objects.create(
             name="AD1", distribution=dist1, layer=layer1
         )
         layer2 = Layer.objects.create(
-            name="L2", geom_type="Point", table_name="test_ts_layer2",
-            scenario=self.scenario, feedstock=self.feedstock,
+            name="L2",
+            geom_type="Point",
+            table_name="test_ts_layer2",
+            scenario=self.scenario,
+            feedstock=self.feedstock,
             algorithm=self.algorithm,
         )
         LayerAggregatedDistribution.objects.create(

@@ -800,13 +800,9 @@ def propagate_algorithm_change_to_scenarios(sender, instance, created, **kwargs)
 
 
 @receiver(post_save, sender=InventoryAlgorithmParameterValue)
-def propagate_parameter_value_change_to_scenarios(
-    sender, instance, created, **kwargs
-):
+def propagate_parameter_value_change_to_scenarios(sender, instance, created, **kwargs):
     if not created:
-        _mark_referencing_scenarios_changed(
-            InventoryAlgorithmParameterValue, instance
-        )
+        _mark_referencing_scenarios_changed(InventoryAlgorithmParameterValue, instance)
 
 
 class RunningTask(models.Model):

@@ -197,12 +197,8 @@ class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
             Material.objects.create(name=f"Spacer Material {i}")
         cls.target_material = Material.objects.create(name="Autocomplete Target")
         cls.region = Region.objects.create(name="AC Region")
-        cls.scenario = Scenario.objects.create(
-            name="AC Scenario", region=cls.region
-        )
-        cls.geodataset = GeoDataset.objects.create(
-            name="AC Dataset", region=cls.region
-        )
+        cls.scenario = Scenario.objects.create(name="AC Scenario", region=cls.region)
+        cls.geodataset = GeoDataset.objects.create(name="AC Dataset", region=cls.region)
         algorithm = InventoryAlgorithm.objects.create(
             name="AC Algorithm", geodataset=cls.geodataset
         )
@@ -213,7 +209,8 @@ class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
 
     def test_apply_filters_uses_material_id_not_series_id(self):
         self.assertNotEqual(
-            self.series.id, self.target_material.id,
+            self.series.id,
+            self.target_material.id,
             "Test requires SampleSeries.id != Material.id to catch the bug",
         )
         view = ScenarioGeoDataSetAutocompleteView()
