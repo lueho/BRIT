@@ -292,6 +292,17 @@ class ProcessSourceInlineForm(forms.ModelForm):
         model = ProcessSource
         fields = ("source",)
 
+    def __init__(self, *args, **kwargs):
+        request = kwargs.pop("request", None)
+        super().__init__(*args, **kwargs)
+        if request and hasattr(request, "user"):
+            from utils.object_management.permissions import filter_queryset_for_user
+
+            qs = filter_queryset_for_user(Source.objects.all(), request.user)
+            if self.instance and self.instance.pk and self.instance.source_id:
+                qs = qs | Source.objects.filter(pk=self.instance.source_id)
+            self.fields["source"].queryset = qs
+
 
 class ProcessSourceFormSet(OrderedUniqueInlineFormSet):
     related_field_name = "source"
@@ -305,6 +316,11 @@ class ProcessSourceInline(InlineFormSetFactory):
     formset_class = ProcessSourceFormSet
     factory_kwargs = {"extra": 1, "can_delete": True}
     formset_helper_class = DynamicTableInlineFormSetHelper
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
 
 
 class ProcessMaterialInlineForm(forms.ModelForm):
