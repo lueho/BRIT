@@ -14,11 +14,6 @@ urlpatterns = [
     # Dashboard
     path("dashboard/", views.ProcessDashboardView.as_view(), name="dashboard"),
     path(
-        "dashboard/",
-        views.ProcessDashboardView.as_view(),
-        name="processes-dashboard",
-    ),
-    path(
         "explorer/",
         views.ProcessDashboardView.as_view(),
         name="processes-explorer",
@@ -93,11 +88,6 @@ urlpatterns = [
     path(
         "types/",
         views.ProcessPublishedFilterView.as_view(),
-        name="type_list",
-    ),
-    path(
-        "types/",
-        views.ProcessPublishedFilterView.as_view(),
         name="processtype-list",
     ),
     path(
@@ -124,11 +114,6 @@ urlpatterns = [
         "<int:pk>/",
         views.ProcessDetailView.as_view(),
         name="process-detail",
-    ),
-    path(
-        "types/<int:pk>/",
-        views.ProcessDetailView.as_view(),
-        name="type_detail",
     ),
     path(
         "types/<int:pk>/",
