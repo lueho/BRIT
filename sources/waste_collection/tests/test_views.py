@@ -4561,6 +4561,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
             collector=collector,
             catchment=collection_catchment,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
 
         response = self.client.get(

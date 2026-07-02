@@ -2432,9 +2432,7 @@ class OrganicCollectionAmountViewSet(WasteAtlasViewSet):
         """Return a JSON array of {catchment_id, amount}."""
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
-        organic = _get_organic_amounts(
-            country, year, nuts_prefixes, user=request.user
-        )
+        organic = _get_organic_amounts(country, year, nuts_prefixes, user=request.user)
         data = [{"catchment_id": cid, "amount": amt} for cid, amt in organic.items()]
         serializer = CatchmentCollectionAmountSerializer(data, many=True)
         return Response(serializer.data)
@@ -2454,9 +2452,7 @@ class OrganicWasteRatioViewSet(WasteAtlasViewSet):
         """Return a JSON array of {catchment_id, organic_amount, residual_amount, ratio}."""
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
-        organic = _get_organic_amounts(
-            country, year, nuts_prefixes, user=request.user
-        )
+        organic = _get_organic_amounts(country, year, nuts_prefixes, user=request.user)
         res_map = {
             r["catchment_id"]: r["amount"]
             for r in _get_collection_amount(
