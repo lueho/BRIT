@@ -1772,7 +1772,7 @@ class CollectionAddPropertyValueView(
         try:
             self.parent_collection = Collection.objects.get(pk=self.kwargs.get("pk"))
         except Collection.DoesNotExist:
-            raise PermissionDenied("Invalid parent collection.") from None
+            return False
         policy = get_object_policy(
             self.request.user, self.parent_collection, request=self.request
         )
