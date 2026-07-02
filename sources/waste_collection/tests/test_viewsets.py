@@ -4560,10 +4560,7 @@ class WasteAtlasPublicationScopingTests(APITestCase):
 
     def _catchment_ids(self, response):
         if isinstance(response.data, dict) and "features" in response.data:
-            return {
-                f["properties"]["catchment_id"]
-                for f in response.data["features"]
-            }
+            return {f["properties"]["catchment_id"] for f in response.data["features"]}
         return {row["catchment_id"] for row in response.data}
 
     def test_collection_system_excludes_private(self):
