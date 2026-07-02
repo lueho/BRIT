@@ -343,12 +343,12 @@ class LayerAggregatedDistribution(models.Model):
             component_dist = {"label": component.name, "data": {}, "unit": "Mg/a"}
             # data = {}
             for timestep in self.distribution.timestep_set.all():
-                try:  # TODO: find better way to deal with the fact that there is not a value for every component/timestep combination
+                try:
                     share = self.shares.get(
                         component=component, distribution_set__timestep=timestep
                     )
                     component_dist["data"][timestep.name] = share.average
-                except Exception:  # noqa: S110
+                except DistributionShare.DoesNotExist:
                     pass
             # component_dist['data'].append(data)
             dist.append(component_dist)

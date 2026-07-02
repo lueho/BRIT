@@ -3,9 +3,10 @@ from unittest.mock import Mock, patch
 from uuid import uuid4
 
 from django.contrib.auth.models import AnonymousUser
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
-from maps.models import Catchment, Region
+from maps.models import Catchment, GeoDataset, Region
+from materials.models import Material, SampleSeries
 from utils.object_management.views import (
     UserCreatedObjectAutocompleteView,
     get_tomselect_filter_pairs,
@@ -13,9 +14,15 @@ from utils.object_management.views import (
 )
 from utils.tests.testcases import AbstractTestCases
 
-from ..models import RunningTask, Scenario, ScenarioStatus
+from ..models import (
+    InventoryAlgorithm,
+    RunningTask,
+    Scenario,
+    ScenarioStatus,
+)
 from ..views import (
     InventoryAlgorithmAutocompleteView,
+    ScenarioGeoDataSetAutocompleteView,
     ScenarioInventoryAlgorithmAutocompleteView,
 )
 
@@ -178,6 +185,42 @@ class UserCreatedObjectAutocompleteViewFilterTests(SimpleTestCase):
             "published",
             user=self.view.request.user,
         )
+
+
+class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
+    """#213: apply_filters must use SampleSeries.material_id, not SampleSeries.id."""
+
+    @classmethod
+    def setUpTestData(cls):
+        # Create spacer materials so Material PKs get ahead of SampleSeries PKs
+        for i in range(5):
+            Material.objects.create(name=f"Spacer Material {i}")
+        cls.target_material = Material.objects.create(name="Autocomplete Target")
+        cls.region = Region.objects.create(name="AC Region")
+        cls.scenario = Scenario.objects.create(name="AC Scenario", region=cls.region)
+        cls.geodataset = GeoDataset.objects.create(name="AC Dataset", region=cls.region)
+        algorithm = InventoryAlgorithm.objects.create(
+            name="AC Algorithm", geodataset=cls.geodataset
+        )
+        algorithm.feedstocks.add(cls.target_material)
+        cls.series = SampleSeries.objects.create(
+            name="AC Series", material=cls.target_material
+        )
+
+    def test_apply_filters_uses_material_id_not_series_id(self):
+        self.assertNotEqual(
+            self.series.id,
+            self.target_material.id,
+            "Test requires SampleSeries.id != Material.id to catch the bug",
+        )
+        view = ScenarioGeoDataSetAutocompleteView()
+        view.filter_by = f"feedstock_id='{self.series.id}'"
+        view.filters_by = []
+        view.exclude_by = f"scenario_id='{self.scenario.id}'"
+        view.excludes_by = []
+
+        result_qs = view.apply_filters(GeoDataset.objects.all())
+        self.assertIn(self.geodataset, result_qs)
 
 
 class ScenarioResultCRUDViewsTestCase(

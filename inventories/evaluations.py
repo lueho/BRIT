@@ -1,8 +1,12 @@
-from distributions.models import TemporalDistribution
+import logging
+
+from distributions.models import TemporalDistribution, Timestep
 from distributions.plots import BarChart, DataSet
 from layer_manager.models import LayerAggregatedDistribution
 from materials.models import MaterialComponentGroup
 from utils.exceptions import UnitMismatchError
+
+logger = logging.getLogger(__name__)
 
 
 class ScenarioResult:
@@ -18,12 +22,29 @@ class ScenarioResult:
         self.timesteps = self.homogenize_timesteps()
 
     def homogenize_timesteps(self):
-        try:
-            layer = self.layers.first()  # TODO: Fix this!!!
-            dist = layer.layeraggregateddistribution_set.first().distribution
-            return list(dist.timestep_set.all())
-        except AttributeError:
+        if not self.layers.exists():
             return []
+        timestep_ids = set()
+        for layer in self.layers:
+            agg_dist = layer.layeraggregateddistribution_set.first()
+            if agg_dist is None:
+                logger.warning(
+                    "Layer %s (pk=%s) has no aggregated distribution.",
+                    layer.name,
+                    layer.pk,
+                )
+                continue
+            if agg_dist.distribution is None:
+                logger.warning(
+                    "Layer %s (pk=%s) has an aggregated distribution with no distribution.",
+                    layer.name,
+                    layer.pk,
+                )
+                continue
+            timestep_ids.update(
+                agg_dist.distribution.timestep_set.values_list("id", flat=True)
+            )
+        return list(Timestep.objects.filter(id__in=timestep_ids))
 
     def material_component_groups(self):
         group_settings = []

@@ -279,3 +279,14 @@ class LayerAggregatedDistributionTestCase(TestCase):
             }
         ]
         self.assertListEqual(expected, self.aggregated_distribution.serialized)
+
+    def test_serialized_does_not_swallow_multiple_objects_returned(self):
+        """#215: MultipleObjectsReturned must not be silently caught."""
+        DistributionShare.objects.create(
+            distribution_set=self.distribution_set,
+            component=self.component,
+            average=4.56,
+            standard_deviation=0.01,
+        )
+        with self.assertRaises(DistributionShare.MultipleObjectsReturned):
+            _ = self.aggregated_distribution.serialized
