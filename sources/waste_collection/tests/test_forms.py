@@ -1265,7 +1265,6 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         self.assertNotIn(self.flyer_2, self.collection.flyers.all())
 
 
-
 class CollectionAddWasteSampleFormTestCase(TestCase):
     def setUp(self):
         self.material = Material.objects.create(
