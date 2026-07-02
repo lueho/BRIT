@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}
+   Waste Atlas — Data conflicts
+{% endblock title %}
+{% block style_sheets %}
+   <link href="{% static 'css/waste_atlas.min.css' %}" rel="stylesheet">
+{% endblock style_sheets %}
+{% block content %}
+   <div class="container mt-4">
+      <div class="atlas-hero">
+         <div class="atlas-eyebrow">Waste Atlas</div>
+         <h1 class="mb-1">Data conflicts</h1>
+         <p class="lead mb-2">Maps that highlight conflicting catchments.</p>
+         <p class="text-muted">
+            Some waste atlas maps can display only one value per catchment per theme.
+            Where the dataset holds several collections with different theme values for
+            the same catchment, these maps offer a "Highlight conflicting catchments"
+            overlay so data maintainers can see where the single-value assumption breaks
+            down. Open a map below and toggle the overlay to inspect the conflicting
+            catchments.
+         </p>
+      </div>
+      <section class="atlas-panel atlas-directory" aria-labelledby="atlas-conflicts-title">
+         <h2 class="atlas-section-title" id="atlas-conflicts-title">Conflict-overlay maps</h2>
+         {% if conflict_maps %}
+            <div class="atlas-map-list">
+               {% for conflict_map in conflict_maps %}
+                  <a class="atlas-map-link"
+                     href="{{ conflict_map.url }}">{{ conflict_map.map_set_label }} — {{ conflict_map.theme_label }}</a>
+               {% endfor %}
+            </div>
+         {% else %}
+            <p class="text-muted">No maps with a conflict overlay are configured yet.</p>
+         {% endif %}
+      </section>
+      <a class="btn btn-outline-secondary btn-sm"
+         href="{% url 'waste-atlas-overview' %}">
+         <i class="fas fa-th-list"></i> Map overview
+      </a>
+   </div>
+{% endblock content %}

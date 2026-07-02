@@ -5345,6 +5345,68 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(response, "Change maps")
 
+    def test_map_overview_links_to_data_conflicts_overview(self):
+        response = self.client.get(reverse("waste-atlas-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'href="{reverse("waste-atlas-data-conflicts-overview")}"',
+        )
+        self.assertContains(response, "Data conflicts")
+
+    def test_data_conflicts_overview_renders_for_waste_atlas_group(self):
+        response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Waste Atlas — Data conflicts")
+        self.assertContains(response, "conflicting catchments")
+
+    def test_data_conflicts_overview_lists_collection_system_maps(self):
+        """The data-conflicts overview surfaces every map whose config opts
+        into the maintainer conflict-overlay aid (currently the
+        collection_system theme across all regional map sets)."""
+        response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        # Every collection_system map page is listed.
+        self.assertContains(
+            response, reverse("waste-atlas-germany-collection-system-map")
+        )
+        self.assertContains(
+            response, reverse("waste-atlas-catalonia-collection-system-map")
+        )
+        self.assertContains(
+            response, reverse("waste-atlas-italy-collection-system-map")
+        )
+        # A map whose config has no conflict overlay is not listed.
+        self.assertNotContains(response, reverse("waste-atlas-germany-orga-level-map"))
+
+    def test_data_conflicts_overview_links_back_to_map_overview(self):
+        response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'href="{reverse("waste-atlas-overview")}"',
+        )
+        self.assertContains(response, "Map overview")
+
+    def test_data_conflicts_overview_denies_anonymous_users(self):
+        self.client.logout()
+        response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_data_conflicts_overview_denies_users_without_waste_atlas_group(self):
+        non_atlas_user = User.objects.create_user(
+            username="non-atlas-user-conflicts", password="secret"
+        )
+        self.client.force_login(non_atlas_user)
+        response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
+
+        self.assertEqual(response.status_code, 403)
+
     def test_germany_collection_system_change_map_renders(self):
         response = self.client.get(
             reverse("waste-atlas-change-map", args=["DE", "collection_system"])
