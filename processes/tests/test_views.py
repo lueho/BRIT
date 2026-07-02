@@ -18,6 +18,7 @@ from ..models import (
     ProcessCategory,
     ProcessInfoResource,
     ProcessMaterial,
+    ProcessSource,
 )
 
 
@@ -587,6 +588,71 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.assertEqual(
             self.unpublished_object.process_materials.get().role,
             ProcessMaterial.Role.OUTPUT,
+        )
+
+    def test_update_with_private_source_inline_succeeds(self):
+        """Saving a process that already has a private source attached must not
+        raise an 'invalid choice' validation error on the source inline."""
+        private_source = Source.objects.create(
+            title="Owner Private Source",
+            abbreviation="OPS",
+            owner=self.owner_user,
+            publication_status="private",
+        )
+        ps = ProcessSource.objects.create(
+            process=self.unpublished_object,
+            source=private_source,
+            order=0,
+        )
+        self.client.force_login(self.owner_user)
+
+        response = self.client.post(
+            reverse(self.view_update_name, kwargs={"pk": self.unpublished_object.pk}),
+            {
+                "name": self.unpublished_object.name,
+                "short_description": self.unpublished_object.short_description,
+                "mechanism": self.unpublished_object.mechanism,
+                "description": self.unpublished_object.description or "",
+                "categories": [self.test_category.pk],
+                "process_materials-TOTAL_FORMS": "0",
+                "process_materials-INITIAL_FORMS": "0",
+                "process_materials-MIN_NUM_FORMS": "0",
+                "process_materials-MAX_NUM_FORMS": "1000",
+                "operating_parameters-TOTAL_FORMS": "0",
+                "operating_parameters-INITIAL_FORMS": "0",
+                "operating_parameters-MIN_NUM_FORMS": "0",
+                "operating_parameters-MAX_NUM_FORMS": "1000",
+                "process_authors-TOTAL_FORMS": "0",
+                "process_authors-INITIAL_FORMS": "0",
+                "process_authors-MIN_NUM_FORMS": "0",
+                "process_authors-MAX_NUM_FORMS": "1000",
+                "process_sources-TOTAL_FORMS": "1",
+                "process_sources-INITIAL_FORMS": "1",
+                "process_sources-MIN_NUM_FORMS": "0",
+                "process_sources-MAX_NUM_FORMS": "1000",
+                "process_sources-0-source": private_source.pk,
+                "process_sources-0-order": "0",
+                "process_sources-0-id": ps.pk,
+                "process_sources-0-process": self.unpublished_object.pk,
+                "links-TOTAL_FORMS": "0",
+                "links-INITIAL_FORMS": "0",
+                "links-MIN_NUM_FORMS": "0",
+                "links-MAX_NUM_FORMS": "1000",
+                "info_resources-TOTAL_FORMS": "0",
+                "info_resources-INITIAL_FORMS": "0",
+                "info_resources-MIN_NUM_FORMS": "0",
+                "info_resources-MAX_NUM_FORMS": "1000",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse(self.view_detail_name, kwargs={"pk": self.unpublished_object.pk}),
+        )
+        self.assertTrue(
+            ProcessSource.objects.filter(
+                process=self.unpublished_object, source=private_source
+            ).exists()
         )
 
 
