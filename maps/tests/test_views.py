@@ -1,18 +1,19 @@
 import io
 import json
+import os
 import re
 import uuid
 from datetime import date
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse, urlunparse
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
 from django.core.cache import caches
 from django.core.management import call_command
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from rest_framework import serializers
 from rest_framework.request import Request
@@ -1643,7 +1644,28 @@ class GeoJSONMixinTestCase(TestCase):
             self.viewset.geojson(request)
 
 
+def _redis_geojson_test_caches():
+    parsed = urlparse(os.environ.get("REDIS_URL", "redis://localhost:6379/0"))
+    location = urlunparse(parsed._replace(path="/14", query=""))
+    options = {
+        "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        "KEY_PREFIX": "geojson",
+    }
+    if parsed.scheme == "rediss":
+        options["CONNECTION_POOL_KWARGS"] = {"ssl_cert_reqs": None}
+    return {
+        "default": settings.CACHES["default"],
+        "geojson": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": location,
+            "TIMEOUT": 86400,
+            "OPTIONS": options,
+        },
+    }
+
+
 @serial_test
+@override_settings(CACHES=_redis_geojson_test_caches())
 class GeoJSONCachingTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -1653,6 +1675,10 @@ class GeoJSONCachingTests(TestCase):
 
     def setUp(self):
         self.geojson_cache = caches[settings.GEOJSON_CACHE]
+        try:
+            self.geojson_cache.client.get_client(write=True).ping()
+        except Exception:
+            self.skipTest("Redis is not available for the geojson test cache.")
         self.geojson_cache.clear()
 
     def tearDown(self):
