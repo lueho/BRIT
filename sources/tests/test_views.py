@@ -1,8 +1,9 @@
 from unittest.mock import patch
 
 from django.contrib.staticfiles import finders
+from django.core.cache import cache
 from django.template.loader import get_template
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase
 from django.urls import resolve, reverse
 
 from sources.registry import (
@@ -18,6 +19,12 @@ from sources.registry import (
 )
 from sources.roadside_trees.views import HamburgRoadsideTreesListFileExportView
 from utils.tests.testcases import ViewWithPermissionsTestCase
+
+
+def legacy_redirect_response(path):
+    url_match = resolve(path)
+    request = RequestFactory().get(path)
+    return url_match.func(request, **url_match.kwargs)
 
 
 class SourcesExplorerViewTestCase(ViewWithPermissionsTestCase):
@@ -243,17 +250,13 @@ class RoadsideTreesPluginIntegrationTestCase(SimpleTestCase):
         )
 
     def test_legacy_hamburg_urls_redirect_to_sources(self):
-        response = self.client.get(
-            "/case_studies/hamburg/roadside_trees/map/",
-            follow=False,
-        )
+        response = legacy_redirect_response("/case_studies/hamburg/roadside_trees/map/")
         self.assertEqual(response.status_code, 301)
         self.assertEqual(response["Location"], "/sources/roadside_trees/map/")
 
     def test_legacy_hamburg_api_urls_redirect_to_sources(self):
-        response = self.client.get(
-            "/case_studies/hamburg/api/hamburg_roadside_trees/",
-            follow=False,
+        response = legacy_redirect_response(
+            "/case_studies/hamburg/api/hamburg_roadside_trees/"
         )
         self.assertEqual(response.status_code, 301)
         self.assertEqual(
@@ -289,10 +292,7 @@ class UrbanGreenSpacesPluginIntegrationTestCase(SimpleTestCase):
         )
 
     def test_legacy_hamburg_green_areas_url_redirects_to_maps(self):
-        response = self.client.get(
-            "/case_studies/hamburg/green_areas/map/",
-            follow=False,
-        )
+        response = legacy_redirect_response("/case_studies/hamburg/green_areas/map/")
 
         self.assertEqual(response.status_code, 301)
         self.assertEqual(response["Location"], "/maps/hamburg/green_areas/map/")
@@ -418,7 +418,16 @@ class SourceDomainExplorerCardRegistryTestCase(SimpleTestCase):
         side_effect=[7, 13],
     )
     def test_registry_returns_sorted_explorer_cards_with_counts(self, _mock_count):
-        cards = get_source_domain_explorer_cards()
+        cache_keys = [
+            "source_domain:greenhouses:published_count",
+            "source_domain:waste_collection:published_count",
+        ]
+        cache.delete_many(cache_keys)
+
+        try:
+            cards = get_source_domain_explorer_cards()
+        finally:
+            cache.delete_many(cache_keys)
 
         self.assertEqual(
             [card["slug"] for card in cards], ["waste_collection", "greenhouses"]
