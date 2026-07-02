@@ -36,7 +36,7 @@
             <ul>
                 {% for proc in involved_processes %}
                     <li>
-                        <a href="{% url 'processes:type_detail' proc.id %}">{{ proc.name }}</a>
+                        <a href="{% url 'processes:processtype-detail' proc.id %}">{{ proc.name }}</a>
                     </li>
                 {% endfor %}
             </ul>

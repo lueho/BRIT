@@ -1244,6 +1244,8 @@ class CatchmentCreateMergeLauView(UserCreatedObjectCreateView):
             for form in self.formset.cleaned_data
             if form.get("region") is not None
         ]
+        if not geoms:
+            raise ValueError("Cannot create region borders: no regions selected.")
         new_geom = geoms[0]
         for geom in geoms[1:]:
             new_geom = new_geom.union(geom)
@@ -1444,7 +1446,7 @@ class CatchmentRegionSummaryAPIView(APIView):
                     region, field_labels_as_keys=True, context={"request": request}
                 )
                 return Response({"summaries": [serializer.data]})
-            except Region.nutsregion.RelatedObjectDoesNotExist:
+            except Region.lauregion.RelatedObjectDoesNotExist:
                 pass
 
         return Response({})
@@ -1488,10 +1490,6 @@ class NutsRegionPedigreeAPI(APIView):
 
         try:
             instance = NutsRegion.objects.get(id=request.query_params["id"])
-        except AttributeError as err:
-            raise NotFound(
-                "A NUTS region with the provided id does not exist."
-            ) from err
         except NutsRegion.DoesNotExist as err:
             raise NotFound(
                 "A NUTS region with the provided id does not exist."
@@ -1542,11 +1540,7 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
         try:
             catchment = Catchment.objects.get(id=request.query_params["id"])
             instance = catchment.region.nutsregion
-        except AttributeError as err:
-            raise NotFound(
-                "A NUTS region with the provided id does not exist."
-            ) from err
-        except Catchment.DoesNotExist as err:
+        except (Catchment.DoesNotExist, NutsRegion.DoesNotExist, AttributeError) as err:
             raise NotFound(
                 "A NUTS region with the provided id does not exist."
             ) from err

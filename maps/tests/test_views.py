@@ -1067,6 +1067,97 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         response = self.client.post(url, data)
         self.assertEqual(302, response.status_code)
 
+    def test_create_region_borders_raises_on_empty_geoms(self):
+        url = reverse("catchment-create-merge-lau")
+        data = {
+            "name": "Empty Merge",
+            "parent_region": self.util_objects["parent_region"].pk,
+            "form-INITIAL_FORMS": 0,
+            "form-TOTAL_FORMS": 2,
+            "form-0-region": "",
+            "form-1-region": "",
+        }
+        request = RequestFactory().post(url, data)
+        request.user = self.staff_user
+        view = CatchmentCreateMergeLauView()
+        view.setup(request)
+        view.formset = Mock()
+        view.formset.cleaned_data = [{"region": None}, {"region": None}]
+        with self.assertRaises(ValueError):
+            view.create_region_borders()
+
+
+class CatchmentRegionSummaryAPIViewTestCase(ViewWithPermissionsTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.nuts_region = NutsRegion.objects.create(
+            nuts_id="AB", levl_code=0, name_latn="Nuts Summary Region"
+        )
+        cls.nuts_catchment = Catchment.objects.create(region=cls.nuts_region.region_ptr)
+        cls.lau_region = LauRegion.objects.create(
+            lau_id="L0001",
+            lau_name="Lau Summary Region",
+            nuts_parent=cls.nuts_region,
+        )
+        cls.lau_catchment = Catchment.objects.create(region=cls.lau_region.region_ptr)
+        cls.plain_region = Region.objects.create(name="Plain Region")
+        cls.plain_catchment = Catchment.objects.create(region=cls.plain_region)
+
+    def test_nuts_catchment_returns_summary(self):
+        response = self.client.get(
+            reverse("data.catchment_region_summaries"),
+            {"pk": self.nuts_catchment.pk},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("summaries", response.data)
+
+    def test_lau_catchment_returns_summary(self):
+        response = self.client.get(
+            reverse("data.catchment_region_summaries"),
+            {"pk": self.lau_catchment.pk},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("summaries", response.data)
+
+    def test_plain_catchment_returns_empty_response(self):
+        response = self.client.get(
+            reverse("data.catchment_region_summaries"),
+            {"pk": self.plain_catchment.pk},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("summaries", response.data)
+
+    def test_no_pk_returns_empty_response(self):
+        response = self.client.get(
+            reverse("data.catchment_region_summaries"),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("summaries", response.data)
+
+
+class NutsRegionPedigreeAPITestCase(ViewWithPermissionsTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.nuts_region = NutsRegion.objects.create(
+            nuts_id="YY", levl_code=0, name_latn="Pedigree Test Region"
+        )
+
+    def test_non_existent_id_returns_404(self):
+        response = self.client.get(
+            reverse("data.nuts_region_options"),
+            {"id": 0, "direction": "children"},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_missing_id_returns_400(self):
+        response = self.client.get(
+            reverse("data.nuts_region_options"),
+            {"direction": "children"},
+        )
+        self.assertEqual(response.status_code, 400)
+
 
 # ----------- Catchment API---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
