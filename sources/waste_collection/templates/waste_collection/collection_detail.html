@@ -170,20 +170,20 @@
       {{ object.established }}
     </p>
   {% endif %}
-  {% if object.connection_type %}
+  {% if object.participation_policy %}
     <p class="card-text">
-      <strong>Connection Type:</strong>
+      <strong>Participation Policy:</strong>
       <br>
-      {% if object.connection_type == 'MANDATORY' %}
+      {% if object.participation_policy == 'MANDATORY' %}
         Mandatory
-      {% elif object.connection_type == 'VOLUNTARY' %}
+      {% elif object.participation_policy == 'VOLUNTARY' %}
         Voluntary
-      {% elif object.connection_type == 'MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION' %}
+      {% elif object.participation_policy == 'MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION' %}
         Mandatory with exception for home composters
-      {% elif object.connection_type == 'not_specified' %}
+      {% elif object.participation_policy == 'not_specified' %}
         Not specified
       {% else %}
-        {{ object.connection_type }}
+        {{ object.participation_policy }}
       {% endif %}
     </p>
   {% endif %}

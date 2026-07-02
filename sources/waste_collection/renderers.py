@@ -67,7 +67,7 @@ _STATIC_LABELS = {
     "collection_system": "Collection System",
     "bin_configuration": "Bin configuration",
     "waste_category": "Waste Category",
-    "connection_type": "Connection type",
+    "participation_policy": "Participation policy",
     "access_control_bp": "Access Control (BP)",
     "access_control_pap": "Access Control (PAP)",
     "allowed_materials": "Allowed Materials",

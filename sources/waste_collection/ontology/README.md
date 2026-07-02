@@ -31,7 +31,7 @@ The live snapshot now includes controlled lists for additional import domains:
 
 Country-pack crosswalk files for NL, DK, BE, and UK now include curated seed
 mappings for waste categories, collection systems, sorting methods, fee
-systems, connection types, and required bin-capacity reference terms.
+systems, participation policies, and required bin-capacity reference terms.
 
 ## How to export the live vocabulary snapshot
 
@@ -87,12 +87,12 @@ should be promoted here instead of remaining only in chat memory.
 - **Biowaste with home-composter exception**
   If an official source states that biowaste participation is obligatory except
   for households that compost at home, map the collection to
-  `Collection.connection_type = MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION`.
+  `Collection.participation_policy = MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION`.
 
 - **Opt-in biowaste service**
   If an official source frames the biowaste bin as an orderable or requestable
   service and does not also state a mandatory participation rule, map the
-  collection to `Collection.connection_type = VOLUNTARY`.
+  collection to `Collection.participation_policy = VOLUNTARY`.
 
 - **Combined food-waste and green-waste path**
   If one source-supported collection path jointly accepts food waste and green

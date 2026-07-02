@@ -107,9 +107,9 @@ class CatchmentConnectionRateSerializer(serializers.Serializer):
         return data
 
 
-class CatchmentConnectionTypeSerializer(serializers.Serializer):
+class CatchmentParticipationPolicySerializer(serializers.Serializer):
     catchment_id = serializers.IntegerField()
-    connection_type = serializers.CharField(allow_blank=True, allow_null=True)
+    participation_policy = serializers.CharField(allow_blank=True, allow_null=True)
 
 
 class CatchmentFoodWasteCategorySerializer(serializers.Serializer):

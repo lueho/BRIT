@@ -34,7 +34,7 @@ CONCEPT_SCHEME_URIS: Final[dict[str, str]] = {
     "materials": f"{VOCABULARY_URI_BASE}/scheme/material",
     "units": f"{VOCABULARY_URI_BASE}/scheme/unit",
     "material_roles": f"{VOCABULARY_URI_BASE}/scheme/material-role",
-    "connection_types": f"{VOCABULARY_URI_BASE}/scheme/connection-type",
+    "participation_policies": f"{VOCABULARY_URI_BASE}/scheme/connection-type",
     "required_bin_capacity_references": (
         f"{VOCABULARY_URI_BASE}/scheme/required-bin-capacity-reference"
     ),
@@ -225,9 +225,11 @@ def get_waste_collection_controlled_vocabulary() -> dict[str, object]:
         "materials": get_material_names_for_collection_data(),
         "units": get_collection_unit_names_for_collection_data(),
         "material_roles": ["allowed", "forbidden"],
-        "connection_types": [
+        "participation_policies": [
             {"value": value, "label": label}
-            for value, label in Collection._meta.get_field("connection_type").choices
+            for value, label in Collection._meta.get_field(
+                "participation_policy"
+            ).choices
         ],
         "required_bin_capacity_references": [
             {"value": value, "label": label}

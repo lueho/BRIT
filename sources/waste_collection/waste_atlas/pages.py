@@ -696,7 +696,7 @@ MAP_PAGES = [
     ),
     _page(
         "generic",
-        "connection_type",
+        "participation_policy",
         "Participation Policy",
         "map/participation-policy/",
         "waste-atlas-participation-policy-map",
@@ -907,7 +907,7 @@ MAP_PAGES = [
     ),
     _page(
         "germany",
-        "connection_type",
+        "participation_policy",
         "Participation Policy",
         "map/germany/participation-policy/",
         "waste-atlas-germany-participation-policy-map",
@@ -1132,7 +1132,7 @@ MAP_PAGES = [
     ),
     _page(
         "nrw",
-        "connection_type",
+        "participation_policy",
         "Participation Policy",
         "map/nrw/participation-policy/",
         "waste-atlas-nrw-participation-policy-map",
@@ -1392,7 +1392,7 @@ MAP_PAGES = [
     ),
     _page(
         "catalonia",
-        "connection_type",
+        "participation_policy",
         "Participation Policy",
         "map/catalonia/participation-policy/",
         "waste-atlas-catalonia-participation-policy-map",
@@ -1631,7 +1631,7 @@ MAP_PAGES = [
     ),
     _page(
         "bw_rp",
-        "connection_type",
+        "participation_policy",
         "Participation Policy",
         "map/bw-rp/participation-policy/",
         "waste-atlas-bw-rp-participation-policy-map",

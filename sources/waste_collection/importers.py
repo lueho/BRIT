@@ -31,7 +31,7 @@ from utils.properties.models import Property, Unit
 # Value mappings
 # ---------------------------------------------------------------------------
 
-_CONNECTION_TYPE_MAP = {
+_PARTICIPATION_POLICY_MAP = {
     "mandatory": "MANDATORY",
     "mandatory with exception": "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION",
     "mandatory with exception for home composters": "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION",
@@ -397,7 +397,7 @@ class CollectionImporter:
         collector = self._resolve_collector(record, label, stats)
         fee_system = self._resolve_fee_system(record, label, stats)
         frequency = self._resolve_frequency(record, label, stats)
-        connection_type = self._resolve_connection_type(record, label, stats)
+        participation_policy = self._resolve_participation_policy(record, label, stats)
         access_control_bp = record.get(
             "access_control_bp"
         )  # bool or None, no mapping needed
@@ -500,13 +500,16 @@ class CollectionImporter:
                 collection.frequency = None
                 update_fields.append("frequency")
 
-            # Update connection_type if different
-            if connection_type and collection.connection_type != connection_type:
+            # Update participation_policy if different
+            if (
+                participation_policy
+                and collection.participation_policy != participation_policy
+            ):
                 changes.append(
-                    f"connection_type: {collection.connection_type or 'None'} → {connection_type}"
+                    f"participation_policy: {collection.participation_policy or 'None'} → {participation_policy}"
                 )
-                collection.connection_type = connection_type
-                update_fields.append("connection_type")
+                collection.participation_policy = participation_policy
+                update_fields.append("participation_policy")
 
             # Update access_control_bp if provided and different
             if (
@@ -677,7 +680,7 @@ class CollectionImporter:
                 fee_system=fee_system,
                 valid_from=valid_from,
                 valid_until=valid_until,
-                connection_type=connection_type,
+                participation_policy=participation_policy,
                 access_control_bp=access_control_bp,
                 access_control_pap=access_control_pap,
                 bin_configuration=bin_configuration,
@@ -1392,16 +1395,16 @@ class CollectionImporter:
                 self._submit_for_review(freq)
         return freq
 
-    def _resolve_connection_type(
+    def _resolve_participation_policy(
         self, record: dict, label: str, stats: dict
     ) -> str | None:
-        value = record.get("connection_type") or ""
+        value = record.get("participation_policy") or ""
         if not value:
             return None
-        mapped = _CONNECTION_TYPE_MAP.get(value.lower())
+        mapped = _PARTICIPATION_POLICY_MAP.get(value.lower())
         if mapped is None:
             stats["warnings"].append(
-                f"{label}: Unknown connection_type '{value}' — field left empty."
+                f"{label}: Unknown participation_policy '{value}' — field left empty."
             )
         return mapped
 

@@ -196,7 +196,7 @@ britvoc:concept/material-role/forbidden a skos:Concept ;
     skos:prefLabel "forbidden"@en .
 
 britvoc:scheme/connection-type a skos:ConceptScheme ;
-    skos:prefLabel "Connection type"@en .
+    skos:prefLabel "Participation policy"@en .
 
 britvoc:concept/connection-type/mandatory a skos:Concept ;
     skos:inScheme britvoc:scheme/connection-type ;

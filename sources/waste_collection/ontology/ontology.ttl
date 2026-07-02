@@ -77,9 +77,9 @@ soilcom:hasCatchment a owl:ObjectProperty ;
     rdfs:domain soilcom:Collection ;
     rdfs:range soilcom:Catchment .
 
-soilcom:connectionTypeCode a owl:DatatypeProperty ;
-    rdfs:label "connection type code"@en ;
-    rdfs:comment "Code value from Collection.connection_type choices."@en ;
+soilcom:participationPolicyCode a owl:DatatypeProperty ;
+    rdfs:label "participation policy code"@en ;
+    rdfs:comment "Code value from Collection.participation_policy choices."@en ;
     rdfs:domain soilcom:Collection ;
     rdfs:range xsd:string ;
     rdfs:seeAlso <https://brit.bioresource-tools.net/vocab/soilcom/scheme/connection-type> .

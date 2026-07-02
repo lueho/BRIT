@@ -1061,13 +1061,13 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
     create_object_data = {
         "name": "Test Collection",
         "description": "The original collection",
-        "connection_type": "VOLUNTARY",
+        "participation_policy": "VOLUNTARY",
         "valid_from": date.today(),
         "valid_until": date.today() + timedelta(days=365),
     }
     update_object_data = {
         "name": "Updated Test Collection",
-        "connection_type": "VOLUNTARY",
+        "participation_policy": "VOLUNTARY",
         "description": "This has been updated",
     }
 
@@ -1290,7 +1290,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
                 "collector": Collector.objects.first().id,
                 "collection_system": CollectionSystem.objects.first().id,
                 "waste_category": WasteCategory.objects.first().id,
-                "connection_type": "VOLUNTARY",
+                "participation_policy": "VOLUNTARY",
                 "allowed_materials": [
                     self.allowed_material_1.id,
                     self.allowed_material_2.id,
@@ -1322,7 +1322,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             "collector": Collector.objects.first().id,
             "collection_system": CollectionSystem.objects.first().id,
             "waste_category": WasteCategory.objects.first().id,
-            "connection_type": "VOLUNTARY",
+            "participation_policy": "VOLUNTARY",
             "allowed_materials": [],
             "forbidden_materials": [
                 self.forbidden_material_1.id,
@@ -1515,7 +1515,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
                 "collector": Collector.objects.first().id,
                 "collection_system": CollectionSystem.objects.first().id,
                 "waste_category": WasteCategory.objects.first().id,
-                "connection_type": "VOLUNTARY",
+                "participation_policy": "VOLUNTARY",
                 "allowed_materials": [
                     self.allowed_material_1.id,
                     self.allowed_material_2.id,
@@ -1543,7 +1543,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
                 "collector": Collector.objects.first().id,
                 "collection_system": CollectionSystem.objects.first().id,
                 "waste_category": WasteCategory.objects.first().id,
-                "connection_type": "VOLUNTARY",
+                "participation_policy": "VOLUNTARY",
                 "allowed_materials": [
                     self.allowed_material_1.id,
                     self.allowed_material_2.id,
@@ -1574,7 +1574,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             "collector": self.unpublished_object.collector.id,
             "collection_system": self.unpublished_object.collection_system.id,
             "waste_category": self.unpublished_object.waste_category.id,
-            "connection_type": "VOLUNTARY",
+            "participation_policy": "VOLUNTARY",
             "allowed_materials": [
                 m.id for m in self.unpublished_object.allowed_materials.all()
             ],
@@ -1601,7 +1601,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             "collector": self.unpublished_object.collector.id,
             "collection_system": self.unpublished_object.collection_system.id,
             "waste_category": self.unpublished_object.waste_category.id,
-            "connection_type": "VOLUNTARY",
+            "participation_policy": "VOLUNTARY",
             "allowed_materials": [
                 m.id for m in self.unpublished_object.allowed_materials.all()
             ],
@@ -1820,7 +1820,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             ).id,
             "collection_system": self.collection_system.id,
             "waste_category": self.waste_category.id,
-            "connection_type": "VOLUNTARY",
+            "participation_policy": "VOLUNTARY",
             "allowed_materials": [
                 self.allowed_material_1.id,
                 self.allowed_material_2.id,
@@ -1853,7 +1853,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             "collector": initial["collector"],
             "collection_system": initial["collection_system"],
             "waste_category": initial["waste_category"],
-            "connection_type": "VOLUNTARY",
+            "participation_policy": "VOLUNTARY",
             "allowed_materials": initial["allowed_materials"],
             "forbidden_materials": initial["forbidden_materials"],
             "frequency": initial["frequency"],
@@ -1880,7 +1880,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             "collector": initial["collector"],
             "collection_system": initial["collection_system"],
             "waste_category": initial["waste_category"],
-            "connection_type": "VOLUNTARY",
+            "participation_policy": "VOLUNTARY",
             "allowed_materials": initial["allowed_materials"],
             "forbidden_materials": initial["forbidden_materials"],
             "frequency": initial["frequency"],
@@ -2142,7 +2142,7 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
             "collector": self.collector.id,
             "collection_system": self.collection_system.id,
             "waste_category": self.waste_category.id,
-            "connection_type": "VOLUNTARY",
+            "participation_policy": "VOLUNTARY",
             "allowed_materials": [
                 self.allowed_material_1.id,
                 self.allowed_material_2.id,
@@ -2177,7 +2177,7 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
             "collector": self.collector.id,
             "collection_system": self.collection_system.id,
             "waste_category": self.waste_category.id,
-            "connection_type": "VOLUNTARY",
+            "participation_policy": "VOLUNTARY",
             "allowed_materials": [
                 self.allowed_material_1.id,
                 self.allowed_material_2.id,
@@ -2796,7 +2796,7 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
             valid_until=date.today() + timedelta(days=30),
             publication_status=Collection.STATUS_PUBLISHED,
             owner=cls.user,
-            connection_type="VOLUNTARY",
+            participation_policy="VOLUNTARY",
         )
         cls.published_collection.allowed_materials.add(
             cls.waste_component,
@@ -2835,7 +2835,7 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
             "collector": self.collector.pk,
             "collection_system": self.collection_system.pk,
             "waste_category": self.waste_category.pk,
-            "connection_type": "VOLUNTARY",
+            "participation_policy": "VOLUNTARY",
             "allowed_materials": [self.waste_component.pk],
             "valid_from": date.today(),
             "form-TOTAL_FORMS": 1,
@@ -2926,7 +2926,7 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
                 valid_until=date.today() + timedelta(days=120),
                 publication_status=status,
                 owner=self.user,
-                connection_type="VOLUNTARY",
+                participation_policy="VOLUNTARY",
             )
             collection.allowed_materials.add(self.waste_component, self.material)
             with self.assertRaises(ValidationError) as cm:
@@ -3079,7 +3079,7 @@ class CollectionFilterWithCatchmentAndPropertiesRegressionTest(
             "collector": "",
             "collection_system": "",
             "filter": "Filter",
-            "connection_type": "",
+            "participation_policy": "",
             "connection_rate_min": "0",
             "connection_rate_max": "100",
             "connection_rate_is_null": "true",
@@ -4301,7 +4301,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         selection_context = build_map_selection_context(
             reverse,
             selected_map_set="DE-NW",
-            selected_theme="connection_type",
+            selected_theme="participation_policy",
         )
 
         sweden_biowaste_themes = {
@@ -6363,14 +6363,16 @@ class CollectionCSVRendererTestCase(TestCase):
         catchment = CollectionCatchment.objects.create(
             name="Test catchment", region=nuts.region_ptr
         )
-        for i, connection_type in enumerate(["MANDATORY", "not_specified"], start=1):
+        for i, participation_policy in enumerate(
+            ["MANDATORY", "not_specified"], start=1
+        ):
             collection = Collection.objects.create(
                 name=f"collection{i}",
                 catchment=catchment,
                 collector=Collector.objects.create(name=f"collector{1}"),
                 collection_system=CollectionSystem.objects.create(name="Test system"),
                 waste_category=waste_category,
-                connection_type=connection_type,
+                participation_policy=participation_policy,
                 fee_system=FeeSystem.objects.create(name="Fixed fee"),
                 frequency=frequency,
                 valid_from=date(2020, 1, 1),
@@ -6404,13 +6406,13 @@ class CollectionCSVRendererTestCase(TestCase):
         fieldnames = [renderer.labels[key] for key in renderer.header]
         self.assertListEqual(fieldnames, list(reader.fieldnames))
         self.assertEqual(2, sum(1 for _ in reader))
-        self.assertIn("Connection type", reader.fieldnames)
+        self.assertIn("Participation policy", reader.fieldnames)
         self.assertEqual(
-            renderer.header.index("connection_type"),
-            reader.fieldnames.index("Connection type"),
+            renderer.header.index("participation_policy"),
+            reader.fieldnames.index("Participation policy"),
         )
 
-    def test_connection_type_field_exported(self):
+    def test_participation_policy_field_exported(self):
         renderer = CollectionCSVRenderer()
         renderer.render(self.file, self.content)
         self.file.seek(0)
@@ -6422,7 +6424,7 @@ class CollectionCSVRendererTestCase(TestCase):
             "not_specified",
         ]
         for row in reader:
-            self.assertIn(row["Connection type"], valid_values)
+            self.assertIn(row["Participation policy"], valid_values)
 
     def test_allowed_materials_formatted_as_comma_separated_list_in_one_field(self):
         renderer = CollectionCSVRenderer()
@@ -7452,7 +7454,7 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
             "forbidden_materials": [],
             "frequency": self.frequency.id,
             "valid_from": date(2024, 6, 1),
-            "connection_type": "VOLUNTARY",
+            "participation_policy": "VOLUNTARY",
         }
         form = CollectionModelForm(
             instance=self.collection, data=dict_to_querydict(form_data)
@@ -7488,7 +7490,7 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
             "forbidden_materials": [],
             "frequency": self.frequency.id,
             "valid_from": date(2024, 6, 1),
-            "connection_type": "VOLUNTARY",
+            "participation_policy": "VOLUNTARY",
         }
         form = CollectionModelForm(
             instance=self.collection, data=dict_to_querydict(form_data)
@@ -7544,7 +7546,7 @@ class CollectionInlineWasteFieldsSaveTestCase(TestCase):
             "forbidden_materials": [],
             "frequency": self.frequency.id,
             "valid_from": date(2024, 1, 1),
-            "connection_type": "VOLUNTARY",
+            "participation_policy": "VOLUNTARY",
         }
         form = CollectionModelForm(data=dict_to_querydict(form_data))
         self.assertTrue(form.is_valid(), form.errors)
@@ -7582,7 +7584,7 @@ class CollectionInlineWasteFieldsSaveTestCase(TestCase):
             "forbidden_materials": [self.forbidden_material.id],
             "frequency": self.frequency.id,
             "valid_from": date(2024, 1, 1),
-            "connection_type": "VOLUNTARY",
+            "participation_policy": "VOLUNTARY",
         }
         form = CollectionModelForm(
             instance=collection, data=dict_to_querydict(form_data)
@@ -7720,7 +7722,7 @@ class CollectionImporterBinConfigurationTestCase(TestCase):
             "collector_name": None,
             "fee_system": None,
             "frequency": None,
-            "connection_type": None,
+            "participation_policy": None,
             "min_bin_size": None,
             "required_bin_capacity": None,
             "required_bin_capacity_reference": None,

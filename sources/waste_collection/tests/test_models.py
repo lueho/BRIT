@@ -386,6 +386,25 @@ class CollectionTestCase(TestCase):
             self.collection.full_clean()
             self.collection.save()
 
+    def test_participation_policy_field_exists_and_persists_values(self):
+        """The renamed field participation_policy stores and retrieves values."""
+        field_names = {f.name for f in Collection._meta.get_fields()}
+        self.assertIn("participation_policy", field_names)
+        self.assertNotIn("connection_type", field_names)
+
+        self.collection.participation_policy = "MANDATORY"
+        self.collection.save(update_fields=["participation_policy"])
+        self.collection.refresh_from_db()
+        self.assertEqual(self.collection.participation_policy, "MANDATORY")
+
+    def test_get_participation_policy_display_accessor_exists(self):
+        """Django auto-generates get_FOO_display for the renamed field."""
+        self.collection.participation_policy = "VOLUNTARY"
+        self.collection.save(update_fields=["participation_policy"])
+        self.assertEqual(
+            self.collection.get_participation_policy_display(), "voluntary"
+        )
+
 
 class CollectionMaterialMatchingQuerySetTestCase(TestCase):
     @classmethod

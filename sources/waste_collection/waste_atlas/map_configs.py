@@ -1046,10 +1046,10 @@ MAP_CONFIGS = {
         "quartileColors": ["#d1e7e6", "#7fcce9", "#0090cb", "#00608e"],
         "quartilePreserveClasses": ["no_d2d"],
     },
-    "connection_type": {
+    "participation_policy": {
         "title": "Participation Policy",
-        "dataUrl": "/waste_collection/api/waste-atlas/connection-type/",
-        "dataField": "connection_type",
+        "dataUrl": "/waste_collection/api/waste-atlas/participation-policy/",
+        "dataField": "participation_policy",
         "categories": [
             {
                 "value": "no_bio_collection",
@@ -1080,7 +1080,7 @@ MAP_CONFIGS = {
         "noDataColor": NO_DATA_COLOR,
         "noDataLabel": "No data",
         "legendTitle": "Participation Policy",
-        "fileBase": "connection_type",
+        "fileBase": "participation_policy",
     },
     "denmark_collection_support": {
         "title": "Accepted materials for biowaste collection aids",

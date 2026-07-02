@@ -608,7 +608,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             "fee_system",
             "bin_configuration",
             "established",
-            "connection_type",
+            "participation_policy",
             "min_bin_size",
             "required_bin_capacity",
             "required_bin_capacity_reference",
@@ -1124,7 +1124,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 established=data.get("established"),
                 valid_from=data["valid_from"],
                 valid_until=data.get("valid_until"),
-                connection_type=data.get("connection_type"),
+                participation_policy=data.get("participation_policy"),
                 min_bin_size=data.get("min_bin_size"),
                 required_bin_capacity=data.get("required_bin_capacity"),
                 required_bin_capacity_reference=data.get(
@@ -1235,8 +1235,8 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 established=data.get("established", predecessor.established),
                 valid_from=data["valid_from"],
                 valid_until=data.get("valid_until"),
-                connection_type=data.get(
-                    "connection_type", predecessor.connection_type
+                participation_policy=data.get(
+                    "participation_policy", predecessor.participation_policy
                 ),
                 min_bin_size=data.get("min_bin_size", predecessor.min_bin_size),
                 required_bin_capacity=data.get(
