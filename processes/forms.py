@@ -293,24 +293,15 @@ class ProcessSourceInlineForm(forms.ModelForm):
         fields = ("source",)
 
     def __init__(self, *args, **kwargs):
+        request = kwargs.pop("request", None)
         super().__init__(*args, **kwargs)
-        extra_ids = set()
-        if self.instance and self.instance.pk and self.instance.source_id:
-            extra_ids.add(self.instance.source_id)
-        data = kwargs.get("data") or (args[0] if args else None)
-        if data:
-            prefix = self.prefix or ""
-            key = f"{prefix}-source" if prefix else "source"
-            val = data.get(key)
-            if val:
-                try:
-                    extra_ids.add(int(val))
-                except (ValueError, TypeError):
-                    pass
-        if extra_ids:
-            published = Source.objects.filter(publication_status="published")
-            existing = Source.objects.filter(pk__in=extra_ids)
-            self.fields["source"].queryset = published | existing
+        if request and hasattr(request, "user"):
+            from utils.object_management.permissions import filter_queryset_for_user
+
+            qs = filter_queryset_for_user(Source.objects.all(), request.user)
+            if self.instance and self.instance.pk and self.instance.source_id:
+                qs = qs | Source.objects.filter(pk=self.instance.source_id)
+            self.fields["source"].queryset = qs
 
 
 class ProcessSourceFormSet(OrderedUniqueInlineFormSet):
@@ -325,6 +316,11 @@ class ProcessSourceInline(InlineFormSetFactory):
     formset_class = ProcessSourceFormSet
     factory_kwargs = {"extra": 1, "can_delete": True}
     formset_helper_class = DynamicTableInlineFormSetHelper
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
 
 
 class ProcessMaterialInlineForm(forms.ModelForm):
