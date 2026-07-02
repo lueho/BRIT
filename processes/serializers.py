@@ -6,7 +6,9 @@ Provides REST API serializers for all process-related models.
 from rest_framework import serializers
 
 from bibliography.serializers import SourceModelSerializer
+from materials.models import Material
 from materials.serializers import MaterialAPISerializer
+from utils.properties.models import Unit
 from utils.properties.serializers import UnitModelSerializer
 
 from .models import (
@@ -45,13 +47,13 @@ class ProcessMaterialAPISerializer(serializers.ModelSerializer):
     material = MaterialAPISerializer(read_only=True)
     material_id = serializers.PrimaryKeyRelatedField(
         source="material",
-        queryset=serializers.SerializerMethodField(),
+        queryset=Material.objects.all(),
         write_only=True,
     )
     quantity_unit = UnitModelSerializer(read_only=True)
     quantity_unit_id = serializers.PrimaryKeyRelatedField(
         source="quantity_unit",
-        queryset=serializers.SerializerMethodField(),
+        queryset=Unit.objects.all(),
         write_only=True,
         required=False,
         allow_null=True,
@@ -85,7 +87,7 @@ class ProcessOperatingParameterSerializer(serializers.ModelSerializer):
     unit = UnitModelSerializer(read_only=True)
     unit_id = serializers.PrimaryKeyRelatedField(
         source="unit",
-        queryset=serializers.SerializerMethodField(),
+        queryset=Unit.objects.all(),
         write_only=True,
         required=False,
         allow_null=True,
