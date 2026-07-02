@@ -21,7 +21,7 @@ from rest_framework.viewsets import ModelViewSet
 
 from bibliography.models import Source
 from maps.mixins import GeoJSONMixin
-from maps.views import CatchmentCreateMergeLauView, CatchmentRegionSummaryAPIView
+from maps.views import CatchmentCreateMergeLauView
 from utils.properties.models import Unit
 from utils.tests.testcases import (
     AbstractTestCases,

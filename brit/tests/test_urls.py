@@ -1,5 +1,5 @@
 from django.test import SimpleTestCase
-from django.urls import resolve, reverse
+from django.urls import reverse
 
 
 class SessionUrlRoutingTests(SimpleTestCase):
