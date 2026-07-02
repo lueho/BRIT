@@ -301,6 +301,22 @@ class ScenarioDownloadSummaryAuthTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
+    def test_moderator_can_download(self):
+        moderator = User.objects.create_user(username="mod", password="pass")
+        ct = ContentType.objects.get_for_model(Scenario)
+        perm, _ = Permission.objects.get_or_create(
+            codename="can_moderate_scenario",
+            content_type=ct,
+            defaults={"name": "Can moderate scenario"},
+        )
+        moderator.user_permissions.add(perm)
+        self.client.force_login(moderator)
+        url = reverse(
+            "scenario-download-summary", kwargs={"scenario_pk": self.scenario.pk}
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
 
 class ScenarioDownloadResultSummaryAuthTests(TestCase):
     @classmethod
@@ -337,6 +353,23 @@ class ScenarioDownloadResultSummaryAuthTests(TestCase):
 
     def test_owner_can_download(self):
         self.client.force_login(self.owner)
+        url = reverse(
+            "scenario-download-result-summary",
+            kwargs={"scenario_pk": self.scenario.pk},
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_moderator_can_download(self):
+        moderator = User.objects.create_user(username="mod", password="pass")
+        ct = ContentType.objects.get_for_model(Scenario)
+        perm, _ = Permission.objects.get_or_create(
+            codename="can_moderate_scenario",
+            content_type=ct,
+            defaults={"name": "Can moderate scenario"},
+        )
+        moderator.user_permissions.add(perm)
+        self.client.force_login(moderator)
         url = reverse(
             "scenario-download-result-summary",
             kwargs={"scenario_pk": self.scenario.pk},

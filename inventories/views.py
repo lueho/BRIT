@@ -448,7 +448,7 @@ def download_scenario_summary(request, scenario_pk):
     except Scenario.DoesNotExist:
         raise Http404 from None
     policy = get_object_policy(request.user, scenario, request=request)
-    if not (policy["is_owner"] or policy["is_published"] or policy["is_staff"]):
+    if not (policy["is_owner"] or policy["is_published"] or policy["is_staff"] or policy["is_moderator"]):
         return HttpResponseForbidden()
     file_name = f"scenario_{scenario_pk}_summary.json"
     with io.StringIO(json.dumps(scenario.summary_dict(), indent=4)) as file:
@@ -564,7 +564,7 @@ def download_scenario_result_summary(request, scenario_pk):
     except Scenario.DoesNotExist:
         raise Http404 from None
     policy = get_object_policy(request.user, scenario, request=request)
-    if not (policy["is_owner"] or policy["is_published"] or policy["is_staff"]):
+    if not (policy["is_owner"] or policy["is_published"] or policy["is_staff"] or policy["is_moderator"]):
         return HttpResponseForbidden()
     result = ScenarioResult(scenario)
     with io.StringIO(json.dumps(result.summary_dict(), indent=4)) as file:
