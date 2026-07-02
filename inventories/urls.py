@@ -99,7 +99,7 @@ urlpatterns = [
     path(
         "scenarios/<int:scenario_pk>/materials/<int:material_pk>/<int:component_pk>/seasonal_distributions/create/",
         SeasonalDistributionCreateView.as_view(),
-        name="seasonal-distribution-create",
+        name="scenario-seasonal-distribution-create",
     ),
     path(
         "scenarios/<int:pk>/<int:algorithm_pk>/<int:feedstock_pk>/",
