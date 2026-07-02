@@ -407,8 +407,14 @@ class EvaluationStatusAuthTests(TestCase):
 class ScenarioAddAlgorithmAuthBypassTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        from django.contrib.auth.models import Permission
+
         cls.owner_a = User.objects.create_user(username="owner_a", password="pass")
         cls.owner_b = User.objects.create_user(username="owner_b", password="pass")
+        # Grant change permission so the owner passes UserPassesTestMixin for
+        # editing their own private scenario (mirrors the standard test setup).
+        change_perm = Permission.objects.get(codename="change_scenario")
+        cls.owner_a.user_permissions.add(change_perm)
         region = Region.objects.create(name="R", publication_status="published")
         catchment = Catchment.objects.create(
             name="C",
@@ -422,6 +428,17 @@ class ScenarioAddAlgorithmAuthBypassTests(TestCase):
         cls.scenario_b = Scenario.objects.create(
             name="B", owner=cls.owner_b, region=region, catchment=catchment
         )
+        # Minimal valid fixtures so post() can complete without raising.
+        material = Material.objects.create(name="M", owner=cls.owner_a)
+        cls.feedstock = SampleSeries.objects.create(
+            name="F", owner=cls.owner_a, material=material
+        )
+        geodataset = GeoDataset.objects.create(
+            name="G", owner=cls.owner_a, region=region
+        )
+        cls.algorithm = InventoryAlgorithm.objects.create(
+            name="A", geodataset=geodataset
+        )
 
     def test_post_uses_url_pk_not_body_scenario(self):
         """post() must use the URL pk, ignoring any 'scenario' field in POST body."""
@@ -432,14 +449,25 @@ class ScenarioAddAlgorithmAuthBypassTests(TestCase):
             "scenario-add-configuration",
             kwargs={"pk": self.scenario_a.pk},
         )
-        # Patch add_inventory_algorithm to capture which scenario it was called on
+        # Patch add_inventory_algorithm so no real side effects occur.
         with patch.object(Scenario, "add_inventory_algorithm") as mock_add:
             mock_add.return_value = None
-            # Supply scenario_b in POST body, but the view should use scenario_a
-            # from the URL pk. We need valid-looking POST data for feedstock/algo.
-            from materials.models import SampleSeries
-
-            with self.assertRaises(SampleSeries.DoesNotExist):
-                self.client.post(url, {"scenario": self.scenario_b.pk})
-            # add_inventory_algorithm should NOT have been called with scenario_b
-            mock_add.assert_not_called()
+            # Supply scenario_b in POST body; the view must use scenario_a
+            # from the URL pk. Provide valid feedstock/algorithm so post()
+            # completes and redirects rather than raising.
+            response = self.client.post(
+                url,
+                {
+                    "scenario": self.scenario_b.pk,
+                    "feedstock": self.feedstock.pk,
+                    "inventory_algorithm": self.algorithm.pk,
+                },
+            )
+        # post() completed and redirected to scenario_a's detail page,
+        # proving the URL pk (scenario_a) was used, not the body value.
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"],
+            reverse("scenario-detail", kwargs={"pk": self.scenario_a.pk}),
+        )
+        mock_add.assert_called_once()
