@@ -728,6 +728,9 @@ MAP_CONFIGS = {
         "noDataLabel": "No data",
         "legendTitle": "Collection system",
         "fileBase": "collection_systems",
+        "conflictUrl": "/waste_collection/api/waste-atlas/collection-conflicts/",
+        "conflictTheme": "collection_system",
+        "conflictOverlayLabel": "Conflicting catchments (>1 collection system)",
     },
     "combined_collection_count": {
         "title": "Annual collection count: biowaste vs residual waste",

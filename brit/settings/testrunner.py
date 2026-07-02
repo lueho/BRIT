@@ -52,6 +52,19 @@ CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_BROKER_USE_SSL = None
 CELERY_REDIS_BACKEND_USE_SSL = None
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "brit-test-default",
+    },
+    "geojson": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "brit-test-geojson",
+        "TIMEOUT": 86400,
+        "KEY_PREFIX": "geojson",
+    },
+}
+
 AUTO_ENQUEUE_URL_CHECKS = False
 
 # Use local filesystem storage in tests to avoid S3 dependencies.

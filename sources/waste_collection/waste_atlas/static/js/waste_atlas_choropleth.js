@@ -34,6 +34,10 @@ var WasteAtlasChoropleth = (function () {
   var COUNTRY_STROKE_WIDTH = 1.5;      // Thicker than Bundesläender border
   var CATCHMENT_STROKE = '#232323';
   var CATCHMENT_STROKE_WIDTH = 0.35;   // ≈ 0.1 mm at 96 DPI
+  // Maintainer aid: outline style for catchments with conflicting collections.
+  var CONFLICT_STROKE = '#d7263d';
+  var CONFLICT_STROKE_WIDTH = 1.6;
+  var CONFLICT_STROKE_DASHARRAY = '3 2';
   var EXPORT_DPI = 300;
   var EXPORT_WIDTH_MM = 160;
   var EXPORT_HEIGHT_MM = 110;
@@ -49,6 +53,12 @@ var WasteAtlasChoropleth = (function () {
   var _lastLoadCfg = null;
   var _baseLoadCfg = null;
   var _measureCtx = null;
+  // Maintainer conflict aid: catchment ids with conflicting theme values,
+  // plus per-catchment detail for tooltips. Populated on demand by the
+  // "Highlight conflicting catchments" toggle.
+  var _conflictCatchments = null;
+  var _conflictDetails = null;
+  var _conflictEnabled = false;
 
   // ---- helpers --------------------------------------------------------------
 
@@ -61,6 +71,49 @@ var WasteAtlasChoropleth = (function () {
         if (!r.ok) throw new Error(r.status + ' ' + r.statusText + ' — ' + url);
         return r.json();
       });
+  }
+
+  /**
+   * Build the conflict-aid API URL for the current selection/theme.
+   * Returns null when the map config does not opt into the conflict aid.
+   */
+  function _conflictUrlFor(cfg, country, year, fromYear) {
+    if (!cfg.conflictUrl || !cfg.conflictTheme) return null;
+    if (cfg.changeMode || fromYear) return null; // not meaningful for diffs
+    var params = [
+      'theme=' + encodeURIComponent(cfg.conflictTheme),
+      'country=' + encodeURIComponent(country || cfg.country || 'DE'),
+      'year=' + encodeURIComponent(year || cfg.year)
+    ];
+    if (cfg.nutsPrefix) {
+      params.push('nuts_prefix=' + encodeURIComponent(cfg.nutsPrefix));
+    }
+    return cfg.conflictUrl + '?' + params.join('&');
+  }
+
+  /**
+   * Fetch conflict rows for the current selection and store them as a
+   * catchment-id set + detail map.  Resolves with the populated set (or an
+   * empty set when the aid is disabled/unsupported for this theme).
+   */
+  function _loadConflicts(cfg, country, year, fromYear) {
+    var url = _conflictUrlFor(cfg, country, year, fromYear);
+    if (!url) {
+      _conflictCatchments = null;
+      _conflictDetails = null;
+      return Promise.resolve(null);
+    }
+    return _fetchJSON(url).then(function (rows) {
+      var ids = new Set();
+      var details = {};
+      (rows || []).forEach(function (row) {
+        ids.add(row.catchment_id);
+        details[row.catchment_id] = row;
+      });
+      _conflictCatchments = ids;
+      _conflictDetails = details;
+      return ids;
+    });
   }
 
   function _isNoDataValue(value, categories) {
@@ -1747,6 +1800,11 @@ var WasteAtlasChoropleth = (function () {
               }
             });
           }
+          if (_conflictEnabled && !layout.exportMode && _conflictDetails && _conflictDetails[p.catchment_id]) {
+            var detail = _conflictDetails[p.catchment_id];
+            tooltip += '\n⚠ Conflicting collections (' + detail.distinct_count + '): '
+              + detail.distinct_values.join(', ');
+          }
           return tooltip;
         });
     }
@@ -1776,6 +1834,26 @@ var WasteAtlasChoropleth = (function () {
         .attr('stroke-width', cfg.outlineStrokeWidth || 1.35)
         .attr('stroke-linejoin', 'round')
         .attr('stroke-linecap', 'round')
+        .style('pointer-events', 'none');
+    }
+
+    // Maintainer aid: outline catchments whose theme value is ambiguous
+    // (more than one collection competes for the single displayed slot).
+    // Screen-only: the export legend carries no conflict entry, so drawing
+    // the outlines in exports would leave them unexplained.
+    if (_conflictEnabled && !layout.exportMode && _conflictCatchments && _conflictCatchments.size && data.catchments.features) {
+      _svg.append('g').attr('class', 'layer-catchments-conflict')
+        .selectAll('path')
+        .data(data.catchments.features.filter(function (d) {
+          return _conflictCatchments.has(d.properties.catchment_id);
+        }))
+        .enter().append('path')
+        .attr('d', path)
+        .attr('fill', 'none')
+        .attr('stroke', CONFLICT_STROKE)
+        .attr('stroke-width', CONFLICT_STROKE_WIDTH)
+        .attr('stroke-dasharray', CONFLICT_STROKE_DASHARRAY)
+        .attr('stroke-linejoin', 'round')
         .style('pointer-events', 'none');
     }
 
@@ -1875,7 +1953,10 @@ var WasteAtlasChoropleth = (function () {
     var swatchW = 22, swatchH = 16, gap = 6;
     var items = _legendItems(cfg);
     var hasOverlayLegend = cfg.overlayPatternField && cfg.overlayPatternLegendLabel && cfg._hasOverlayPattern;
-    var legendRows = items.length + (hasOverlayLegend ? 1 : 0);
+    var hasConflictLegend = !!(_conflictEnabled && cfg.conflictOverlayLabel
+      && _conflictCatchments && _conflictCatchments.size);
+    var legendRows = items.length + (hasOverlayLegend ? 1 : 0)
+      + (hasConflictLegend ? 1 : 0);
 
     if (layout.exportMode) {
       var opts = layout.legend;
@@ -1920,7 +2001,8 @@ var WasteAtlasChoropleth = (function () {
       }
     });
     items = normalCats.concat(noCollectionCats);
-    legendRows = items.length + (hasOverlayLegend ? 1 : 0);
+    legendRows = items.length + (hasOverlayLegend ? 1 : 0)
+      + (hasConflictLegend ? 1 : 0);
 
     if (cfg.noDataLabel && cfg._hasNoData !== false) {
       legendRows += 1;
@@ -1972,6 +2054,22 @@ var WasteAtlasChoropleth = (function () {
         .attr('font-size', 12)
         .attr('font-family', "'Nunito', sans-serif")
         .text(cfg.overlayPatternLegendLabel);
+      currentY += swatchH + gap;
+    }
+
+    if (hasConflictLegend) {
+      g.append('rect')
+        .attr('x', 0).attr('y', currentY + 4)
+        .attr('width', swatchW).attr('height', swatchH)
+        .attr('fill', '#ffffff')
+        .attr('stroke', CONFLICT_STROKE)
+        .attr('stroke-width', 1.4)
+        .attr('stroke-dasharray', CONFLICT_STROKE_DASHARRAY);
+      g.append('text')
+        .attr('x', swatchW + 8).attr('y', currentY + 4 + swatchH - 3)
+        .attr('font-size', 12)
+        .attr('font-family', "'Nunito', sans-serif")
+        .text(cfg.conflictOverlayLabel);
       currentY += swatchH + gap;
     }
 
@@ -2223,10 +2321,26 @@ var WasteAtlasChoropleth = (function () {
           }
           _lastData = data;
           _lastLoadCfg = renderCfg;
-          _render(data, renderCfg);
-          _hide(loadingEl);
-          if (btnSVG) btnSVG.disabled = false;
-          if (btnPNG) btnPNG.disabled = false;
+          var conflictPromise = _conflictEnabled
+            ? _loadConflicts(loadCfg, loadCfg.country, loadCfg.year, fromYear)
+            : Promise.resolve(null);
+          conflictPromise
+            .then(function () {
+              _render(data, renderCfg);
+              _hide(loadingEl);
+              if (btnSVG) btnSVG.disabled = false;
+              if (btnPNG) btnPNG.disabled = false;
+            })
+            .catch(function (conflictErr) {
+              // Conflict aid is best-effort; never block the map render.
+              console.warn('Waste Atlas conflict aid failed:', conflictErr);
+              _conflictCatchments = null;
+              _conflictDetails = null;
+              _render(data, renderCfg);
+              _hide(loadingEl);
+              if (btnSVG) btnSVG.disabled = false;
+              if (btnPNG) btnPNG.disabled = false;
+            });
         })
         .catch(function (err) {
           _hide(loadingEl);
@@ -2273,6 +2387,47 @@ var WasteAtlasChoropleth = (function () {
       toggleWrap.appendChild(toggleCheckbox);
       toggleWrap.appendChild(document.createTextNode('Quartile boundaries'));
       atlasControls.appendChild(toggleWrap);
+    }
+
+    // Maintainer aid: highlight catchments where the dataset holds more than
+    // one collection competing for the single displayed theme value.
+    if (atlasControls && cfg.conflictUrl && cfg.conflictTheme && !cfg.changeMode) {
+      var conflictWrap = document.createElement('label');
+      conflictWrap.style.display = 'inline-flex';
+      conflictWrap.style.alignItems = 'center';
+      conflictWrap.style.gap = '0.4rem';
+      conflictWrap.style.fontWeight = '600';
+      conflictWrap.style.cursor = 'pointer';
+      conflictWrap.style.fontSize = '0.875rem';
+      conflictWrap.style.color = CONFLICT_STROKE;
+
+      var conflictCheckbox = document.createElement('input');
+      conflictCheckbox.type = 'checkbox';
+      conflictCheckbox.checked = false;
+      conflictCheckbox.addEventListener('change', function () {
+        _conflictEnabled = conflictCheckbox.checked;
+        if (!_conflictEnabled) {
+          _conflictCatchments = null;
+          _conflictDetails = null;
+          if (_lastData && _lastLoadCfg) _render(_lastData, _lastLoadCfg);
+          return;
+        }
+        // Fetch conflicts for the current selection, then re-render.
+        if (_lastData && _lastLoadCfg) {
+          _loadConflicts(_lastLoadCfg, _lastLoadCfg.country, _lastLoadCfg.year, _lastLoadCfg.fromYear)
+            .then(function () { _render(_lastData, _lastLoadCfg); })
+            .catch(function (err) {
+              console.warn('Waste Atlas conflict aid failed:', err);
+              _conflictCatchments = null;
+              _conflictDetails = null;
+              _render(_lastData, _lastLoadCfg);
+            });
+        }
+      });
+
+      conflictWrap.appendChild(conflictCheckbox);
+      conflictWrap.appendChild(document.createTextNode('Highlight conflicting catchments'));
+      atlasControls.appendChild(conflictWrap);
     }
 
     if (btnSVG) btnSVG.addEventListener('click', function () { exportSVG(_exportFileBase() + '.svg'); });
