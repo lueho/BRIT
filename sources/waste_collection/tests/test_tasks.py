@@ -2,14 +2,34 @@
 
 from unittest.mock import Mock, patch
 
-from django.test import SimpleTestCase
+from django.contrib.auth import get_user_model
+from django.test import SimpleTestCase, TestCase
 
-from sources.waste_collection.tasks import warm_collection_geojson_cache
+from sources.waste_collection.models import WasteFlyer
+from sources.waste_collection.tasks import (
+    cleanup_orphaned_waste_flyers,
+    warm_collection_geojson_cache,
+)
 
 from .test_views import (  # noqa: F401
     CheckWasteFlyerUrlsTestCase,
     CheckWasteFlyerUrlWaybackFallbackTestCase,
 )
+
+
+class CleanupOrphanedWasteFlyersTestCase(TestCase):
+    """Test cleanup_orphaned_waste_flyers task does not raise FieldError."""
+
+    def test_cleanup_orphaned_waste_flyers_does_not_raise(self):
+        """Calling the task should not raise a FieldError from an invalid reverse relation."""
+        owner = get_user_model().objects.create(username="task_test_user")
+        flyer = WasteFlyer.objects.create(
+            url="https://www.example.com/orphan",
+            owner=owner,
+        )
+        deleted_count, _ = cleanup_orphaned_waste_flyers()
+        self.assertEqual(deleted_count, 1)
+        self.assertFalse(WasteFlyer.objects.filter(pk=flyer.pk).exists())
 
 
 class WasteCollectionGeoJSONWarmTaskTestCase(SimpleTestCase):

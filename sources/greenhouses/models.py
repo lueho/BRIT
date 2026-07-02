@@ -109,16 +109,16 @@ class Greenhouse(NamedUserCreatedObject):
 
     def grouped_growth_cycles(self):
         grouped_growth_cycles = {}
-        for cycle_number in range(1, self.number_of_growth_cycles() + 1):
+        for cycle_number in range(1, self.number_of_growth_cycles + 1):
             for component_distribution in self.growth_cycles.filter(
                 cycle_number=cycle_number
             ):
                 if cycle_number not in grouped_growth_cycles:
                     grouped_growth_cycles[cycle_number] = {
-                        component_distribution.material: []
+                        component_distribution.culture: []
                     }
                 grouped_growth_cycles[cycle_number][
-                    component_distribution.material
+                    component_distribution.culture
                 ].append(component_distribution)
         return grouped_growth_cycles
 

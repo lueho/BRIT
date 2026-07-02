@@ -82,6 +82,17 @@ class ProcessMaterialSerializerTestCase(TestCase):
         self.assertEqual(data["role_display"], "Input")
         self.assertEqual(float(data["quantity_value"]), 10.5)
 
+    def test_deserialize_process_material_with_ids(self):
+        """Write fields material_id and quantity_unit_id should accept valid PKs."""
+        data = {
+            "material_id": self.material.pk,
+            "role": ProcessMaterial.Role.OUTPUT,
+            "quantity_value": "5.0",
+            "quantity_unit_id": self.unit.pk,
+        }
+        serializer = ProcessMaterialAPISerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
 
 class ProcessOperatingParameterSerializerTestCase(TestCase):
     """Test ProcessOperatingParameter serializer."""
@@ -110,6 +121,17 @@ class ProcessOperatingParameterSerializerTestCase(TestCase):
         self.assertEqual(data["parameter_display"], "Temperature")
         self.assertEqual(float(data["value_min"]), 100)
         self.assertEqual(float(data["value_max"]), 200)
+
+    def test_deserialize_parameter_with_unit_id(self):
+        """Write field unit_id should accept a valid PK."""
+        data = {
+            "parameter": ProcessOperatingParameter.Parameter.PRESSURE,
+            "value_min": "1.0",
+            "value_max": "10.0",
+            "unit_id": self.unit.pk,
+        }
+        serializer = ProcessOperatingParameterSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
 
 
 class ProcessListSerializerTestCase(TestCase):
