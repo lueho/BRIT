@@ -256,13 +256,12 @@ class ScenarioAlgorithmConfigurationUpdateView(
         policy = get_object_policy(self.request.user, scenario, request=self.request)
         return policy["can_edit"]
 
-    @staticmethod
-    def post(request, *args, **kwargs):
-        scenario = Scenario.objects.get(id=request.POST.get("scenario"))
+    def post(self, request, *args, **kwargs):
+        scenario = Scenario.objects.get(id=self.kwargs.get("scenario_pk"))
         current_algorithm = InventoryAlgorithm.objects.get(
-            id=kwargs.get("algorithm_pk")
+            id=self.kwargs.get("algorithm_pk")
         )
-        current_feedstock = SampleSeries.objects.get(id=kwargs.get("feedstock_pk"))
+        current_feedstock = SampleSeries.objects.get(id=self.kwargs.get("feedstock_pk"))
         scenario.remove_inventory_algorithm(current_algorithm, current_feedstock)
         feedstock = SampleSeries.objects.get(id=request.POST.get("feedstock"))
         new_algorithm = InventoryAlgorithm.objects.get(
@@ -279,7 +278,7 @@ class ScenarioAlgorithmConfigurationUpdateView(
                     InventoryAlgorithmParameterValue.objects.get(id=value_id)
                 )
         scenario.add_inventory_algorithm(feedstock, new_algorithm, values)
-        return redirect("scenario-detail", pk=request.POST.get("scenario"))
+        return redirect("scenario-detail", pk=scenario.pk)
 
     def get_object(self, **kwargs):
         return Scenario.objects.get(pk=self.kwargs.get("scenario_pk"))
@@ -447,9 +446,9 @@ def download_scenario_summary(request, scenario_pk):
     try:
         scenario = Scenario.objects.get(id=scenario_pk)
     except Scenario.DoesNotExist:
-        raise Http404
+        raise Http404 from None
     policy = get_object_policy(request.user, scenario, request=request)
-    if not (policy["is_owner"] or policy["is_published"] or request.user.is_staff):
+    if not (policy["is_owner"] or policy["is_published"] or policy["is_staff"]):
         return HttpResponseForbidden()
     file_name = f"scenario_{scenario_pk}_summary.json"
     with io.StringIO(json.dumps(scenario.summary_dict(), indent=4)) as file:
@@ -563,9 +562,9 @@ def download_scenario_result_summary(request, scenario_pk):
     try:
         scenario = Scenario.objects.get(id=scenario_pk)
     except Scenario.DoesNotExist:
-        raise Http404
+        raise Http404 from None
     policy = get_object_policy(request.user, scenario, request=request)
-    if not (policy["is_owner"] or policy["is_published"] or request.user.is_staff):
+    if not (policy["is_owner"] or policy["is_published"] or policy["is_staff"]):
         return HttpResponseForbidden()
     result = ScenarioResult(scenario)
     with io.StringIO(json.dumps(result.summary_dict(), indent=4)) as file:
