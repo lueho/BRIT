@@ -189,6 +189,7 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
             waste_category=cls.biowaste,
             collection_system=collection_system,
             valid_from=date(year, 1, 1),
+            publication_status="published",
         )
 
     @classmethod
