@@ -1180,18 +1180,20 @@ class ReviewDashboardViewTests(TestCase):
             for item in baseline_response.context["review_items"]
         }
 
-        response = self.client.get(
-            reverse("object_management:review_dashboard"),
-            {
-                "model_type": ["not-a-content-type"],
-                "owner": "not-a-user",
-                "submitted_after": "not-a-date",
-                "submitted_before": "2026-99-99",
-                "ordering": "not-a-sort-field",
-            },
-        )
+        with self.assertLogs("utils.object_management", level="WARNING") as cm:
+            response = self.client.get(
+                reverse("object_management:review_dashboard"),
+                {
+                    "model_type": ["not-a-content-type"],
+                    "owner": "not-a-user",
+                    "submitted_after": "not-a-date",
+                    "submitted_before": "2026-99-99",
+                    "ordering": "not-a-sort-field",
+                },
+            )
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(cm.records), 4)
         self.assertSetEqual(
             {
                 (item._meta.label_lower, item.pk)
