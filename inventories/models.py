@@ -5,7 +5,7 @@ from celery.result import AsyncResult
 from celery.states import READY_STATES
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
-from django.db import models
+from django.db import models, transaction
 from django.db.models.query import QuerySet
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
@@ -477,27 +477,28 @@ class Scenario(NamedUserCreatedObject):
         else:
             values = algorithm.default_values()
 
-        if not values:
-            config = {
-                "scenario": self,
-                "feedstock": feedstock,
-                "geodataset": algorithm.geodataset,
-                "inventory_algorithm": algorithm,
-            }
-            ScenarioInventoryConfiguration.objects.create(**config)
-            return
-
-        for parameter, value_list in values.items():
-            for value in value_list:
+        with transaction.atomic():
+            if not values:
                 config = {
                     "scenario": self,
                     "feedstock": feedstock,
                     "geodataset": algorithm.geodataset,
                     "inventory_algorithm": algorithm,
-                    "inventory_parameter": parameter,
-                    "inventory_value": value,
                 }
                 ScenarioInventoryConfiguration.objects.create(**config)
+                return
+
+            for parameter, value_list in values.items():
+                for value in value_list:
+                    config = {
+                        "scenario": self,
+                        "feedstock": feedstock,
+                        "geodataset": algorithm.geodataset,
+                        "inventory_algorithm": algorithm,
+                        "inventory_parameter": parameter,
+                        "inventory_value": value,
+                    }
+                    ScenarioInventoryConfiguration.objects.create(**config)
 
     def remove_inventory_algorithm(
         self, algorithm: InventoryAlgorithm, feedstock: SampleSeries

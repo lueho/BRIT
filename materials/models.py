@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Max, Q
 from django.db.models.functions import Lower
 from django.db.models.signals import post_save, pre_save
@@ -450,24 +450,27 @@ class SampleSeries(NamedUserCreatedObject):
         return self.group_ids
 
     def duplicate(self, creator, **kwargs):
-        post_save.disconnect(add_default_temporal_distribution, sender=SampleSeries)
+        with transaction.atomic():
+            post_save.disconnect(add_default_temporal_distribution, sender=SampleSeries)
+            try:
+                duplicate = SampleSeries.objects.create(
+                    owner=creator,
+                    name=kwargs.get("name", self.name),
+                    material=kwargs.get("material", self.material),
+                )
 
-        duplicate = SampleSeries.objects.create(
-            owner=creator,
-            name=kwargs.get("name", self.name),
-            material=kwargs.get("material", self.material),
-        )
+                for sample in self.samples.all():
+                    sample_duplicate = sample.duplicate(creator)
+                    sample_duplicate.series = duplicate
+                    sample_duplicate.save()
 
-        for sample in self.samples.all():
-            sample_duplicate = sample.duplicate(creator)
-            sample_duplicate.series = duplicate
-            sample_duplicate.save()
+                duplicate.temporal_distributions.set(self.temporal_distributions.all())
+            finally:
+                post_save.connect(
+                    add_default_temporal_distribution, sender=SampleSeries
+                )
 
-        duplicate.temporal_distributions.set(self.temporal_distributions.all())
-
-        post_save.connect(add_default_temporal_distribution, sender=SampleSeries)
-
-        return duplicate
+            return duplicate
 
     @property
     def full_name(self):
@@ -858,39 +861,45 @@ class Sample(NamedUserCreatedObject):
         return super().approve(user=user)
 
     def duplicate(self, creator, **kwargs):
-        post_save.disconnect(add_default_composition, sender=Sample)
-        duplicate = Sample.objects.create(
-            owner=creator,
-            name=kwargs.get("name", f"{self.name} (copy)"),
-            description=kwargs.get("description", self.description),
-            material=kwargs.get("material", self.material),
-            series=kwargs.get("series", self.series),
-            timestep=kwargs.get("timestep", self.timestep),
-            datetime=kwargs.get("datetime", self.datetime),
-            location=kwargs.get("location", self.location),
-            analysis_date=kwargs.get("analysis_date", self.analysis_date),
-            analysis_laboratory=kwargs.get(
-                "analysis_laboratory", self.analysis_laboratory
-            ),
-            lab_accreditation=kwargs.get("lab_accreditation", self.lab_accreditation),
-            analysis_objective=kwargs.get(
-                "analysis_objective", self.analysis_objective
-            ),
-            standalone=kwargs.get("standalone", self.standalone),
-        )
-        post_save.connect(add_default_composition, sender=Sample)
-        for composition in self.compositions.all():
-            duplicate_composition = composition.duplicate(creator)
-            duplicate_composition.sample = duplicate
-            duplicate_composition.save()
+        with transaction.atomic():
+            post_save.disconnect(add_default_composition, sender=Sample)
+            try:
+                duplicate = Sample.objects.create(
+                    owner=creator,
+                    name=kwargs.get("name", f"{self.name} (copy)"),
+                    description=kwargs.get("description", self.description),
+                    material=kwargs.get("material", self.material),
+                    series=kwargs.get("series", self.series),
+                    timestep=kwargs.get("timestep", self.timestep),
+                    datetime=kwargs.get("datetime", self.datetime),
+                    location=kwargs.get("location", self.location),
+                    analysis_date=kwargs.get("analysis_date", self.analysis_date),
+                    analysis_laboratory=kwargs.get(
+                        "analysis_laboratory", self.analysis_laboratory
+                    ),
+                    lab_accreditation=kwargs.get(
+                        "lab_accreditation", self.lab_accreditation
+                    ),
+                    analysis_objective=kwargs.get(
+                        "analysis_objective", self.analysis_objective
+                    ),
+                    standalone=kwargs.get("standalone", self.standalone),
+                )
+            finally:
+                post_save.connect(add_default_composition, sender=Sample)
 
-        for prop in self.get_property_values_queryset():
-            prop.duplicate(creator, sample=duplicate)
+            for composition in self.compositions.all():
+                duplicate_composition = composition.duplicate(creator)
+                duplicate_composition.sample = duplicate
+                duplicate_composition.save()
 
-        for measurement in self.component_measurements.all():
-            measurement.duplicate(creator, sample=duplicate)
+            for prop in self.get_property_values_queryset():
+                prop.duplicate(creator, sample=duplicate)
 
-        return duplicate
+            for measurement in self.component_measurements.all():
+                measurement.duplicate(creator, sample=duplicate)
+
+            return duplicate
 
 
 @receiver(post_save, sender=Sample)
@@ -961,41 +970,47 @@ class Composition(NamedUserCreatedObject):
         self.sample.series.remove_temporal_distribution(distribution)
 
     def order_up(self):
-        current_order = self.order
-        next_composition = (
-            self.sample.compositions.filter(order__gt=self.order)
-            .order_by("order")
-            .first()
-        )
-        if next_composition:
-            self.order = next_composition.order
-            next_composition.order = current_order
-            next_composition.save()
-            self.save()
+        with transaction.atomic():
+            current_order = self.order
+            next_composition = (
+                self.sample.compositions.select_for_update()
+                .filter(order__gt=self.order)
+                .order_by("order")
+                .first()
+            )
+            if next_composition:
+                self.order = next_composition.order
+                next_composition.order = current_order
+                next_composition.save(update_fields=["order"])
+                self.save(update_fields=["order"])
 
     def order_down(self):
-        current_order = self.order
-        previous_composition = (
-            self.sample.compositions.filter(order__lt=self.order)
-            .order_by("-order")
-            .first()
-        )
-        if previous_composition:
-            self.order = previous_composition.order
-            previous_composition.order = current_order
-            previous_composition.save()
-            self.save()
+        with transaction.atomic():
+            current_order = self.order
+            previous_composition = (
+                self.sample.compositions.select_for_update()
+                .filter(order__lt=self.order)
+                .order_by("-order")
+                .first()
+            )
+            if previous_composition:
+                self.order = previous_composition.order
+                previous_composition.order = current_order
+                previous_composition.save(update_fields=["order"])
+                self.save(update_fields=["order"])
 
     def duplicate(self, creator):
         post_save.disconnect(add_next_order_value, sender=Composition)
-        duplicate = Composition.objects.create(
-            owner=creator,
-            group=self.group,
-            sample=self.sample,
-            fractions_of=self.fractions_of,
-            order=self.order,
-        )
-        post_save.connect(add_next_order_value, sender=Composition)
+        try:
+            duplicate = Composition.objects.create(
+                owner=creator,
+                group=self.group,
+                sample=self.sample,
+                fractions_of=self.fractions_of,
+                order=self.order,
+            )
+        finally:
+            post_save.connect(add_next_order_value, sender=Composition)
         return duplicate
 
     def get_absolute_url(self):
@@ -1112,6 +1127,16 @@ def set_default_material(sender, instance, **kwargs):
 @receiver(post_save, sender=Composition)
 def add_next_order_value(sender, instance, created, **kwargs):
     if created:
-        compositions = Composition.objects.filter(sample=instance.sample)
-        instance.order = compositions.aggregate(Max("order"))["order__max"] + 10
-        instance.save()
+        with transaction.atomic():
+            # Lock rows first, then aggregate separately (select_for_update
+            # cannot be combined with aggregate in Django 4.2+).
+            list(
+                Composition.objects.select_for_update()
+                .filter(sample=instance.sample)
+                .values("id")
+            )
+            max_order = Composition.objects.filter(sample=instance.sample).aggregate(
+                Max("order")
+            )["order__max"]
+            instance.order = max_order + 10
+            instance.save(update_fields=["order"])

@@ -7392,6 +7392,30 @@ class UpdateCollectionNamesSignalTestCase(TestCase):
 
         self.assertEqual(mock_clear.call_count, 0)
 
+    def test_update_collection_names_updates_all_collections_atomically(self):
+        """All collection name updates from a single related-object save must be atomic."""
+        c2 = Collection.objects.create(
+            catchment=self.catchment,
+            collector=self.collector,
+            collection_system=self.system,
+            waste_category=self.category,
+            valid_from=date(2023, 1, 1),
+        )
+        c3 = Collection.objects.create(
+            catchment=self.catchment,
+            collector=self.collector,
+            collection_system=self.system,
+            waste_category=self.category,
+            valid_from=date(2022, 1, 1),
+        )
+
+        self.system.name = "Batch Updated System"
+        self.system.save()
+
+        for c in [self.collection, c2, c3]:
+            c.refresh_from_db()
+            self.assertIn("Batch Updated System", c.name)
+
 
 class CollectionFormPredecessorSaveTestCase(TestCase):
     """Tests for predecessor handling in CollectionModelForm.save()."""
