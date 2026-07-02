@@ -42,6 +42,24 @@ class LayeringContractTests(SimpleTestCase):
 
         self.assertEqual(violations, [])
 
+    def test_scanner_reports_syntax_errors(self):
+        with TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            package_dir = repo_root / "utils"
+            package_dir.mkdir()
+            broken_file = package_dir / "broken.py"
+            broken_file.write_text("def broken(:\n")
+
+            violations = find_layering_violations(
+                repo_root,
+                LayeringContract(layers={"utils": 0}),
+            )
+
+        self.assertEqual(
+            violations,
+            ["utils/broken.py:1 syntax error: invalid syntax"],
+        )
+
     def test_non_test_code_only_imports_same_or_lower_layers(self):
         repo_root = Path(__file__).resolve().parents[2]
 

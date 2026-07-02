@@ -29,7 +29,14 @@ def find_layering_violations(
         if importer_layer is None:
             continue
 
-        tree = ast.parse(path.read_text(), filename=str(path))
+        try:
+            tree = ast.parse(path.read_text(), filename=str(path))
+        except SyntaxError as error:
+            violations.append(
+                f"{relative_path}:{error.lineno or 1} syntax error: {error.msg}"
+            )
+            continue
+
         for imported_module, line_number in _iter_imports(tree):
             imported_root = imported_module.split(".", 1)[0]
             imported_layer = contract.layers.get(imported_root)
