@@ -2,7 +2,6 @@ import logging
 
 from django.conf import settings
 from django.core.cache import caches
-from django.core.exceptions import ImproperlyConfigured
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -31,10 +30,11 @@ def get_geojson_cache():
 
 def clear_geojson_cache_pattern(pattern: str) -> None:
     """
-    Clear cache keys matching the given pattern using the backend's delete_pattern.
+    Clear cache keys matching the given pattern.
 
-    This function assumes the cache backend (e.g. django-redis) supports
-    delete_pattern. If not, it logs an error and raises ImproperlyConfigured.
+    Uses the backend's ``delete_pattern`` when available (e.g. django-redis).
+    For backends without pattern support (e.g. LocMemCache used in tests),
+    falls back to ``cache.clear()`` which drops the entire cache namespace.
     """
     geojson_cache = get_geojson_cache()
     try:
@@ -45,14 +45,16 @@ def clear_geojson_cache_pattern(pattern: str) -> None:
                 f"Cleared {deleted_count} cache keys matching pattern: {pattern}"
             )
         else:
-            msg = (
-                f"Cache backend '{geojson_cache.__class__.__name__}' does not support 'delete_pattern'. "
-                f"Cannot clear pattern: {pattern}. Please use a compatible Redis cache backend."
+            # Fallback for backends without delete_pattern (e.g. LocMemCache).
+            # Clearing the whole namespace is acceptable for process-local
+            # caches such as the test runner's LocMemCache.
+            geojson_cache.clear()
+            logger.debug(
+                f"Cache backend '{geojson_cache.__class__.__name__}' lacks "
+                f"delete_pattern; cleared entire cache for pattern: {pattern}"
             )
-            logger.error(msg)
-            raise ImproperlyConfigured(msg)
-    except Exception as e:
-        logger.exception(f"Error clearing cache pattern '{pattern}': {e}")
+    except Exception:
+        logger.exception(f"Error clearing cache pattern '{pattern}'")
 
 
 def safe_cache_delete(cache, key: str) -> None:
