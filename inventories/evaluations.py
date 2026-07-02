@@ -34,6 +34,13 @@ class ScenarioResult:
                     layer.pk,
                 )
                 continue
+            if agg_dist.distribution is None:
+                logger.warning(
+                    "Layer %s (pk=%s) has an aggregated distribution with no distribution.",
+                    layer.name,
+                    layer.pk,
+                )
+                continue
             timestep_ids.update(
                 agg_dist.distribution.timestep_set.values_list("id", flat=True)
             )

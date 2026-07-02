@@ -570,3 +570,20 @@ class ScenarioResultHomogenizeTimestepsTestCase(TestCase):
         timestep_ids = {ts.id for ts in result.timesteps}
         self.assertIn(ts1.id, timestep_ids)
         self.assertIn(ts2.id, timestep_ids)
+
+    def test_skips_aggregated_distribution_with_null_distribution(self):
+        """homogenize_timesteps must not crash when distribution FK is None."""
+        layer = Layer.objects.create(
+            name="L_null",
+            geom_type="Point",
+            table_name="test_ts_layer_null",
+            scenario=self.scenario,
+            feedstock=self.feedstock,
+            algorithm=self.algorithm,
+        )
+        LayerAggregatedDistribution.objects.create(
+            name="AD_null", distribution=None, layer=layer
+        )
+
+        result = ScenarioResult(self.scenario)
+        self.assertEqual(result.timesteps, [])
