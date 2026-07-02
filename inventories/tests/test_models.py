@@ -2,14 +2,18 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
+from django.apps import apps
 from django.test import TestCase
 
-from maps.models import Region
+from distributions.models import TemporalDistribution, Timestep
+from layer_manager.models import Layer, LayerAggregatedDistribution
+from maps.models import Catchment, Region
 from materials.models import SampleSeries
 from sources.greenhouses.inventory.algorithms import (
     InventoryAlgorithms as GreenhouseInventoryAlgorithms,
 )
 
+from ..evaluations import ScenarioResult
 from ..exceptions import BlockedRunningScenario
 from ..models import (
     GeoDataset,
@@ -414,6 +418,71 @@ class ScenarioTestCase(TestCase):
         )
         self.assertTrue(configs.exists())
 
+    def test_scenario_status_updates_when_referenced_parameter_value_changes(self):
+        """#212: Changing a referenced InventoryAlgorithmParameterValue must
+        mark all scenarios that use it as CHANGED."""
+        material = Material.objects.get(name="Feedstock 1")
+        feedstock = SampleSeries.objects.create(
+            name="FK Signal Series", material=material
+        )
+        geodataset = GeoDataset.objects.get(name="Test Dataset")
+        algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
+        parameter = InventoryAlgorithmParameter.objects.create(
+            descriptive_name="Signal Param", short_name="signal_param"
+        )
+        parameter.inventory_algorithm.add(algorithm)
+        value = InventoryAlgorithmParameterValue.objects.create(
+            name="Signal Value",
+            parameter=parameter,
+            value=1.0,
+            standard_deviation=0.0,
+            default=True,
+        )
+        ScenarioInventoryConfiguration.objects.create(
+            scenario=self.scenario,
+            feedstock=feedstock,
+            geodataset=geodataset,
+            inventory_algorithm=algorithm,
+            inventory_parameter=parameter,
+            inventory_value=value,
+        )
+        # Creating the config set status to CHANGED; set it to FINISHED
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.FINISHED)
+
+        # Modify the referenced parameter value
+        value.value = 2.0
+        value.save()
+
+        # Scenario status should now be CHANGED
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
+
+    def test_scenario_status_updates_when_referenced_algorithm_changes(self):
+        """#212: Changing a referenced InventoryAlgorithm must mark all
+        scenarios that use it as CHANGED."""
+        material = Material.objects.get(name="Feedstock 1")
+        feedstock = SampleSeries.objects.create(
+            name="FK Algo Series", material=material
+        )
+        geodataset = GeoDataset.objects.get(name="Test Dataset")
+        algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
+        ScenarioInventoryConfiguration.objects.create(
+            scenario=self.scenario,
+            feedstock=feedstock,
+            geodataset=geodataset,
+            inventory_algorithm=algorithm,
+        )
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.FINISHED)
+
+        # Modify the referenced algorithm
+        algorithm.name = "Updated Algorithm"
+        algorithm.save()
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
+
     @patch("inventories.models.AsyncResult")
     def test_running_scenario_save_stays_blocked_while_task_is_active(
         self, mock_async_result
@@ -439,3 +508,61 @@ class ScenarioTestCase(TestCase):
         self.assertEqual(self.scenario.name, "Recovered After Failure")
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
         self.assertFalse(RunningTask.objects.filter(id=running_task.id).exists())
+
+
+class ScenarioResultHomogenizeTimestepsTestCase(TestCase):
+    """#211: homogenize_timesteps must collect timesteps from all layers."""
+
+    @classmethod
+    def setUpTestData(cls):
+        region = Region.objects.create(name="TS Region")
+        catchment = Catchment.objects.create(name="TS Catchment", region=region)
+        cls.scenario = Scenario.objects.create(
+            name="TS Scenario", region=region, catchment=catchment
+        )
+        geodataset = GeoDataset.objects.create(name="TS Dataset", region=region)
+        material = Material.objects.create(name="TS Feedstock")
+        cls.algorithm = InventoryAlgorithm.objects.create(
+            name="TS Algorithm", geodataset=geodataset
+        )
+        cls.algorithm.feedstocks.add(material)
+        cls.feedstock = SampleSeries.objects.create(
+            name="TS Series", material=material
+        )
+
+    def tearDown(self):
+        for name in list(apps.all_models["layer_manager"]):
+            if name.startswith("test_ts_"):
+                del apps.all_models["layer_manager"][name]
+
+    def test_returns_empty_list_for_scenario_without_layers(self):
+        result = ScenarioResult(self.scenario)
+        self.assertEqual(result.timesteps, [])
+
+    def test_collects_timesteps_from_all_layers(self):
+        dist1 = TemporalDistribution.objects.create(name="TS Dist1")
+        ts1 = Timestep.objects.create(name="TS T1", distribution=dist1)
+        dist2 = TemporalDistribution.objects.create(name="TS Dist2")
+        ts2 = Timestep.objects.create(name="TS T2", distribution=dist2)
+
+        layer1 = Layer.objects.create(
+            name="L1", geom_type="Point", table_name="test_ts_layer1",
+            scenario=self.scenario, feedstock=self.feedstock,
+            algorithm=self.algorithm,
+        )
+        LayerAggregatedDistribution.objects.create(
+            name="AD1", distribution=dist1, layer=layer1
+        )
+        layer2 = Layer.objects.create(
+            name="L2", geom_type="Point", table_name="test_ts_layer2",
+            scenario=self.scenario, feedstock=self.feedstock,
+            algorithm=self.algorithm,
+        )
+        LayerAggregatedDistribution.objects.create(
+            name="AD2", distribution=dist2, layer=layer2
+        )
+
+        result = ScenarioResult(self.scenario)
+        timestep_ids = {ts.id for ts in result.timesteps}
+        self.assertIn(ts1.id, timestep_ids)
+        self.assertIn(ts2.id, timestep_ids)

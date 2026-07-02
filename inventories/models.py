@@ -752,7 +752,6 @@ class ScenarioInventoryConfiguration(models.Model):
     )
 
     def save(self, *args, **kwargs):
-        # TODO: The status must also be changed, when any of the referenced foreign key objects change
         self.scenario.set_status(ScenarioStatus.Status.CHANGED)
         super().save(*args, **kwargs)
 
@@ -771,6 +770,43 @@ class ScenarioInventoryConfiguration(models.Model):
 
     def get_absolute_url(self):
         return reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
+
+
+def _mark_referencing_scenarios_changed(model_class, instance):
+    """Set status to CHANGED for all scenarios that reference the given instance
+    through ScenarioInventoryConfiguration."""
+    field_map = {
+        InventoryAlgorithm: "inventory_algorithm",
+        InventoryAlgorithmParameterValue: "inventory_value",
+    }
+    fk_field = field_map.get(model_class)
+    if fk_field is None:
+        return
+    scenario_ids = (
+        ScenarioInventoryConfiguration.objects.filter(**{fk_field: instance})
+        .values_list("scenario_id", flat=True)
+        .distinct()
+    )
+    for scenario_status in ScenarioStatus.objects.filter(scenario_id__in=scenario_ids):
+        if scenario_status.status != ScenarioStatus.Status.CHANGED:
+            scenario_status.status = ScenarioStatus.Status.CHANGED
+            scenario_status.save()
+
+
+@receiver(post_save, sender=InventoryAlgorithm)
+def propagate_algorithm_change_to_scenarios(sender, instance, created, **kwargs):
+    if not created:
+        _mark_referencing_scenarios_changed(InventoryAlgorithm, instance)
+
+
+@receiver(post_save, sender=InventoryAlgorithmParameterValue)
+def propagate_parameter_value_change_to_scenarios(
+    sender, instance, created, **kwargs
+):
+    if not created:
+        _mark_referencing_scenarios_changed(
+            InventoryAlgorithmParameterValue, instance
+        )
 
 
 class RunningTask(models.Model):

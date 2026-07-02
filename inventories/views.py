@@ -359,16 +359,11 @@ class ScenarioGeoDataSetAutocompleteView(GeoDataSetAutocompleteView):
         except (Scenario.DoesNotExist, SampleSeries.DoesNotExist):
             return GeoDataset.objects.none()
 
-        # TODO: This is really trouble. The InventoryAlgorithm used Material for feedstock but ScenarioInventoryConfiguration
-        # uses SampleSeries.
-
         # Resolve which Material objects to consider
         if feedstock_series is None:
             feedstocks_qs = Material.objects.filter(type="material")
         else:
-            # NB: historical behaviour filters by the *SampleSeries* ID, maintaining it
-            # to avoid unexpected test regressions.
-            feedstocks_qs = Material.objects.filter(id=feedstock_series.id)
+            feedstocks_qs = Material.objects.filter(id=feedstock_series.material_id)
 
         # Build a single query using EXISTS sub-queries
         from django.db.models import Exists, OuterRef
