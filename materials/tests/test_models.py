@@ -414,9 +414,7 @@ class SampleSeriesTestCase(TestCase):
         """SampleSeries.duplicate must run inside transaction.atomic."""
         creator = User.objects.create(username=f"dup_atomic_{uuid4().hex[:8]}")
         duplicate = self.sample_series.duplicate(creator)
-        self.assertEqual(
-            duplicate.samples.count(), self.sample_series.samples.count()
-        )
+        self.assertEqual(duplicate.samples.count(), self.sample_series.samples.count())
         self.assertQuerySetEqual(
             duplicate.temporal_distributions.all().order_by("id"),
             self.sample_series.temporal_distributions.all().order_by("id"),

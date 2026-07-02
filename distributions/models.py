@@ -61,11 +61,16 @@ class Timestep(NamedUserCreatedObject):
 def add_next_order_value(sender, instance, created, **kwargs):
     if created:
         with transaction.atomic():
-            max_order = (
+            # Lock rows first, then aggregate separately (select_for_update
+            # cannot be combined with aggregate in Django 4.2+).
+            list(
                 Timestep.objects.select_for_update()
                 .filter(distribution=instance.distribution)
-                .aggregate(Max("order"))["order__max"]
+                .values("id")
             )
+            max_order = Timestep.objects.filter(
+                distribution=instance.distribution
+            ).aggregate(Max("order"))["order__max"]
             instance.order = max_order + 10
             instance.save(update_fields=["order"])
 
