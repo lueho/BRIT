@@ -401,6 +401,28 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         no_data_idx = draw_legend_fn.find("cfg.noDataLabel")
         self.assertLess(overlay_idx, no_data_idx)
 
+    def test_collection_system_config_opts_into_conflict_aid(self):
+        """The collection_system theme exposes the maintainer conflict aid."""
+        config = MAP_CONFIGS["collection_system"]
+        self.assertEqual(config["conflictTheme"], "collection_system")
+        self.assertTrue(config["conflictUrl"].endswith("/collection-conflicts/"))
+        self.assertTrue(config["conflictOverlayLabel"])
+
+    def test_conflict_aid_url_matches_registered_router_endpoint(self):
+        """The configured conflict URL must match a registered waste-atlas route."""
+        from sources.waste_collection.waste_atlas.router import router
+
+        registered = {
+            f"/waste_collection/api/waste-atlas/{prefix}/"
+            for prefix, _viewset, _basename in router.registry
+        }
+        for config in MAP_CONFIGS.values():
+            url = config.get("conflictUrl")
+            if not url:
+                continue
+            with self.subTest(url=url):
+                self.assertIn(url, registered)
+
     def _forbidden_unit_tokens(self, legend_title):
         for unit, forbidden_tokens in self.UNIT_LABEL_FORBIDDEN_TOKENS.items():
             if f"({unit})" in legend_title:
