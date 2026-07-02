@@ -40,7 +40,7 @@ DOMAIN_FIELD_MAP: Final[dict[str, str]] = {
     "waste_category": "waste_category",
     "bin_configuration": "bin_configuration",
     "fee_system": "fee_system",
-    "connection_type": "connection_type",
+    "participation_policy": "participation_policy",
     "required_bin_capacity_reference": "required_bin_capacity_reference",
 }
 
@@ -50,11 +50,11 @@ DOMAIN_SNAPSHOT_KEY_MAP: Final[dict[str, str]] = {
     "waste_category": "waste_categories",
     "bin_configuration": "bin_configurations",
     "fee_system": "fee_systems",
-    "connection_type": "connection_types",
+    "participation_policy": "participation_policies",
     "required_bin_capacity_reference": "required_bin_capacity_references",
 }
 
-_CONNECTION_TYPE_IMPORT_ALIASES: Final[set[str]] = {
+_PARTICIPATION_POLICY_IMPORT_ALIASES: Final[set[str]] = {
     "mandatory",
     "mandatory with exception",
     "mandatory with exception for home composters",
@@ -63,7 +63,7 @@ _CONNECTION_TYPE_IMPORT_ALIASES: Final[set[str]] = {
     "not_specified",
 }
 
-_CONNECTION_TYPE_IMPORT_EQUIVALENTS: Final[dict[str, set[str]]] = {
+_PARTICIPATION_POLICY_IMPORT_EQUIVALENTS: Final[dict[str, set[str]]] = {
     "mandatory": {"mandatory"},
     "voluntary": {"voluntary"},
     "mandatory with exception": {
@@ -119,10 +119,10 @@ def _normalize_required_bin_capacity_reference(value: str) -> str | None:
     return None
 
 
-def _normalize_connection_type_candidates(value: str) -> set[str]:
-    """Return normalized connection-type candidates for importer aliases."""
+def _normalize_participation_policy_candidates(value: str) -> set[str]:
+    """Return normalized participation-policy candidates for importer aliases."""
     normalized = _normalize_term(value)
-    return _CONNECTION_TYPE_IMPORT_EQUIVALENTS.get(normalized, {normalized})
+    return _PARTICIPATION_POLICY_IMPORT_EQUIVALENTS.get(normalized, {normalized})
 
 
 class CrosswalkValidationError(ValueError):
@@ -488,20 +488,22 @@ def validate_record_against_controlled_vocabulary(
                     f"Field '{record_field}' has non-controlled value '{value}'."
                 )
 
-    connection_value = record.get("connection_type")
-    if isinstance(connection_value, str) and connection_value.strip():
-        allowed_connection_values = {
+    participation_value = record.get("participation_policy")
+    if isinstance(participation_value, str) and participation_value.strip():
+        allowed_participation_values = {
             _normalize_term(str(candidate))
-            for entry in vocabulary_snapshot.get("connection_types") or []
+            for entry in vocabulary_snapshot.get("participation_policies") or []
             if isinstance(entry, dict)
             for candidate in (entry.get("label"), entry.get("value"))
             if candidate
         }
-        candidate_values = _normalize_connection_type_candidates(connection_value)
-        if candidate_values.isdisjoint(allowed_connection_values):
+        candidate_values = _normalize_participation_policy_candidates(
+            participation_value
+        )
+        if candidate_values.isdisjoint(allowed_participation_values):
             warnings.append(
-                "Field 'connection_type' has non-controlled value "
-                f"'{connection_value}'."
+                "Field 'participation_policy' has non-controlled value "
+                f"'{participation_value}'."
             )
 
     ref_value = record.get("required_bin_capacity_reference")

@@ -50,7 +50,7 @@ soilcom-shape:CollectionImportRecordShape
     ) ;
 
     sh:property [
-        sh:path soilcom-shape:connection_type ;
+        sh:path soilcom-shape:participation_policy ;
         sh:in (
             "mandatory"
             "mandatory with exception"

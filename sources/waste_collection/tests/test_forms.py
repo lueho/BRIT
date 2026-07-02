@@ -420,7 +420,7 @@ class CollectionModelFormTestCase(TestCase):
                     "frequency": self.frequency.id,
                     "valid_from": date(2023, 1, 1),
                     "description": "This is a test case",
-                    "connection_type": "VOLUNTARY",
+                    "participation_policy": "VOLUNTARY",
                 }
             )
         )
@@ -466,7 +466,7 @@ class CollectionModelFormTestCase(TestCase):
                     "valid_from": date(2023, 1, 1),
                     "flyer_url": "https://www.great-test-flyers.com",
                     "description": "This is a test case",
-                    "connection_type": "VOLUNTARY",
+                    "participation_policy": "VOLUNTARY",
                 }
             )
         )
@@ -522,7 +522,7 @@ class CollectionModelFormTestCase(TestCase):
                     "valid_from": date(2023, 1, 1),
                     "valid_until": date(2023, 12, 31),
                     "description": "First comment ;; Second comment",
-                    "connection_type": "VOLUNTARY",
+                    "participation_policy": "VOLUNTARY",
                 }
             ),
         )
@@ -553,7 +553,7 @@ class CollectionModelFormTestCase(TestCase):
                     "valid_from": date(2023, 1, 1),
                     "valid_until": date(2023, 12, 31),
                     "description": "First comment ; ; Second comment",
-                    "connection_type": "VOLUNTARY",
+                    "participation_policy": "VOLUNTARY",
                 }
             ),
         )
@@ -586,7 +586,7 @@ class CollectionModelFormTestCase(TestCase):
                     "valid_from": date(2023, 1, 1),
                     "valid_until": date(2023, 12, 31),
                     "description": "This is a test case",
-                    "connection_type": "VOLUNTARY",
+                    "participation_policy": "VOLUNTARY",
                 }
             ),
         )
@@ -618,7 +618,7 @@ class CollectionModelFormTestCase(TestCase):
                 self.forbidden_material_1.id,
                 self.forbidden_material_2.id,
             ],
-            "connection_type": "VOLUNTARY",
+            "participation_policy": "VOLUNTARY",
             "min_bin_size": 120,
             "required_bin_capacity": 5,
             "required_bin_capacity_reference": "person",
@@ -669,10 +669,10 @@ class CollectionModelFormTestCase(TestCase):
         instance = form.save(commit=False)
         self.assertIn(instance.required_bin_capacity_reference, [None, ""])
 
-    def test_connection_type_field_accepts_all_choices(self):
-        from sources.waste_collection.forms import CONNECTION_TYPE_CHOICES
+    def test_participation_policy_field_accepts_all_choices(self):
+        from sources.waste_collection.forms import PARTICIPATION_POLICY_CHOICES
 
-        valid_choices = [c[0] for c in CONNECTION_TYPE_CHOICES] + [None, ""]
+        valid_choices = [c[0] for c in PARTICIPATION_POLICY_CHOICES] + [None, ""]
         for value in valid_choices:
             data = {
                 "catchment": self.catchment.id,
@@ -686,22 +686,22 @@ class CollectionModelFormTestCase(TestCase):
                 "required_bin_capacity_reference": "person",
                 "frequency": self.frequency.id,
                 "valid_from": date(2023, 1, 1),
-                "connection_type": value if value is not None else "",
+                "participation_policy": value if value is not None else "",
             }
             form = CollectionModelForm(data=dict_to_querydict(data))
             self.assertTrue(
                 form.is_valid(),
-                f"Form should be valid for connection_type={value}: {form.errors}",
+                f"Form should be valid for participation_policy={value}: {form.errors}",
             )
             instance = form.save(commit=False)
             expected = value if value not in (None, "") else None
             if expected is None:
-                self.assertIn(instance.connection_type, [None, ""])
+                self.assertIn(instance.participation_policy, [None, ""])
             else:
-                self.assertEqual(instance.connection_type, expected)
+                self.assertEqual(instance.participation_policy, expected)
         # Check help_text
         form = CollectionModelForm()
-        self.assertIn("not specified", form.fields["connection_type"].help_text)
+        self.assertIn("not specified", form.fields["participation_policy"].help_text)
 
         form = CollectionModelForm()
         self.assertIn("required_bin_capacity_reference", form.fields)
@@ -719,7 +719,7 @@ class CollectionModelFormTestCase(TestCase):
                 self.forbidden_material_1.id,
                 self.forbidden_material_2.id,
             ],
-            "connection_type": "VOLUNTARY",
+            "participation_policy": "VOLUNTARY",
             "min_bin_size": 120,
             "required_bin_capacity": 5,
             "required_bin_capacity_reference": "person",
@@ -761,7 +761,7 @@ class CollectionModelFormTestCase(TestCase):
                     "forbidden_materials": initial_waste_data["forbidden_materials"],
                     "frequency": self.frequency.id,
                     "valid_from": date(2024, 1, 1),
-                    "connection_type": "VOLUNTARY",
+                    "participation_policy": "VOLUNTARY",
                 }
             ),
             initial=initial_waste_data,
@@ -806,7 +806,7 @@ class CollectionModelFormTestCase(TestCase):
                     "forbidden_materials": [],
                     "frequency": self.frequency.id,
                     "valid_from": date(2024, 1, 1),
-                    "connection_type": "VOLUNTARY",
+                    "participation_policy": "VOLUNTARY",
                 }
             ),
         )
@@ -837,7 +837,7 @@ class CollectionModelFormTestCase(TestCase):
                     ),
                     "frequency": self.frequency.id,
                     "valid_from": date(2024, 1, 1),
-                    "connection_type": "VOLUNTARY",
+                    "participation_policy": "VOLUNTARY",
                 }
             ),
         )
@@ -873,7 +873,7 @@ class CollectionModelFormTestCase(TestCase):
                     "forbidden_materials": [self.forbidden_material_1.id],
                     "frequency": self.frequency.id,
                     "valid_from": date(2024, 1, 1),
-                    "connection_type": "VOLUNTARY",
+                    "participation_policy": "VOLUNTARY",
                 }
             ),
         )
@@ -915,7 +915,7 @@ class CollectionModelFormTestCase(TestCase):
                     "forbidden_materials": [],
                     "frequency": self.frequency.id,
                     "valid_from": date(2024, 1, 1),
-                    "connection_type": "VOLUNTARY",
+                    "participation_policy": "VOLUNTARY",
                 }
             ),
         )

@@ -39,11 +39,11 @@
     <br>
     {{ object.valid_from|date:"Y" }}
   </p>
-  {% if object.connection_type %}
+  {% if object.participation_policy %}
     <p class="card-text">
-      <strong>Connection Type:</strong>
+      <strong>Participation Policy:</strong>
       <br>
-      {{ object.get_connection_type_display }}
+      {{ object.get_participation_policy_display }}
     </p>
   {% endif %}
   {% if object.min_bin_size %}

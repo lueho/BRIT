@@ -511,7 +511,7 @@ class CollectionFilterTestCase(TestCase):
         expected_qs = Collection.objects.filter(pk__in=[self.collection1.pk])
         self.assertQuerySetEqual(expected_qs, qs, ordered=False)
 
-    def test_connection_type_filter_variants(self):
+    def test_participation_policy_filter_variants(self):
         from sources.waste_collection.models import Collection
 
         base_kwargs = {
@@ -532,8 +532,10 @@ class CollectionFilterTestCase(TestCase):
             ("", None),
         ]
         for value, filter_value in values:
-            collection = Collection.objects.create(**base_kwargs, connection_type=value)
-            data = {"connection_type": filter_value} if filter_value else {}
+            collection = Collection.objects.create(
+                **base_kwargs, participation_policy=value
+            )
+            data = {"participation_policy": filter_value} if filter_value else {}
             filtr = CollectionFilterSet(data, queryset=Collection.objects.all())
             if filter_value:
                 self.assertIn(collection, filtr.qs)

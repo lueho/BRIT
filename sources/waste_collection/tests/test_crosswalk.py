@@ -50,7 +50,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
         record = {
             "collection_system": "Ingen utsortering",
             "bin_configuration": "Optisk sortering",
-            "connection_type": "Obl",
+            "participation_policy": "Obl",
             "fee_system": "PAYT",
         }
 
@@ -58,7 +58,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
 
         self.assertEqual(mapped["collection_system"], "No separate collection")
         self.assertEqual(mapped["bin_configuration"], "Optical bag sorting")
-        self.assertEqual(mapped["connection_type"], "mandatory")
+        self.assertEqual(mapped["participation_policy"], "mandatory")
         self.assertEqual(mapped["fee_system"], "Pay as you throw (PAYT)")
 
     def test_maps_brandenburg_category_terms(self):
@@ -87,7 +87,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
             "collection_system": "Kerbside collection",
             "bin_configuration": "Kildesortering",
             "fee_system": "DIFTAR",
-            "connection_type": "Obligatoire",
+            "participation_policy": "Obligatoire",
             "required_bin_capacity_reference": "Per indbygger",
         }
 
@@ -97,7 +97,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
         self.assertEqual(mapped["collection_system"], "Door to door")
         self.assertEqual(mapped["bin_configuration"], "Separate bins")
         self.assertEqual(mapped["fee_system"], "Pay as you throw (PAYT)")
-        self.assertEqual(mapped["connection_type"], "mandatory")
+        self.assertEqual(mapped["participation_policy"], "mandatory")
         self.assertEqual(mapped["required_bin_capacity_reference"], "person")
 
     def test_exposes_equivalences_by_canonical_concept_uri(self):
@@ -161,7 +161,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
             "bin_configurations": ["Separate bins"],
             "fee_systems": ["Flat fee"],
             "materials": ["Food waste: Processed plant-based"],
-            "connection_types": [{"label": "mandatory"}],
+            "participation_policies": [{"label": "mandatory"}],
             "required_bin_capacity_references": [{"value": "person"}],
         }
         record = {
@@ -171,7 +171,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
             "bin_configuration": "Other",
             "fee_system": "Flat fee",
             "allowed_materials": ["Food waste: Processed plant-based", "Unknown item"],
-            "connection_type": "VOLUNTARY",
+            "participation_policy": "VOLUNTARY",
             "required_bin_capacity_reference": "household",
         }
 
@@ -183,7 +183,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
         self.assertTrue(any("frequency" in warning for warning in warnings))
         self.assertTrue(any("bin_configuration" in warning for warning in warnings))
         self.assertTrue(any("allowed_materials" in warning for warning in warnings))
-        self.assertTrue(any("connection_type" in warning for warning in warnings))
+        self.assertTrue(any("participation_policy" in warning for warning in warnings))
         self.assertTrue(
             any("required_bin_capacity_reference" in warning for warning in warnings),
         )
@@ -197,7 +197,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
             "bin_configurations": ["Optical bag sorting"],
             "fee_systems": ["Pay as you throw (PAYT)"],
             "materials": ["Food waste: Processed plant-based"],
-            "connection_types": [{"label": "mandatory"}],
+            "participation_policies": [{"label": "mandatory"}],
             "required_bin_capacity_references": [{"value": "person"}],
         }
         record = {
@@ -208,7 +208,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
             "fee_system": "Pay as you throw (PAYT)",
             "allowed_materials": ["Food waste: Processed plant-based"],
             "forbidden_materials": ["Food waste: Processed plant-based"],
-            "connection_type": "mandatory",
+            "participation_policy": "mandatory",
             "required_bin_capacity_reference": "person",
         }
 
@@ -216,12 +216,12 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
 
         self.assertEqual(warnings, [])
 
-    def test_controlled_vocabulary_validation_accepts_connection_type_import_aliases(
+    def test_controlled_vocabulary_validation_accepts_participation_policy_import_aliases(
         self,
     ):
-        """Importer-supported connection_type aliases should not emit false warnings."""
+        """Importer-supported participation_policy aliases should not emit false warnings."""
         vocabulary = {
-            "connection_types": [
+            "participation_policies": [
                 {
                     "value": "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION",
                     "label": "mandatory with exception for home composters",
@@ -230,7 +230,7 @@ class CrosswalkPreprocessingTestCase(SimpleTestCase):
         }
 
         warnings = validate_record_against_controlled_vocabulary(
-            {"connection_type": "Mandatory with exception"},
+            {"participation_policy": "Mandatory with exception"},
             vocabulary,
         )
 

@@ -119,7 +119,7 @@ def serialize_collection_update_context(
             "sources",
             "flyer_urls",
             "established",
-            "connection_type",
+            "participation_policy",
             "min_bin_size",
             "required_bin_capacity",
             "required_bin_capacity_reference",

@@ -229,7 +229,7 @@ class CollectionModelSerializer(
     bin_configuration = serializers.StringRelatedField()
     waste_category = serializers.SerializerMethodField()
     publication_status = serializers.CharField()
-    connection_type = serializers.CharField(required=False, allow_null=True)
+    participation_policy = serializers.CharField(required=False, allow_null=True)
     access_control_bp = serializers.BooleanField(required=False, allow_null=True)
     access_control_pap = serializers.BooleanField(required=False, allow_null=True)
     allowed_materials = serializers.SerializerMethodField()
@@ -273,7 +273,7 @@ class CollectionModelSerializer(
             "established",
             "waste_category_id",
             "waste_category",
-            "connection_type",
+            "participation_policy",
             "access_control_bp",
             "access_control_pap",
             "allowed_materials",
@@ -446,7 +446,9 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     required_bin_capacity_reference = serializers.CharField(
         required=False, allow_null=True
     )
-    connection_type = serializers.SerializerMethodField(label="Connection type")
+    participation_policy = serializers.SerializerMethodField(
+        label="Participation policy"
+    )
     access_control_bp = serializers.BooleanField(required=False, allow_null=True)
     access_control_pap = serializers.BooleanField(required=False, allow_null=True)
     comments = serializers.SerializerMethodField(source="description", label="Comments")
@@ -466,7 +468,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
             "collection_system",
             "bin_configuration",
             "waste_category",
-            "connection_type",
+            "participation_policy",
             "access_control_bp",
             "access_control_pap",
             "allowed_materials",
@@ -508,8 +510,8 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
         return str(category) if category else ""
 
     @staticmethod
-    def get_connection_type(obj):
-        return obj.connection_type
+    def get_participation_policy(obj):
+        return obj.participation_policy
 
     @staticmethod
     def get_flyer_urls(obj):
@@ -652,7 +654,7 @@ class CollectionResearchSerializer(
             "collection_system",
             "waste_category_id",
             "waste_category",
-            "connection_type",
+            "participation_policy",
             "allowed_materials",
             "forbidden_materials",
             "fee_system_id",
@@ -803,7 +805,7 @@ class CollectionImportRecordSerializer(serializers.Serializer):
     country_code        Optional ISO country code used to disambiguate LAU identifiers.
     fee_system          Exact name of the FeeSystem.
     frequency           Exact name of the CollectionFrequency.
-    connection_type     One of 'mandatory', 'mandatory with exception', 'voluntary',
+    participation_policy  One of 'mandatory', 'mandatory with exception', 'voluntary',
                         'not specified'.
     access_control_bp   Boolean (true/false/null). Whether access to the bring-point
                         (BP) infrastructure is controlled (e.g. by chip or key card).
@@ -846,7 +848,7 @@ class CollectionImportRecordSerializer(serializers.Serializer):
     )
     frequency = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     clear_frequency = serializers.BooleanField(required=False, default=False)
-    connection_type = serializers.CharField(
+    participation_policy = serializers.CharField(
         required=False, allow_null=True, allow_blank=True
     )
     access_control_bp = serializers.BooleanField(required=False, allow_null=True)
@@ -1082,8 +1084,8 @@ class CollectionMutationCreateSerializer(
     established = serializers.IntegerField(
         required=False, allow_null=True, min_value=1800, max_value=2100
     )
-    connection_type = serializers.ChoiceField(
-        choices=[choice[0] for choice in models.CONNECTION_TYPE_CHOICES],
+    participation_policy = serializers.ChoiceField(
+        choices=[choice[0] for choice in models.PARTICIPATION_POLICY_CHOICES],
         required=False,
         allow_null=True,
     )
@@ -1184,8 +1186,8 @@ class CollectionMutationUpdateSerializer(
     established = serializers.IntegerField(
         required=False, allow_null=True, min_value=1800, max_value=2100
     )
-    connection_type = serializers.ChoiceField(
-        choices=[choice[0] for choice in models.CONNECTION_TYPE_CHOICES],
+    participation_policy = serializers.ChoiceField(
+        choices=[choice[0] for choice in models.PARTICIPATION_POLICY_CHOICES],
         required=False,
         allow_null=True,
     )
@@ -1241,7 +1243,7 @@ class CollectionMutationUpdateSerializer(
             "sources",
             "flyer_urls",
             "established",
-            "connection_type",
+            "participation_policy",
             "access_control_bp",
             "access_control_pap",
             "min_bin_size",
@@ -1300,8 +1302,8 @@ class CollectionMutationVersionSerializer(
     established = serializers.IntegerField(
         required=False, allow_null=True, min_value=1800, max_value=2100
     )
-    connection_type = serializers.ChoiceField(
-        choices=[choice[0] for choice in models.CONNECTION_TYPE_CHOICES],
+    participation_policy = serializers.ChoiceField(
+        choices=[choice[0] for choice in models.PARTICIPATION_POLICY_CHOICES],
         required=False,
         allow_null=True,
     )
