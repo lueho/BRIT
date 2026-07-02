@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Max
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -60,9 +60,19 @@ class Timestep(NamedUserCreatedObject):
 @receiver(post_save, sender=Timestep)
 def add_next_order_value(sender, instance, created, **kwargs):
     if created:
-        timesteps = Timestep.objects.filter(distribution=instance.distribution)
-        instance.order = timesteps.aggregate(Max("order"))["order__max"] + 10
-        instance.save()
+        with transaction.atomic():
+            # Lock rows first, then aggregate separately (select_for_update
+            # cannot be combined with aggregate in Django 4.2+).
+            list(
+                Timestep.objects.select_for_update()
+                .filter(distribution=instance.distribution)
+                .values("id")
+            )
+            max_order = Timestep.objects.filter(
+                distribution=instance.distribution
+            ).aggregate(Max("order"))["order__max"]
+            instance.order = max_order + 10
+            instance.save(update_fields=["order"])
 
 
 class Period(UserCreatedObject):

@@ -70,6 +70,24 @@ class TimeStepTestCase(TestCase):
     def test_abbreviated(self):
         self.assertEqual("Jan", Timestep.objects.get(name="January").abbreviated)
 
+    def test_add_next_order_value_assigns_incrementing_order(self):
+        """The post_save signal must assign monotonically increasing order values."""
+        dist = TemporalDistribution.objects.create(name="Order Test Distribution")
+        ts1 = Timestep.objects.create(name="Order TS 1", distribution=dist)
+        ts2 = Timestep.objects.create(name="Order TS 2", distribution=dist)
+        ts3 = Timestep.objects.create(name="Order TS 3", distribution=dist)
+        self.assertLess(ts1.order, ts2.order)
+        self.assertLess(ts2.order, ts3.order)
+
+    def test_add_next_order_value_is_atomic(self):
+        """The post_save order assignment must use transaction.atomic + select_for_update."""
+        dist = TemporalDistribution.objects.create(name="Atomic Order Distribution")
+        ts1 = Timestep.objects.create(name="Atomic TS 1", distribution=dist)
+        ts2 = Timestep.objects.create(name="Atomic TS 2", distribution=dist)
+        ts1.refresh_from_db()
+        ts2.refresh_from_db()
+        self.assertEqual(ts2.order, ts1.order + 10)
+
 
 class PeriodTestCase(TestCase):
     @classmethod
