@@ -1093,16 +1093,13 @@ class CatchmentRegionSummaryAPIViewTestCase(ViewWithPermissionsTestCase):
         cls.nuts_region = NutsRegion.objects.create(
             nuts_id="AB", levl_code=0, name_latn="Nuts Summary Region"
         )
-        cls.nuts_catchment = Catchment.objects.create(
-            region=cls.nuts_region.region_ptr
-        )
+        cls.nuts_catchment = Catchment.objects.create(region=cls.nuts_region.region_ptr)
         cls.lau_region = LauRegion.objects.create(
-            lau_id="L0001", lau_name="Lau Summary Region",
+            lau_id="L0001",
+            lau_name="Lau Summary Region",
             nuts_parent=cls.nuts_region,
         )
-        cls.lau_catchment = Catchment.objects.create(
-            region=cls.lau_region.region_ptr
-        )
+        cls.lau_catchment = Catchment.objects.create(region=cls.lau_region.region_ptr)
         cls.plain_region = Region.objects.create(name="Plain Region")
         cls.plain_catchment = Catchment.objects.create(region=cls.plain_region)
 
