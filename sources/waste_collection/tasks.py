@@ -130,6 +130,7 @@ def cleanup_orphaned_waste_flyers():
 
     return WasteFlyer.objects.filter(
         collections__isnull=True,
+        collection__isnull=True,
         collectionpropertyvalue__isnull=True,
         aggregatedcollectionpropertyvalue__isnull=True,
     ).delete()

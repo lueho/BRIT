@@ -1264,6 +1264,40 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         self.assertEqual(2, self.collection.flyers.count())
         self.assertNotIn(self.flyer_2, self.collection.flyers.all())
 
+    def test_flyer_referenced_as_generic_source_is_not_deleted(self):
+        """Test that a flyer used as a generic Source elsewhere is not deleted."""
+        # Add flyer_3 to collection2's sources (as generic Source, not as flyer)
+        self.collection2.sources.add(self.flyer_3)
+
+        # Remove flyer_3 from collection's flyers
+        initial_urls = [{"url": flyer.url} for flyer in self.collection.flyers.all()]
+        data = {
+            "form-INITIAL_FORMS": 3,
+            "form-TOTAL_FORMS": 3,
+            "form-0-url": initial_urls[0]["url"],  # Keep flyer_1
+            "form-1-url": initial_urls[1]["url"],  # Keep flyer_2
+            "form-2-url": "",  # Remove flyer_3 from collection
+        }
+        WasteFlyerModelFormSet = formset_factory(
+            WasteFlyerModelForm, formset=WasteFlyerFormSet
+        )
+        formset = WasteFlyerModelFormSet(
+            data, parent_object=self.collection, relation_field_name="flyers"
+        )
+        self.assertTrue(formset.is_valid())
+        with patch(
+            "sources.waste_collection.forms.cleanup_orphaned_waste_flyers.delay"
+        ) as mock_cleanup:
+            formset.save()
+        mock_cleanup.assert_called_once()
+        cleanup_orphaned_waste_flyers()
+
+        # flyer_3 should still exist because it's referenced by collection2.sources
+        WasteFlyer.objects.get(pk=self.flyer_3.pk)
+        # It should be removed from collection.flyers
+        self.assertEqual(2, self.collection.flyers.count())
+        self.assertNotIn(self.flyer_3, self.collection.flyers.all())
+
 
 class CollectionAddWasteSampleFormTestCase(TestCase):
     def setUp(self):
