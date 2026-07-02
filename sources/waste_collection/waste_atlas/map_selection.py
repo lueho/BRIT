@@ -7,6 +7,7 @@ selector with a consistent label.
 
 from urllib.parse import urlencode
 
+from .map_configs import MAP_CONFIGS
 from .pages import MAP_PAGES, MAP_SET_LABELS
 
 # Short selector label per theme key.
@@ -444,3 +445,33 @@ def build_map_selection_context(
             selected_map_set, selected_theme, themes_by_map_set
         ),
     }
+
+
+def build_conflict_maps_context(reverse_func):
+    """Return context listing every map page whose config opts into the
+    maintainer conflict-overlay aid (``conflictUrl`` in ``MAP_CONFIGS``).
+
+    Each entry carries the page's reverse URL, title, and the label of its
+    map set so the data-conflicts overview can render a plain link list
+    grouped by region.  Pages without a selector set (generic/legacy routes)
+    are skipped.
+    """
+    conflict_maps = []
+    for page in MAP_PAGES:
+        map_set = page["selector_set"]
+        if not map_set:
+            continue
+        config = MAP_CONFIGS.get(page["config_key"], {})
+        if not config.get("conflictUrl"):
+            continue
+        conflict_maps.append(
+            {
+                "url": reverse_func(page["name"]),
+                "title": page["title"],
+                "map_set": map_set,
+                "map_set_label": MAP_SET_LABELS.get(map_set, map_set),
+                "theme_label": THEME_LABELS.get(page["theme"], page["theme"]),
+            }
+        )
+    conflict_maps.sort(key=lambda item: (item["map_set_label"], item["title"]))
+    return {"conflict_maps": conflict_maps}

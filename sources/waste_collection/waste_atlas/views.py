@@ -7,6 +7,7 @@ from django.views.generic import TemplateView
 
 from .map_selection import (
     MAP_SELECTION_YEARS,
+    build_conflict_maps_context,
     build_map_selection_context,
     build_related_maps_context,
     resolve_map_set,
@@ -189,6 +190,22 @@ class WasteAtlasChangeMapOverviewView(WasteAtlasGroupMixin, TemplateView):
         ctx["default_to_year"] = self.request.GET.get(
             "to_year", years[-1] if years else "2024"
         )
+        return ctx
+
+
+class WasteAtlasDataConflictsOverviewView(WasteAtlasGroupMixin, TemplateView):
+    """Overview page listing maps with the maintainer conflict-overlay aid.
+
+    Surfaces every choropleth map whose ``MAP_CONFIGS`` entry opts into the
+    conflict overlay (``conflictUrl``) so data maintainers can find maps that
+    highlight catchments where the dataset holds conflicting theme values.
+    """
+
+    template_name = "waste_atlas/data_conflicts_overview.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(build_conflict_maps_context(reverse))
         return ctx
 
 
