@@ -35,9 +35,6 @@ from sources.waste_collection.models import (
     Collector,
 )
 from utils.object_management.models import UserCreatedObject
-
-_PUBLISHED = UserCreatedObject.STATUS_PUBLISHED
-
 from .serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
     CatchmentAccessControlSerializer,
@@ -72,6 +69,8 @@ from .serializers import (
     CatchmentWasteRatioSerializer,
     CatchmentWeeklyBpAccessDaysSerializer,
 )
+
+_PUBLISHED = UserCreatedObject.STATUS_PUBLISHED
 
 # Material IDs for food waste classification (Karte 4)
 _FOOD_WASTE_MATERIAL_IDS = {11, 12, 13, 14}
