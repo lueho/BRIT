@@ -123,11 +123,13 @@ class GreenhouseDetailView(UserCreatedObjectDetailView):
 class GreenhouseUpdateView(UserCreatedObjectUpdateView):
     model = Greenhouse
     form_class = GreenhouseModelForm
+    permission_required = "greenhouses.change_greenhouse"
 
 
 class GreenhouseModalUpdateView(UserCreatedObjectModalUpdateView):
     model = Greenhouse
     form_class = GreenhouseModalModelForm
+    permission_required = "greenhouses.change_greenhouse"
 
 
 class GreenhouseModalDeleteView(UserCreatedObjectModalDeleteView):

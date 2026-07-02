@@ -149,6 +149,87 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     update_object_data = {"name": "Updated Test Collector"}
 
 
+class CollectorUpdateViewPermissionTestCase(ViewWithPermissionsTestCase):
+    """#209: CollectorUpdateView must require change_collector permission."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.collector = Collector.objects.create(
+            owner=cls.owner, name="Test Collector", publication_status="private"
+        )
+
+    def test_get_http_403_for_owner_without_change_permission(self):
+        self.client.force_login(self.owner)
+        url = reverse("collector-update", kwargs={"pk": self.collector.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_for_owner_with_change_permission(self):
+        perm = Permission.objects.get(codename="change_collector")
+        self.owner.user_permissions.add(perm)
+        self.client.force_login(self.owner)
+        url = reverse("collector-update", kwargs={"pk": self.collector.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_for_staff_without_explicit_permission(self):
+        self.client.force_login(self.staff)
+        url = reverse("collector-update", kwargs={"pk": self.collector.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+
+class CollectionSystemUpdateViewPermissionTestCase(ViewWithPermissionsTestCase):
+    """#209: CollectionSystemUpdateView must require change_collectionsystem."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.obj = CollectionSystem.objects.create(
+            owner=cls.owner, name="Test System", publication_status="private"
+        )
+
+    def test_get_http_403_for_owner_without_change_permission(self):
+        self.client.force_login(self.owner)
+        url = reverse("collectionsystem-update", kwargs={"pk": self.obj.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_for_owner_with_change_permission(self):
+        perm = Permission.objects.get(codename="change_collectionsystem")
+        self.owner.user_permissions.add(perm)
+        self.client.force_login(self.owner)
+        url = reverse("collectionsystem-update", kwargs={"pk": self.obj.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+
+class WasteCategoryUpdateViewPermissionTestCase(ViewWithPermissionsTestCase):
+    """#209: WasteCategoryUpdateView must require change_wastecategory."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.obj = WasteCategory.objects.create(
+            owner=cls.owner, name="Test Category", publication_status="private"
+        )
+
+    def test_get_http_403_for_owner_without_change_permission(self):
+        self.client.force_login(self.owner)
+        url = reverse("wastecategory-update", kwargs={"pk": self.obj.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_for_owner_with_change_permission(self):
+        perm = Permission.objects.get(codename="change_wastecategory")
+        self.owner.user_permissions.add(perm)
+        self.client.force_login(self.owner)
+        url = reverse("wastecategory-update", kwargs={"pk": self.obj.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+
 class CollectorListScopeRegressionTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -2369,6 +2450,84 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
             year=2022,
         )
         self.assertEqual(list(cpv.sources.values_list("pk", flat=True)), [source.pk])
+
+
+class CollectionAddPropertyValueViewDispatchOrderTestCase(ViewWithPermissionsTestCase):
+    """#217: Permission check must run before parent dispatch to prevent side effects."""
+
+    member_permissions = "add_collectionpropertyvalue"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.private_collection = Collection.objects.create(
+            name="Private Collection",
+            publication_status="private",
+            owner=cls.owner,
+        )
+        cls.unit = Unit.objects.create(name="Test Unit", publication_status="published")
+        cls.prop = Property.objects.create(
+            name="Test Property", publication_status="published"
+        )
+        cls.prop.allowed_units.add(cls.unit)
+
+    def test_post_valid_data_as_non_owner_blocked_without_db_write(self):
+        """Valid POST by non-owner must be blocked before saving (#217)."""
+        self.client.force_login(self.member)
+        url = reverse(
+            "collection-add-property", kwargs={"pk": self.private_collection.pk}
+        )
+        data = {
+            "collection": self.private_collection.pk,
+            "property": self.prop.pk,
+            "unit": self.unit.pk,
+            "year": 2023,
+            "average": 50.0,
+            "standard_deviation": 5.0,
+            "form-TOTAL_FORMS": "0",
+            "form-INITIAL_FORMS": "0",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+        }
+        initial_count = CollectionPropertyValue.objects.count()
+        response = self.client.post(url, data=data)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            CollectionPropertyValue.objects.count(),
+            initial_count,
+            "No CPV should be created when permission is denied",
+        )
+
+
+class SelectNewlyCreatedObjectModelSelectOptionsViewTestCase(
+    ViewWithPermissionsTestCase,
+):
+    """#214: get_selected_object must filter by owner, not global max(created_at)."""
+
+    member_permissions = "view_collector"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        perm = Permission.objects.get(codename="view_collector")
+        cls.owner.user_permissions.add(perm)
+        cls.own_collector = Collector.objects.create(
+            owner=cls.owner, name="Owner Collector"
+        )
+        cls.other_collector = Collector.objects.create(
+            owner=cls.member, name="Member Collector"
+        )
+
+    def test_get_selected_object_returns_own_object(self):
+        """Selected object must belong to the requesting user, not be global max (#214)."""
+        request = RequestFactory().get(reverse("collector-options"))
+        request.user = self.owner
+        view = views.CollectorOptions()
+        view.setup(request)
+        view.kwargs = {}
+        view.model = Collector
+        selected = view.get_selected_object()
+        self.assertEqual(selected.owner, self.owner)
 
 
 class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCase):

@@ -2275,9 +2275,14 @@ class UserCreatedObjectModalDetailView(
 
 
 class UserCreatedObjectUpdateView(
-    UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, UpdateView
+    PermissionRequiredMixin, UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, UpdateView
 ):
-    # TODO: Implement permission flow for publication process and moderators.
+    permission_required = ()
+
+    def has_permission(self):
+        if self.request.user.is_staff:
+            return True
+        return super().has_permission()
 
     def get_form_kwargs(self):
         """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
@@ -2382,9 +2387,15 @@ class UserCreatedObjectCreateWithInlinesView(
 
 
 class UserCreatedObjectUpdateWithInlinesView(
-    UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView
+    PermissionRequiredMixin, UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView
 ):
+    permission_required = ()
     formset_helper_class = DynamicTableInlineFormSetHelper
+
+    def has_permission(self):
+        if self.request.user.is_staff:
+            return True
+        return super().has_permission()
 
     def get_form_kwargs(self):
         """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
@@ -2437,10 +2448,16 @@ class UserCreatedObjectUpdateWithInlinesView(
 
 
 class UserCreatedObjectModalUpdateView(
-    UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, BSModalUpdateView
+    PermissionRequiredMixin, UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, BSModalUpdateView
 ):
+    permission_required = ()
     template_name = "modal_form.html"
     success_message = "Successfully updated."
+
+    def has_permission(self):
+        if self.request.user.is_staff:
+            return True
+        return super().has_permission()
 
     def get_form_kwargs(self):
         """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""

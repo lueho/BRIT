@@ -2212,6 +2212,27 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(value.basis_component, self.selected_basis)
 
+    def test_get_http_403_for_non_owner_with_permission(self):
+        """Non-owner with add_materialpropertyvalue should be denied (#206)."""
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("sample-add-property", kwargs={"pk": self.sample.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_403_for_non_owner_with_permission(self):
+        """Non-owner with add_materialpropertyvalue should be denied on POST (#206)."""
+        self.client.force_login(self.member)
+        data = {
+            "property": self.property.pk,
+            "average": 99.0,
+            "standard_deviation": 1.0,
+        }
+        response = self.client.post(
+            reverse("sample-add-property", kwargs={"pk": self.sample.pk}), data
+        )
+        self.assertEqual(response.status_code, 403)
+
 
 class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "add_materialpropertyvalue"

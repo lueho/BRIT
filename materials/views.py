@@ -1366,9 +1366,17 @@ class SampleAddCompositionView(UserCreatedObjectCreateView):
         return super().post(request, *args, **kwargs)
 
 
-class SampleAddPropertyView(UserCreatedObjectCreateView):
+class SampleAddPropertyView(UserPassesTestMixin, UserCreatedObjectCreateView):
     form_class = MaterialPropertyValueModelForm
     permission_required = "materials.add_materialpropertyvalue"
+
+    def test_func(self):
+        try:
+            sample = Sample.objects.get(pk=self.kwargs.get("pk"))
+        except Sample.DoesNotExist:
+            return False
+        policy = get_object_policy(self.request.user, sample, request=self.request)
+        return policy["can_add_property"]
 
     def form_valid(self, form):
         sample = Sample.objects.get(pk=self.kwargs.get("pk"))
