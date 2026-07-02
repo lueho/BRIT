@@ -1,6 +1,7 @@
 import os
 import ssl
 from pathlib import Path
+from urllib.parse import urlparse
 
 from django.core.management.utils import get_random_secret_key
 
@@ -163,27 +164,42 @@ REGISTRATION_FORM = "users.forms.UserRegistrationForm"
 LOGIN_REDIRECT_URL = "home"
 LOGIN_URL = "/users/login/"
 
+REDIS_URL = os.environ.get("REDIS_URL")
+
+
+def _redis_connection_pool_kwargs(redis_url):
+    if redis_url and urlparse(redis_url).scheme == "rediss":
+        return {"ssl_cert_reqs": None}
+    return {}
+
+
+def _redis_ssl_settings(redis_url):
+    if redis_url and urlparse(redis_url).scheme == "rediss":
+        return {"ssl_cert_reqs": ssl.CERT_NONE}
+    return None
+
+
 # Redis and Caching
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.environ.get("REDIS_URL"),
+        "LOCATION": REDIS_URL,
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
             "IGNORE_EXCEPTIONS": True,
-            "CONNECTION_POOL_KWARGS": {"ssl_cert_reqs": None},
+            "CONNECTION_POOL_KWARGS": _redis_connection_pool_kwargs(REDIS_URL),
         },
     },
     "geojson": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.environ.get("REDIS_URL"),
+        "LOCATION": REDIS_URL,
         "TIMEOUT": 86400,  # 24 hours
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
             "IGNORE_EXCEPTIONS": True,
-            "CONNECTION_POOL_KWARGS": {"ssl_cert_reqs": None},
+            "CONNECTION_POOL_KWARGS": _redis_connection_pool_kwargs(REDIS_URL),
             "KEY_PREFIX": "geojson",  # Differentiate keys for the geojson cache
         },
     },
@@ -281,10 +297,10 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 COOKIE_CONSENT_NAME = "cookie_consent"
 
-CELERY_BROKER_URL = os.environ.get("REDIS_URL")
-CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
-CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
-CELERY_REDIS_BACKEND_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = REDIS_URL
+CELERY_BROKER_USE_SSL = _redis_ssl_settings(REDIS_URL)
+CELERY_REDIS_BACKEND_USE_SSL = _redis_ssl_settings(REDIS_URL)
 
 GEO_BORDER_TOLERANCE = 0.005  # Tolerance for border detection in degrees for EPSG 4326
 
