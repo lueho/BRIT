@@ -2124,6 +2124,7 @@ class GreenWasteCollectionSystemCountViewSetTests(APITestCase):
             waste_category=waste_category,
             collection_system=collection_system,
             valid_from=date(year, 1, 1),
+            publication_status="published",
         )
 
     def test_returns_distinct_green_waste_system_count_per_catchment(self):
@@ -2218,6 +2219,7 @@ class CollectionConflictViewSetTests(APITestCase):
             waste_category=waste_category,
             collection_system=collection_system,
             valid_from=date(year, 1, 1),
+            publication_status="published",
         )
 
     def _conflict_ids(self, **params):
@@ -2249,6 +2251,7 @@ class CollectionConflictViewSetTests(APITestCase):
             waste_category=self.bio_category,
             collection_system=None,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
 
         conflicts = self._conflict_ids()
@@ -2432,6 +2435,7 @@ class CataloniaCollectionSystemViewSetTests(APITestCase):
             valid_from=date(2024, 1, 1),
             access_control_bp=access_control_bp,
             access_control_pap=access_control_pap,
+            publication_status="published",
         )
 
     def test_stream_specific_collection_system_endpoints(self):
@@ -2579,6 +2583,7 @@ class CollectionPointCountViewSetTests(APITestCase):
             waste_category=cls.waste_category,
             collection_system=collection_system,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
 
     def test_returns_primary_collection_point_count_per_catchment(self):
@@ -2625,6 +2630,7 @@ class ConnectionRateViewSetTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2020, 1, 1),
+            publication_status="published",
         )
         cls.current_collection = Collection.objects.create(
             name="Current connection rate collection",
@@ -2633,6 +2639,7 @@ class ConnectionRateViewSetTests(APITestCase):
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
             participation_policy="MANDATORY",
+            publication_status="published",
         )
         cls.current_collection.predecessors.add(cls.previous_collection)
         CollectionPropertyValue.objects.create(
@@ -2722,6 +2729,7 @@ class WasteAtlasPrimarySelectionTests(APITestCase):
                 waste_category=cls.bio_category,
                 collection_system=cls.d2d,
                 valid_from=date(2024, 1, 1),
+                publication_status="published",
             )
             d2d_collection.allowed_materials.add(cls.paper_bags)
             CollectionPropertyValue.objects.create(
@@ -2737,6 +2745,7 @@ class WasteAtlasPrimarySelectionTests(APITestCase):
                 waste_category=cls.food_category,
                 collection_system=cls.bring_point,
                 valid_from=date(2024, 1, 1),
+                publication_status="published",
             )
 
         cls.no_collection_catchment = CollectionCatchment.objects.create(
@@ -2749,6 +2758,7 @@ class WasteAtlasPrimarySelectionTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.no_collection,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
 
     def test_primary_selection_is_consistent_across_map_endpoints(self):
@@ -2915,6 +2925,7 @@ class BinConfigurationViewSetTests(APITestCase):
             collection_system=collection_system,
             bin_configuration=bin_configuration,
             valid_from=date(year, 1, 1),
+            publication_status="published",
         )
 
     def test_returns_bin_configuration_with_expected_fallbacks(self):
@@ -2990,6 +3001,7 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
                 waste_category=cls.biowaste_category,
                 collection_system=cls.d2d,
                 valid_from=date(2022, 1, 1),
+                publication_status="published",
             )
 
         Collection.objects.create(
@@ -2999,6 +3011,7 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
             collection_system=cls.d2d,
             frequency=cls.residual_frequency,
             valid_from=date(2022, 1, 1),
+            publication_status="published",
         )
 
     def test_collection_system_endpoint_respects_nuts_prefix(self):
@@ -3225,6 +3238,7 @@ class GreenWasteCollectionAmountViewSetTests(APITestCase):
             waste_category=waste_category,
             collection_system=collection_system,
             valid_from=date(year, 1, 1),
+            publication_status="published",
         )
 
     @classmethod
@@ -3315,6 +3329,7 @@ class BinSizeViewSetTests(APITestCase):
             min_bin_size=80,
             required_bin_capacity=10,
             required_bin_capacity_reference="person",
+            publication_status="published",
         )
         cls.residual_col = Collection.objects.create(
             name="BinSize residual col",
@@ -3325,6 +3340,7 @@ class BinSizeViewSetTests(APITestCase):
             min_bin_size=120,
             required_bin_capacity=40,
             required_bin_capacity_reference="household",
+            publication_status="published",
         )
         Collection.objects.create(
             name="BinSize no bin col",
@@ -3332,6 +3348,7 @@ class BinSizeViewSetTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
         Collection.objects.create(
             name="BinSize bring point col",
@@ -3340,6 +3357,7 @@ class BinSizeViewSetTests(APITestCase):
             collection_system=cls.bring_point,
             valid_from=date(2024, 1, 1),
             min_bin_size=60,
+            publication_status="published",
         )
 
     def test_biowaste_min_bin_size_returns_d2d_collections(self):
@@ -3462,6 +3480,7 @@ class AtlasRatioViewSetTests(APITestCase):
             frequency=cls.bio_frequency,
             valid_from=date(2024, 1, 1),
             min_bin_size=60,
+            publication_status="published",
         )
         Collection.objects.create(
             name="Ratio residual collection",
@@ -3471,6 +3490,7 @@ class AtlasRatioViewSetTests(APITestCase):
             frequency=cls.residual_frequency,
             valid_from=date(2024, 1, 1),
             min_bin_size=120,
+            publication_status="published",
         )
         Collection.objects.create(
             name="Ratio residual only collection",
@@ -3480,6 +3500,7 @@ class AtlasRatioViewSetTests(APITestCase):
             frequency=cls.residual_frequency,
             valid_from=date(2024, 1, 1),
             min_bin_size=80,
+            publication_status="published",
         )
 
     @classmethod
@@ -3612,6 +3633,7 @@ class OrganicAmountViewSetTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
             collection=bio_col_both,
@@ -3627,6 +3649,7 @@ class OrganicAmountViewSetTests(APITestCase):
             waste_category=cls.green_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
         acpv = AggregatedCollectionPropertyValue.objects.create(
             name="Organic green ACPV both",
@@ -3644,6 +3667,7 @@ class OrganicAmountViewSetTests(APITestCase):
             waste_category=cls.residual_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
             collection=residual_col_both,
@@ -3659,6 +3683,7 @@ class OrganicAmountViewSetTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
             collection=bio_col_bio_only,
@@ -3674,6 +3699,7 @@ class OrganicAmountViewSetTests(APITestCase):
             waste_category=cls.green_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
             collection=green_col_green_only,
@@ -3689,6 +3715,7 @@ class OrganicAmountViewSetTests(APITestCase):
             waste_category=cls.residual_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
             collection=residual_col_only,
@@ -3810,6 +3837,7 @@ class SouthTyrolCollectionPointTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
         cls.residual_collection = Collection.objects.create(
             name="South Tyrol Residual Collection",
@@ -3817,6 +3845,7 @@ class SouthTyrolCollectionPointTests(APITestCase):
             waste_category=cls.residual_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
         # Create collection point values
         CollectionPropertyValue.objects.create(
@@ -3841,6 +3870,7 @@ class SouthTyrolCollectionPointTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
             collection=cls.bio_only_collection,
@@ -3906,6 +3936,7 @@ class SouthTyrolCollectionPointTests(APITestCase):
             waste_category=self.residual_category,
             collection_system=self.d2d,
             valid_from=date(2025, 1, 1),
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
             collection=zero_collection,
@@ -3962,6 +3993,7 @@ class FalsyZeroRatioGuardTests(APITestCase):
             frequency=cls.bio_frequency,
             valid_from=date(2024, 1, 1),
             min_bin_size=60,
+            publication_status="published",
         )
         Collection.objects.create(
             name="Zero residual collection",
@@ -3971,6 +4003,7 @@ class FalsyZeroRatioGuardTests(APITestCase):
             frequency=cls.residual_frequency,
             valid_from=date(2024, 1, 1),
             min_bin_size=0,
+            publication_status="published",
         )
 
     @classmethod
@@ -4074,6 +4107,7 @@ class CollectionPointCountNoDataAndDtDTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
 
         # Catchment B: biowaste bring-point collection, no CPV → no-data + is_door_to_door=False
@@ -4086,6 +4120,7 @@ class CollectionPointCountNoDataAndDtDTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.bring_point,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
 
         # Catchment C: biowaste DtD (no CPV) + residual with CPV
@@ -4108,6 +4143,7 @@ class CollectionPointCountNoDataAndDtDTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
         cls.residual_collection_c = Collection.objects.create(
             name="CP Residual Collection C",
@@ -4115,6 +4151,7 @@ class CollectionPointCountNoDataAndDtDTests(APITestCase):
             waste_category=cls.residual_category,
             collection_system=cls.bring_point,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
         # Only create a CPV for the property used by COLLECTION_POINT_COUNT_PROPERTY_NAME
         # (viewsets hardcode "number of collection points")
@@ -4212,6 +4249,7 @@ class BiowasteImpurityViewSetTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
             collection=cls.collection_with_data,
@@ -4238,6 +4276,7 @@ class BiowasteImpurityViewSetTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
 
         # Catchment C: No separate collection → no_collection=True
@@ -4250,6 +4289,7 @@ class BiowasteImpurityViewSetTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.no_collection,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
 
     def _by_catchment(self, country="ES", year=2024):
@@ -4335,6 +4375,7 @@ class WeeklyBpAccessDaysViewSetTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.bring_point,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
             collection=cls.collection_bp,
@@ -4354,6 +4395,7 @@ class WeeklyBpAccessDaysViewSetTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.mixed,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
             collection=cls.collection_mixed,
@@ -4373,6 +4415,7 @@ class WeeklyBpAccessDaysViewSetTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.d2d,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
 
         # Catchment D: bring-point but no CPV → has_bring_point=True, value null
@@ -4385,6 +4428,7 @@ class WeeklyBpAccessDaysViewSetTests(APITestCase):
             waste_category=cls.bio_category,
             collection_system=cls.bring_point,
             valid_from=date(2024, 1, 1),
+            publication_status="published",
         )
 
     def _by_catchment(self, country="ES", year=2024):
@@ -4430,3 +4474,144 @@ class WeeklyBpAccessDaysViewSetTests(APITestCase):
         self.assertIn("catchment_id", row)
         self.assertIn("weekly_access_days", row)
         self.assertIn("has_bring_point", row)
+
+
+class WasteAtlasPublicationScopingTests(APITestCase):
+    """Non-published collections must never appear in waste atlas API responses."""
+
+    ENDPOINTS = {
+        "collection_system": "/waste_collection/api/waste-atlas/collection-system/",
+        "catchment_geojson": "/waste_collection/api/waste-atlas/catchment/geojson/",
+        "collector_orga_level": "/waste_collection/api/waste-atlas/collector-orga-level/",
+        "collection_orga_level": "/waste_collection/api/waste-atlas/collection-orga-level/",
+        "connection_type": "/waste_collection/api/waste-atlas/connection-type/",
+        "conflicts": "/waste_collection/api/waste-atlas/collection-conflicts/",
+    }
+
+    @classmethod
+    def _region_with_borders(cls, name):
+        borders = GeoPolygon.objects.create(
+            geom="MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))",
+        )
+        return Region.objects.create(name=name, country="DE", borders=borders)
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = cls._region_with_borders("Pub Scope Region")
+        cls.d2d = CollectionSystem.objects.create(name="Door to door")
+        cls.bio_category = WasteCategory.objects.create(name="Biowaste")
+        cls.collector = Collector.objects.create(name="Pub Scope Collector")
+        cls.user = User.objects.create_user(username="pubscopeuser")
+
+        cls.published_catchment = CollectionCatchment.objects.create(
+            name="Published Catchment",
+            region=cls.region,
+        )
+        cls.collector.catchment = cls.published_catchment
+        cls.collector.save()
+
+        cls.published_collection = Collection.objects.create(
+            name="Published Collection",
+            owner=cls.user,
+            catchment=cls.published_catchment,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+            collector=cls.collector,
+        )
+
+        cls.private_catchment = CollectionCatchment.objects.create(
+            name="Private Catchment",
+            region=cls._region_with_borders("Private Region"),
+        )
+        cls.private_collector = Collector.objects.create(
+            name="Private Collector",
+            catchment=cls.private_catchment,
+        )
+        cls.private_collection = Collection.objects.create(
+            name="Private Collection",
+            owner=cls.user,
+            catchment=cls.private_catchment,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2024, 1, 1),
+            publication_status="private",
+            collector=cls.private_collector,
+        )
+
+        cls.review_catchment = CollectionCatchment.objects.create(
+            name="Review Catchment",
+            region=cls._region_with_borders("Review Region"),
+        )
+        cls.review_collection = Collection.objects.create(
+            name="Review Collection",
+            owner=cls.user,
+            catchment=cls.review_catchment,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2024, 1, 1),
+            publication_status="review",
+        )
+
+    def _get(self, endpoint_key, **extra_params):
+        params = {"country": "DE", "year": 2024, **extra_params}
+        return self.client.get(self.ENDPOINTS[endpoint_key], params)
+
+    def _catchment_ids(self, response):
+        if isinstance(response.data, dict) and "features" in response.data:
+            return {
+                f["properties"]["catchment_id"]
+                for f in response.data["features"]
+            }
+        return {row["catchment_id"] for row in response.data}
+
+    def test_collection_system_excludes_private(self):
+        response = self._get("collection_system")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = self._catchment_ids(response)
+        self.assertIn(self.published_catchment.id, ids)
+        self.assertNotIn(self.private_catchment.id, ids)
+
+    def test_collection_system_excludes_review(self):
+        response = self._get("collection_system")
+        ids = self._catchment_ids(response)
+        self.assertNotIn(self.review_catchment.id, ids)
+
+    def test_catchment_geojson_excludes_non_published(self):
+        response = self._get("catchment_geojson")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = self._catchment_ids(response)
+        self.assertIn(self.published_catchment.id, ids)
+        self.assertNotIn(self.private_catchment.id, ids)
+        self.assertNotIn(self.review_catchment.id, ids)
+
+    def test_collector_orga_level_excludes_non_published(self):
+        response = self._get("collector_orga_level")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = self._catchment_ids(response)
+        self.assertIn(self.published_catchment.id, ids)
+        self.assertNotIn(self.private_catchment.id, ids)
+
+    def test_collection_orga_level_excludes_non_published(self):
+        response = self._get("collection_orga_level")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = self._catchment_ids(response)
+        self.assertIn(self.published_catchment.id, ids)
+        self.assertNotIn(self.private_catchment.id, ids)
+        self.assertNotIn(self.review_catchment.id, ids)
+
+    def test_connection_type_excludes_non_published(self):
+        response = self._get("connection_type")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = self._catchment_ids(response)
+        self.assertIn(self.published_catchment.id, ids)
+        self.assertNotIn(self.private_catchment.id, ids)
+        self.assertNotIn(self.review_catchment.id, ids)
+
+    def test_conflicts_excludes_non_published(self):
+        response = self._get("conflicts", theme="collection_system")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = self._catchment_ids(response)
+        self.assertNotIn(self.private_catchment.id, ids)
+        self.assertNotIn(self.review_catchment.id, ids)

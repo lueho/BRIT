@@ -34,6 +34,9 @@ from sources.waste_collection.models import (
     CollectionPropertyValue,
     Collector,
 )
+from utils.object_management.models import UserCreatedObject
+
+_PUBLISHED = UserCreatedObject.STATUS_PUBLISHED
 
 from .serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
@@ -277,7 +280,7 @@ def _select_primary_collections(
     extra_fields=(),
     extra_filters=None,
 ):
-    qs = Collection.objects.filter(
+    qs = Collection.objects.published().filter(
         _country_filter_q("catchment__", country),
         valid_from__year=year,
     )
@@ -423,6 +426,7 @@ def _active_collector_scope(country, year, nuts_prefixes):
         _country_filter_q("catchment__", country),
         catchment__isnull=False,
         collection__valid_from__year=year,
+        collection__publication_status=_PUBLISHED,
     )
     return _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
 
@@ -451,6 +455,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
             CollectionCatchment.objects.filter(
                 _country_filter_q("", country),
                 collections__valid_from__year=year,
+                collections__publication_status=_PUBLISHED,
                 region__borders__isnull=False,
             )
             .distinct()
@@ -578,7 +583,7 @@ class CollectionOrgaLevelViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
 
-        qs = Collection.objects.filter(
+        qs = Collection.objects.published().filter(
             _country_filter_q("catchment__", country),
             catchment__isnull=False,
             valid_from__year=year,
@@ -852,7 +857,7 @@ class GreenWasteCollectionSystemCountViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         qs = _filter_by_waste_categories(
-            Collection.objects.filter(
+            Collection.objects.published().filter(
                 _country_filter_q("catchment__", country),
                 valid_from__year=year,
             ),
@@ -952,7 +957,7 @@ def _get_collection_count(
     Non-door-to-door catchments are excluded (they have no frequency data).
     """
     qs = _filter_by_waste_categories(
-        Collection.objects.filter(
+        Collection.objects.published().filter(
             _country_filter_q("catchment__", country),
             valid_from__year=year,
             collection_system__name="Door to door",
@@ -1488,7 +1493,7 @@ def _get_collection_amount(
     # Step 2: map catchments → all collection IDs (any year)
     # ------------------------------------------------------------------
     all_col_rows = _filter_by_waste_categories(
-        Collection.objects.filter(
+        Collection.objects.published().filter(
             catchment_id__in=catchment_ids,
         ),
         waste_categories,
@@ -1760,6 +1765,7 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=()):
             CollectionCatchment.objects.filter(
                 _country_filter_q("", country),
                 collections__valid_from__year=year,
+                collections__publication_status=_PUBLISHED,
             ).distinct(),
             nuts_prefixes,
         ).values_list("id", flat=True)
@@ -1778,7 +1784,7 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=()):
         return []
 
     all_col_rows = _filter_by_waste_categories(
-        Collection.objects.filter(
+        Collection.objects.published().filter(
             catchment_id__in=catchment_ids,
         ),
         _GREEN_WASTE_CATEGORY_NAMES,
@@ -2015,7 +2021,7 @@ def _get_min_bin_size(
     Only door-to-door collections carry meaningful bin size data.
     """
     qs = _filter_by_waste_categories(
-        Collection.objects.filter(
+        Collection.objects.published().filter(
             _country_filter_q("catchment__", country),
             valid_from__year=year,
             collection_system__name="Door to door",
@@ -2061,7 +2067,7 @@ def _get_required_bin_capacity(
     not_specified) for the primary door-to-door collection per catchment.
     """
     qs = _filter_by_waste_categories(
-        Collection.objects.filter(
+        Collection.objects.published().filter(
             _country_filter_q("catchment__", country),
             valid_from__year=year,
             collection_system__name="Door to door",
@@ -2787,6 +2793,7 @@ class CatchmentPopulationViewSet(WasteAtlasViewSet):
             CollectionCatchment.objects.filter(
                 _country_filter_q("", country),
                 collections__valid_from__year=year,
+                collections__publication_status=_PUBLISHED,
             )
             .distinct()
             .values_list("id", flat=False)
@@ -2809,6 +2816,7 @@ class CatchmentPopulationViewSet(WasteAtlasViewSet):
             CollectionCatchment.objects.filter(
                 _country_filter_q("", country),
                 collections__valid_from__year=year,
+                collections__publication_status=_PUBLISHED,
             )
             .distinct()
             .annotate(
@@ -2967,7 +2975,7 @@ def _collection_system_conflicts(country, year, nuts_prefixes, waste_categories)
     holds more than one distinct ``collection_system`` name for it, because the
     map can only display a single (priority-triaged) system per catchment.
     """
-    qs = Collection.objects.filter(
+    qs = Collection.objects.published().filter(
         _country_filter_q("catchment__", country),
         valid_from__year=year,
     )
