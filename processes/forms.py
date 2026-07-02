@@ -292,6 +292,26 @@ class ProcessSourceInlineForm(forms.ModelForm):
         model = ProcessSource
         fields = ("source",)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        extra_ids = set()
+        if self.instance and self.instance.pk and self.instance.source_id:
+            extra_ids.add(self.instance.source_id)
+        data = kwargs.get("data") or (args[0] if args else None)
+        if data:
+            prefix = self.prefix or ""
+            key = f"{prefix}-source" if prefix else "source"
+            val = data.get(key)
+            if val:
+                try:
+                    extra_ids.add(int(val))
+                except (ValueError, TypeError):
+                    pass
+        if extra_ids:
+            published = Source.objects.filter(publication_status="published")
+            existing = Source.objects.filter(pk__in=extra_ids)
+            self.fields["source"].queryset = published | existing
+
 
 class ProcessSourceFormSet(OrderedUniqueInlineFormSet):
     related_field_name = "source"
