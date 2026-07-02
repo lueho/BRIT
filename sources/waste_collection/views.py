@@ -6,7 +6,11 @@ from urllib.parse import urlencode
 
 from celery.result import AsyncResult
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.mixins import (
+    LoginRequiredMixin,
+    PermissionRequiredMixin,
+    UserPassesTestMixin,
+)
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count, Max, Min, Prefetch, Q
 from django.forms.models import model_to_dict
@@ -1761,32 +1765,23 @@ class CollectionListFileExportView(GenericUserCreatedObjectExportView):
     include_row_count_estimate = True
 
 
-class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
-    # TODO: Handle permissions without overriding dispatch
-    def dispatch(self, request, *args, **kwargs):
-        # Let parent handle authentication first
-        result = super().dispatch(request, *args, **kwargs)
-
-        # Only check policy for authenticated requests that passed parent checks
-        if request.user.is_authenticated and request.method in ("GET", "POST"):
-            try:
-                self.parent_collection = Collection.objects.get(pk=kwargs.get("pk"))
-            except Collection.DoesNotExist as err:
-                raise PermissionDenied("Invalid parent collection.") from err
-
-            policy = get_object_policy(
-                request.user, self.parent_collection, request=request
-            )
-            if not policy.get("can_add_property"):
-                raise PermissionDenied(
-                    "You do not have permission to add statistics to this collection."
-                )
-
-            self.anchor_collection = (
-                self.parent_collection.version_anchor or self.parent_collection
-            )
-
-        return result
+class CollectionAddPropertyValueView(
+    UserPassesTestMixin, CollectionPropertyValueCreateView
+):
+    def test_func(self):
+        try:
+            self.parent_collection = Collection.objects.get(pk=self.kwargs.get("pk"))
+        except Collection.DoesNotExist:
+            return False
+        policy = get_object_policy(
+            self.request.user, self.parent_collection, request=self.request
+        )
+        if not policy.get("can_add_property"):
+            return False
+        self.anchor_collection = (
+            self.parent_collection.version_anchor or self.parent_collection
+        )
+        return True
 
     def get_initial(self):
         initial = super().get_initial()
@@ -1825,11 +1820,11 @@ class CollectionCatchmentAddAggregatedPropertyView(
 
 class SelectNewlyCreatedObjectModelSelectOptionsView(OwnedObjectModelSelectOptionsView):
     def get_selected_object(self):
-        # TODO: Improve this by adding owner to
-        created_at = self.model.objects.aggregate(max_created_at=Max("created_at"))[
-            "max_created_at"
-        ]
-        return self.model.objects.get(created_at=created_at)
+        qs = self.model.objects.filter(owner=self.request.user)
+        created_at = qs.aggregate(max_created_at=Max("created_at"))["max_created_at"]
+        if created_at is None:
+            return None
+        return qs.filter(created_at=created_at).first()
 
 
 class CollectorOptions(SelectNewlyCreatedObjectModelSelectOptionsView):

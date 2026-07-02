@@ -356,6 +356,9 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         """
         Test updating a Source that was created with no authors to add one or more authors.
         """
+        self.user_with_add_perm.user_permissions.add(
+            Permission.objects.get(codename="change_source")
+        )
         self.client.force_login(self.user_with_add_perm)
         post_data = self.create_object_data.copy()
         # Create Source with no authors

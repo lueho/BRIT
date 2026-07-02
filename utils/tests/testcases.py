@@ -194,6 +194,10 @@ class AbstractTestCases:
                 )
                 cls.user_with_add_perm.user_permissions.add(add_perm)
 
+                change_perm_codename = f"change_{cls.model._meta.model_name}"
+                change_perm = Permission.objects.get(codename=change_perm_codename)
+                cls.owner_user.user_permissions.add(change_perm)
+
             if cls.allow_create_for_any_authenticated_user:
                 cls.owner_user.user_permissions.add(add_perm)
                 cls.non_owner_user.user_permissions.add(add_perm)

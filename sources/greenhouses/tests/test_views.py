@@ -144,6 +144,39 @@ class GrowthCycleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
         )
 
 
+class GreenhouseUpdateViewPermissionTestCase(ViewWithPermissionsTestCase):
+    """#209: GreenhouseUpdateView must require change_greenhouse permission."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.greenhouse = Greenhouse.objects.create(
+            owner=cls.owner, name="Test Greenhouse", publication_status="private"
+        )
+
+    def test_get_http_403_for_owner_without_change_permission(self):
+        self.client.force_login(self.owner)
+        url = reverse("greenhouse-update", kwargs={"pk": self.greenhouse.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_for_owner_with_change_permission(self):
+        from django.contrib.auth.models import Permission
+
+        perm = Permission.objects.get(codename="change_greenhouse")
+        self.owner.user_permissions.add(perm)
+        self.client.force_login(self.owner)
+        url = reverse("greenhouse-update", kwargs={"pk": self.greenhouse.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_for_staff_without_explicit_permission(self):
+        self.client.force_login(self.staff)
+        url = reverse("greenhouse-update", kwargs={"pk": self.greenhouse.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+
 class GreenhouseDetailPermissionRegressionTest(ViewWithPermissionsTestCase):
     member_permissions = "add_greenhousegrowthcycle"
 
