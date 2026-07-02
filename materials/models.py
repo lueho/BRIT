@@ -1001,14 +1001,16 @@ class Composition(NamedUserCreatedObject):
 
     def duplicate(self, creator):
         post_save.disconnect(add_next_order_value, sender=Composition)
-        duplicate = Composition.objects.create(
-            owner=creator,
-            group=self.group,
-            sample=self.sample,
-            fractions_of=self.fractions_of,
-            order=self.order,
-        )
-        post_save.connect(add_next_order_value, sender=Composition)
+        try:
+            duplicate = Composition.objects.create(
+                owner=creator,
+                group=self.group,
+                sample=self.sample,
+                fractions_of=self.fractions_of,
+                order=self.order,
+            )
+        finally:
+            post_save.connect(add_next_order_value, sender=Composition)
         return duplicate
 
     def get_absolute_url(self):
