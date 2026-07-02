@@ -269,26 +269,35 @@ class ScenarioDownloadSummaryAuthTests(TestCase):
         cls.other_user = User.objects.create_user(username="other", password="pass")
         region = Region.objects.create(name="R", publication_status="published")
         catchment = Catchment.objects.create(
-            name="C", region=region, parent_region=region, publication_status="published"
+            name="C",
+            region=region,
+            parent_region=region,
+            publication_status="published",
         )
         cls.scenario = Scenario.objects.create(
             name="S", owner=cls.owner, region=region, catchment=catchment
         )
 
     def test_anonymous_is_denied(self):
-        url = reverse("scenario-download-summary", kwargs={"scenario_pk": self.scenario.pk})
+        url = reverse(
+            "scenario-download-summary", kwargs={"scenario_pk": self.scenario.pk}
+        )
         response = self.client.get(url)
         self.assertNotEqual(response.status_code, 200)
 
     def test_non_owner_non_staff_is_denied(self):
         self.client.force_login(self.other_user)
-        url = reverse("scenario-download-summary", kwargs={"scenario_pk": self.scenario.pk})
+        url = reverse(
+            "scenario-download-summary", kwargs={"scenario_pk": self.scenario.pk}
+        )
         response = self.client.get(url)
         self.assertIn(response.status_code, [302, 403])
 
     def test_owner_can_download(self):
         self.client.force_login(self.owner)
-        url = reverse("scenario-download-summary", kwargs={"scenario_pk": self.scenario.pk})
+        url = reverse(
+            "scenario-download-summary", kwargs={"scenario_pk": self.scenario.pk}
+        )
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
@@ -300,7 +309,10 @@ class ScenarioDownloadResultSummaryAuthTests(TestCase):
         cls.other_user = User.objects.create_user(username="other", password="pass")
         region = Region.objects.create(name="R", publication_status="published")
         catchment = Catchment.objects.create(
-            name="C", region=region, parent_region=region, publication_status="published"
+            name="C",
+            region=region,
+            parent_region=region,
+            publication_status="published",
         )
         cls.scenario = Scenario.objects.create(
             name="S", owner=cls.owner, region=region, catchment=catchment
@@ -366,7 +378,10 @@ class ScenarioAddAlgorithmAuthBypassTests(TestCase):
         cls.owner_b = User.objects.create_user(username="owner_b", password="pass")
         region = Region.objects.create(name="R", publication_status="published")
         catchment = Catchment.objects.create(
-            name="C", region=region, parent_region=region, publication_status="published"
+            name="C",
+            region=region,
+            parent_region=region,
+            publication_status="published",
         )
         cls.scenario_a = Scenario.objects.create(
             name="A", owner=cls.owner_a, region=region, catchment=catchment
