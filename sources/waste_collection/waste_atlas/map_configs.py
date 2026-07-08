@@ -189,8 +189,8 @@ MAP_CONFIGS = {
         "outlineStrokeOpacity": 0.95,
         "outlineStrokeWidth": 1.35,
         "overlayPatternField": "_has_acpv_overlay",
-        "overlayPatternLegendLabel": "Hatched = aggregated value (ACPV)",
-        "exportOverlayPatternLegendLabel": "Hatched = ACPV",
+        "overlayPatternLegendLabel": "Hatched = aggregated value",
+        "exportOverlayPatternLegendLabel": "Hatched = aggregated value",
         "numericField": "amount",
         "quartileColors": ["#d9f0d3", "#a6d96a", "#66bd63", "#1a9850"],
         "quartileSpecialCases": [

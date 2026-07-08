@@ -35,7 +35,7 @@ class Command(BaseCommand):
             type=str,
             default=None,
             help="Username to set as owner of created/updated derived records. "
-            "Defaults to the source CPV's owner.",
+            "Defaults to the source value's owner.",
         )
         parser.add_argument(
             "--publication-status",
@@ -43,7 +43,7 @@ class Command(BaseCommand):
             default=None,
             choices=_VALID_STATUSES,
             help="Publication status for created/updated derived records. "
-            "Defaults to the source CPV's publication status.",
+            "Defaults to the source value's publication status.",
         )
 
     def handle(self, *args, **options):

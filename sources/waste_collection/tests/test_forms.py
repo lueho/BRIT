@@ -1085,13 +1085,12 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
     def test_flyers_removed_from_this_collection_but_connected_to_another_are_preserved(
         self,
     ):
-        initial_urls = [{"url": flyer.url} for flyer in self.collection.flyers.all()]
         data = {
             "form-INITIAL_FORMS": 3,
             "form-TOTAL_FORMS": 3,
-            "form-0-url": initial_urls[0]["url"],
-            "form-1-url": "",
-            "form-2-url": initial_urls[2]["url"],
+            "form-0-url": self.flyer_1.url,  # Keep flyer_1
+            "form-1-url": "",  # Remove flyer_2 (also connected to collection2)
+            "form-2-url": self.flyer_3.url,  # Keep flyer_3
         }
         WasteFlyerModelFormSet = formset_factory(
             WasteFlyerModelForm, formset=WasteFlyerFormSet
@@ -1107,18 +1106,17 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             formset.save()
         mock_cleanup.assert_called_once()
         cleanup_orphaned_waste_flyers()
-        WasteFlyer.objects.get(url=initial_urls[1]["url"])
+        WasteFlyer.objects.get(url=self.flyer_2.url)
         self.assertEqual(original_flyer_count - 1, self.collection.flyers.count())
         self.assertEqual(original_flyer_count, WasteFlyer.objects.count())
 
     def test_completely_unused_flyers_get_deleted(self):
-        initial_urls = [{"url": flyer.url} for flyer in self.collection.flyers.all()]
         data = {
             "form-INITIAL_FORMS": 3,
             "form-TOTAL_FORMS": 3,
-            "form-0-url": initial_urls[0]["url"],
-            "form-1-url": initial_urls[1]["url"],
-            "form-2-url": "",
+            "form-0-url": self.flyer_1.url,  # Keep flyer_1
+            "form-1-url": self.flyer_2.url,  # Keep flyer_2
+            "form-2-url": "",  # Remove flyer_3 (completely unused)
         }
         WasteFlyerModelFormSet = formset_factory(
             WasteFlyerModelForm, formset=WasteFlyerFormSet
@@ -1135,7 +1133,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         mock_cleanup.assert_called_once()
         cleanup_orphaned_waste_flyers()
         with self.assertRaises(WasteFlyer.DoesNotExist):
-            WasteFlyer.objects.get(url=initial_urls[2]["url"])
+            WasteFlyer.objects.get(url=self.flyer_3.url)
         self.assertEqual(original_flyer_count - 1, WasteFlyer.objects.count())
         self.assertEqual(original_flyer_count - 1, self.collection.flyers.count())
 
@@ -1186,12 +1184,11 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         prop_value.sources.add(self.flyer_1)
 
         # Remove flyer_1 from collection's flyers
-        initial_urls = [{"url": flyer.url} for flyer in self.collection.flyers.all()]
         data = {
             "form-INITIAL_FORMS": 3,
             "form-TOTAL_FORMS": 3,
-            "form-0-url": initial_urls[1]["url"],  # Keep flyer_2
-            "form-1-url": initial_urls[2]["url"],  # Keep flyer_3
+            "form-0-url": self.flyer_2.url,  # Keep flyer_2
+            "form-1-url": self.flyer_3.url,  # Keep flyer_3
             "form-2-url": "",  # Remove flyer_1 from collection
         }
         WasteFlyerModelFormSet = formset_factory(
@@ -1236,13 +1233,12 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         agg_prop_value.sources.add(self.flyer_2)
 
         # Remove flyer_2 from collection's flyers
-        initial_urls = [{"url": flyer.url} for flyer in self.collection.flyers.all()]
         data = {
             "form-INITIAL_FORMS": 3,
             "form-TOTAL_FORMS": 3,
-            "form-0-url": initial_urls[0]["url"],  # Keep flyer_1
+            "form-0-url": self.flyer_1.url,  # Keep flyer_1
             "form-1-url": "",  # Remove flyer_2 from collection
-            "form-2-url": initial_urls[2]["url"],  # Keep flyer_3
+            "form-2-url": self.flyer_3.url,  # Keep flyer_3
         }
         WasteFlyerModelFormSet = formset_factory(
             WasteFlyerModelForm, formset=WasteFlyerFormSet
@@ -1270,12 +1266,11 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         self.collection2.sources.add(self.flyer_3)
 
         # Remove flyer_3 from collection's flyers
-        initial_urls = [{"url": flyer.url} for flyer in self.collection.flyers.all()]
         data = {
             "form-INITIAL_FORMS": 3,
             "form-TOTAL_FORMS": 3,
-            "form-0-url": initial_urls[0]["url"],  # Keep flyer_1
-            "form-1-url": initial_urls[1]["url"],  # Keep flyer_2
+            "form-0-url": self.flyer_1.url,  # Keep flyer_1
+            "form-1-url": self.flyer_2.url,  # Keep flyer_2
             "form-2-url": "",  # Remove flyer_3 from collection
         }
         WasteFlyerModelFormSet = formset_factory(
