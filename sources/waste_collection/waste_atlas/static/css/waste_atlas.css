@@ -84,6 +84,33 @@
   border-color: var(--atlas-ink-muted);
   color: var(--atlas-ink);
 }
+.atlas-hero-actions {
+  align-items: center;
+  display: flex;
+  flex: none;
+  gap: .75rem;
+}
+.atlas-feedback-link {
+  align-items: center;
+  border: 1px solid var(--atlas-border);
+  border-radius: 999px;
+  color: var(--atlas-label);
+  display: inline-flex;
+  flex: none;
+  font-size: .85rem;
+  font-weight: 700;
+  gap: .35rem;
+  padding: .4rem .9rem;
+  text-decoration: none;
+  transition: background-color .12s ease, border-color .12s ease;
+  white-space: nowrap;
+}
+.atlas-feedback-link:hover,
+.atlas-feedback-link:focus {
+  background: var(--atlas-surface-muted);
+  border-color: var(--atlas-ink-muted);
+  color: var(--atlas-ink);
+}
 
 /* Unified surfaces for the finder and the directory */
 .atlas-panel {

@@ -9,10 +9,17 @@
 {% block style_sheets %}
   <link href="{% static 'css/waste_atlas.min.css' %}" rel="stylesheet">
 {% endblock style_sheets %}
+{% block body_class %} sb-sidenav-toggled{% endblock body_class %}
 {% block content %}
-  <div class="atlas-hero">
-    <div class="atlas-eyebrow">Waste Atlas</div>
-    <h2 class="mb-0">{{ map_title }}</h2>
+  <div class="atlas-hero atlas-hero--split">
+    <div class="atlas-hero-heading">
+      <div class="atlas-eyebrow">Waste Atlas</div>
+      <h2 class="mb-0">{{ map_title }}</h2>
+    </div>
+    <a class="atlas-feedback-link"
+       href="mailto:info@bioresource-tools.net?subject=Waste%20Atlas%20feedback">
+      <i class="fas fa-comment-dots"></i> Feedback
+    </a>
   </div>
   <div id="atlas-controls">
     {% block atlas_selector %}

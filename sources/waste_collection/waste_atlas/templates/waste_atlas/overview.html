@@ -6,6 +6,7 @@
 {% block style_sheets %}
    <link href="{% static 'css/waste_atlas.min.css' %}" rel="stylesheet">
 {% endblock style_sheets %}
+{% block body_class %} sb-sidenav-toggled{% endblock body_class %}
 {% block content %}
    <div class="container atlas-page">
       <header class="atlas-hero atlas-hero--split">
@@ -16,6 +17,11 @@
                Choose a region, then the information you need — collection systems and bins, schedules and collection counts, fees, or collected amounts.
             </p>
          </div>
+         <div class="atlas-hero-actions">
+            <a class="atlas-feedback-link"
+               href="mailto:info@bioresource-tools.net?subject=Waste%20Atlas%20feedback">
+               <i class="fas fa-comment-dots"></i> Feedback
+            </a>
          {% if request.user.is_staff %}
             <div class="atlas-hero-tools dropdown">
                <button class="atlas-hero-link dropdown-toggle" type="button" id="atlas-tools-menu" data-bs-toggle="dropdown" aria-expanded="false">
@@ -35,6 +41,7 @@
                </ul>
             </div>
          {% endif %}
+         </div>
       </header>
       <section class="atlas-panel atlas-directory" aria-labelledby="atlas-directory-title">
          <div class="atlas-directory-header">

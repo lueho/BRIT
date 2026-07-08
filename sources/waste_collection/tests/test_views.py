@@ -4238,11 +4238,11 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(germany_selection["label"], "Germany")
         self.assertEqual(
             germany_selection["themes"]["orga_level"]["label"],
-            "Collectors: administrative level",
+            "Collectors: admin. level",
         )
         self.assertEqual(
             germany_selection["themes"]["collection_orga_level"]["label"],
-            "Collections: administrative level",
+            "Collections: admin. level",
         )
         self.assertEqual(
             collection_system_selection["label"], "Biowaste collection systems"
@@ -4465,6 +4465,30 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertNotContains(response, "atlas-selector-eyebrow")
         # The Load button no longer uses the location-arrow icon.
         self.assertNotContains(response, "fa-location-arrow")
+
+    def test_overview_collapses_sidebar_and_shows_feedback_link(self):
+        response = self.client.get(reverse("waste-atlas-overview"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "sb-sidenav-toggled")
+        self.assertContains(response, "atlas-feedback-link")
+
+    def test_detail_page_collapses_sidebar(self):
+        response = self.client.get(
+            reverse("waste-atlas-germany-residual-frequency-map")
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "sb-sidenav-toggled")
+
+    def test_theme_labels_are_shortened(self):
+        response = self.client.get(reverse("waste-atlas-overview"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Collectors: admin. level")
+        self.assertNotContains(response, "Collectors: administrative level")
+
+    def test_change_map_overview_compare_button_is_not_narrow(self):
+        response = self.client.get(reverse("waste-atlas-change-map-overview"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "col-md-1")
 
     def test_related_maps_generic_same_region_links_preserve_region_scope(self):
         from sources.waste_collection.waste_atlas.map_selection import (
@@ -5146,11 +5170,11 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(
             response,
-            "Collectors: administrative level",
+            "Collectors: admin. level",
         )
         self.assertContains(
             response,
-            "Collections: administrative level",
+            "Collections: admin. level",
         )
         self.assertContains(
             response, reverse("waste-atlas-italy-collection-system-map")
