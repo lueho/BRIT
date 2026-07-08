@@ -419,11 +419,10 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
 
         # _legendItems must call _isNoCollectionCategory
         self.assertIn("_isNoCollectionCategory(item)", script)
-        # In _legendItems, overlay is pushed before noData
+        # Overlay pattern is NOT a legend item — it is rendered as a footnote.
         legend_items_fn = script.split("function _legendItems(cfg, exportMode)")[1]
-        overlay_idx = legend_items_fn.find("cfg.overlayPatternField")
         no_data_idx = legend_items_fn.find("cfg.noDataLabel")
-        self.assertLess(overlay_idx, no_data_idx)
+        self.assertNotIn("cfg.overlayPatternField", legend_items_fn[: no_data_idx + 50])
 
     def test_screen_legend_renders_no_data_last(self):
         script_path = (
@@ -440,10 +439,37 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         )[1]
         # _drawLegend must separate categories with _isNoCollectionCategory
         self.assertIn("_isNoCollectionCategory(item)", draw_legend_fn)
-        # noData rendering must come after overlay rendering in screen mode
+        # Overlay hint is a footnote (separator + italic text), not a swatch row
+        self.assertIn("font-style', 'italic'", draw_legend_fn)
+        self.assertIn("cfg.overlayPatternLegendLabel", draw_legend_fn)
+        # noData rendering must come after overlay footnote in screen mode
         overlay_idx = draw_legend_fn.find("cfg.overlayPatternLegendLabel")
         no_data_idx = draw_legend_fn.find("cfg.noDataLabel")
         self.assertLess(overlay_idx, no_data_idx)
+
+    def test_export_legend_renders_overlay_as_footnote(self):
+        """The overlay pattern hint must be a footnote, not a legend category.
+
+        In export mode the overlay is drawn as a separator line + italic text
+        below the legend columns, not as a regular swatch item.
+        """
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+        script = script_path.read_text()
+
+        # _measureExportLegend must compute a footnote separately
+        measure_fn = script.split("function _measureExportLegend(")[1]
+        self.assertIn("opts.footnote", measure_fn)
+        self.assertIn("opts.footnoteHeight", measure_fn)
+        # _drawExportLegendItem must not draw pattern swatches for the overlay
+        draw_item_fn = script.split("function _drawExportLegendItem(")[1]
+        # The pattern block should be gone (overlay is no longer an item)
+        self.assertNotIn("cat.pattern", draw_item_fn[:500])
 
     def test_collection_system_config_opts_into_conflict_aid(self):
         """The collection_system theme exposes the maintainer conflict aid."""

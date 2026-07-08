@@ -829,15 +829,6 @@ var WasteAtlasChoropleth = (function () {
     noCollection.forEach(function (item) {
       items.push(exportMode ? Object.assign({}, item, { label: _exportLegendLabel(item) }) : item);
     });
-    if (cfg.overlayPatternField && cfg.overlayPatternLegendLabel && cfg._hasOverlayPattern) {
-      items.push({
-        label: exportMode && cfg.exportOverlayPatternLegendLabel
-          ? cfg.exportOverlayPatternLegendLabel
-          : cfg.overlayPatternLegendLabel,
-        color: '#f8f9fa',
-        pattern: true
-      });
-    }
     if (cfg.noDataLabel && cfg._hasNoData !== false) {
       items.push({
         label: exportMode && cfg.exportNoDataLabel ? cfg.exportNoDataLabel : cfg.noDataLabel,
@@ -902,8 +893,24 @@ var WasteAtlasChoropleth = (function () {
         return total + item.height + (index ? opts.rowGap : 0);
       }, 0);
     });
+    // Footnote for overlay pattern hint (rendered separately, not as a category)
+    opts.footnote = null;
+    if (cfg.overlayPatternField && cfg.overlayPatternLegendLabel && cfg._hasOverlayPattern) {
+      var footnoteLabel = exportMode && cfg.exportOverlayPatternLegendLabel
+        ? cfg.exportOverlayPatternLegendLabel
+        : cfg.overlayPatternLegendLabel;
+      var footnoteFontSize = Math.round(opts.fontSize * 0.82);
+      opts.footnote = {
+        lines: _wrapTextToWidth(footnoteLabel, width - opts.paddingX * 2, footnoteFontSize),
+        fontSize: footnoteFontSize
+      };
+      opts.footnoteHeight = opts.footnote.lines.length * Math.round(footnoteFontSize * 1.12)
+        + Math.round(opts.fontSize * 0.6);
+    } else {
+      opts.footnoteHeight = 0;
+    }
     opts.height = opts.paddingY * 2 + opts.titleHeight + opts.titleGap
-      + Math.max.apply(null, opts.columnHeights);
+      + Math.max.apply(null, opts.columnHeights) + opts.footnoteHeight;
     return opts;
   }
 
@@ -1926,13 +1933,6 @@ var WasteAtlasChoropleth = (function () {
       .attr('x', x).attr('y', swatchY)
       .attr('width', opts.swatchW).attr('height', opts.swatchH)
       .attr('fill', cat.color).attr('stroke', '#333');
-    if (cat.pattern) {
-      g.append('rect')
-        .attr('x', x).attr('y', swatchY)
-        .attr('width', opts.swatchW).attr('height', opts.swatchH)
-        .attr('fill', 'url(#' + _overlayPatternId(opts.cfg) + ')')
-        .attr('stroke', 'none');
-    }
     var textX = x + opts.swatchW + opts.labelGap;
     var text = g.append('text')
       .attr('x', textX).attr('y', textBaselineY)
@@ -1971,6 +1971,28 @@ var WasteAtlasChoropleth = (function () {
           y += _drawExportLegendItem(gExport, cat, x, y, opts) - opts.rowGap;
         });
       });
+      // Footnote: overlay pattern hint (separate from legend categories)
+      if (opts.footnote) {
+        var footnoteY = columnStartY + Math.max.apply(null, opts.columnHeights)
+          + Math.round(opts.fontSize * 0.3);
+        gExport.append('line')
+          .attr('x1', opts.paddingX).attr('y1', footnoteY)
+          .attr('x2', opts.width - opts.paddingX).attr('y2', footnoteY)
+          .attr('stroke', '#d0d4da').attr('stroke-width', 1);
+        var footnoteText = gExport.append('text')
+          .attr('x', opts.paddingX)
+          .attr('y', footnoteY + Math.round(opts.footnote.fontSize * 1.12))
+          .attr('font-size', opts.footnote.fontSize)
+          .attr('font-style', 'italic')
+          .attr('fill', '#6c757d')
+          .attr('font-family', opts.fontFamily);
+        opts.footnote.lines.forEach(function (line, index) {
+          footnoteText.append('tspan')
+            .attr('x', opts.paddingX)
+            .attr('dy', index === 0 ? 0 : Math.round(opts.footnote.fontSize * 1.12))
+            .text(line);
+        });
+      }
       gExport.insert('rect', ':first-child')
         .attr('x', 0).attr('y', 0)
         .attr('width', opts.width).attr('height', opts.height)
@@ -1999,18 +2021,20 @@ var WasteAtlasChoropleth = (function () {
       }
     });
     items = normalCats.concat(noCollectionCats);
-    legendRows = items.length + (hasOverlayLegend ? 1 : 0)
-      + (hasConflictLegend ? 1 : 0);
+    legendRows = items.length + (hasConflictLegend ? 1 : 0);
 
     if (cfg.noDataLabel && cfg._hasNoData !== false) {
       legendRows += 1;
     }
 
+    // Overlay footnote takes less space than a full legend row
+    var overlayFootnoteH = hasOverlayLegend ? 18 : 0;
+
     var g = _svg.append('g')
       .attr('class', 'atlas-legend')
-      .attr('transform', 'translate(40,' + (height - 30 - legendRows * (swatchH + gap) - 20) + ')');
+      .attr('transform', 'translate(40,' + (height - 30 - legendRows * (swatchH + gap) - overlayFootnoteH - 20) + ')');
 
-    var totalH = legendRows * (swatchH + gap) + gap + 20;
+    var totalH = legendRows * (swatchH + gap) + overlayFootnoteH + gap + 20;
     g.append('rect')
       .attr('x', -8).attr('y', -20)
       .attr('width', 300).attr('height', totalH)
@@ -2038,21 +2062,19 @@ var WasteAtlasChoropleth = (function () {
 
     var currentY = items.length * (swatchH + gap);
     if (hasOverlayLegend) {
-      g.append('rect')
-        .attr('x', 0).attr('y', currentY + 4)
-        .attr('width', swatchW).attr('height', swatchH)
-        .attr('fill', '#f8f9fa').attr('stroke', '#333');
-      g.append('rect')
-        .attr('x', 0).attr('y', currentY + 4)
-        .attr('width', swatchW).attr('height', swatchH)
-        .attr('fill', 'url(#' + _overlayPatternId(cfg) + ')')
-        .attr('stroke', 'none');
+      // Footnote: thin separator + small italic text (not a legend category)
+      g.append('line')
+        .attr('x1', 0).attr('y1', currentY)
+        .attr('x2', 280).attr('y2', currentY)
+        .attr('stroke', '#d0d4da').attr('stroke-width', 1);
       g.append('text')
-        .attr('x', swatchW + 8).attr('y', currentY + 4 + swatchH - 3)
-        .attr('font-size', 12)
+        .attr('x', 0).attr('y', currentY + 12)
+        .attr('font-size', 10)
+        .attr('font-style', 'italic')
+        .attr('fill', '#6c757d')
         .attr('font-family', "'Nunito', sans-serif")
         .text(cfg.overlayPatternLegendLabel);
-      currentY += swatchH + gap;
+      currentY += 18;
     }
 
     if (hasConflictLegend) {
