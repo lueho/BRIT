@@ -5599,7 +5599,7 @@ class GenericMapTemplateTests(TestCase):
             content,
         )
         self.assertIn('"overlayPatternField": "_has_acpv_overlay"', content)
-        self.assertIn("Hatched = aggregated value (ACPV)", content)
+        self.assertIn("Hatched = aggregated value", content)
         self.assertIn('"outlineGeoJsonUrl"', content)
 
     def test_residual_collection_count_renders_transform_name(self):

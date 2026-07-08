@@ -815,7 +815,7 @@ class CollectionImporter:
                 continue
             if len(url) > 2083:
                 stats["warnings"].append(
-                    f"CPV source URL too long ({len(url)} chars), skipped."
+                    f"Property value source URL too long ({len(url)} chars), skipped."
                 )
                 continue
             flyer, created = WasteFlyer.objects.get_or_create_by_url(
@@ -853,13 +853,13 @@ class CollectionImporter:
             stats["cpv_skipped"] += 1
             property_label = pv.get("property_id") or pv.get("property_name")
             stats["warnings"].append(
-                f"Property '{property_label}' not found — CPV skipped."
+                f"Property '{property_label}' not found — value skipped."
             )
             return
         if unit is None:
             stats["cpv_skipped"] += 1
             stats["warnings"].append(
-                f"Unit '{pv['unit_name']}' not found — CPV skipped."
+                f"Unit '{pv['unit_name']}' not found — value skipped."
             )
             return
 
