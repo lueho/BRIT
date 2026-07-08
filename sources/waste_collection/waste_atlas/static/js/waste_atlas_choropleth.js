@@ -2379,12 +2379,13 @@ var WasteAtlasChoropleth = (function () {
     }, { useChangeUrls: !!cfg.changeMode });
 
     var atlasControls = document.getElementById('atlas-controls');
+    var atlasToggleMount = document.getElementById('atlas-map-tools') || atlasControls;
     var _atlasToggleBar = null;
     function _atlasToggleContainer() {
       if (!_atlasToggleBar) {
         _atlasToggleBar = document.createElement('div');
         _atlasToggleBar.className = 'atlas-map-toggles';
-        atlasControls.appendChild(_atlasToggleBar);
+        atlasToggleMount.appendChild(_atlasToggleBar);
       }
       return _atlasToggleBar;
     }

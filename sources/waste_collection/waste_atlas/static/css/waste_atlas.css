@@ -221,7 +221,7 @@
 
 /* ============================ Map page ============================ */
 #atlas-controls {
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 .atlas-hero-btn {
   border-radius: 999px;
@@ -231,8 +231,8 @@
   background: var(--atlas-surface);
   border: 1px solid var(--atlas-border);
   border-radius: var(--atlas-radius);
-  box-shadow: var(--atlas-shadow);
-  padding: 1rem;
+  box-shadow: var(--atlas-shadow-sm);
+  padding: 1.15rem 1.35rem;
 }
 .atlas-selector-header {
   align-items: start;
@@ -261,7 +261,7 @@
 .atlas-selector-grid {
   align-items: start;
   display: grid;
-  gap: .75rem;
+  gap: .85rem;
   grid-template-columns: minmax(10rem, 1.1fr) minmax(10rem, 1.05fr) minmax(9rem, .95fr) minmax(13rem, 1.45fr) minmax(5rem, .45fr) auto;
 }
 .atlas-selector-grid--compare {
@@ -323,22 +323,21 @@
 
 .atlas-map-toggles {
   align-items: center;
-  background: var(--atlas-surface);
+  background: var(--atlas-surface-muted);
   border: 1px solid var(--atlas-border);
   border-radius: var(--atlas-radius);
-  box-shadow: var(--atlas-shadow-sm);
   display: flex;
   flex-wrap: wrap;
   gap: .5rem 1.5rem;
-  margin-top: .75rem;
-  padding: .6rem .9rem;
+  margin-bottom: .6rem;
+  padding: .5rem .9rem;
 }
 .atlas-map-toggle {
   align-items: center;
   cursor: pointer;
   display: inline-flex;
-  font-size: .85rem;
-  font-weight: 600;
+  font-size: .82rem;
+  font-weight: 700;
   gap: .45rem;
   margin: 0;
 }
@@ -354,8 +353,8 @@
   border: 1px solid var(--atlas-border);
   border-radius: var(--atlas-radius);
   box-shadow: var(--atlas-shadow-sm);
-  margin: -.25rem 0 1rem;
-  padding: .85rem 1rem;
+  margin: 0 0 1.25rem;
+  padding: 1.15rem 1.35rem;
 }
 .atlas-related-group + .atlas-related-group {
   margin-top: .75rem;
@@ -373,8 +372,8 @@
 
 #map-container {
   background: var(--atlas-surface);
-  border: 1px solid var(--bs-border-color, #dee2e6);
-  border-radius: .5rem;
+  border: 1px solid var(--atlas-border);
+  border-radius: var(--atlas-radius);
   box-shadow: var(--atlas-shadow-sm);
   overflow: hidden;
   position: relative;
@@ -393,8 +392,15 @@
   position: absolute;
   z-index: 10;
 }
-#export-buttons { margin-top: .75rem; }
-#export-buttons .btn { margin-right: .5rem; }
+#export-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin-top: 1rem;
+}
+#export-buttons .btn {
+  border-radius: 999px;
+}
 
 /* ============================ Responsive ============================ */
 @media (max-width: 1199.98px) {
