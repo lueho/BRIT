@@ -9,6 +9,7 @@ from .map_selection import (
     MAP_SELECTION_YEARS,
     build_conflict_maps_context,
     build_map_selection_context,
+    build_overview_directory_context,
     build_related_maps_context,
     resolve_map_set,
 )
@@ -170,7 +171,14 @@ class WasteAtlasOverviewView(WasteAtlasGroupMixin, TemplateView):
             "required_bin_capacity_reference",
             "person",
         )
-        ctx.update(build_map_selection_context(reverse))
+        ctx.update(
+            build_overview_directory_context(
+                reverse,
+                selected_region=self.request.GET.get("region"),
+            )
+        )
+        ctx["directory_selected_category"] = self.request.GET.get("category", "")
+        ctx["directory_query"] = self.request.GET.get("q", "")
         return ctx
 
 

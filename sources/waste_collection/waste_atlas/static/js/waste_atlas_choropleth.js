@@ -2434,9 +2434,95 @@ var WasteAtlasChoropleth = (function () {
     if (btnPNG) btnPNG.addEventListener('click', function () { exportPNG(_exportFileBase() + '.png'); });
   }
 
+  function initOverviewDirectory() {
+    var tabList = document.getElementById('atlas-region-tabs');
+    var categorySelect = document.getElementById('atlas-directory-category');
+    var searchInput = document.getElementById('atlas-directory-search');
+    if (!tabList && !categorySelect && !searchInput) return null;
+
+    var params = new URLSearchParams(window.location.search);
+
+    function activeRegion() {
+      var activeTab = tabList && tabList.querySelector('.nav-link.active');
+      return activeTab ? activeTab.getAttribute('data-region') : '';
+    }
+
+    function updateUrl() {
+      if (!window.history || !window.history.replaceState) return;
+      var next = new URLSearchParams();
+      var region = activeRegion();
+      var category = categorySelect ? categorySelect.value : '';
+      var query = searchInput ? searchInput.value.trim() : '';
+      if (region) next.set('region', region);
+      if (category) next.set('category', category);
+      if (query) next.set('q', query);
+      var qs = next.toString();
+      window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
+    }
+
+    function applyFilters() {
+      var category = categorySelect ? categorySelect.value : '';
+      var query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+      var panes = document.querySelectorAll('#atlas-region-tab-content .atlas-region-pane');
+      panes.forEach(function (pane) {
+        var visibleInPane = 0;
+        pane.querySelectorAll('.atlas-map-link').forEach(function (link) {
+          var linkCategory = link.getAttribute('data-category') || '';
+          var haystack = link.getAttribute('data-search') || link.textContent || '';
+          var matches = (!category || linkCategory === category)
+            && (!query || haystack.toLowerCase().indexOf(query) !== -1);
+          link.hidden = !matches;
+          if (matches) visibleInPane += 1;
+        });
+        pane.querySelectorAll('.atlas-link-group').forEach(function (group) {
+          var anyVisible = Array.prototype.some.call(
+            group.querySelectorAll('.atlas-map-link'),
+            function (link) { return !link.hidden; }
+          );
+          group.hidden = !anyVisible;
+        });
+        pane.querySelectorAll('.atlas-directory-region').forEach(function (region) {
+          var anyVisible = Array.prototype.some.call(
+            region.querySelectorAll('.atlas-map-link'),
+            function (link) { return !link.hidden; }
+          );
+          region.hidden = !anyVisible;
+        });
+        var emptyEl = pane.querySelector('.atlas-directory-empty');
+        if (emptyEl) emptyEl.hidden = visibleInPane !== 0;
+      });
+    }
+
+    if (categorySelect && params.has('category')) categorySelect.value = params.get('category');
+    if (searchInput && params.has('q')) searchInput.value = params.get('q');
+
+    if (tabList) {
+      tabList.addEventListener('shown.bs.tab', function () {
+        applyFilters();
+        updateUrl();
+      });
+    }
+    if (categorySelect) {
+      categorySelect.addEventListener('change', function () {
+        applyFilters();
+        updateUrl();
+      });
+    }
+    if (searchInput) {
+      searchInput.addEventListener('input', _debounce(function () {
+        applyFilters();
+        updateUrl();
+      }, 150));
+    }
+
+    applyFilters();
+    return { applyFilters: applyFilters };
+  }
+
   return {
     init: init,
     initSelectorControls: initSelectorControls,
+    initOverviewDirectory: initOverviewDirectory,
     selectorNavigationTarget: _selectorNavigationTarget,
     exportSVG: exportSVG,
     exportPNG: exportPNG,

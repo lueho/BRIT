@@ -95,6 +95,92 @@ def _build_map_set_region_scopes():
 
 MAP_SET_REGION_SCOPES = _build_map_set_region_scopes()
 
+# ── Overview directory ──────────────────────────────────────────────────────
+# Region tabs on the overview page. Each tab groups one or more map sets so the
+# registry-driven directory stays browseable. ``id`` doubles as the ``?region=``
+# query-string value and the tab pane id (``atlas-<id>``).
+OVERVIEW_REGION_GROUPS = (
+    {"id": "europe", "label": "Europe", "map_sets": ()},
+    {"id": "germany", "label": "Germany", "map_sets": ("DE", "DE-BW-RP", "DE-NW")},
+    {"id": "catalonia", "label": "Catalonia", "map_sets": ("ES-CT",)},
+    {
+        "id": "italy-south-tyrol",
+        "label": "Italy & South Tyrol",
+        "map_sets": ("IT", "IT-ST"),
+    },
+    {
+        "id": "other-countries",
+        "label": "Other countries",
+        "map_sets": ("DK", "SE", "NL", "BE", "BE-FL-BR"),
+    },
+)
+
+OVERVIEW_DEFAULT_REGION = "germany"
+
+# Generic, non-regional Europe-wide maps shown under the "Europe" tab.
+OVERVIEW_EUROPE_MAPS = (
+    {"route_name": "waste-atlas-europe-data-coverage-map", "title": "Data coverage"},
+    {
+        "route_name": "waste-atlas-europe-biowaste-collection-amount-map",
+        "title": "Biowaste amount",
+    },
+)
+
+# Directory sections group a region's themes under clear headings. Ordering is
+# the display order; membership is keyed by the theme group (see
+# ``_selection_theme_group``).
+DIRECTORY_SECTION_ORDER = (
+    "organisation",
+    "systems",
+    "bins",
+    "points",
+    "schedule",
+    "counts",
+    "fees",
+    "amounts",
+)
+
+DIRECTORY_SECTION_LABELS = {
+    "organisation": "Organisation & coverage",
+    "systems": "Collection systems & materials",
+    "bins": "Bins",
+    "points": "Collection points",
+    "schedule": "Schedule",
+    "counts": "Collection counts",
+    "fees": "Fees",
+    "amounts": "Collected amounts & ratios",
+}
+
+DIRECTORY_THEME_GROUP_SECTIONS = {
+    "orga_level": "organisation",
+    "collection_orga_level": "organisation",
+    "population_density": "organisation",
+    "collection_system": "systems",
+    "connection_rate": "systems",
+    "participation_policy": "systems",
+    "food_waste_category": "systems",
+    "paper_bags": "systems",
+    "plastic_bags": "systems",
+    "collection_support": "systems",
+    "access_control": "systems",
+    "system_access_control": "systems",
+    "impurity": "systems",
+    "weekly_bp_access_days": "systems",
+    "bin_configuration": "bins",
+    "min_bin_size": "bins",
+    "min_bin_size_ratio": "bins",
+    "required_bin_capacity": "bins",
+    "collection_point_count": "points",
+    "collection_point_count_ratio": "points",
+    "collection_system_count": "points",
+    "frequency": "schedule",
+    "collection_count": "counts",
+    "collection_count_ratio": "counts",
+    "fee_system": "fees",
+    "collection_amount": "amounts",
+    "waste_ratio": "amounts",
+}
+
 MAP_SELECTION_YEARS = ("2020", "2021", "2022", "2023", "2024")
 
 MAP_SELECTION_THEME_ORDER = {
@@ -475,3 +561,107 @@ def build_conflict_maps_context(reverse_func):
         )
     conflict_maps.sort(key=lambda item: (item["map_set_label"], item["title"]))
     return {"conflict_maps": conflict_maps}
+
+
+def _directory_section(theme):
+    theme_group = _selection_theme_group(theme)
+    return DIRECTORY_THEME_GROUP_SECTIONS.get(theme_group, "systems")
+
+
+def _map_set_region_group(map_set):
+    for group in OVERVIEW_REGION_GROUPS:
+        if map_set in group["map_sets"]:
+            return group["id"]
+    return None
+
+
+def resolve_overview_region(map_set):
+    """Return the overview ``?region=`` tab id that contains ``map_set``.
+
+    Accepts either a region-group id (returned unchanged) or a map-set key
+    (resolved to its containing region group). Falls back to the default tab.
+    """
+    if not map_set:
+        return OVERVIEW_DEFAULT_REGION
+    for group in OVERVIEW_REGION_GROUPS:
+        if group["id"] == map_set:
+            return map_set
+    return _map_set_region_group(map_set) or OVERVIEW_DEFAULT_REGION
+
+
+def _directory_region_context(map_set, themes, reverse_func):
+    """Group one map set's themes into ordered directory sections."""
+    sections_by_key = {}
+    for theme in themes:
+        theme_value = theme["value"]
+        url = (
+            theme["url"]
+            if theme["change_url"]
+            else _url_with_map_set_scope(theme["url"], map_set)
+        )
+        entry = {
+            "title": THEME_LABELS.get(theme_value, theme["label"]),
+            "url": url,
+            "theme": theme_value,
+            "waste_category": theme["waste_category"],
+        }
+        sections_by_key.setdefault(_directory_section(theme_value), []).append(entry)
+    sections = [
+        {
+            "key": key,
+            "label": DIRECTORY_SECTION_LABELS[key],
+            "maps": sections_by_key[key],
+        }
+        for key in DIRECTORY_SECTION_ORDER
+        if key in sections_by_key
+    ]
+    scope = MAP_SET_REGION_SCOPES.get(map_set, {})
+    return {
+        "value": map_set,
+        "label": MAP_SET_LABELS.get(map_set, map_set),
+        "country": scope.get("country", ""),
+        "nuts_prefix": scope.get("nuts_prefix", ""),
+        "nuts_level": scope.get("nuts_level", ""),
+        "sections": sections,
+    }
+
+
+def build_overview_directory_context(reverse_func, selected_region=None):
+    """Build the registry-driven overview directory grouped by region tab.
+
+    The directory is generated entirely from ``MAP_PAGES`` (via
+    ``build_map_selection_context``) so it can never drift from the routed map
+    pages. Each region tab lists its map sets, and each map set's themes are
+    grouped into ordered sections using the full ``THEME_LABELS``.
+    """
+    selection = build_map_selection_context(reverse_func)
+    themes_by_map_set = selection["map_selection_themes_by_map_set"]
+
+    groups = []
+    for group in OVERVIEW_REGION_GROUPS:
+        group_context = {
+            "id": group["id"],
+            "label": group["label"],
+            "regions": [
+                _directory_region_context(
+                    map_set, themes_by_map_set.get(map_set, []), reverse_func
+                )
+                for map_set in group["map_sets"]
+            ],
+            "europe_maps": [],
+        }
+        if group["id"] == "europe":
+            group_context["europe_maps"] = [
+                {
+                    "title": entry["title"],
+                    "url": reverse_func(entry["route_name"]),
+                }
+                for entry in OVERVIEW_EUROPE_MAPS
+            ]
+        groups.append(group_context)
+
+    return {
+        "directory_region_groups": groups,
+        "directory_waste_categories": MAP_SELECTION_WASTE_CATEGORIES,
+        "directory_selected_region": resolve_overview_region(selected_region),
+    }
