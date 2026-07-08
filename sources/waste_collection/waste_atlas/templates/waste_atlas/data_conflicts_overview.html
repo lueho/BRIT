@@ -8,19 +8,29 @@
 {% endblock style_sheets %}
 {% block body_class %} sb-sidenav-toggled{% endblock body_class %}
 {% block content %}
-   <div class="container mt-4">
-      <div class="atlas-hero">
-         <div class="atlas-eyebrow">Waste Atlas</div>
-         <h1 class="mb-1">Data conflicts</h1>
-         <p class="lead mb-2">Maps that highlight conflicting catchments.</p>
-         <p class="text-muted">
-            Some waste atlas maps can display only one value per catchment per theme.
-            Where the dataset holds several collections with different theme values for
-            the same catchment, these maps offer a "Highlight conflicting catchments"
-            overlay so data maintainers can see where the single-value assumption breaks
-            down. Open a map below and toggle the overlay to inspect the conflicting
-            catchments.
-         </p>
+   <div class="container atlas-page">
+      <div class="atlas-hero atlas-hero--split">
+         <div class="atlas-hero-heading">
+            <div class="atlas-eyebrow">Waste Atlas</div>
+            <h1>Data conflicts</h1>
+            <p class="atlas-hero-lead">
+               Some waste atlas maps can display only one value per catchment per theme.
+               Where the dataset holds several collections with different theme values for
+               the same catchment, these maps offer a "Highlight conflicting catchments"
+               overlay so data maintainers can see where the single-value assumption breaks
+               down. Open a map below and toggle the overlay to inspect the conflicting
+               catchments.
+            </p>
+         </div>
+         <div class="atlas-hero-actions">
+            <a class="atlas-feedback-link"
+               href="mailto:info@bioresource-tools.net?subject=Waste%20Atlas%20feedback">
+               <i class="fas fa-comment-dots"></i> Feedback
+            </a>
+            <a class="btn btn-primary btn-sm atlas-hero-btn" href="{% url 'waste-atlas-overview' %}">
+               <i class="fas fa-th-list"></i> Map overview
+            </a>
+         </div>
       </div>
       <section class="atlas-panel atlas-directory" aria-labelledby="atlas-conflicts-title">
          <h2 class="atlas-section-title" id="atlas-conflicts-title">Conflict-overlay maps</h2>
@@ -35,9 +45,5 @@
             <p class="text-muted">No maps with a conflict overlay are configured yet.</p>
          {% endif %}
       </section>
-      <a class="btn btn-outline-secondary btn-sm"
-         href="{% url 'waste-atlas-overview' %}">
-         <i class="fas fa-th-list"></i> Map overview
-      </a>
    </div>
 {% endblock content %}

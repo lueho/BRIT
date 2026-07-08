@@ -5482,7 +5482,9 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Change-map navigation")
+        # The selector header matches the detail page: a single title, no
+        # redundant uppercase eyebrow.
+        self.assertNotContains(response, "atlas-selector-eyebrow")
         self.assertContains(response, "Compare another map")
         self.assertContains(response, 'id="sel-theme-search"')
         self.assertContains(response, 'id="atlas-selector-status"')

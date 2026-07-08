@@ -127,6 +127,51 @@
   margin: 0 0 1rem;
 }
 
+/* Directory header: section title on the left, filters on the right */
+.atlas-directory-header {
+  align-items: flex-end;
+  column-gap: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  row-gap: .75rem;
+}
+.atlas-directory-header .atlas-section-title {
+  margin: 0;
+}
+.atlas-directory-filters {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+}
+.atlas-filter {
+  display: flex;
+  flex-direction: column;
+}
+.atlas-filter label {
+  color: var(--atlas-ink-muted);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  margin-bottom: .2rem;
+  text-transform: uppercase;
+}
+.atlas-filter--search {
+  min-width: 16rem;
+}
+.atlas-directory-region-head {
+  border-bottom: 1px solid var(--atlas-border);
+  margin-bottom: .75rem;
+  padding-bottom: .35rem;
+}
+.atlas-directory-region-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin: 0;
+}
+
 /* Region tab navigation — quiet underline tabs, no colored pills */
 .atlas-region-tabs {
   border-bottom: 1px solid var(--atlas-border);

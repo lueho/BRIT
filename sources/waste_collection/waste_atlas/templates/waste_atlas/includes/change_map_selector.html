@@ -1,80 +1,10 @@
-{% if atlas_selector_bootstrap %}
-  <div class="row g-3 align-items-end">
-    <div class="col-md-2">
-      <label class="form-label" for="sel-country">Region</label>
-      <select class="form-select" id="sel-country">
-        {% for option in map_selection_map_sets %}
-          <option value="{{ option.value }}"
-                  data-country="{{ option.country }}"
-                  data-nuts-prefix="{{ option.nuts_prefix }}"
-                  data-nuts-level="{{ option.nuts_level }}"
-                  {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
-        {% endfor %}
-      </select>
-      <div class="form-text">Region means the map scope, not an individual municipality.</div>
-    </div>
-    <div class="col-md-2">
-      <label class="form-label" for="sel-waste-category">Waste category</label>
-      <select class="form-select" id="sel-waste-category">
-        {% for value, label in map_selection_waste_categories.items %}
-          <option value="{{ value }}"
-                  {% if value == selected_waste_category %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-2">
-      <label class="form-label" for="sel-theme">Theme</label>
-      <select class="form-select" id="sel-theme">
-        {% for map_set, themes in map_selection_themes_by_map_set.items %}
-          {% for option in themes %}
-            <option value="{{ option.value }}"
-                    data-map-set="{{ map_set }}"
-                    data-theme-group="{{ option.theme_group }}"
-                    data-waste-category="{{ option.waste_category }}"
-                    data-url="{{ option.url }}"
-                    {% if option.change_url %}data-change-url="{{ option.change_url }}"{% endif %}
-                    {% if map_set == selected_map_set and option.value == selected_map_theme %}selected{% endif %}>
-              {{ option.label }}
-            </option>
-          {% endfor %}
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-2">
-      <label class="form-label" for="sel-from-year">From year</label>
-      <select class="form-select" id="sel-from-year">
-        {% for option_year in map_selection_years %}
-          <option value="{{ option_year }}"
-                  {% if option_year == default_from_year %}selected{% endif %}>{{ option_year }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-2">
-      <label class="form-label" for="sel-to-year">To year</label>
-      <select class="form-select" id="sel-to-year">
-        {% for option_year in map_selection_years %}
-          <option value="{{ option_year }}"
-                  {% if option_year == default_to_year %}selected{% endif %}>{{ option_year }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-2">
-      <button class="btn btn-primary w-100 text-nowrap" id="btn-load" type="submit">
-        {{ atlas_selector_button_label|default:"Compare" }}
-      </button>
-    </div>
-  </div>
-{% else %}
   <form class="atlas-selector-form"
         id="atlas-selection-form"
         data-empty-message="No comparable maps match these filters."
         data-count-singular="comparison map available"
         data-count-plural="comparison maps available">
     <div class="atlas-selector-header">
-      <div>
-        <div class="atlas-selector-eyebrow">Change-map navigation</div>
-        <h3 class="atlas-selector-title">Compare another map</h3>
-      </div>
+      <h3 class="atlas-selector-title">Compare another map</h3>
       <p class="atlas-selector-help">
         Select the region, waste category, map theme, and year interval to compare.
       </p>
@@ -157,4 +87,3 @@
       <span id="atlas-selector-status" aria-live="polite"></span>
     </div>
   </form>
-{% endif %}
