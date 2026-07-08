@@ -212,6 +212,49 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         self.assertIn("change = difference > 0 ? 'increase' : 'decrease'", script)
         self.assertIn("legendTitle: isNumericChange ? 'Difference' : 'Change'", script)
 
+    def test_quartile_legend_labels_show_whole_numbers_only(self):
+        """Quartile legend labels must display rounded integers, not decimals.
+
+        e.g. ``41`` instead of ``41.0`` or ``5`` instead of ``5.00``.
+        """
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+        script = script_path.read_text()
+
+        # The fmt() function inside _computeQuartileCategories must not use
+        # toFixed — only Math.round for whole-number display.
+        quartile_fn = script.split("function _computeQuartileCategories(")[1]
+        fmt_section = quartile_fn[: quartile_fn.index("return [")]
+        self.assertIn("Math.round(v).toString()", fmt_section)
+        self.assertNotIn("toFixed", fmt_section)
+
+    def test_quartile_mode_is_enabled_by_default(self):
+        """The quartile toggle must be checked on page load for all KPI maps.
+
+        Users prefer quartile classification over fixed class boundaries, so
+        the checkbox starts checked and ``isQuartileMode`` initialises to true
+        whenever the config supports quartiles.
+        """
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+        script = script_path.read_text()
+
+        self.assertIn(
+            "var isQuartileMode = _isQuartileEnabled(cfg) && !cfg.changeMode;",
+            script,
+        )
+        self.assertIn("toggleCheckbox.checked = true;", script)
+
     def test_selector_labels_are_unique_per_map_set_and_waste_category(self):
         context = build_map_selection_context(
             lambda route_name, args=None: f"/{route_name}/{'/'.join(args or [])}"

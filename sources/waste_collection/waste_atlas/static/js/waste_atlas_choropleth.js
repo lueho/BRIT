@@ -1052,9 +1052,7 @@ var WasteAtlasChoropleth = (function () {
 
     function fmt(v) {
       if (v == null) return '';
-      if (Math.abs(v) >= 100) return Math.round(v).toString();
-      if (Math.abs(v) >= 10) return v.toFixed(1);
-      return v.toFixed(2);
+      return Math.round(v).toString();
     }
 
     return [
@@ -2278,7 +2276,7 @@ var WasteAtlasChoropleth = (function () {
     var btnSVG = document.getElementById('btn-export-svg');
     var btnPNG = document.getElementById('btn-export-png');
     var fileBase = cfg.fileBase || 'waste_atlas_map';
-    var isQuartileMode = false;
+    var isQuartileMode = _isQuartileEnabled(cfg) && !cfg.changeMode;
 
     function _exportFileBase() {
       if (cfg.changeMode && _lastLoadCfg) {
@@ -2370,7 +2368,7 @@ var WasteAtlasChoropleth = (function () {
 
       var toggleCheckbox = document.createElement('input');
       toggleCheckbox.type = 'checkbox';
-      toggleCheckbox.checked = false;
+      toggleCheckbox.checked = true;
       toggleCheckbox.addEventListener('change', function () {
         isQuartileMode = toggleCheckbox.checked;
         if (_lastData && _baseLoadCfg) {
