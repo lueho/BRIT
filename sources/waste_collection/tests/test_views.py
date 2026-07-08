@@ -4316,7 +4316,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
             "Map scope, not an individual municipality.",
         )
         self.assertContains(response, 'id="atlas-selection-form"')
-        self.assertContains(response, "Map navigation")
         self.assertContains(response, "Find another map")
         self.assertContains(response, 'id="sel-theme-search"')
         self.assertContains(response, 'id="atlas-selector-status"')
@@ -4387,6 +4386,85 @@ class WasteAtlasMapViewsTestCase(TestCase):
             reverse("waste-atlas-biowaste-collection-amount-map"),
             same_theme_urls,
         )
+
+    def test_related_maps_same_region_uses_full_distinguishing_labels(self):
+        from sources.waste_collection.waste_atlas.map_selection import (
+            build_related_maps_context,
+        )
+
+        related_maps = build_related_maps_context(
+            "DE",
+            "residual_frequency",
+            reverse,
+        )
+
+        labels_by_url = {
+            entry["url"]: entry["label"]
+            for entry in related_maps["same_region_same_category"]
+        }
+        self.assertEqual(
+            labels_by_url[reverse("waste-atlas-germany-biowaste-frequency-map")],
+            "Biowaste schedule",
+        )
+        self.assertEqual(
+            labels_by_url[reverse("waste-atlas-germany-combined-frequency-map")],
+            "Combined schedule",
+        )
+        # The group label "Schedule" must not be used for sibling schedule maps.
+        self.assertNotIn("Schedule", set(labels_by_url.values()))
+
+    def test_related_maps_same_theme_other_regions_includes_all_german_map_sets(self):
+        from sources.waste_collection.waste_atlas.map_selection import (
+            build_related_maps_context,
+        )
+
+        related_maps = build_related_maps_context(
+            "DE",
+            "residual_frequency",
+            reverse,
+        )
+
+        same_theme_urls = {
+            entry["url"] for entry in related_maps["same_theme_other_regions"]
+        }
+        self.assertIn(
+            reverse("waste-atlas-bw-rp-residual-frequency-map"),
+            same_theme_urls,
+        )
+        self.assertIn(
+            reverse("waste-atlas-nrw-residual-frequency-map"),
+            same_theme_urls,
+        )
+
+    def test_detail_page_breadcrumb_links_back_to_overview_with_region(self):
+        response = self.client.get(
+            reverse("waste-atlas-germany-residual-frequency-map")
+        )
+        self.assertEqual(response.status_code, 200)
+        overview_url = reverse("waste-atlas-overview")
+        # Breadcrumb: BRIT > Waste Atlas > {Region} with the region crumb linking
+        # back to the overview with the region tab preselected.
+        self.assertContains(response, f'href="{overview_url}"')
+        self.assertContains(response, f'href="{overview_url}?region=DE"')
+        self.assertContains(response, "Germany")
+
+    def test_detail_page_map_overview_button_preserves_region_state(self):
+        response = self.client.get(
+            reverse("waste-atlas-south-tyrol-residual-frequency-map")
+        )
+        self.assertEqual(response.status_code, 200)
+        overview_url = reverse("waste-atlas-overview")
+        self.assertContains(response, f'href="{overview_url}?region=IT-ST"')
+
+    def test_detail_page_selector_has_single_heading_and_map_icon(self):
+        response = self.client.get(
+            reverse("waste-atlas-germany-residual-frequency-map")
+        )
+        self.assertEqual(response.status_code, 200)
+        # The redundant "Map navigation" eyebrow is collapsed into one heading.
+        self.assertNotContains(response, "atlas-selector-eyebrow")
+        # The Load button no longer uses the location-arrow icon.
+        self.assertNotContains(response, "fa-location-arrow")
 
     def test_related_maps_generic_same_region_links_preserve_region_scope(self):
         from sources.waste_collection.waste_atlas.map_selection import (

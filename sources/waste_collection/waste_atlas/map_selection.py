@@ -477,7 +477,7 @@ def build_related_maps_context(selected_map_set, selected_theme, reverse_func):
             continue
         same_region_same_category.append(
             {
-                "label": theme["label"],
+                "label": THEME_LABELS.get(theme_value, theme["label"]),
                 "url": (
                     _url_with_map_set_scope(theme["url"], selected_map_set)
                     if not theme["change_url"]

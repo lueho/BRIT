@@ -60,10 +60,7 @@
         data-count-singular="map available"
         data-count-plural="maps available">
     <div class="atlas-selector-header">
-      <div>
-        <div class="atlas-selector-eyebrow">Map navigation</div>
-        <h3 class="atlas-selector-title">Find another map</h3>
-      </div>
+      <h3 class="atlas-selector-title">Find another map</h3>
       <p class="atlas-selector-help">
         Narrow by region, waste category, text search, theme, then load the exact map.
       </p>
@@ -96,7 +93,7 @@
         <input id="sel-theme-search"
                type="search"
                autocomplete="off"
-               placeholder="amount, bin, schedule, policy…" />
+               placeholder="amount, schedule, fees…" />
       </div>
       <div class="atlas-selector-field atlas-selector-field--theme">
         <label for="sel-theme">Theme</label>
@@ -126,7 +123,7 @@
         </select>
       </div>
       <button class="btn btn-primary atlas-selector-submit" id="btn-load" type="submit">
-        <i class="fas fa-location-arrow"></i> {{ atlas_selector_button_label|default:"Load map" }}
+        <i class="fas fa-sync-alt"></i> {{ atlas_selector_button_label|default:"Load map" }}
       </button>
     </div>
     <div class="atlas-selector-footer">

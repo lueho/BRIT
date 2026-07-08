@@ -12,8 +12,9 @@ from .map_selection import (
     build_overview_directory_context,
     build_related_maps_context,
     resolve_map_set,
+    resolve_overview_region,
 )
-from .pages import MAP_PAGES
+from .pages import MAP_PAGES, MAP_SET_LABELS
 
 WASTE_ATLAS_GROUP_NAME = "waste_atlas"
 
@@ -86,6 +87,20 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
         ctx["map_title"] = page["title"]
         ctx["map_overview_label"] = "Map overview"
         ctx["map_overview_url"] = "waste-atlas-overview"
+        region_label = MAP_SET_LABELS.get(selected_map_set, "")
+        overview_href = reverse("waste-atlas-overview")
+        overview_region_href = f"{overview_href}?region={selected_map_set}"
+        ctx["atlas_map_set"] = selected_map_set
+        ctx["atlas_region_label"] = region_label
+        ctx["atlas_overview_href"] = overview_href
+        ctx["atlas_overview_region_href"] = overview_region_href
+        ctx["atlas_overview_region_tab"] = resolve_overview_region(selected_map_set)
+        ctx["breadcrumb_module_label"] = "Waste Atlas"
+        ctx["breadcrumb_module_url"] = overview_href
+        if region_label:
+            ctx["breadcrumb_section_label"] = region_label
+            ctx["breadcrumb_section_url"] = overview_region_href
+        ctx["breadcrumb_object_label"] = page["title"]
         ctx["map_config_key"] = page["config_key"]
         ctx["map_config_overrides"] = page.get("overrides")
         ctx.update(
@@ -154,6 +169,7 @@ class AtlasChangeMapView(AtlasMapView):
         ctx["default_from_year"] = ctx["from_year"]
         ctx["default_to_year"] = ctx["to_year"]
         ctx["map_title"] = f"{self.page['title']} — changes"
+        ctx["breadcrumb_object_label"] = ctx["map_title"]
         ctx["is_change_map"] = True
         ctx["map_toggle_url"] = reverse(self.page["name"])
         ctx["map_toggle_label"] = "View current map"

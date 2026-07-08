@@ -30,8 +30,8 @@
         {% endif %}
         {{ map_toggle_label }}
       </a>
-      <a href="{% url map_overview_url %}"
-         class="btn btn-outline-secondary btn-sm">
+      <a href="{% url map_overview_url %}{% if not is_change_map and atlas_map_set %}?region={{ atlas_map_set }}{% endif %}"
+         class="btn btn-primary btn-sm">
         <i class="fas fa-th-list"></i> {{ map_overview_label|default:"Map overview" }}
       </a>
     </div>
