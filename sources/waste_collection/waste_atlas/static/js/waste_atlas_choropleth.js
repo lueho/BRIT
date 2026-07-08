@@ -2469,7 +2469,7 @@ var WasteAtlasChoropleth = (function () {
         pane.querySelectorAll('.atlas-map-link').forEach(function (link) {
           var linkCategory = link.getAttribute('data-category') || '';
           var haystack = link.getAttribute('data-search') || link.textContent || '';
-          var matches = (!category || linkCategory === category)
+          var matches = (!category || linkCategory === '' || linkCategory === category)
             && (!query || haystack.toLowerCase().indexOf(query) !== -1);
           link.hidden = !matches;
           if (matches) visibleInPane += 1;

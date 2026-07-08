@@ -86,7 +86,7 @@
                         <p class="atlas-region-lead">Coverage and European comparison indicators.</p>
                         <div class="atlas-map-list">
                            {% for map in group.europe_maps %}
-                              <a class="atlas-map-link" href="{{ map.url }}" data-region="{{ group.id }}" data-category="" data-search="{{ map.title|lower }}">{{ map.title }}</a>
+                              <a class="atlas-map-link" href="{{ map.url }}" data-region="{{ group.id }}" data-category="{{ map.category }}" data-search="{{ map.title|lower }}">{{ map.title }}</a>
                            {% endfor %}
                         </div>
                      </div>

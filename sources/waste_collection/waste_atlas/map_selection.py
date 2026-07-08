@@ -117,12 +117,19 @@ OVERVIEW_REGION_GROUPS = (
 
 OVERVIEW_DEFAULT_REGION = "germany"
 
-# Generic, non-regional Europe-wide maps shown under the "Europe" tab.
+# Generic, non-regional Europe-wide maps shown under the "Europe" tab. An empty
+# ``category`` marks a map as category-agnostic (always visible regardless of the
+# waste-category filter).
 OVERVIEW_EUROPE_MAPS = (
-    {"route_name": "waste-atlas-europe-data-coverage-map", "title": "Data coverage"},
+    {
+        "route_name": "waste-atlas-europe-data-coverage-map",
+        "title": "Data coverage",
+        "category": "",
+    },
     {
         "route_name": "waste-atlas-europe-biowaste-collection-amount-map",
         "title": "Biowaste amount",
+        "category": "biowaste",
     },
 )
 
@@ -655,6 +662,7 @@ def build_overview_directory_context(reverse_func, selected_region=None):
                 {
                     "title": entry["title"],
                     "url": reverse_func(entry["route_name"]),
+                    "category": entry.get("category", ""),
                 }
                 for entry in OVERVIEW_EUROPE_MAPS
             ]

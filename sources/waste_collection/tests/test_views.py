@@ -5133,9 +5133,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(
             response, reverse("waste-atlas-sweden-collection-system-map")
         )
-        self.assertContains(
-            response, reverse("waste-atlas-sweden-connection-rate-map")
-        )
+        self.assertContains(response, reverse("waste-atlas-sweden-connection-rate-map"))
         self.assertContains(
             response, reverse("waste-atlas-sweden-biowaste-collection-amount-map")
         )
@@ -5273,6 +5271,11 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 reverse("waste-atlas-europe-biowaste-collection-amount-map"),
             },
         )
+        europe_categories = {
+            entry["title"]: entry["category"] for entry in europe["europe_maps"]
+        }
+        self.assertEqual(europe_categories["Biowaste amount"], "biowaste")
+        self.assertEqual(europe_categories["Data coverage"], "")
         germany = next(group for group in groups if group["id"] == "germany")
         self.assertEqual(
             [region["value"] for region in germany["regions"]],
@@ -5300,9 +5303,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         response = self.client.get(reverse("waste-atlas-overview"))
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'id="atlas-tools-menu"')
-        self.assertNotContains(
-            response, reverse("waste-atlas-data-conflicts-overview")
-        )
+        self.assertNotContains(response, reverse("waste-atlas-data-conflicts-overview"))
 
         staff = User.objects.create_user(
             username="atlas-staff", password="secret", is_staff=True
