@@ -16,18 +16,13 @@
       <div class="atlas-eyebrow">Waste Atlas</div>
       <h2 class="mb-0">{{ map_title }}</h2>
     </div>
-    <a class="atlas-feedback-link"
-       href="mailto:info@bioresource-tools.net?subject=Waste%20Atlas%20feedback">
-      <i class="fas fa-comment-dots"></i> Feedback
-    </a>
-  </div>
-  <div id="atlas-controls">
-    {% block atlas_selector %}
-      {% include "waste_atlas/includes/map_selector.html" with atlas_selector_bootstrap=False atlas_selector_button_label="Load" %}
-    {% endblock atlas_selector %}
-    <div class="atlas-control-links">
+    <div class="atlas-hero-actions">
+      <a class="atlas-feedback-link"
+         href="mailto:info@bioresource-tools.net?subject=Waste%20Atlas%20feedback">
+        <i class="fas fa-comment-dots"></i> Feedback
+      </a>
       <a href="{{ map_toggle_url }}"
-         class="btn btn-outline-primary btn-sm"
+         class="btn btn-outline-primary btn-sm atlas-hero-btn"
          id="btn-toggle-change"
          {% if not map_toggle_url %}style="display: none;"{% endif %}>
         {% if is_change_map %}
@@ -38,10 +33,15 @@
         {{ map_toggle_label }}
       </a>
       <a href="{% url map_overview_url %}{% if not is_change_map and atlas_map_set %}?region={{ atlas_map_set }}{% endif %}"
-         class="btn btn-primary btn-sm">
+         class="btn btn-primary btn-sm atlas-hero-btn">
         <i class="fas fa-th-list"></i> {{ map_overview_label|default:"Map overview" }}
       </a>
     </div>
+  </div>
+  <div id="atlas-controls">
+    {% block atlas_selector %}
+      {% include "waste_atlas/includes/map_selector.html" with atlas_selector_bootstrap=False atlas_selector_button_label="Load" %}
+    {% endblock atlas_selector %}
   </div>
   {% include "waste_atlas/includes/related_maps.html" %}
   <div id="map-container">

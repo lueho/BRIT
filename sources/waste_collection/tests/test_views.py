@@ -4490,6 +4490,29 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "col-md-1")
 
+    def test_change_map_overview_uses_unified_selector_and_hero_actions(self):
+        response = self.client.get(reverse("waste-atlas-change-map-overview"))
+        self.assertEqual(response.status_code, 200)
+        # Uses the shared custom selector styling, not a bootstrap card grid, so
+        # the change-map page matches the detail page.
+        self.assertContains(response, "atlas-selector-form")
+        self.assertNotContains(response, "row g-3")
+        # Page-level navigation lives in the hero actions area (same spot as the
+        # detail page's "Map overview" action).
+        self.assertContains(response, "atlas-hero-actions")
+        self.assertContains(response, "Map overview")
+
+    def test_detail_page_actions_live_in_hero_actions(self):
+        response = self.client.get(
+            reverse("waste-atlas-germany-collection-system-map")
+        )
+        self.assertEqual(response.status_code, 200)
+        # The Feedback link and the map navigation actions share one hero row so
+        # the buttons sit in a consistent place across atlas pages.
+        self.assertContains(response, "atlas-hero-actions")
+        self.assertContains(response, "View changes for this map")
+        self.assertContains(response, "Map overview")
+
     def test_related_maps_generic_same_region_links_preserve_region_scope(self):
         from sources.waste_collection.waste_atlas.map_selection import (
             build_related_maps_context,
@@ -5436,22 +5459,19 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Waste Atlas — Change maps")
         self.assertContains(response, "Compare waste atlas data between two years")
-        self.assertContains(response, "Configure comparison")
+        # The change-map overview now reuses the shared selector, matching the
+        # detail page instead of a separate bootstrap card.
+        self.assertContains(response, "Compare another map")
 
     def test_change_map_overview_includes_dual_year_selector(self):
         response = self.client.get(reverse("waste-atlas-change-map-overview"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response,
-            '<label class="form-label" for="sel-from-year">From year</label>',
-        )
-        self.assertContains(
-            response,
-            '<label class="form-label" for="sel-to-year">To year</label>',
-        )
-        self.assertContains(response, '<select class="form-select" id="sel-from-year">')
-        self.assertContains(response, '<select class="form-select" id="sel-to-year">')
+        # The unified selector keeps both year selects (dual-year comparison).
+        self.assertContains(response, '<label for="sel-from-year">')
+        self.assertContains(response, '<label for="sel-to-year">')
+        self.assertContains(response, '<select id="sel-from-year">')
+        self.assertContains(response, '<select id="sel-to-year">')
         self.assertContains(response, 'id="sel-country"')
         self.assertContains(response, 'id="sel-waste-category"')
         self.assertContains(response, 'id="sel-theme"')

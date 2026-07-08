@@ -8,27 +8,25 @@
 {% endblock style_sheets %}
 {% block body_class %} sb-sidenav-toggled{% endblock body_class %}
 {% block content %}
-   <div class="container mt-4">
-      <div class="atlas-hero">
-         <div class="atlas-eyebrow">Waste Atlas</div>
-         <h1 class="mb-1">Change maps</h1>
-         <p class="lead mb-2">Compare waste atlas data between two years.</p>
-         <p class="text-muted">
-            Select a region, theme, and two years to visualize how waste collection data has changed over time.
-            Each catchment is classified as unchanged, changed, new, or removed between the two years.
-            This view is intended for data maintainers.
-         </p>
-      </div>
-      <form class="card mb-4" id="atlas-selection-form">
-         <div class="card-body">
-            <h2 class="h5">Configure comparison</h2>
-            {% include "waste_atlas/includes/change_map_selector.html" with atlas_selector_bootstrap=True atlas_selector_button_label="Compare" %}
+   <div class="container atlas-page">
+      <div class="atlas-hero atlas-hero--split">
+         <div class="atlas-hero-heading">
+            <div class="atlas-eyebrow">Waste Atlas</div>
+            <h1>Change maps</h1>
+            <p class="atlas-hero-lead">
+               Compare waste atlas data between two years to see how waste collection changed over time.
+               Each catchment is classified as unchanged, changed, new, or removed. Intended for data maintainers.
+            </p>
          </div>
-      </form>
-      <a class="btn btn-outline-secondary btn-sm"
-         href="{% url 'waste-atlas-overview' %}">
-         <i class="fas fa-th-list"></i> Map overview
-      </a>
+         <div class="atlas-hero-actions">
+            <a class="btn btn-primary btn-sm atlas-hero-btn" href="{% url 'waste-atlas-overview' %}">
+               <i class="fas fa-th-list"></i> Map overview
+            </a>
+         </div>
+      </div>
+      <div id="atlas-controls">
+         {% include "waste_atlas/includes/change_map_selector.html" with atlas_selector_bootstrap=False atlas_selector_button_label="Compare" %}
+      </div>
    </div>
 {% endblock content %}
 {% block javascript %}

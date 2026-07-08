@@ -146,9 +146,12 @@
           {% endfor %}
         </select>
       </div>
-      <button class="btn btn-primary atlas-selector-submit" id="btn-load" type="submit">
-        <i class="fas fa-code-compare"></i> {{ atlas_selector_button_label|default:"Compare" }}
-      </button>
+      <div class="atlas-selector-field atlas-selector-field--submit">
+        <span class="atlas-selector-label-spacer" aria-hidden="true"></span>
+        <button class="btn btn-primary atlas-selector-submit" id="btn-load" type="submit">
+          <i class="fas fa-code-compare"></i> {{ atlas_selector_button_label|default:"Compare" }}
+        </button>
+      </div>
     </div>
     <div class="atlas-selector-footer">
       <span id="atlas-selector-status" aria-live="polite"></span>

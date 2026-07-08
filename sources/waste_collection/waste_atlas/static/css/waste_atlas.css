@@ -221,11 +221,11 @@
 
 /* ============================ Map page ============================ */
 #atlas-controls {
-  align-items: stretch;
-  display: grid;
-  gap: .75rem;
-  grid-template-columns: minmax(0, 1fr) auto;
   margin-bottom: 1rem;
+}
+.atlas-hero-btn {
+  border-radius: 999px;
+  white-space: nowrap;
 }
 .atlas-selector-form {
   background: var(--atlas-surface);
@@ -259,6 +259,7 @@
   max-width: 27rem;
 }
 .atlas-selector-grid {
+  align-items: start;
   display: grid;
   gap: .75rem;
   grid-template-columns: minmax(10rem, 1.1fr) minmax(10rem, 1.05fr) minmax(9rem, .95fr) minmax(13rem, 1.45fr) minmax(5rem, .45fr) auto;
@@ -298,10 +299,18 @@
   font-size: .74rem;
   margin-top: .18rem;
 }
+.atlas-selector-label-spacer {
+  display: block;
+  font-size: .78rem;
+  margin-bottom: .25rem;
+}
+.atlas-selector-label-spacer::before {
+  content: "\00a0";
+}
 .atlas-selector-submit {
-  align-self: end;
   min-height: 2.35rem;
   white-space: nowrap;
+  width: 100%;
 }
 .atlas-selector-footer {
   color: var(--atlas-ink-muted);
@@ -310,22 +319,6 @@
 }
 .atlas-selector-empty #sel-theme {
   border-color: var(--bs-danger, #dc3545);
-}
-
-.atlas-control-links {
-  align-self: start;
-  display: flex;
-  flex-direction: column;
-  gap: .5rem;
-}
-.atlas-control-links .btn {
-  border-radius: .65rem;
-  white-space: nowrap;
-}
-#atlas-controls > a {
-  align-self: start;
-  border-radius: .65rem;
-  white-space: nowrap;
 }
 
 .atlas-related-maps {
@@ -391,12 +384,6 @@
   }
   .atlas-selector-submit {
     width: 100%;
-  }
-  .atlas-control-links {
-    display: inline-flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    margin-top: .75rem;
   }
 }
 @media (max-width: 575.98px) {
