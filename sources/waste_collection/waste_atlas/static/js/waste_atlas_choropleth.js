@@ -2061,21 +2061,6 @@ var WasteAtlasChoropleth = (function () {
     });
 
     var currentY = items.length * (swatchH + gap);
-    if (hasOverlayLegend) {
-      // Footnote: thin separator + small italic text (not a legend category)
-      g.append('line')
-        .attr('x1', 0).attr('y1', currentY)
-        .attr('x2', 280).attr('y2', currentY)
-        .attr('stroke', '#d0d4da').attr('stroke-width', 1);
-      g.append('text')
-        .attr('x', 0).attr('y', currentY + 12)
-        .attr('font-size', 10)
-        .attr('font-style', 'italic')
-        .attr('fill', '#6c757d')
-        .attr('font-family', "'Nunito', sans-serif")
-        .text(cfg.overlayPatternLegendLabel);
-      currentY += 18;
-    }
 
     if (hasConflictLegend) {
       g.append('rect')
@@ -2103,6 +2088,22 @@ var WasteAtlasChoropleth = (function () {
         .attr('font-size', 12)
         .attr('font-family', "'Nunito', sans-serif")
         .text(cfg.noDataLabel);
+      currentY += swatchH + gap;
+    }
+
+    if (hasOverlayLegend) {
+      // Footnote: thin separator + small italic text (not a legend category)
+      g.append('line')
+        .attr('x1', 0).attr('y1', currentY)
+        .attr('x2', 280).attr('y2', currentY)
+        .attr('stroke', '#d0d4da').attr('stroke-width', 1);
+      g.append('text')
+        .attr('x', 0).attr('y', currentY + 12)
+        .attr('font-size', 10)
+        .attr('font-style', 'italic')
+        .attr('fill', '#6c757d')
+        .attr('font-family', "'Nunito', sans-serif")
+        .text(cfg.overlayPatternLegendLabel);
     }
   }
 

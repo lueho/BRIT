@@ -442,10 +442,12 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         # Overlay hint is a footnote (separator + italic text), not a swatch row
         self.assertIn("font-style', 'italic'", draw_legend_fn)
         self.assertIn("cfg.overlayPatternLegendLabel", draw_legend_fn)
-        # noData rendering must come after overlay footnote in screen mode
-        overlay_idx = draw_legend_fn.find("cfg.overlayPatternLegendLabel")
-        no_data_idx = draw_legend_fn.find("cfg.noDataLabel")
-        self.assertLess(overlay_idx, no_data_idx)
+        # Overlay footnote must come after No data so all real categories stay grouped
+        no_data_render_idx = draw_legend_fn.rfind(".text(cfg.noDataLabel)")
+        overlay_render_idx = draw_legend_fn.rfind(
+            ".text(cfg.overlayPatternLegendLabel)"
+        )
+        self.assertLess(no_data_render_idx, overlay_render_idx)
 
     def test_export_legend_renders_overlay_as_footnote(self):
         """The overlay pattern hint must be a footnote, not a legend category.
