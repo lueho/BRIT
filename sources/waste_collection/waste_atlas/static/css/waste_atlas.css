@@ -321,6 +321,34 @@
   border-color: var(--bs-danger, #dc3545);
 }
 
+.atlas-map-toggles {
+  align-items: center;
+  background: var(--atlas-surface);
+  border: 1px solid var(--atlas-border);
+  border-radius: var(--atlas-radius);
+  box-shadow: var(--atlas-shadow-sm);
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem 1.5rem;
+  margin-top: .75rem;
+  padding: .6rem .9rem;
+}
+.atlas-map-toggle {
+  align-items: center;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: .85rem;
+  font-weight: 600;
+  gap: .45rem;
+  margin: 0;
+}
+.atlas-map-toggle input {
+  cursor: pointer;
+}
+.atlas-map-toggle--conflict {
+  color: #d7263d;
+}
+
 .atlas-related-maps {
   background: var(--atlas-surface);
   border: 1px solid var(--atlas-border);

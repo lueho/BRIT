@@ -2379,14 +2379,18 @@ var WasteAtlasChoropleth = (function () {
     }, { useChangeUrls: !!cfg.changeMode });
 
     var atlasControls = document.getElementById('atlas-controls');
+    var _atlasToggleBar = null;
+    function _atlasToggleContainer() {
+      if (!_atlasToggleBar) {
+        _atlasToggleBar = document.createElement('div');
+        _atlasToggleBar.className = 'atlas-map-toggles';
+        atlasControls.appendChild(_atlasToggleBar);
+      }
+      return _atlasToggleBar;
+    }
     if (atlasControls && _isQuartileEnabled(cfg) && !cfg.changeMode) {
       var toggleWrap = document.createElement('label');
-      toggleWrap.style.display = 'inline-flex';
-      toggleWrap.style.alignItems = 'center';
-      toggleWrap.style.gap = '0.4rem';
-      toggleWrap.style.fontWeight = '600';
-      toggleWrap.style.cursor = 'pointer';
-      toggleWrap.style.fontSize = '0.875rem';
+      toggleWrap.className = 'atlas-map-toggle';
 
       var toggleCheckbox = document.createElement('input');
       toggleCheckbox.type = 'checkbox';
@@ -2406,20 +2410,14 @@ var WasteAtlasChoropleth = (function () {
 
       toggleWrap.appendChild(toggleCheckbox);
       toggleWrap.appendChild(document.createTextNode('Quartile boundaries'));
-      atlasControls.appendChild(toggleWrap);
+      _atlasToggleContainer().appendChild(toggleWrap);
     }
 
     // Maintainer aid: highlight catchments where the dataset holds more than
     // one collection competing for the single displayed theme value.
     if (atlasControls && cfg.conflictUrl && cfg.conflictTheme && !cfg.changeMode) {
       var conflictWrap = document.createElement('label');
-      conflictWrap.style.display = 'inline-flex';
-      conflictWrap.style.alignItems = 'center';
-      conflictWrap.style.gap = '0.4rem';
-      conflictWrap.style.fontWeight = '600';
-      conflictWrap.style.cursor = 'pointer';
-      conflictWrap.style.fontSize = '0.875rem';
-      conflictWrap.style.color = CONFLICT_STROKE;
+      conflictWrap.className = 'atlas-map-toggle atlas-map-toggle--conflict';
 
       var conflictCheckbox = document.createElement('input');
       conflictCheckbox.type = 'checkbox';
@@ -2447,7 +2445,7 @@ var WasteAtlasChoropleth = (function () {
 
       conflictWrap.appendChild(conflictCheckbox);
       conflictWrap.appendChild(document.createTextNode('Highlight conflicting catchments'));
-      atlasControls.appendChild(conflictWrap);
+      _atlasToggleContainer().appendChild(conflictWrap);
     }
 
     if (btnSVG) btnSVG.addEventListener('click', function () { exportSVG(_exportFileBase() + '.svg'); });
