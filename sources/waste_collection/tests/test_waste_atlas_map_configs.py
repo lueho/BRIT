@@ -466,8 +466,10 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
 
         # _measureExportLegend must compute a footnote separately
         measure_fn = script.split("function _measureExportLegend(")[1]
+        measure_fn_body = measure_fn.split("function _rectIntersectionArea")[0]
         self.assertIn("opts.footnote", measure_fn)
         self.assertIn("opts.footnoteHeight", measure_fn)
+        self.assertNotIn("exportMode", measure_fn_body)
         # _drawExportLegendItem must not draw pattern swatches for the overlay
         draw_item_fn = script.split("function _drawExportLegendItem(")[1]
         # The pattern block should be gone (overlay is no longer an item)

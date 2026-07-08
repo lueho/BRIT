@@ -896,9 +896,7 @@ var WasteAtlasChoropleth = (function () {
     // Footnote for overlay pattern hint (rendered separately, not as a category)
     opts.footnote = null;
     if (cfg.overlayPatternField && cfg.overlayPatternLegendLabel && cfg._hasOverlayPattern) {
-      var footnoteLabel = exportMode && cfg.exportOverlayPatternLegendLabel
-        ? cfg.exportOverlayPatternLegendLabel
-        : cfg.overlayPatternLegendLabel;
+      var footnoteLabel = cfg.exportOverlayPatternLegendLabel || cfg.overlayPatternLegendLabel;
       var footnoteFontSize = Math.round(opts.fontSize * 0.82);
       opts.footnote = {
         lines: _wrapTextToWidth(footnoteLabel, width - opts.paddingX * 2, footnoteFontSize),
