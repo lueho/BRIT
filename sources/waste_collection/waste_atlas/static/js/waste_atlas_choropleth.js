@@ -2028,7 +2028,7 @@ var WasteAtlasChoropleth = (function () {
     }
 
     // Overlay footnote takes less space than a full legend row
-    var overlayFootnoteH = hasOverlayLegend ? 18 : 0;
+    var overlayFootnoteH = hasOverlayLegend ? 28 : 0;
 
     var g = _svg.append('g')
       .attr('class', 'atlas-legend')
@@ -2093,12 +2093,13 @@ var WasteAtlasChoropleth = (function () {
 
     if (hasOverlayLegend) {
       // Footnote: thin separator + small italic text (not a legend category)
+      var footnoteLineY = currentY + 6;
       g.append('line')
-        .attr('x1', 0).attr('y1', currentY)
-        .attr('x2', 280).attr('y2', currentY)
+        .attr('x1', 0).attr('y1', footnoteLineY)
+        .attr('x2', 280).attr('y2', footnoteLineY)
         .attr('stroke', '#d0d4da').attr('stroke-width', 1);
       g.append('text')
-        .attr('x', 0).attr('y', currentY + 12)
+        .attr('x', 0).attr('y', footnoteLineY + 14)
         .attr('font-size', 10)
         .attr('font-style', 'italic')
         .attr('fill', '#6c757d')
