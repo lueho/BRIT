@@ -4983,6 +4983,39 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "WasteAtlasChoropleth.exportElementSVG")
         self.assertContains(response, "WasteAtlasChoropleth.exportElementPNG")
 
+    def test_europe_data_coverage_map_highlights_final_case_study_selection(self):
+        """The coverage map highlights only the final case-study regions."""
+        response = self.client.get(reverse("waste-atlas-europe-data-coverage-map"))
+
+        self.assertEqual(response.status_code, 200)
+        # Sweden is the only highlighted country.
+        self.assertContains(response, "new Set(['SE'])")
+        # German NUTS-1 regions are fetched (replaces the former Belgium fetch).
+        self.assertContains(response, "levl_code=1&cntr_code=DE")
+        # Final sub-national case-study regions.
+        self.assertContains(response, "new Set(['DE1', 'DEA', 'DEB', 'ES51', 'ITH1'])")
+        # Region list reflects the final selection.
+        self.assertContains(response, "Sweden")
+        self.assertContains(response, "Nordrhein-Westfalen")
+        self.assertContains(response, "Rheinland-Pfalz")
+        self.assertContains(response, "Baden-Württemberg")
+        self.assertContains(response, "South Tyrol")
+        self.assertContains(response, "Catalonia")
+        # Subtitle lists the final selection.
+        self.assertContains(
+            response,
+            "Sweden, Nordrhein-Westfalen, Rheinland-Pfalz, "
+            "Baden-Württemberg, South Tyrol, and Catalonia",
+        )
+        # Former case-study entries are no longer present.
+        self.assertNotContains(response, "'DE', 'DK', 'SE', 'NL'")
+        self.assertNotContains(response, "'BE1', 'BE2', 'ES51', 'ITH1'")
+        self.assertNotContains(response, "levl_code=1&cntr_code=BE")
+        self.assertNotContains(response, ">Germany</li>")
+        self.assertNotContains(response, ">Denmark</li>")
+        self.assertNotContains(response, ">Flanders + Brussels</li>")
+        self.assertNotContains(response, ">The Netherlands</li>")
+
     def test_atlas_pages_link_shared_stylesheet(self):
         """Atlas pages load the shared waste_atlas stylesheet instead of inline CSS."""
         for url_name in (
