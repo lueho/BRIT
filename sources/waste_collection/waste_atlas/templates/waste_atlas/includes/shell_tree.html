@@ -1,0 +1,46 @@
+<div class="atlas-tree-head">
+  <label class="visually-hidden" for="atlas-tree-filter">Filter maps</label>
+  <input id="atlas-tree-filter"
+         class="atlas-tree-filter form-control form-control-sm"
+         type="search"
+         autocomplete="off"
+         placeholder="Filter maps…">
+</div>
+<div class="atlas-tree-scroll">
+  <a class="atlas-tree-overview-link{% if atlas_tree_overview_active %} atlas-tree-link--active{% endif %}"
+     href="{% url 'waste-atlas-overview' %}">
+    <i class="fas fa-th-list"></i> All maps
+  </a>
+  {% for group in directory_region_groups %}
+    <details class="atlas-tree-region"
+             data-region="{{ group.id }}"
+             {% if group.id == directory_selected_region %}open{% endif %}>
+      <summary class="atlas-tree-region-summary">{{ group.label }}</summary>
+      {% if group.europe_maps %}
+        <div class="atlas-tree-section">
+          {% for map in group.europe_maps %}
+            <a class="atlas-tree-link"
+               href="{{ map.url }}"
+               data-search="{{ map.title|lower }}">{{ map.title }}</a>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% for region in group.regions %}
+        <div class="atlas-tree-region-block" data-map-set="{{ region.value }}">
+          <div class="atlas-tree-region-title">{{ region.label }}</div>
+          {% for section in region.sections %}
+            <div class="atlas-tree-section">
+              <div class="atlas-tree-section-title">{{ section.label }}</div>
+              {% for map in section.maps %}
+                <a class="atlas-tree-link{% if region.value == atlas_map_set and map.theme == atlas_active_theme %} atlas-tree-link--active{% endif %}"
+                   {% if region.value == atlas_map_set and map.theme == atlas_active_theme %}aria-current="page"{% endif %}
+                   href="{{ map.url }}"
+                   data-search="{{ map.title|lower }} {{ region.label|lower }} {{ map.theme|lower }}">{{ map.title }}</a>
+              {% endfor %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </details>
+  {% endfor %}
+</div>

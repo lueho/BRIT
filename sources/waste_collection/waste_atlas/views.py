@@ -18,6 +18,24 @@ from .pages import MAP_PAGES, MAP_SET_LABELS
 WASTE_ATLAS_GROUP_NAME = "waste_atlas"
 
 
+class AtlasShellTreeMixin:
+    """Provide the registry-driven map tree for the atlas app shell."""
+
+    atlas_tree_selected_region = None
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.setdefault("atlas_active_theme", "")
+        if "directory_region_groups" not in ctx:
+            ctx.update(
+                build_overview_directory_context(
+                    reverse,
+                    selected_region=self.atlas_tree_selected_region,
+                )
+            )
+        return ctx
+
+
 def _previous_selection_year(year):
     year = str(year)
     if year in MAP_SELECTION_YEARS:
@@ -97,6 +115,10 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
         ctx["breadcrumb_object_label"] = page["title"]
         ctx["map_config_key"] = page["config_key"]
         ctx["map_config_overrides"] = page.get("overrides")
+        ctx["atlas_active_theme"] = page["theme"]
+        ctx.update(
+            build_overview_directory_context(reverse, selected_region=selected_map_set)
+        )
         ctx.update(
             build_map_selection_context(
                 reverse,
@@ -189,10 +211,13 @@ class WasteAtlasOverviewView(WasteAtlasGroupMixin, TemplateView):
         )
         ctx["directory_selected_category"] = self.request.GET.get("category", "")
         ctx["directory_query"] = self.request.GET.get("q", "")
+        ctx["atlas_tree_overview_active"] = True
         return ctx
 
 
-class WasteAtlasChangeMapOverviewView(WasteAtlasGroupMixin, TemplateView):
+class WasteAtlasChangeMapOverviewView(
+    WasteAtlasGroupMixin, AtlasShellTreeMixin, TemplateView
+):
     """Overview page for change maps — compare two versions of a waste atlas map."""
 
     template_name = "waste_atlas/change_map_overview.html"
@@ -211,7 +236,9 @@ class WasteAtlasChangeMapOverviewView(WasteAtlasGroupMixin, TemplateView):
         return ctx
 
 
-class WasteAtlasDataConflictsOverviewView(WasteAtlasGroupMixin, TemplateView):
+class WasteAtlasDataConflictsOverviewView(
+    WasteAtlasGroupMixin, AtlasShellTreeMixin, TemplateView
+):
     """Overview page listing maps with the maintainer conflict-overlay aid.
 
     Surfaces every choropleth map whose ``MAP_CONFIGS`` entry opts into the

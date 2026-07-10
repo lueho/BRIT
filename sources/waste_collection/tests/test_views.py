@@ -4357,6 +4357,49 @@ class WasteAtlasMapViewsTestCase(TestCase):
             f'href="{reverse("waste-atlas-germany-collection-system-map")}"',
         )
 
+    def test_map_page_renders_shell_layout(self):
+        response = self.client.get(reverse("waste-atlas-germany-collection-system-map"))
+
+        self.assertEqual(response.status_code, 200)
+        # App-shell workspace: left tree navigation, map stage, right controls
+        # panel, and the Current/Changes mode toggle in the context header.
+        self.assertContains(response, 'id="atlas-shell"')
+        self.assertContains(response, 'id="atlas-tree"')
+        self.assertContains(response, 'id="atlas-side"')
+        self.assertContains(response, 'id="atlas-map-tools"')
+        self.assertContains(response, "atlas-mode-toggle")
+        self.assertContains(response, 'id="atlas-tree-filter"')
+        # The tree marks the current map set and theme as active.
+        self.assertContains(response, 'data-map-set="DE"')
+        self.assertContains(response, "atlas-tree-link--active")
+
+    def test_change_map_page_marks_changes_mode_active(self):
+        response = self.client.get(
+            reverse("waste-atlas-change-map", args=["DE", "collection_system"])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "atlas-mode-toggle")
+        self.assertContains(response, 'id="btn-toggle-change"')
+        self.assertContains(response, 'id="atlas-tree"')
+
+    def test_overview_renders_shell_with_tree(self):
+        response = self.client.get(reverse("waste-atlas-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="atlas-shell"')
+        self.assertContains(response, 'id="atlas-tree"')
+        # The directory (region tabs + filters) stays as the workspace content.
+        self.assertContains(response, 'id="atlas-region-tabs"')
+
+    def test_change_map_overview_and_conflicts_render_shell_tree(self):
+        for route in ("waste-atlas-change-map-overview", "waste-atlas-data-conflicts-overview"):
+            with self.subTest(route=route):
+                response = self.client.get(reverse(route))
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'id="atlas-shell"')
+                self.assertContains(response, 'id="atlas-tree"')
+
     def test_related_maps_context_links_theme_regions_and_region_category(self):
         from sources.waste_collection.waste_atlas.map_selection import (
             build_related_maps_context,
@@ -4497,9 +4540,9 @@ class WasteAtlasMapViewsTestCase(TestCase):
         # the change-map page matches the detail page.
         self.assertContains(response, "atlas-selector-form")
         self.assertNotContains(response, "row g-3")
-        # Page-level navigation lives in the hero actions area (same spot as the
-        # detail page's "Map overview" action).
-        self.assertContains(response, "atlas-hero-actions")
+        # Page-level navigation lives in the context header actions area (same
+        # spot as the detail page's "Map overview" action).
+        self.assertContains(response, "atlas-context-actions")
         self.assertContains(response, "Map overview")
 
     def test_detail_page_actions_live_in_hero_actions(self):
@@ -4507,9 +4550,11 @@ class WasteAtlasMapViewsTestCase(TestCase):
             reverse("waste-atlas-germany-collection-system-map")
         )
         self.assertEqual(response.status_code, 200)
-        # The Feedback link and the map navigation actions share one hero row so
-        # the buttons sit in a consistent place across atlas pages.
-        self.assertContains(response, "atlas-hero-actions")
+        # The map navigation actions share one context-header row (and the
+        # Feedback link sits in the shared shell toolbar) so the buttons sit in
+        # a consistent place across atlas pages.
+        self.assertContains(response, "atlas-context-actions")
+        self.assertContains(response, "atlas-feedback-link")
         self.assertContains(response, "View changes for this map")
         self.assertContains(response, "Map overview")
 
@@ -5575,18 +5620,25 @@ class WasteAtlasMapViewsTestCase(TestCase):
         response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
 
         self.assertEqual(response.status_code, 200)
-        # Every collection_system map page is listed.
-        self.assertContains(
-            response, reverse("waste-atlas-germany-collection-system-map")
+        # Every collection_system map page is listed in the conflict-overlay
+        # directory (the shell map tree additionally links every map, so check
+        # the directory context rather than the raw markup).
+        conflict_map_urls = {
+            conflict_map["url"] for conflict_map in response.context["conflict_maps"]
+        }
+        self.assertIn(
+            reverse("waste-atlas-germany-collection-system-map"), conflict_map_urls
         )
-        self.assertContains(
-            response, reverse("waste-atlas-catalonia-collection-system-map")
+        self.assertIn(
+            reverse("waste-atlas-catalonia-collection-system-map"), conflict_map_urls
         )
-        self.assertContains(
-            response, reverse("waste-atlas-italy-collection-system-map")
+        self.assertIn(
+            reverse("waste-atlas-italy-collection-system-map"), conflict_map_urls
         )
         # A map whose config has no conflict overlay is not listed.
-        self.assertNotContains(response, reverse("waste-atlas-germany-orga-level-map"))
+        self.assertNotIn(
+            reverse("waste-atlas-germany-orga-level-map"), conflict_map_urls
+        )
 
     def test_data_conflicts_overview_links_back_to_map_overview(self):
         response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))

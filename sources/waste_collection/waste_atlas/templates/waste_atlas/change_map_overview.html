@@ -1,36 +1,29 @@
-{% extends "base.html" %}
+{% extends "waste_atlas/shell_base.html" %}
 {% load static %}
 {% block title %}
    Waste Atlas — Change maps
 {% endblock title %}
-{% block style_sheets %}
-   <link href="{% static 'css/waste_atlas.min.css' %}" rel="stylesheet">
-{% endblock style_sheets %}
-{% block body_class %} sb-sidenav-toggled{% endblock body_class %}
-{% block content %}
-   <div class="container atlas-page">
-      <div class="atlas-hero atlas-hero--split">
-         <div class="atlas-hero-heading">
+{% block atlas_workspace %}
+      <header class="atlas-context">
+         <div class="atlas-context-heading">
             <div class="atlas-eyebrow">Waste Atlas</div>
-            <h1>Change maps</h1>
+            <h1 class="atlas-context-title">Change maps</h1>
             <p class="atlas-hero-lead">
                Compare waste atlas data between two years to see how waste collection changed over time.
                Each catchment is classified as unchanged, changed, new, or removed. Intended for data maintainers.
             </p>
          </div>
-         <div class="atlas-hero-actions">
-            <a class="btn btn-primary btn-sm atlas-hero-btn" href="{% url 'waste-atlas-overview' %}">
+         <div class="atlas-context-actions">
+            <a class="btn btn-outline-primary btn-sm atlas-hero-btn"
+               href="{% url 'waste-atlas-overview' %}">
                <i class="fas fa-th-list"></i> Map overview
             </a>
          </div>
-      </div>
-      <div id="atlas-controls">
+      </header>
+      <div id="atlas-controls" class="atlas-panel">
          {% include "waste_atlas/includes/change_map_selector.html" with atlas_selector_button_label="Compare" %}
       </div>
-   </div>
-{% endblock content %}
-{% block javascript %}
-   {{ block.super }}
-   <script src="{% static 'js/waste_atlas_choropleth.min.js' %}?v=20260615-1"></script>
+{% endblock atlas_workspace %}
+{% block atlas_page_javascript %}
    <script>WasteAtlasChoropleth.initSelectorControls(null, { useChangeUrls: true });</script>
-{% endblock javascript %}
+{% endblock atlas_page_javascript %}

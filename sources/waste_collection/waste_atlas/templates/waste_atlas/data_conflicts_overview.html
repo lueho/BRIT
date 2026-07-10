@@ -1,18 +1,13 @@
-{% extends "base.html" %}
+{% extends "waste_atlas/shell_base.html" %}
 {% load static %}
 {% block title %}
    Waste Atlas — Data conflicts
 {% endblock title %}
-{% block style_sheets %}
-   <link href="{% static 'css/waste_atlas.min.css' %}" rel="stylesheet">
-{% endblock style_sheets %}
-{% block body_class %} sb-sidenav-toggled{% endblock body_class %}
-{% block content %}
-   <div class="container atlas-page">
-      <div class="atlas-hero atlas-hero--split">
-         <div class="atlas-hero-heading">
+{% block atlas_workspace %}
+      <header class="atlas-context">
+         <div class="atlas-context-heading">
             <div class="atlas-eyebrow">Waste Atlas</div>
-            <h1>Data conflicts</h1>
+            <h1 class="atlas-context-title">Data conflicts</h1>
             <p class="atlas-hero-lead">
                Some waste atlas maps can display only one value per catchment per theme.
                Where the dataset holds several collections with different theme values for
@@ -22,16 +17,13 @@
                catchments.
             </p>
          </div>
-         <div class="atlas-hero-actions">
-            <a class="atlas-feedback-link"
-               href="mailto:info@bioresource-tools.net?subject=Waste%20Atlas%20feedback">
-               <i class="fas fa-comment-dots"></i> Feedback
-            </a>
-            <a class="btn btn-primary btn-sm atlas-hero-btn" href="{% url 'waste-atlas-overview' %}">
+         <div class="atlas-context-actions">
+            <a class="btn btn-outline-primary btn-sm atlas-hero-btn"
+               href="{% url 'waste-atlas-overview' %}">
                <i class="fas fa-th-list"></i> Map overview
             </a>
          </div>
-      </div>
+      </header>
       <section class="atlas-panel atlas-directory" aria-labelledby="atlas-conflicts-title">
          <h2 class="atlas-section-title" id="atlas-conflicts-title">Conflict-overlay maps</h2>
          {% if conflict_maps %}
@@ -45,5 +37,4 @@
             <p class="text-muted">No maps with a conflict overlay are configured yet.</p>
          {% endif %}
       </section>
-   </div>
-{% endblock content %}
+{% endblock atlas_workspace %}

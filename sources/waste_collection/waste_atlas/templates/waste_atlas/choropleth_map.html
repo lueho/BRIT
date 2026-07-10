@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "waste_atlas/shell_base.html" %}
 {% load static %}
 {% block title %}
   Waste Atlas — {{ map_title }}
@@ -6,71 +6,77 @@
 {% block meta_keywords %}
   waste atlas, {{ map_title|lower }}
 {% endblock meta_keywords %}
-{% block style_sheets %}
-  <link href="{% static 'css/waste_atlas.min.css' %}" rel="stylesheet">
-{% endblock style_sheets %}
-{% block body_class %} sb-sidenav-toggled{% endblock body_class %}
-{% block content %}
-  <div class="atlas-hero atlas-hero--split">
-    <div class="atlas-hero-heading">
-      <div class="atlas-eyebrow">Waste Atlas</div>
-      <h2 class="mb-0">{{ map_title }}</h2>
+{% block atlas_workspace %}
+  <header class="atlas-context">
+    <div class="atlas-context-heading">
+      <div class="atlas-eyebrow">
+        {% firstof breadcrumb_section_label "Waste Atlas" %}
+      </div>
+      <h1 class="atlas-context-title">{{ map_title }}</h1>
     </div>
-    <div class="atlas-hero-actions">
-      <a class="atlas-feedback-link"
-         href="mailto:info@bioresource-tools.net?subject=Waste%20Atlas%20feedback">
-        <i class="fas fa-comment-dots"></i> Feedback
-      </a>
-      <a href="{{ map_toggle_url }}"
-         class="btn btn-outline-primary btn-sm atlas-hero-btn"
-         id="btn-toggle-change"
-         {% if not map_toggle_url %}style="display: none;"{% endif %}>
-        {% if is_change_map %}
-          <i class="fas fa-map"></i>
-        {% else %}
-          <i class="fas fa-exchange-alt"></i>
-        {% endif %}
-        {{ map_toggle_label }}
-      </a>
+    <div class="atlas-context-actions">
+      {% if map_toggle_url %}
+        <div class="atlas-mode-toggle" role="group" aria-label="Map mode">
+          {% if is_change_map %}
+            <a class="atlas-mode"
+               id="btn-toggle-change"
+               href="{{ map_toggle_url }}"
+               title="View current map">Current</a>
+            <span class="atlas-mode atlas-mode--active" aria-current="page">Changes</span>
+          {% else %}
+            <span class="atlas-mode atlas-mode--active" aria-current="page">Current</span>
+            <a class="atlas-mode"
+               id="btn-toggle-change"
+               href="{{ map_toggle_url }}"
+               title="View changes for this map">Changes</a>
+          {% endif %}
+        </div>
+      {% endif %}
       <a href="{% url map_overview_url %}{% if not is_change_map and atlas_map_set %}?region={{ atlas_map_set }}{% endif %}"
-         class="btn btn-primary btn-sm atlas-hero-btn">
+         class="btn btn-outline-primary btn-sm atlas-hero-btn">
         <i class="fas fa-th-list"></i> {{ map_overview_label|default:"Map overview" }}
       </a>
     </div>
-  </div>
-  <div id="atlas-controls">
-    {% block atlas_selector %}
-      {% include "waste_atlas/includes/map_selector.html" with atlas_selector_button_label="Load" %}
-    {% endblock atlas_selector %}
-  </div>
-  {% include "waste_atlas/includes/related_maps.html" %}
-  <div id="atlas-map-tools"></div>
-  <div id="map-container">
-    <div id="loading-overlay">
-      <i class="fas fa-spinner fa-spin me-2"></i> Loading map data…
+  </header>
+  <div class="atlas-stage">
+    <div class="atlas-stage-main">
+      {% include "waste_atlas/includes/related_maps.html" %}
+      <div id="map-container">
+        <div id="loading-overlay">
+          <i class="fas fa-spinner fa-spin me-2"></i> Loading map data…
+        </div>
+        <svg id="atlas-svg">
+        </svg>
+      </div>
+      <div id="export-buttons">
+        <button class="btn btn-outline-secondary btn-sm"
+                id="btn-export-svg"
+                type="button"
+                disabled>
+          <i class="fas fa-download"></i> Download SVG
+        </button>
+        <button class="btn btn-outline-secondary btn-sm"
+                id="btn-export-png"
+                type="button"
+                disabled>
+          <i class="fas fa-image"></i> Download PNG (Word-ready, 300 DPI)
+        </button>
+      </div>
     </div>
-    <svg id="atlas-svg">
-    </svg>
+    <aside class="atlas-side" id="atlas-side">
+      <section class="atlas-side-card" id="atlas-controls">
+        {% block atlas_selector %}
+          {% include "waste_atlas/includes/map_selector.html" with atlas_selector_button_label="Load" %}
+        {% endblock atlas_selector %}
+      </section>
+      <div id="atlas-map-tools"></div>
+    </aside>
   </div>
-  <div id="export-buttons">
-    <button class="btn btn-outline-secondary btn-sm"
-            id="btn-export-svg"
-            type="button"
-            disabled>
-      <i class="fas fa-download"></i> Download SVG
-    </button>
-    <button class="btn btn-outline-secondary btn-sm"
-            id="btn-export-png"
-            type="button"
-            disabled>
-      <i class="fas fa-image"></i> Download PNG (Word-ready, 300 DPI)
-    </button>
-  </div>
-{% endblock content %}
-{% block javascript %}
-  {{ block.super }}
+{% endblock atlas_workspace %}
+{% block atlas_vendor_javascript %}
   <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-  <script src="{% static 'js/waste_atlas_choropleth.min.js' %}?v=20260615-1"></script>
+{% endblock atlas_vendor_javascript %}
+{% block atlas_page_javascript %}
   {% block atlas_config %}
   {% endblock atlas_config %}
-{% endblock javascript %}
+{% endblock atlas_page_javascript %}

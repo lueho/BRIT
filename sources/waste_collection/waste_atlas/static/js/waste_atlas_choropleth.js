@@ -2538,10 +2538,70 @@ var WasteAtlasChoropleth = (function () {
     return { applyFilters: applyFilters };
   }
 
+  function initShell() {
+    var shell = document.getElementById('atlas-shell');
+    if (!shell) return null;
+    var tree = document.getElementById('atlas-tree');
+    var toggle = document.getElementById('atlas-tree-toggle');
+    var scrim = document.getElementById('atlas-tree-scrim');
+
+    function setTreeOpen(open) {
+      shell.classList.toggle('atlas-shell--tree-open', open);
+      if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    if (toggle) {
+      toggle.addEventListener('click', function () {
+        setTreeOpen(!shell.classList.contains('atlas-shell--tree-open'));
+      });
+    }
+    if (scrim) scrim.addEventListener('click', function () { setTreeOpen(false); });
+
+    var filter = document.getElementById('atlas-tree-filter');
+    if (filter && tree) {
+      var links = Array.prototype.slice.call(tree.querySelectorAll('.atlas-tree-link'));
+      var regions = Array.prototype.slice.call(tree.querySelectorAll('.atlas-tree-region'));
+      var savedOpenStates = null;
+
+      filter.addEventListener('input', _debounce(function () {
+        var query = filter.value.trim().toLowerCase();
+        if (query && savedOpenStates === null) {
+          savedOpenStates = regions.map(function (region) { return region.open; });
+        }
+        links.forEach(function (link) {
+          var haystack = link.getAttribute('data-search') || link.textContent || '';
+          link.hidden = !!query && haystack.toLowerCase().indexOf(query) === -1;
+        });
+        tree.querySelectorAll('.atlas-tree-section').forEach(function (section) {
+          section.hidden = !section.querySelector('.atlas-tree-link:not([hidden])');
+        });
+        tree.querySelectorAll('.atlas-tree-region-block').forEach(function (block) {
+          block.hidden = !block.querySelector('.atlas-tree-link:not([hidden])');
+        });
+        regions.forEach(function (region, index) {
+          var anyVisible = !!region.querySelector('.atlas-tree-link:not([hidden])');
+          region.hidden = !!query && !anyVisible;
+          if (query) {
+            region.open = anyVisible;
+          } else if (savedOpenStates) {
+            region.open = savedOpenStates[index];
+          }
+        });
+        if (!query) savedOpenStates = null;
+      }, 120));
+    }
+
+    var activeLink = tree && tree.querySelector('.atlas-tree-link--active');
+    if (activeLink && activeLink.scrollIntoView) {
+      activeLink.scrollIntoView({ block: 'nearest' });
+    }
+    return { setTreeOpen: setTreeOpen };
+  }
+
   return {
     init: init,
     initSelectorControls: initSelectorControls,
     initOverviewDirectory: initOverviewDirectory,
+    initShell: initShell,
     selectorNavigationTarget: _selectorNavigationTarget,
     exportSVG: exportSVG,
     exportPNG: exportPNG,
