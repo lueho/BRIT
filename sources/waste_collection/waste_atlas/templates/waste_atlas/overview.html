@@ -1,40 +1,17 @@
-{% extends "base.html" %}
+{% extends "waste_atlas/shell_base.html" %}
 {% load static %}
 {% block title %}
    Waste Atlas — Map overview
 {% endblock title %}
-{% block style_sheets %}
-   <link href="{% static 'css/waste_atlas.min.css' %}" rel="stylesheet">
-{% endblock style_sheets %}
-{% block content %}
-   <div class="container atlas-page">
-      <header class="atlas-hero atlas-hero--split">
-         <div class="atlas-hero-text">
+{% block atlas_workspace %}
+      <header class="atlas-context">
+         <div class="atlas-context-heading">
             <div class="atlas-eyebrow">Waste Atlas</div>
-            <h1>Map overview</h1>
+            <h1 class="atlas-context-title">Map overview</h1>
             <p class="atlas-hero-lead">
                Choose a region, then the information you need — collection systems and bins, schedules and collection counts, fees, or collected amounts.
             </p>
          </div>
-         {% if request.user.is_staff %}
-            <div class="atlas-hero-tools dropdown">
-               <button class="atlas-hero-link dropdown-toggle" type="button" id="atlas-tools-menu" data-bs-toggle="dropdown" aria-expanded="false">
-                  <i class="fas fa-cog"></i> Tools
-               </button>
-               <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="atlas-tools-menu">
-                  <li>
-                     <a class="dropdown-item" href="{% url 'waste-atlas-change-map-overview' %}">
-                        <i class="fas fa-exchange-alt"></i> Change maps
-                     </a>
-                  </li>
-                  <li>
-                     <a class="dropdown-item" href="{% url 'waste-atlas-data-conflicts-overview' %}">
-                        <i class="fas fa-exclamation-triangle"></i> Data conflicts
-                     </a>
-                  </li>
-               </ul>
-            </div>
-         {% endif %}
       </header>
       <section class="atlas-panel atlas-directory" aria-labelledby="atlas-directory-title">
          <div class="atlas-directory-header">
@@ -120,10 +97,7 @@
             {% endfor %}
          </div>
       </section>
-   </div>
-{% endblock content %}
-{% block javascript %}
-   {{ block.super }}
-   <script src="{% static 'js/waste_atlas_choropleth.min.js' %}?v=20260615-1"></script>
+{% endblock atlas_workspace %}
+{% block atlas_page_javascript %}
    <script>WasteAtlasChoropleth.initOverviewDirectory();</script>
-{% endblock javascript %}
+{% endblock atlas_page_javascript %}

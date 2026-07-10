@@ -2379,14 +2379,19 @@ var WasteAtlasChoropleth = (function () {
     }, { useChangeUrls: !!cfg.changeMode });
 
     var atlasControls = document.getElementById('atlas-controls');
+    var atlasToggleMount = document.getElementById('atlas-map-tools') || atlasControls;
+    var _atlasToggleBar = null;
+    function _atlasToggleContainer() {
+      if (!_atlasToggleBar) {
+        _atlasToggleBar = document.createElement('div');
+        _atlasToggleBar.className = 'atlas-map-toggles';
+        atlasToggleMount.appendChild(_atlasToggleBar);
+      }
+      return _atlasToggleBar;
+    }
     if (atlasControls && _isQuartileEnabled(cfg) && !cfg.changeMode) {
       var toggleWrap = document.createElement('label');
-      toggleWrap.style.display = 'inline-flex';
-      toggleWrap.style.alignItems = 'center';
-      toggleWrap.style.gap = '0.4rem';
-      toggleWrap.style.fontWeight = '600';
-      toggleWrap.style.cursor = 'pointer';
-      toggleWrap.style.fontSize = '0.875rem';
+      toggleWrap.className = 'atlas-map-toggle';
 
       var toggleCheckbox = document.createElement('input');
       toggleCheckbox.type = 'checkbox';
@@ -2406,20 +2411,14 @@ var WasteAtlasChoropleth = (function () {
 
       toggleWrap.appendChild(toggleCheckbox);
       toggleWrap.appendChild(document.createTextNode('Quartile boundaries'));
-      atlasControls.appendChild(toggleWrap);
+      _atlasToggleContainer().appendChild(toggleWrap);
     }
 
     // Maintainer aid: highlight catchments where the dataset holds more than
     // one collection competing for the single displayed theme value.
     if (atlasControls && cfg.conflictUrl && cfg.conflictTheme && !cfg.changeMode) {
       var conflictWrap = document.createElement('label');
-      conflictWrap.style.display = 'inline-flex';
-      conflictWrap.style.alignItems = 'center';
-      conflictWrap.style.gap = '0.4rem';
-      conflictWrap.style.fontWeight = '600';
-      conflictWrap.style.cursor = 'pointer';
-      conflictWrap.style.fontSize = '0.875rem';
-      conflictWrap.style.color = CONFLICT_STROKE;
+      conflictWrap.className = 'atlas-map-toggle atlas-map-toggle--conflict';
 
       var conflictCheckbox = document.createElement('input');
       conflictCheckbox.type = 'checkbox';
@@ -2447,7 +2446,7 @@ var WasteAtlasChoropleth = (function () {
 
       conflictWrap.appendChild(conflictCheckbox);
       conflictWrap.appendChild(document.createTextNode('Highlight conflicting catchments'));
-      atlasControls.appendChild(conflictWrap);
+      _atlasToggleContainer().appendChild(conflictWrap);
     }
 
     if (btnSVG) btnSVG.addEventListener('click', function () { exportSVG(_exportFileBase() + '.svg'); });
@@ -2539,10 +2538,70 @@ var WasteAtlasChoropleth = (function () {
     return { applyFilters: applyFilters };
   }
 
+  function initShell() {
+    var shell = document.getElementById('atlas-shell');
+    if (!shell) return null;
+    var tree = document.getElementById('atlas-tree');
+    var toggle = document.getElementById('atlas-tree-toggle');
+    var scrim = document.getElementById('atlas-tree-scrim');
+
+    function setTreeOpen(open) {
+      shell.classList.toggle('atlas-shell--tree-open', open);
+      if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    if (toggle) {
+      toggle.addEventListener('click', function () {
+        setTreeOpen(!shell.classList.contains('atlas-shell--tree-open'));
+      });
+    }
+    if (scrim) scrim.addEventListener('click', function () { setTreeOpen(false); });
+
+    var filter = document.getElementById('atlas-tree-filter');
+    if (filter && tree) {
+      var links = Array.prototype.slice.call(tree.querySelectorAll('.atlas-tree-link'));
+      var regions = Array.prototype.slice.call(tree.querySelectorAll('.atlas-tree-region'));
+      var savedOpenStates = null;
+
+      filter.addEventListener('input', _debounce(function () {
+        var query = filter.value.trim().toLowerCase();
+        if (query && savedOpenStates === null) {
+          savedOpenStates = regions.map(function (region) { return region.open; });
+        }
+        links.forEach(function (link) {
+          var haystack = link.getAttribute('data-search') || link.textContent || '';
+          link.hidden = !!query && haystack.toLowerCase().indexOf(query) === -1;
+        });
+        tree.querySelectorAll('.atlas-tree-section').forEach(function (section) {
+          section.hidden = !section.querySelector('.atlas-tree-link:not([hidden])');
+        });
+        tree.querySelectorAll('.atlas-tree-region-block').forEach(function (block) {
+          block.hidden = !block.querySelector('.atlas-tree-link:not([hidden])');
+        });
+        regions.forEach(function (region, index) {
+          var anyVisible = !!region.querySelector('.atlas-tree-link:not([hidden])');
+          region.hidden = !!query && !anyVisible;
+          if (query) {
+            region.open = anyVisible;
+          } else if (savedOpenStates) {
+            region.open = savedOpenStates[index];
+          }
+        });
+        if (!query) savedOpenStates = null;
+      }, 120));
+    }
+
+    var activeLink = tree && tree.querySelector('.atlas-tree-link--active');
+    if (activeLink && activeLink.scrollIntoView) {
+      activeLink.scrollIntoView({ block: 'nearest' });
+    }
+    return { setTreeOpen: setTreeOpen };
+  }
+
   return {
     init: init,
     initSelectorControls: initSelectorControls,
     initOverviewDirectory: initOverviewDirectory,
+    initShell: initShell,
     selectorNavigationTarget: _selectorNavigationTarget,
     exportSVG: exportSVG,
     exportPNG: exportPNG,

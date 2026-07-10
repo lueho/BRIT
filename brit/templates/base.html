@@ -40,7 +40,7 @@
     {% block custom_style %}
     {% endblock custom_style %}
   </head>
-  <body class="sb-nav-fixed">
+  <body class="sb-nav-fixed{% block body_class %}{% endblock body_class %}">
     {% include "partials/_topbar.html" %}
     <div id="layoutSidenav">
       <div id="layoutSidenav_nav">{% include "partials/_sidebar.html" %}</div>

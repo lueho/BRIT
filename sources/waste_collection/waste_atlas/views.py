@@ -13,9 +13,27 @@ from .map_selection import (
     build_related_maps_context,
     resolve_map_set,
 )
-from .pages import MAP_PAGES
+from .pages import MAP_PAGES, MAP_SET_LABELS
 
 WASTE_ATLAS_GROUP_NAME = "waste_atlas"
+
+
+class AtlasShellTreeMixin:
+    """Provide the registry-driven map tree for the atlas app shell."""
+
+    atlas_tree_selected_region = None
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.setdefault("atlas_active_theme", "")
+        if "directory_region_groups" not in ctx:
+            ctx.update(
+                build_overview_directory_context(
+                    reverse,
+                    selected_region=self.atlas_tree_selected_region,
+                )
+            )
+        return ctx
 
 
 def _previous_selection_year(year):
@@ -86,8 +104,21 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
         ctx["map_title"] = page["title"]
         ctx["map_overview_label"] = "Map overview"
         ctx["map_overview_url"] = "waste-atlas-overview"
+        region_label = MAP_SET_LABELS.get(selected_map_set, "")
+        overview_href = reverse("waste-atlas-overview")
+        ctx["atlas_map_set"] = selected_map_set
+        ctx["breadcrumb_module_label"] = "Waste Atlas"
+        ctx["breadcrumb_module_url"] = overview_href
+        if region_label:
+            ctx["breadcrumb_section_label"] = region_label
+            ctx["breadcrumb_section_url"] = f"{overview_href}?region={selected_map_set}"
+        ctx["breadcrumb_object_label"] = page["title"]
         ctx["map_config_key"] = page["config_key"]
         ctx["map_config_overrides"] = page.get("overrides")
+        ctx["atlas_active_theme"] = page["theme"]
+        ctx.update(
+            build_overview_directory_context(reverse, selected_region=selected_map_set)
+        )
         ctx.update(
             build_map_selection_context(
                 reverse,
@@ -154,6 +185,7 @@ class AtlasChangeMapView(AtlasMapView):
         ctx["default_from_year"] = ctx["from_year"]
         ctx["default_to_year"] = ctx["to_year"]
         ctx["map_title"] = f"{self.page['title']} — changes"
+        ctx["breadcrumb_object_label"] = ctx["map_title"]
         ctx["is_change_map"] = True
         ctx["map_toggle_url"] = reverse(self.page["name"])
         ctx["map_toggle_label"] = "View current map"
@@ -179,10 +211,13 @@ class WasteAtlasOverviewView(WasteAtlasGroupMixin, TemplateView):
         )
         ctx["directory_selected_category"] = self.request.GET.get("category", "")
         ctx["directory_query"] = self.request.GET.get("q", "")
+        ctx["atlas_tree_overview_active"] = True
         return ctx
 
 
-class WasteAtlasChangeMapOverviewView(WasteAtlasGroupMixin, TemplateView):
+class WasteAtlasChangeMapOverviewView(
+    WasteAtlasGroupMixin, AtlasShellTreeMixin, TemplateView
+):
     """Overview page for change maps — compare two versions of a waste atlas map."""
 
     template_name = "waste_atlas/change_map_overview.html"
@@ -201,7 +236,9 @@ class WasteAtlasChangeMapOverviewView(WasteAtlasGroupMixin, TemplateView):
         return ctx
 
 
-class WasteAtlasDataConflictsOverviewView(WasteAtlasGroupMixin, TemplateView):
+class WasteAtlasDataConflictsOverviewView(
+    WasteAtlasGroupMixin, AtlasShellTreeMixin, TemplateView
+):
     """Overview page listing maps with the maintainer conflict-overlay aid.
 
     Surfaces every choropleth map whose ``MAP_CONFIGS`` entry opts into the

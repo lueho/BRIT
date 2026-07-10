@@ -24,7 +24,7 @@ THEME_LABELS = {
     "biowaste_min_bin_size": "Biowaste bin size",
     "biowaste_required_bin_capacity": "Biowaste bin capacity",
     "collection_count_ratio": "Collection-count ratio",
-    "collection_orga_level": "Collections: administrative level",
+    "collection_orga_level": "Collections: admin. level",
     "collection_point_count": "Collection points",
     "collection_point_count_ratio": "Collection-point ratio",
     "collection_support": "Collection aids",
@@ -39,7 +39,7 @@ THEME_LABELS = {
     "green_waste_collection_amount": "Green waste amount",
     "green_waste_collection_system_count": "Green waste system count",
     "min_bin_size_ratio": "Minimum bin-size ratio",
-    "orga_level": "Collectors: administrative level",
+    "orga_level": "Collectors: admin. level",
     "organic_collection_amount": "Organic-fraction amount",
     "organic_waste_ratio": "Organic separation rate",
     "paper_bags": "Paper products",
@@ -477,7 +477,7 @@ def build_related_maps_context(selected_map_set, selected_theme, reverse_func):
             continue
         same_region_same_category.append(
             {
-                "label": theme["label"],
+                "label": THEME_LABELS.get(theme_value, theme["label"]),
                 "url": (
                     _url_with_map_set_scope(theme["url"], selected_map_set)
                     if not theme["change_url"]
