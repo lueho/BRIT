@@ -94,11 +94,10 @@
         </div>
         <div class="card-body">
           <ul class="coverage-region-list mb-0">
-            <li>Germany</li>
-            <li>Denmark</li>
             <li>Sweden</li>
-            <li>Flanders + Brussels</li>
-            <li>The Netherlands</li>
+            <li>Nordrhein-Westfalen</li>
+            <li>Rheinland-Pfalz</li>
+            <li>Baden-Württemberg</li>
             <li>South Tyrol</li>
             <li>Catalonia</li>
           </ul>
@@ -118,8 +117,8 @@
       var loadingEl = document.getElementById('loading-overlay');
       var btnSVG = document.getElementById('btn-export-svg');
       var btnPNG = document.getElementById('btn-export-png');
-      var highlightedCountries = new Set(['DE', 'DK', 'SE', 'NL']);
-      var highlightedRegions = new Set(['BE1', 'BE2', 'ES51', 'ITH1']);
+      var highlightedCountries = new Set(['SE']);
+      var highlightedRegions = new Set(['DE1', 'DEA', 'DEB', 'ES51', 'ITH1']);
       var highlightFill = '#6dbb5a';
       var neutralFill = '#eceff3';
       var neutralStroke = '#7a8694';
@@ -386,15 +385,15 @@
 
       Promise.all([
         fetchJson('/maps/api/nuts_region/geojson/?levl_code=0'),
-        fetchJson('/maps/api/nuts_region/geojson/?levl_code=1&cntr_code=BE'),
+        fetchJson('/maps/api/nuts_region/geojson/?levl_code=1&cntr_code=DE'),
         fetchJson('/maps/api/nuts_region/geojson/?levl_code=2&cntr_code=ES'),
         fetchJson('/maps/api/nuts_region/geojson/?levl_code=2&cntr_code=IT')
       ]).then(function (results) {
         var countries = trimFeatureCollectionToExtent(results[0]);
-        var belgiumRegions = trimFeatureCollectionToExtent(results[1]);
+        var germanyRegions = trimFeatureCollectionToExtent(results[1]);
         var spainRegions = trimFeatureCollectionToExtent(results[2]);
         var italyRegions = trimFeatureCollectionToExtent(results[3]);
-        var highlightedRegionFeatures = (belgiumRegions.features || []).concat(spainRegions.features || []).concat(italyRegions.features || [])
+        var highlightedRegionFeatures = (germanyRegions.features || []).concat(spainRegions.features || []).concat(italyRegions.features || [])
           .filter(function (feature) {
             var nutsId = feature.properties && feature.properties.nuts_id;
             return highlightedRegions.has(nutsId);
@@ -459,7 +458,7 @@
           .attr('font-family', "'Nunito', sans-serif")
           .attr('font-size', 13)
           .attr('fill', '#5c6670')
-          .text('Germany, Denmark, Sweden, Flanders + Brussels, the Netherlands, South Tyrol, and Catalonia');
+          .text('Sweden, Nordrhein-Westfalen, Rheinland-Pfalz, Baden-Württemberg, South Tyrol, and Catalonia');
 
         drawLegend(svg, width, height);
         loadingEl.style.display = 'none';
