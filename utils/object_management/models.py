@@ -4,8 +4,9 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.functional import cached_property
 
 from ..models import CRUDUrlsMixin
@@ -214,22 +215,38 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
             models.Index(fields=["publication_status"]),
         ]
 
+    def _lock_and_validate_transition(self, expected_statuses, error_message):
+        current_status = (
+            self.__class__._default_manager.select_for_update()
+            .filter(pk=self.pk)
+            .values_list("publication_status", flat=True)
+            .first()
+        )
+        if current_status not in expected_statuses:
+            raise ValidationError(error_message)
+
     def submit_for_review(self):
         """
         Submit this object for review. Transitions from private to review status.
         Sets submitted_at timestamp and clears approval fields if previously set.
         """
-        if self.publication_status not in (self.STATUS_PRIVATE, self.STATUS_DECLINED):
-            raise ValidationError(
-                "Only private or declined objects can be submitted for review."
+        with transaction.atomic():
+            self._lock_and_validate_transition(
+                (self.STATUS_PRIVATE, self.STATUS_DECLINED),
+                "Only private or declined objects can be submitted for review.",
             )
-        self.publication_status = self.STATUS_REVIEW
-        from django.utils import timezone
-
-        self.submitted_at = timezone.now()
-        self.approved_at = None
-        self.approved_by = None
-        self.save()
+            self.publication_status = self.STATUS_REVIEW
+            self.submitted_at = timezone.now()
+            self.approved_at = None
+            self.approved_by = None
+            self.save(
+                update_fields=[
+                    "publication_status",
+                    "submitted_at",
+                    "approved_at",
+                    "approved_by",
+                ]
+            )
         # TODO: Implement notification to moderators
         return True
 
@@ -238,13 +255,14 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         return self.submit_for_review()
 
     def withdraw_from_review(self):
-        if self.publication_status not in (self.STATUS_REVIEW, self.STATUS_DECLINED):
-            raise ValidationError(
-                "Only objects in review or declined can be withdrawn to private."
+        with transaction.atomic():
+            self._lock_and_validate_transition(
+                (self.STATUS_REVIEW, self.STATUS_DECLINED),
+                "Only objects in review or declined can be withdrawn to private.",
             )
-        self.publication_status = self.STATUS_PRIVATE
-        self.submitted_at = None
-        self.save()
+            self.publication_status = self.STATUS_PRIVATE
+            self.submitted_at = None
+            self.save(update_fields=["publication_status", "submitted_at"])
         # TODO: Implement notification to moderators
 
     def approve(self, user=None):
@@ -252,32 +270,45 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         Approve this object, transitioning from review to published.
         Sets approved_at and approved_by.
         """
-        if self.publication_status != self.STATUS_REVIEW:
-            raise ValidationError("Only objects in review can be approved.")
-        self.publication_status = self.STATUS_PUBLISHED
-        from django.utils import timezone
-
-        self.approved_at = timezone.now()
-        if user is not None:
-            self.approved_by = user
-        self.save()
+        with transaction.atomic():
+            self._lock_and_validate_transition(
+                (self.STATUS_REVIEW,), "Only objects in review can be approved."
+            )
+            self.publication_status = self.STATUS_PUBLISHED
+            self.approved_at = timezone.now()
+            update_fields = ["publication_status", "approved_at"]
+            if user is not None:
+                self.approved_by = user
+                update_fields.append("approved_by")
+            self.save(update_fields=update_fields)
         # TODO: Implement notification to the owner
 
     def reject(self):
-        if self.publication_status != self.STATUS_REVIEW:
-            raise ValidationError("Only objects in review can be rejected.")
-        self.publication_status = self.STATUS_DECLINED
-        self.submitted_at = None
-        self.approved_at = None
-        self.approved_by = None
-        self.save()
+        with transaction.atomic():
+            self._lock_and_validate_transition(
+                (self.STATUS_REVIEW,), "Only objects in review can be rejected."
+            )
+            self.publication_status = self.STATUS_DECLINED
+            self.submitted_at = None
+            self.approved_at = None
+            self.approved_by = None
+            self.save(
+                update_fields=[
+                    "publication_status",
+                    "submitted_at",
+                    "approved_at",
+                    "approved_by",
+                ]
+            )
         # TODO: Implement notification to the owner
 
     def archive(self):
-        if self.publication_status != self.STATUS_PUBLISHED:
-            raise ValidationError("Only published objects can be archived.")
-        self.publication_status = self.STATUS_ARCHIVED
-        self.save()
+        with transaction.atomic():
+            self._lock_and_validate_transition(
+                (self.STATUS_PUBLISHED,), "Only published objects can be archived."
+            )
+            self.publication_status = self.STATUS_ARCHIVED
+            self.save(update_fields=["publication_status"])
         # TODO: Implement notification to the owner
 
     @property

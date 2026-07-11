@@ -391,12 +391,12 @@ class SampleSeriesTestCase(TestCase):
     def test_approve_allows_series_with_samples(self):
         """Test that approve() works when series has samples."""
         series_with_sample = SampleSeries.objects.create(material=self.material1)
-        series_with_sample.publication_status = SampleSeries.STATUS_REVIEW
         Sample.objects.create(
             material=self.material1,
             series=series_with_sample,
             timestep=Timestep.objects.default(),
         )
+        series_with_sample.submit_for_review()
 
         # Should not raise any exception and should approve the series
         try:

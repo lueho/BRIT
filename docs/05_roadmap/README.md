@@ -108,6 +108,7 @@ on it.
    call `save()` without `update_fields`. Implement compare-and-swap transitions
    (`filter(pk, publication_status=expected).update(...)` inside a transaction, or
    `select_for_update`), saving only workflow fields. Add transition tests.
+   **Status:** completed in PR #273.
 2. **Single source of truth for permissions.** Permission logic is spread over
    `permissions.py` (object permission, submit/approve checks, `get_object_policy`),
    view mixins, and viewsets with double `check_object_permissions` calls. Consolidate
@@ -299,7 +300,7 @@ consolidation that pays compounding dividends.
 1. Waste Atlas publication scoping fix + regression test (WS3.1)
 2. CI workflow running the full suite + ruff (WS6.1)
 3. Settings hardening checklist (WS7)
-4. Atomic review-state transitions (WS2.1)
+4. Atomic review-state transitions (WS2.1) — completed in PR #273
 
 **Phase 1 — Foundation inversion (next, ~1 month)**
 5. Object-management hooks; strip waste_collection out of utils (WS1-A)
@@ -352,4 +353,4 @@ decoupling), #87 (soilcom cleanup), #139/#141/#145 (GeoJSON/serialization
 performance & cache warmup), #142 (collector NOT NULL), #143 (normalization bug),
 #106 (legacy unit field).
 
-_Last updated: 2026-06-23_
+_Last updated: 2026-07-11_
