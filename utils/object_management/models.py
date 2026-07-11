@@ -216,22 +216,13 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         ]
 
     def _lock_and_validate_transition(self, expected_statuses, error_message):
-        current_state = (
+        current_status = (
             self.__class__._default_manager.select_for_update()
             .filter(pk=self.pk)
-            .values_list("publication_status", "lastmodified_at")
+            .values_list("publication_status", flat=True)
             .first()
         )
-        if current_state is None:
-            raise ValidationError(error_message)
-
-        current_status, current_lastmodified_at = current_state
-        has_current_status = current_status in expected_statuses
-        has_unsaved_status = (
-            self.publication_status in expected_statuses
-            and self.lastmodified_at == current_lastmodified_at
-        )
-        if not has_current_status and not has_unsaved_status:
+        if current_status not in expected_statuses:
             raise ValidationError(error_message)
 
     def submit_for_review(self):

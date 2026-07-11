@@ -138,6 +138,25 @@ class ReviewWorkflowModelTests(TestCase):
             self.collection.publication_status, UserCreatedObject.STATUS_PRIVATE
         )
 
+    def test_stale_review_object_cannot_bypass_a_direct_status_change(self):
+        self.collection.publication_status = UserCreatedObject.STATUS_REVIEW
+        self.collection.save()
+        stale_collection = Collection.objects.get(pk=self.collection.pk)
+
+        Collection.objects.filter(pk=self.collection.pk).update(
+            publication_status=UserCreatedObject.STATUS_PRIVATE
+        )
+
+        with self.assertRaisesMessage(
+            ValidationError, "Only objects in review can be approved."
+        ):
+            stale_collection.approve(user=self.moderator)
+
+        self.collection.refresh_from_db()
+        self.assertEqual(
+            self.collection.publication_status, UserCreatedObject.STATUS_PRIVATE
+        )
+
     def test_submit_for_review_preserves_a_concurrent_content_edit(self):
         stale_collection = Collection.objects.get(pk=self.collection.pk)
         Collection.objects.filter(pk=self.collection.pk).update(
