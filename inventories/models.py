@@ -750,8 +750,7 @@ def manage_scenario_status(sender, instance, created, **kwargs):
     if created:
         ScenarioStatus.objects.create(scenario=instance)
     else:
-        instance.scenariostatus.status = ScenarioStatus.Status.CHANGED
-        instance.scenariostatus.save()
+        instance.set_status(ScenarioStatus.Status.CHANGED)
 
 
 class ScenarioInventoryConfiguration(models.Model):
@@ -804,10 +803,8 @@ def _mark_referencing_scenarios_changed(model_class, instance):
         .values_list("scenario_id", flat=True)
         .distinct()
     )
-    for scenario_status in ScenarioStatus.objects.filter(scenario_id__in=scenario_ids):
-        if scenario_status.status != ScenarioStatus.Status.CHANGED:
-            scenario_status.status = ScenarioStatus.Status.CHANGED
-            scenario_status.save()
+    for scenario in Scenario.objects.filter(id__in=scenario_ids):
+        scenario.set_status(ScenarioStatus.Status.CHANGED)
 
 
 @receiver(post_save, sender=InventoryAlgorithm)

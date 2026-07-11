@@ -56,6 +56,25 @@ class ScenarioTestCase(TestCase):
     def setUp(self):
         self.scenario.refresh_from_db()
 
+    def set_failed_status(self, algorithm):
+        scenario_status = self.scenario.scenariostatus
+        scenario_status.status = ScenarioStatus.Status.FAILED
+        scenario_status.failed_algorithm = algorithm
+        scenario_status.failure_message = "calculation failed"
+        scenario_status.save()
+
+    def test_scenario_edit_clears_failure_metadata(self):
+        algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
+        self.set_failed_status(algorithm)
+
+        self.scenario.name = "Updated Scenario"
+        self.scenario.save()
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
+        self.assertIsNone(self.scenario.scenariostatus.failed_algorithm)
+        self.assertEqual(self.scenario.scenariostatus.failure_message, "")
+
     def test_available_geodatasets_with_single_feedstock(self):
         feedstock = Material.objects.get(name="Feedstock 1")
         geodatasets = self.scenario.available_geodatasets(feedstock=feedstock)
@@ -454,6 +473,7 @@ class ScenarioTestCase(TestCase):
         # Creating the config set status to CHANGED; set it to FINISHED
         self.scenario.set_status(ScenarioStatus.Status.FINISHED)
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.FINISHED)
+        self.set_failed_status(algorithm)
 
         # Modify the referenced parameter value
         value.value = 2.0
@@ -462,6 +482,8 @@ class ScenarioTestCase(TestCase):
         # Scenario status should now be CHANGED
         self.scenario.scenariostatus.refresh_from_db()
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
+        self.assertIsNone(self.scenario.scenariostatus.failed_algorithm)
+        self.assertEqual(self.scenario.scenariostatus.failure_message, "")
 
     def test_scenario_status_updates_when_referenced_algorithm_changes(self):
         """#212: Changing a referenced InventoryAlgorithm must mark all
@@ -480,6 +502,7 @@ class ScenarioTestCase(TestCase):
         )
         self.scenario.set_status(ScenarioStatus.Status.FINISHED)
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.FINISHED)
+        self.set_failed_status(algorithm)
 
         # Modify the referenced algorithm
         algorithm.name = "Updated Algorithm"
@@ -487,6 +510,8 @@ class ScenarioTestCase(TestCase):
 
         self.scenario.scenariostatus.refresh_from_db()
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
+        self.assertIsNone(self.scenario.scenariostatus.failed_algorithm)
+        self.assertEqual(self.scenario.scenariostatus.failure_message, "")
 
     @patch("inventories.models.AsyncResult")
     def test_running_scenario_save_stays_blocked_while_task_is_active(
