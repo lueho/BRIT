@@ -232,23 +232,25 @@ Duplication is concentrated in three patterns; fix the pattern in L0 once, then 
 
 Consolidated hardening (single issue with checklist; see appendix):
 
-- `SECRET_KEY` falls back to `get_random_secret_key()` per process — sessions/CSRF
-  break on every restart if the env var is missing; fail hard in production instead.
-- Celery↔Redis uses `ssl.CERT_NONE`; require verification in production.
-- Cache `IGNORE_EXCEPTIONS=True` hides Redis outages — keep for availability but add
-  logging/metrics (`django_redis` logger) so failures are visible.
-- `EMAIL_USE_SSL` is read as a raw string; `ADMINS` can become `[(None, None)]`.
+- Production must fail hard when `SECRET_KEY` is missing instead of inheriting the
+  development fallback.
+- Celery↔Redis certificate verification is addressed in PR #276.
+- Cache `IGNORE_EXCEPTIONS=True` remains for availability while PR #277 adds
+  production `django_redis` error logging.
+- Typed `EMAIL_USE_SSL` parsing and valid-only `ADMINS` configuration are addressed
+  in PR #275.
 - No CSP; templates rely on inline JS and several `|safe` usages
-  (`utils/templates/bootstrap5/formset_base.html` etc.). Adopt django-csp in
-  report-only mode, then enforce after the asset pipeline emits nonces.
+  (`utils/templates/bootstrap5/formset_base.html` etc.). Start with Django's built-in
+  report-only CSP, then enforce after the asset pipeline emits nonces.
 - Error monitoring (Sentry or equivalent) for web + Celery; currently only
   console/mail_admins logging in production.
 - Add `.env.example`; document required vs optional variables.
 - `brit/urls.py` catch-all `path("<str:short_code>/", DynamicRedirectView...)`
   swallows arbitrary root paths — audit interaction with 404 handling and bots.
 
-**Status:** active; implementation is split into focused safety changes, starting
-with typed `EMAIL_USE_SSL` parsing and valid-only `ADMINS` configuration.
+**Status:** active; environment parsing (#275), production Redis TLS verification
+(#276), and ignored-cache-error logging (#277) are in review. The next slice is a
+report-only CSP baseline.
 
 ### WS8 — Inventories/scenario subsystem: decide, then act
 
@@ -306,7 +308,8 @@ consolidation that pays compounding dividends.
 **Phase 0 — Safety (immediately, days)**
 1. Waste Atlas publication scoping fix + regression test (WS3.1) — completed in PR #260
 2. CI workflow running the full suite + ruff (WS6.1) — completed in commit `f9b34b09`
-3. Settings hardening checklist (WS7) — next active safety track (#166)
+3. Settings hardening checklist (WS7) — active; PRs #275–#277 are in review and CSP
+   is the next slice (#166)
 4. Atomic review-state transitions (WS2.1) — completed in PR #273
 
 **Phase 1 — Foundation inversion (next, ~1 month)**
@@ -343,7 +346,7 @@ New issues from this review (created 2026-06-09):
 | #163 | Waste Atlas publication scoping (security) — completed in PR #260 | WS3.1 |
 | #164 | Atomic review-state transitions — completed in PR #273 | WS2.1 |
 | #165 | CI test workflow — completed in commit `f9b34b09` | WS6.1 |
-| #166 | Settings hardening checklist | WS7 |
+| #166 | Settings hardening checklist — active in PRs #275–#277; CSP next | WS7 |
 | #167 | Region-attribute cache invalidation | WS5.4 |
 | #168 | waste_collection DB indexes | WS5.2 |
 | #169 | Collection detail N+1 queries | WS5.1 |
