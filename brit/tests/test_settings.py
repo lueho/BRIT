@@ -1,3 +1,4 @@
+import os
 import ssl
 import subprocess
 import sys
@@ -10,6 +11,48 @@ from brit.settings.settings import (
     _redis_connection_pool_kwargs,
     _redis_ssl_settings,
 )
+
+
+class EnvironmentSettingsTests(SimpleTestCase):
+    def run_settings_assertions(self, environment, assertions):
+        return subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                f"import brit.settings.settings as s; {assertions}",
+            ],
+            capture_output=True,
+            check=False,
+            env=environment,
+            text=True,
+        )
+
+    def test_false_email_ssl_and_missing_admins_are_typed_safely(self):
+        environment = os.environ.copy()
+        environment["EMAIL_USE_SSL"] = "false"
+        environment.pop("ADMIN_NAME", None)
+        environment.pop("ADMIN_EMAIL", None)
+        completed = self.run_settings_assertions(
+            environment,
+            "assert s.EMAIL_USE_SSL is False; assert s.ADMINS == []",
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_true_email_ssl_and_complete_admin_are_preserved(self):
+        environment = os.environ.copy()
+        environment["EMAIL_USE_SSL"] = "true"
+        environment["ADMIN_NAME"] = "BRIT operations"
+        environment["ADMIN_EMAIL"] = "operations@example.com"
+        completed = self.run_settings_assertions(
+            environment,
+            (
+                "assert s.EMAIL_USE_SSL is True; "
+                "assert s.ADMINS == [('BRIT operations', 'operations@example.com')]"
+            ),
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
 
 
 class RedisSettingsTests(SimpleTestCase):
