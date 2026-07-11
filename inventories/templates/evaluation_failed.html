@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Inventories | {{ scenario.name }}
+{% endblock title %}
+
+{% block content %}
+    <div class="alert alert-danger" role="alert">
+        <h2 class="alert-heading">The evaluation failed.</h2>
+        {% if scenario.scenariostatus.failed_algorithm %}
+            <p>Failed algorithm: {{ scenario.scenariostatus.failed_algorithm }}</p>
+        {% endif %}
+        <p class="mb-0">Return to the scenario to review its settings and retry the evaluation.</p>
+    </div>
+    <a class="btn btn-primary"
+       href="{% url "scenario-detail" scenario.id %}">Return to scenario</a>
+{% endblock content %}

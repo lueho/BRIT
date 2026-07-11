@@ -292,12 +292,20 @@ class ScenarioStatus(models.Model):
         CHANGED = 1
         RUNNING = 2
         FINISHED = 3
+        FAILED = 4
 
     class Meta:
         verbose_name_plural = "scenario statuses"
 
     scenario = models.OneToOneField("Scenario", on_delete=models.CASCADE, null=True)
     status = models.IntegerField(choices=Status.choices, default=Status.CHANGED)
+    failed_algorithm = models.ForeignKey(
+        InventoryAlgorithm,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+    )
+    failure_message = models.TextField(blank=True)
 
     def __str__(self):
         return f"Status of Scenario {self.scenario}: {self.status}"
@@ -319,16 +327,18 @@ class Scenario(NamedUserCreatedObject):
         return ScenarioStatus.Status(self.scenariostatus.status)
 
     @status.setter
-    def status(
-        self, status: ScenarioStatus.Status
-    ):  # TODO: It might be confusing that is saves. Remove?
-        self.scenariostatus.status = status
-        self.scenariostatus.save()
+    def status(self, status: ScenarioStatus.Status):
+        self.set_status(status)
 
     def set_status(self, status):
         if isinstance(status, ScenarioStatus.Status):
             self.scenariostatus.status = status
-            self.scenariostatus.save()
+            update_fields = ["status"]
+            if status != ScenarioStatus.Status.FAILED:
+                self.scenariostatus.failed_algorithm = None
+                self.scenariostatus.failure_message = ""
+                update_fields.extend(["failed_algorithm", "failure_message"])
+            self.scenariostatus.save(update_fields=update_fields)
 
     def available_feedstocks(self):
         """
@@ -701,27 +711,34 @@ def block_running_scenario(sender, instance, **kwargs):
     if instance.pk is None:
         return
 
-    scenario_status = ScenarioStatus.objects.filter(scenario_id=instance.pk).first()
-    if scenario_status is None:
-        return
+    with transaction.atomic():
+        scenario_status = (
+            ScenarioStatus.objects.select_for_update()
+            .filter(scenario_id=instance.pk)
+            .first()
+        )
+        if scenario_status is None:
+            return
 
-    if scenario_status.status != ScenarioStatus.Status.RUNNING:
-        return
+        if scenario_status.status != ScenarioStatus.Status.RUNNING:
+            return
 
-    running_tasks = list(RunningTask.objects.filter(scenario_id=instance.pk))
-    if not running_tasks:
-        raise BlockedRunningScenario
-
-    stale_task_ids = []
-    for task in running_tasks:
-        if AsyncResult(str(task.uuid)).state not in READY_STATES:
+        running_tasks = list(
+            RunningTask.objects.select_for_update().filter(scenario_id=instance.pk)
+        )
+        if not running_tasks:
             raise BlockedRunningScenario
-        stale_task_ids.append(task.id)
 
-    if stale_task_ids:
-        RunningTask.objects.filter(id__in=stale_task_ids).delete()
-    scenario_status.status = ScenarioStatus.Status.CHANGED
-    scenario_status.save()
+        stale_task_ids = []
+        for task in running_tasks:
+            if AsyncResult(str(task.uuid)).state not in READY_STATES:
+                raise BlockedRunningScenario
+            stale_task_ids.append(task.id)
+
+        if stale_task_ids:
+            RunningTask.objects.filter(id__in=stale_task_ids).delete()
+        scenario_status.status = ScenarioStatus.Status.CHANGED
+        scenario_status.save(update_fields=["status"])
 
 
 @receiver(post_save, sender=Scenario)

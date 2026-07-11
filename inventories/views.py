@@ -511,7 +511,7 @@ class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
         scenario = self.object
-        if scenario.status == 2:
+        if scenario.status == ScenarioStatus.Status.RUNNING:
             context = {"scenario": scenario, "task_list": {"tasks": []}}
             for task in RunningTask.objects.filter(scenario=scenario):
                 context["task_list"]["tasks"].append(
@@ -522,9 +522,14 @@ class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
                 )
 
             return render(request, "evaluation_progress.html", context)
-        else:
-            context = self.get_context_data()
-            return self.render_to_response(context)
+        if scenario.status == ScenarioStatus.Status.FAILED:
+            return render(
+                request,
+                "evaluation_failed.html",
+                {"scenario": scenario},
+            )
+        context = self.get_context_data()
+        return self.render_to_response(context)
 
 
 class ScenarioEvaluationProgressView(DetailView):

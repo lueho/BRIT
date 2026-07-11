@@ -31,6 +31,19 @@
                     Show results
                 </a>
             </div>
+        {% elif object.status == 4 %}
+            <p>The evaluation failed.</p>
+            {% if object.scenariostatus.failed_algorithm %}
+                <p>Failed algorithm: {{ object.scenariostatus.failed_algorithm }}</p>
+            {% endif %}
+            <div class="text-center">
+                <form method="post">
+                    {% csrf_token %}
+                    <button type="submit" name="run" class="btn btn-primary">
+                        Retry evaluation
+                    </button>
+                </form>
+            </div>
         {% endif %}
     </div>
     <div class="card-footer"></div>

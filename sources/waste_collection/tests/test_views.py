@@ -4393,7 +4393,10 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, 'id="atlas-region-tabs"')
 
     def test_change_map_overview_and_conflicts_render_shell_tree(self):
-        for route in ("waste-atlas-change-map-overview", "waste-atlas-data-conflicts-overview"):
+        for route in (
+            "waste-atlas-change-map-overview",
+            "waste-atlas-data-conflicts-overview",
+        ):
             with self.subTest(route=route):
                 response = self.client.get(reverse(route))
                 self.assertEqual(response.status_code, 200)
@@ -4546,9 +4549,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "Map overview")
 
     def test_detail_page_actions_live_in_hero_actions(self):
-        response = self.client.get(
-            reverse("waste-atlas-germany-collection-system-map")
-        )
+        response = self.client.get(reverse("waste-atlas-germany-collection-system-map"))
         self.assertEqual(response.status_code, 200)
         # The map navigation actions share one context-header row (and the
         # Feedback link sits in the shared shell toolbar) so the buttons sit in
