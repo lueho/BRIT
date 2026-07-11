@@ -1,3 +1,4 @@
+import os
 import ssl
 import subprocess
 import sys
@@ -51,3 +52,28 @@ class RedisSettingsTests(SimpleTestCase):
             _redis_ssl_settings("rediss://localhost:6379/0"),
             {"ssl_cert_reqs": ssl.CERT_NONE},
         )
+
+
+class ProductionRedisSettingsTests(SimpleTestCase):
+    def test_tls_redis_requires_certificate_verification(self):
+        environment = os.environ.copy()
+        environment["REDIS_URL"] = "rediss://localhost:6379/0"
+        environment["SECRET_KEY"] = "test-secret-key"
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "import ssl; import brit.settings.heroku as h; "
+                    "expected = {'ssl_cert_reqs': ssl.CERT_REQUIRED}; "
+                    "assert h.CELERY_BROKER_USE_SSL == expected; "
+                    "assert h.CELERY_REDIS_BACKEND_USE_SSL == expected"
+                ),
+            ],
+            capture_output=True,
+            check=False,
+            env=environment,
+            text=True,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
