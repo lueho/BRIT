@@ -2,6 +2,7 @@ import datetime
 
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
@@ -119,6 +120,37 @@ class ReviewWorkflowModelTests(TestCase):
             self.collection.publication_status, UserCreatedObject.STATUS_PRIVATE
         )
         self.assertIsNone(self.collection.submitted_at)
+
+    def test_stale_review_object_cannot_overwrite_a_concurrent_withdrawal(self):
+        self.collection.submit_for_review()
+        stale_collection = Collection.objects.get(pk=self.collection.pk)
+
+        concurrent_collection = Collection.objects.get(pk=self.collection.pk)
+        concurrent_collection.withdraw_from_review()
+
+        with self.assertRaisesMessage(
+            ValidationError, "Only objects in review can be approved."
+        ):
+            stale_collection.approve(user=self.moderator)
+
+        self.collection.refresh_from_db()
+        self.assertEqual(
+            self.collection.publication_status, UserCreatedObject.STATUS_PRIVATE
+        )
+
+    def test_submit_for_review_preserves_a_concurrent_content_edit(self):
+        stale_collection = Collection.objects.get(pk=self.collection.pk)
+        Collection.objects.filter(pk=self.collection.pk).update(
+            description="Concurrent edit"
+        )
+
+        stale_collection.submit_for_review()
+
+        self.collection.refresh_from_db()
+        self.assertEqual(self.collection.description, "Concurrent edit")
+        self.assertEqual(
+            self.collection.publication_status, UserCreatedObject.STATUS_REVIEW
+        )
 
     def test_has_review_feedback_only_reflects_current_submission_cycle(self):
         self.assertFalse(self.collection.has_review_feedback)
