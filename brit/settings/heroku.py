@@ -1,4 +1,5 @@
 import dj_database_url
+from django.utils.csp import CSP
 
 from .settings import *
 
@@ -18,9 +19,18 @@ SECURE_HSTS_SECONDS = 31536000  # 1 year
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 
+MIDDLEWARE.insert(1, "django.middleware.csp.ContentSecurityPolicyMiddleware")
+
 # Add middleware for emails with logs about unhandled exceptions
 # This middleware is added only in production because it triggers too many logging events during testing in development.
 MIDDLEWARE.append("brit.middleware.ExceptionLoggingMiddleware")
+
+SECURE_CSP_REPORT_ONLY = {
+    "default-src": [CSP.SELF],
+    "base-uri": [CSP.SELF],
+    "frame-ancestors": [CSP.SELF],
+    "object-src": [CSP.NONE],
+}
 
 # Database configuration
 DATABASES["default"] = dj_database_url.config(conn_max_age=600, ssl_require=True)
