@@ -3,7 +3,9 @@ from unittest.mock import Mock, patch
 from uuid import uuid4
 
 from django.apps import apps
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 
 from distributions.models import TemporalDistribution, Timestep
 from layer_manager.models import Layer, LayerAggregatedDistribution
@@ -33,6 +35,9 @@ class ModelLabelMetadataTestCase(TestCase):
     def test_scenario_status_plural_label_is_explicit(self):
         self.assertEqual(ScenarioStatus._meta.verbose_name_plural, "scenario statuses")
 
+    def test_scenario_status_includes_failed_state(self):
+        self.assertEqual(ScenarioStatus.Status.FAILED.label, "Failed")
+
 
 class ScenarioTestCase(TestCase):
     @classmethod
@@ -50,6 +55,25 @@ class ScenarioTestCase(TestCase):
 
     def setUp(self):
         self.scenario.refresh_from_db()
+
+    def set_failed_status(self, algorithm):
+        scenario_status = self.scenario.scenariostatus
+        scenario_status.status = ScenarioStatus.Status.FAILED
+        scenario_status.failed_algorithm = algorithm
+        scenario_status.failure_message = "calculation failed"
+        scenario_status.save()
+
+    def test_scenario_edit_clears_failure_metadata(self):
+        algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
+        self.set_failed_status(algorithm)
+
+        self.scenario.name = "Updated Scenario"
+        self.scenario.save()
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
+        self.assertIsNone(self.scenario.scenariostatus.failed_algorithm)
+        self.assertEqual(self.scenario.scenariostatus.failure_message, "")
 
     def test_available_geodatasets_with_single_feedstock(self):
         feedstock = Material.objects.get(name="Feedstock 1")
@@ -449,6 +473,7 @@ class ScenarioTestCase(TestCase):
         # Creating the config set status to CHANGED; set it to FINISHED
         self.scenario.set_status(ScenarioStatus.Status.FINISHED)
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.FINISHED)
+        self.set_failed_status(algorithm)
 
         # Modify the referenced parameter value
         value.value = 2.0
@@ -457,6 +482,8 @@ class ScenarioTestCase(TestCase):
         # Scenario status should now be CHANGED
         self.scenario.scenariostatus.refresh_from_db()
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
+        self.assertIsNone(self.scenario.scenariostatus.failed_algorithm)
+        self.assertEqual(self.scenario.scenariostatus.failure_message, "")
 
     def test_scenario_status_updates_when_referenced_algorithm_changes(self):
         """#212: Changing a referenced InventoryAlgorithm must mark all
@@ -475,6 +502,7 @@ class ScenarioTestCase(TestCase):
         )
         self.scenario.set_status(ScenarioStatus.Status.FINISHED)
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.FINISHED)
+        self.set_failed_status(algorithm)
 
         # Modify the referenced algorithm
         algorithm.name = "Updated Algorithm"
@@ -482,6 +510,8 @@ class ScenarioTestCase(TestCase):
 
         self.scenario.scenariostatus.refresh_from_db()
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
+        self.assertIsNone(self.scenario.scenariostatus.failed_algorithm)
+        self.assertEqual(self.scenario.scenariostatus.failure_message, "")
 
     @patch("inventories.models.AsyncResult")
     def test_running_scenario_save_stays_blocked_while_task_is_active(
@@ -494,6 +524,29 @@ class ScenarioTestCase(TestCase):
 
         with self.assertRaises(BlockedRunningScenario):
             self.scenario.save()
+
+    @patch("inventories.models.AsyncResult")
+    def test_running_scenario_guard_locks_status_and_tasks(self, mock_async_result):
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        RunningTask.objects.create(scenario=self.scenario, uuid=uuid4())
+        mock_async_result.return_value.state = "STARTED"
+        self.scenario.name = "Updated While Running"
+
+        with CaptureQueriesContext(connection) as queries:
+            with self.assertRaises(BlockedRunningScenario):
+                self.scenario.save()
+
+        locking_queries = [
+            query["sql"]
+            for query in queries.captured_queries
+            if "FOR UPDATE" in query["sql"]
+        ]
+        self.assertTrue(
+            any("inventories_scenariostatus" in query for query in locking_queries)
+        )
+        self.assertTrue(
+            any("inventories_runningtask" in query for query in locking_queries)
+        )
 
     @patch("inventories.models.AsyncResult")
     def test_running_scenario_save_recovers_after_failed_tasks(self, mock_async_result):

@@ -87,6 +87,26 @@ class ScenarioCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         self.assertEqual(scenario.status, ScenarioStatus.Status.CHANGED)
         self.assertFalse(RunningTask.objects.filter(scenario=scenario).exists())
 
+    def test_detail_view_offers_retry_after_failed_evaluation(self):
+        self.client.force_login(self.owner_user)
+        scenario = self.unpublished_object
+        scenario.set_status(ScenarioStatus.Status.FAILED)
+
+        response = self.client.get(self.get_detail_url(scenario.pk))
+
+        self.assertContains(response, "The evaluation failed.")
+        self.assertContains(response, "Retry evaluation")
+
+    def test_result_view_shows_failed_evaluation(self):
+        self.client.force_login(self.owner_user)
+        scenario = self.unpublished_object
+        scenario.set_status(ScenarioStatus.Status.FAILED)
+
+        response = self.client.get(reverse("scenario-result", args=[scenario.pk]))
+
+        self.assertContains(response, "The evaluation failed.")
+        self.assertContains(response, "Return to scenario")
+
 
 class InventoryAutocompleteInheritanceRegressionTests(SimpleTestCase):
     """Regression tests for tomselect subclass attribute inheritance."""
