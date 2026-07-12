@@ -173,9 +173,9 @@ def _redis_connection_pool_kwargs(redis_url):
     return {}
 
 
-def _redis_ssl_settings(redis_url):
+def _redis_ssl_settings(redis_url, certificate_requirement=ssl.CERT_NONE):
     if redis_url and urlparse(redis_url).scheme == "rediss":
-        return {"ssl_cert_reqs": ssl.CERT_NONE}
+        return {"ssl_cert_reqs": certificate_requirement}
     return None
 
 
@@ -269,11 +269,18 @@ EMAIL_HOST = os.environ.get("EMAIL_HOST")
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
 EMAIL_PORT = os.environ.get("EMAIL_PORT")
-EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL")
+EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "false").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL")
 SERVER_EMAIL = os.environ.get("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
 
-ADMINS = [(os.environ.get("ADMIN_NAME"), os.environ.get("ADMIN_EMAIL"))]
+_admin_name = os.environ.get("ADMIN_NAME")
+_admin_email = os.environ.get("ADMIN_EMAIL")
+ADMINS = [(_admin_name, _admin_email)] if _admin_name and _admin_email else []
 
 # Additional packages settings
 GOOGLE_ANALYTICS_KEY = os.environ.get("GOOGLE_ANALYTICS_KEY")
