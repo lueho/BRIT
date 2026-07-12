@@ -249,10 +249,6 @@ Consolidated hardening (single issue with checklist; see appendix):
 **Status:** active; PRs #275–#279 are in review. The next slice makes production
 fail fast when `SECRET_KEY` is missing.
 
-**Status:** active; environment parsing (#275), production Redis TLS verification
-(#276), and ignored-cache-error logging (#277) are in review. The next slice is a
-report-only CSP baseline.
-
 ### WS8 — Inventories/scenario subsystem: decide, then act
 
 The FLEXIBI-era scenario machinery (`inventories` + `layer_manager`) is functional but
