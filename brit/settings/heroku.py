@@ -1,6 +1,7 @@
 import ssl
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 import sentry_sdk
 from django.utils.csp import CSP
 from sentry_sdk.integrations.celery import CeleryIntegration
@@ -22,6 +23,9 @@ if SENTRY_DSN:
     )
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    raise ImproperlyConfigured("SECRET_KEY must be set in production.")
+
 ALLOWED_HOSTS = list(os.environ.get("ALLOWED_HOSTS", "").split(","))
 CELERY_BROKER_USE_SSL = _redis_ssl_settings(REDIS_URL, ssl.CERT_REQUIRED)
 CELERY_REDIS_BACKEND_USE_SSL = _redis_ssl_settings(REDIS_URL, ssl.CERT_REQUIRED)
