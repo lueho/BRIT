@@ -1,6 +1,9 @@
+import ssl
+
 import dj_database_url
 
 from .settings import *
+from .settings import _redis_ssl_settings
 
 SITE_ID = 2
 
@@ -8,6 +11,8 @@ DEBUG = False
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 ALLOWED_HOSTS = list(os.environ.get("ALLOWED_HOSTS", "").split(","))
+CELERY_BROKER_USE_SSL = _redis_ssl_settings(REDIS_URL, ssl.CERT_REQUIRED)
+CELERY_REDIS_BACKEND_USE_SSL = _redis_ssl_settings(REDIS_URL, ssl.CERT_REQUIRED)
 
 # Security settings
 SECURE_SSL_REDIRECT = True

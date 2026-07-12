@@ -173,9 +173,9 @@ def _redis_connection_pool_kwargs(redis_url):
     return {}
 
 
-def _redis_ssl_settings(redis_url):
+def _redis_ssl_settings(redis_url, certificate_requirement=ssl.CERT_NONE):
     if redis_url and urlparse(redis_url).scheme == "rediss":
-        return {"ssl_cert_reqs": ssl.CERT_NONE}
+        return {"ssl_cert_reqs": certificate_requirement}
     return None
 
 
