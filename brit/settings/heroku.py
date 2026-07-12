@@ -1,7 +1,10 @@
 import ssl
 
 import dj_database_url
+import sentry_sdk
 from django.utils.csp import CSP
+from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.integrations.django import DjangoIntegration
 
 from .settings import *
 from .settings import _redis_ssl_settings
@@ -9,6 +12,14 @@ from .settings import _redis_ssl_settings
 SITE_ID = 2
 
 DEBUG = False
+
+SENTRY_DSN = os.environ.get("SENTRY_DSN")
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration(), CeleryIntegration()],
+        send_default_pii=False,
+    )
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 ALLOWED_HOSTS = list(os.environ.get("ALLOWED_HOSTS", "").split(","))
