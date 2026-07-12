@@ -1,8 +1,8 @@
 import ssl
 
 import dj_database_url
-from django.core.exceptions import ImproperlyConfigured
 import sentry_sdk
+from django.core.exceptions import ImproperlyConfigured
 from django.utils.csp import CSP
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
