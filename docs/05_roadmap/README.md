@@ -95,8 +95,8 @@ The single most important arc. Sub-items in implementation order:
    **Status:** completed in PR #196.
 6. **F. Enforcement.** Add import-linter (or a dedicated test) encoding the table in
    §1, run in CI. From then on the layering is a build invariant, not a convention.
-   **Status:** in progress in the next focused PR after #196, starting with a scoped
-   dedicated test for resolved boundaries and documented short-term exceptions.
+   **Status:** completed in PR #199 with a scoped dedicated test for resolved
+   boundaries and documented short-term exceptions, running in CI.
 
 ### WS2 — Harden the user-created object lifecycle (utils.object_management)
 
@@ -137,6 +137,7 @@ The atlas is the largest product surface and the largest concentration of duplic
    Add a single scoped queryset helper (`published_collections()`) and use it
    everywhere; add a regression test that creates a private collection and asserts it
    never appears. (GitHub issue created — see appendix.)
+   **Status:** completed in PR #260.
 2. **Config as data, not code.** `map_configs.py` (1,309 lines), `urls.py` (1,121
    lines, ~190 imports) and 48 near-identical viewsets encode what is really a table:
    *(metric, waste-category variant, country scope) → endpoint + legend*. Introduce a
@@ -213,6 +214,8 @@ Duplication is concentrated in three patterns; fix the pattern in L0 once, then 
    only the asset check — nothing runs the suite. Add a workflow: PostGIS + Redis
    services, `manage.py test --parallel`, ruff check, djlint. This precedes all
    refactors above; nothing else in this roadmap is safe without it.
+   **Status:** completed in commit `f9b34b09`; CI now gates deployment on lint,
+   migration, and parallel test jobs.
 2. **Layering check** (from WS1-F) in the same workflow.
 3. **Decouple utils tests from domain apps.** utils/object_management tests import
    waste_collection/bibliography/maps models as fixtures. Create a minimal concrete
@@ -229,29 +232,32 @@ Duplication is concentrated in three patterns; fix the pattern in L0 once, then 
 
 Consolidated hardening (single issue with checklist; see appendix):
 
-- `SECRET_KEY` falls back to `get_random_secret_key()` per process — sessions/CSRF
-  break on every restart if the env var is missing; fail hard in production instead.
-- Celery↔Redis uses `ssl.CERT_NONE`; require verification in production.
-- Cache `IGNORE_EXCEPTIONS=True` hides Redis outages — keep for availability but add
-  logging/metrics (`django_redis` logger) so failures are visible.
-- `EMAIL_USE_SSL` is read as a raw string; `ADMINS` can become `[(None, None)]`.
-- No CSP; templates rely on inline JS and several `|safe` usages
-  (`utils/templates/bootstrap5/formset_base.html` etc.). Adopt django-csp in
-  report-only mode, then enforce after the asset pipeline emits nonces.
-- Error monitoring (Sentry or equivalent) for web + Celery; currently only
-  console/mail_admins logging in production.
+- Production must fail hard when `SECRET_KEY` is missing instead of inheriting the
+  development fallback.
+- Celery↔Redis certificate verification is addressed in PR #276.
+- Cache `IGNORE_EXCEPTIONS=True` remains for availability while PR #277 adds
+  production `django_redis` error logging.
+- Typed `EMAIL_USE_SSL` parsing and valid-only `ADMINS` configuration are addressed
+  in PR #275.
+- PR #278 adds Django's built-in report-only CSP baseline. Enforce CSP after the
+  asset pipeline emits nonces for the remaining inline scripts and styles.
+- Optional Sentry monitoring for Django and Celery is addressed in PR #279.
 - Add `.env.example`; document required vs optional variables.
 - `brit/urls.py` catch-all `path("<str:short_code>/", DynamicRedirectView...)`
   swallows arbitrary root paths — audit interaction with 404 handling and bots.
+
+**Status:** active; PRs #275–#279 are in review. The next slice makes production
+fail fast when `SECRET_KEY` is missing.
 
 ### WS8 — Inventories/scenario subsystem: decide, then act
 
 The FLEXIBI-era scenario machinery (`inventories` + `layer_manager`) is functional but
 carries the oldest debt: string/dotted-path dispatch from the DB, dynamic table
 creation via `schema_editor` and app-registry mutation
-(`layer_manager/models.py:195-264`), missing FAILED state (scenarios stuck in RUNNING
-when a chord fails, `inventories/tasks.py:54-62`), commented-out methods, and 10+
-design TODOs in models.
+(`layer_manager/models.py:195-264`), commented-out methods, and 10+ design TODOs in
+models. PR #274 added durable FAILED-state recovery, task cleanup, retry behavior, and
+locking for the running-scenario guard; the strategic modernization-versus-containment
+decision remains.
 
 **Decision to make this quarter:** is scenario modeling a strategic feature?
 - If **yes**: execute the modernization — merge layer_manager into inventories (fixes
@@ -297,17 +303,18 @@ Order matters: safety first, then the inversion that everything else builds on, 
 consolidation that pays compounding dividends.
 
 **Phase 0 — Safety (immediately, days)**
-1. Waste Atlas publication scoping fix + regression test (WS3.1)
-2. CI workflow running the full suite + ruff (WS6.1)
-3. Settings hardening checklist (WS7)
+1. Waste Atlas publication scoping fix + regression test (WS3.1) — completed in PR #260
+2. CI workflow running the full suite + ruff (WS6.1) — completed in commit `f9b34b09`
+3. Settings hardening checklist (WS7) — active; PRs #275–#279 are in review and
+   production `SECRET_KEY` validation is the next slice (#166)
 4. Atomic review-state transitions (WS2.1) — completed in PR #273
 
 **Phase 1 — Foundation inversion (next, ~1 month)**
 5. Object-management hooks; strip waste_collection out of utils (WS1-A)
 6. Properties/bibliography attribution inversion (WS1-B)
 7. Export-registry inversion (WS1-C) and maps/sources contract move (WS1-D start) — completed through PR #194
-8. Registry init in `ready()` (WS1-E) — completed in PR #196; layering check in CI (WS1-F) — in progress
-9. Decide inventories future (WS8)
+8. Registry init in `ready()` (WS1-E) — completed in PR #196; layering check in CI (WS1-F) — completed in PR #199
+9. Decide inventories future (WS8); correctness containment baseline completed in PR #274
 
 **Phase 2 — Consolidation (months 2–3)**
 10. CRUD view factory + migrate materials, processes, waste_collection (WS4.1)
@@ -333,16 +340,16 @@ New issues from this review (created 2026-06-09):
 
 | Issue | Topic | Workstream |
 |---|---|---|
-| #163 | Waste Atlas publication scoping (security) | WS3.1 |
-| #164 | Atomic review-state transitions | WS2.1 |
-| #165 | CI test workflow | WS6.1 |
-| #166 | Settings hardening checklist | WS7 |
+| #163 | Waste Atlas publication scoping (security) — completed in PR #260 | WS3.1 |
+| #164 | Atomic review-state transitions — completed in PR #273 | WS2.1 |
+| #165 | CI test workflow — completed in commit `f9b34b09` | WS6.1 |
+| #166 | Settings hardening checklist — active in PRs #275–#277; CSP next | WS7 |
 | #167 | Region-attribute cache invalidation | WS5.4 |
 | #168 | waste_collection DB indexes | WS5.2 |
 | #169 | Collection detail N+1 queries | WS5.1 |
 | #170 | Manual-CPV uniqueness constraints | WS9 |
 | #171 | Greenhouse algorithm crash + dead filter | WS8 |
-| #172 | Scenario FAILED state / chord error handling | WS8 |
+| #172 | Scenario FAILED state / chord error handling — completed in PR #274 | WS8 |
 | #173 | Green-waste MV lifecycle | WS3.4 |
 | #174 | Dead-code and hygiene sweep | WS10 |
 | #175 | Atlas throttling alignment | WS3.5 |
