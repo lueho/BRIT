@@ -239,14 +239,15 @@ Consolidated hardening (single issue with checklist; see appendix):
   production `django_redis` error logging.
 - Typed `EMAIL_USE_SSL` parsing and valid-only `ADMINS` configuration are addressed
   in PR #275.
-- No CSP; templates rely on inline JS and several `|safe` usages
-  (`utils/templates/bootstrap5/formset_base.html` etc.). Start with Django's built-in
-  report-only CSP, then enforce after the asset pipeline emits nonces.
-- Error monitoring (Sentry or equivalent) for web + Celery; currently only
-  console/mail_admins logging in production.
+- PR #278 adds Django's built-in report-only CSP baseline. Enforce CSP after the
+  asset pipeline emits nonces for the remaining inline scripts and styles.
+- Optional Sentry monitoring for Django and Celery is addressed in PR #279.
 - Add `.env.example`; document required vs optional variables.
 - `brit/urls.py` catch-all `path("<str:short_code>/", DynamicRedirectView...)`
   swallows arbitrary root paths — audit interaction with 404 handling and bots.
+
+**Status:** active; PRs #275–#279 are in review. The next slice makes production
+fail fast when `SECRET_KEY` is missing.
 
 **Status:** active; environment parsing (#275), production Redis TLS verification
 (#276), and ignored-cache-error logging (#277) are in review. The next slice is a
@@ -308,8 +309,8 @@ consolidation that pays compounding dividends.
 **Phase 0 — Safety (immediately, days)**
 1. Waste Atlas publication scoping fix + regression test (WS3.1) — completed in PR #260
 2. CI workflow running the full suite + ruff (WS6.1) — completed in commit `f9b34b09`
-3. Settings hardening checklist (WS7) — active; PRs #275–#277 are in review and CSP
-   is the next slice (#166)
+3. Settings hardening checklist (WS7) — active; PRs #275–#279 are in review and
+   production `SECRET_KEY` validation is the next slice (#166)
 4. Atomic review-state transitions (WS2.1) — completed in PR #273
 
 **Phase 1 — Foundation inversion (next, ~1 month)**
