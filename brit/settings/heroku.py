@@ -58,6 +58,9 @@ STORAGES = {
 
 # Logging settings
 # In production all logs of unhandled exceptions are mailed to the admins.
+DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
+DJANGO_REDIS_LOGGER = "django_redis"
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -88,6 +91,11 @@ LOGGING = {
         "brit": {
             "handlers": ["console", "mail_admins"],
             "level": "WARNING",
+            "propagate": False,
+        },
+        "django_redis": {
+            "handlers": ["console"],
+            "level": "ERROR",
             "propagate": False,
         },
     },
