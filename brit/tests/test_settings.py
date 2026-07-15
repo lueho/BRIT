@@ -97,7 +97,7 @@ class RedisSettingsTests(SimpleTestCase):
 
 
 class ProductionRedisSettingsTests(SimpleTestCase):
-    def test_tls_redis_requires_certificate_verification(self):
+    def test_tls_redis_accepts_self_signed_certificates(self):
         environment = os.environ.copy()
         environment["REDIS_URL"] = "rediss://localhost:6379/0"
         environment["SECRET_KEY"] = "test-secret-key"
@@ -107,7 +107,7 @@ class ProductionRedisSettingsTests(SimpleTestCase):
                 "-c",
                 (
                     "import ssl; import brit.settings.heroku as h; "
-                    "expected = {'ssl_cert_reqs': ssl.CERT_REQUIRED}; "
+                    "expected = {'ssl_cert_reqs': ssl.CERT_NONE}; "
                     "assert h.CELERY_BROKER_USE_SSL == expected; "
                     "assert h.CELERY_REDIS_BACKEND_USE_SSL == expected"
                 ),

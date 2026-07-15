@@ -23,8 +23,10 @@ if SENTRY_DSN:
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 ALLOWED_HOSTS = list(os.environ.get("ALLOWED_HOSTS", "").split(","))
-CELERY_BROKER_USE_SSL = _redis_ssl_settings(REDIS_URL, ssl.CERT_REQUIRED)
-CELERY_REDIS_BACKEND_USE_SSL = _redis_ssl_settings(REDIS_URL, ssl.CERT_REQUIRED)
+# Heroku Redis uses self-signed certificates, so certificate verification
+# must be disabled for TLS connections.
+CELERY_BROKER_USE_SSL = _redis_ssl_settings(REDIS_URL, ssl.CERT_NONE)
+CELERY_REDIS_BACKEND_USE_SSL = _redis_ssl_settings(REDIS_URL, ssl.CERT_NONE)
 
 # Security settings
 SECURE_SSL_REDIRECT = True
