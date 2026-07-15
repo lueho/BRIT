@@ -1911,6 +1911,7 @@ MAP_CONFIGS = {
         "legendTitle": "Biobin stream separation rate (%)",
         "fileBase": "waste_amount_ratio",
         "numericField": "ratio",
+        "quartileDisplayMultiplier": 100,
         "quartileColors": ["#bae4bc", "#7bccc4", "#43a2ca", "#0868ac"],
         "quartilePreserveClasses": ["no_bio"],
     },
