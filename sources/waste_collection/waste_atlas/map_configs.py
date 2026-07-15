@@ -1478,6 +1478,7 @@ MAP_CONFIGS = {
         "legendTitle": "Organic stream separation rate (%)",
         "fileBase": "organic_waste_ratio",
         "numericField": "ratio",
+        "quartileDisplayMultiplier": 100,
         "quartileColors": ["#bae4bc", "#7bccc4", "#43a2ca", "#0868ac"],
     },
     "paper_bags": {

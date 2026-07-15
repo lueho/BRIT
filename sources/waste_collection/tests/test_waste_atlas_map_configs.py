@@ -230,8 +230,23 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         # toFixed — only Math.round for whole-number display.
         quartile_fn = script.split("function _computeQuartileCategories(")[1]
         fmt_section = quartile_fn[: quartile_fn.index("return [")]
-        self.assertIn("Math.round(v).toString()", fmt_section)
+        self.assertIn("Math.round(v * displayMultiplier).toString()", fmt_section)
         self.assertNotIn("toFixed", fmt_section)
+
+    def test_separation_rate_quartile_labels_use_percentage_values(self):
+        config = MAP_CONFIGS["organic_waste_ratio"]
+
+        self.assertEqual(config["quartileDisplayMultiplier"], 100)
+        self.assertIn(
+            "baseCfg.quartileDisplayMultiplier",
+            Path(
+                Path(__file__).resolve().parents[1]
+                / "waste_atlas"
+                / "static"
+                / "js"
+                / "waste_atlas_choropleth.js"
+            ).read_text(),
+        )
 
     def test_quartile_mode_is_enabled_by_default(self):
         """The quartile toggle must be checked on page load for all KPI maps.

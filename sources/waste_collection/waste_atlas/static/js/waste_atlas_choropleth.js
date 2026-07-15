@@ -1044,7 +1044,7 @@ var WasteAtlasChoropleth = (function () {
 
   // ---- quartile helpers -----------------------------------------------------
 
-  function _computeQuartileCategories(values, colors) {
+  function _computeQuartileCategories(values, colors, displayMultiplier) {
     var valid = values.filter(function (v) { return v != null && !isNaN(v); });
     if (valid.length < 4) return null;
     var sorted = valid.slice().sort(function (a, b) { return a - b; });
@@ -1054,10 +1054,11 @@ var WasteAtlasChoropleth = (function () {
     var min = sorted[0];
     var max = sorted[sorted.length - 1];
     colors = colors || ['#d9f0d3', '#a6d96a', '#66bd63', '#1a9850'];
+    displayMultiplier = displayMultiplier || 1;
 
     function fmt(v) {
       if (v == null) return '';
-      return Math.round(v).toString();
+      return Math.round(v * displayMultiplier).toString();
     }
 
     return [
@@ -1116,7 +1117,11 @@ var WasteAtlasChoropleth = (function () {
     var values = records
       .filter(function (r) { return !isPreservedRecord(r) && !isSpecialCaseRecord(r); })
       .map(function (r) { return r[baseCfg.numericField]; });
-    var categories = _computeQuartileCategories(values, baseCfg.quartileColors);
+    var categories = _computeQuartileCategories(
+      values,
+      baseCfg.quartileColors,
+      baseCfg.quartileDisplayMultiplier
+    );
     if (!categories) return baseCfg;
 
     var allCategories = preservedCategories.concat(specialCases.map(function (sc) {
