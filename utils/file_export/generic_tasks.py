@@ -102,16 +102,19 @@ def export_user_created_object_to_file(
         except Exception:
             logger.exception("Could not determine export file size for %s", file_name)
             file_size = None
-        UserExport.objects.create(
-            owner=user,
-            model_label=model_label,
-            file_format=file_format,
-            file_name=file_name,
-            file_size=file_size,
-            row_count=total,
-            filter_params=dict(query_params),
-            task_id=str(self.request.id),
-        )
+        try:
+            UserExport.objects.create(
+                owner=user,
+                model_label=model_label,
+                file_format=file_format,
+                file_name=file_name,
+                file_size=file_size,
+                row_count=total,
+                filter_params=dict(query_params),
+                task_id=str(self.request.id),
+            )
+        except Exception:
+            logger.exception("Could not record export %s for re-download", file_name)
 
     try:
         cleanup_expired_exports.run()
