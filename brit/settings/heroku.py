@@ -2,6 +2,7 @@ import ssl
 
 import dj_database_url
 import sentry_sdk
+from django.core.exceptions import ImproperlyConfigured
 from django.utils.csp import CSP
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
@@ -22,6 +23,9 @@ if SENTRY_DSN:
     )
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    raise ImproperlyConfigured("SECRET_KEY must be set in production.")
+
 ALLOWED_HOSTS = list(os.environ.get("ALLOWED_HOSTS", "").split(","))
 # Heroku Redis uses self-signed certificates, so certificate verification
 # must be disabled for TLS connections.
