@@ -428,6 +428,30 @@ class OwnershipSharingViewTests(TestCase):
         response = self.client.get(self.collection.get_absolute_url())
         self.assertEqual(response.status_code, 403)
 
+    def test_non_user_created_object_content_type_returns_404(self):
+        from django.contrib.auth.models import Group
+
+        group = Group.objects.create(name="some group")
+        group_ct = ContentType.objects.get_for_model(Group)
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse(
+                "object_management:add_editor",
+                kwargs={"content_type_id": group_ct.pk, "object_id": group.pk},
+            ),
+            {"user": self.editor.username},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_transfer_redirects_former_owner_away_from_unreadable_detail(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            self._url("transfer_ownership"),
+            {"new_owner": self.other.username},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, "/")
+
     def test_external_next_url_is_ignored(self):
         self.client.force_login(self.owner)
         response = self.client.post(

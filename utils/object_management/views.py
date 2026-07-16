@@ -1290,6 +1290,8 @@ class BaseObjectAccessActionView(LoginRequiredMixin, UserPassesTestMixin, View):
             ContentType, pk=self.kwargs.get("content_type_id")
         )
         model_class = content_type.model_class()
+        if model_class is None or not issubclass(model_class, UserCreatedObject):
+            raise Http404("Unsupported object type.")
         obj = get_object_or_404(model_class, pk=self.kwargs.get("object_id"))
         self.object = obj
         return obj
@@ -1303,7 +1305,12 @@ class BaseObjectAccessActionView(LoginRequiredMixin, UserPassesTestMixin, View):
             return False
         perm = UserCreatedObjectPermission()
         checker = getattr(perm, str(self.permission_method), None)
-        return bool(checker(self.request, obj)) if callable(checker) else False
+        if not callable(checker):
+            return False
+        try:
+            return bool(checker(self.request, obj))
+        except Exception:
+            return False
 
     def get_success_url(self):
         next_url = self.request.POST.get("next") or self.request.GET.get("next")
@@ -1351,7 +1358,22 @@ class TransferOwnershipView(BaseObjectAccessActionView):
             f"Ownership of {capfirst(obj._meta.verbose_name)} has been transferred "
             f"to {new_owner.username}.",
         )
-        return HttpResponseRedirect(self.get_success_url())
+        success_url = self.get_success_url()
+        policy = get_object_policy(request.user, obj, request=request)
+        if not (
+            policy["is_published"]
+            or policy["is_owner"]
+            or policy["is_editor"]
+            or policy["is_staff"]
+            or policy["is_moderator"]
+        ):
+            # The former owner may no longer read the object; avoid a 403.
+            try:
+                if success_url == obj.get_absolute_url():
+                    success_url = "/"
+            except Exception:
+                success_url = "/"
+        return HttpResponseRedirect(success_url)
 
 
 class AddEditorView(BaseObjectAccessActionView):
