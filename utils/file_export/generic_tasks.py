@@ -13,6 +13,19 @@ from .export_registry import get_export_spec
 BATCH_SIZE = 50
 
 
+@shared_task
+def cleanup_expired_exports():
+    """Delete expired export files from storage and remove their records."""
+    from .models import UserExport
+
+    deleted = 0
+    for export in UserExport.objects.expired():
+        export.delete_file()
+        export.delete()
+        deleted += 1
+    return deleted
+
+
 @shared_task(bind=True)
 def export_user_created_object_to_file(
     self, model_label, file_format, query_params, context
@@ -75,4 +88,27 @@ def export_user_created_object_to_file(
 
     renderer = spec.renderers[file_format]
     file_name = f"{spec.model._meta.model_name}_{self.request.id}.{file_format}"
-    return utils.file_export.storages.write_file_for_download(file_name, data, renderer)
+    url = utils.file_export.storages.write_file_for_download(file_name, data, renderer)
+
+    if user is not None:
+        from .models import UserExport
+
+        storage = utils.file_export.storages.get_file_export_storage()
+        try:
+            file_size = storage.size(file_name)
+        except (NotImplementedError, OSError):
+            file_size = None
+        UserExport.objects.create(
+            owner=user,
+            model_label=model_label,
+            file_format=file_format,
+            file_name=file_name,
+            file_size=file_size,
+            row_count=total,
+            filter_params=dict(query_params),
+            task_id=str(self.request.id),
+        )
+
+    cleanup_expired_exports.run()
+
+    return url
