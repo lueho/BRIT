@@ -115,6 +115,11 @@ def export_user_created_object_to_file(
             )
         except Exception:
             logger.exception("Could not record export %s for re-download", file_name)
+            try:
+                storage.delete(file_name)
+            except Exception:
+                logger.exception("Could not delete orphaned export %s", file_name)
+            raise
 
     try:
         cleanup_expired_exports.run()

@@ -152,6 +152,30 @@ class ExportTaskRecordTests(TestCase):
                 self.assertFalse(UserExport.objects.exists())
 
     @patch("utils.file_export.generic_tasks.get_export_spec")
+    def test_task_deletes_file_when_record_creation_fails(self, mock_get_spec):
+        mock_get_spec.return_value = self._make_spec()
+        with TemporaryDirectory() as tmpdir:
+            with override_settings(
+                FILE_EXPORT_USE_LOCAL_STORAGE=True,
+                MEDIA_ROOT=tmpdir,
+                MEDIA_URL="/media/",
+            ):
+                with patch.object(
+                    type(UserExport.objects),
+                    "create",
+                    side_effect=RuntimeError("db down"),
+                ):
+                    with self.assertRaises(RuntimeError):
+                        self._run_task(
+                            "auth.User",
+                            "csv",
+                            {},
+                            {"user_id": self.owner.pk, "list_type": "public"},
+                        )
+                storage = get_file_export_storage()
+                self.assertFalse(storage.exists("user_fake-request-id.csv"))
+
+    @patch("utils.file_export.generic_tasks.get_export_spec")
     def test_task_removes_expired_exports_opportunistically(self, mock_get_spec):
         mock_get_spec.return_value = self._make_spec()
         with TemporaryDirectory() as tmpdir:
