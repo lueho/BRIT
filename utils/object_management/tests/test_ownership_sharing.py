@@ -177,6 +177,18 @@ class EditorPermissionTests(TestCase):
             self.permission.has_object_permission(request, None, self.collection)
         )
 
+    def test_is_editor_check_is_cached_per_user(self):
+        other_collection = Collection.objects.create(
+            name="Second Collection",
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_PRIVATE,
+        )
+        ContentType.objects.get_for_model(Collection)  # warm ContentType cache
+        self.assertTrue(self.permission._is_editor(self.editor, self.collection))
+        with self.assertNumQueries(0):
+            self.assertTrue(self.permission._is_editor(self.editor, self.collection))
+            self.assertFalse(self.permission._is_editor(self.editor, other_collection))
+
     def test_transfer_ownership_permission(self):
         for user, expected in [
             (self.owner, True),

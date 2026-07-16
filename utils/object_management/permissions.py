@@ -231,14 +231,31 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         return user.is_staff or user.has_perm(f"{app_label}.{perm_codename}")
 
     def _is_editor(self, user, obj):
-        """Return whether ``user`` has an editor grant on ``obj``."""
+        """Return whether ``user`` has an editor grant on ``obj``.
+
+        The user's granted object ids are fetched once per model and cached on
+        the user instance, so per-row checks in list views stay query-free.
+        """
         if not user or not user.is_authenticated:
             return False
+
+        from django.contrib.contenttypes.models import ContentType
 
         from .models import ObjectEditorGrant
 
         try:
-            return ObjectEditorGrant.for_object(obj).filter(editor=user).exists()
+            content_type = ContentType.objects.get_for_model(obj.__class__)
+            cache = getattr(user, "_editor_grant_cache", None)
+            if cache is None:
+                cache = {}
+                user._editor_grant_cache = cache
+            if content_type.pk not in cache:
+                cache[content_type.pk] = set(
+                    ObjectEditorGrant.objects.filter(
+                        content_type=content_type, editor=user
+                    ).values_list("object_id", flat=True)
+                )
+            return obj.pk in cache[content_type.pk]
         except Exception:
             return False
 
