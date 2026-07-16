@@ -1,72 +1,75 @@
-{% extends 'base_single_card.html' %}
+{% extends 'base.html' %}
 
 {% block title %}BRIT | My exports{% endblock %}
 
-{% block card_header %}Your Exports{% endblock %}
-
-{% block card_body %}
-
-    <p class="text-muted">
-        Files you have exported are available for download here until they expire.
-    </p>
-
-    {% if exports %}
-        <div class="table-responsive">
-            <table class="table table-sm align-middle">
-                <thead>
-                <tr>
-                    <th>Data</th>
-                    <th>Format</th>
-                    <th>Records</th>
-                    <th>Size</th>
-                    <th>Created</th>
-                    <th>Expires</th>
-                    <th></th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for export in exports %}
-                    <tr>
-                        <td>{{ export.model_label }}</td>
-                        <td>{{ export.file_format|upper }}</td>
-                        <td>{{ export.row_count|default_if_none:"–" }}</td>
-                        <td>{% if export.file_size is not None %}{{ export.file_size|filesizeformat }}{% else %}–{% endif %}</td>
-                        <td>{{ export.created_at|date:"Y-m-d H:i" }}</td>
-                        <td>{{ export.expires_at|date:"Y-m-d H:i" }}</td>
-                        <td class="text-end">
-                            <a href="{% url 'user-export-download' pk=export.pk %}"
-                               class="btn btn-sm btn-outline-primary"
-                               title="Download {{ export.file_name }}">
-                                <i class="fas fa-download"></i> Download
-                            </a>
-                        </td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
+{% block content %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-3">
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h5 class="mb-0">My exports</h5>
+                        <a href="{% url 'user_profile' %}" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-user"></i> Back to profile
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body overflow-auto">
+                    <p class="text-muted">
+                        Files you have exported are available for download here until they expire.
+                    </p>
+                    <table class="table modern-table">
+                        <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Format</th>
+                            <th>Filters</th>
+                            <th>Records</th>
+                            <th>Size</th>
+                            <th>Created</th>
+                            <th>Expires</th>
+                            <th class="actions-column"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for export in exports %}
+                            <tr>
+                                <td>{{ export.model_label }}</td>
+                                <td>{{ export.file_format|upper }}</td>
+                                <td>
+                                    {% if export.filter_params_display %}
+                                        {% for name, value in export.filter_params_display %}
+                                            <span class="badge text-bg-light border me-1"
+                                                  title="{{ name }}: {{ value }}">{{ name }}: {{ value }}</span>
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="text-muted">none</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ export.row_count|default_if_none:"–" }}</td>
+                                <td>{% if export.file_size is not None %}{{ export.file_size|filesizeformat }}{% else %}–{% endif %}</td>
+                                <td>{{ export.created_at|date:"Y-m-d H:i" }}</td>
+                                <td>{{ export.expires_at|date:"Y-m-d H:i" }}</td>
+                                <td class="text-end">
+                                    <a href="{% url 'user-export-download' pk=export.pk %}"
+                                       class="btn btn-sm btn-outline-primary"
+                                       title="Download {{ export.file_name }}">
+                                        <i class="fas fa-download"></i> Download
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">
+                                    You have no exports available for download.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    {% include 'partials/_pagination.html' %}
+                </div>
+            </div>
         </div>
-
-        {% if is_paginated %}
-            <nav aria-label="Export list pagination">
-                <ul class="pagination justify-content-center">
-                    {% if page_obj.has_previous %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
-                        </li>
-                    {% endif %}
-                    <li class="page-item disabled">
-                        <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-                    </li>
-                    {% if page_obj.has_next %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
-                        </li>
-                    {% endif %}
-                </ul>
-            </nav>
-        {% endif %}
-    {% else %}
-        <p>You have no exports available for download.</p>
-    {% endif %}
-
-{% endblock card_body %}
+    </div>
+{% endblock content %}

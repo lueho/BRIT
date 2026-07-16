@@ -55,6 +55,24 @@ class UserExportModelTests(TestCase):
         )
         self.assertTrue(export.is_expired)
 
+    def test_filter_params_display_flattens_values_and_hides_internal_keys(self):
+        export = UserExport.objects.create(
+            owner=self.owner,
+            model_label="auth.User",
+            file_format="csv",
+            file_name="user_test.csv",
+            filter_params={
+                "catchment": ["42"],
+                "waste_category": ["Bio", "Residual"],
+                "owner": [str(self.owner.pk)],
+                "publication_status": ["published"],
+            },
+        )
+        self.assertEqual(
+            export.filter_params_display,
+            [("catchment", "42"), ("waste_category", "Bio, Residual")],
+        )
+
     def test_active_and_expired_querysets(self):
         active = UserExport.objects.create(
             owner=self.owner,
@@ -256,6 +274,15 @@ class UserExportListViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         exports = list(response.context["object_list"])
         self.assertEqual(exports, [self.own_export])
+
+    def test_list_shows_filter_params(self):
+        UserExport.objects.filter(pk=self.own_export.pk).update(
+            filter_params={"waste_category": ["Bio"], "owner": ["1"]}
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(self.url)
+        self.assertContains(response, "waste_category")
+        self.assertContains(response, "Bio")
 
     def test_profile_links_to_exports(self):
         self.client.force_login(self.owner)
