@@ -177,6 +177,20 @@ class EditorPermissionTests(TestCase):
             self.permission.has_object_permission(request, None, self.collection)
         )
 
+    def test_editor_who_is_moderator_can_edit_private_content(self):
+        from django.contrib.auth.models import Permission
+
+        moderate_perm = Permission.objects.get(
+            codename="can_moderate_collection",
+            content_type=ContentType.objects.get_for_model(Collection),
+        )
+        self.editor.user_permissions.add(moderate_perm)
+        moderator_editor = User.objects.get(pk=self.editor.pk)  # reset perm cache
+        request = self._request(moderator_editor, data={"description": "updated"})
+        self.assertTrue(
+            self.permission.has_object_permission(request, None, self.collection)
+        )
+
     def test_is_editor_check_is_cached_per_user(self):
         other_collection = Collection.objects.create(
             name="Second Collection",

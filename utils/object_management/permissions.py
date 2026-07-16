@@ -112,32 +112,29 @@ class UserCreatedObjectPermission(permissions.BasePermission):
 
         # Editors (shared edit access) may modify content fields of
         # non-published objects, but never the publication status and never
-        # delete. Moderators are handled by the moderator branch below.
-        if (
-            obj.owner != user
-            and not self._is_moderator(user, obj)
-            and self._is_editor(user, obj)
-        ):
+        # delete. Requests outside that scope fall through to the moderator
+        # branch below, so editors who are also moderators keep both abilities.
+        if obj.owner != user and self._is_editor(user, obj):
             from .models import UserCreatedObject
-
-            if request.method not in ("PUT", "PATCH"):
-                return False
-
-            if getattr(obj, "publication_status", None) in (
-                UserCreatedObject.STATUS_PUBLISHED,
-                getattr(UserCreatedObject, "STATUS_ARCHIVED", "archived"),
-            ):
-                return False
 
             try:
                 payload = request.data
             except drf_exceptions.UnsupportedMediaType:
                 payload = {}
 
-            if "publication_status" in payload:
-                return False
+            if (
+                request.method in ("PUT", "PATCH")
+                and getattr(obj, "publication_status", None)
+                not in (
+                    UserCreatedObject.STATUS_PUBLISHED,
+                    getattr(UserCreatedObject, "STATUS_ARCHIVED", "archived"),
+                )
+                and "publication_status" not in payload
+            ):
+                return True
 
-            return True
+            if not self._is_moderator(user, obj):
+                return False
 
         if obj.owner == user:
             from .models import UserCreatedObject
