@@ -111,9 +111,10 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         user = request.user
 
         # Editors (shared edit access) may modify content fields of
-        # non-published objects, but never the publication status and never
-        # delete. Requests outside that scope fall through to the moderator
-        # branch below, so editors who are also moderators keep both abilities.
+        # non-published objects, but never the publication status, the owner,
+        # and never delete. Requests outside that scope fall through to the
+        # moderator branch below, so editors who are also moderators keep both
+        # abilities.
         if obj.owner != user and self._is_editor(user, obj):
             from .models import UserCreatedObject
 
@@ -130,6 +131,7 @@ class UserCreatedObjectPermission(permissions.BasePermission):
                     getattr(UserCreatedObject, "STATUS_ARCHIVED", "archived"),
                 )
                 and "publication_status" not in payload
+                and "owner" not in payload
             ):
                 return True
 

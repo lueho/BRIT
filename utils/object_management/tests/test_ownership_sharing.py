@@ -191,6 +191,24 @@ class EditorPermissionTests(TestCase):
             self.permission.has_object_permission(request, None, self.collection)
         )
 
+    def test_editor_cannot_change_owner(self):
+        request = self._request(self.editor, data={"owner": self.editor.pk})
+        self.assertFalse(
+            self.permission.has_object_permission(request, None, self.collection)
+        )
+
+    def test_editor_grants_deleted_with_object(self):
+        grant_qs = ObjectEditorGrant.for_object(self.collection)
+        self.assertTrue(grant_qs.filter(editor=self.editor).exists())
+        content_type = ContentType.objects.get_for_model(Collection)
+        object_id = self.collection.pk
+        self.collection.delete()
+        self.assertFalse(
+            ObjectEditorGrant.objects.filter(
+                content_type=content_type, object_id=object_id
+            ).exists()
+        )
+
     def test_is_editor_check_is_cached_per_user(self):
         other_collection = Collection.objects.create(
             name="Second Collection",
