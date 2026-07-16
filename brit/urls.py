@@ -10,7 +10,6 @@ from sources.registry import (
     get_source_domain_legacy_redirects,
     get_source_domain_public_mounts,
 )
-from utils.views import DynamicRedirectView
 
 from .sitemaps import DynamicViewSitemap, HomepageSitemap
 from .views import (
@@ -74,7 +73,6 @@ urlpatterns = [
     path("cache-test/", CacheTestView.as_view(), name="cache_test"),
     path("set_session/", set_session, name="set_session"),
     path("get_session/", get_session, name="get_session"),
-    path("<str:short_code>/", DynamicRedirectView.as_view(), name="redirect"),
 ]
 
 if settings.DEBUG:

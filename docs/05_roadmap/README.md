@@ -244,13 +244,14 @@ Consolidated hardening (single issue with checklist; see appendix):
 - PR #278 adds Django's built-in report-only CSP baseline. Enforce CSP after the
   asset pipeline emits nonces for the remaining inline scripts and styles.
 - Optional Sentry monitoring for Django and Celery is addressed in PR #279.
-- Add `.env.example`; document required vs optional variables. **In progress in this
+- Safe `.env.example` and required/optional variable documentation are addressed in
+  PR #283.
+- Replace the root short-code catch-all with a 404 fallback so arbitrary bot paths
+  remain unresolved and unsupported methods return 404. **In progress in this
   slice.**
-- `brit/urls.py` catch-all `path("<str:short_code>/", DynamicRedirectView...)`
-  swallows arbitrary root paths — audit interaction with 404 handling and bots.
 
-**Status:** active; PRs #275–#279 are merged and PR #280 is in review. Environment
-examples/documentation are the current slice; the root-path catch-all audit follows.
+**Status:** active; PRs #275–#280 and #283 are merged. Root short-code routing is the
+current slice.
 
 ### WS8 — Inventories/scenario subsystem: decide, then act
 
@@ -308,8 +309,8 @@ consolidation that pays compounding dividends.
 **Phase 0 — Safety (immediately, days)**
 1. Waste Atlas publication scoping fix + regression test (WS3.1) — completed in PR #260
 2. CI workflow running the full suite + ruff (WS6.1) — completed in commit `f9b34b09`
-3. Settings hardening checklist (WS7) — active; PRs #275–#279 are merged, PR #280 is
-   in review, and environment documentation is the current slice (#166)
+3. Settings hardening checklist (WS7) — active; PRs #275–#280 and #283 are merged,
+   and root short-code routing is the current slice (#166)
 4. Atomic review-state transitions (WS2.1) — completed in PR #273
 
 **Phase 1 — Foundation inversion (next, ~1 month)**

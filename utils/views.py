@@ -2,12 +2,8 @@ from urllib.parse import urlencode
 
 from crispy_forms.helper import FormHelper
 from django.http import HttpResponseRedirect, JsonResponse
-from django.shortcuts import render
 from django.template.loader import render_to_string
-from django.views import View
 from django.views.generic import ListView, TemplateView
-
-from .models import Redirect
 
 
 def build_breadcrumb_context(
@@ -251,19 +247,3 @@ class UtilsDashboardView(BreadcrumbContextMixin, TemplateView):
     template_name = "utils_dashboard.html"
     breadcrumb_module_label = "Utilities"
     breadcrumb_page_title = "Utilities"
-
-
-class DynamicRedirectView(View):
-    """
-    A view that handles dynamic redirection based on a short code.
-    If no such object exists, it returns a proper 404 response without logging an error.
-    """
-
-    def get(self, request, short_code):
-        try:
-            redirect_obj = Redirect.objects.get(short_code=short_code)
-            return HttpResponseRedirect(
-                f"{request.scheme}://{request.get_host()}{redirect_obj.full_path}"
-            )
-        except Redirect.DoesNotExist:
-            return render(request, "404.html", status=404)
