@@ -698,7 +698,7 @@ def apply_scope_filter(queryset, scope: str | None, user=None):
 
     Supported scopes:
     - ``published``: published records only
-    - ``private``: authenticated owner's records only
+    - ``private``: authenticated owner's records plus editor grants
     - ``review``: review records visible by role (owner/moderator/staff)
     - ``declined``/``archived``: owner-only for authenticated users, staff sees all
 
@@ -738,7 +738,7 @@ def apply_scope_filter(queryset, scope: str | None, user=None):
         if not is_authenticated:
             return queryset.none()
         _ensure_owner_field("private")
-        return queryset.filter(owner=user)
+        return queryset.filter(Q(owner=user) | _editor_grant_filter(model, user))
 
     if scope == "review":
         filtered = queryset.filter(**_status_kwargs(scope))
@@ -759,6 +759,23 @@ def apply_scope_filter(queryset, scope: str | None, user=None):
         return filtered.filter(owner=user)
 
     return queryset
+
+
+def _editor_grant_filter(model, user):
+    """Q filter matching objects the user holds an editor grant for."""
+    from django.contrib.contenttypes.models import ContentType
+
+    from .models import ObjectEditorGrant
+
+    try:
+        return Q(
+            pk__in=ObjectEditorGrant.objects.filter(
+                content_type=ContentType.objects.get_for_model(model),
+                editor=user,
+            ).values("object_id")
+        )
+    except Exception:
+        return Q(pk__in=[])
 
 
 def filter_queryset_for_user(queryset, user):
@@ -788,19 +805,7 @@ def filter_queryset_for_user(queryset, user):
     published_filter = Q(publication_status=_resolve_status_value(model, "published"))
     owner_filter = Q(owner=user)
 
-    from django.contrib.contenttypes.models import ContentType
-
-    from .models import ObjectEditorGrant
-
-    try:
-        editor_filter = Q(
-            pk__in=ObjectEditorGrant.objects.filter(
-                content_type=ContentType.objects.get_for_model(model),
-                editor=user,
-            ).values("object_id")
-        )
-    except Exception:
-        editor_filter = Q(pk__in=[])
+    editor_filter = _editor_grant_filter(model, user)
 
     if user_is_moderator_for_model(user, model):
         review_filter = Q(publication_status=_resolve_status_value(model, "review"))

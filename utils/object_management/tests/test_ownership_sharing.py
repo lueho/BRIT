@@ -417,6 +417,17 @@ class OwnershipSharingViewTests(TestCase):
         other_queryset = filter_queryset_for_user(Collection.objects.all(), self.other)
         self.assertNotIn(self.collection, other_queryset)
 
+    def test_private_scope_includes_editor_grants(self):
+        from utils.object_management.permissions import apply_scope_filter
+
+        self.collection.add_editor(self.editor)
+        queryset = apply_scope_filter(Collection.objects.all(), "private", self.editor)
+        self.assertIn(self.collection, queryset)
+        other_queryset = apply_scope_filter(
+            Collection.objects.all(), "private", self.other
+        )
+        self.assertNotIn(self.collection, other_queryset)
+
     def test_editor_can_view_private_detail_page(self):
         self.collection.add_editor(self.editor)
         self.client.force_login(self.editor)
