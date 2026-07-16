@@ -19,7 +19,12 @@ from django.core.exceptions import (
     ValidationError,
 )
 from django.db.models import Q
-from django.http import Http404, HttpResponse, HttpResponseRedirect
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseNotAllowed,
+    HttpResponseRedirect,
+)
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string, select_template
 from django.urls import NoReverseMatch, reverse
@@ -1444,6 +1449,17 @@ class ManageAccessModalView(BaseObjectAccessActionView):
             "object_id": self.kwargs.get("object_id"),
         }
         return HttpResponse(render_to_string(self.template_name, context, request))
+
+    def post(self, request, *args, **kwargs):
+        """Preflight handling for django-bootstrap-modal-forms.
+
+        The plugin sends an AJAX POST to the modal URL before submitting the
+        form natively to its action. Respond with 204 so the real submit
+        proceeds; the actual work happens in the action views.
+        """
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return HttpResponse(status=204)
+        return HttpResponseNotAllowed(["GET"])
 
 
 class UserOwnsObjectMixin(UserPassesTestMixin):
