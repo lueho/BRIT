@@ -55,6 +55,14 @@
         </a>
       {% endif %}
 
+      {# Manage access: transfer ownership and shared edit access (owner or staff) #}
+      {% if policy.can_manage_editors %}
+        <a class="dropdown-item modal-link"
+           href="{% url 'object_management:manage_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+          <i class="fas fa-user-group"></i> Manage access
+        </a>
+      {% endif %}
+
       {# Delete via policy (supports modal_delete_url or delete_url) #}
       {% if policy.can_delete %}
         {% if object.modal_delete_url %}

@@ -328,6 +328,22 @@ class OwnershipSharingViewTests(TestCase):
             },
         )
 
+    def test_detail_page_shows_manage_access_button_for_owner(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(self.collection.get_absolute_url())
+        self.assertContains(response, self._url("manage_access_modal"))
+
+    def test_detail_page_shows_manage_access_button_for_staff(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(self.collection.get_absolute_url())
+        self.assertContains(response, self._url("manage_access_modal"))
+
+    def test_detail_page_hides_manage_access_button_for_editor(self):
+        self.collection.add_editor(self.editor)
+        self.client.force_login(self.editor)
+        response = self.client.get(self.collection.get_absolute_url())
+        self.assertNotContains(response, self._url("manage_access_modal"))
+
     def test_owner_can_transfer_ownership(self):
         self.client.force_login(self.owner)
         response = self.client.post(
