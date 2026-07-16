@@ -364,6 +364,17 @@ class OwnershipSharingViewTests(TestCase):
         response = self.client.get(self._url("manage_access_modal"))
         self.assertEqual(response.status_code, 403)
 
+    def test_editor_can_view_private_detail_page(self):
+        self.collection.add_editor(self.editor)
+        self.client.force_login(self.editor)
+        response = self.client.get(self.collection.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+
+    def test_other_cannot_view_private_detail_page(self):
+        self.client.force_login(self.other)
+        response = self.client.get(self.collection.get_absolute_url())
+        self.assertEqual(response.status_code, 403)
+
     def test_external_next_url_is_ignored(self):
         self.client.force_login(self.owner)
         response = self.client.post(

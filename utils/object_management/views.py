@@ -1954,7 +1954,12 @@ class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
         if policy["is_published"]:
             return True
         # Archived, private, review, and declined objects require authentication
-        return policy["is_owner"] or policy["is_staff"] or policy["is_moderator"]
+        return (
+            policy["is_owner"]
+            or policy["is_editor"]
+            or policy["is_staff"]
+            or policy["is_moderator"]
+        )
 
 
 class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
