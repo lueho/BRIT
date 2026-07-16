@@ -11,7 +11,14 @@ from .storages import get_file_export_storage
 
 DEFAULT_RETENTION_DAYS = 7
 
-INTERNAL_FILTER_PARAMS = {"owner", "publication_status", "page", "scope", "list_type"}
+INTERNAL_FILTER_PARAMS = {
+    "owner",
+    "publication_status",
+    "page",
+    "scope",
+    "list_type",
+    "csrfmiddlewaretoken",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -65,15 +72,18 @@ class UserExport(models.Model):
     def filter_params_display(self):
         """User-facing filter parameters as (name, value) pairs.
 
-        Flattens single-item lists and hides internal scoping parameters.
+        Flattens single-item lists and hides internal or empty parameters.
         """
         pairs = []
         for key, value in self.filter_params.items():
             if key in INTERNAL_FILTER_PARAMS:
                 continue
             if isinstance(value, (list, tuple)):
-                value = ", ".join(str(v) for v in value)
-            pairs.append((key, str(value)))
+                value = ", ".join(str(v) for v in value if str(v))
+            value = str(value)
+            if not value:
+                continue
+            pairs.append((key, value))
         return pairs
 
     @property

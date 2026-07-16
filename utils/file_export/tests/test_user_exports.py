@@ -66,6 +66,9 @@ class UserExportModelTests(TestCase):
                 "waste_category": ["Bio", "Residual"],
                 "owner": [str(self.owner.pk)],
                 "publication_status": ["published"],
+                "csrfmiddlewaretoken": ["secret-token"],
+                "name": [""],
+                "created_at_after": [],
             },
         )
         self.assertEqual(
