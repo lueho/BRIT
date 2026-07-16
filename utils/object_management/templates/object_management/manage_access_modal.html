@@ -1,0 +1,71 @@
+<div class="modal-header">
+  <h5 class="modal-title">{{ modal_title }}</h5>
+  <button type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"></button>
+</div>
+<div class="modal-body">
+  <h6>Current owner</h6>
+  <p class="mb-3">{{ object.owner.username }}</p>
+
+  <h6>Transfer ownership</h6>
+  <form method="post"
+        class="mb-4"
+        action="{% url 'object_management:transfer_ownership' content_type_id=content_type_id object_id=object_id %}">
+    {% csrf_token %}
+    {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+    <div class="input-group">
+      <input type="text"
+             class="form-control"
+             name="new_owner"
+             placeholder="Username of new owner"
+             required>
+      <button type="submit" class="btn btn-outline-danger">
+        <i class="fas fa-exchange-alt"></i> Transfer
+      </button>
+    </div>
+    <div class="form-text">The new owner gains full control of this item.</div>
+  </form>
+
+  <h6>Users with edit access</h6>
+  {% if editors %}
+    <ul class="list-group mb-3">
+      {% for editor in editors %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          {{ editor.username }}
+          <form method="post"
+                action="{% url 'object_management:remove_editor' content_type_id=content_type_id object_id=object_id %}">
+            {% csrf_token %}
+            {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+            <input type="hidden" name="user" value="{{ editor.username }}">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">
+              <i class="fas fa-times"></i> Remove
+            </button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-muted mb-3">No other users have edit access.</p>
+  {% endif %}
+
+  <form method="post"
+        action="{% url 'object_management:add_editor' content_type_id=content_type_id object_id=object_id %}">
+    {% csrf_token %}
+    {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+    <div class="input-group">
+      <input type="text"
+             class="form-control"
+             name="user"
+             placeholder="Username to grant edit access"
+             required>
+      <button type="submit" class="btn btn-outline-primary">
+        <i class="fas fa-user-plus"></i> Add
+      </button>
+    </div>
+  </form>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+</div>
