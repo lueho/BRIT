@@ -101,6 +101,7 @@ COOKIE_CONSENT_ENABLED = False
 
 MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "utils.middleware.DynamicRedirectFallbackMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "maps.middleware.CacheMonitoringMiddleware",
