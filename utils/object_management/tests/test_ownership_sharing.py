@@ -390,6 +390,15 @@ class OwnershipSharingViewTests(TestCase):
         response = self.client.get(self._url("manage_access_modal"))
         self.assertEqual(response.status_code, 403)
 
+    def test_filter_queryset_for_user_includes_editor_grants(self):
+        from utils.object_management.permissions import filter_queryset_for_user
+
+        self.collection.add_editor(self.editor)
+        queryset = filter_queryset_for_user(Collection.objects.all(), self.editor)
+        self.assertIn(self.collection, queryset)
+        other_queryset = filter_queryset_for_user(Collection.objects.all(), self.other)
+        self.assertNotIn(self.collection, other_queryset)
+
     def test_editor_can_view_private_detail_page(self):
         self.collection.add_editor(self.editor)
         self.client.force_login(self.editor)

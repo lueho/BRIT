@@ -764,8 +764,8 @@ def filter_queryset_for_user(queryset, user):
 
     - staff: full queryset
     - anonymous: published only
-    - authenticated regular: own + published
-    - authenticated moderator: own + published + review
+    - authenticated regular: own + published + editor grants
+    - authenticated moderator: own + published + review + editor grants
     """
 
     model = queryset.model
@@ -786,11 +786,27 @@ def filter_queryset_for_user(queryset, user):
     published_filter = Q(publication_status=_resolve_status_value(model, "published"))
     owner_filter = Q(owner=user)
 
+    from django.contrib.contenttypes.models import ContentType
+
+    from .models import ObjectEditorGrant
+
+    try:
+        editor_filter = Q(
+            pk__in=ObjectEditorGrant.objects.filter(
+                content_type=ContentType.objects.get_for_model(model),
+                editor=user,
+            ).values("object_id")
+        )
+    except Exception:
+        editor_filter = Q(pk__in=[])
+
     if user_is_moderator_for_model(user, model):
         review_filter = Q(publication_status=_resolve_status_value(model, "review"))
-        return queryset.filter(owner_filter | published_filter | review_filter)
+        return queryset.filter(
+            owner_filter | published_filter | review_filter | editor_filter
+        )
 
-    return queryset.filter(owner_filter | published_filter)
+    return queryset.filter(owner_filter | published_filter | editor_filter)
 
 
 def build_scope_filter_params(scope: str | None, user):
