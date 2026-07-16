@@ -1,12 +1,17 @@
+import logging
 from datetime import timedelta
 
 from django.conf import settings
 from django.db import models
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 from django.utils import timezone
 
 from .storages import get_file_export_storage
 
 DEFAULT_RETENTION_DAYS = 7
+
+logger = logging.getLogger(__name__)
 
 
 def default_expires_at():
@@ -65,3 +70,12 @@ class UserExport(models.Model):
         storage = get_file_export_storage()
         if storage.exists(self.file_name):
             storage.delete(self.file_name)
+
+
+@receiver(pre_delete, sender=UserExport)
+def delete_export_file_on_record_delete(sender, instance, **kwargs):
+    """Remove the stored file when its record is deleted, including cascades."""
+    try:
+        instance.delete_file()
+    except Exception:
+        logger.exception("Could not delete export file %s", instance.file_name)

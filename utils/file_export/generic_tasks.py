@@ -100,7 +100,8 @@ def export_user_created_object_to_file(
         storage = utils.file_export.storages.get_file_export_storage()
         try:
             file_size = storage.size(file_name)
-        except (NotImplementedError, OSError):
+        except Exception:
+            logger.exception("Could not determine export file size for %s", file_name)
             file_size = None
         UserExport.objects.create(
             owner=user,

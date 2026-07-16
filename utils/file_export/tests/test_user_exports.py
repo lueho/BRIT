@@ -195,6 +195,31 @@ class CleanupExpiredExportsTests(TestCase):
                 self.assertTrue(storage.exists("fresh.csv"))
 
 
+class UserExportFileDeletionTests(TestCase):
+    def test_deleting_owner_removes_export_files(self):
+        owner = User.objects.create_user(username="doomed_owner")
+        with TemporaryDirectory() as tmpdir:
+            with override_settings(
+                FILE_EXPORT_USE_LOCAL_STORAGE=True,
+                MEDIA_ROOT=tmpdir,
+                MEDIA_URL="/media/",
+            ):
+                storage = get_file_export_storage()
+                with storage.open("owned.csv", "wb") as f:
+                    f.write(b"data")
+                UserExport.objects.create(
+                    owner=owner,
+                    model_label="auth.User",
+                    file_format="csv",
+                    file_name="owned.csv",
+                )
+
+                owner.delete()
+
+                self.assertFalse(UserExport.objects.exists())
+                self.assertFalse(storage.exists("owned.csv"))
+
+
 class UserExportListViewTests(TestCase):
     @classmethod
     def setUpTestData(cls):
