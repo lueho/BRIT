@@ -232,9 +232,11 @@ Duplication is concentrated in three patterns; fix the pattern in L0 once, then 
 
 Consolidated hardening (single issue with checklist; see appendix):
 
-- Production must fail hard when `SECRET_KEY` is missing instead of inheriting the
-  development fallback.
-- Celery↔Redis certificate verification is addressed in PR #276.
+- Production fail-fast behavior for a missing `SECRET_KEY` is addressed in PR #280.
+- PR #276 required Celery↔Redis certificate verification, while PR #281 restored the
+  explicit `CERT_NONE` exception required by Heroku Redis self-signed certificates.
+  Keep this platform exception documented and revisit it if the provider trust model
+  changes.
 - Cache `IGNORE_EXCEPTIONS=True` remains for availability while PR #277 adds
   production `django_redis` error logging.
 - Typed `EMAIL_USE_SSL` parsing and valid-only `ADMINS` configuration are addressed
@@ -242,12 +244,13 @@ Consolidated hardening (single issue with checklist; see appendix):
 - PR #278 adds Django's built-in report-only CSP baseline. Enforce CSP after the
   asset pipeline emits nonces for the remaining inline scripts and styles.
 - Optional Sentry monitoring for Django and Celery is addressed in PR #279.
-- Add `.env.example`; document required vs optional variables.
+- Add `.env.example`; document required vs optional variables. **In progress in this
+  slice.**
 - `brit/urls.py` catch-all `path("<str:short_code>/", DynamicRedirectView...)`
   swallows arbitrary root paths — audit interaction with 404 handling and bots.
 
-**Status:** active; PRs #275–#279 are in review. The next slice makes production
-fail fast when `SECRET_KEY` is missing.
+**Status:** active; PRs #275–#279 are merged and PR #280 is in review. Environment
+examples/documentation are the current slice; the root-path catch-all audit follows.
 
 ### WS8 — Inventories/scenario subsystem: decide, then act
 
@@ -305,8 +308,8 @@ consolidation that pays compounding dividends.
 **Phase 0 — Safety (immediately, days)**
 1. Waste Atlas publication scoping fix + regression test (WS3.1) — completed in PR #260
 2. CI workflow running the full suite + ruff (WS6.1) — completed in commit `f9b34b09`
-3. Settings hardening checklist (WS7) — active; PRs #275–#279 are in review and
-   production `SECRET_KEY` validation is the next slice (#166)
+3. Settings hardening checklist (WS7) — active; PRs #275–#279 are merged, PR #280 is
+   in review, and environment documentation is the current slice (#166)
 4. Atomic review-state transitions (WS2.1) — completed in PR #273
 
 **Phase 1 — Foundation inversion (next, ~1 month)**

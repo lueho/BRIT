@@ -29,6 +29,18 @@ This page is the canonical source for day-to-day development workflow in BRIT.
 
 ## Local Development
 
+### Configure the environment
+
+Create the ignored local environment file from the committed example:
+
+```sh
+cp brit/settings/.env.example brit/settings/.env
+```
+
+Replace the development placeholders before starting Docker Compose. The complete
+required/optional variable reference is in
+[Deployment Overview](architecture/deployment.md#environment-configuration).
+
 ### Start the stack
 
 ```sh
