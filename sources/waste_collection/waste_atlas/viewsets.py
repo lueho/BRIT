@@ -72,8 +72,20 @@ from .serializers import (
 )
 
 _PUBLISHED = UserCreatedObject.STATUS_PUBLISHED
+_ARCHIVED = UserCreatedObject.STATUS_ARCHIVED
+# Archived collections were necessarily published before being archived
+# (``UserCreatedObject.archive`` only transitions from ``published`` and the
+# collection version workflow archives superseded predecessors).  They are
+# therefore safe to expose in historical, year-scoped maps so that older
+# atlas years remain available after newer versions supersede them, without
+# leaking private/review/declined data.
+_PUBLIC_VISIBLE = (
+    UserCreatedObject.STATUS_PUBLISHED,
+    UserCreatedObject.STATUS_ARCHIVED,
+)
 _STAFF_VISIBLE = (
     UserCreatedObject.STATUS_PUBLISHED,
+    UserCreatedObject.STATUS_ARCHIVED,
     UserCreatedObject.STATUS_REVIEW,
     UserCreatedObject.STATUS_PRIVATE,
 )
@@ -83,15 +95,19 @@ def _is_staff(user):
     return user is not None and hasattr(user, "is_staff") and user.is_staff
 
 
+def _visible_statuses(user=None):
+    """Publication statuses visible to *user* in the year-scoped atlas maps."""
+    return _STAFF_VISIBLE if _is_staff(user) else _PUBLIC_VISIBLE
+
+
 def _collection_qs(user=None):
     """Base Collection queryset respecting publication scoping.
 
-    Staff users see published, review, and private collections so they can
-    monitor data-collection progress.  Everyone else sees only published.
+    Staff users additionally see review and private collections so they can
+    monitor data-collection progress.  Everyone sees published and archived
+    (previously published) collections so historical maps stay available.
     """
-    if _is_staff(user):
-        return Collection.objects.filter(publication_status__in=_STAFF_VISIBLE)
-    return Collection.objects.published()
+    return Collection.objects.filter(publication_status__in=_visible_statuses(user))
 
 
 def _publication_q(user=None, prefix=""):
@@ -101,9 +117,7 @@ def _publication_q(user=None, prefix=""):
     e.g. ``"collections__"`` for reverse-FK through catchments.
     """
     field = f"{prefix}publication_status"
-    if _is_staff(user):
-        return Q(**{f"{field}__in": _STAFF_VISIBLE})
-    return Q(**{field: _PUBLISHED})
+    return Q(**{f"{field}__in": _visible_statuses(user)})
 
 
 # Material IDs for food waste classification (Karte 4)
