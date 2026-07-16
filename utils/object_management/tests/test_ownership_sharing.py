@@ -152,6 +152,31 @@ class EditorPermissionTests(TestCase):
             self.permission.has_object_permission(request, None, self.collection)
         )
 
+    def test_editor_cannot_delete(self):
+        request = self._request(self.editor, method="DELETE")
+        self.assertFalse(
+            self.permission.has_object_permission(request, None, self.collection)
+        )
+
+    def test_editor_who_is_moderator_keeps_moderator_rights(self):
+        from django.contrib.auth.models import Permission
+
+        moderate_perm = Permission.objects.get(
+            codename="can_moderate_collection",
+            content_type=ContentType.objects.get_for_model(Collection),
+        )
+        self.editor.user_permissions.add(moderate_perm)
+        moderator_editor = User.objects.get(pk=self.editor.pk)  # reset perm cache
+        self.collection.publication_status = UserCreatedObject.STATUS_REVIEW
+        self.collection.save()
+        request = self._request(
+            moderator_editor,
+            data={"publication_status": UserCreatedObject.STATUS_PUBLISHED},
+        )
+        self.assertTrue(
+            self.permission.has_object_permission(request, None, self.collection)
+        )
+
     def test_transfer_ownership_permission(self):
         for user, expected in [
             (self.owner, True),
@@ -338,3 +363,12 @@ class OwnershipSharingViewTests(TestCase):
         self.client.force_login(self.other)
         response = self.client.get(self._url("manage_access_modal"))
         self.assertEqual(response.status_code, 403)
+
+    def test_external_next_url_is_ignored(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            self._url("add_editor"),
+            {"user": self.editor.username, "next": "https://evil.example/"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn("evil.example", response.url)
