@@ -1,5 +1,6 @@
 import os
 import ssl
+from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -308,6 +309,17 @@ CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_BROKER_USE_SSL = _redis_ssl_settings(REDIS_URL)
 CELERY_REDIS_BACKEND_USE_SSL = _redis_ssl_settings(REDIS_URL)
+
+# Number of days exported files remain available for re-download before they
+# are removed from storage.
+FILE_EXPORT_RETENTION_DAYS = int(os.environ.get("FILE_EXPORT_RETENTION_DAYS", "7"))
+
+CELERY_BEAT_SCHEDULE = {
+    "cleanup-expired-user-exports": {
+        "task": "utils.file_export.generic_tasks.cleanup_expired_exports",
+        "schedule": timedelta(hours=24),
+    },
+}
 
 GEO_BORDER_TOLERANCE = 0.005  # Tolerance for border detection in degrees for EPSG 4326
 

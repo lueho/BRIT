@@ -2,10 +2,11 @@ import logging
 
 from celery.result import AsyncResult
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import JsonResponse
+from django.http import HttpResponseGone, JsonResponse
 from django.http.request import MultiValueDict, QueryDict
+from django.shortcuts import get_object_or_404, redirect
 from django.views import View
-from django.views.generic import TemplateView
+from django.views.generic import ListView, TemplateView
 from django.views.generic.detail import SingleObjectMixin
 
 from utils.object_management.permissions import (
@@ -13,6 +14,8 @@ from utils.object_management.permissions import (
     build_scope_filter_params,
     filter_queryset_for_user,
 )
+
+from .models import UserExport
 
 logger = logging.getLogger(__name__)
 
@@ -239,6 +242,28 @@ class ExportModalView(LoginRequiredMixin, TemplateView):
             if k != "export_url":
                 context[k] = v
         return context
+
+
+class UserExportListView(LoginRequiredMixin, ListView):
+    """List the current user's non-expired exports for re-download."""
+
+    model = UserExport
+    template_name = "user_export_list.html"
+    context_object_name = "exports"
+    paginate_by = 25
+
+    def get_queryset(self):
+        return UserExport.objects.active().filter(owner=self.request.user)
+
+
+class UserExportDownloadView(LoginRequiredMixin, View):
+    """Redirect the owner of an export to a fresh download URL for its file."""
+
+    def get(self, request, pk):
+        export = get_object_or_404(UserExport, pk=pk, owner=request.user)
+        if export.is_expired:
+            return HttpResponseGone("This export has expired.")
+        return redirect(export.get_download_url())
 
 
 class FilteredListFileExportProgressView(LoginRequiredMixin, View):

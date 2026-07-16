@@ -1,3 +1,5 @@
+import logging
+
 from celery import shared_task
 from django.contrib.auth import get_user_model
 from django.http.request import MultiValueDict, QueryDict
@@ -11,6 +13,20 @@ from utils.object_management.permissions import (
 from .export_registry import get_export_spec
 
 BATCH_SIZE = 50
+
+logger = logging.getLogger(__name__)
+
+
+@shared_task
+def cleanup_expired_exports():
+    """Delete expired export files from storage and remove their records."""
+    from .models import UserExport
+
+    deleted = 0
+    for export in UserExport.objects.expired():
+        export.delete()
+        deleted += 1
+    return deleted
 
 
 @shared_task(bind=True)
@@ -75,4 +91,39 @@ def export_user_created_object_to_file(
 
     renderer = spec.renderers[file_format]
     file_name = f"{spec.model._meta.model_name}_{self.request.id}.{file_format}"
-    return utils.file_export.storages.write_file_for_download(file_name, data, renderer)
+    url = utils.file_export.storages.write_file_for_download(file_name, data, renderer)
+
+    if user is not None:
+        from .models import UserExport
+
+        storage = utils.file_export.storages.get_file_export_storage()
+        try:
+            file_size = storage.size(file_name)
+        except Exception:
+            logger.exception("Could not determine export file size for %s", file_name)
+            file_size = None
+        try:
+            UserExport.objects.create(
+                owner=user,
+                model_label=model_label,
+                file_format=file_format,
+                file_name=file_name,
+                file_size=file_size,
+                row_count=total,
+                filter_params=dict(query_params),
+                task_id=str(self.request.id),
+            )
+        except Exception:
+            logger.exception("Could not record export %s for re-download", file_name)
+            try:
+                storage.delete(file_name)
+            except Exception:
+                logger.exception("Could not delete orphaned export %s", file_name)
+            raise
+
+    try:
+        cleanup_expired_exports.run()
+    except Exception:
+        logger.exception("Opportunistic cleanup of expired exports failed")
+
+    return url
