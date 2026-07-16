@@ -4556,6 +4556,71 @@ class WasteAtlasPublicationScopingTests(APITestCase):
             publication_status="review",
         )
 
+        # Historical (2022) collections in their own catchments. Archived data
+        # was necessarily published before (``archive`` only transitions from
+        # ``published``), so it must remain visible in historical-year maps,
+        # while private/review/declined data must never leak.
+        cls.archived_catchment = CollectionCatchment.objects.create(
+            name="Archived Catchment",
+            region=cls._region_with_borders("Archived Region"),
+        )
+        cls.archived_collector = Collector.objects.create(
+            name="Archived Collector",
+            catchment=cls.archived_catchment,
+        )
+        cls.archived_collection = Collection.objects.create(
+            name="Archived Collection",
+            owner=cls.user,
+            catchment=cls.archived_catchment,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2022, 1, 1),
+            publication_status="archived",
+            collector=cls.archived_collector,
+        )
+
+        cls.historical_private_catchment = CollectionCatchment.objects.create(
+            name="Historical Private Catchment",
+            region=cls._region_with_borders("Historical Private Region"),
+        )
+        cls.historical_private_collection = Collection.objects.create(
+            name="Historical Private Collection",
+            owner=cls.user,
+            catchment=cls.historical_private_catchment,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2022, 1, 1),
+            publication_status="private",
+        )
+
+        cls.historical_review_catchment = CollectionCatchment.objects.create(
+            name="Historical Review Catchment",
+            region=cls._region_with_borders("Historical Review Region"),
+        )
+        cls.historical_review_collection = Collection.objects.create(
+            name="Historical Review Collection",
+            owner=cls.user,
+            catchment=cls.historical_review_catchment,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2022, 1, 1),
+            publication_status="review",
+        )
+
+        cls.historical_declined_catchment = CollectionCatchment.objects.create(
+            name="Historical Declined Catchment",
+            region=cls._region_with_borders("Historical Declined Region"),
+        )
+        cls.historical_declined_collection = Collection.objects.create(
+            name="Historical Declined Collection",
+            owner=cls.user,
+            catchment=cls.historical_declined_catchment,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2022, 1, 1),
+            publication_status="declined",
+        )
+
     def _get(self, endpoint_key, **extra_params):
         params = {"country": "DE", "year": 2024, **extra_params}
         return self.client.get(self.ENDPOINTS[endpoint_key], params)
@@ -4656,3 +4721,38 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         self.assertIn(self.published_catchment.id, ids)
         self.assertNotIn(self.private_catchment.id, ids)
         self.assertNotIn(self.review_catchment.id, ids)
+
+    # --- Historical-year archived visibility ---
+
+    HISTORICAL_ENDPOINTS = (
+        "collection_system",
+        "catchment_geojson",
+        "collection_orga_level",
+    )
+
+    def test_archived_visible_in_historical_maps_for_anonymous(self):
+        """Previously-published (archived) collections show in historical maps."""
+        for key in self.HISTORICAL_ENDPOINTS:
+            response = self._get(key, year=2022)
+            self.assertEqual(response.status_code, status.HTTP_200_OK, key)
+            ids = self._catchment_ids(response)
+            self.assertIn(self.archived_catchment.id, ids, key)
+
+    def test_historical_maps_exclude_non_published(self):
+        """Private/review/declined data must never leak into historical maps."""
+        for key in self.HISTORICAL_ENDPOINTS:
+            response = self._get(key, year=2022)
+            self.assertEqual(response.status_code, status.HTTP_200_OK, key)
+            ids = self._catchment_ids(response)
+            self.assertNotIn(self.historical_private_catchment.id, ids, key)
+            self.assertNotIn(self.historical_review_catchment.id, ids, key)
+            self.assertNotIn(self.historical_declined_catchment.id, ids, key)
+
+    def test_staff_sees_archived_in_historical_maps(self):
+        staff = User.objects.create_user("staffhist", is_staff=True)
+        self.client.force_login(staff)
+        for key in self.HISTORICAL_ENDPOINTS:
+            response = self._get(key, year=2022)
+            self.assertEqual(response.status_code, status.HTTP_200_OK, key)
+            ids = self._catchment_ids(response)
+            self.assertIn(self.archived_catchment.id, ids, key)
