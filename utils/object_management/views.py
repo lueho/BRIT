@@ -23,6 +23,7 @@ from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string, select_template
 from django.urls import NoReverseMatch, reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.text import capfirst
 from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
 from django_filters.views import FilterView
@@ -1269,6 +1270,182 @@ class RejectItemModalView(BaseReviewActionModalView):
     review_action = ReviewAction.ACTION_REJECTED
 
 
+class BaseObjectAccessActionView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Base view for ownership transfer and shared edit access actions.
+
+    Resolves the target object from ContentType and object ID, checks the
+    configured permission method on UserCreatedObjectPermission, and redirects
+    to 'next' or the object's detail page.
+    """
+
+    permission_method: str | None = None
+    permission_denied_message: str = "You don't have permission to perform this action."
+
+    def get_object(self):
+        cached_object = getattr(self, "object", None)
+        if cached_object is not None:
+            return cached_object
+
+        content_type = get_object_or_404(
+            ContentType, pk=self.kwargs.get("content_type_id")
+        )
+        model_class = content_type.model_class()
+        if model_class is None or not issubclass(model_class, UserCreatedObject):
+            raise Http404("Unsupported object type.")
+        obj = get_object_or_404(model_class, pk=self.kwargs.get("object_id"))
+        self.object = obj
+        return obj
+
+    def test_func(self):
+        try:
+            obj = self.get_object()
+        except Http404:
+            raise
+        except Exception:
+            return False
+        perm = UserCreatedObjectPermission()
+        checker = getattr(perm, str(self.permission_method), None)
+        if not callable(checker):
+            return False
+        try:
+            return bool(checker(self.request, obj))
+        except Exception:
+            return False
+
+    def get_success_url(self):
+        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={self.request.get_host()},
+            require_https=self.request.is_secure(),
+        ):
+            return next_url
+        try:
+            return self.object.get_absolute_url()
+        except Exception:
+            return "/"
+
+    def _resolve_user(self, username):
+        from django.contrib.auth.models import User
+
+        try:
+            return User.objects.get(username=username)
+        except User.DoesNotExist:
+            return None
+
+
+class TransferOwnershipView(BaseObjectAccessActionView):
+    """Transfer ownership of a UserCreatedObject to another user."""
+
+    permission_method = "has_transfer_ownership_permission"
+    permission_denied_message = (
+        "You don't have permission to transfer ownership of this item."
+    )
+
+    def post(self, request, *args, **kwargs):
+        obj = self.get_object()
+        new_owner = self._resolve_user((request.POST.get("new_owner") or "").strip())
+        if new_owner is None:
+            messages.error(request, "The specified user does not exist.")
+            return HttpResponseRedirect(self.get_success_url())
+        try:
+            obj.transfer_ownership(new_owner, initiator=request.user)
+        except ValidationError as e:
+            messages.error(request, " ".join(e.messages))
+            return HttpResponseRedirect(self.get_success_url())
+        messages.success(
+            request,
+            f"Ownership of {capfirst(obj._meta.verbose_name)} has been transferred "
+            f"to {new_owner.username}.",
+        )
+        success_url = self.get_success_url()
+        policy = get_object_policy(request.user, obj, request=request)
+        if not (
+            policy["is_published"]
+            or policy["is_owner"]
+            or policy["is_editor"]
+            or policy["is_staff"]
+            or policy["is_moderator"]
+        ):
+            # The former owner may no longer read the object; avoid a 403.
+            try:
+                if success_url == obj.get_absolute_url():
+                    success_url = "/"
+            except Exception:
+                success_url = "/"
+        return HttpResponseRedirect(success_url)
+
+
+class AddEditorView(BaseObjectAccessActionView):
+    """Grant another user edit access to a UserCreatedObject."""
+
+    permission_method = "has_manage_editors_permission"
+    permission_denied_message = (
+        "You don't have permission to manage edit access for this item."
+    )
+
+    def post(self, request, *args, **kwargs):
+        obj = self.get_object()
+        user = self._resolve_user((request.POST.get("user") or "").strip())
+        if user is None:
+            messages.error(request, "The specified user does not exist.")
+            return HttpResponseRedirect(self.get_success_url())
+        try:
+            obj.add_editor(user, granted_by=request.user)
+        except ValidationError as e:
+            messages.error(request, " ".join(e.messages))
+            return HttpResponseRedirect(self.get_success_url())
+        messages.success(
+            request,
+            f"{user.username} can now edit this {obj._meta.verbose_name}.",
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class RemoveEditorView(BaseObjectAccessActionView):
+    """Revoke a user's edit access to a UserCreatedObject."""
+
+    permission_method = "has_manage_editors_permission"
+    permission_denied_message = (
+        "You don't have permission to manage edit access for this item."
+    )
+
+    def post(self, request, *args, **kwargs):
+        obj = self.get_object()
+        user = self._resolve_user((request.POST.get("user") or "").strip())
+        if user is None:
+            messages.error(request, "The specified user does not exist.")
+            return HttpResponseRedirect(self.get_success_url())
+        obj.remove_editor(user)
+        messages.success(
+            request,
+            f"{user.username} can no longer edit this {obj._meta.verbose_name}.",
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class ManageAccessModalView(BaseObjectAccessActionView):
+    """Modal to transfer ownership and manage shared edit access."""
+
+    permission_method = "has_manage_editors_permission"
+    permission_denied_message = (
+        "You don't have permission to manage access for this item."
+    )
+    template_name = "object_management/manage_access_modal.html"
+
+    def get(self, request, *args, **kwargs):
+        obj = self.get_object()
+        context = {
+            "object": obj,
+            "modal_title": f"Manage access for {obj._meta.verbose_name}",
+            "editors": obj.editors.order_by("username"),
+            "next_url": request.GET.get("next"),
+            "content_type_id": self.kwargs.get("content_type_id"),
+            "object_id": self.kwargs.get("object_id"),
+        }
+        return HttpResponse(render_to_string(self.template_name, context, request))
+
+
 class UserOwnsObjectMixin(UserPassesTestMixin):
     """
     All models that have access restrictions specific to a user contain a field named 'owner'. This mixin prevents
@@ -1799,7 +1976,12 @@ class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
         if policy["is_published"]:
             return True
         # Archived, private, review, and declined objects require authentication
-        return policy["is_owner"] or policy["is_staff"] or policy["is_moderator"]
+        return (
+            policy["is_owner"]
+            or policy["is_editor"]
+            or policy["is_staff"]
+            or policy["is_moderator"]
+        )
 
 
 class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):

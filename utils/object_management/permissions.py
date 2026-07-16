@@ -110,6 +110,34 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         # Handle write methods
         user = request.user
 
+        # Editors (shared edit access) may modify content fields of
+        # non-published objects, but never the publication status, the owner,
+        # and never delete. Requests outside that scope fall through to the
+        # moderator branch below, so editors who are also moderators keep both
+        # abilities.
+        if obj.owner != user and self._is_editor(user, obj):
+            from .models import UserCreatedObject
+
+            try:
+                payload = request.data
+            except drf_exceptions.UnsupportedMediaType:
+                payload = {}
+
+            if (
+                request.method in ("PUT", "PATCH")
+                and getattr(obj, "publication_status", None)
+                not in (
+                    UserCreatedObject.STATUS_PUBLISHED,
+                    getattr(UserCreatedObject, "STATUS_ARCHIVED", "archived"),
+                )
+                and "publication_status" not in payload
+                and "owner" not in payload
+            ):
+                return True
+
+            if not self._is_moderator(user, obj):
+                return False
+
         if obj.owner == user:
             from .models import UserCreatedObject
 
@@ -176,21 +204,18 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         if status == UserCreatedObject.STATUS_PUBLISHED:
             return True
 
-        # Objects in review: owner or moderator/staff can view
-        if status == UserCreatedObject.STATUS_REVIEW:
-            return obj.owner == request.user or self._is_moderator(request.user, obj)
-
-        # Private objects: owner or moderator/staff can view
-        if status == UserCreatedObject.STATUS_PRIVATE:
-            return obj.owner == request.user or self._is_moderator(request.user, obj)
-
-        # Declined objects: owner or moderator/staff can view
-        if status == getattr(UserCreatedObject, "STATUS_DECLINED", "declined"):
-            return obj.owner == request.user or self._is_moderator(request.user, obj)
-
-        # Archived objects: NOT publicly readable; owner or moderator/staff only
-        if status == getattr(UserCreatedObject, "STATUS_ARCHIVED", "archived"):
-            return obj.owner == request.user or self._is_moderator(request.user, obj)
+        # Non-published objects: owner, editor, or moderator/staff can view
+        if status in (
+            UserCreatedObject.STATUS_REVIEW,
+            UserCreatedObject.STATUS_PRIVATE,
+            getattr(UserCreatedObject, "STATUS_DECLINED", "declined"),
+            getattr(UserCreatedObject, "STATUS_ARCHIVED", "archived"),
+        ):
+            return (
+                obj.owner == request.user
+                or self._is_editor(request.user, obj)
+                or self._is_moderator(request.user, obj)
+            )
 
         return False
 
@@ -203,6 +228,57 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         perm_codename = f"can_moderate_{model_name}"
         app_label = obj._meta.app_label
         return user.is_staff or user.has_perm(f"{app_label}.{perm_codename}")
+
+    def _is_editor(self, user, obj):
+        """Return whether ``user`` has an editor grant on ``obj``.
+
+        The user's granted object ids are fetched once per model and cached on
+        the user instance, so per-row checks in list views stay query-free.
+        """
+        if not user or not user.is_authenticated:
+            return False
+
+        from django.contrib.contenttypes.models import ContentType
+
+        from .models import ObjectEditorGrant
+
+        try:
+            content_type = ContentType.objects.get_for_model(obj.__class__)
+            cache = getattr(user, "_editor_grant_cache", None)
+            if cache is None:
+                cache = {}
+                user._editor_grant_cache = cache
+            if content_type.pk not in cache:
+                cache[content_type.pk] = set(
+                    ObjectEditorGrant.objects.filter(
+                        content_type=content_type, editor=user
+                    ).values_list("object_id", flat=True)
+                )
+            return obj.pk in cache[content_type.pk]
+        except Exception:
+            return False
+
+    def is_editor(self, user, obj):  # pragma: no cover - thin wrapper
+        """Public wrapper around ``_is_editor`` for templates and helpers."""
+        return self._is_editor(user, obj)
+
+    def has_transfer_ownership_permission(self, request, obj):
+        """Return whether ``request.user`` may transfer ownership of ``obj``.
+
+        Allowed for the owner and staff members.
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        return obj.owner == request.user or getattr(request.user, "is_staff", False)
+
+    def has_manage_editors_permission(self, request, obj):
+        """Return whether ``request.user`` may grant/revoke edit access on ``obj``.
+
+        Allowed for the owner and staff members.
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        return obj.owner == request.user or getattr(request.user, "is_staff", False)
 
     def is_moderator(self, user, obj):  # pragma: no cover - thin wrapper
         """Public wrapper around ``_is_moderator`` for templates and helpers."""
@@ -382,6 +458,17 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         is_authenticated and getattr(obj, "owner_id", None) == getattr(user, "id", None)
     )
 
+    # Shared edit access via editor grants
+    try:
+        is_editor = bool(
+            is_authenticated and not is_owner and perm.is_editor(user, obj)
+        )
+    except Exception:
+        logger.exception(
+            "Failed checking editor permission in get_object_policy", exc_info=True
+        )
+        is_editor = False
+
     # Publication status helpers (use convenience properties if available)
     is_private = bool(getattr(obj, "is_private", False))
     is_in_review = bool(getattr(obj, "is_in_review", False))
@@ -453,13 +540,20 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         )
         has_change_permission = is_staff
 
-    # Edit: staff always; owners with change permission if not published;
-    # never when archived
+    # Edit: staff always; owners and editors with change permission if not
+    # published; never when archived
     can_edit = (
         has_update_url
         and not is_archived
-        and (is_staff or (is_owner and not is_published and has_change_permission))
+        and (
+            is_staff
+            or ((is_owner or is_editor) and not is_published and has_change_permission)
+        )
     )
+
+    # Ownership transfer and shared edit access management: owner or staff
+    can_transfer_ownership = is_authenticated and (is_owner or is_staff)
+    can_manage_editors = is_authenticated and (is_owner or is_staff)
 
     # Delete:
     # - Archived: staff-only special case (optional "Archive → Delete")
@@ -541,6 +635,7 @@ def get_object_policy(user, obj, request=None, review_mode=False):
     return {
         "is_authenticated": is_authenticated,
         "is_owner": is_owner,
+        "is_editor": is_editor,
         "is_staff": is_staff,
         "is_moderator": is_moderator,
         "is_private": is_private,
@@ -550,6 +645,8 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         "is_archived": is_archived,
         "has_change_permission": has_change_permission,
         "can_edit": can_edit,
+        "can_transfer_ownership": can_transfer_ownership,
+        "can_manage_editors": can_manage_editors,
         "can_manage_samples": can_manage_samples,
         "can_add_property": can_add_property,
         "can_duplicate": can_duplicate,
@@ -601,7 +698,7 @@ def apply_scope_filter(queryset, scope: str | None, user=None):
 
     Supported scopes:
     - ``published``: published records only
-    - ``private``: authenticated owner's records only
+    - ``private``: authenticated owner's records plus editor grants
     - ``review``: review records visible by role (owner/moderator/staff)
     - ``declined``/``archived``: owner-only for authenticated users, staff sees all
 
@@ -641,7 +738,7 @@ def apply_scope_filter(queryset, scope: str | None, user=None):
         if not is_authenticated:
             return queryset.none()
         _ensure_owner_field("private")
-        return queryset.filter(owner=user)
+        return queryset.filter(Q(owner=user) | _editor_grant_filter(model, user))
 
     if scope == "review":
         filtered = queryset.filter(**_status_kwargs(scope))
@@ -664,13 +761,30 @@ def apply_scope_filter(queryset, scope: str | None, user=None):
     return queryset
 
 
+def _editor_grant_filter(model, user):
+    """Q filter matching objects the user holds an editor grant for."""
+    from django.contrib.contenttypes.models import ContentType
+
+    from .models import ObjectEditorGrant
+
+    try:
+        return Q(
+            pk__in=ObjectEditorGrant.objects.filter(
+                content_type=ContentType.objects.get_for_model(model),
+                editor=user,
+            ).values("object_id")
+        )
+    except Exception:
+        return Q(pk__in=[])
+
+
 def filter_queryset_for_user(queryset, user):
     """Return the subset of ``queryset`` visible to ``user`` under read policy.
 
     - staff: full queryset
     - anonymous: published only
-    - authenticated regular: own + published
-    - authenticated moderator: own + published + review
+    - authenticated regular: own + published + editor grants
+    - authenticated moderator: own + published + review + editor grants
     """
 
     model = queryset.model
@@ -691,11 +805,15 @@ def filter_queryset_for_user(queryset, user):
     published_filter = Q(publication_status=_resolve_status_value(model, "published"))
     owner_filter = Q(owner=user)
 
+    editor_filter = _editor_grant_filter(model, user)
+
     if user_is_moderator_for_model(user, model):
         review_filter = Q(publication_status=_resolve_status_value(model, "review"))
-        return queryset.filter(owner_filter | published_filter | review_filter)
+        return queryset.filter(
+            owner_filter | published_filter | review_filter | editor_filter
+        )
 
-    return queryset.filter(owner_filter | published_filter)
+    return queryset.filter(owner_filter | published_filter | editor_filter)
 
 
 def build_scope_filter_params(scope: str | None, user):

@@ -247,7 +247,9 @@ class UserCreatedObjectQueryTests(BaseAPITestCase):
 
     def test_regular_scope_private(self):
         self._get_qs(user=self.regular_user, params={"scope": "private"})
-        self.base_qs.filter.assert_called_once_with(owner=self.regular_user)
+        self.base_qs.filter.assert_called_once()
+        q = self.base_qs.filter.call_args[0][0]
+        self.assertIn(("owner", self.regular_user), q.children)
 
     def test_regular_scope_review(self):
         self._get_qs(user=self.regular_user, params={"scope": "review"})
@@ -265,7 +267,9 @@ class UserCreatedObjectQueryTests(BaseAPITestCase):
 
     def test_staff_scope_private_is_owner_only(self):
         self._get_qs(user=self.staff_user, params={"scope": "private"})
-        self.base_qs.filter.assert_called_once_with(owner=self.staff_user)
+        self.base_qs.filter.assert_called_once()
+        q = self.base_qs.filter.call_args[0][0]
+        self.assertIn(("owner", self.staff_user), q.children)
 
     def test_staff_scope_review_returns_all_review_objects(self):
         self._get_qs(user=self.staff_user, params={"scope": "review"})

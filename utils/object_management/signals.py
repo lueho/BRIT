@@ -217,6 +217,25 @@ def clear_moderation_cache_on_delete(sender, instance, **kwargs):
         pass
 
 
+@receiver(post_delete)
+def delete_editor_grants_on_delete(sender, instance, **kwargs):
+    """Remove editor grants pointing at a deleted UserCreatedObject instance."""
+    try:
+        from utils.object_management.models import ObjectEditorGrant, UserCreatedObject
+
+        if not (
+            isinstance(sender, type)
+            and issubclass(sender, UserCreatedObject)
+            and not sender._meta.abstract
+        ):
+            return
+
+        ObjectEditorGrant.for_object(instance).delete()
+    except Exception:
+        # Be defensive - if grant cleanup fails, don't break the delete operation
+        pass
+
+
 def _clear_moderator_caches():
     """Clear moderation cache for all users who might be moderators."""
     try:

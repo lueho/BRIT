@@ -123,12 +123,68 @@ class ReviewAction(models.Model):
         )
 
 
+class ObjectEditorGrant(models.Model):
+    """Grants a user edit access to a single ``UserCreatedObject`` instance.
+
+    Uses a GenericForeignKey so that any model inheriting from
+    ``UserCreatedObject`` can share edit access with additional users.
+    """
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey("content_type", "object_id")
+
+    editor = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="editor_grants"
+    )
+    granted_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["content_type", "object_id", "editor"],
+                name="unique_editor_grant_per_object",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["content_type", "object_id"]),
+            models.Index(fields=["editor"]),
+        ]
+
+    def __str__(self):
+        return f"Edit access for {self.editor} on {self.content_type} #{self.object_id}"
+
+    @classmethod
+    def for_object(cls, obj):
+        return cls.objects.filter(
+            content_type=ContentType.objects.get_for_model(obj.__class__),
+            object_id=obj.pk,
+        )
+
+
 class UserCreatedObjectQuerySet(models.QuerySet):
     def published(self):
         return self.filter(publication_status=UserCreatedObject.STATUS_PUBLISHED)
 
     def owned_by_user(self, user):
         return self.filter(owner=user)
+
+    def editable_by_user(self, user):
+        """Objects the user owns or has been granted edit access to."""
+        if not user or not user.is_authenticated:
+            return self.none()
+        return self.filter(
+            Q(owner=user) | Q(pk__in=self._editor_grant_object_ids(user))
+        )
+
+    def _editor_grant_object_ids(self, user):
+        return ObjectEditorGrant.objects.filter(
+            content_type=ContentType.objects.get_for_model(self.model),
+            editor=user,
+        ).values("object_id")
 
     def reviewable_by_user(self, user):
         if self._is_moderator(user):
@@ -143,11 +199,14 @@ class UserCreatedObjectQuerySet(models.QuerySet):
         if self._is_moderator(user):
             return self.all()
         else:
-            return self.filter(
+            filters = (
                 Q(owner=user)
                 | Q(publication_status=UserCreatedObject.STATUS_PUBLISHED)
                 | Q(publication_status=UserCreatedObject.STATUS_REVIEW, owner=user)
             )
+            if user and user.is_authenticated:
+                filters |= Q(pk__in=self._editor_grant_object_ids(user))
+            return self.filter(filters)
 
     def _is_moderator(self, user):
         """
@@ -169,6 +228,9 @@ class UserCreatedObjectManager(models.Manager):
 
     def owned_by_user(self, user):
         return self.get_queryset().owned_by_user(user)
+
+    def editable_by_user(self, user):
+        return self.get_queryset().editable_by_user(user)
 
     def reviewable_by_user(self, user):
         return self.get_queryset().reviewable_by_user(user)
@@ -310,6 +372,63 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
             self.publication_status = self.STATUS_ARCHIVED
             self.save(update_fields=["publication_status"])
         # TODO: Implement notification to the owner
+
+    # --- Ownership transfer and shared edit access ---
+    @property
+    def editor_grants(self):
+        return ObjectEditorGrant.for_object(self)
+
+    @property
+    def editors(self):
+        return User.objects.filter(
+            editor_grants__content_type=ContentType.objects.get_for_model(
+                self.__class__
+            ),
+            editor_grants__object_id=self.pk,
+        )
+
+    def add_editor(self, user, granted_by=None):
+        """Grant ``user`` edit access to this object."""
+        if user.pk == self.owner_id:
+            raise ValidationError("The owner already has edit access.")
+        if not user.is_active:
+            raise ValidationError("Cannot grant edit access to an inactive user.")
+        grant, _ = ObjectEditorGrant.objects.get_or_create(
+            content_type=ContentType.objects.get_for_model(self.__class__),
+            object_id=self.pk,
+            editor=user,
+            defaults={"granted_by": granted_by},
+        )
+        return grant
+
+    def remove_editor(self, user):
+        """Revoke ``user``'s edit access to this object."""
+        self.editor_grants.filter(editor=user).delete()
+
+    def is_editable_by(self, user):
+        """Return whether ``user`` is the owner or has an editor grant."""
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if user.pk == self.owner_id:
+            return True
+        return self.editor_grants.filter(editor=user).exists()
+
+    def transfer_ownership(self, new_owner, initiator=None):
+        """Transfer ownership of this object to ``new_owner``.
+
+        Any editor grant held by the new owner is removed since owners
+        implicitly have edit access.
+        """
+        if not isinstance(new_owner, User):
+            raise ValidationError("New owner must be a user.")
+        if not new_owner.is_active:
+            raise ValidationError("Cannot transfer ownership to an inactive user.")
+        if new_owner.pk == self.owner_id:
+            return
+        with transaction.atomic():
+            self.owner = new_owner
+            self.save(update_fields=["owner"])
+            self.remove_editor(new_owner)
 
     @property
     def is_private(self):

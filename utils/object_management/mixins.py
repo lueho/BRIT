@@ -46,6 +46,7 @@ class _BaseUserCreatedObjectAccessMixin(UserPassesTestMixin):
             policy["is_published"]
             or policy["is_archived"]
             or policy["is_owner"]
+            or policy["is_editor"]
             or policy["is_staff"]
         )
 
