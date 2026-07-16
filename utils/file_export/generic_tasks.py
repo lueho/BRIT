@@ -24,7 +24,6 @@ def cleanup_expired_exports():
 
     deleted = 0
     for export in UserExport.objects.expired():
-        export.delete_file()
         export.delete()
         deleted += 1
     return deleted
