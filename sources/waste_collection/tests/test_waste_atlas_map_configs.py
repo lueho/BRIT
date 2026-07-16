@@ -234,7 +234,11 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         self.assertNotIn("toFixed", fmt_section)
 
     def test_separation_rate_quartile_labels_use_percentage_values(self):
-        for config_key in ("organic_waste_ratio", "waste_ratio"):
+        for config_key in (
+            "connection_rate",
+            "organic_waste_ratio",
+            "waste_ratio",
+        ):
             with self.subTest(config_key=config_key):
                 self.assertEqual(
                     MAP_CONFIGS[config_key]["quartileDisplayMultiplier"], 100

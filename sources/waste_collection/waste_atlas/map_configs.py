@@ -1042,6 +1042,7 @@ MAP_CONFIGS = {
         "legendTitle": "Connection rate",
         "fileBase": "connection_rate",
         "numericField": "connection_rate",
+        "quartileDisplayMultiplier": 100,
         "tooltipFields": [{"field": "reporting_year", "label": "Reporting year"}],
         "quartileColors": ["#d1e7e6", "#7fcce9", "#0090cb", "#00608e"],
         "quartilePreserveClasses": ["no_d2d"],
