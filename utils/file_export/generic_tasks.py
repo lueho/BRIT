@@ -1,3 +1,5 @@
+import logging
+
 from celery import shared_task
 from django.contrib.auth import get_user_model
 from django.http.request import MultiValueDict, QueryDict
@@ -11,6 +13,8 @@ from utils.object_management.permissions import (
 from .export_registry import get_export_spec
 
 BATCH_SIZE = 50
+
+logger = logging.getLogger(__name__)
 
 
 @shared_task
@@ -109,6 +113,9 @@ def export_user_created_object_to_file(
             task_id=str(self.request.id),
         )
 
-    cleanup_expired_exports.run()
+    try:
+        cleanup_expired_exports.run()
+    except Exception:
+        logger.exception("Opportunistic cleanup of expired exports failed")
 
     return url
