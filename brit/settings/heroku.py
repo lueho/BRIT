@@ -45,6 +45,7 @@ MIDDLEWARE.append("brit.middleware.ExceptionLoggingMiddleware")
 
 SECURE_CSP_REPORT_ONLY = {
     "default-src": [CSP.SELF],
+    "style-src": [CSP.SELF],
     "base-uri": [CSP.SELF],
     "frame-ancestors": [CSP.SELF],
     "object-src": [CSP.NONE],

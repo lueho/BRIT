@@ -257,7 +257,7 @@ class DynamicFormset {
         if (deletedInput) {
             // If there's a DELETE field, mark for deletion rather than removing
             deletedInput.value = "on";
-            row.style.display = "none";
+            row.classList.add("d-none");
         } else {
             // Otherwise remove the row and renumber
             row.remove();

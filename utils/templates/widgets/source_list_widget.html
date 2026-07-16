@@ -5,26 +5,23 @@
     <select name="{{ widget.name }}"
             id="{{ widget.attrs.id }}"
             multiple
-            style="display: none"
+            class="source-list-hidden-select"
             {% include "django/forms/widgets/attrs.html" %}>
         {% for option in widget.optgroups %}
             {% for opt in option.1 %}<option value="{{ opt.value }}" selected>{{ opt.label }}</option>{% endfor %}
         {% endfor %}
     </select>
-
     <div class="card-header bg-light">
         <h6 class="mb-0">
             <i class="fas fa-book me-1"></i> Bibliographic References
         </h6>
     </div>
-
     <div class="card-body py-2 border-bottom bg-light">
         <p class="text-muted small mb-0">
             Research papers, books, reports, and other documented sources with full metadata (authors, year, DOI, etc.).
             Use the autocomplete to search by title or abbreviation.
         </p>
     </div>
-
     <div class="card-body">
         {# Section 1: Search and add existing sources #}
         <div class="source-add-section mb-3">
@@ -41,7 +38,6 @@
                    data-label-field="{{ widget.label_field }}"
                    data-target-select="{{ widget.attrs.id }}">
         </div>
-
         {# Section 2: Create a new source #}
         <div class="source-create-section border rounded p-3 bg-light mb-3"
              id="{{ widget.attrs.id }}_create_section">
@@ -82,7 +78,6 @@
             <p class="text-danger small mt-2 mb-0 d-none"
                id="{{ widget.attrs.id }}_feedback"></p>
         </div>
-
         {# List of selected sources #}
         <div class="source-selected-list">
             <label class="form-label fw-semibold">Selected:</label>
@@ -107,10 +102,8 @@
                     {% endfor %}
                 {% endfor %}
             </ul>
-            <p class="text-muted small mt-2 mb-0"
-               id="{{ widget.attrs.id }}_empty"
-               style="{% if widget.value %}display: none;
-                      {% endif %}">No sources selected yet. Use the search above to add sources.</p>
+            <p class="text-muted small mt-2 mb-0{% if widget.value %} d-none{% endif %}"
+               id="{{ widget.attrs.id }}_empty">No sources selected yet. Use the search above to add sources.</p>
         </div>
     </div>
 </div>

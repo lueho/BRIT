@@ -7343,6 +7343,153 @@ body {
   height: 100%;
 }
 
+.source-list-hidden-select {
+  display: none;
+}
+
+.wasteflyer-url {
+  max-width: 500px;
+}
+
+.process-category-image {
+  height: 12rem;
+  object-fit: cover;
+}
+
+.svg-icon-header-mark {
+  height: 1em;
+  width: auto;
+  fill: currentColor;
+  vertical-align: -0.125em;
+  stroke: currentColor;
+  stroke-width: 0.2;
+}
+
+.about-logo-half {
+  width: 50%;
+}
+
+.about-logo-wide {
+  width: 80%;
+}
+
+.sample-gallery-image,
+.geodataset-gallery-image {
+  aspect-ratio: 16/9;
+  object-fit: cover;
+}
+
+.sample-gallery-placeholder {
+  aspect-ratio: 16/9;
+}
+
+.sample-gallery-placeholder-label {
+  max-width: 18rem;
+}
+
+.diagram-container {
+  background: #fff;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  overflow-x: auto;
+}
+
+.diagram-container .node rect,
+.diagram-container .node polygon,
+.diagram-container .node circle {
+  cursor: pointer;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 1.5rem;
+  font-size: 0.85rem;
+}
+
+.legend-line {
+  width: 2rem;
+  height: 0;
+  display: inline-block;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+}
+
+.legend-line--fk {
+  border-top: 2px solid #666;
+}
+
+.legend-line--m2m {
+  border-top: 2px dashed #666;
+}
+
+.legend-swatch {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 3px;
+  display: inline-block;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+}
+
+.legend-swatch--clickable {
+  background: #dbeafe;
+  border: 2px solid #1e40af;
+}
+
+.legend-swatch--internal {
+  background: #f3f4f6;
+  border: 2px solid #9ca3af;
+}
+
+.feedstock-summary-legend {
+  list-style: none;
+  padding-left: 0;
+}
+
+.feedstock-summary-legend li {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 10px;
+}
+
+.feedstock-summary-legend-swatch {
+  display: inline-block;
+  margin-right: 10px;
+  width: 25px;
+  height: 0.8rem;
+}
+
+.feedstock-summary-legend-label {
+  display: inline-block;
+  font-size: small;
+}
+
+.feedstock-summary-legend-swatch-0 {
+  background-color: #04555e;
+}
+
+.feedstock-summary-legend-swatch-1 {
+  background-color: #943329;
+}
+
+.feedstock-summary-legend-swatch-2 {
+  background-color: #63a33c;
+}
+
+.feedstock-summary-legend-swatch-3 {
+  background-color: #f49a33;
+}
+
+.feedstock-summary-legend-swatch-4 {
+  background-color: #826937;
+}
+
+.feedstock-summary-legend-swatch-5 {
+  background-color: #fcc767;
+}
+
 .review-hint-dot {
   display: inline-block;
   flex-shrink: 0;

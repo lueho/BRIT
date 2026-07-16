@@ -20,6 +20,11 @@
     width: 100%;
 }
 
+.formset-row-deleted {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
 /* TomSelect specific adjustments */
 .formset-form-row .ts-control {
     min-width: 12rem;

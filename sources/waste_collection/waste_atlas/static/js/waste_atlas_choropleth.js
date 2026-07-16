@@ -62,8 +62,8 @@ var WasteAtlasChoropleth = (function () {
 
   // ---- helpers --------------------------------------------------------------
 
-  function _show(el) { if (el) el.style.display = ''; }
-  function _hide(el) { if (el) el.style.display = 'none'; }
+  function _show(el) { if (el) el.classList.remove('d-none'); }
+  function _hide(el) { if (el) el.classList.add('d-none'); }
 
   function _fetchJSON(url) {
     return fetch(url, { credentials: 'same-origin' })
@@ -633,7 +633,7 @@ var WasteAtlasChoropleth = (function () {
       if (!btnToggleChange) return;
       var url = selectedCrossLinkUrl();
       if (!url) {
-        btnToggleChange.style.display = 'none';
+        btnToggleChange.classList.add('d-none');
         btnToggleChange.removeAttribute('href');
         return;
       }
@@ -643,7 +643,7 @@ var WasteAtlasChoropleth = (function () {
         ? 'year=' + encodeURIComponent(year)
         : 'from_year=' + encodeURIComponent(fromYear || previousChangeYear(year)) + '&to_year=' + encodeURIComponent(year);
       btnToggleChange.href = url + '?' + params;
-      btnToggleChange.style.display = '';
+      btnToggleChange.classList.remove('d-none');
     }
 
     function ensureVisibleSelection() {
@@ -1744,7 +1744,7 @@ var WasteAtlasChoropleth = (function () {
       .attr('width', width)
       .attr('height', height)
       .attr('viewBox', '0 0 ' + width + ' ' + height)
-      .style('background', '#fff');
+      .attr('class', 'waste-atlas-export-svg');
 
     _svg.selectAll('*').remove();
     _defineOverlayPattern(cfg);
@@ -1827,7 +1827,7 @@ var WasteAtlasChoropleth = (function () {
         .attr('d', path)
         .attr('fill', 'url(#' + _overlayPatternId(cfg) + ')')
         .attr('stroke', 'none')
-        .style('pointer-events', 'none');
+        .attr('pointer-events', 'none');
     }
 
     if (data.acpvOutlines && data.acpvOutlines.features) {
@@ -1842,7 +1842,7 @@ var WasteAtlasChoropleth = (function () {
         .attr('stroke-width', cfg.outlineStrokeWidth || 1.35)
         .attr('stroke-linejoin', 'round')
         .attr('stroke-linecap', 'round')
-        .style('pointer-events', 'none');
+        .attr('pointer-events', 'none');
     }
 
     // Maintainer aid: outline catchments whose theme value is ambiguous
@@ -1862,7 +1862,7 @@ var WasteAtlasChoropleth = (function () {
         .attr('stroke-width', CONFLICT_STROKE_WIDTH)
         .attr('stroke-dasharray', CONFLICT_STROKE_DASHARRAY)
         .attr('stroke-linejoin', 'round')
-        .style('pointer-events', 'none');
+        .attr('pointer-events', 'none');
     }
 
     var hasRegionalBorder = cfg.nutsPrefix && data.bundeslaender && data.bundeslaender.features

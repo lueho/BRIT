@@ -1,22 +1,5 @@
 {% extends "materials/sample_filter.html" %}
 {% load moderation_tags %}
-{% block custom_style %}
-    {{ block.super }}
-    <style>
-  .sample-gallery-image {
-    aspect-ratio: 16 / 9;
-    object-fit: cover;
-  }
-
-  .sample-gallery-placeholder {
-    aspect-ratio: 16 / 9;
-  }
-
-  .sample-gallery-placeholder-label {
-    max-width: 18rem;
-  }
-    </style>
-{% endblock custom_style %}
 {% block list_table %}
     <div class="row g-3">
         {% for object in object_list %}

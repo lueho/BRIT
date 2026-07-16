@@ -10,14 +10,13 @@
     Usage example:
     {% include "django_tomselect/formset_add_button.html" with formset_prefix="edition" button_text="Add Another Edition" %}
 {% endcomment %}
-
 {% with button_text=button_text|default:"Add Another" %}
-{% with button_class=button_class|default:"btn btn-secondary" %}
-{% with container_id=container_id|default:"form-container" %}
-
-<button type="button" class="{{ button_class }}" id="add-{{ formset_prefix }}-form">{{ button_text }}</button>
-
-<script>
+    {% with button_class=button_class|default:"btn btn-secondary" %}
+        {% with container_id=container_id|default:"form-container" %}
+            <button type="button"
+                    class="{{ button_class }}"
+                    id="add-{{ formset_prefix }}-form">{{ button_text }}</button>
+            <script>
     document.addEventListener('DOMContentLoaded', function() {
         const addButton = document.getElementById('add-{{ formset_prefix }}-form');
         const formContainer = document.getElementById('{{ container_id }}');
@@ -83,7 +82,7 @@
                     selectElement.className = selectElement.className
                         .replace(/\btomselected\b/g, '')
                         .replace(/\bts-hidden-accessible\b/g, '');
-                    selectElement.style.display = '';
+                    selectElement.classList.remove('d-none');
                     selectElement.removeAttribute('tabindex');
                     selectElement.removeAttribute('data-ts-hidden');
                     
@@ -107,8 +106,7 @@
             });
         }
     });
-</script>
-
-{% endwith %}
-{% endwith %}
+            </script>
+        {% endwith %}
+    {% endwith %}
 {% endwith %}

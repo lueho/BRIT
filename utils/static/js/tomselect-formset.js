@@ -139,8 +139,7 @@ class TomSelectFormset {
         const del = row.querySelector("input[name$='-DELETE']");
         if (del) {
             del.checked = true;
-            row.style.opacity = 0.5;
-            row.style.pointerEvents = "none";
+            row.classList.add("formset-row-deleted");
         } else {
             row.remove();
             this.renumber();

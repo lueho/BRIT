@@ -2,15 +2,12 @@
 {% load crispy_forms_tags %}
 {% load user_created_object_tags %}
 {% load moderation_tags %}
-
 {% block title %}
     BRIT | Waste Collection Flyers
 {% endblock title %}
-
 {% block list_card_header %}
     <strong>Flyers</strong>
 {% endblock list_card_header %}
-
 {% block list_table %}
     <div class="collection-list-min-height">
         <div class="table-responsive">
@@ -27,7 +24,7 @@
                             <td data-label="Flyer" class="ps-3">
                                 <a href="{% detail_or_review_url object use_back=True %}"
                                    class="text-decoration-none">
-                                    <strong class="d-block text-truncate" style="max-width: 500px;">{{ object.url }}</strong>
+                                    <strong class="d-block text-truncate wasteflyer-url">{{ object.url }}</strong>
                                     <span class="text-muted small">Valid: {{ object.url_valid }}
                                         {% if object.url_checked %}· Checked: {{ object.url_checked|date:'d.m.Y' }}{% endif %}
                                     </span>
@@ -45,24 +42,20 @@
         </div>
     </div>
 {% endblock list_table %}
-
 {% block list_card_options_dropdown_additional_links %}
     {% if private_list_owner == user or user.is_staff %}
         <a id="check_url"
            class="btn btn-outline-secondary w-100 mb-2"
-           href="javascript:void(0)"
-           onclick="check_url()">
+           href="#check_url"
+           role="button">
             <i class="fas fa-fw fa-check-circle"></i>
             <span>Check URLs</span>
         </a>
     {% endif %}
 {% endblock list_card_options_dropdown_additional_links %}
-
 {% block javascript %}
     {{ block.super }}
-
     <script type="text/javascript">
-
     async function monitor_task_progress(url, count = 0) {
         const response = await fetch(url);
         const data = await response.json();
@@ -106,6 +99,9 @@
         monitor_task_progress(url);
     }
 
+    document.getElementById('check_url')?.addEventListener('click', function (event) {
+        event.preventDefault();
+        check_url();
+    });
     </script>
-
 {% endblock javascript %}

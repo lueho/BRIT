@@ -35,7 +35,7 @@
     let firstVisibleIdx = -1;
     paletteItems.forEach((item, idx) => {
       const match = !q || item.textContent.toLowerCase().includes(q);
-      item.parentElement.style.display = match ? "" : "none";
+      item.parentElement.classList.toggle("d-none", !match);
       item.classList.remove("is-active");
       if (match && firstVisibleIdx === -1) firstVisibleIdx = idx;
     });
@@ -48,7 +48,7 @@
   function movePaletteActive(delta) {
     if (!paletteItems.length) return;
     const visible = paletteItems.filter(
-      (item) => item.parentElement.style.display !== "none"
+      (item) => !item.parentElement.classList.contains("d-none")
     );
     if (!visible.length) return;
     let currentVisibleIdx = visible.findIndex((item) =>
@@ -193,8 +193,7 @@
     }
     const ta = document.createElement("textarea");
     ta.value = text;
-    ta.style.position = "fixed";
-    ta.style.top = "-1000px";
+    ta.className = "sdv2-clipboard-textarea";
     document.body.appendChild(ta);
     ta.select();
     try {

@@ -193,10 +193,10 @@ function updateProcessingLink(format, count, progress) {
 
         if (elements.statusElement) {
             elements.statusElement.innerHTML = `
-                <div class="progress export-progress" style="width: 100px; height: 8px;">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                <div class="progress export-progress export-progress-active">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary export-progress-bar"
                          role="progressbar"
-                         style="width: ${percent}%"
+                         data-progress="${percent}%"
                          aria-valuenow="${percent}"
                          aria-valuemin="0"
                          aria-valuemax="100"></div>

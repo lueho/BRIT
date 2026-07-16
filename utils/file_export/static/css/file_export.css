@@ -1,3 +1,8 @@
+.export-link {
+    display: inline-block;
+    width: 10em;
+}
+
 a.disabled {
     pointer-events: none !important;
     text-decoration: none !important;
@@ -41,8 +46,14 @@ a.disabled {
 
 /* Export progress bar styling */
 .export-progress {
+    width: 100px;
+    height: 8px;
     border-radius: 4px;
     background-color: #e9ecef;
+}
+
+.export-progress-bar {
+    width: attr(data-progress type(<percentage>), 0%);
 }
 
 .export-progress .progress-bar {

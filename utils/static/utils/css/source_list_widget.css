@@ -8,6 +8,10 @@
     margin-bottom: 1rem;
 }
 
+.source-list-hidden-select {
+    display: none;
+}
+
 .source-add-section {
     padding: 1rem;
     background-color: #f8f9fa;

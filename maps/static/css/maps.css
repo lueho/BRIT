@@ -15,6 +15,28 @@
     height: 100%;
 }
 
+.map-container-positioned {
+    position: relative;
+}
+
+.map-progress-container {
+    z-index: 1000;
+    width: 300px;
+    display: none;
+}
+
+.map-progress-container.map-progress-visible {
+    display: block;
+}
+
+.map-progress-bar-container {
+    height: 8px;
+}
+
+.map-progress-container .progress-bar {
+    width: attr(data-progress type(<percentage>), 0%);
+}
+
 #map-overlay {
     position: absolute;
     top: 0;
@@ -27,6 +49,10 @@
     justify-content: center;
     z-index: 1000;
     /* Ensure it overlays the map */
+}
+
+#map-overlay.map-overlay-visible {
+    display: flex;
 }
 
 .overlay-content {

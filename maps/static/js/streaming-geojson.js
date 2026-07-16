@@ -222,8 +222,7 @@ function createMapProgressBar(containerId = 'map-progress-container') {
         // Create progress container if it doesn't exist
         container = document.createElement('div');
         container.id = containerId;
-        container.className = 'position-absolute top-50 start-50 translate-middle';
-        container.style.cssText = 'z-index: 1000; width: 300px; display: none;';
+        container.className = 'map-progress-container position-absolute top-50 start-50 translate-middle';
         container.innerHTML = `
             <div class="card shadow">
                 <div class="card-body p-3">
@@ -231,11 +230,11 @@ function createMapProgressBar(containerId = 'map-progress-container') {
                         <small class="text-muted" id="map-progress-label">Loading map data...</small>
                         <small class="text-muted" id="map-progress-text"></small>
                     </div>
-                    <div class="progress" style="height: 8px;">
+                    <div class="progress map-progress-bar-container">
                         <div class="progress-bar progress-bar-striped progress-bar-animated" 
                              role="progressbar" 
                              id="map-progress-bar"
-                             style="width: 0%"
+                             data-progress="0%"
                              aria-valuenow="0" 
                              aria-valuemin="0" 
                              aria-valuemax="100">
@@ -248,16 +247,16 @@ function createMapProgressBar(containerId = 'map-progress-container') {
 
         // Append to map container if available
         const mapContainer = document.getElementById('map') || document.body;
-        mapContainer.style.position = 'relative';
+        mapContainer.classList.add('map-container-positioned');
         mapContainer.appendChild(container);
     }
 
     return {
         show() {
-            container.style.display = 'block';
+            container.classList.add('map-progress-visible');
         },
         hide() {
-            container.style.display = 'none';
+            container.classList.remove('map-progress-visible');
         },
         /**
          * Show indeterminate "connecting" state before we know the total.
@@ -271,7 +270,7 @@ function createMapProgressBar(containerId = 'map-progress-container') {
             if (label) label.textContent = 'Preparing data...';
             if (bar) {
                 // Indeterminate: full width, animated stripes convey activity
-                bar.style.width = '100%';
+                bar.dataset.progress = '100%';
                 bar.setAttribute('aria-valuenow', '0');
             }
             if (text) text.textContent = '';
@@ -290,7 +289,7 @@ function createMapProgressBar(containerId = 'map-progress-container') {
 
             const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
             if (bar) {
-                bar.style.width = `${percent}%`;
+                bar.dataset.progress = `${percent}%`;
                 bar.setAttribute('aria-valuenow', percent);
             }
             if (text) {

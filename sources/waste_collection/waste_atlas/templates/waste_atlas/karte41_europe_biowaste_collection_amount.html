@@ -5,75 +5,7 @@
 {% endblock title %}
 {% block style_sheets %}
   {{ block.super }}
-  <style>
-    #map-container {
-      background: #fff;
-      border: 1px solid #dee2e6;
-      border-radius: .375rem;
-      overflow: hidden;
-      position: relative;
-      margin-bottom: 1rem;
-    }
-    .coverage-page {
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-    #europe-biowaste-svg {
-      display: block;
-      width: 100%;
-      height: auto;
-      background: #fff;
-    }
-    #loading-overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(255,255,255,.85);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10;
-      font-size: 1.1rem;
-      color: #555;
-    }
-    .atlas-legend text,
-    #europe-biowaste-svg text,
-    .biowaste-region-value,
-    .biowaste-region-name,
-    .biowaste-region-note {
-      font-family: 'Nunito', sans-serif;
-    }
-    .biowaste-region-list li + li {
-      margin-top: .5rem;
-    }
-    .biowaste-region-link {
-      color: inherit;
-      text-decoration: none;
-    }
-    .biowaste-region-link:hover .biowaste-region-name {
-      text-decoration: underline;
-    }
-    .biowaste-region-link.is-disabled {
-      pointer-events: none;
-      cursor: default;
-      color: inherit;
-      text-decoration: none;
-    }
-    .map-hint {
-      display: inline-flex;
-      align-items: center;
-      gap: .5rem;
-      margin-bottom: .75rem;
-      padding: .5rem .75rem;
-      border: 1px solid #bfd7c1;
-      border-radius: .375rem;
-      background: #f2fbf3;
-      color: #244b2a;
-      font-weight: 600;
-      font-family: 'Nunito', sans-serif;
-    }
-    #export-buttons { margin-top: .75rem; margin-bottom: 1rem; }
-    #export-buttons .btn { margin-right: .5rem; }
-  </style>
+  <link href="{% static 'css/waste_atlas.min.css' %}" rel="stylesheet">
 {% endblock style_sheets %}
 {% block content %}
   <div class="coverage-page">
@@ -704,7 +636,7 @@
             .attr('fill', fill)
             .attr('stroke', stroke)
             .attr('stroke-width', strokeWidth)
-            .style('cursor', region.isClickable ? 'pointer' : 'default')
+            .attr('cursor', region.isClickable ? 'pointer' : 'default')
             .on('click', function () {
               if (region.isClickable) {
                 window.location.href = region.detailUrl;
@@ -716,7 +648,7 @@
 
         drawLegend(svg, width, height);
         renderRegionList(regionsWithData);
-        loadingEl.style.display = 'none';
+        loadingEl.classList.add('d-none');
         if (btnSVG) {
           btnSVG.disabled = false;
         }
@@ -724,7 +656,7 @@
           btnPNG.disabled = false;
         }
       }).catch(function (error) {
-        loadingEl.style.display = 'none';
+        loadingEl.classList.add('d-none');
         mapContainer.innerHTML = '<div class="alert alert-danger m-3"><strong>Error loading map data:</strong> ' + error.message + '</div>';
       });
       if (btnSVG) {

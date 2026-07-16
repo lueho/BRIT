@@ -1,65 +1,11 @@
 {% extends "base_iframe.html" %}
+{% load static %}
 {% block title %}
   Waste Atlas — {{ map_title }}
 {% endblock title %}
 {% block style_sheets %}
   {{ block.super }}
-  <style>
-    body.iframe-embed {
-      margin: 0;
-      background: #fff;
-    }
-    body.iframe-embed #wrapper,
-    body.iframe-embed #content-wrapper,
-    body.iframe-embed #content,
-    body.iframe-embed .container-fluid {
-      margin: 0;
-      padding: 0;
-    }
-    body.iframe-embed .scroll-to-top {
-      display: none !important;
-    }
-    #map-container {
-      background: #fff;
-      border: 0;
-      border-radius: 0;
-      overflow: hidden;
-      position: relative;
-      margin-bottom: 0;
-    }
-    .coverage-page {
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-    .coverage-page.coverage-page--iframe {
-      max-width: none;
-      padding: 0;
-    }
-    #europe-coverage-svg {
-      display: block;
-      width: 100%;
-      height: auto;
-      background: #fff;
-    }
-    #loading-overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(255,255,255,.85);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10;
-      font-size: 1.1rem;
-      color: #555;
-    }
-    .atlas-legend text {
-      font-family: 'Nunito', sans-serif;
-      font-size: 12px;
-    }
-    .coverage-region-list li + li {
-      margin-top: .25rem;
-    }
-  </style>
+  <link href="{% static 'css/waste_atlas.min.css' %}" rel="stylesheet">
 {% endblock style_sheets %}
 {% block content %}
   <div class="coverage-page{% if iframe_mode %} coverage-page--iframe{% endif %}">
@@ -453,9 +399,9 @@
           .text('Sweden, Nordrhein-Westfalen, Rheinland-Pfalz, Baden-Württemberg, South Tyrol, and Catalonia');
 
         drawLegend(svg, width, height);
-        loadingEl.style.display = 'none';
+        loadingEl.classList.add('d-none');
       }).catch(function (error) {
-        loadingEl.style.display = 'none';
+        loadingEl.classList.add('d-none');
         mapContainer.innerHTML = '<div class="alert alert-danger m-3"><strong>Error loading map data:</strong> '
           + error.message + '</div>';
       });

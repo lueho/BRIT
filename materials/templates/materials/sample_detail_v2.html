@@ -137,7 +137,7 @@
                 {% if group.segments %}
                   {% for segment in group.segments %}
                     <span class="sdv2-spark-seg sdv2-spark-seg-{{ forloop.counter0|modulo:8 }}"
-                          style="flex:{{ segment.value }}"
+                          data-flex="{{ segment.value }}"
                           title="{{ segment.label }}"></span>
                   {% endfor %}
                 {% else %}
@@ -817,17 +817,10 @@
         // Paint the neighbouring composition table rows with the same colors
         // Chart.js uses for slices, so the table doubles as the legend.
         const body = container.closest(".sdv2-group-body");
-        const dataset = (config.data && config.data.datasets && config.data.datasets[0]) || {};
-        const borderColors = dataset.borderColor || [];
-        const backgroundColors = dataset.backgroundColor || [];
-        if (body && (borderColors.length || backgroundColors.length)) {
+        if (body) {
           const rows = body.querySelectorAll(".sdv2-group-table tbody tr");
           rows.forEach((row, idx) => {
-            const border = borderColors[idx % Math.max(borderColors.length, 1)] || "";
-            const fill = backgroundColors[idx % Math.max(backgroundColors.length, 1)] || "";
-            if (border) row.style.setProperty("--sdv2-swatch-border", border);
-            if (fill) row.style.setProperty("--sdv2-swatch-fill", fill);
-            row.classList.add("sdv2-has-swatch");
+            row.classList.add("sdv2-has-swatch", `sdv2-swatch-${idx % 8}`);
           });
         }
       });

@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
 {% block content %}
   <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
@@ -46,15 +46,16 @@
             waste stream model. Further, the tool is extended with a completely new Household Waste Collection
             module and an interface with <a href="https://www.simucf.de">SimuCF</a>, a
             simulation tool for aerobic and anaerobic digestion processes. To find out more about the
-            SOILCOM project and the associated partners, please visit: <a></a>
+            SOILCOM project and the associated partners, please visit the project website below.
           </p>
           <p>
             <a class="d-flex align-items-center justify-content-center"
                href="https://northsearegion.eu/soilcom/"
                target="_blank">
-              <img class="img-fluid"
+              <img class="img-fluid about-logo about-logo-half"
                    src="{% static 'img/soilcom_logo.png' %}"
-                   style="width: 50%"
+                   width="520"
+                   height="130"
                    alt="Soilcom logo">
             </a>
           </p>
@@ -66,9 +67,10 @@
             <a class="d-flex align-items-center justify-content-center"
                href="https://northsearegion.eu/"
                target="_blank">
-              <img class="img-fluid"
+              <img class="img-fluid about-logo about-logo-half"
                    src="{% static 'img/interreg_with_soilcom_logo.png' %}"
-                   style="width: 50%"
+                   width="571"
+                   height="236"
                    alt="Interreg with Soilcom logo">
             </a>
           </p>
@@ -81,20 +83,16 @@
             partners, please visit the official project website:
           </p>
           <a class="sidebar-brand d-flex align-items-center justify-content-center"
-             href="http://www.flexibi-biorefineries.eu"
+             href="https://www.flexibi-biorefineries.eu"
              target="_blank">
-            <img class="img-fluid"
+            <img class="img-fluid about-logo about-logo-half"
                  src="{% static 'img/LOGO_Flexibi_Farbe.png' %}"
-                 style="width: 50%"
+                 width="719"
+                 height="319"
                  alt="Flexibi logo">
           </a>
           <p>
-            <a class="sidebar-brand d-flex align-items-center justify-content-center"
-               href="http://www.flexibi-biorefineries.eu"
-               target="_blank"></a>
-          </p>
-          <p>
-            <a href="http://www.flexibi-biorefineries.eu" target="_blank">http://www.flexibi-biorefineries.eu</a>
+            <a href="https://www.flexibi-biorefineries.eu" target="_blank">https://www.flexibi-biorefineries.eu</a>
           </p>
           <p>
             FLEXIBI is a project of the ERA-NET
@@ -104,9 +102,10 @@
             <a class="d-flex align-items-center justify-content-center"
                href="https://projects.au.dk/faccesurplus/"
                target="_blank">
-              <img class="funding-logo"
+              <img class="funding-logo about-logo about-logo-wide"
                    src="{% static 'img/facce-logo.png' %}"
-                   style="width: 80%"
+                   width="450"
+                   height="100"
                    alt="Facce Surplus logo">
             </a>
           </p>
@@ -129,6 +128,8 @@
           <a href="https://northsearegion.eu/" target="_blank">
             <img class="w-100 m-0 p-1"
                  src="{% static 'img/interreg_with_soilcom_logo.png' %}"
+                 width="571"
+                 height="236"
                  alt="Logo of INTERREG North Sea Region SOILCOM Project">
           </a>
           <hr>
@@ -136,7 +137,9 @@
           <a href="https://www.bmbf.de/EN/Home/home_node.html" target="_blank">
             <img class="funding-logo"
                  src="{% static 'img/bmbf-logo.svg' %}"
-                 alt="Facce Surplus Logo">
+                 width="168"
+                 height="84"
+                 alt="BMBF logo">
           </a>
         </div>
       </div>

@@ -28,6 +28,7 @@ middleware = ContentSecurityPolicyMiddleware(lambda request: HttpResponse("ok"))
 response = middleware(RequestFactory().get("/"))
 expected = (
     "default-src 'self'; "
+    "style-src 'self'; "
     "base-uri 'self'; "
     "frame-ancestors 'self'; "
     "object-src 'none'"

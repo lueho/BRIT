@@ -271,7 +271,7 @@ function hideLoadingIndicator() {
 function showMapOverlay() {
     try {
         const overlay = document.getElementById('map-overlay');
-        overlay.style.display = 'flex';
+        overlay.classList.add('map-overlay-visible');
     } catch (error) {
         console.warn('Map overlay could not be shown:', error);
     }
@@ -280,7 +280,7 @@ function showMapOverlay() {
 function hideMapOverlay() {
     try {
         const overlay = document.getElementById('map-overlay');
-        overlay.style.display = 'none';
+        overlay.classList.remove('map-overlay-visible');
     } catch (error) {
         console.warn('Map overlay could not be hidden:', error);
     }
@@ -872,7 +872,7 @@ function formatUrls(urlString) {
 
     return urls
         .map(url => `<li>
-            <a href="${url}" 
+            <a href="${url}"
                title="${url}"
                target="_blank" 
                rel="noopener noreferrer"

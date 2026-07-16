@@ -53,13 +53,12 @@
                        class="card h-100 text-decoration-none text-reset">
                         {% if process.image %}
                             <img src="{{ process.image.url }}"
-                                 class="card-img-top"
-                                 alt="{{ process.image_alt_text|default_if_none:''|default:process.name }}"
-                                 style="height: 12rem;
-                                        object-fit: cover">
+                                 class="card-img-top process-category-image"
+                                 width="768"
+                                 height="768"
+                                 alt="{{ process.image_alt_text|default_if_none:''|default:process.name }}">
                         {% else %}
-                            <div class="card-img-top bg-light d-flex align-items-center justify-content-center text-muted"
-                                 style="height: 12rem">
+                            <div class="card-img-top process-category-image bg-light d-flex align-items-center justify-content-center text-muted">
                                 <i class="fas fa-industry fa-3x"></i>
                             </div>
                         {% endif %}

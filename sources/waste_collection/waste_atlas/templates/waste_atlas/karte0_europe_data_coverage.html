@@ -5,50 +5,6 @@
 {% endblock title %}
 {% block style_sheets %}
   {{ block.super }}
-  <style>
-    #map-container {
-      background: #fff;
-      border: 1px solid #dee2e6;
-      border-radius: .375rem;
-      overflow: hidden;
-      position: relative;
-      margin-bottom: 1rem;
-    }
-    .coverage-page {
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-    .coverage-page.coverage-page--iframe {
-      max-width: none;
-      padding: 1rem 0;
-    }
-    #europe-coverage-svg {
-      display: block;
-      width: 100%;
-      height: auto;
-      background: #fff;
-    }
-    #loading-overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(255,255,255,.85);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10;
-      font-size: 1.1rem;
-      color: #555;
-    }
-    .atlas-legend text {
-      font-family: 'Nunito', sans-serif;
-      font-size: 12px;
-    }
-    .coverage-region-list li + li {
-      margin-top: .25rem;
-    }
-    #export-buttons { margin-top: .75rem; margin-bottom: 1rem; }
-    #export-buttons .btn { margin-right: .5rem; }
-  </style>
 {% endblock style_sheets %}
 {% block content %}
   <div class="coverage-page{% if iframe_mode %} coverage-page--iframe{% endif %}">
@@ -461,7 +417,7 @@
           .text('Sweden, Nordrhein-Westfalen, Rheinland-Pfalz, Baden-Württemberg, South Tyrol, and Catalonia');
 
         drawLegend(svg, width, height);
-        loadingEl.style.display = 'none';
+        loadingEl.classList.add('d-none');
         if (btnSVG) {
           btnSVG.disabled = false;
         }
@@ -469,7 +425,7 @@
           btnPNG.disabled = false;
         }
       }).catch(function (error) {
-        loadingEl.style.display = 'none';
+        loadingEl.classList.add('d-none');
         mapContainer.innerHTML = '<div class="alert alert-danger m-3"><strong>Error loading map data:</strong> '
           + error.message + '</div>';
       });

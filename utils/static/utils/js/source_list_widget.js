@@ -432,7 +432,7 @@ document.addEventListener('DOMContentLoaded', function () {
             addSourceToList(listElement, sourceId, sourceLabel, targetSelect);
 
             if (emptyMessage) {
-                emptyMessage.style.display = 'none';
+                emptyMessage.classList.add('d-none');
             }
         }
 
@@ -591,7 +591,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 if (listElement.children.length === 0 && emptyMessage) {
-                    emptyMessage.style.display = 'block';
+                    emptyMessage.classList.remove('d-none');
                 }
             }
         });
