@@ -1876,7 +1876,7 @@ MAP_CONFIGS = {
         "fileBase": "catalonia_system_access_control",
     },
     "waste_ratio": {
-        "title": "Biobin stream separation rate (%)",
+        "title": "Separation rate – Biowaste stream (%)",
         "dataUrl": "/waste_collection/api/waste-atlas/waste-ratio/",
         "dataField": "_classified",
         "transformName": "wasteRatio",

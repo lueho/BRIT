@@ -506,7 +506,7 @@ MAP_PAGES = [
     _page(
         "sweden",
         "waste_ratio",
-        "Biobin stream separation rate (%)",
+        "Separation rate – Biowaste stream (%)",
         "map/sweden/waste-ratio/",
         "waste-atlas-sweden-waste-ratio-map",
         overrides={
@@ -830,7 +830,7 @@ MAP_PAGES = [
     _page(
         "generic",
         "waste_ratio",
-        "Biobin stream separation rate (%)",
+        "Separation rate – Biowaste stream (%)",
         "map/waste-ratio/",
         "waste-atlas-waste-ratio-map",
     ),
@@ -1076,7 +1076,7 @@ MAP_PAGES = [
     _page(
         "germany",
         "waste_ratio",
-        "Biobin stream separation rate (%)",
+        "Separation rate – Biowaste stream (%)",
         "map/germany/waste-ratio/",
         "waste-atlas-germany-waste-ratio-map",
     ),
@@ -1301,7 +1301,7 @@ MAP_PAGES = [
     _page(
         "nrw",
         "waste_ratio",
-        "Biobin stream separation rate (%)",
+        "Separation rate – Biowaste stream (%)",
         "map/nrw/waste-ratio/",
         "waste-atlas-nrw-waste-ratio-map",
     ),
@@ -1561,7 +1561,7 @@ MAP_PAGES = [
     _page(
         "catalonia",
         "waste_ratio",
-        "Biobin stream separation rate (%)",
+        "Separation rate – Biowaste stream (%)",
         "map/catalonia/waste-ratio/",
         "waste-atlas-catalonia-waste-ratio-map",
     ),
@@ -1793,7 +1793,7 @@ MAP_PAGES = [
     _page(
         "bw_rp",
         "waste_ratio",
-        "Biobin stream separation rate (%)",
+        "Separation rate – Biowaste stream (%)",
         "map/bw-rp/waste-ratio/",
         "waste-atlas-bw-rp-waste-ratio-map",
     ),
