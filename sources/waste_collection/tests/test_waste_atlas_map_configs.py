@@ -510,6 +510,27 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         # The pattern block should be gone (overlay is no longer an item)
         self.assertNotIn("cat.pattern", draw_item_fn[:500])
 
+    def test_export_legend_titles_support_explicit_line_breaks(self):
+        """Explicit newlines in export legend titles must be preserved."""
+        config = MAP_CONFIGS["waste_ratio"]
+        self.assertEqual(
+            config["exportLegendTitle"],
+            "Separation rate –\nBiowaste stream (%)",
+        )
+
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+        script = script_path.read_text()
+        wrap_fn = script.split("function _wrapTextToWidth(")[1].split(
+            "function _exportLegendLabel("
+        )[0]
+        self.assertIn("String(label).split(/\\r?\\n/)", wrap_fn)
+
     def test_collection_system_config_opts_into_conflict_aid(self):
         """The collection_system theme exposes the maintainer conflict aid."""
         config = MAP_CONFIGS["collection_system"]

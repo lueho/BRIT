@@ -747,33 +747,35 @@ var WasteAtlasChoropleth = (function () {
   }
 
   function _wrapTextToWidth(label, maxWidth, fontSize) {
-    var words = String(label)
-      .replace(/\s*\/\s*/g, ' / ')
-      .replace(/\s*[–—]\s*/g, ' – ')
-      .split(/\s+/)
-      .filter(function (word) { return word.length > 0; });
     var lines = [];
-    var current = '';
-    words.forEach(function (word) {
-      var next = current ? current + ' ' + word : word;
-      if (_measureTextWidth(next, fontSize) <= maxWidth || !current) {
-        current = next;
-        if (_measureTextWidth(current, fontSize) <= maxWidth || current.length <= 1) return;
-      }
-      if (current !== word) {
-        lines.push(current);
-        current = word;
-      }
-      while (_measureTextWidth(current, fontSize) > maxWidth && current.length > 1) {
-        var part = current;
-        while (_measureTextWidth(part, fontSize) > maxWidth && part.length > 1) {
-          part = part.slice(0, -1);
+    String(label).split(/\r?\n/).forEach(function (segment) {
+      var words = segment
+        .replace(/\s*\/\s*/g, ' / ')
+        .replace(/\s*[–—]\s*/g, ' – ')
+        .split(/\s+/)
+        .filter(function (word) { return word.length > 0; });
+      var current = '';
+      words.forEach(function (word) {
+        var next = current ? current + ' ' + word : word;
+        if (_measureTextWidth(next, fontSize) <= maxWidth || !current) {
+          current = next;
+          if (_measureTextWidth(current, fontSize) <= maxWidth || current.length <= 1) return;
         }
-        lines.push(part);
-        current = current.slice(part.length);
-      }
+        if (current !== word) {
+          lines.push(current);
+          current = word;
+        }
+        while (_measureTextWidth(current, fontSize) > maxWidth && current.length > 1) {
+          var part = current;
+          while (_measureTextWidth(part, fontSize) > maxWidth && part.length > 1) {
+            part = part.slice(0, -1);
+          }
+          lines.push(part);
+          current = current.slice(part.length);
+        }
+      });
+      if (current) lines.push(current);
     });
-    if (current) lines.push(current);
     return lines;
   }
 
