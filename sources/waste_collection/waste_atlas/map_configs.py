@@ -1883,22 +1883,22 @@ MAP_CONFIGS = {
         "categories": [
             {
                 "value": "very_high",
-                "label": "> 66 (much more biowaste than residual waste)",
+                "label": "\u003e 66 (Biowaste-stream dominant)",
                 "color": "#0868ac",
             },
             {
                 "value": "high",
-                "label": "51–66 (more biowaste than residual waste)",
+                "label": "51–66",
                 "color": "#43a2ca",
             },
             {
                 "value": "low",
-                "label": "34–50 (more residual waste than biowaste)",
+                "label": "34–50",
                 "color": "#7bccc4",
             },
             {
                 "value": "very_low",
-                "label": "0–33 (low biowaste share)",
+                "label": "\u2264 33 (Residual-waste-stream dominant)",
                 "color": "#bae4bc",
             },
             {
