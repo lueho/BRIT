@@ -68,6 +68,19 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
                     ):
                         self.assertNotIn(token, label)
 
+    def test_waste_ratio_legend_labels_define_only_the_outer_ranges(self):
+        categories = MAP_CONFIGS["waste_ratio"]["categories"]
+
+        self.assertEqual(
+            [category["label"] for category in categories[:4]],
+            [
+                "> 66 (Biowaste-stream dominant)",
+                "51–66",
+                "34–50",
+                "≤ 33 (Residual-waste-stream dominant)",
+            ],
+        )
+
     def test_biowaste_no_collection_entries_share_the_same_color(self):
         for config_key, config in MAP_CONFIGS.items():
             for entry in [
