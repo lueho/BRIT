@@ -329,6 +329,16 @@ class ExportModalViewTests(TestCase):
         self.assertEqual(context["baz"], "qux")
         self.assertNotIn("export_url_extra", context)
 
+    def test_shows_link_to_profile_downloads_list(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            "/utils/file_export/export-modal/?export_url=/some/export/"
+        )
+
+        self.assertContains(response, "downloads list in your profile")
+        self.assertContains(response, 'href="/utils/file_export/exports/"')
+
 
 class FilteredListFileExportProgressViewTests(TestCase):
     """Tests for the progress-polling view with mocked AsyncResult."""
