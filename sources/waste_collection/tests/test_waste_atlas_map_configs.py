@@ -439,6 +439,8 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
                 "exportLegendPlacement": "bottom-right",
                 "exportLegendWidth": 0.64,
                 "exportLegendColumns": 1,
+                "exportLegendFitContent": True,
+                "exportLegendReserveMapSpace": True,
             },
         )
 
@@ -456,6 +458,10 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         self.assertIn("cfg.exportLegendPlacement", export_layout_fn)
         self.assertIn("cfg.exportLegendWidth", export_layout_fn)
         self.assertIn("cfg.exportLegendColumns", export_layout_fn)
+        self.assertIn("cfg.exportLegendFitContent", script)
+        self.assertIn("cfg.exportLegendReserveMapSpace", export_layout_fn)
+        self.assertIn("function _fitExportLegendWidth(", script)
+        self.assertIn("candidate.requireNoOverlap && overlap > 0", export_layout_fn)
 
     def test_legend_reordering_helper_exists_in_js(self):
         script_path = (

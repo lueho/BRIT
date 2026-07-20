@@ -514,6 +514,8 @@ MAP_PAGES = [
             "exportLegendPlacement": "bottom-right",
             "exportLegendWidth": 0.64,
             "exportLegendColumns": 1,
+            "exportLegendFitContent": True,
+            "exportLegendReserveMapSpace": True,
         },
     ),
     _page(

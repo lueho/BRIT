@@ -840,6 +840,22 @@ var WasteAtlasChoropleth = (function () {
     return items;
   }
 
+  function _fitExportLegendWidth(cfg, maxWidth, opts) {
+    var titleWidth = String(cfg.exportLegendTitle || cfg.legendTitle || '')
+      .split(/\r?\n/)
+      .reduce(function (widest, line) {
+        return Math.max(widest, _measureTextWidth(line, opts.titleFontSize, 'bold'));
+      }, 0);
+    var labelWidth = _legendItems(cfg, true).reduce(function (widest, item) {
+      return Math.max(widest, _measureTextWidth(item.label, opts.fontSize));
+    }, 0);
+    var contentWidth = Math.max(
+      titleWidth,
+      opts.swatchW + opts.labelGap + labelWidth
+    );
+    return Math.min(maxWidth, Math.ceil(contentWidth + opts.paddingX * 2 + 2));
+  }
+
   function _measureExportLegend(cfg, width, columnCount) {
     var swatchSize = Math.round(EXPORT_LEGEND_FONT_SIZE * 0.72);
     var opts = {
@@ -857,6 +873,9 @@ var WasteAtlasChoropleth = (function () {
       fontFamily: EXPORT_LEGEND_FONT_FAMILY
     };
     opts.lineHeight = Math.round(opts.fontSize * 1.12);
+    if (cfg.exportLegendFitContent && opts.columnCount === 1) {
+      width = _fitExportLegendWidth(cfg, width, opts);
+    }
     opts.width = width;
     opts.columnWidth = (
       width - opts.paddingX * 2 - (opts.columnCount - 1) * opts.columnGap
@@ -950,7 +969,8 @@ var WasteAtlasChoropleth = (function () {
       placement: cfg.exportLegendPlacement,
       width: cfg.exportLegendWidth || 0.52,
       columns: cfg.exportLegendColumns || 1,
-      overlay: true
+      reserveMapSpace: Boolean(cfg.exportLegendReserveMapSpace),
+      overlay: !cfg.exportLegendReserveMapSpace
     };
     var legendSpecs = preferredLegendSpec ? [preferredLegendSpec] : [
       { placement: 'right', width: 0.32, columns: 1 },
@@ -979,6 +999,9 @@ var WasteAtlasChoropleth = (function () {
         } else if (spec.placement === 'bottom-right') {
           x = EXPORT_WIDTH - margin - legend.width;
           y = exportHeight - margin - legend.height;
+          if (spec.reserveMapSpace) {
+            mapExtent = [[margin, titleBlock], [x - gap, exportHeight - margin]];
+          }
         } else if (spec.placement === 'bottom-left') {
           x = margin;
           y = exportHeight - margin - legend.height;
@@ -1000,7 +1023,8 @@ var WasteAtlasChoropleth = (function () {
           height: exportHeight,
           legend: legend,
           mapExtent: mapExtent,
-          overlay: Boolean(spec.overlay)
+          overlay: Boolean(spec.overlay),
+          requireNoOverlap: Boolean(spec.reserveMapSpace)
         });
       });
     });
@@ -1024,6 +1048,7 @@ var WasteAtlasChoropleth = (function () {
       var overlap = _rectIntersectionArea(mapBounds, legendRect);
       var legendArea = candidate.legend.width * candidate.legend.height;
       var invalidOverlay = candidate.overlay && overlap > legendArea * 0.02;
+      var invalidReservedLayout = candidate.requireNoOverlap && overlap > 0;
       var mapArea = mapBounds.width * mapBounds.height;
       var usedArea = mapArea + legendArea - overlap;
       candidate.score = mapBounds.scale * 100000 + usedArea / 1000
@@ -1031,6 +1056,7 @@ var WasteAtlasChoropleth = (function () {
         - legendOverflow * 1000000
         - overlap * 1000
         - (invalidOverlay ? 1000000000 : 0)
+        - (invalidReservedLayout ? 1000000000 : 0)
         - (invalidMap ? 1000000000 : 0);
       if (!selected || candidate.score > selected.score) return candidate;
       return selected;
