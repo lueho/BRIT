@@ -425,6 +425,38 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
                 self.assertEqual(sweden_themes[theme]["route_name"], route_name)
                 self.assertEqual(pages_by_route[route_name]["year"], "2024")
 
+    def test_sweden_waste_ratio_export_uses_a_wide_bottom_right_legend(self):
+        page = next(
+            page
+            for page in MAP_PAGES
+            if page["name"] == "waste-atlas-sweden-waste-ratio-map"
+        )
+
+        self.assertEqual(
+            page["overrides"],
+            {
+                "fileBase": "sweden_waste_ratio",
+                "exportLegendPlacement": "bottom-right",
+                "exportLegendWidth": 0.64,
+                "exportLegendColumns": 1,
+            },
+        )
+
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+        script = script_path.read_text()
+        export_layout_fn = script.split("function _exportLayout(data, cfg)")[1].split(
+            "// ---- quartile helpers"
+        )[0]
+        self.assertIn("cfg.exportLegendPlacement", export_layout_fn)
+        self.assertIn("cfg.exportLegendWidth", export_layout_fn)
+        self.assertIn("cfg.exportLegendColumns", export_layout_fn)
+
     def test_legend_reordering_helper_exists_in_js(self):
         script_path = (
             Path(__file__).resolve().parents[1]

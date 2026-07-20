@@ -509,7 +509,12 @@ MAP_PAGES = [
         "Biobin stream separation rate (%)",
         "map/sweden/waste-ratio/",
         "waste-atlas-sweden-waste-ratio-map",
-        overrides={"fileBase": "sweden_waste_ratio"},
+        overrides={
+            "fileBase": "sweden_waste_ratio",
+            "exportLegendPlacement": "bottom-right",
+            "exportLegendWidth": 0.64,
+            "exportLegendColumns": 1,
+        },
     ),
     _page(
         "sweden",

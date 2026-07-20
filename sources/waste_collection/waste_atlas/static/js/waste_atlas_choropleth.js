@@ -946,19 +946,26 @@ var WasteAtlasChoropleth = (function () {
     var fitData = (regionBorder && regionBorder.features && regionBorder.features.length)
       ? regionBorder : data.catchments;
     var candidates = [];
+    var preferredLegendSpec = cfg.exportLegendPlacement && {
+      placement: cfg.exportLegendPlacement,
+      width: cfg.exportLegendWidth || 0.52,
+      columns: cfg.exportLegendColumns || 1,
+      overlay: true
+    };
+    var legendSpecs = preferredLegendSpec ? [preferredLegendSpec] : [
+      { placement: 'right', width: 0.32, columns: 1 },
+      { placement: 'right', width: 0.40, columns: 1 },
+      { placement: 'left', width: 0.32, columns: 1 },
+      { placement: 'left', width: 0.40, columns: 1 },
+      { placement: 'bottom-right', width: 0.52, columns: 2, overlay: true },
+      { placement: 'bottom-left', width: 0.52, columns: 2, overlay: true },
+      { placement: 'top-right', width: 0.52, columns: 2, overlay: true },
+      { placement: 'top-left', width: 0.52, columns: 2, overlay: true },
+      { placement: 'bottom', width: 0.88, columns: cfg.exportLegendBottomColumns || 3 }
+    ];
     [EXPORT_HEIGHT_MM, 130, 150, 170, EXPORT_MAX_HEIGHT_MM].forEach(function (heightMm) {
       var exportHeight = Math.round(heightMm / 25.4 * EXPORT_DPI);
-      [
-        { placement: 'right', width: 0.32, columns: 1 },
-        { placement: 'right', width: 0.40, columns: 1 },
-        { placement: 'left', width: 0.32, columns: 1 },
-        { placement: 'left', width: 0.40, columns: 1 },
-        { placement: 'bottom-right', width: 0.52, columns: 2, overlay: true },
-        { placement: 'bottom-left', width: 0.52, columns: 2, overlay: true },
-        { placement: 'top-right', width: 0.52, columns: 2, overlay: true },
-        { placement: 'top-left', width: 0.52, columns: 2, overlay: true },
-        { placement: 'bottom', width: 0.88, columns: cfg.exportLegendBottomColumns || 3 }
-      ].forEach(function (spec) {
+      legendSpecs.forEach(function (spec) {
         var legend = _measureExportLegend(cfg, Math.round(EXPORT_WIDTH * spec.width), spec.columns);
         var x = margin;
         var y = titleBlock;
