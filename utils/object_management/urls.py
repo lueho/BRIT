@@ -88,6 +88,11 @@ urlpatterns = [
         name="remove_editor",
     ),
     path(
+        "bulk-manage-access/",
+        views.BulkManageAccessView.as_view(),
+        name="bulk_manage_access",
+    ),
+    path(
         "modal/manage-access/<int:content_type_id>/<int:object_id>/",
         views.ManageAccessModalView.as_view(),
         name="manage_access_modal",

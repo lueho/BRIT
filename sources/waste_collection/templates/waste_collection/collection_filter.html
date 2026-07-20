@@ -47,6 +47,7 @@
             <table class="table modern-table">
                 <thead>
                     <tr>
+                        {% include "object_management/bulk_select_th.html" %}
                         <th>Collection</th>
                         <th class="actions-column">Status/Actions</th>
                     </tr>
@@ -54,6 +55,7 @@
                 <tbody>
                     {% for object in object_list %}
                         <tr>
+                            {% include "object_management/bulk_select_td.html" %}
                             <td data-label="Collection" class="ps-3">
                                 <a href="{% detail_or_review_url object use_back=True %}"
                                    class="collection-link">

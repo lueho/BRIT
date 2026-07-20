@@ -1,0 +1,8 @@
+{% load user_created_object_tags %}
+{% if list_type == 'private' and object_list.model|is_user_created %}
+  <th class="bulk-select-column">
+    <input type="checkbox"
+           aria-label="Select all items"
+           onclick="document.querySelectorAll('input[name=items]').forEach(cb => cb.checked = this.checked)">
+  </th>
+{% endif %}

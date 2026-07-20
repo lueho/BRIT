@@ -22,6 +22,7 @@ from django.db.models import Q
 from django.http import (
     Http404,
     HttpResponse,
+    HttpResponseBadRequest,
     HttpResponseNotAllowed,
     HttpResponseRedirect,
 )
@@ -1463,6 +1464,117 @@ class ManageAccessModalView(BaseObjectAccessActionView):
         if "new_owner" in request.POST:
             return TransferOwnershipView.as_view()(request, *args, **kwargs)
         return HttpResponseNotAllowed(["GET", "POST"])
+
+
+class BulkManageAccessView(LoginRequiredMixin, View):
+    """Apply an access-management action to multiple UserCreatedObjects.
+
+    Accepts POST data:
+    - ``bulk_action``: ``add_editor`` | ``remove_editor`` | ``transfer_ownership``
+    - ``username``: the target user
+    - ``items``: repeated ``<content_type_id>:<object_id>`` values, or
+    - ``all_owned``: apply to every object owned by the requesting user
+    - ``next``: optional safe redirect target
+
+    Objects the requesting user may not manage are skipped; a summary
+    message reports applied and skipped counts.
+    """
+
+    actions = {
+        "add_editor": "has_manage_editors_permission",
+        "remove_editor": "has_manage_editors_permission",
+        "transfer_ownership": "has_transfer_ownership_permission",
+    }
+
+    def post(self, request, *args, **kwargs):
+        action = request.POST.get("bulk_action")
+        permission_method = self.actions.get(action)
+        if permission_method is None:
+            return HttpResponseBadRequest("Unknown bulk action.")
+
+        from django.contrib.auth.models import User
+
+        username = (request.POST.get("username") or "").strip()
+        try:
+            target_user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            messages.error(request, "The specified user does not exist.")
+            return HttpResponseRedirect(self._success_url(request))
+
+        objects = self._resolve_objects(request)
+        perm = UserCreatedObjectPermission()
+        checker = getattr(perm, permission_method)
+        applied = skipped = 0
+        for obj in objects:
+            try:
+                if not checker(request, obj):
+                    skipped += 1
+                    continue
+                if action == "add_editor":
+                    obj.add_editor(target_user, granted_by=request.user)
+                elif action == "remove_editor":
+                    obj.remove_editor(target_user)
+                else:
+                    obj.transfer_ownership(target_user, initiator=request.user)
+                applied += 1
+            except (ValidationError, PermissionDenied):
+                skipped += 1
+
+        label = {
+            "add_editor": f"Granted edit access to {target_user.username}",
+            "remove_editor": f"Revoked edit access from {target_user.username}",
+            "transfer_ownership": f"Transferred ownership to {target_user.username}",
+        }[action]
+        if applied:
+            messages.success(request, f"{label} for {applied} item(s).")
+        if skipped:
+            messages.warning(request, f"Skipped {skipped} item(s).")
+        if not applied and not skipped:
+            messages.info(request, "No items selected.")
+        return HttpResponseRedirect(self._success_url(request))
+
+    def _resolve_objects(self, request):
+        if request.POST.get("all_owned"):
+            from django.apps import apps
+
+            objects = []
+            for model in apps.get_models():
+                if (
+                    issubclass(model, UserCreatedObject)
+                    and not model._meta.abstract
+                    and not model._meta.proxy
+                ):
+                    objects.extend(model.objects.filter(owner=request.user))
+            return objects
+
+        objects = []
+        for item in request.POST.getlist("items"):
+            try:
+                content_type_id, object_id = item.split(":", 1)
+                content_type = ContentType.objects.get(pk=int(content_type_id))
+                model_class = content_type.model_class()
+                if model_class is None or not issubclass(
+                    model_class, UserCreatedObject
+                ):
+                    continue
+                objects.append(model_class.objects.get(pk=int(object_id)))
+            except (
+                ValueError,
+                ContentType.DoesNotExist,
+                ObjectDoesNotExist,
+            ):
+                continue
+        return objects
+
+    def _success_url(self, request):
+        next_url = request.POST.get("next") or request.GET.get("next")
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            return next_url
+        return "/"
 
 
 class UserOwnsObjectMixin(UserPassesTestMixin):
