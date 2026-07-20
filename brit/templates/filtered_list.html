@@ -81,12 +81,16 @@
                 </p>
               {% endif %}
             {% endblock list_result_count %}
+            {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
+              {% include "object_management/bulk_access_toolbar.html" %}
+            {% endif %}
             {% block list_table %}
               <div class="table-responsive">
                 <table class="table modern-table">
                   {% block list_table_head %}
                     <thead>
                       <tr>
+                        {% include "object_management/bulk_select_th.html" %}
                         <th>Name</th>
                         {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
                       </tr>
@@ -99,6 +103,7 @@
                             role="link"
                             onclick="window.location='{% detail_or_review_url object use_back=True %}'"
                             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.location='{% detail_or_review_url object use_back=True %}'}">
+                          {% include "object_management/bulk_select_td.html" %}
                           <td data-label="Name" class="ps-3">
                             <a href="{% detail_or_review_url object use_back=True %}"
                                class="text-decoration-none">

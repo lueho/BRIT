@@ -19,6 +19,11 @@
     </div>
 
     <div class="pt-3">
+        <p><b>Access to all my objects:</b></p>
+        {% include "object_management/bulk_access_toolbar.html" with all_owned=True %}
+    </div>
+
+    <div class="pt-3">
         <a href="{% url 'auth_password_change' %}" class="btn btn-primary w-100">
             Change password
         </a>

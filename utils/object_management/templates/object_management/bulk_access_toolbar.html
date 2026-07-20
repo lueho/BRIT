@@ -1,0 +1,31 @@
+{# Bulk access management form.
+   Context:
+   - all_owned: if truthy, applies to every object owned by the user
+     (no item checkboxes required); otherwise checkboxes elsewhere in the
+     page reference this form via form="bulk-access-form". #}
+<form id="bulk-access-form"
+      method="post"
+      action="{% url 'object_management:bulk_manage_access' %}"
+      class="d-flex flex-wrap align-items-center gap-2 {% if not all_owned %}mb-3{% endif %}"
+      onsubmit="return this.bulk_action.value !== 'transfer_ownership' || confirm('Transfer ownership of the affected items? This cannot be undone from your side.')">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+  {% if all_owned %}<input type="hidden" name="all_owned" value="1">{% endif %}
+  <select name="bulk_action"
+          class="form-select form-select-sm w-auto"
+          aria-label="Bulk access action">
+    <option value="add_editor">Grant edit access</option>
+    <option value="remove_editor">Revoke edit access</option>
+    <option value="transfer_ownership">Transfer ownership</option>
+  </select>
+  <input type="text"
+         name="username"
+         class="form-control form-control-sm w-auto"
+         placeholder="Username"
+         required
+         aria-label="Username">
+  <button type="submit" class="btn btn-sm btn-outline-primary">
+    <i class="fas fa-user-group"></i>
+    {% if all_owned %}Apply to all my items{% else %}Apply to selected{% endif %}
+  </button>
+</form>

@@ -1,0 +1,10 @@
+{% load moderation_tags user_created_object_tags %}
+{% if list_type == 'private' and object_list.model|is_user_created %}
+  <td class="bulk-select-column mobile-no-label" onclick="event.stopPropagation()">
+    <input type="checkbox"
+           form="bulk-access-form"
+           name="items"
+           value="{{ object|get_content_type_id }}:{{ object.id }}"
+           aria-label="Select {{ object.name }}">
+  </td>
+{% endif %}
