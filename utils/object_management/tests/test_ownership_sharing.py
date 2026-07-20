@@ -328,6 +328,65 @@ class OwnershipSharingViewTests(TestCase):
             },
         )
 
+    def test_detail_page_shows_manage_access_button_for_owner(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(self.collection.get_absolute_url())
+        self.assertContains(response, self._url("manage_access_modal"))
+
+    def test_detail_page_shows_manage_access_button_for_staff(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(self.collection.get_absolute_url())
+        self.assertContains(response, self._url("manage_access_modal"))
+
+    def test_detail_page_hides_manage_access_button_for_editor(self):
+        self.collection.add_editor(self.editor)
+        self.client.force_login(self.editor)
+        response = self.client.get(self.collection.get_absolute_url())
+        # Editors can read the page but must not see the manage-access button.
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, self._url("manage_access_modal"))
+
+    def test_manage_access_modal_ajax_preflight_returns_204_for_owner(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            self._url("manage_access_modal"),
+            {"new_owner": self.new_owner.username},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 204)
+        self.collection.refresh_from_db()
+        self.assertEqual(self.collection.owner, self.owner)
+
+    def test_manage_access_modal_ajax_preflight_denied_for_non_owner(self):
+        self.client.force_login(self.other)
+        response = self.client.post(
+            self._url("manage_access_modal"),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_transfer_with_querystring_next_falls_back_when_unreadable(self):
+        self.client.force_login(self.owner)
+        detail_url = self.collection.get_absolute_url()
+        response = self.client.post(
+            self._url("transfer_ownership"),
+            {"new_owner": self.new_owner.username, "next": f"{detail_url}?tab=info"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, "/")
+
+    def test_manage_access_modal_dispatches_transfer_post(self):
+        # django-bootstrap-modal-forms rewrites the form action to the modal
+        # URL, so the modal view must dispatch the transfer POST itself.
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            self._url("manage_access_modal"),
+            {"new_owner": self.new_owner.username},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.collection.refresh_from_db()
+        self.assertEqual(self.collection.owner, self.new_owner)
+
     def test_owner_can_transfer_ownership(self):
         self.client.force_login(self.owner)
         response = self.client.post(

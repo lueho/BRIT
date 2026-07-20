@@ -19,7 +19,12 @@ from django.core.exceptions import (
     ValidationError,
 )
 from django.db.models import Q
-from django.http import Http404, HttpResponse, HttpResponseRedirect
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseNotAllowed,
+    HttpResponseRedirect,
+)
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string, select_template
 from django.urls import NoReverseMatch, reverse
@@ -1369,7 +1374,7 @@ class TransferOwnershipView(BaseObjectAccessActionView):
         ):
             # The former owner may no longer read the object; avoid a 403.
             try:
-                if success_url == obj.get_absolute_url():
+                if urlparse(success_url).path == urlparse(obj.get_absolute_url()).path:
                     success_url = "/"
             except Exception:
                 success_url = "/"
@@ -1444,6 +1449,20 @@ class ManageAccessModalView(BaseObjectAccessActionView):
             "object_id": self.kwargs.get("object_id"),
         }
         return HttpResponse(render_to_string(self.template_name, context, request))
+
+    def post(self, request, *args, **kwargs):
+        """Preflight handling for django-bootstrap-modal-forms.
+
+        The plugin sends an AJAX POST to the modal URL first; respond with 204
+        so it proceeds with the real submit. Because it rewrites the form's
+        action to the modal URL before submitting, the real transfer POST also
+        arrives here and is dispatched to ``TransferOwnershipView``.
+        """
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return HttpResponse(status=204)
+        if "new_owner" in request.POST:
+            return TransferOwnershipView.as_view()(request, *args, **kwargs)
+        return HttpResponseNotAllowed(["GET", "POST"])
 
 
 class UserOwnsObjectMixin(UserPassesTestMixin):
