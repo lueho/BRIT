@@ -28,4 +28,15 @@
     <i class="fas fa-user-group"></i>
     {% if all_owned %}Apply to all my items{% else %}Apply to selected{% endif %}
   </button>
+  {% if not all_owned %}
+    <script>
+      // Templates with custom tables may not render selection checkboxes;
+      // hide the toolbar there instead of offering a dead control.
+      document.addEventListener('DOMContentLoaded', function () {
+        if (!document.querySelector('input[name=items]')) {
+          document.getElementById('bulk-access-form').classList.add('d-none');
+        }
+      });
+    </script>
+  {% endif %}
 </form>
