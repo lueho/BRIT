@@ -25,6 +25,9 @@
 {% endblock title %}
 {% block list_table %}
     {% load custom_tags %}
+    {% if list_type == 'private' and user.is_authenticated %}
+        {% include "object_management/bulk_access_toolbar.html" %}
+    {% endif %}
     {% if chips %}
         <div class="mb-2 d-flex flex-wrap gap-2">
             {% for chip in chips %}
@@ -68,7 +71,11 @@
                             <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
                         </tr>
                     {% empty %}
-                        {% include "includes/list_empty_state.html" %}
+                        {% if list_type == 'private' %}
+                            {% include "includes/list_empty_state.html" with colspan=3 %}
+                        {% else %}
+                            {% include "includes/list_empty_state.html" %}
+                        {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
