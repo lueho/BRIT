@@ -1374,7 +1374,7 @@ class TransferOwnershipView(BaseObjectAccessActionView):
         ):
             # The former owner may no longer read the object; avoid a 403.
             try:
-                if success_url == obj.get_absolute_url():
+                if urlparse(success_url).path == urlparse(obj.get_absolute_url()).path:
                     success_url = "/"
             except Exception:
                 success_url = "/"
@@ -1462,7 +1462,7 @@ class ManageAccessModalView(BaseObjectAccessActionView):
             return HttpResponse(status=204)
         if "new_owner" in request.POST:
             return TransferOwnershipView.as_view()(request, *args, **kwargs)
-        return HttpResponseNotAllowed(["GET"])
+        return HttpResponseNotAllowed(["GET", "POST"])
 
 
 class UserOwnsObjectMixin(UserPassesTestMixin):

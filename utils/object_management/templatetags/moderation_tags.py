@@ -183,6 +183,9 @@ def _safe_policy_fallback(user, obj, review_mode=False):
         "can_withdraw_review": False,
         "can_approve": False,
         "can_reject": False,
+        "can_transfer_ownership": False,
+        "can_manage_editors": False,
+        "is_editor": False,
         "can_export": (is_published or is_archived)
         or (is_authenticated and (is_owner or is_staff)),
         "export_list_type": export_list_type,
