@@ -1453,12 +1453,15 @@ class ManageAccessModalView(BaseObjectAccessActionView):
     def post(self, request, *args, **kwargs):
         """Preflight handling for django-bootstrap-modal-forms.
 
-        The plugin sends an AJAX POST to the modal URL before submitting the
-        form natively to its action. Respond with 204 so the real submit
-        proceeds; the actual work happens in the action views.
+        The plugin sends an AJAX POST to the modal URL first; respond with 204
+        so it proceeds with the real submit. Because it rewrites the form's
+        action to the modal URL before submitting, the real transfer POST also
+        arrives here and is dispatched to ``TransferOwnershipView``.
         """
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
             return HttpResponse(status=204)
+        if "new_owner" in request.POST:
+            return TransferOwnershipView.as_view()(request, *args, **kwargs)
         return HttpResponseNotAllowed(["GET"])
 
 

@@ -363,6 +363,18 @@ class OwnershipSharingViewTests(TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_manage_access_modal_dispatches_transfer_post(self):
+        # django-bootstrap-modal-forms rewrites the form action to the modal
+        # URL, so the modal view must dispatch the transfer POST itself.
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            self._url("manage_access_modal"),
+            {"new_owner": self.new_owner.username},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.collection.refresh_from_db()
+        self.assertEqual(self.collection.owner, self.new_owner)
+
     def test_owner_can_transfer_ownership(self):
         self.client.force_login(self.owner)
         response = self.client.post(
