@@ -225,6 +225,19 @@ class BulkManageAccessViewTests(TestCase):
         self.assertContains(response, reverse("object_management:bulk_manage_access"))
         self.assertContains(response, 'name="all_owned"')
 
+    def test_no_next_falls_back_to_private_list_of_model(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            self.url,
+            {
+                "bulk_action": "add_editor",
+                "username": self.editor.username,
+                "items": [self._item(self.collection_a)],
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"{Collection.private_list_url()}?scope=private")
+
     def test_external_next_is_ignored(self):
         self.client.force_login(self.owner)
         response = self.client.post(

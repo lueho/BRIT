@@ -1373,13 +1373,25 @@ class TransferOwnershipView(BaseObjectAccessActionView):
             or policy["is_staff"]
             or policy["is_moderator"]
         ):
-            # The former owner may no longer read the object; avoid a 403.
+            # The former owner may no longer read the object; avoid a 403 by
+            # falling back to the model's private list, or the start page as
+            # a last resort.
             try:
                 if urlparse(success_url).path == urlparse(obj.get_absolute_url()).path:
-                    success_url = "/"
+                    success_url = self._unreadable_fallback_url(obj)
             except Exception:
-                success_url = "/"
+                success_url = self._unreadable_fallback_url(obj)
         return HttpResponseRedirect(success_url)
+
+    @staticmethod
+    def _unreadable_fallback_url(obj):
+        try:
+            list_url = type(obj).private_list_url()
+            if list_url:
+                return f"{list_url}?scope=private"
+        except Exception:
+            pass
+        return "/"
 
 
 class AddEditorView(BaseObjectAccessActionView):
@@ -1502,6 +1514,7 @@ class BulkManageAccessView(LoginRequiredMixin, View):
             return HttpResponseRedirect(self._success_url(request))
 
         objects = self._resolve_objects(request)
+        self._objects = objects
         perm = UserCreatedObjectPermission()
         checker = getattr(perm, permission_method)
         applied = skipped = 0
@@ -1574,6 +1587,13 @@ class BulkManageAccessView(LoginRequiredMixin, View):
             require_https=request.is_secure(),
         ):
             return next_url
+        for obj in getattr(self, "_objects", []):
+            try:
+                list_url = type(obj).private_list_url()
+                if list_url:
+                    return f"{list_url}?scope=private"
+            except Exception:
+                continue
         return "/"
 
 
