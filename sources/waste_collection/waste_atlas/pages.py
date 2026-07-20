@@ -92,6 +92,16 @@ MAP_SET_LABELS = {
     "SE": "Sweden",
 }
 
+REGION_MAP_OVERRIDES = {
+    "sweden": {
+        "exportLegendPlacement": "bottom-right",
+        "exportLegendWidth": 0.64,
+        "exportLegendColumns": 1,
+        "exportLegendFitContent": True,
+        "exportLegendReserveMapSpace": True,
+    }
+}
+
 
 def _page(region, theme, title, path, name, **extra):
     """Build one page entry from region defaults plus page-specific values."""
@@ -105,6 +115,12 @@ def _page(region, theme, title, path, name, **extra):
         **REGIONS[region],
     }
     page.update(extra)
+    overrides = {
+        **REGION_MAP_OVERRIDES.get(region, {}),
+        **page.get("overrides", {}),
+    }
+    if overrides:
+        page["overrides"] = overrides
     return page
 
 
@@ -509,14 +525,7 @@ MAP_PAGES = [
         "Biobin stream separation rate (%)",
         "map/sweden/waste-ratio/",
         "waste-atlas-sweden-waste-ratio-map",
-        overrides={
-            "fileBase": "sweden_waste_ratio",
-            "exportLegendPlacement": "bottom-right",
-            "exportLegendWidth": 0.64,
-            "exportLegendColumns": 1,
-            "exportLegendFitContent": True,
-            "exportLegendReserveMapSpace": True,
-        },
+        overrides={"fileBase": "sweden_waste_ratio"},
     ),
     _page(
         "sweden",
