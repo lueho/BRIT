@@ -1,8 +1,9 @@
-{# Bulk access management form.
-   Context:
-   - all_owned: if truthy, applies to every object owned by the user
-     (no item checkboxes required); otherwise checkboxes elsewhere in the
-     page reference this form via form="bulk-access-form". #}
+{% comment %}
+Bulk access management form. Context:
+- all_owned: if truthy, applies to every object owned by the user (no item
+  checkboxes required); otherwise checkboxes elsewhere in the page reference
+  this form via form="bulk-access-form".
+{% endcomment %}
 <form id="bulk-access-form"
       method="post"
       action="{% url 'object_management:bulk_manage_access' %}"
