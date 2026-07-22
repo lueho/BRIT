@@ -431,7 +431,7 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
             "exportLegendWidth": 0.64,
             "exportLegendColumns": 1,
             "exportLegendFitContent": True,
-            "exportLegendReserveMapSpace": True,
+            "exportLegendAvoidMapOverlap": True,
         }
         sweden_pages = [page for page in MAP_PAGES if page["region"] == "sweden"]
 
@@ -472,9 +472,12 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         self.assertIn("cfg.exportLegendWidth", export_layout_fn)
         self.assertIn("cfg.exportLegendColumns", export_layout_fn)
         self.assertIn("cfg.exportLegendFitContent", script)
-        self.assertIn("cfg.exportLegendReserveMapSpace", export_layout_fn)
+        self.assertIn("cfg.exportLegendAvoidMapOverlap", export_layout_fn)
         self.assertIn("function _fitExportLegendWidth(", script)
-        self.assertIn("candidate.requireNoOverlap && overlap > 0", export_layout_fn)
+        self.assertIn("function _projectedRightEdgeInBand(", script)
+        self.assertIn("d3.geoStream(geometryData, projection.stream(stream))", script)
+        self.assertIn("function _fitBottomRightLegend(", script)
+        self.assertNotIn("cfg.exportLegendReserveMapSpace", export_layout_fn)
 
     def test_legend_reordering_helper_exists_in_js(self):
         script_path = (

@@ -972,6 +972,72 @@ var WasteAtlasChoropleth = (function () {
     };
   }
 
+  function _projectedRightEdgeInBand(geometryData, fitData, extent, minY, maxY) {
+    var projection = d3.geoMercator().fitExtent(extent, fitData);
+    var rightEdge = -Infinity;
+    var previous = null;
+    var inLine = false;
+    var stream = {
+      point: function (x, y) {
+        if (y >= minY && y <= maxY) rightEdge = Math.max(rightEdge, x);
+        if (inLine && previous && y !== previous[1]) {
+          [minY, maxY].forEach(function (boundaryY) {
+            var crossesBoundary = (previous[1] < boundaryY && y > boundaryY)
+              || (previous[1] > boundaryY && y < boundaryY);
+            if (crossesBoundary) {
+              var ratio = (boundaryY - previous[1]) / (y - previous[1]);
+              rightEdge = Math.max(rightEdge, previous[0] + (x - previous[0]) * ratio);
+            }
+          });
+        }
+        if (inLine) previous = [x, y];
+      },
+      lineStart: function () {
+        inLine = true;
+        previous = null;
+      },
+      lineEnd: function () {
+        inLine = false;
+        previous = null;
+      },
+      polygonStart: function () { },
+      polygonEnd: function () { },
+      sphere: function () { }
+    };
+    d3.geoStream(geometryData, projection.stream(stream));
+    return rightEdge;
+  }
+
+  function _fitBottomRightLegend(cfg, geometryData, fitData, mapExtent, maxWidth,
+    columnCount, exportHeight, margin, gap) {
+    var documentRight = EXPORT_WIDTH - margin;
+    var widthLimit = maxWidth;
+    var legend;
+    var mapRight = -Infinity;
+    while (true) {
+      legend = _measureExportLegend(cfg, widthLimit, columnCount);
+      var legendTop = exportHeight - margin - legend.height;
+      mapRight = _projectedRightEdgeInBand(
+        geometryData,
+        fitData,
+        mapExtent,
+        legendTop,
+        exportHeight - margin
+      );
+      var availableWidth = mapRight === -Infinity
+        ? maxWidth
+        : Math.max(1, Math.floor(documentRight - mapRight - gap));
+      if (availableWidth >= legend.width || widthLimit <= 1) break;
+      widthLimit = Math.min(widthLimit, availableWidth);
+    }
+    return {
+      legend: legend,
+      x: documentRight - legend.width,
+      y: exportHeight - margin - legend.height,
+      mapRight: mapRight
+    };
+  }
+
   function _exportLayout(data, cfg) {
     // Ensure cfg._hasNoData is up to date before measuring the legend.
     _annotateFeatures(data, cfg);
@@ -990,8 +1056,8 @@ var WasteAtlasChoropleth = (function () {
       placement: cfg.exportLegendPlacement,
       width: cfg.exportLegendWidth || 0.52,
       columns: cfg.exportLegendColumns || 1,
-      reserveMapSpace: Boolean(cfg.exportLegendReserveMapSpace),
-      overlay: !cfg.exportLegendReserveMapSpace
+      avoidMapOverlap: Boolean(cfg.exportLegendAvoidMapOverlap),
+      overlay: true
     };
     var legendSpecs = preferredLegendSpec ? [preferredLegendSpec] : [
       { placement: 'right', width: 0.32, columns: 1 },
@@ -1007,9 +1073,11 @@ var WasteAtlasChoropleth = (function () {
     [EXPORT_HEIGHT_MM, 130, 150, 170, EXPORT_MAX_HEIGHT_MM].forEach(function (heightMm) {
       var exportHeight = Math.round(heightMm / 25.4 * EXPORT_DPI);
       legendSpecs.forEach(function (spec) {
-        var legend = _measureExportLegend(cfg, Math.round(EXPORT_WIDTH * spec.width), spec.columns);
+        var maxLegendWidth = Math.round(EXPORT_WIDTH * spec.width);
+        var legend = _measureExportLegend(cfg, maxLegendWidth, spec.columns);
         var x = margin;
         var y = titleBlock;
+        var mapRight = -Infinity;
         var mapExtent = [[margin, titleBlock], [EXPORT_WIDTH - margin, exportHeight - margin]];
         if (spec.placement === 'right') {
           x = EXPORT_WIDTH - margin - legend.width;
@@ -1018,10 +1086,25 @@ var WasteAtlasChoropleth = (function () {
           x = margin;
           mapExtent = [[x + legend.width + gap, titleBlock], [EXPORT_WIDTH - margin, exportHeight - margin]];
         } else if (spec.placement === 'bottom-right') {
-          x = EXPORT_WIDTH - margin - legend.width;
-          y = exportHeight - margin - legend.height;
-          if (spec.reserveMapSpace) {
-            mapExtent = [[margin, titleBlock], [x - gap, exportHeight - margin]];
+          if (spec.avoidMapOverlap) {
+            var fittedLegend = _fitBottomRightLegend(
+              cfg,
+              data.catchments,
+              fitData,
+              mapExtent,
+              maxLegendWidth,
+              spec.columns,
+              exportHeight,
+              margin,
+              gap
+            );
+            legend = fittedLegend.legend;
+            x = fittedLegend.x;
+            y = fittedLegend.y;
+            mapRight = fittedLegend.mapRight;
+          } else {
+            x = EXPORT_WIDTH - margin - legend.width;
+            y = exportHeight - margin - legend.height;
           }
         } else if (spec.placement === 'bottom-left') {
           x = margin;
@@ -1045,7 +1128,8 @@ var WasteAtlasChoropleth = (function () {
           legend: legend,
           mapExtent: mapExtent,
           overlay: Boolean(spec.overlay),
-          requireNoOverlap: Boolean(spec.reserveMapSpace)
+          avoidMapOverlap: Boolean(spec.avoidMapOverlap),
+          mapRight: mapRight
         });
       });
     });
@@ -1068,16 +1152,18 @@ var WasteAtlasChoropleth = (function () {
       };
       var overlap = _rectIntersectionArea(mapBounds, legendRect);
       var legendArea = candidate.legend.width * candidate.legend.height;
-      var invalidOverlay = candidate.overlay && overlap > legendArea * 0.02;
-      var invalidReservedLayout = candidate.requireNoOverlap && overlap > 0;
+      var shapeOverlap = candidate.avoidMapOverlap && candidate.mapRight !== -Infinity
+        && candidate.legend.x < candidate.mapRight + gap;
+      var scoredOverlap = candidate.avoidMapOverlap ? 0 : overlap;
+      var invalidOverlay = candidate.overlay && scoredOverlap > legendArea * 0.02;
       var mapArea = mapBounds.width * mapBounds.height;
-      var usedArea = mapArea + legendArea - overlap;
+      var usedArea = mapArea + legendArea - scoredOverlap;
       candidate.score = mapBounds.scale * 100000 + usedArea / 1000
         - (candidate.heightMm - EXPORT_HEIGHT_MM) * 120000
         - legendOverflow * 1000000
-        - overlap * 1000
+        - scoredOverlap * 1000
         - (invalidOverlay ? 1000000000 : 0)
-        - (invalidReservedLayout ? 1000000000 : 0)
+        - (shapeOverlap ? 1000000000 : 0)
         - (invalidMap ? 1000000000 : 0);
       if (!selected || candidate.score > selected.score) return candidate;
       return selected;

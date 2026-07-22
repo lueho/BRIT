@@ -98,7 +98,7 @@ REGION_MAP_OVERRIDES = {
         "exportLegendWidth": 0.64,
         "exportLegendColumns": 1,
         "exportLegendFitContent": True,
-        "exportLegendReserveMapSpace": True,
+        "exportLegendAvoidMapOverlap": True,
     }
 }
 
