@@ -116,17 +116,22 @@ var WasteAtlasChoropleth = (function () {
     });
   }
 
+  function _matchesCategory(value, category) {
+    return typeof category.test === 'function'
+      ? category.test(value)
+      : category.value === value;
+  }
+
   function _isNoDataValue(value, categories) {
     if (value == null) return true;
-    for (var i = 0; i < categories.length; i++) {
-      var cat = categories[i];
-      if (typeof cat.test === 'function') {
-        if (cat.test(value)) return false;
-      } else if (cat.value === value) {
-        return false;
-      }
-    }
-    return true;
+    return !categories.some(function (category) {
+      return _matchesCategory(value, category);
+    });
+  }
+
+  function _isNoDataCategory(item) {
+    return item.value === 'no_data'
+      || String(item.label || '').toLowerCase().indexOf('no data') !== -1;
   }
 
   function _colorFor(value, categories, noDataColor) {
@@ -159,7 +164,8 @@ var WasteAtlasChoropleth = (function () {
     var lookup = {};
     records.forEach(function (r) { lookup[r.catchment_id] = r; });
 
-    var hasNoData = false;
+    var hasFallbackNoData = false;
+    var hasNoDataCategory = false;
     var hasOverlayPattern = false;
     if (data.catchments.features) {
       data.catchments.features.forEach(function (f) {
@@ -172,12 +178,21 @@ var WasteAtlasChoropleth = (function () {
         if (f.properties._overlay_pattern) {
           hasOverlayPattern = true;
         }
-        if (_isNoDataValue(f.properties._thematic_value, cfg.categories)) {
-          hasNoData = true;
+        var matchesNoDataCategory = f.properties._thematic_value != null
+          && cfg.categories.some(function (category) {
+            return _isNoDataCategory(category)
+              && _matchesCategory(f.properties._thematic_value, category);
+          });
+        if (matchesNoDataCategory) {
+          hasNoDataCategory = true;
+        } else if (_isNoDataValue(f.properties._thematic_value, cfg.categories)) {
+          hasFallbackNoData = true;
         }
       });
     }
-    cfg._hasNoData = hasNoData;
+    cfg._hasNoData = hasFallbackNoData || hasNoDataCategory;
+    cfg._hasFallbackNoData = hasFallbackNoData;
+    cfg._hasNoDataCategory = hasNoDataCategory;
     cfg._hasOverlayPattern = hasOverlayPattern;
   }
 
@@ -814,10 +829,16 @@ var WasteAtlasChoropleth = (function () {
     );
   }
 
+  function _visibleLegendCategories(cfg) {
+    return cfg.categories.filter(function (item) {
+      return !_isNoDataCategory(item) || cfg._hasNoDataCategory;
+    });
+  }
+
   function _legendItems(cfg, exportMode) {
     var normal = [];
     var noCollection = [];
-    cfg.categories.forEach(function (item) {
+    _visibleLegendCategories(cfg).forEach(function (item) {
       if (_isNoCollectionCategory(item)) {
         noCollection.push(item);
       } else {
@@ -831,7 +852,7 @@ var WasteAtlasChoropleth = (function () {
     noCollection.forEach(function (item) {
       items.push(exportMode ? Object.assign({}, item, { label: _exportLegendLabel(item) }) : item);
     });
-    if (cfg.noDataLabel && cfg._hasNoData !== false) {
+    if (cfg.noDataLabel && cfg._hasFallbackNoData) {
       items.push({
         label: exportMode && cfg.exportNoDataLabel ? cfg.exportNoDataLabel : cfg.noDataLabel,
         color: cfg.noDataColor || '#e0e0e0'
@@ -2051,7 +2072,7 @@ var WasteAtlasChoropleth = (function () {
 
     var normalCats = [];
     var noCollectionCats = [];
-    cfg.categories.forEach(function (item) {
+    _visibleLegendCategories(cfg).forEach(function (item) {
       if (_isNoCollectionCategory(item)) {
         noCollectionCats.push(item);
       } else {
@@ -2061,7 +2082,7 @@ var WasteAtlasChoropleth = (function () {
     items = normalCats.concat(noCollectionCats);
     legendRows = items.length + (hasConflictLegend ? 1 : 0);
 
-    if (cfg.noDataLabel && cfg._hasNoData !== false) {
+    if (cfg.noDataLabel && cfg._hasFallbackNoData) {
       legendRows += 1;
     }
 
@@ -2116,7 +2137,7 @@ var WasteAtlasChoropleth = (function () {
       currentY += swatchH + gap;
     }
 
-    if (cfg.noDataLabel && cfg._hasNoData !== false) {
+    if (cfg.noDataLabel && cfg._hasFallbackNoData) {
       g.append('rect')
         .attr('x', 0).attr('y', currentY + 4)
         .attr('width', swatchW).attr('height', swatchH)

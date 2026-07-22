@@ -501,6 +501,29 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         no_data_idx = legend_items_fn.find("cfg.noDataLabel")
         self.assertNotIn("cfg.overlayPatternField", legend_items_fn[: no_data_idx + 50])
 
+    def test_no_data_legend_entries_only_render_for_displayed_regions(self):
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+        script = script_path.read_text()
+        annotate_fn = script.split("function _annotateFeatures(data, cfg)")[1].split(
+            "function _overlayPatternId"
+        )[0]
+        legend_items_fn = script.split("function _legendItems(cfg, exportMode)")[
+            1
+        ].split("function _fitExportLegendWidth")[0]
+
+        self.assertIn("function _isNoDataCategory(item)", script)
+        self.assertIn("function _visibleLegendCategories(cfg)", script)
+        self.assertIn("cfg._hasNoDataCategory = hasNoDataCategory", annotate_fn)
+        self.assertIn("cfg._hasFallbackNoData = hasFallbackNoData", annotate_fn)
+        self.assertIn("_visibleLegendCategories(cfg)", legend_items_fn)
+        self.assertIn("cfg._hasFallbackNoData", legend_items_fn)
+
     def test_screen_legend_renders_no_data_last(self):
         script_path = (
             Path(__file__).resolve().parents[1]
