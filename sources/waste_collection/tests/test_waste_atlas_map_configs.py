@@ -425,23 +425,27 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
                 self.assertEqual(sweden_themes[theme]["route_name"], route_name)
                 self.assertEqual(pages_by_route[route_name]["year"], "2024")
 
-    def test_sweden_waste_ratio_export_uses_a_wide_bottom_right_legend(self):
-        page = next(
-            page
-            for page in MAP_PAGES
-            if page["name"] == "waste-atlas-sweden-waste-ratio-map"
-        )
+    def test_sweden_exports_use_fitted_bottom_right_legends(self):
+        expected_overrides = {
+            "exportLegendPlacement": "bottom-right",
+            "exportLegendWidth": 0.64,
+            "exportLegendColumns": 1,
+            "exportLegendFitContent": True,
+            "exportLegendReserveMapSpace": True,
+        }
+        sweden_pages = [page for page in MAP_PAGES if page["region"] == "sweden"]
 
+        self.assertTrue(sweden_pages)
+        for page in sweden_pages:
+            with self.subTest(page=page["name"]):
+                for key, value in expected_overrides.items():
+                    self.assertEqual(page["overrides"][key], value)
+
+        waste_ratio_page = next(
+            page for page in sweden_pages if page["theme"] == "waste_ratio"
+        )
         self.assertEqual(
-            page["overrides"],
-            {
-                "fileBase": "sweden_waste_ratio",
-                "exportLegendPlacement": "bottom-right",
-                "exportLegendWidth": 0.64,
-                "exportLegendColumns": 1,
-                "exportLegendFitContent": True,
-                "exportLegendReserveMapSpace": True,
-            },
+            waste_ratio_page["overrides"]["fileBase"], "sweden_waste_ratio"
         )
 
         script_path = (
