@@ -74,6 +74,7 @@ class LayeringContractTests(SimpleTestCase):
                     "distributions": 1,
                     "maps": 1,
                     "materials": 2,
+                    "population": 2,
                     "processes": 2,
                     "inventories": 3,
                     "layer_manager": 3,

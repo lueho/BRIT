@@ -20,7 +20,9 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 
-from maps.models import RegionAttributeValue, RegionProperty
+from maps.models import RegionProperty
+from maps.validation import RegionCompositionError
+from population.services import resolve_population
 from utils.object_management.models import get_default_owner
 from utils.properties.models import Property, Unit
 
@@ -277,33 +279,34 @@ def is_convertible_property(property_id):
 
 
 def get_population_for_collection(collection, year=None):
-    """Return the population for a collection's catchment region.
+    """Return the exact-year population for a collection's catchment region.
 
-    Uses the most recent ``RegionAttributeValue`` with
-    ``attribute_id=WASTE_COLLECTION_POPULATION_ATTRIBUTE_*`` for the catchment's region.
-    If *year* is given, prefers the value closest to that year.
+    Resolution goes through :func:`population.services.resolve_population`,
+    which requires an observation for exactly *year* (with a legacy
+    exact-year ``RegionAttributeValue`` compatibility adapter). Returns
+    ``None`` when *year* is not given or no exact-year value exists.
     """
-    cfg = get_derived_property_config()
-    region_id = getattr(collection.catchment, "region_id", None)
-    if region_id is None:
+    if not year:
         return None
 
-    qs = RegionAttributeValue.objects.filter(
-        region_id=region_id,
-        property_id=cfg.population_attribute_id,
-    )
+    cfg = get_derived_property_config()
+    region = getattr(collection.catchment, "region", None)
+    if region is None:
+        return None
 
-    if year:
-        exact = (
-            qs.filter(date__year=year)
-            .order_by("-date")
-            .values_list("value", flat=True)
-            .first()
+    try:
+        result = resolve_population(
+            region, year, legacy_attribute_id=cfg.population_attribute_id
         )
-        if exact is not None:
-            return exact
-
-    return qs.order_by("-date").values_list("value", flat=True).first()
+    except RegionCompositionError:
+        logger.warning(
+            "Invalid region composition for region id=%s; no population resolved.",
+            region.pk,
+        )
+        return None
+    if result is None:
+        return None
+    return result.value
 
 
 def compute_counterpart_value(cpv):

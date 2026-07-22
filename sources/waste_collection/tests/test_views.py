@@ -44,6 +44,7 @@ from materials.models import (
     Sample,
     SampleSeries,
 )
+from population.models import PopulationDataset, PopulationObservation
 from sources.waste_collection.derived_values import (
     backfill_derived_values,
     clear_derived_value_config_cache,
@@ -7280,6 +7281,14 @@ class DerivedValuesTestCase(TestCase):
             is_derived=False,
         )
 
+        RegionAttributeValue.objects.create(
+            name="Population has-pop 2025",
+            region=collection_with_population.catchment.region,
+            property=self.population_attribute,
+            date=date(2025, 1, 1),
+            value=1000,
+        )
+
         dry_stats = backfill_derived_values(dry_run=True)
         self.assertEqual(dry_stats, {"created": 1, "updated": 1, "skipped": 3})
 
@@ -7309,6 +7318,37 @@ class DerivedValuesTestCase(TestCase):
             catchment_ids=[catchment.pk],
         )
         self.assertEqual(amounts[catchment.pk], Decimal("2.6"))
+
+    def test_amounts_fallback_does_not_use_population_from_another_year(self):
+        collection, catchment = self._create_collection(
+            "atlas-wrong-year", population=None
+        )
+        RegionAttributeValue.objects.create(
+            name="Population atlas-wrong-year 2023",
+            region=collection.catchment.region,
+            property=self.population_attribute,
+            date=date(2023, 1, 1),
+            value=2500,
+        )
+
+        self._bulk_create_cpv(
+            name="total-only-wrong-year",
+            collection=collection,
+            property=self.property_total,
+            unit=self.unit_total,
+            year=2024,
+            average=6.5,
+            publication_status="published",
+            is_derived=False,
+        )
+
+        amounts = _amounts_for_2024(
+            year=2024,
+            all_collection_ids={collection.pk},
+            col_to_cid={collection.pk: catchment.pk},
+            catchment_ids=[catchment.pk],
+        )
+        self.assertNotIn(catchment.pk, amounts)
 
     def test_compute_counterpart_value_returns_none_for_non_convertible_property(self):
         other_property = Property.objects.create(name="other property [test]")
@@ -7649,6 +7689,13 @@ class DerivedValuesTestCase(TestCase):
 
     def test_backfill_writes_correct_values(self):
         collection, _ = self._create_collection("bf-val", population=2000)
+        RegionAttributeValue.objects.create(
+            name="Population bf-val 2025",
+            region=collection.catchment.region,
+            property=self.population_attribute,
+            date=date(2025, 1, 1),
+            value=2000,
+        )
         self._bulk_create_cpv(
             name="bf-specific",
             collection=collection,
@@ -7708,7 +7755,7 @@ class DerivedValuesTestCase(TestCase):
         self.assertEqual(get_population_for_collection(collection, year=2024), 3500)
         self.assertEqual(get_population_for_collection(collection, year=2023), 3000)
 
-    def test_get_population_for_collection_falls_back_to_most_recent(self):
+    def test_get_population_for_collection_never_falls_back_to_another_year(self):
         collection, _ = self._create_collection("pop-fallback", population=None)
         region = collection.catchment.region
         RegionAttributeValue.objects.create(
@@ -7725,7 +7772,31 @@ class DerivedValuesTestCase(TestCase):
             date=date(2022, 1, 1),
             value=2000,
         )
-        self.assertEqual(get_population_for_collection(collection, year=2024), 2000)
+        self.assertIsNone(get_population_for_collection(collection, year=2024))
+        self.assertIsNone(get_population_for_collection(collection))
+
+    def test_get_population_for_collection_prefers_population_observation(self):
+        collection, _ = self._create_collection("pop-observation", population=2000)
+        region = collection.catchment.region
+        dataset = PopulationDataset.objects.create(
+            slug="eurostat-test",
+            name="Eurostat test",
+            provider="Eurostat",
+            source_code="nama_10r_3popgdp",
+            geographic_scope="nuts",
+            temporal_basis="calendar_year_average",
+            is_canonical=True,
+        )
+        PopulationObservation.objects.create(
+            dataset=dataset,
+            region=region,
+            year=2024,
+            value=Decimal("2500"),
+        )
+        self.assertEqual(
+            get_population_for_collection(collection, year=2024), Decimal("2500")
+        )
+        self.assertIsNone(get_population_for_collection(collection, year=2023))
 
     def test_get_population_for_collection_returns_none_without_data(self):
         collection, _ = self._create_collection("pop-none", population=None)
