@@ -447,6 +447,15 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         self.assertEqual(
             waste_ratio_page["overrides"]["fileBase"], "sweden_waste_ratio"
         )
+        residual_amount_page = next(
+            page
+            for page in sweden_pages
+            if page["theme"] == "residual_collection_amount"
+        )
+        self.assertEqual(
+            residual_amount_page["overrides"]["exportLegendTitle"],
+            "Collected amount\n(kg / cap / a)",
+        )
 
         script_path = (
             Path(__file__).resolve().parents[1]
