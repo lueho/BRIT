@@ -431,7 +431,7 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
             "exportLegendWidth": 0.64,
             "exportLegendColumns": 1,
             "exportLegendFitContent": True,
-            "exportLegendReserveMapSpace": True,
+            "exportLegendAvoidMapOverlap": True,
         }
         sweden_pages = [page for page in MAP_PAGES if page["region"] == "sweden"]
 
@@ -446,6 +446,15 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         )
         self.assertEqual(
             waste_ratio_page["overrides"]["fileBase"], "sweden_waste_ratio"
+        )
+        residual_amount_page = next(
+            page
+            for page in sweden_pages
+            if page["theme"] == "residual_collection_amount"
+        )
+        self.assertEqual(
+            residual_amount_page["overrides"]["exportLegendTitle"],
+            "Collected amount\n(kg / cap / a)",
         )
 
         script_path = (
@@ -463,9 +472,12 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         self.assertIn("cfg.exportLegendWidth", export_layout_fn)
         self.assertIn("cfg.exportLegendColumns", export_layout_fn)
         self.assertIn("cfg.exportLegendFitContent", script)
-        self.assertIn("cfg.exportLegendReserveMapSpace", export_layout_fn)
+        self.assertIn("cfg.exportLegendAvoidMapOverlap", export_layout_fn)
         self.assertIn("function _fitExportLegendWidth(", script)
-        self.assertIn("candidate.requireNoOverlap && overlap > 0", export_layout_fn)
+        self.assertIn("function _projectedRightEdgeInBand(", script)
+        self.assertIn("d3.geoStream(geometryData, projection.stream(stream))", script)
+        self.assertIn("function _fitBottomRightLegend(", script)
+        self.assertNotIn("cfg.exportLegendReserveMapSpace", export_layout_fn)
 
     def test_legend_reordering_helper_exists_in_js(self):
         script_path = (
@@ -500,6 +512,29 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         legend_items_fn = script.split("function _legendItems(cfg, exportMode)")[1]
         no_data_idx = legend_items_fn.find("cfg.noDataLabel")
         self.assertNotIn("cfg.overlayPatternField", legend_items_fn[: no_data_idx + 50])
+
+    def test_no_data_legend_entries_only_render_for_displayed_regions(self):
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+        script = script_path.read_text()
+        annotate_fn = script.split("function _annotateFeatures(data, cfg)")[1].split(
+            "function _overlayPatternId"
+        )[0]
+        legend_items_fn = script.split("function _legendItems(cfg, exportMode)")[
+            1
+        ].split("function _fitExportLegendWidth")[0]
+
+        self.assertIn("function _isNoDataCategory(item)", script)
+        self.assertIn("function _visibleLegendCategories(cfg)", script)
+        self.assertIn("cfg._hasNoDataCategory = hasNoDataCategory", annotate_fn)
+        self.assertIn("cfg._hasFallbackNoData = hasFallbackNoData", annotate_fn)
+        self.assertIn("_visibleLegendCategories(cfg)", legend_items_fn)
+        self.assertIn("cfg._hasFallbackNoData", legend_items_fn)
 
     def test_screen_legend_renders_no_data_last(self):
         script_path = (

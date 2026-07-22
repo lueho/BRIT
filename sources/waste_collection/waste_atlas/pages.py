@@ -98,7 +98,7 @@ REGION_MAP_OVERRIDES = {
         "exportLegendWidth": 0.64,
         "exportLegendColumns": 1,
         "exportLegendFitContent": True,
-        "exportLegendReserveMapSpace": True,
+        "exportLegendAvoidMapOverlap": True,
     }
 }
 
@@ -509,7 +509,10 @@ MAP_PAGES = [
         "Specifically collected amount of residual waste",
         "map/sweden/residual-collection-amount/",
         "waste-atlas-sweden-residual-collection-amount-map",
-        overrides={"fileBase": "sweden_residual_collection_amount"},
+        overrides={
+            "fileBase": "sweden_residual_collection_amount",
+            "exportLegendTitle": "Collected amount\n(kg / cap / a)",
+        },
     ),
     _page(
         "sweden",
