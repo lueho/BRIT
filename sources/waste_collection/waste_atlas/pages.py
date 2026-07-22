@@ -511,7 +511,7 @@ MAP_PAGES = [
         "waste-atlas-sweden-residual-collection-amount-map",
         overrides={
             "fileBase": "sweden_residual_collection_amount",
-            "exportLegendTitle": "Collected amount\n(kg / cap / a)",
+            "exportLegendTitle": "Collected amount (kg / cap / a)",
         },
     ),
     _page(

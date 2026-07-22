@@ -134,13 +134,8 @@ MAP_CONFIGS = {
             },
             {
                 "value": "No separate collection",
-                "label": "No separate collection",
+                "label": "No separate biowaste collection",
                 "color": BIOWASTE_NO_COLLECTION_COLOR,
-            },
-            {
-                "value": "no_data",
-                "label": "No data reported",
-                "color": NO_DATA_COLOR,
             },
         ],
         "noDataColor": NO_DATA_COLOR,
