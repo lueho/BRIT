@@ -99,7 +99,8 @@ REGION_MAP_OVERRIDES = {
         "exportLegendColumns": 1,
         "exportLegendFitContent": True,
         "exportLegendAvoidMapOverlap": True,
-    }
+    },
+    "nrw": {"exportLegendBottomColumns": 2},
 }
 
 

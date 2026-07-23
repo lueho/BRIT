@@ -425,6 +425,14 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
                 self.assertEqual(sweden_themes[theme]["route_name"], route_name)
                 self.assertEqual(pages_by_route[route_name]["year"], "2024")
 
+    def test_nrw_exports_use_two_column_bottom_legends(self):
+        nrw_pages = [page for page in MAP_PAGES if page["region"] == "nrw"]
+
+        self.assertTrue(nrw_pages)
+        for page in nrw_pages:
+            with self.subTest(page=page["name"]):
+                self.assertEqual(page["overrides"]["exportLegendBottomColumns"], 2)
+
     def test_sweden_exports_use_fitted_bottom_right_legends(self):
         expected_overrides = {
             "exportLegendPlacement": "bottom-right",
