@@ -4740,6 +4740,34 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(cfg["nutsPrefix"], "ITH10")
         self.assertEqual(cfg["nutsLevel"], 3)
 
+    def test_south_tyrol_target_waste_category_map_uses_expected_classes(self):
+        response = self.client.get(
+            reverse("waste-atlas-south-tyrol-target-waste-category-map")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Target waste category")
+        self.assertContains(
+            response,
+            f'data-url="{reverse("waste-atlas-south-tyrol-target-waste-category-map")}"',
+        )
+        cfg = self._map_config(response)
+        self.assertEqual(
+            cfg["dataUrl"],
+            "/waste_collection/api/waste-atlas/target-waste-category/",
+        )
+        self.assertEqual(cfg["dataField"], "target_waste_category")
+        self.assertEqual(cfg["nutsPrefix"], "ITH10")
+        self.assertEqual(cfg["nutsLevel"], 3)
+        self.assertEqual(
+            [category["value"] for category in cfg["categories"]],
+            ["Biowaste", "Food waste", "No separate collection"],
+        )
+        self.assertEqual(
+            [category["color"] for category in cfg["categories"]],
+            ["#94cf7c", "#debf6a", "#d7d7d7"],
+        )
+
     def test_bw_rp_orga_level_map_uses_bundesland_border_scope(self):
         response = self.client.get(reverse("waste-atlas-bw-rp-orga-level-map"))
 
@@ -5036,6 +5064,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
     def test_south_tyrol_bundle_maps_default_to_regional_filter(self):
         map_names = [
             "waste-atlas-south-tyrol-collection-system-map",
+            "waste-atlas-south-tyrol-target-waste-category-map",
             "waste-atlas-south-tyrol-green-waste-collection-system-count-map",
             "waste-atlas-south-tyrol-collection-count-ratio-map",
             "waste-atlas-south-tyrol-residual-frequency-map",

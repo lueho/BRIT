@@ -340,7 +340,6 @@ class WasteAtlasMapConfigTests(TestCase):
                 "MANDATORY",
                 "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION",
                 "VOLUNTARY",
-                "not_specified",
             ],
         )
         self.assertEqual(
@@ -462,7 +461,7 @@ class WasteAtlasMapConfigTests(TestCase):
         )
         self.assertEqual(
             residual_amount_page["overrides"]["exportLegendTitle"],
-            "Collected amount\n(kg / cap / a)",
+            "Collected amount (kg / cap / a)",
         )
 
         script_path = (

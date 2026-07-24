@@ -47,6 +47,7 @@ from .viewsets import (
     ResidualFrequencyTypeViewSet,
     ResidualMinBinSizeViewSet,
     ResidualRequiredBinCapacityViewSet,
+    TargetWasteCategoryViewSet,
     WasteRatioViewSet,
     WeeklyBpAccessDaysViewSet,
 )
@@ -132,6 +133,11 @@ router.register(
     "food-waste-category",
     FoodWasteCategoryViewSet,
     basename="api-waste-atlas-food-waste-category",
+)
+router.register(
+    "target-waste-category",
+    TargetWasteCategoryViewSet,
+    basename="api-waste-atlas-target-waste-category",
 )
 router.register(
     "paper-bags",

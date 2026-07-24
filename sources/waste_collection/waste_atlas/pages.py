@@ -272,6 +272,13 @@ MAP_PAGES = [
     ),
     _page(
         "south_tyrol",
+        "target_waste_category",
+        "Target waste category",
+        "map/south-tyrol/target-waste-category/",
+        "waste-atlas-south-tyrol-target-waste-category-map",
+    ),
+    _page(
+        "south_tyrol",
         "green_waste_collection_system_count",
         "Number of green-waste collection systems per catchment",
         "map/south-tyrol/green-waste-collection-system-count/",
