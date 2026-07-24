@@ -67,6 +67,7 @@ from .serializers import (
     CatchmentParticipationPolicySerializer,
     CatchmentPopulationSerializer,
     CatchmentRequiredBinCapacitySerializer,
+    CatchmentTargetWasteCategorySerializer,
     CatchmentWasteRatioSerializer,
     CatchmentWeeklyBpAccessDaysSerializer,
 )
@@ -2849,6 +2850,47 @@ class FoodWasteCategoryViewSet(WasteAtlasViewSet):
             data.append({"catchment_id": cid, "food_waste_category": category})
 
         serializer = CatchmentFoodWasteCategorySerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class TargetWasteCategoryViewSet(WasteAtlasViewSet):
+    """Return the target organic-waste category per catchment.
+
+    The category is read from the selected Biowaste/Food waste collection.
+    A collection explicitly marked ``No separate collection`` takes
+    precedence over its stored waste category, because these records describe
+    the absence of a separately collected organic fraction.
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        best = _select_primary_collections(
+            country,
+            year,
+            ["Biowaste", "Food waste"],
+            nuts_prefixes,
+            extra_fields=("waste_category__name",),
+            user=request.user,
+        )
+
+        data = []
+        for catchment_id, row in best.items():
+            target_waste_category = (
+                "No separate collection"
+                if row["collection_system"] == "No separate collection"
+                else row["waste_category__name"]
+            )
+            data.append(
+                {
+                    "catchment_id": catchment_id,
+                    "target_waste_category": target_waste_category,
+                }
+            )
+
+        serializer = CatchmentTargetWasteCategorySerializer(data, many=True)
         return Response(serializer.data)
 
 
