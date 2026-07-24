@@ -11,6 +11,8 @@ from .views import (
     EuropeDataCoverageMapView,
     WasteAtlasChangeMapOverviewView,
     WasteAtlasDataConflictsOverviewView,
+    WasteAtlasMapConfigurationListView,
+    WasteAtlasMapConfigurationUpdateView,
     WasteAtlasOverviewView,
 )
 
@@ -30,6 +32,16 @@ urlpatterns = [
         "map/data-conflicts/",
         WasteAtlasDataConflictsOverviewView.as_view(),
         name="waste-atlas-data-conflicts-overview",
+    ),
+    path(
+        "map/configurations/",
+        WasteAtlasMapConfigurationListView.as_view(),
+        name="waste-atlas-map-configuration-list",
+    ),
+    path(
+        "map/configurations/<slug:key>/",
+        WasteAtlasMapConfigurationUpdateView.as_view(),
+        name="waste-atlas-map-configuration-update",
     ),
     path(
         "map/changes/<str:map_set>/<str:theme>/",

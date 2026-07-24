@@ -547,7 +547,7 @@ def build_map_selection_context(
 
 def build_conflict_maps_context(reverse_func):
     """Return context listing every map page whose config opts into the
-    maintainer conflict-overlay aid (``conflictUrl`` in ``MAP_CONFIGS``).
+    maintainer conflict-overlay aid (``conflictUrl`` in its stored config).
 
     Each entry carries the page's reverse URL, title, and the label of its
     map set so the data-conflicts overview can render a plain link list
@@ -555,11 +555,12 @@ def build_conflict_maps_context(reverse_func):
     are skipped.
     """
     conflict_maps = []
+    map_configs = dict(MAP_CONFIGS.items())
     for page in MAP_PAGES:
         map_set = page["selector_set"]
         if not map_set:
             continue
-        config = MAP_CONFIGS.get(page["config_key"], {})
+        config = map_configs.get(page["config_key"], {})
         if not config.get("conflictUrl"):
             continue
         conflict_maps.append(

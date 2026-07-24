@@ -1,10 +1,16 @@
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import Http404
+from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
 from django.views.decorators.clickjacking import xframe_options_exempt
-from django.views.generic import TemplateView
+from django.views.generic import FormView, ListView, TemplateView
 
+from .forms import WasteAtlasMapConfigurationForm
 from .map_selection import (
     MAP_SELECTION_YEARS,
     build_conflict_maps_context,
@@ -13,6 +19,7 @@ from .map_selection import (
     build_related_maps_context,
     resolve_map_set,
 )
+from .models import WasteAtlasMapConfiguration
 from .pages import MAP_PAGES, MAP_SET_LABELS
 
 WASTE_ATLAS_GROUP_NAME = "waste_atlas"
@@ -55,12 +62,141 @@ class WasteAtlasGroupMixin(LoginRequiredMixin, UserPassesTestMixin):
         return self.request.user.groups.filter(name=WASTE_ATLAS_GROUP_NAME).exists()
 
 
+class WasteAtlasStaffMixin(LoginRequiredMixin, UserPassesTestMixin):
+    """Restrict configuration tools to authenticated staff users."""
+
+    def test_func(self):
+        return self.request.user.is_staff
+
+
+def _configuration_map_pages(config_key):
+    pages = []
+    seen_urls = set()
+    for page in MAP_PAGES:
+        if page["config_key"] != config_key:
+            continue
+        url = reverse(page["name"])
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+        pages.append(
+            {
+                "title": page["title"],
+                "region": MAP_SET_LABELS.get(page["selector_set"], "Generic"),
+                "url": url,
+            }
+        )
+    return pages
+
+
+def _configuration_return_paths(config_key):
+    paths = {page["url"] for page in _configuration_map_pages(config_key)}
+    for page in MAP_PAGES:
+        if page["config_key"] != config_key or not page["selector_set"]:
+            continue
+        paths.add(
+            reverse(
+                "waste-atlas-change-map",
+                args=[page["selector_set"], page["theme"]],
+            )
+        )
+    return paths
+
+
+class WasteAtlasMapConfigurationListView(
+    WasteAtlasStaffMixin,
+    AtlasShellTreeMixin,
+    ListView,
+):
+    model = WasteAtlasMapConfiguration
+    template_name = "waste_atlas/map_configuration_list.html"
+    context_object_name = "map_configurations"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        for configuration in ctx["map_configurations"]:
+            configuration.map_pages = _configuration_map_pages(configuration.key)
+            configuration.category_count = len(
+                configuration.configuration.get("categories", [])
+            )
+        return ctx
+
+
+class WasteAtlasMapConfigurationUpdateView(
+    WasteAtlasStaffMixin,
+    AtlasShellTreeMixin,
+    FormView,
+):
+    form_class = WasteAtlasMapConfigurationForm
+    template_name = "waste_atlas/map_configuration_form.html"
+
+    def get_object(self):
+        if not hasattr(self, "object"):
+            self.object = get_object_or_404(
+                WasteAtlasMapConfiguration,
+                key=self.kwargs["key"],
+            )
+        return self.object
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["instance"] = self.get_object()
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        configuration = self.get_object()
+        ctx["map_configuration"] = configuration
+        ctx["preview_pages"] = _configuration_map_pages(configuration.key)
+        ctx["return_to"] = self.get_return_url()
+        return ctx
+
+    def get_return_url(self):
+        candidate = self.request.POST.get("return_to") or self.request.GET.get(
+            "return_to"
+        )
+        if candidate:
+            parsed = urlsplit(candidate)
+            allowed_paths = _configuration_return_paths(self.get_object().key)
+            if not parsed.scheme and not parsed.netloc and parsed.path in allowed_paths:
+                return candidate
+
+        preview_pages = _configuration_map_pages(self.get_object().key)
+        if preview_pages:
+            return preview_pages[0]["url"]
+        return reverse("waste-atlas-map-configuration-list")
+
+    def form_valid(self, form):
+        configuration = form.save()
+        messages.success(
+            self.request,
+            f'Map configuration "{configuration.key}" was updated.',
+        )
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return_to = urlsplit(self.get_return_url())
+        query = [
+            (key, value)
+            for key, value in parse_qsl(return_to.query, keep_blank_values=True)
+            if key != "config_updated"
+        ]
+        query.append(
+            (
+                "config_updated",
+                str(int(self.get_object().updated_at.timestamp() * 1_000_000)),
+            )
+        )
+        return urlunsplit(return_to._replace(query=urlencode(query)))
+
+
+@method_decorator(never_cache, name="dispatch")
 class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
     """Generic choropleth map page driven by a ``MAP_PAGES`` entry.
 
     The page entry (see ``pages.py``) provides the URL, title, region scope,
-    selector theme, and the key of the JS map configuration in
-    ``map_configs.py``.  ``year`` can always be overridden via query string;
+    selector theme, and the key of the database-backed JS map configuration.
+    ``year`` can always be overridden via query string;
     ``country``/``nuts_*`` only when the page is not locked to a region.
     """
 
@@ -114,6 +250,13 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
             ctx["breadcrumb_section_url"] = f"{overview_href}?region={selected_map_set}"
         ctx["breadcrumb_object_label"] = page["title"]
         ctx["map_config_key"] = page["config_key"]
+        edit_url = reverse(
+            "waste-atlas-map-configuration-update",
+            args=[page["config_key"]],
+        )
+        ctx["map_configuration_edit_url"] = (
+            f"{edit_url}?{urlencode({'return_to': self.request.get_full_path()})}"
+        )
         ctx["map_config_overrides"] = page.get("overrides")
         ctx["atlas_active_theme"] = page["theme"]
         ctx.update(
@@ -241,7 +384,7 @@ class WasteAtlasDataConflictsOverviewView(
 ):
     """Overview page listing maps with the maintainer conflict-overlay aid.
 
-    Surfaces every choropleth map whose ``MAP_CONFIGS`` entry opts into the
+    Surfaces every choropleth map whose stored configuration opts into the
     conflict overlay (``conflictUrl``) so data maintainers can find maps that
     highlight catchments where the dataset holds conflicting theme values.
     """

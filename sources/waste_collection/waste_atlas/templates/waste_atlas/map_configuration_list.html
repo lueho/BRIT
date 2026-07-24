@@ -1,0 +1,62 @@
+{% extends "waste_atlas/shell_base.html" %}
+{% block title %}
+  Waste Atlas - Map configurations
+{% endblock title %}
+{% block atlas_workspace %}
+  <header class="atlas-context">
+    <div class="atlas-context-heading">
+      <div class="atlas-eyebrow">Waste Atlas</div>
+      <h1 class="atlas-context-title">Map configurations</h1>
+    </div>
+  </header>
+  <div class="p-3 p-lg-4">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Configuration</th>
+            <th scope="col">Legend title</th>
+            <th scope="col">Categories</th>
+            <th scope="col">Preview</th>
+            <th scope="col">
+              <span class="visually-hidden">Actions</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for configuration in map_configurations %}
+            <tr>
+              <th scope="row">
+                <code>{{ configuration.key }}</code>
+              </th>
+              <td>{{ configuration.configuration.legendTitle|default:"-" }}</td>
+              <td>{{ configuration.category_count }}</td>
+              <td>
+                {% with preview=configuration.map_pages.0 %}
+                  {% if preview %}
+                    <a href="{{ preview.url }}" target="_blank" rel="noopener">
+                      {{ preview.region }}
+                      <span class="visually-hidden">{{ preview.title }}</span>
+                    </a>
+                  {% else %}
+                    -
+                  {% endif %}
+                {% endwith %}
+              </td>
+              <td class="text-end">
+                <a class="btn btn-outline-primary btn-sm"
+                   href="{% url 'waste-atlas-map-configuration-update' configuration.key %}">
+                  <i class="fas fa-edit"></i> Edit
+                </a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5">No map configurations found.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock atlas_workspace %}

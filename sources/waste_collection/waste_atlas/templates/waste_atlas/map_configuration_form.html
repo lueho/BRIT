@@ -1,0 +1,182 @@
+{% extends "waste_atlas/shell_base.html" %}
+{% block title %}
+  Waste Atlas - Edit {{ map_configuration.key }}
+{% endblock title %}
+{% block atlas_workspace %}
+  <header class="atlas-context">
+    <div class="atlas-context-heading">
+      <div class="atlas-eyebrow">Map configuration</div>
+      <h1 class="atlas-context-title">{{ map_configuration.key }}</h1>
+    </div>
+    <div class="atlas-context-actions">
+      {% if preview_pages %}
+        <div class="dropdown">
+          <button class="btn btn-outline-secondary btn-sm atlas-hero-btn dropdown-toggle"
+                  type="button"
+                  id="atlas-configuration-preview-menu"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false">
+            <i class="fas fa-map"></i> Preview
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end"
+              aria-labelledby="atlas-configuration-preview-menu">
+            {% for preview in preview_pages %}
+              <li>
+                <a class="dropdown-item"
+                   href="{{ preview.url }}"
+                   target="_blank"
+                   rel="noopener">{{ preview.region }}: {{ preview.title }}</a>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+      <a class="btn btn-outline-primary btn-sm atlas-hero-btn"
+         href="{% url 'waste-atlas-map-configuration-list' %}">
+        <i class="fas fa-th-list"></i> Configurations
+      </a>
+    </div>
+  </header>
+  <form method="post" class="p-3 p-lg-4">
+    {% csrf_token %}
+    <input type="hidden" name="return_to" value="{{ return_to }}">
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+    {% endif %}
+    <fieldset class="mb-4">
+      <legend class="h5">Legend</legend>
+      <div class="row g-3">
+        <div class="col-12 col-lg-6">
+          <label class="form-label" for="{{ form.legend_title.id_for_label }}">{{ form.legend_title.label }}</label>
+          {{ form.legend_title }}
+          {{ form.legend_title.errors }}
+        </div>
+        <div class="col-12 col-lg-6">
+          <label class="form-label"
+                 for="{{ form.export_legend_title.id_for_label }}">{{ form.export_legend_title.label }}</label>
+          {{ form.export_legend_title }}
+          {{ form.export_legend_title.errors }}
+        </div>
+      </div>
+    </fieldset>
+    <fieldset class="mb-4">
+      <legend class="h5">Online preview</legend>
+      <div class="row g-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label"
+                 for="{{ form.legend_placement.id_for_label }}">{{ form.legend_placement.label }}</label>
+          {{ form.legend_placement }}
+          {{ form.legend_placement.errors }}
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label" for="{{ form.legend_width.id_for_label }}">{{ form.legend_width.label }}</label>
+          {{ form.legend_width }}
+          {{ form.legend_width.errors }}
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label"
+                 for="{{ form.legend_font_size.id_for_label }}">{{ form.legend_font_size.label }}</label>
+          {{ form.legend_font_size }}
+          {{ form.legend_font_size.errors }}
+        </div>
+      </div>
+    </fieldset>
+    <fieldset class="mb-4">
+      <legend class="h5">Export</legend>
+      <div class="row g-3 align-items-end">
+        <div class="col-12 col-md-4">
+          <label class="form-label"
+                 for="{{ form.export_legend_placement.id_for_label }}">{{ form.export_legend_placement.label }}</label>
+          {{ form.export_legend_placement }}
+          {{ form.export_legend_placement.errors }}
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label"
+                 for="{{ form.export_legend_width.id_for_label }}">{{ form.export_legend_width.label }}</label>
+          {{ form.export_legend_width }}
+          {{ form.export_legend_width.errors }}
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label"
+                 for="{{ form.export_legend_columns.id_for_label }}">{{ form.export_legend_columns.label }}</label>
+          {{ form.export_legend_columns }}
+          {{ form.export_legend_columns.errors }}
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="form-check">
+            {{ form.export_legend_fit_content }}
+            <label class="form-check-label"
+                   for="{{ form.export_legend_fit_content.id_for_label }}">{{ form.export_legend_fit_content.label }}</label>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="form-check">
+            {{ form.export_legend_avoid_map_overlap }}
+            <label class="form-check-label"
+                   for="{{ form.export_legend_avoid_map_overlap.id_for_label }}">{{ form.export_legend_avoid_map_overlap.label }}</label>
+          </div>
+        </div>
+      </div>
+    </fieldset>
+    <fieldset class="mb-4">
+      <legend class="h5">Categories</legend>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th scope="col">Order</th>
+              <th scope="col">Value</th>
+              <th scope="col">Preview name</th>
+              <th scope="col">Export name</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in form.category_rows %}
+              <tr>
+                <td style="width: 6rem">
+                  <label class="visually-hidden"
+                         for="{{ row.order_field.id_for_label }}">{{ row.order_field.label }} for {{ row.value }}</label>
+                  {{ row.order_field }}
+                  {{ row.order_field.errors }}
+                </td>
+                <th scope="row">
+                  {% if row.color %}
+                    <span class="d-inline-block border me-2"
+                          style="width: 1rem;
+                                 height: 1rem;
+                                 background: {{ row.color }}"
+                          aria-hidden="true"></span>
+                  {% endif %}
+                  <code>{{ row.value }}</code>
+                </th>
+                <td>
+                  <label class="visually-hidden"
+                         for="{{ row.label_field.id_for_label }}">{{ row.label_field.label }} for {{ row.value }}</label>
+                  {{ row.label_field }}
+                  {{ row.label_field.errors }}
+                </td>
+                <td>
+                  <label class="visually-hidden"
+                         for="{{ row.export_label_field.id_for_label }}">{{ row.export_label_field.label }} for {{ row.value }}</label>
+                  {{ row.export_label_field }}
+                  {{ row.export_label_field.errors }}
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="4">This configuration has no fixed categories.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </fieldset>
+    <div class="d-flex gap-2">
+      <button class="btn btn-primary" type="submit">
+        <i class="fas fa-save"></i> Save
+      </button>
+      <a class="btn btn-outline-secondary"
+         href="{% url 'waste-atlas-map-configuration-list' %}">Cancel</a>
+    </div>
+  </form>
+{% endblock atlas_workspace %}
