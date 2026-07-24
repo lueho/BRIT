@@ -161,6 +161,23 @@ class WasteAtlasMapConfigTests(TestCase):
 
         self.assertIn("else delete loadCfg.nutsLevel;", script)
 
+    def test_catchments_open_the_displayed_values_collection(self):
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "waste_atlas"
+            / "static"
+            / "js"
+            / "waste_atlas_choropleth.js"
+        )
+        script = script_path.read_text()
+
+        self.assertIn("function _collectionDetailUrl(", script)
+        self.assertIn("properties.collection_detail_url", script)
+        self.assertIn("window.location.assign(detailUrl)", script)
+        self.assertIn(".on('click'", script)
+        self.assertIn(".on('keydown'", script)
+        self.assertNotIn("atlas-collection-links", script)
+
     def test_load_current_uses_passed_country_instead_of_cfg_country(self):
         """The ``loadCurrent`` callback in ``init()`` must use the country
         argument from the selector, not the hard-coded ``cfg.country``.

@@ -12,6 +12,7 @@ from django.views.generic import FormView, ListView, TemplateView
 
 from .forms import WasteAtlasMapConfigurationForm
 from .map_selection import (
+    COLLECTION_DETAIL_CATEGORY_BY_THEME,
     MAP_SELECTION_YEARS,
     build_conflict_maps_context,
     build_map_selection_context,
@@ -258,6 +259,9 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
             f"{edit_url}?{urlencode({'return_to': self.request.get_full_path()})}"
         )
         ctx["map_config_overrides"] = page.get("overrides")
+        ctx["collection_detail_category"] = COLLECTION_DETAIL_CATEGORY_BY_THEME.get(
+            page["theme"]
+        )
         ctx["atlas_active_theme"] = page["theme"]
         ctx.update(
             build_overview_directory_context(reverse, selected_region=selected_map_set)

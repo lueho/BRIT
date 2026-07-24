@@ -4343,6 +4343,17 @@ class WasteAtlasMapViewsTestCase(TestCase):
             response,
             f'href="{reverse("waste-atlas-change-map", args=["DE", "collection_system"])}?from_year=2023&amp;to_year=2024"',
         )
+        self.assertEqual(
+            self._map_config(response)["collectionDetailCategory"],
+            "biowaste",
+        )
+
+    def test_aggregate_map_does_not_link_to_an_unrelated_collection(self):
+        response = self.client.get(
+            reverse("waste-atlas-germany-biowaste-collection-amount-map")
+        )
+
+        self.assertNotIn("collectionDetailCategory", self._map_config(response))
 
     def test_change_map_page_renders_current_map_cross_link(self):
         response = self.client.get(
@@ -4356,6 +4367,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
             response,
             f'href="{reverse("waste-atlas-germany-collection-system-map")}"',
         )
+        self.assertNotIn("collectionDetailCategory", self._map_config(response))
 
     def test_map_page_renders_shell_layout(self):
         response = self.client.get(reverse("waste-atlas-germany-collection-system-map"))

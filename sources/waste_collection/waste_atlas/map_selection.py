@@ -276,6 +276,32 @@ MAP_SELECTION_WASTE_CATEGORY_OVERRIDES = {
     "collection_support": "biowaste",
 }
 
+# Themes whose displayed value is derived from one deterministic primary
+# collection. Aggregate, ratio, combined, population, and organisation themes
+# are intentionally omitted because no single collection owns their value.
+COLLECTION_DETAIL_CATEGORY_BY_THEME = {
+    "access_control": "biowaste",
+    "bin_configuration": "biowaste",
+    "biowaste_collection_point_count": "biowaste",
+    "biowaste_collection_system": "biowaste",
+    "biowaste_fee_system": "biowaste",
+    "biowaste_frequency": "biowaste",
+    "biowaste_impurity": "biowaste",
+    "collection_point_count": "all",
+    "collection_support": "biowaste",
+    "collection_system": "biowaste",
+    "food_waste_category": "biowaste",
+    "paper_bags": "biowaste",
+    "participation_policy": "biowaste",
+    "plastic_bags": "biowaste",
+    "residual_collection_point_count": "residual",
+    "residual_collection_system": "residual",
+    "residual_fee_system": "residual",
+    "residual_frequency": "residual",
+    "target_waste_category": "biowaste",
+    "weekly_bp_access_days": "biowaste",
+}
+
 TOPIC_COLOR_CLASSES = {
     "orga_level": "atlas-topic-admin",
     "collection_orga_level": "atlas-topic-admin",
