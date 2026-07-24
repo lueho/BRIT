@@ -52,6 +52,10 @@ def atlas_js_config(context, config_key):
     if nuts_level:
         config["nutsLevel"] = int(nuts_level)
 
+    collection_detail_category = context.get("collection_detail_category")
+    if collection_detail_category and not context.get("from_year"):
+        config["collectionDetailCategory"] = collection_detail_category
+
     # Change maps compare category or numeric value differences client-side
     config.pop("changeMode", None)
     config.pop("fromYear", None)

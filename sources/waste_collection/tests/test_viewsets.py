@@ -4712,6 +4712,83 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         self.assertNotIn(self.private_catchment.id, ids)
         self.assertNotIn(self.review_catchment.id, ids)
 
+    def test_catchment_geojson_includes_selected_collection_detail_url(self):
+        response = self._get(
+            "catchment_geojson",
+            collection_detail_category="biowaste",
+        )
+
+        published_feature = next(
+            feature
+            for feature in response.data["features"]
+            if feature["properties"]["catchment_id"] == self.published_catchment.id
+        )
+
+        self.assertEqual(
+            published_feature["properties"]["collection_detail_url"],
+            reverse(
+                "collection-detail",
+                kwargs={"pk": self.published_collection.id},
+            ),
+        )
+
+    def test_catchment_geojson_links_the_collection_selected_for_displayed_value(self):
+        bring_point = CollectionSystem.objects.create(name="Bring point")
+        lower_priority_collection = Collection.objects.create(
+            name="Lower Priority Published Collection",
+            owner=self.user,
+            catchment=self.published_catchment,
+            waste_category=self.bio_category,
+            collection_system=bring_point,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+        hidden_private = Collection.objects.create(
+            name="Hidden Private Collection",
+            owner=self.user,
+            catchment=self.published_catchment,
+            waste_category=self.bio_category,
+            collection_system=self.d2d,
+            valid_from=date(2024, 1, 1),
+            publication_status="private",
+        )
+
+        thematic_response = self._get("collection_system")
+        thematic_row = next(
+            row
+            for row in thematic_response.data
+            if row["catchment_id"] == self.published_catchment.id
+        )
+        response = self._get(
+            "catchment_geojson",
+            collection_detail_category="biowaste",
+        )
+        feature = next(
+            feature
+            for feature in response.data["features"]
+            if feature["properties"]["catchment_id"] == self.published_catchment.id
+        )
+
+        self.assertEqual(thematic_row["collection_system"], self.d2d.name)
+        self.assertEqual(
+            feature["properties"]["collection_detail_url"],
+            reverse(
+                "collection-detail",
+                kwargs={"pk": self.published_collection.id},
+            ),
+        )
+        self.assertNotEqual(
+            feature["properties"]["collection_detail_url"],
+            reverse(
+                "collection-detail",
+                kwargs={"pk": lower_priority_collection.id},
+            ),
+        )
+        self.assertNotEqual(
+            feature["properties"]["collection_detail_url"],
+            reverse("collection-detail", kwargs={"pk": hidden_private.id}),
+        )
+
     def test_collector_orga_level_excludes_non_published(self):
         response = self._get("collector_orga_level")
         self.assertEqual(response.status_code, status.HTTP_200_OK)

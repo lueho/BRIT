@@ -65,6 +65,18 @@ var WasteAtlasChoropleth = (function () {
   function _show(el) { if (el) el.classList.remove('d-none'); }
   function _hide(el) { if (el) el.classList.add('d-none'); }
 
+  function _collectionDetailUrl(feature) {
+    var properties = feature && feature.properties;
+    return properties && properties.collection_detail_url
+      ? properties.collection_detail_url
+      : null;
+  }
+
+  function _openCollectionDetail(feature) {
+    var detailUrl = _collectionDetailUrl(feature);
+    if (detailUrl) window.location.assign(detailUrl);
+  }
+
   function _fetchJSON(url) {
     return fetch(url, { credentials: 'same-origin' })
       .then(function (r) {
@@ -229,7 +241,11 @@ var WasteAtlasChoropleth = (function () {
     var collectionYear = cfg.collectionYear || cfg.year;
     var collectionYearSuffix = cfg.collectionYear ? '&collection_year=' + encodeURIComponent(cfg.collectionYear) : '';
     var catchmentDataUrl = cfg.catchmentDataUrl || (base + 'catchment/geojson/');
-    var catchUrl = catchmentDataUrl + '?country=' + cfg.country + '&year=' + collectionYear + nutsSuffix;
+    var collectionDetailSuffix = cfg.collectionDetailCategory
+      ? '&collection_detail_category=' + encodeURIComponent(cfg.collectionDetailCategory)
+      : '';
+    var catchUrl = catchmentDataUrl + '?country=' + cfg.country + '&year=' + collectionYear
+      + nutsSuffix + collectionDetailSuffix;
     var nuts0Url = '/maps/api/nuts_region/geojson/?levl_code=0&cntr_code=' + cfg.country;
     var nutsLevel = cfg.nutsLevel || 1;
     var nutsRegionUrl = '/maps/api/nuts_region/geojson/?levl_code=' + nutsLevel + '&cntr_code=' + cfg.country;
@@ -1939,7 +1955,7 @@ var WasteAtlasChoropleth = (function () {
 
     // Layer 3: catchments with data (thin borders)
     if (data.catchments.features) {
-      _svg.append('g').attr('class', 'layer-catchments')
+      var catchmentPaths = _svg.append('g').attr('class', 'layer-catchments')
         .selectAll('path')
         .data(data.catchments.features)
         .enter().append('path')
@@ -1948,8 +1964,36 @@ var WasteAtlasChoropleth = (function () {
           return _colorFor(d.properties._thematic_value, cfg.categories, cfg.noDataColor);
         })
         .attr('stroke', CATCHMENT_STROKE)
-        .attr('stroke-width', CATCHMENT_STROKE_WIDTH)
-        .append('title')
+        .attr('stroke-width', CATCHMENT_STROKE_WIDTH);
+
+      if (!layout.exportMode) {
+        catchmentPaths
+          .attr('tabindex', function (d) {
+            return _collectionDetailUrl(d) ? 0 : null;
+          })
+          .attr('role', function (d) {
+            return _collectionDetailUrl(d) ? 'link' : null;
+          })
+          .attr('aria-label', function (d) {
+            if (!_collectionDetailUrl(d)) return null;
+            return 'Open collection for ' + d.properties.catchment_name;
+          })
+          .style('cursor', function (d) {
+            return _collectionDetailUrl(d) ? 'pointer' : null;
+          })
+          .on('click', function (event, d) {
+            event.stopPropagation();
+            _openCollectionDetail(d);
+          })
+          .on('keydown', function (event, d) {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            event.stopPropagation();
+            _openCollectionDetail(d);
+          });
+      }
+
+      catchmentPaths.append('title')
         .text(function (d) {
           var p = d.properties;
           var val = p._thematic_value != null ? String(p._thematic_value) : 'no data';
@@ -1967,6 +2011,7 @@ var WasteAtlasChoropleth = (function () {
             tooltip += '\n⚠ Conflicting collections (' + detail.distinct_count + '): '
               + detail.distinct_values.join(', ');
           }
+          if (_collectionDetailUrl(d)) tooltip += '\nClick to open collection';
           return tooltip;
         });
     }

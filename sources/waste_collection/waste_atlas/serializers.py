@@ -1,3 +1,4 @@
+from django.urls import reverse
 from rest_framework import serializers
 from rest_framework_gis.fields import GeometrySerializerMethodField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
@@ -26,12 +27,25 @@ class CatchmentGeometrySerializer(GeoFeatureModelSerializer):
     catchment_id = serializers.IntegerField(source="id")
     catchment_name = serializers.CharField(source="name")
     catchment_type = serializers.CharField(source="type")
+    collection_detail_url = serializers.SerializerMethodField()
     geom = GeometrySerializerMethodField()
 
     class Meta:
         model = CollectionCatchment
         geo_field = "geom"
-        fields = ["catchment_id", "catchment_name", "catchment_type"]
+        fields = [
+            "catchment_id",
+            "catchment_name",
+            "catchment_type",
+            "collection_detail_url",
+        ]
+
+    def get_collection_detail_url(self, instance):
+        """Return the detail URL for the collection driving the map value."""
+        collections = getattr(instance, "atlas_collections", ())
+        if not collections:
+            return None
+        return reverse("collection-detail", kwargs={"pk": collections[0].pk})
 
     def get_geom(self, instance):
         """Return simplified geometry if available, otherwise original."""

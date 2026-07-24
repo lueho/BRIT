@@ -10,6 +10,7 @@ from django.db.models import (
     F,
     FloatField,
     OuterRef,
+    Prefetch,
     Q,
     Subquery,
     Value,
@@ -131,6 +132,11 @@ _REGULAR_PLASTIC_BAGS_MATERIAL_ID = 18
 
 # Waste category names for green waste maps.
 _GREEN_WASTE_CATEGORY_NAMES = ["Green waste"]
+_COLLECTION_DETAIL_CATEGORIES = {
+    "all": None,
+    "biowaste": ["Biowaste", "Food waste"],
+    "residual": ["Residual waste"],
+}
 
 # Property ID for "Connection rate" (properties_property table)
 CONNECTION_RATE_PROPERTY_ID = 4
@@ -542,8 +548,40 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
                 GEOMETRY_SIMPLIFY_TOLERANCE,
             )
         )
+        queryset = self._with_atlas_collection(request, queryset)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+    @staticmethod
+    def _with_atlas_collection(request, queryset):
+        """Prefetch the collection selected by the current map's value logic."""
+        category = request.query_params.get("collection_detail_category")
+        if category not in _COLLECTION_DETAIL_CATEGORIES:
+            return queryset
+
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        selected = _select_primary_collections(
+            country,
+            year,
+            _COLLECTION_DETAIL_CATEGORIES[category],
+            nuts_prefixes,
+            user=request.user,
+        )
+        collection_ids = [
+            row["collection_id"]
+            for row in selected.values()
+            if row["collection_id"] is not None
+        ]
+        return queryset.prefetch_related(
+            Prefetch(
+                "collections",
+                queryset=_collection_qs(request.user)
+                .filter(id__in=collection_ids)
+                .order_by("id"),
+                to_attr="atlas_collections",
+            )
+        )
 
     @action(detail=False, methods=["get"], url_path="collector-geojson")
     def collector_geojson(self, request, *args, **kwargs):
@@ -574,6 +612,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
                 GEOMETRY_SIMPLIFY_TOLERANCE,
             )
         )
+        queryset = self._with_atlas_collection(request, queryset)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
