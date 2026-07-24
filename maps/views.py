@@ -91,6 +91,7 @@ from .models import (
     RegionProperty,
 )
 from .signals import clear_geojson_cache_pattern
+from .validation import RegionCompositionError, validate_region_composition
 
 
 def build_local_relation_filter_form(column_policies, data=None, filter_options=None):
@@ -1238,6 +1239,13 @@ class CatchmentCreateMergeLauView(UserCreatedObjectCreateView):
             return self.object.name
         return None
 
+    def get_member_regions(self):
+        return [
+            form["region"]
+            for form in self.formset.cleaned_data
+            if form.get("region") is not None
+        ]
+
     def create_region_borders(self):
         geoms = [
             form.get("region").borders.geom
@@ -1255,9 +1263,11 @@ class CatchmentCreateMergeLauView(UserCreatedObjectCreateView):
         return GeoPolygon.objects.create(geom=new_geom)
 
     def get_region(self):
-        return Region.objects.create(
+        region = Region.objects.create(
             name=self.get_region_name(), borders=self.create_region_borders()
         )
+        region.composed_of.set(self.get_member_regions())
+        return region
 
     def get_context_data(self, **kwargs):
         if "formset" not in kwargs:
@@ -1268,6 +1278,12 @@ class CatchmentCreateMergeLauView(UserCreatedObjectCreateView):
     def form_valid(self, form):
         self.formset = self.get_formset()
         if not self.formset.is_valid():
+            return self.form_invalid(form)
+        try:
+            validate_region_composition(self.get_member_regions())
+        except RegionCompositionError as error:
+            for message in error.messages:
+                form.add_error(None, message)
             return self.form_invalid(form)
         with transaction.atomic():
             response = super().form_valid(form)

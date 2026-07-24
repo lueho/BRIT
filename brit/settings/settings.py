@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "distributions.apps.DistributionsConfig",
     "bibliography.apps.BibliographyConfig",
     "materials.apps.MaterialsConfig",
+    "population.apps.PopulationConfig",
     "processes",
     "inventories.apps.InventoriesConfig",
     "sources.apps.SourcesConfig",

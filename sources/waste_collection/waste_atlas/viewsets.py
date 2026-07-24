@@ -23,6 +23,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from maps.db_functions import SimplifyPreserveTopology
 from maps.mixins import get_unbounded_geojson_rejection_response
 from maps.models import LauRegion, NutsRegion, RegionAttributeValue, RegionProperty
+from population.services import population_values_by_region
 from sources.waste_collection.derived_values import (
     convert_total_to_specific,
     get_derived_property_config,
@@ -1768,21 +1769,15 @@ def _amounts_for_year(
             return result, value_sources, acpv_group_keys
         return result
 
-    pop_qs = (
-        RegionAttributeValue.objects.filter(
-            region__catchment__id__in=list(total_by_catchment.keys()),
-            property_id=_resolved_population_attribute_id(),
-        )
-        .order_by("region_id", "-date")
-        .distinct("region_id")
-        .values_list("region_id", "value")
-    )
-    region_pop: dict[int, float] = dict(pop_qs)
-
     catchment_regions = dict(
         CollectionCatchment.objects.filter(
             id__in=list(total_by_catchment.keys()),
         ).values_list("id", "region_id")
+    )
+    region_pop = population_values_by_region(
+        {region_id for region_id in catchment_regions.values() if region_id},
+        year,
+        legacy_attribute_id=_resolved_population_attribute_id(),
     )
     for cid, total_mg in total_by_catchment.items():
         region_id = catchment_regions.get(cid)
@@ -2017,21 +2012,15 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
                     total_by_catchment[cid] = sum(values) / len(values)
 
         if total_by_catchment:
-            pop_qs = (
-                RegionAttributeValue.objects.filter(
-                    region__catchment__id__in=list(total_by_catchment.keys()),
-                    property_id=_resolved_population_attribute_id(),
-                )
-                .order_by("region_id", "-date")
-                .distinct("region_id")
-                .values_list("region_id", "value")
-            )
-            region_pop: dict[int, float] = dict(pop_qs)
-
             catchment_regions = dict(
                 CollectionCatchment.objects.filter(
                     id__in=list(total_by_catchment.keys()),
                 ).values_list("id", "region_id")
+            )
+            region_pop = population_values_by_region(
+                {region_id for region_id in catchment_regions.values() if region_id},
+                year,
+                legacy_attribute_id=_resolved_population_attribute_id(),
             )
             for cid, total_mg in total_by_catchment.items():
                 region_id = catchment_regions.get(cid)
