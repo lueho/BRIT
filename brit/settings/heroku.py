@@ -47,9 +47,31 @@ MIDDLEWARE.insert(1, "django.middleware.csp.ContentSecurityPolicyMiddleware")
 # This middleware is added only in production because it triggers too many logging events during testing in development.
 MIDDLEWARE.append("brit.middleware.ExceptionLoggingMiddleware")
 
+AWS_S3_ORIGIN = f"https://{AWS_S3_CUSTOM_DOMAIN}"
+
 SECURE_CSP_REPORT_ONLY = {
     "default-src": [CSP.SELF],
-    "style-src": [CSP.SELF],
+    "style-src": [
+        CSP.SELF,
+        AWS_S3_ORIGIN,
+        "https://cdn.jsdelivr.net",
+        "https://cdnjs.cloudflare.com",
+        "https://fonts.googleapis.com",
+    ],
+    "script-src": [
+        CSP.SELF,
+        AWS_S3_ORIGIN,
+        "https://cdn.jsdelivr.net",
+        "https://cdnjs.cloudflare.com",
+        "https://www.googletagmanager.com",
+    ],
+    "font-src": [
+        CSP.SELF,
+        AWS_S3_ORIGIN,
+        "https://cdnjs.cloudflare.com",
+        "https://fonts.gstatic.com",
+    ],
+    "img-src": [CSP.SELF, AWS_S3_ORIGIN, "data:"],
     "base-uri": [CSP.SELF],
     "frame-ancestors": [CSP.SELF],
     "object-src": [CSP.NONE],
