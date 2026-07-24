@@ -15,6 +15,12 @@
       <h1 class="atlas-context-title">{{ map_title }}</h1>
     </div>
     <div class="atlas-context-actions">
+      {% if request.user.is_staff %}
+        <a href="{{ map_configuration_edit_url }}"
+           class="btn btn-outline-secondary btn-sm atlas-hero-btn">
+          <i class="fas fa-sliders-h"></i> Edit configuration
+        </a>
+      {% endif %}
       {% if map_toggle_url %}
         <div class="atlas-mode-toggle" role="group" aria-label="Map mode">
           {% if is_change_map %}

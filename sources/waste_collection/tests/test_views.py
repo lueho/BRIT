@@ -5810,7 +5810,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
 
 class GenericMapTemplateTests(TestCase):
-    """Tests for the generic map.html template backed by MAP_CONFIGS."""
+    """Tests for the generic map template backed by stored configurations."""
 
     @classmethod
     def setUpTestData(cls):

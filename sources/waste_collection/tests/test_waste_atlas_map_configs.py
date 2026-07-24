@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from django.test import SimpleTestCase
+from django.test import TestCase
 
 from sources.waste_collection.waste_atlas.map_configs import (
     BIOWASTE_NO_COLLECTION_COLOR,
@@ -17,7 +17,7 @@ from sources.waste_collection.waste_atlas.map_selection import (
 from sources.waste_collection.waste_atlas.pages import MAP_PAGES
 
 
-class WasteAtlasMapConfigTests(SimpleTestCase):
+class WasteAtlasMapConfigTests(TestCase):
     UNIT_LABEL_FORBIDDEN_TOKENS = {
         "kg/cap/a": ("kg/cap/a", " kg"),
         "%": ("%",),
@@ -536,12 +536,16 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         legend_items_fn = script.split("function _legendItems(cfg, exportMode)")[
             1
         ].split("function _fitExportLegendWidth")[0]
+        ordered_items_fn = script.split("function _orderedLegendCategories(cfg)")[
+            1
+        ].split("function _legendItems(cfg, exportMode)")[0]
 
         self.assertIn("function _isNoDataCategory(item)", script)
         self.assertIn("function _visibleLegendCategories(cfg)", script)
         self.assertIn("cfg._hasNoDataCategory = hasNoDataCategory", annotate_fn)
         self.assertIn("cfg._hasFallbackNoData = hasFallbackNoData", annotate_fn)
-        self.assertIn("_visibleLegendCategories(cfg)", legend_items_fn)
+        self.assertIn("_orderedLegendCategories(cfg)", legend_items_fn)
+        self.assertIn("_visibleLegendCategories(cfg)", ordered_items_fn)
         self.assertIn("cfg._hasFallbackNoData", legend_items_fn)
 
     def test_screen_legend_renders_no_data_last(self):
@@ -557,16 +561,20 @@ class WasteAtlasMapConfigTests(SimpleTestCase):
         draw_legend_fn = script.split(
             "function _drawLegend(width, height, cfg, layout)"
         )[1]
-        # _drawLegend must separate categories with _isNoCollectionCategory
-        self.assertIn("_isNoCollectionCategory(item)", draw_legend_fn)
+        # Screen and export legends use the same explicit/legacy order.
+        self.assertIn("_orderedLegendCategories(cfg)", draw_legend_fn)
+        ordered_items_fn = script.split("function _orderedLegendCategories(cfg)")[
+            1
+        ].split("function _legendItems(cfg, exportMode)")[0]
+        self.assertIn("_isNoCollectionCategory(item)", ordered_items_fn)
         # Overlay hint is a footnote (separator + italic text), not a swatch row
         self.assertIn("font-style', 'italic'", draw_legend_fn)
         self.assertIn("cfg.overlayPatternLegendLabel", draw_legend_fn)
         # Overlay footnote must come after No data so all real categories stay grouped
-        no_data_render_idx = draw_legend_fn.rfind(".text(cfg.noDataLabel)")
-        overlay_render_idx = draw_legend_fn.rfind(
-            ".text(cfg.overlayPatternLegendLabel)"
+        no_data_render_idx = draw_legend_fn.find(
+            "if (cfg.noDataLabel && cfg._hasFallbackNoData)"
         )
+        overlay_render_idx = draw_legend_fn.rfind("if (hasOverlayLegend)")
         self.assertLess(no_data_render_idx, overlay_render_idx)
 
     def test_export_legend_renders_overlay_as_footnote(self):

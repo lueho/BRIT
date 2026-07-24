@@ -2,7 +2,7 @@
 
 This module is the single source of truth for every choropleth map page:
 URL path, route name, region scope (map set), selector theme, page title,
-and the JS map configuration key (see ``map_configs.py``).
+and the database-backed JS map configuration key.
 
 ``views.py`` and ``urls.py`` generate the actual views/urlpatterns from
 ``MAP_PAGES``; ``map_selection.py`` derives the region/theme selector from it.

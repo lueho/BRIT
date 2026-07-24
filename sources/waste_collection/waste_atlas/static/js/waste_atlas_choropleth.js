@@ -835,21 +835,33 @@ var WasteAtlasChoropleth = (function () {
     });
   }
 
-  function _legendItems(cfg, exportMode) {
+  function _orderedLegendCategories(cfg) {
+    var visible = _visibleLegendCategories(cfg);
+    if (Array.isArray(cfg.legendCategoryOrder)) {
+      return visible.slice().sort(function (left, right) {
+        var leftIndex = cfg.legendCategoryOrder.indexOf(left.value);
+        var rightIndex = cfg.legendCategoryOrder.indexOf(right.value);
+        if (leftIndex === -1) leftIndex = cfg.legendCategoryOrder.length;
+        if (rightIndex === -1) rightIndex = cfg.legendCategoryOrder.length;
+        return leftIndex - rightIndex;
+      });
+    }
+
     var normal = [];
     var noCollection = [];
-    _visibleLegendCategories(cfg).forEach(function (item) {
+    visible.forEach(function (item) {
       if (_isNoCollectionCategory(item)) {
         noCollection.push(item);
       } else {
         normal.push(item);
       }
     });
+    return normal.concat(noCollection);
+  }
+
+  function _legendItems(cfg, exportMode) {
     var items = [];
-    normal.forEach(function (item) {
-      items.push(exportMode ? Object.assign({}, item, { label: _exportLegendLabel(item) }) : item);
-    });
-    noCollection.forEach(function (item) {
+    _orderedLegendCategories(cfg).forEach(function (item) {
       items.push(exportMode ? Object.assign({}, item, { label: _exportLegendLabel(item) }) : item);
     });
     if (cfg.noDataLabel && cfg._hasFallbackNoData) {
@@ -2093,13 +2105,9 @@ var WasteAtlasChoropleth = (function () {
   }
 
   function _drawLegend(width, height, cfg, layout) {
-    var swatchW = 22, swatchH = 16, gap = 6;
-    var items = _legendItems(cfg);
     var hasOverlayLegend = cfg.overlayPatternField && cfg.overlayPatternLegendLabel && cfg._hasOverlayPattern;
     var hasConflictLegend = !!(_conflictEnabled && cfg.conflictOverlayLabel
       && _conflictCatchments && _conflictCatchments.size);
-    var legendRows = items.length + (hasOverlayLegend ? 1 : 0)
-      + (hasConflictLegend ? 1 : 0);
 
     if (layout.exportMode) {
       var opts = layout.legend;
@@ -2156,100 +2164,138 @@ var WasteAtlasChoropleth = (function () {
       return;
     }
 
-    var normalCats = [];
-    var noCollectionCats = [];
-    _visibleLegendCategories(cfg).forEach(function (item) {
-      if (_isNoCollectionCategory(item)) {
-        noCollectionCats.push(item);
-      } else {
-        normalCats.push(item);
-      }
+    var fontSize = Math.max(8, Math.min(24, Number(cfg.legendFontSize) || 12));
+    var lineHeight = Math.round(fontSize * 1.18);
+    var swatchH = Math.max(12, Math.round(fontSize * 1.3));
+    var swatchW = Math.round(swatchH * 1.375);
+    var gap = Math.max(5, Math.round(fontSize * 0.5));
+    var paddingX = 10;
+    var paddingY = 12;
+    var labelGap = 8;
+    var requestedWidth = Number(cfg.legendWidth) || 300;
+    var legendWidth = Math.max(120, Math.min(requestedWidth, width - 32));
+    var textWidth = legendWidth - paddingX * 2 - swatchW - labelGap;
+    var screenItems = _orderedLegendCategories(cfg).map(function (item) {
+      return {
+        color: item.color,
+        lines: _wrapTextToWidth(item.label, textWidth, fontSize),
+        kind: 'category'
+      };
     });
-    items = normalCats.concat(noCollectionCats);
-    legendRows = items.length + (hasConflictLegend ? 1 : 0);
-
+    if (hasConflictLegend) {
+      screenItems.push({
+        color: '#ffffff',
+        lines: _wrapTextToWidth(cfg.conflictOverlayLabel, textWidth, fontSize),
+        kind: 'conflict'
+      });
+    }
     if (cfg.noDataLabel && cfg._hasFallbackNoData) {
-      legendRows += 1;
+      screenItems.push({
+        color: cfg.noDataColor || '#e0e0e0',
+        lines: _wrapTextToWidth(cfg.noDataLabel, textWidth, fontSize),
+        kind: 'no-data'
+      });
     }
 
-    // Overlay footnote takes less space than a full legend row
-    var overlayFootnoteH = hasOverlayLegend ? 28 : 0;
+    screenItems.forEach(function (item) {
+      item.height = Math.max(swatchH, item.lines.length * lineHeight);
+    });
+    var titleLines = _wrapTextToWidth(
+      cfg.legendTitle || '',
+      legendWidth - paddingX * 2,
+      fontSize
+    );
+    var titleHeight = Math.max(fontSize, titleLines.length * lineHeight) + 10;
+    var itemsHeight = screenItems.reduce(function (total, item, index) {
+      return total + item.height + (index ? gap : 0);
+    }, 0);
+    var footnoteLines = hasOverlayLegend
+      ? _wrapTextToWidth(
+        cfg.overlayPatternLegendLabel,
+        legendWidth - paddingX * 2,
+        Math.max(8, fontSize - 2)
+      )
+      : [];
+    var footnoteHeight = footnoteLines.length
+      ? gap + 7 + footnoteLines.length * Math.max(10, lineHeight - 2)
+      : 0;
+    var totalH = paddingY * 2 + titleHeight + itemsHeight + footnoteHeight;
+    var placement = cfg.legendPlacement || 'bottom-left';
+    var margin = 32;
+    var legendX = placement.indexOf('right') !== -1
+      ? width - margin - legendWidth
+      : margin;
+    var legendY = placement.indexOf('top') === 0
+      ? margin
+      : height - margin - totalH;
+    legendX = Math.max(16, legendX);
+    legendY = Math.max(16, legendY);
 
     var g = _svg.append('g')
       .attr('class', 'atlas-legend')
-      .attr('transform', 'translate(40,' + (height - 30 - legendRows * (swatchH + gap) - overlayFootnoteH - 20) + ')');
-
-    var totalH = legendRows * (swatchH + gap) + overlayFootnoteH + gap + 20;
+      .attr('transform', 'translate(' + legendX + ',' + legendY + ')');
     g.append('rect')
-      .attr('x', -8).attr('y', -20)
-      .attr('width', 300).attr('height', totalH)
+      .attr('width', legendWidth).attr('height', totalH)
       .attr('fill', 'white').attr('fill-opacity', 0.9)
       .attr('stroke', '#ccc').attr('rx', 4);
-
-    g.append('text')
-      .attr('x', 0).attr('y', -4)
-      .attr('font-weight', 'bold').attr('font-size', 12)
-      .attr('font-family', "'Nunito', sans-serif")
-      .text(cfg.legendTitle || '');
-
-    items.forEach(function (cat, i) {
-      var y = i * (swatchH + gap);
-      g.append('rect')
-        .attr('x', 0).attr('y', y + 4)
-        .attr('width', swatchW).attr('height', swatchH)
-        .attr('fill', cat.color).attr('stroke', '#333');
-      g.append('text')
-        .attr('x', swatchW + 8).attr('y', y + 4 + swatchH - 3)
-        .attr('font-size', 12)
-        .attr('font-family', "'Nunito', sans-serif")
-        .text(cat.label);
+    var title = g.append('text')
+      .attr('x', paddingX).attr('y', paddingY + fontSize)
+      .attr('font-weight', 'bold').attr('font-size', fontSize)
+      .attr('font-family', "'Nunito', sans-serif");
+    titleLines.forEach(function (line, index) {
+      title.append('tspan')
+        .attr('x', paddingX)
+        .attr('dy', index === 0 ? 0 : lineHeight)
+        .text(line);
     });
 
-    var currentY = items.length * (swatchH + gap);
-
-    if (hasConflictLegend) {
-      g.append('rect')
-        .attr('x', 0).attr('y', currentY + 4)
+    var currentY = paddingY + titleHeight;
+    screenItems.forEach(function (item, index) {
+      if (index) currentY += gap;
+      var swatchY = currentY + Math.round((item.height - swatchH) / 2);
+      var swatch = g.append('rect')
+        .attr('x', paddingX).attr('y', swatchY)
         .attr('width', swatchW).attr('height', swatchH)
-        .attr('fill', '#ffffff')
-        .attr('stroke', CONFLICT_STROKE)
-        .attr('stroke-width', 1.4)
-        .attr('stroke-dasharray', CONFLICT_STROKE_DASHARRAY);
-      g.append('text')
-        .attr('x', swatchW + 8).attr('y', currentY + 4 + swatchH - 3)
-        .attr('font-size', 12)
-        .attr('font-family', "'Nunito', sans-serif")
-        .text(cfg.conflictOverlayLabel);
-      currentY += swatchH + gap;
-    }
-
-    if (cfg.noDataLabel && cfg._hasFallbackNoData) {
-      g.append('rect')
-        .attr('x', 0).attr('y', currentY + 4)
-        .attr('width', swatchW).attr('height', swatchH)
-        .attr('fill', cfg.noDataColor || '#e0e0e0').attr('stroke', '#333');
-      g.append('text')
-        .attr('x', swatchW + 8).attr('y', currentY + 4 + swatchH - 3)
-        .attr('font-size', 12)
-        .attr('font-family', "'Nunito', sans-serif")
-        .text(cfg.noDataLabel);
-      currentY += swatchH + gap;
-    }
+        .attr('fill', item.color).attr('stroke', '#333');
+      if (item.kind === 'conflict') {
+        swatch
+          .attr('stroke', CONFLICT_STROKE)
+          .attr('stroke-width', 1.4)
+          .attr('stroke-dasharray', CONFLICT_STROKE_DASHARRAY);
+      }
+      var textX = paddingX + swatchW + labelGap;
+      var label = g.append('text')
+        .attr('x', textX).attr('y', currentY + fontSize)
+        .attr('font-size', fontSize)
+        .attr('font-family', "'Nunito', sans-serif");
+      item.lines.forEach(function (line, lineIndex) {
+        label.append('tspan')
+          .attr('x', textX)
+          .attr('dy', lineIndex === 0 ? 0 : lineHeight)
+          .text(line);
+      });
+      currentY += item.height;
+    });
 
     if (hasOverlayLegend) {
-      // Footnote: thin separator + small italic text (not a legend category)
-      var footnoteLineY = currentY + 6;
+      var footnoteLineY = currentY + gap;
       g.append('line')
-        .attr('x1', 0).attr('y1', footnoteLineY)
-        .attr('x2', 280).attr('y2', footnoteLineY)
+        .attr('x1', paddingX).attr('y1', footnoteLineY)
+        .attr('x2', legendWidth - paddingX).attr('y2', footnoteLineY)
         .attr('stroke', '#d0d4da').attr('stroke-width', 1);
-      g.append('text')
-        .attr('x', 0).attr('y', footnoteLineY + 14)
-        .attr('font-size', 10)
+      var footnoteFontSize = Math.max(8, fontSize - 2);
+      var footnote = g.append('text')
+        .attr('x', paddingX).attr('y', footnoteLineY + footnoteFontSize + 6)
+        .attr('font-size', footnoteFontSize)
         .attr('font-style', 'italic')
         .attr('fill', '#6c757d')
-        .attr('font-family', "'Nunito', sans-serif")
-        .text(cfg.overlayPatternLegendLabel);
+        .attr('font-family', "'Nunito', sans-serif");
+      footnoteLines.forEach(function (line, index) {
+        footnote.append('tspan')
+          .attr('x', paddingX)
+          .attr('dy', index === 0 ? 0 : Math.max(10, lineHeight - 2))
+          .text(line);
+      });
     }
   }
 
