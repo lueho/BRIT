@@ -1067,11 +1067,6 @@ MAP_CONFIGS = {
                 "label": "Voluntary",
                 "color": "#7fcce9",
             },
-            {
-                "value": "not_specified",
-                "label": "Not specified",
-                "color": NO_DATA_COLOR,
-            },
         ],
         "noDataColor": NO_DATA_COLOR,
         "noDataLabel": "No data",
