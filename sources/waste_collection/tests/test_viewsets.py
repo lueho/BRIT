@@ -2832,6 +2832,68 @@ class WasteAtlasPrimarySelectionTests(APITestCase):
         self.assertEqual(len(response.data), 7)
 
 
+class TargetWasteCategoryViewSetTests(APITestCase):
+    endpoint = "/waste_collection/api/waste-atlas/target-waste-category/"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region.objects.create(name="South Tyrol", country="IT")
+        cls.door_to_door = CollectionSystem.objects.create(name="Door to door")
+        cls.no_separate_collection = CollectionSystem.objects.create(
+            name="No separate collection"
+        )
+        cls.biowaste = WasteCategory.objects.create(name="Biowaste")
+        cls.food_waste = WasteCategory.objects.create(name="Food waste")
+
+        cls.biowaste_catchment = cls._create_collection(
+            "Biowaste municipality",
+            cls.biowaste,
+            cls.door_to_door,
+        ).catchment
+        cls.food_waste_catchment = cls._create_collection(
+            "Food-waste municipality",
+            cls.food_waste,
+            cls.door_to_door,
+        ).catchment
+        cls.no_collection_catchment = cls._create_collection(
+            "No-collection municipality",
+            cls.food_waste,
+            cls.no_separate_collection,
+        ).catchment
+
+    @classmethod
+    def _create_collection(cls, name, waste_category, collection_system):
+        catchment = CollectionCatchment.objects.create(name=name, region=cls.region)
+        return Collection.objects.create(
+            name=name,
+            catchment=catchment,
+            waste_category=waste_category,
+            collection_system=collection_system,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+
+    def test_returns_category_and_overrides_no_separate_collection(self):
+        response = self.client.get(self.endpoint, {"country": "IT", "year": 2024})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        categories = {
+            row["catchment_id"]: row["target_waste_category"] for row in response.data
+        }
+        self.assertEqual(categories[self.biowaste_catchment.id], "Biowaste")
+        self.assertEqual(categories[self.food_waste_catchment.id], "Food waste")
+        self.assertEqual(
+            categories[self.no_collection_catchment.id],
+            "No separate collection",
+        )
+
+    def test_excludes_other_years(self):
+        response = self.client.get(self.endpoint, {"country": "IT", "year": 2023})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+
 class BinConfigurationViewSetTests(APITestCase):
     """Tests for bin-configuration atlas endpoint."""
 

@@ -1244,6 +1244,32 @@ MAP_CONFIGS = {
         "legendTitle": "Accepted food waste",
         "fileBase": "food_waste_category",
     },
+    "target_waste_category": {
+        "title": "Target waste category",
+        "dataUrl": "/waste_collection/api/waste-atlas/target-waste-category/",
+        "dataField": "target_waste_category",
+        "categories": [
+            {
+                "value": "Biowaste",
+                "label": "Biowaste",
+                "color": "#94cf7c",
+            },
+            {
+                "value": "Food waste",
+                "label": "Food waste",
+                "color": "#debf6a",
+            },
+            {
+                "value": "No separate collection",
+                "label": "No separate collection",
+                "color": "#d7d7d7",
+            },
+        ],
+        "noDataColor": NO_DATA_COLOR,
+        "noDataLabel": "No data",
+        "legendTitle": "Target waste category",
+        "fileBase": "south_tyrol_target_waste_category",
+    },
     "green_waste_collection_amount": {
         "title": "Specifically collected amount of green waste",
         "dataUrl": "/waste_collection/api/waste-atlas/green-waste-collection-amount/",

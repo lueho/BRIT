@@ -119,6 +119,13 @@ class CatchmentFoodWasteCategorySerializer(serializers.Serializer):
     food_waste_category = serializers.CharField()
 
 
+class CatchmentTargetWasteCategorySerializer(serializers.Serializer):
+    """Flat JSON serializer for the target organic-waste category."""
+
+    catchment_id = serializers.IntegerField()
+    target_waste_category = serializers.CharField()
+
+
 class CatchmentMaterialStatusSerializer(serializers.Serializer):
     """Flat JSON serializer for material allowed/forbidden status (Karte 5, 6)."""
 
