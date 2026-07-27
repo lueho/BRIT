@@ -21,8 +21,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 
 from maps.models import RegionProperty
+from maps.population.services import resolve_population
 from maps.validation import RegionCompositionError
-from population.services import resolve_population
 from utils.object_management.models import get_default_owner
 from utils.properties.models import Property, Unit
 

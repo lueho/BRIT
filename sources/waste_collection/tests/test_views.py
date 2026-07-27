@@ -39,12 +39,12 @@ from maps.models import (
     RegionAttributeValue,
     RegionProperty,
 )
+from maps.population.models import PopulationDataset, PopulationObservation
 from materials.models import (
     Material,
     Sample,
     SampleSeries,
 )
-from population.models import PopulationDataset, PopulationObservation
 from sources.waste_collection.derived_values import (
     backfill_derived_values,
     clear_derived_value_config_cache,
