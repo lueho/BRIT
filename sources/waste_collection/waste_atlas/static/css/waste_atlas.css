@@ -368,11 +368,6 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
   flex-direction: column;
   gap: .05rem;
 }
-.atlas-map-list--inline {
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: .15rem .5rem;
-}
 .atlas-map-link {
   border-radius: .45rem;
   color: var(--atlas-link);
@@ -516,26 +511,6 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
 }
 .atlas-map-toggle--conflict {
   color: #d7263d;
-}
-
-.atlas-related-maps {
-  background: var(--atlas-surface);
-  border: 1px solid var(--atlas-border);
-  border-radius: var(--atlas-radius);
-  box-shadow: var(--atlas-shadow-sm);
-  margin: 0 0 1.25rem;
-  padding: 1.15rem 1.35rem;
-}
-.atlas-related-group + .atlas-related-group {
-  margin-top: .75rem;
-}
-.atlas-related-heading {
-  color: var(--atlas-eyebrow);
-  font-size: .76rem;
-  font-weight: 800;
-  letter-spacing: .06em;
-  margin-bottom: .4rem;
-  text-transform: uppercase;
 }
 
 .atlas-year-input { width: 5.5rem; }
