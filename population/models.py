@@ -109,7 +109,7 @@ class PopulationObservation(models.Model):
         related_name="observations",
     )
     region = models.ForeignKey(
-        Region, on_delete=models.PROTECT, related_name="population_observations"
+        Region, on_delete=models.CASCADE, related_name="population_observations"
     )
     year = models.IntegerField()
     value = models.DecimalField(max_digits=15, decimal_places=3)
@@ -159,7 +159,7 @@ class PopulationEstimate(models.Model):
     """
 
     region = models.ForeignKey(
-        Region, on_delete=models.PROTECT, related_name="population_estimates"
+        Region, on_delete=models.CASCADE, related_name="population_estimates"
     )
     year = models.IntegerField()
     value = models.DecimalField(max_digits=15, decimal_places=3)
@@ -195,7 +195,7 @@ class PopulationEstimateComponent(models.Model):
         PopulationEstimate, on_delete=models.CASCADE, related_name="component_links"
     )
     observation = models.ForeignKey(
-        PopulationObservation, on_delete=models.PROTECT, related_name="component_links"
+        PopulationObservation, on_delete=models.CASCADE, related_name="component_links"
     )
 
     class Meta:

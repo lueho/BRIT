@@ -324,4 +324,45 @@ class EstimateMaterializationTestCase(PopulationServiceTestCaseBase):
         self.observe(self.lau_dataset, self.lau1, 2021, "55000")
         region = self.custom_region("Incomplete", [self.lau1, self.lau2])
         self.assertIsNone(materialize_estimate(region, 2021))
-        self.assertFalse(PopulationEstimate.objects.filter(region=region).exists())
+
+
+class RegionDeletionCascadeTestCase(PopulationServiceTestCaseBase):
+    def test_deleting_region_cascades_its_observations(self):
+        self.observe(self.nuts_dataset, self.nuts3_sibling, 2021, "330000")
+        region_pk = self.nuts3_sibling.pk
+
+        self.nuts3_sibling.delete()
+
+        self.assertFalse(Region.objects.filter(pk=region_pk).exists())
+        self.assertFalse(
+            PopulationObservation.objects.filter(region_id=region_pk).exists()
+        )
+
+    def test_deleting_component_region_cascades_observation_and_estimate_link(self):
+        self.observe(self.lau_dataset, self.lau1, 2021, "55000")
+        self.observe(self.lau_dataset, self.lau2, 2021, "35000")
+        region = self.custom_region("Lingen+Meppen", [self.lau1, self.lau2])
+        estimate = materialize_estimate(region, 2021)
+        self.assertEqual(estimate.components.count(), 2)
+        lau1_pk = self.lau1.pk
+
+        self.lau1.delete()
+
+        self.assertFalse(
+            PopulationObservation.objects.filter(region_id=lau1_pk).exists()
+        )
+        estimate.refresh_from_db()
+        self.assertEqual(estimate.components.count(), 1)
+
+    def test_deleting_custom_region_cascades_its_materialized_estimate(self):
+        self.observe(self.lau_dataset, self.lau1, 2021, "55000")
+        self.observe(self.lau_dataset, self.lau2, 2021, "35000")
+        region = self.custom_region("Lingen+Meppen", [self.lau1, self.lau2])
+        materialize_estimate(region, 2021)
+        region_pk = region.pk
+
+        region.delete()
+
+        self.assertFalse(
+            PopulationEstimate.objects.filter(region_id=region_pk).exists()
+        )
