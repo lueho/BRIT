@@ -5,6 +5,7 @@ ratio into the SVG once, so the map neither followed the canvas width when the
 window changed nor offered any manual sizing.
 """
 
+import re
 from pathlib import Path
 
 from django.contrib.auth.models import Group, User
@@ -13,6 +14,7 @@ from django.test import RequestFactory, TestCase
 WASTE_ATLAS_DIR = Path(__file__).resolve().parents[1] / "waste_atlas"
 CHOROPLETH_SCRIPT = WASTE_ATLAS_DIR / "static" / "js" / "waste_atlas_choropleth.js"
 ATLAS_STYLESHEET = WASTE_ATLAS_DIR / "static" / "css" / "waste_atlas.css"
+SHELL_TEMPLATE = WASTE_ATLAS_DIR / "templates" / "waste_atlas" / "shell_base.html"
 
 
 class WasteAtlasResponsiveMapScriptTests(TestCase):
@@ -125,6 +127,29 @@ class WasteAtlasResponsiveMapScriptTests(TestCase):
         self.assertNotIn("_pannedRecently", self.script)
         self.assertNotIn("mousedown.atlaspan", self.script)
 
+    def test_screen_legend_is_anchored_to_the_top_of_the_canvas(self):
+        """The canvas is taller than the viewport, so a bottom legend loads
+        below the fold and readers never see it without scrolling."""
+        layout_body = self.script.split("function _screenLayout(container, fitData)")[1]
+        layout_body = layout_body.split("function _measureTextWidth(")[0]
+        self.assertIn("legendAtTop: true", layout_body)
+        self.assertIn("layout.legendAtTop", self.script)
+
+        # The reserved vertical band has to follow the legend to the top.
+        self.assertIn("var SCREEN_PADDING_TOP = 100;", self.script)
+        self.assertIn("var SCREEN_PADDING_BOTTOM = 40;", self.script)
+
+    def test_top_legend_does_not_affect_exports(self):
+        """Exports pick their own placement and must return before the
+        screen-only anchoring runs."""
+        legend_body = self.script.split(
+            "function _drawLegend(width, height, cfg, layout)"
+        )[1]
+        export_branch = legend_body.index("if (layout.exportMode)")
+        screen_anchor = legend_body.index("layout.legendAtTop")
+        self.assertLess(export_branch, screen_anchor)
+        self.assertIn("return;", legend_body[export_branch:screen_anchor])
+
     def test_stylesheet_lets_the_svg_fill_the_container_width(self):
         self.assertIn("#map-container svg", self.stylesheet)
         self.assertNotIn("#map-container svg { display: block; }", self.stylesheet)
@@ -180,6 +205,27 @@ class WasteAtlasZoomControlMarkupTests(TestCase):
             '<svg id="atlas-svg"'
         )[0]
         self.assertIn('id="atlas-map-zoom"', container_markup)
+
+    def test_static_assets_carry_a_bumped_cache_buster(self):
+        """Regression: the renderer changed behaviour but kept its ?v= marker.
+
+        Browsers keep serving the cached stylesheet/script for an unchanged
+        URL, so deployed readers would never receive the responsive canvas —
+        and locally it looked like a fix simply had no effect.
+        """
+        template = SHELL_TEMPLATE.read_text()
+        versions = re.findall(
+            r"\.min\.(?:css|js)' %\}\?v=([\w-]+)",
+            template,
+        )
+
+        self.assertEqual(len(versions), 2, "both the CSS and the JS need a ?v=")
+        self.assertEqual(len(set(versions)), 1, "both assets should share one ?v=")
+        self.assertNotEqual(
+            versions[0],
+            "20260724-2",
+            "bump the cache buster when the atlas CSS/JS behaviour changes",
+        )
 
     def test_zoom_handles_are_labelled_for_assistive_technology(self):
         content = self._render_generic()

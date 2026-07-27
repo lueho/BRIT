@@ -50,8 +50,10 @@ var WasteAtlasChoropleth = (function () {
   // follows the projected geometry so DE, EU and single-region maps each get
   // sensible proportions instead of one hard-coded aspect ratio.
   var SCREEN_PADDING_X = 40;
-  var SCREEN_PADDING_TOP = 40;
-  var SCREEN_PADDING_BOTTOM = 100;   // Legend sits inside this band.
+  // The canvas is taller than the viewport, so the legend is anchored to the
+  // top where it is visible on load; this band reserves room for it.
+  var SCREEN_PADDING_TOP = 100;
+  var SCREEN_PADDING_BOTTOM = 40;
   var SCREEN_FALLBACK_ASPECT = 1.11; // Used until the geometry is known.
   var SCREEN_MIN_ASPECT = 0.4;
   var SCREEN_MAX_ASPECT = 1.7;
@@ -864,6 +866,7 @@ var WasteAtlasChoropleth = (function () {
         [SCREEN_PADDING_X, SCREEN_PADDING_TOP],
         [width - SCREEN_PADDING_X, height - SCREEN_PADDING_BOTTOM]
       ],
+      legendAtTop: true,
       showHeader: false,
       titleY: 30,
       subtitleY: 50,
@@ -2376,10 +2379,15 @@ var WasteAtlasChoropleth = (function () {
     var totalH = paddingY * 2 + titleHeight + itemsHeight + footnoteHeight;
     var placement = cfg.legendPlacement || 'bottom-left';
     var margin = 32;
+    // Honour the configured side, but keep the vertical anchor at the top on
+    // screen: the canvas is taller than the viewport, so a bottom legend would
+    // sit below the fold on load. The configured side still wins for exports,
+    // which never reach this code.
+    var anchorTop = layout.legendAtTop || placement.indexOf('top') === 0;
     var legendX = placement.indexOf('right') !== -1
       ? width - margin - legendWidth
       : margin;
-    var legendY = placement.indexOf('top') === 0
+    var legendY = anchorTop
       ? margin
       : height - margin - totalH;
     legendX = Math.max(16, legendX);
