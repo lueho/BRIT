@@ -46,9 +46,32 @@ var WasteAtlasChoropleth = (function () {
   var EXPORT_HEIGHT = Math.round(EXPORT_HEIGHT_MM / 25.4 * EXPORT_DPI);
   var EXPORT_LEGEND_FONT_SIZE = 11 / 72 * EXPORT_DPI;
   var EXPORT_LEGEND_FONT_FAMILY = "'Calibri', 'Carlito', Arial, sans-serif";
+  // On-screen canvas: the SVG always spans the container width, the height
+  // follows the projected geometry so DE, EU and single-region maps each get
+  // sensible proportions instead of one hard-coded aspect ratio.
+  var SCREEN_PADDING_X = 40;
+  var SCREEN_PADDING_TOP = 40;
+  var SCREEN_PADDING_BOTTOM = 100;   // Legend sits inside this band.
+  var SCREEN_FALLBACK_ASPECT = 1.11; // Used until the geometry is known.
+  var SCREEN_MIN_ASPECT = 0.4;
+  var SCREEN_MAX_ASPECT = 1.7;
+  var SCREEN_MIN_HEIGHT = 320;
+  var MERCATOR_MAX_LATITUDE = 89.5;
+  var ZOOM_MIN = 1;
+  var ZOOM_MAX = 12;
+  var ZOOM_STEP = 1.5;
 
   var _cfg = {};
   var _svg;
+  // Root group holding every geographic layer; the zoom transform is applied
+  // here so the title and legend stay put and readable.
+  var _mapRoot = null;
+  var _zoomBehavior = null;
+  var _zoomTarget = null;
+  var _zoomTransform = null;
+  // A drag gesture ends with a click on the catchment underneath; without this
+  // guard panning would navigate to that catchment's collection.
+  var _pannedRecently = false;
   var _lastData = null;
   var _lastLoadCfg = null;
   var _baseLoadCfg = null;
@@ -752,14 +775,92 @@ var WasteAtlasChoropleth = (function () {
 
   // ---- rendering ------------------------------------------------------------
 
-  function _screenLayout(container) {
-    var width = container.clientWidth || 900;
-    var height = Math.round(width * 1.17);
+  /** Geometry the projection is fitted to: region border, else country, else catchments. */
+  function _fitGeometry(data, cfg) {
+    if (!data) return null;
+    var regionBorder = (cfg && cfg.nutsPrefix && data.bundeslaender
+      && data.bundeslaender.features && data.bundeslaender.features.length)
+      ? data.bundeslaender : data.countryBorder;
+    return (regionBorder && regionBorder.features && regionBorder.features.length)
+      ? regionBorder : data.catchments;
+  }
+
+  /** Geographic bounding box of any GeoJSON node, independent of ring winding. */
+  function _geographicBounds(geojson) {
+    var west = Infinity, east = -Infinity, south = Infinity, north = -Infinity;
+
+    function visitPosition(position) {
+      var lon = position[0];
+      var lat = position[1];
+      if (typeof lon !== 'number' || typeof lat !== 'number') return;
+      if (lon < west) west = lon;
+      if (lon > east) east = lon;
+      if (lat < south) south = lat;
+      if (lat > north) north = lat;
+    }
+
+    function visitCoordinates(coordinates) {
+      if (!Array.isArray(coordinates)) return;
+      if (typeof coordinates[0] === 'number') return visitPosition(coordinates);
+      coordinates.forEach(visitCoordinates);
+    }
+
+    function visit(node) {
+      if (!node) return;
+      if (node.type === 'FeatureCollection') (node.features || []).forEach(visit);
+      else if (node.type === 'Feature') visit(node.geometry);
+      else if (node.type === 'GeometryCollection') (node.geometries || []).forEach(visit);
+      else visitCoordinates(node.coordinates);
+    }
+
+    visit(geojson);
+    if (west > east || south > north) return null;
+    return { west: west, east: east, south: south, north: north };
+  }
+
+  function _mercatorY(latitude) {
+    var clamped = Math.max(-MERCATOR_MAX_LATITUDE, Math.min(MERCATOR_MAX_LATITUDE, latitude));
+    return Math.log(Math.tan(Math.PI / 4 + clamped * Math.PI / 360));
+  }
+
+  /**
+   * Projected height/width ratio of the fitted geometry, or null when unknown.
+   *
+   * Measured from the geographic bounding box and the Mercator y transform
+   * rather than from a probe projection: d3's spherical polygon clipping is
+   * winding-sensitive, so `geoMercator().fitWidth(…)` + `geoPath().bounds(…)`
+   * reports the whole (square) world for rings wound the GeoJSON way.
+   */
+  function _geometryAspect(fitData) {
+    var bounds = _geographicBounds(fitData);
+    if (!bounds) return null;
+    var lonSpan = (bounds.east - bounds.west) * Math.PI / 180;
+    var latSpan = _mercatorY(bounds.north) - _mercatorY(bounds.south);
+    if (!isFinite(lonSpan) || !isFinite(latSpan)) return null;
+    if (lonSpan <= 0 || latSpan <= 0) return null;
+    return latSpan / lonSpan;
+  }
+
+  function _screenLayout(container, fitData) {
+    var width = (container && container.clientWidth) || 900;
+    var innerWidth = Math.max(120, width - SCREEN_PADDING_X * 2);
+    var aspect = _geometryAspect(fitData);
+    if (aspect == null) aspect = SCREEN_FALLBACK_ASPECT;
+    aspect = Math.min(SCREEN_MAX_ASPECT, Math.max(SCREEN_MIN_ASPECT, aspect));
+
+    // The map fills the canvas width; the canvas grows vertically to match the
+    // geometry and the page scrolls if that is taller than the viewport.
+    var chrome = SCREEN_PADDING_TOP + SCREEN_PADDING_BOTTOM;
+    var height = Math.max(SCREEN_MIN_HEIGHT, Math.round(innerWidth * aspect) + chrome);
+
     return {
       exportMode: false,
       width: width,
       height: height,
-      mapExtent: [[40, 40], [width - 40, height - 100]],
+      mapExtent: [
+        [SCREEN_PADDING_X, SCREEN_PADDING_TOP],
+        [width - SCREEN_PADDING_X, height - SCREEN_PADDING_BOTTOM]
+      ],
       showHeader: false,
       titleY: 30,
       subtitleY: 50,
@@ -1073,12 +1174,7 @@ var WasteAtlasChoropleth = (function () {
     var titleBlock = 46;
     var gap = 46;
     // Use the same logic as main rendering: country border for full maps, Bundesläender for regional maps
-    var regionBorder = data.countryBorder;
-    if (cfg.nutsPrefix && data.bundeslaender && data.bundeslaender.features && data.bundeslaender.features.length) {
-      regionBorder = data.bundeslaender;
-    }
-    var fitData = (regionBorder && regionBorder.features && regionBorder.features.length)
-      ? regionBorder : data.catchments;
+    var fitData = _fitGeometry(data, cfg);
     var candidates = [];
     var preferredLegendSpec = cfg.exportLegendPlacement && {
       placement: cfg.exportLegendPlacement,
@@ -1904,7 +2000,9 @@ var WasteAtlasChoropleth = (function () {
 
     // SVG dimensions
     var container = document.getElementById(cfg.containerId);
-    var layout = options.layout || _screenLayout(container);
+    // Projection — fit to country border (or filtered regions when nutsPrefix is set)
+    var fitData = _fitGeometry(data, cfg);
+    var layout = options.layout || _screenLayout(container, fitData);
     var width = layout.width;
     var height = layout.height;
 
@@ -1919,11 +2017,11 @@ var WasteAtlasChoropleth = (function () {
     _svg.selectAll('*').remove();
     _defineOverlayPattern(cfg);
 
-    // Projection — fit to country border (or filtered regions when nutsPrefix is set)
-    var regionBorder = (cfg.nutsPrefix && data.bundeslaender && data.bundeslaender.features && data.bundeslaender.features.length)
-      ? data.bundeslaender : data.countryBorder;
-    var fitData = (regionBorder && regionBorder.features && regionBorder.features.length)
-      ? regionBorder : data.catchments;
+    // Geographic layers live in one group so the screen zoom transform can move
+    // and scale them without touching the title or the legend.
+    var mapRoot = _svg.append('g').attr('class', 'layer-map-root');
+    if (!layout.exportMode) _mapRoot = mapRoot;
+
     var projection = d3.geoMercator()
       .fitExtent(layout.mapExtent, fitData);
     var path = d3.geoPath().projection(projection);
@@ -1932,7 +2030,7 @@ var WasteAtlasChoropleth = (function () {
     var fillData = (cfg.nutsPrefix && data.bundeslaender && data.bundeslaender.features && data.bundeslaender.features.length)
       ? data.bundeslaender : data.countryBorder;
     if (fillData && fillData.features) {
-      _svg.append('g').attr('class', 'layer-country-fill')
+      mapRoot.append('g').attr('class', 'layer-country-fill')
         .selectAll('path')
         .data(fillData.features)
         .enter().append('path')
@@ -1943,7 +2041,7 @@ var WasteAtlasChoropleth = (function () {
 
     // Layer 2: all catchments (border-only background for those without data this year)
     if (data.allCatchments && data.allCatchments.features) {
-      _svg.append('g').attr('class', 'layer-catchments-all')
+      mapRoot.append('g').attr('class', 'layer-catchments-all')
         .selectAll('path')
         .data(data.allCatchments.features)
         .enter().append('path')
@@ -1955,7 +2053,7 @@ var WasteAtlasChoropleth = (function () {
 
     // Layer 3: catchments with data (thin borders)
     if (data.catchments.features) {
-      var catchmentPaths = _svg.append('g').attr('class', 'layer-catchments')
+      var catchmentPaths = mapRoot.append('g').attr('class', 'layer-catchments')
         .selectAll('path')
         .data(data.catchments.features)
         .enter().append('path')
@@ -1983,6 +2081,11 @@ var WasteAtlasChoropleth = (function () {
           })
           .on('click', function (event, d) {
             event.stopPropagation();
+            // Swallow the click that closes a pan gesture.
+            if (_pannedRecently) {
+              _pannedRecently = false;
+              return;
+            }
             _openCollectionDetail(d);
           })
           .on('keydown', function (event, d) {
@@ -2017,7 +2120,7 @@ var WasteAtlasChoropleth = (function () {
     }
 
     if (cfg.overlayPatternField && data.catchments.features) {
-      _svg.append('g').attr('class', 'layer-catchments-overlay')
+      mapRoot.append('g').attr('class', 'layer-catchments-overlay')
         .selectAll('path')
         .data(data.catchments.features.filter(function (d) {
           return d.properties._overlay_pattern && d.properties._thematic_value != null;
@@ -2030,7 +2133,7 @@ var WasteAtlasChoropleth = (function () {
     }
 
     if (data.acpvOutlines && data.acpvOutlines.features) {
-      _svg.append('g').attr('class', 'layer-acpv-outlines')
+      mapRoot.append('g').attr('class', 'layer-acpv-outlines')
         .selectAll('path')
         .data(data.acpvOutlines.features)
         .enter().append('path')
@@ -2049,7 +2152,7 @@ var WasteAtlasChoropleth = (function () {
     // Screen-only: the export legend carries no conflict entry, so drawing
     // the outlines in exports would leave them unexplained.
     if (_conflictEnabled && !layout.exportMode && _conflictCatchments && _conflictCatchments.size && data.catchments.features) {
-      _svg.append('g').attr('class', 'layer-catchments-conflict')
+      mapRoot.append('g').attr('class', 'layer-catchments-conflict')
         .selectAll('path')
         .data(data.catchments.features.filter(function (d) {
           return _conflictCatchments.has(d.properties.catchment_id);
@@ -2069,7 +2172,7 @@ var WasteAtlasChoropleth = (function () {
 
     // Layer 4: Bundesländer borders (on top of catchments)
     if (!hasRegionalBorder && data.bundeslaender && data.bundeslaender.features) {
-      _svg.append('g').attr('class', 'layer-bundeslaender')
+      mapRoot.append('g').attr('class', 'layer-bundeslaender')
         .selectAll('path')
         .data(data.bundeslaender.features)
         .enter().append('path')
@@ -2092,7 +2195,7 @@ var WasteAtlasChoropleth = (function () {
     }
 
     if (borderData && borderData.features) {
-      _svg.append('g').attr('class', 'layer-country-border')
+      mapRoot.append('g').attr('class', 'layer-country-border')
         .selectAll('path')
         .data(borderData.features)
         .enter().append('path')
@@ -2124,6 +2227,13 @@ var WasteAtlasChoropleth = (function () {
 
     // Legend
     _drawLegend(width, height, cfg, layout);
+
+    // Re-apply the manual zoom/pan the user had set before this re-render
+    // (window resize, toggles, …). Exports always render unzoomed.
+    if (!layout.exportMode) {
+      if (_zoomTransform) mapRoot.attr('transform', _zoomTransform);
+      _updateZoomReadout();
+    }
   }
 
   function _drawExportLegendItem(g, cat, x, y, opts) {
@@ -2342,6 +2452,94 @@ var WasteAtlasChoropleth = (function () {
           .text(line);
       });
     }
+  }
+
+  // ---- responsive canvas & manual zoom ---------------------------------------
+
+  function _updateZoomReadout() {
+    var readout = document.getElementById('atlas-map-zoom-level');
+    if (!readout) return;
+    var scale = _zoomTransform ? _zoomTransform.k : 1;
+    readout.textContent = Math.round(scale * 100) + '%';
+  }
+
+  function _applyZoomTransform(transform) {
+    _zoomTransform = transform;
+    if (_mapRoot) _mapRoot.attr('transform', transform);
+    _updateZoomReadout();
+  }
+
+  /** Scale around the canvas centre, as the +/- handles are not pointer events. */
+  function _zoomBy(factor) {
+    if (!_zoomBehavior || !_zoomTarget) return;
+    var node = _zoomTarget.node();
+    var box = node.viewBox.baseVal;
+    var center = [(box.width || node.clientWidth) / 2, (box.height || node.clientHeight) / 2];
+    _zoomTarget.transition().duration(180).call(_zoomBehavior.scaleBy, factor, center);
+  }
+
+  function _resetZoom() {
+    _zoomTransform = null;
+    if (_mapRoot) _mapRoot.attr('transform', null);
+    if (_zoomBehavior && _zoomTarget) {
+      _zoomTarget.call(_zoomBehavior.transform, d3.zoomIdentity);
+    }
+    _updateZoomReadout();
+  }
+
+  function _setupZoom(cfg) {
+    var svgNode = document.getElementById(cfg.svgId);
+    if (!svgNode || typeof d3.zoom !== 'function') return;
+
+    _zoomTarget = d3.select(svgNode);
+    _zoomBehavior = d3.zoom()
+      .scaleExtent([ZOOM_MIN, ZOOM_MAX])
+      // Plain wheel keeps scrolling the page — the map is taller than the
+      // viewport, so hijacking the wheel would trap the reader.
+      .filter(function (event) {
+        if (event.type === 'wheel') return event.ctrlKey || event.metaKey;
+        return !event.button;
+      })
+      .on('zoom', function (event) {
+        if (event.sourceEvent && event.sourceEvent.type !== 'wheel') _pannedRecently = true;
+        _applyZoomTransform(event.transform);
+      });
+    _zoomTarget
+      .call(_zoomBehavior)
+      .on('dblclick.zoom', null)
+      .on('mousedown.atlaspan', function () { _pannedRecently = false; });
+
+    var bindings = [
+      ['btn-map-zoom-in', function () { _zoomBy(ZOOM_STEP); }],
+      ['btn-map-zoom-out', function () { _zoomBy(1 / ZOOM_STEP); }],
+      ['btn-map-zoom-reset', _resetZoom]
+    ];
+    bindings.forEach(function (binding) {
+      var button = document.getElementById(binding[0]);
+      if (button) button.addEventListener('click', binding[1]);
+    });
+    _updateZoomReadout();
+  }
+
+  /** Re-render at the new canvas width so labels and strokes keep their size. */
+  function _observeContainerResize(cfg) {
+    var container = document.getElementById(cfg.containerId);
+    if (!container) return;
+    var lastWidth = container.clientWidth;
+    var rerender = _debounce(function () {
+      if (_lastData && _lastLoadCfg) _render(_lastData, _lastLoadCfg);
+    }, 150);
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', rerender);
+      return;
+    }
+    new ResizeObserver(function (entries) {
+      var width = Math.round(entries[0].contentRect.width);
+      if (!width || width === lastWidth) return;
+      lastWidth = width;
+      rerender();
+    }).observe(container);
   }
 
   // ---- export ---------------------------------------------------------------
@@ -2579,6 +2777,8 @@ var WasteAtlasChoropleth = (function () {
           }
           _lastData = data;
           _lastLoadCfg = renderCfg;
+          // A new selection means a new extent; keep the manual zoom out of it.
+          _resetZoom();
           var conflictPromise = _conflictEnabled
             ? _loadConflicts(loadCfg, loadCfg.country, loadCfg.year, fromYear)
             : Promise.resolve(null);
@@ -2609,6 +2809,9 @@ var WasteAtlasChoropleth = (function () {
             + '</div>';
         });
     }
+
+    _setupZoom(cfg);
+    _observeContainerResize(cfg);
 
     load(cfg.country, cfg.year, true);
 

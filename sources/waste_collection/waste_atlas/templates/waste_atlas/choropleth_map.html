@@ -51,6 +51,35 @@
         <div id="loading-overlay">
           <i class="fas fa-spinner fa-spin me-2"></i> Loading map data…
         </div>
+        <div class="atlas-map-zoom"
+             id="atlas-map-zoom"
+             role="group"
+             aria-label="Map zoom">
+          <button class="atlas-map-zoom-btn"
+                  id="btn-map-zoom-in"
+                  type="button"
+                  title="Zoom in (Ctrl + scroll, drag to pan)"
+                  aria-label="Zoom in">
+            <i class="fas fa-plus" aria-hidden="true"></i>
+          </button>
+          <button class="atlas-map-zoom-btn"
+                  id="btn-map-zoom-out"
+                  type="button"
+                  title="Zoom out"
+                  aria-label="Zoom out">
+            <i class="fas fa-minus" aria-hidden="true"></i>
+          </button>
+          <button class="atlas-map-zoom-btn"
+                  id="btn-map-zoom-reset"
+                  type="button"
+                  title="Fit map to canvas"
+                  aria-label="Reset zoom">
+            <i class="fas fa-compress-arrows-alt" aria-hidden="true"></i>
+          </button>
+          <span class="atlas-map-zoom-level"
+                id="atlas-map-zoom-level"
+                aria-live="polite">100%</span>
+        </div>
         <svg id="atlas-svg">
         </svg>
       </div>
