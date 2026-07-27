@@ -4416,85 +4416,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertContains(response, 'id="atlas-shell"')
                 self.assertContains(response, 'id="atlas-tree"')
 
-    def test_related_maps_context_links_theme_regions_and_region_category(self):
-        from sources.waste_collection.waste_atlas.map_selection import (
-            build_related_maps_context,
-        )
-
-        related_maps = build_related_maps_context(
-            "DE",
-            "biowaste_collection_amount",
-            reverse,
-        )
-
-        same_theme_urls = {
-            entry["url"] for entry in related_maps["same_theme_other_regions"]
-        }
-        same_region_urls = {
-            entry["url"] for entry in related_maps["same_region_same_category"]
-        }
-        self.assertIn(
-            reverse("waste-atlas-bw-rp-biowaste-collection-amount-map"),
-            same_theme_urls,
-        )
-        self.assertIn(
-            reverse("waste-atlas-germany-green-waste-collection-amount-map"),
-            same_region_urls,
-        )
-        self.assertNotIn(
-            reverse("waste-atlas-biowaste-collection-amount-map"),
-            same_theme_urls,
-        )
-
-    def test_related_maps_same_region_uses_full_distinguishing_labels(self):
-        from sources.waste_collection.waste_atlas.map_selection import (
-            build_related_maps_context,
-        )
-
-        related_maps = build_related_maps_context(
-            "DE",
-            "residual_frequency",
-            reverse,
-        )
-
-        labels_by_url = {
-            entry["url"]: entry["label"]
-            for entry in related_maps["same_region_same_category"]
-        }
-        self.assertEqual(
-            labels_by_url[reverse("waste-atlas-germany-biowaste-frequency-map")],
-            "Biowaste schedule",
-        )
-        self.assertEqual(
-            labels_by_url[reverse("waste-atlas-germany-combined-frequency-map")],
-            "Combined schedule",
-        )
-        # The group label "Schedule" must not be used for sibling schedule maps.
-        self.assertNotIn("Schedule", set(labels_by_url.values()))
-
-    def test_related_maps_same_theme_other_regions_includes_all_german_map_sets(self):
-        from sources.waste_collection.waste_atlas.map_selection import (
-            build_related_maps_context,
-        )
-
-        related_maps = build_related_maps_context(
-            "DE",
-            "residual_frequency",
-            reverse,
-        )
-
-        same_theme_urls = {
-            entry["url"] for entry in related_maps["same_theme_other_regions"]
-        }
-        self.assertIn(
-            reverse("waste-atlas-bw-rp-residual-frequency-map"),
-            same_theme_urls,
-        )
-        self.assertIn(
-            reverse("waste-atlas-nrw-residual-frequency-map"),
-            same_theme_urls,
-        )
-
     def test_detail_page_breadcrumb_links_back_to_overview_with_region(self):
         response = self.client.get(
             reverse("waste-atlas-germany-residual-frequency-map")
@@ -4561,6 +4482,43 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "atlas-context-actions")
         self.assertContains(response, "Map overview")
 
+    def test_map_page_has_no_related_maps_card(self):
+        """The card cost ~200px above an already tall map.
+
+        Both of its link groups were duplicates: the left tree carries the
+        sibling themes for the current region, and the selector's region
+        dropdown carries the current theme in other regions.
+        """
+        response = self.client.get(reverse("waste-atlas-germany-collection-system-map"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "atlas-related-maps")
+        self.assertNotContains(response, "Related maps")
+        self.assertNotIn("same_theme_other_regions", response.context)
+        self.assertNotIn("same_region_same_category", response.context)
+
+    def test_sibling_themes_for_the_region_stay_reachable_in_the_tree(self):
+        """What the "same waste category" group offered is in the map tree."""
+        response = self.client.get(
+            reverse("waste-atlas-germany-biowaste-collection-amount-map")
+        )
+
+        self.assertContains(response, 'id="atlas-tree"')
+        self.assertContains(
+            response,
+            reverse("waste-atlas-germany-green-waste-collection-amount-map"),
+        )
+
+    def test_other_regions_for_the_theme_stay_reachable_in_the_selector(self):
+        """What the "same theme in other regions" group offered is in the
+        selector: picking another region keeps the current theme."""
+        response = self.client.get(reverse("waste-atlas-germany-collection-system-map"))
+
+        self.assertContains(response, 'id="sel-country"')
+        self.assertContains(response, 'value="IT-ST"')
+        # The same theme in another region is still one link away in the tree.
+        self.assertContains(response, reverse("waste-atlas-nrw-collection-system-map"))
+
     def test_detail_page_actions_live_in_hero_actions(self):
         response = self.client.get(reverse("waste-atlas-germany-collection-system-map"))
         self.assertEqual(response.status_code, 200)
@@ -4571,40 +4529,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "atlas-feedback-link")
         self.assertContains(response, "View changes for this map")
         self.assertContains(response, "Map overview")
-
-    def test_related_maps_generic_same_region_links_preserve_region_scope(self):
-        from sources.waste_collection.waste_atlas.map_selection import (
-            build_related_maps_context,
-        )
-
-        related_maps = build_related_maps_context(
-            "SE",
-            "biowaste_collection_amount",
-            reverse,
-        )
-
-        same_region_urls = {
-            entry["url"] for entry in related_maps["same_region_same_category"]
-        }
-        generic_url = reverse("waste-atlas-biowaste-frequency-map")
-        self.assertIn(f"{generic_url}?country=SE", same_region_urls)
-        self.assertNotIn(generic_url, same_region_urls)
-
-        south_tyrol_related_maps = build_related_maps_context(
-            "IT-ST",
-            "biowaste_collection_amount",
-            reverse,
-        )
-        south_tyrol_same_region_urls = {
-            entry["url"]
-            for entry in south_tyrol_related_maps["same_region_same_category"]
-        }
-        food_waste_url = reverse("waste-atlas-food-waste-category-map")
-        self.assertIn(
-            f"{food_waste_url}?country=IT&nuts_prefix=ITH10&nuts_level=3",
-            south_tyrol_same_region_urls,
-        )
-        self.assertNotIn(f"{food_waste_url}?country=IT", south_tyrol_same_region_urls)
 
     def test_generic_map_preserves_nuts_region_in_selector(self):
         response = self.client.get(

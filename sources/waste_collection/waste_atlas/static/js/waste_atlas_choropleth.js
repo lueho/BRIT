@@ -2949,6 +2949,9 @@ var WasteAtlasChoropleth = (function () {
         _atlasToggleBar = document.createElement('div');
         _atlasToggleBar.className = 'atlas-map-toggles';
         atlasToggleMount.appendChild(_atlasToggleBar);
+        // The card ships hidden because only some maps offer these options.
+        var optionsCard = document.getElementById('atlas-map-options');
+        if (optionsCard) optionsCard.removeAttribute('hidden');
       }
       return _atlasToggleBar;
     }

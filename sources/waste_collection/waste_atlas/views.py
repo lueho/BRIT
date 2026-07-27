@@ -16,7 +16,6 @@ from .map_selection import (
     build_conflict_maps_context,
     build_map_selection_context,
     build_overview_directory_context,
-    build_related_maps_context,
     collection_detail_categories_for_theme,
     resolve_map_set,
 )
@@ -275,7 +274,6 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
                 selected_theme=page["theme"],
             )
         )
-        ctx.update(build_related_maps_context(selected_map_set, page["theme"], reverse))
         selected_theme_option = next(
             (
                 theme
