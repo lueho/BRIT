@@ -24,7 +24,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from maps.db_functions import SimplifyPreserveTopology
 from maps.mixins import get_unbounded_geojson_rejection_response
 from maps.models import LauRegion, NutsRegion, RegionAttributeValue, RegionProperty
-from population.services import population_values_by_region
+from maps.population.services import population_values_by_region
 from sources.waste_collection.derived_values import (
     convert_total_to_specific,
     get_derived_property_config,

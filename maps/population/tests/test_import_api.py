@@ -14,7 +14,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from maps.models import LauRegion, NutsRegion
-from population.models import (
+from maps.population.models import (
     PopulationDataset,
     PopulationImportRun,
     PopulationObservation,

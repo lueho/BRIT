@@ -4,8 +4,7 @@ from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.test import TestCase
 
 from maps.models import GeoPolygon, LauRegion, NutsRegion, Region
-from maps.validation import RegionCompositionError
-from population.models import (
+from maps.population.models import (
     GeographicScope,
     PopulationDataset,
     PopulationEstimate,
@@ -13,13 +12,14 @@ from population.models import (
     SourceStatus,
     TemporalBasis,
 )
-from population.services import (
+from maps.population.services import (
     METHOD_DIRECT,
     METHOD_SUMMED,
     TEMPORAL_BASIS_MIXED,
     materialize_estimate,
     resolve_population,
 )
+from maps.validation import RegionCompositionError
 
 
 def square(x0, y0, size=1):
