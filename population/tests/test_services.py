@@ -338,12 +338,13 @@ class RegionDeletionCascadeTestCase(PopulationServiceTestCaseBase):
             PopulationObservation.objects.filter(region_id=region_pk).exists()
         )
 
-    def test_deleting_component_region_cascades_observation_and_estimate_link(self):
+    def test_deleting_component_observation_invalidates_dependent_estimate(self):
         self.observe(self.lau_dataset, self.lau1, 2021, "55000")
-        self.observe(self.lau_dataset, self.lau2, 2021, "35000")
+        obs2 = self.observe(self.lau_dataset, self.lau2, 2021, "35000")
         region = self.custom_region("Lingen+Meppen", [self.lau1, self.lau2])
         estimate = materialize_estimate(region, 2021)
         self.assertEqual(estimate.components.count(), 2)
+        estimate_pk = estimate.pk
         lau1_pk = self.lau1.pk
 
         self.lau1.delete()
@@ -351,8 +352,11 @@ class RegionDeletionCascadeTestCase(PopulationServiceTestCaseBase):
         self.assertFalse(
             PopulationObservation.objects.filter(region_id=lau1_pk).exists()
         )
-        estimate.refresh_from_db()
-        self.assertEqual(estimate.components.count(), 1)
+        # The materialized estimate must not silently keep a stale value that no
+        # longer matches its components: it is invalidated (removed) instead.
+        self.assertFalse(PopulationEstimate.objects.filter(pk=estimate_pk).exists())
+        # Surviving observations for other regions are untouched.
+        self.assertTrue(PopulationObservation.objects.filter(pk=obs2.pk).exists())
 
     def test_deleting_custom_region_cascades_its_materialized_estimate(self):
         self.observe(self.lau_dataset, self.lau1, 2021, "55000")

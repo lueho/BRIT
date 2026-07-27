@@ -8,6 +8,8 @@ materialized estimates that preserve every contributing observation.
 """
 
 from django.db import models
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 
 from bibliography.models import Source
 from maps.models import Region
@@ -205,3 +207,16 @@ class PopulationEstimateComponent(models.Model):
                 name="population_estimate_component_unique",
             )
         ]
+
+
+@receiver(pre_delete, sender=PopulationObservation)
+def _invalidate_dependent_estimates(sender, instance, **kwargs):
+    """Drop materialized estimates that depend on a deleted observation.
+
+    A ``PopulationEstimate`` caches an exact-year sum over its component
+    observations. When a contributing observation is deleted (e.g. via a
+    region cascade), the cached value no longer matches the remaining
+    components, so the estimate is removed and must be re-materialized rather
+    than served with a silently stale value.
+    """
+    PopulationEstimate.objects.filter(components=instance).delete()
