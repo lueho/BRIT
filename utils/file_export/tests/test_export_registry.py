@@ -1,4 +1,6 @@
+import logging
 from collections import OrderedDict, namedtuple
+from contextlib import contextmanager
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
@@ -217,6 +219,30 @@ TaskExportSpec = namedtuple(
 )
 
 
+@contextmanager
+def silence_export_task_logging():
+    """Silence expected export-task error logs.
+
+    These unit tests mock ``write_file_for_download``, so the export file is
+    never written and the task's file-size lookup raises an expected error.
+    That error is handled gracefully; suppressing it keeps the test output
+    clean without hiding genuine failures (assertions still catch those).
+    """
+    logger = logging.getLogger("utils.file_export.generic_tasks")
+    handler = logging.NullHandler()
+    original_level = logger.level
+    original_propagate = logger.propagate
+    logger.addHandler(handler)
+    logger.propagate = False
+    logger.setLevel(logging.CRITICAL)
+    try:
+        yield
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(original_level)
+        logger.propagate = original_propagate
+
+
 class ExportTaskTestCase(TestCase):
     """Tests for export_user_created_object_to_file."""
 
@@ -230,7 +256,8 @@ class ExportTaskTestCase(TestCase):
         mock_self = MagicMock()
         mock_self.request.id = "fake-request-id"
         run_fn = export_user_created_object_to_file.run.__func__
-        result = run_fn(mock_self, model_label, file_format, query_params, context)
+        with silence_export_task_logging():
+            result = run_fn(mock_self, model_label, file_format, query_params, context)
         return result, mock_self
 
     def _make_spec(self, model=User):
