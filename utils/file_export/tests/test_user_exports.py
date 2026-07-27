@@ -165,13 +165,16 @@ class ExportTaskRecordTests(TestCase):
                     "create",
                     side_effect=RuntimeError("db down"),
                 ):
-                    with self.assertRaises(RuntimeError):
-                        self._run_task(
-                            "auth.User",
-                            "csv",
-                            {},
-                            {"user_id": self.owner.pk, "list_type": "public"},
-                        )
+                    with self.assertLogs(
+                        "utils.file_export.generic_tasks", level="ERROR"
+                    ):
+                        with self.assertRaises(RuntimeError):
+                            self._run_task(
+                                "auth.User",
+                                "csv",
+                                {},
+                                {"user_id": self.owner.pk, "list_type": "public"},
+                            )
                 storage = get_file_export_storage()
                 self.assertFalse(storage.exists("user_fake-request-id.csv"))
 
