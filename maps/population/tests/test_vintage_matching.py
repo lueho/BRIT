@@ -6,7 +6,9 @@ holding more than one vintage would make every import fail with
 "ambiguous region code".
 """
 
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 
 from maps.models import NutsRegion, NutsVintage
 from maps.population.importers import import_population_payload
@@ -153,6 +155,24 @@ class VintageAwareMatchingTestCase(TestCase):
         self.assertEqual(
             report.errors[0]["reason"], "ambiguous region code (multiple matches)"
         )
+
+    def test_vintage_is_resolved_once_per_label_not_once_per_observation(self):
+        observations = [
+            {
+                "region_code": "DE111",
+                "region_version": "2024",
+                "reference_period": 2000 + index,
+            }
+            for index in range(6)
+        ]
+        with CaptureQueriesContext(connection) as captured:
+            import_population_payload(_payload(observations))
+        vintage_queries = [
+            query
+            for query in captured.captured_queries
+            if "maps_nutsvintage" in query["sql"]
+        ]
+        self.assertEqual(len(vintage_queries), 1)
 
     def test_unknown_code_still_reports_no_matching_region(self):
         report = import_population_payload(

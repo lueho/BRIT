@@ -47,19 +47,29 @@ class RegionMatch:
     matched_version: str = ""
 
 
-def _resolve_vintage(region_version, classification_version):
-    """Select the NUTS vintage a provider code refers to.
+class VintageResolver:
+    """Resolves version labels to vintages, caching lookups for one import.
 
-    ``region_version`` (per observation) wins over the dataset's
-    ``classification_version``; without either, the current vintage applies.
+    Version labels repeat across every observation of a dataset, so the handful
+    of distinct labels is resolved once instead of once per row.
     """
-    for label, resolution in (
-        (region_version, "exact"),
-        (classification_version, "exact"),
-    ):
-        if label:
-            return NutsVintage.resolve(label), resolution
-    return NutsVintage.current(), "current_vintage"
+
+    def __init__(self):
+        self._by_label = {}
+
+    def resolve(self, region_version, classification_version):
+        """Select the NUTS vintage a provider code refers to.
+
+        ``region_version`` (per observation) wins over the dataset's
+        ``classification_version``; without either, the current vintage applies.
+        """
+        label = region_version or classification_version
+        resolution = "exact" if label else "current_vintage"
+        if label not in self._by_label:
+            self._by_label[label] = (
+                NutsVintage.resolve(label) if label else NutsVintage.current()
+            )
+        return self._by_label[label], resolution
 
 
 def _unique_or_error(regions, resolution, matched_version=""):
@@ -72,7 +82,9 @@ def _unique_or_error(regions, resolution, matched_version=""):
     )
 
 
-def _match_region(scheme, code, region_version="", classification_version=""):
+def _match_region(
+    scheme, code, region_version="", classification_version="", resolver=None
+):
     """Match a provider region code, scoped to the requested NUTS vintage.
 
     Codes are only unique within a vintage, so an unscoped lookup would report
@@ -85,7 +97,8 @@ def _match_region(scheme, code, region_version="", classification_version=""):
             list(LauRegion.objects.filter(lau_id=code)[:2]), "exact"
         )
 
-    vintage, resolution = _resolve_vintage(region_version, classification_version)
+    resolver = resolver or VintageResolver()
+    vintage, resolution = resolver.resolve(region_version, classification_version)
     if vintage is not None:
         regions = list(NutsRegion.objects.filter(nuts_id=code, version=vintage)[:2])
         if regions:
@@ -149,6 +162,7 @@ def import_population_payload(payload, *, user=None, dry_run=False):
         )
 
         classification_version = payload["dataset"].get("classification_version", "")
+        resolver = VintageResolver()
 
         for index, observation in enumerate(payload["observations"]):
             requested_version = observation.get("region_version", "")
@@ -157,6 +171,7 @@ def import_population_payload(payload, *, user=None, dry_run=False):
                 observation["region_code"],
                 region_version=requested_version,
                 classification_version=classification_version,
+                resolver=resolver,
             )
             if match.error is not None:
                 report.errors.append(
