@@ -42,6 +42,7 @@ urlpatterns = [
     path("learning/", LearningView.as_view(), name="learning"),
     path("distributions/", include("distributions.urls")),
     path("maps/", include("maps.urls")),
+    path("population/", include("population.urls")),
     path("materials/", include("materials.urls")),
     path("processes/", include("processes.urls")),
     path("sources/", include("sources.urls")),
