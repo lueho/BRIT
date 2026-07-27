@@ -72,6 +72,10 @@ class WasteAtlasResponsiveMapScriptTests(TestCase):
                     f"_svg.append('g').attr('class', '{layer}')", self.script
                 )
 
+    def test_zoom_can_shrink_the_map_below_the_fitted_size(self):
+        """Zooming out to 20% brings a tall map back onto a single screen."""
+        self.assertIn("var ZOOM_MIN = 0.2;", self.script)
+
     def test_zoom_behaviour_is_wired_to_handles_wheel_and_drag(self):
         self.assertIn("d3.zoom()", self.script)
         self.assertIn("scaleExtent([ZOOM_MIN, ZOOM_MAX])", self.script)
@@ -100,8 +104,26 @@ class WasteAtlasResponsiveMapScriptTests(TestCase):
         guard_index = render_body.rindex("if (!layout.exportMode)", 0, transform_index)
         self.assertLess(guard_index, transform_index)
 
-    def test_panning_does_not_trigger_a_catchment_navigation(self):
-        self.assertIn("_pannedRecently", self.script)
+    def test_a_click_survives_slight_pointer_movement(self):
+        """Regression: catchments became completely unclickable.
+
+        ``d3.zoom`` defaults ``clickDistance`` to 0, so a single pixel of mouse
+        jitter between mousedown and mouseup marks the gesture as a drag. d3
+        then swallows the following click with a capturing window listener, so
+        the catchment's own click handler never ran and no collection opened.
+        """
+        self.assertIn("clickDistance(", self.script)
+        self.assertIn("ZOOM_CLICK_DISTANCE", self.script)
+
+    def test_drag_suppression_is_left_to_d3_zoom(self):
+        """d3-zoom already cancels the click that terminates a real drag.
+
+        The hand-rolled guard duplicated that and misfired: d3's mousedown
+        handler calls ``stopImmediatePropagation()``, so the listener meant to
+        clear the flag never ran and the next genuine click was eaten.
+        """
+        self.assertNotIn("_pannedRecently", self.script)
+        self.assertNotIn("mousedown.atlaspan", self.script)
 
     def test_stylesheet_lets_the_svg_fill_the_container_width(self):
         self.assertIn("#map-container svg", self.stylesheet)

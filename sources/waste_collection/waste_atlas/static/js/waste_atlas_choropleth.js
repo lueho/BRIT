@@ -57,9 +57,15 @@ var WasteAtlasChoropleth = (function () {
   var SCREEN_MAX_ASPECT = 1.7;
   var SCREEN_MIN_HEIGHT = 320;
   var MERCATOR_MAX_LATITUDE = 89.5;
-  var ZOOM_MIN = 1;
+  // Below 1 the map shrinks inside the canvas, which is how a reader gets a
+  // tall map back onto one screen without resizing the window.
+  var ZOOM_MIN = 0.2;
   var ZOOM_MAX = 12;
   var ZOOM_STEP = 1.5;
+  // d3-zoom treats any movement beyond this as a drag and cancels the trailing
+  // click. Its default of 0 makes ordinary mouse jitter swallow catchment
+  // clicks, so allow a few pixels of slop.
+  var ZOOM_CLICK_DISTANCE = 4;
 
   var _cfg = {};
   var _svg;
@@ -69,9 +75,6 @@ var WasteAtlasChoropleth = (function () {
   var _zoomBehavior = null;
   var _zoomTarget = null;
   var _zoomTransform = null;
-  // A drag gesture ends with a click on the catchment underneath; without this
-  // guard panning would navigate to that catchment's collection.
-  var _pannedRecently = false;
   var _lastData = null;
   var _lastLoadCfg = null;
   var _baseLoadCfg = null;
@@ -2081,11 +2084,7 @@ var WasteAtlasChoropleth = (function () {
           })
           .on('click', function (event, d) {
             event.stopPropagation();
-            // Swallow the click that closes a pan gesture.
-            if (_pannedRecently) {
-              _pannedRecently = false;
-              return;
-            }
+            // d3-zoom itself cancels the click that terminates a real drag.
             _openCollectionDetail(d);
           })
           .on('keydown', function (event, d) {
@@ -2494,6 +2493,7 @@ var WasteAtlasChoropleth = (function () {
     _zoomTarget = d3.select(svgNode);
     _zoomBehavior = d3.zoom()
       .scaleExtent([ZOOM_MIN, ZOOM_MAX])
+      .clickDistance(ZOOM_CLICK_DISTANCE)
       // Plain wheel keeps scrolling the page — the map is taller than the
       // viewport, so hijacking the wheel would trap the reader.
       .filter(function (event) {
@@ -2501,13 +2501,11 @@ var WasteAtlasChoropleth = (function () {
         return !event.button;
       })
       .on('zoom', function (event) {
-        if (event.sourceEvent && event.sourceEvent.type !== 'wheel') _pannedRecently = true;
         _applyZoomTransform(event.transform);
       });
     _zoomTarget
       .call(_zoomBehavior)
-      .on('dblclick.zoom', null)
-      .on('mousedown.atlaspan', function () { _pannedRecently = false; });
+      .on('dblclick.zoom', null);
 
     var bindings = [
       ['btn-map-zoom-in', function () { _zoomBy(ZOOM_STEP); }],
