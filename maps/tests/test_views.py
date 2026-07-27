@@ -604,7 +604,7 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         lau_3 = LauRegion.objects.create(
             name="Test Region 3",
             borders=GeoPolygon.objects.create(
-                geom=MultiPolygon(Polygon(((1, 1), (1, 3), (3, 3), (3, 1), (1, 1))))
+                geom=MultiPolygon(Polygon(((2, 1), (2, 3), (3, 3), (3, 1), (2, 1))))
             ),
             publication_status="published",
         )
@@ -1032,6 +1032,47 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         self.assertTrue(catchment.region.borders.geom.equals_exact(geom))
         self.assertTrue(catchment.type == "custom")
         self.assertEqual(catchment.parent_region, self.util_objects["parent_region"])
+
+    def test_merge_lau_persists_selected_components_in_composed_of(self):
+        url = reverse("catchment-create-merge-lau")
+        self.client.force_login(self.staff_user)
+        data = {
+            "name": "Merged Catchment With Components",
+            "parent_region": self.util_objects["parent_region"].pk,
+            "form-INITIAL_FORMS": 2,
+            "form-TOTAL_FORMS": 3,
+            "form-0-region": self.util_objects["lau_region_1"].pk,
+            "form-1-region": self.util_objects["lau_region_2"].pk,
+            "form-2-region": self.util_objects["lau_region_3"].pk,
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(302, response.status_code)
+        catchment = Catchment.objects.get(name="Merged Catchment With Components")
+        self.assertCountEqual(
+            list(catchment.region.composed_of.values_list("pk", flat=True)),
+            [
+                self.util_objects["lau_region_1"].pk,
+                self.util_objects["lau_region_2"].pk,
+                self.util_objects["lau_region_3"].pk,
+            ],
+        )
+
+    def test_merge_lau_rejects_duplicate_components(self):
+        url = reverse("catchment-create-merge-lau")
+        self.client.force_login(self.staff_user)
+        data = {
+            "name": "Merged Catchment With Duplicates",
+            "parent_region": self.util_objects["parent_region"].pk,
+            "form-INITIAL_FORMS": 2,
+            "form-TOTAL_FORMS": 2,
+            "form-0-region": self.util_objects["lau_region_1"].pk,
+            "form-1-region": self.util_objects["lau_region_1"].pk,
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(200, response.status_code)
+        self.assertFalse(
+            Catchment.objects.filter(name="Merged Catchment With Duplicates").exists()
+        )
 
     def test_at_least_one_entry_in_formset_is_enforced(self):
         url = reverse("catchment-create-merge-lau")
