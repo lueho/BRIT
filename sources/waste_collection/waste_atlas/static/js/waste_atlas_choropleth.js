@@ -77,6 +77,9 @@ var WasteAtlasChoropleth = (function () {
   var _zoomBehavior = null;
   var _zoomTarget = null;
   var _zoomTransform = null;
+  // Open choice popover for a catchment whose value comes from several
+  // collections; only one can be open at a time.
+  var _collectionPicker = null;
   var _lastData = null;
   var _lastLoadCfg = null;
   var _baseLoadCfg = null;
@@ -103,6 +106,36 @@ var WasteAtlasChoropleth = (function () {
   function _openCollectionDetail(feature) {
     var detailUrl = _collectionDetailUrl(feature);
     if (detailUrl) window.location.assign(detailUrl);
+  }
+
+  /**
+   * Every collection a click on *feature* may open.
+   *
+   * Composite themes (waste ratio, combined frequency, …) derive one value from
+   * a biowaste and a residual collection, so the API sends both and the reader
+   * chooses. Falls back to the single-collection field for cached responses
+   * that predate the list.
+   */
+  function _collectionOptions(feature) {
+    var properties = feature && feature.properties;
+    if (!properties) return [];
+    if (Array.isArray(properties.collection_details)) {
+      return properties.collection_details.filter(function (option) {
+        return option && option.url;
+      });
+    }
+    var detailUrl = properties.collection_detail_url;
+    if (!detailUrl) return [];
+    return [{ url: detailUrl, label: properties.catchment_name || 'Collection' }];
+  }
+
+  function _openCollectionChoice(event, feature) {
+    var options = _collectionOptions(feature);
+    if (options.length > 1) {
+      _openCollectionPicker(event, feature, options);
+      return;
+    }
+    _openCollectionDetail(feature);
   }
 
   function _fetchJSON(url) {
@@ -2011,6 +2044,8 @@ var WasteAtlasChoropleth = (function () {
     var layout = options.layout || _screenLayout(container, fitData);
     var width = layout.width;
     var height = layout.height;
+    // A new render replaces the geography a picker was anchored to.
+    if (!layout.exportMode) _closeCollectionPicker();
 
     _svg = options.svgSelection || d3.select('#' + cfg.svgId);
     _svg
@@ -2079,7 +2114,11 @@ var WasteAtlasChoropleth = (function () {
             return _collectionDetailUrl(d) ? 'link' : null;
           })
           .attr('aria-label', function (d) {
-            if (!_collectionDetailUrl(d)) return null;
+            var options = _collectionOptions(d);
+            if (!options.length) return null;
+            if (options.length > 1) {
+              return 'Choose a collection for ' + d.properties.catchment_name;
+            }
             return 'Open collection for ' + d.properties.catchment_name;
           })
           .style('cursor', function (d) {
@@ -2088,13 +2127,13 @@ var WasteAtlasChoropleth = (function () {
           .on('click', function (event, d) {
             event.stopPropagation();
             // d3-zoom itself cancels the click that terminates a real drag.
-            _openCollectionDetail(d);
+            _openCollectionChoice(event, d);
           })
           .on('keydown', function (event, d) {
             if (event.key !== 'Enter' && event.key !== ' ') return;
             event.preventDefault();
             event.stopPropagation();
-            _openCollectionDetail(d);
+            _openCollectionChoice(event, d);
           });
       }
 
@@ -2461,6 +2500,81 @@ var WasteAtlasChoropleth = (function () {
     }
   }
 
+  // ---- collection picker ------------------------------------------------------
+
+  function _closeCollectionPicker() {
+    if (!_collectionPicker) return;
+    document.removeEventListener('keydown', _collectionPickerKeydown, true);
+    document.removeEventListener('mousedown', _collectionPickerOutside, true);
+    if (_collectionPicker.parentNode) {
+      _collectionPicker.parentNode.removeChild(_collectionPicker);
+    }
+    _collectionPicker = null;
+  }
+
+  function _collectionPickerKeydown(event) {
+    if (event.key !== 'Escape') return;
+    event.stopPropagation();
+    _closeCollectionPicker();
+  }
+
+  function _collectionPickerOutside(event) {
+    if (_collectionPicker && !_collectionPicker.contains(event.target)) {
+      _closeCollectionPicker();
+    }
+  }
+
+  /**
+   * Offer every collection behind an aggregated value, anchored at the click.
+   *
+   * Dismissed with Escape, by pressing outside, or as soon as the map moves
+   * underneath it (zoom, pan, re-render).
+   */
+  function _openCollectionPicker(event, feature, options) {
+    _closeCollectionPicker();
+    var container = document.getElementById(_cfg.containerId);
+    if (!container) return;
+
+    var name = (feature && feature.properties && feature.properties.catchment_name) || '';
+    var picker = document.createElement('div');
+    picker.className = 'atlas-collection-picker';
+    picker.setAttribute('role', 'group');
+    picker.setAttribute('aria-label', 'Collections for ' + name);
+
+    var title = document.createElement('p');
+    title.className = 'atlas-collection-picker-title';
+    title.textContent = name;
+    picker.appendChild(title);
+
+    options.forEach(function (option) {
+      var link = document.createElement('a');
+      link.className = 'atlas-collection-picker-link';
+      link.href = option.url;
+      link.textContent = option.label || option.url;
+      picker.appendChild(link);
+    });
+    container.appendChild(picker);
+
+    // Anchor at the pointer, clamped so the whole picker stays on the canvas.
+    // Keyboard activation has no coordinates, so fall back to the centre.
+    var rect = container.getBoundingClientRect();
+    var hasPointer = event && event.clientX != null && event.clientY != null;
+    var x = hasPointer ? event.clientX - rect.left : container.clientWidth / 2;
+    var y = hasPointer ? event.clientY - rect.top : Math.min(container.clientHeight / 2, 320);
+    picker.style.left = Math.max(
+      8, Math.min(x + 8, Math.max(8, container.clientWidth - picker.offsetWidth - 8))
+    ) + 'px';
+    picker.style.top = Math.max(
+      8, Math.min(y + 8, Math.max(8, container.clientHeight - picker.offsetHeight - 8))
+    ) + 'px';
+
+    _collectionPicker = picker;
+    var firstLink = picker.querySelector('a');
+    if (firstLink) firstLink.focus();
+    document.addEventListener('keydown', _collectionPickerKeydown, true);
+    document.addEventListener('mousedown', _collectionPickerOutside, true);
+  }
+
   // ---- responsive canvas & manual zoom ---------------------------------------
 
   function _updateZoomReadout() {
@@ -2471,6 +2585,8 @@ var WasteAtlasChoropleth = (function () {
   }
 
   function _applyZoomTransform(transform) {
+    // The picker is anchored to a screen position, not to the map.
+    _closeCollectionPicker();
     _zoomTransform = transform;
     if (_mapRoot) _mapRoot.attr('transform', transform);
     _updateZoomReadout();

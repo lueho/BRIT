@@ -554,31 +554,44 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
 
     @staticmethod
     def _with_atlas_collection(request, queryset):
-        """Prefetch the collection selected by the current map's value logic."""
-        category = request.query_params.get("collection_detail_category")
-        if category not in _COLLECTION_DETAIL_CATEGORIES:
+        """Prefetch the collections a click on the current map may open.
+
+        Composite themes pass several comma-separated categories, one per
+        contributing waste stream, and each contributes its own primary
+        collection.
+        """
+        requested = request.query_params.get("collection_detail_category") or ""
+        categories = [
+            category
+            for category in (part.strip() for part in requested.split(","))
+            if category in _COLLECTION_DETAIL_CATEGORIES
+        ]
+        if not categories:
             return queryset
 
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
-        selected = _select_primary_collections(
-            country,
-            year,
-            _COLLECTION_DETAIL_CATEGORIES[category],
-            nuts_prefixes,
-            user=request.user,
-        )
-        collection_ids = [
-            row["collection_id"]
-            for row in selected.values()
-            if row["collection_id"] is not None
-        ]
+        collection_ids = []
+        for category in categories:
+            selected = _select_primary_collections(
+                country,
+                year,
+                _COLLECTION_DETAIL_CATEGORIES[category],
+                nuts_prefixes,
+                user=request.user,
+            )
+            collection_ids.extend(
+                row["collection_id"]
+                for row in selected.values()
+                if row["collection_id"] is not None
+            )
         return queryset.prefetch_related(
             Prefetch(
                 "collections",
                 queryset=_collection_qs(request.user)
                 .filter(id__in=collection_ids)
-                .order_by("id"),
+                .select_related("waste_category", "collection_system")
+                .order_by("waste_category__name", "id"),
                 to_attr="atlas_collections",
             )
         )

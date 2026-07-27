@@ -302,6 +302,31 @@ COLLECTION_DETAIL_CATEGORY_BY_THEME = {
     "weekly_bp_access_days": "biowaste",
 }
 
+# Composite themes combine one biowaste and one residual collection into a
+# single displayed value, so no single collection "drives" it. Clicking such a
+# catchment offers every contributing collection instead of guessing one.
+COMPOSITE_COLLECTION_DETAIL_CATEGORIES_BY_THEME = {
+    "collection_count_ratio": ("biowaste", "residual"),
+    "combined_collection_count": ("biowaste", "residual"),
+    "combined_fee_system": ("biowaste", "residual"),
+    "combined_frequency": ("biowaste", "residual"),
+    "waste_ratio": ("biowaste", "residual"),
+}
+
+
+def collection_detail_categories_for_theme(theme):
+    """Return the collection categories a click on *theme* may open.
+
+    Empty for themes computed from region properties, which have no collection
+    to open at all.
+    """
+    composite = COMPOSITE_COLLECTION_DETAIL_CATEGORIES_BY_THEME.get(theme)
+    if composite:
+        return tuple(composite)
+    single = COLLECTION_DETAIL_CATEGORY_BY_THEME.get(theme)
+    return (single,) if single else ()
+
+
 TOPIC_COLOR_CLASSES = {
     "orga_level": "atlas-topic-admin",
     "collection_orga_level": "atlas-topic-admin",

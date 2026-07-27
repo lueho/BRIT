@@ -28,6 +28,7 @@ class CatchmentGeometrySerializer(GeoFeatureModelSerializer):
     catchment_name = serializers.CharField(source="name")
     catchment_type = serializers.CharField(source="type")
     collection_detail_url = serializers.SerializerMethodField()
+    collection_details = serializers.SerializerMethodField()
     geom = GeometrySerializerMethodField()
 
     class Meta:
@@ -38,7 +39,33 @@ class CatchmentGeometrySerializer(GeoFeatureModelSerializer):
             "catchment_name",
             "catchment_type",
             "collection_detail_url",
+            "collection_details",
         ]
+
+    def get_collection_details(self, instance):
+        """Return every collection a click may open, labelled for a choice.
+
+        Composite themes contribute one collection per waste stream, so the
+        reader picks instead of the map guessing for them.
+        """
+        return [
+            {
+                "url": reverse("collection-detail", kwargs={"pk": collection.pk}),
+                "label": self._collection_label(collection),
+            }
+            for collection in getattr(instance, "atlas_collections", ())
+        ]
+
+    @staticmethod
+    def _collection_label(collection):
+        """Name the waste stream and how it is collected, e.g. "Biowaste — Door to door"."""
+        parts = [
+            getattr(collection.waste_category, "name", None),
+            getattr(collection.collection_system, "name", None),
+        ]
+        return (
+            " — ".join(part for part in parts if part) or f"Collection {collection.pk}"
+        )
 
     def get_collection_detail_url(self, instance):
         """Return the detail URL for the collection driving the map value."""
