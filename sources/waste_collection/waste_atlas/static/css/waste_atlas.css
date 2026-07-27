@@ -548,7 +548,108 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
   overflow: hidden;
   position: relative;
 }
-#map-container svg { display: block; }
+/*
+ * The renderer sizes the SVG in user units and re-renders on container resize;
+ * these rules keep the canvas fitted to the column width in between.
+ */
+#map-container svg {
+  display: block;
+  height: auto;
+  width: 100%;
+}
+/* Drag-to-pan canvas; vertical page scrolling stays with the browser. */
+#atlas-svg {
+  cursor: grab;
+  touch-action: pan-y;
+}
+#atlas-svg:active {
+  cursor: grabbing;
+}
+
+/* Manual sizing handles, overlaid on the map canvas */
+.atlas-map-zoom {
+  align-items: center;
+  background: color-mix(in srgb, var(--atlas-surface) 92%, transparent);
+  border: 1px solid var(--atlas-border);
+  border-radius: 999px;
+  box-shadow: var(--atlas-shadow-sm);
+  display: flex;
+  gap: .15rem;
+  padding: .2rem .35rem;
+  position: absolute;
+  right: .6rem;
+  top: .6rem;
+  z-index: 5;
+}
+.atlas-map-zoom-btn {
+  align-items: center;
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  color: var(--atlas-label);
+  display: inline-flex;
+  font-size: .78rem;
+  height: 1.75rem;
+  justify-content: center;
+  padding: 0;
+  width: 1.75rem;
+}
+.atlas-map-zoom-btn:hover,
+.atlas-map-zoom-btn:focus-visible {
+  background: var(--atlas-surface-muted);
+  color: var(--atlas-ink);
+}
+.atlas-map-zoom-level {
+  color: var(--atlas-ink-muted);
+  font-size: .74rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  min-width: 2.6rem;
+  padding-right: .25rem;
+  text-align: right;
+}
+
+/*
+ * Choice popover for catchments whose value is derived from several
+ * collections; anchored at the click and dismissed when the map moves.
+ */
+.atlas-collection-picker {
+  background: var(--atlas-surface);
+  border: 1px solid var(--atlas-border);
+  border-radius: .6rem;
+  box-shadow: var(--atlas-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: .1rem;
+  max-width: min(20rem, calc(100% - 1rem));
+  padding: .5rem;
+  position: absolute;
+  z-index: 8;
+}
+.atlas-collection-picker-title {
+  color: var(--atlas-ink-muted);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  margin: 0 0 .2rem;
+  padding: 0 .35rem;
+  text-transform: uppercase;
+}
+.atlas-collection-picker-link {
+  border-radius: .4rem;
+  color: var(--atlas-link);
+  display: block;
+  font-size: .86rem;
+  line-height: 1.35;
+  padding: .3rem .35rem;
+  text-decoration: none;
+}
+.atlas-collection-picker-link:hover,
+.atlas-collection-picker-link:focus-visible {
+  background: var(--atlas-surface-muted);
+  color: var(--bs-primary);
+}
+
 .atlas-legend { font-family: 'Nunito', sans-serif; }
 .atlas-legend text { font-size: 12px; }
 #loading-overlay {
