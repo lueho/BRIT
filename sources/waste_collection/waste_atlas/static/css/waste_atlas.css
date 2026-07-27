@@ -918,6 +918,35 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
   box-shadow: var(--atlas-shadow-sm);
   padding: 1rem;
 }
+.atlas-side-card-title {
+  color: var(--atlas-eyebrow);
+  font-size: .76rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  margin: 0 0 .6rem;
+  text-transform: uppercase;
+}
+/*
+ * The toggle bar carries its own frame for the legacy inline layout; inside a
+ * panel card that would nest two boxes, so flatten it.
+ */
+.atlas-side-card .atlas-map-toggles {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: 0;
+}
+/* Downloads stack full width so the long PNG label never truncates. */
+.atlas-export-actions {
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+.atlas-export-actions .btn {
+  border-radius: 999px;
+  width: 100%;
+}
 .atlas-side .atlas-selector-grid {
   grid-template-columns: 1fr;
 }

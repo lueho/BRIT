@@ -82,20 +82,6 @@
         <svg id="atlas-svg">
         </svg>
       </div>
-      <div id="export-buttons">
-        <button class="btn btn-outline-secondary btn-sm"
-                id="btn-export-svg"
-                type="button"
-                disabled>
-          <i class="fas fa-download"></i> Download SVG
-        </button>
-        <button class="btn btn-outline-secondary btn-sm"
-                id="btn-export-png"
-                type="button"
-                disabled>
-          <i class="fas fa-image"></i> Download PNG (Word-ready, 300 DPI)
-        </button>
-      </div>
     </div>
     <aside class="atlas-side" id="atlas-side">
       <section class="atlas-side-card" id="atlas-controls">
@@ -103,7 +89,30 @@
           {% include "waste_atlas/includes/map_selector.html" with atlas_selector_button_label="Load" %}
         {% endblock atlas_selector %}
       </section>
-      <div id="atlas-map-tools"></div>
+      {# Revealed by the renderer when the map supports quartiles or the conflict aid. #}
+      <section class="atlas-side-card" id="atlas-map-options" hidden>
+        <h3 class="atlas-side-card-title">Map options</h3>
+        <div id="atlas-map-tools"></div>
+      </section>
+      <section class="atlas-side-card" id="atlas-export">
+        <h3 class="atlas-side-card-title">Export</h3>
+        <div class="atlas-export-actions">
+          <button class="btn btn-outline-secondary btn-sm"
+                  id="btn-export-svg"
+                  type="button"
+                  title="Download a vector SVG"
+                  disabled>
+            <i class="fas fa-download" aria-hidden="true"></i> SVG
+          </button>
+          <button class="btn btn-outline-secondary btn-sm"
+                  id="btn-export-png"
+                  type="button"
+                  title="Download a PNG at 300 DPI, ready for Word"
+                  disabled>
+            <i class="fas fa-image" aria-hidden="true"></i> PNG (300 DPI)
+          </button>
+        </div>
+      </section>
     </aside>
   </div>
 {% endblock atlas_workspace %}
