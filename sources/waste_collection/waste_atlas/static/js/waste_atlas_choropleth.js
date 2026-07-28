@@ -138,6 +138,24 @@ var WasteAtlasChoropleth = (function () {
     _openCollectionDetail(feature);
   }
 
+  /**
+   * Middle-click means "open in a new tab" everywhere else, but the browser's
+   * default action for it is autoscroll, which is useless on a map that pans by
+   * dragging. Suppressing it needs preventDefault on the *mousedown*.
+   */
+  function _suppressAutoscroll(event) {
+    if (event.button === 1) event.preventDefault();
+  }
+
+  function _openCollectionInNewTab(feature) {
+    var options = _collectionOptions(feature);
+    if (options.length !== 1) return false;
+    var opened = window.open(options[0].url, '_blank');
+    // Keep the new tab from reaching back into this one.
+    if (opened) opened.opener = null;
+    return true;
+  }
+
   function _fetchJSON(url) {
     return fetch(url, { credentials: 'same-origin' })
       .then(function (r) {
@@ -2129,6 +2147,14 @@ var WasteAtlasChoropleth = (function () {
             // d3-zoom itself cancels the click that terminates a real drag.
             _openCollectionChoice(event, d);
           })
+          .on('auxclick', function (event, d) {
+            if (event.button !== 1) return;
+            event.preventDefault();
+            event.stopPropagation();
+            // One collection goes straight to a new tab; several have no single
+            // destination, so offer the choice as a left click would.
+            if (!_openCollectionInNewTab(d)) _openCollectionChoice(event, d);
+          })
           .on('keydown', function (event, d) {
             if (event.key !== 'Enter' && event.key !== ' ') return;
             event.preventDefault();
@@ -2629,7 +2655,10 @@ var WasteAtlasChoropleth = (function () {
       });
     _zoomTarget
       .call(_zoomBehavior)
-      .on('dblclick.zoom', null);
+      .on('dblclick.zoom', null)
+      // Canvas-wide, so a middle click never starts autoscroll, whether or not
+      // it lands on a catchment.
+      .on('mousedown.atlasautoscroll', _suppressAutoscroll);
 
     var bindings = [
       ['btn-map-zoom-in', function () { _zoomBy(ZOOM_STEP); }],
@@ -2949,9 +2978,6 @@ var WasteAtlasChoropleth = (function () {
         _atlasToggleBar = document.createElement('div');
         _atlasToggleBar.className = 'atlas-map-toggles';
         atlasToggleMount.appendChild(_atlasToggleBar);
-        // The card ships hidden because only some maps offer these options.
-        var optionsCard = document.getElementById('atlas-map-options');
-        if (optionsCard) optionsCard.removeAttribute('hidden');
       }
       return _atlasToggleBar;
     }

@@ -191,50 +191,11 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
   margin: 0;
   max-width: 46rem;
 }
-.atlas-hero-link {
-  border: 1px solid var(--atlas-border);
-  border-radius: 999px;
-  color: var(--atlas-label);
-  flex: none;
-  font-size: .85rem;
-  font-weight: 700;
-  padding: .4rem .9rem;
-  text-decoration: none;
-  transition: background-color .12s ease, border-color .12s ease;
-  white-space: nowrap;
-}
-.atlas-hero-link:hover,
-.atlas-hero-link:focus {
-  background: var(--atlas-surface-muted);
-  border-color: var(--atlas-ink-muted);
-  color: var(--atlas-ink);
-}
 .atlas-hero-actions {
   align-items: center;
   display: flex;
   flex: none;
   gap: .75rem;
-}
-.atlas-feedback-link {
-  align-items: center;
-  border: 1px solid var(--atlas-border);
-  border-radius: 999px;
-  color: var(--atlas-label);
-  display: inline-flex;
-  flex: none;
-  font-size: .85rem;
-  font-weight: 700;
-  gap: .35rem;
-  padding: .4rem .9rem;
-  text-decoration: none;
-  transition: background-color .12s ease, border-color .12s ease;
-  white-space: nowrap;
-}
-.atlas-feedback-link:hover,
-.atlas-feedback-link:focus {
-  background: var(--atlas-surface-muted);
-  border-color: var(--atlas-ink-muted);
-  color: var(--atlas-ink);
 }
 
 /* Unified surfaces for the finder and the directory */
@@ -540,6 +501,20 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
 #atlas-svg:active {
   cursor: grabbing;
 }
+/*
+ * Catchments are focusable so they can be reached by keyboard, but a focus ring
+ * on an SVG path is drawn around its bounding box, so clicking one left a stray
+ * rectangle across the map. Drop the ring for pointer focus and give keyboard
+ * focus an indicator that follows the catchment outline instead.
+ */
+#atlas-svg .layer-catchments path:focus {
+  outline: none;
+}
+#atlas-svg .layer-catchments path:focus-visible {
+  outline: none;
+  stroke: var(--bs-primary, #0d6efd);
+  stroke-width: 2;
+}
 
 /* Manual sizing handles, overlaid on the map canvas */
 .atlas-map-zoom {
@@ -703,13 +678,6 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
   gap: .9rem;
   margin-bottom: 1rem;
   padding: .55rem .9rem;
-}
-.atlas-shell-brand {
-  color: var(--brit-accent);
-  font-size: .8rem;
-  font-weight: 800;
-  letter-spacing: .08em;
-  text-transform: uppercase;
 }
 .atlas-shell-toolbar-actions {
   align-items: center;
@@ -911,31 +879,51 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
   gap: 1rem;
   min-width: 0;
 }
-.atlas-side-card {
-  background: var(--brit-surface);
-  border: 1px solid var(--brit-border);
-  border-radius: var(--brit-radius);
-  box-shadow: var(--atlas-shadow-sm);
-  padding: 1rem;
-}
-.atlas-side-card-title {
-  color: var(--atlas-eyebrow);
-  font-size: .76rem;
-  font-weight: 800;
-  letter-spacing: .06em;
-  margin: 0 0 .6rem;
-  text-transform: uppercase;
-}
 /*
- * The toggle bar carries its own frame for the legacy inline layout; inside a
- * panel card that would nest two boxes, so flatten it.
+ * The toggle bar carries its own frame for the legacy inline layout; inside the
+ * panel that would nest two boxes, so flatten it.
  */
-.atlas-side-card .atlas-map-toggles {
+.atlas-side .atlas-map-toggles {
   background: none;
   border: 0;
   border-radius: 0;
   margin: 0;
   padding: 0;
+}
+/* Groups inside a panel tab, e.g. the Current/Changes switch under the selector. */
+.atlas-side-group {
+  border-top: 1px solid var(--atlas-border-soft);
+  margin-top: .9rem;
+  padding-top: .8rem;
+}
+.atlas-side-group-title {
+  color: var(--atlas-eyebrow);
+  font-size: .76rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  margin: 0 0 .45rem;
+  text-transform: uppercase;
+}
+.atlas-side .atlas-mode-toggle {
+  width: 100%;
+}
+.atlas-side .atlas-mode {
+  flex: 1;
+  text-align: center;
+}
+.atlas-side-link {
+  color: var(--atlas-link);
+  display: inline-block;
+  font-size: .86rem;
+  margin-top: .9rem;
+  text-decoration: none;
+}
+.atlas-side-link:hover,
+.atlas-side-link:focus-visible {
+  color: var(--bs-primary);
+}
+.atlas-side-action {
+  width: 100%;
 }
 /* Downloads stack full width so the long PNG label never truncates. */
 .atlas-export-actions {

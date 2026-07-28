@@ -1,8 +1,10 @@
-"""Per-map controls belong in the right-hand panel, not scattered around it.
+"""Per-map controls live in one tabbed panel, not scattered around the map.
 
-The export buttons used to sit below a canvas that is taller than the viewport,
-so they could only be found by scrolling past the whole map, and the option
-toggles were injected into a bare div hanging below the panel's only card.
+The map page used to spread controls over four places: navigation buttons in the
+context header, zoom on the canvas, option toggles in a bare div hanging below
+the panel, and export buttons below a canvas taller than the viewport. They now
+share the right-hand panel, using the same ``sidebar-tabs`` pattern as
+``maps/templates/filtered_map.html`` so the atlas matches the rest of BRIT.
 """
 
 from pathlib import Path
@@ -18,14 +20,18 @@ ATLAS_STYLESHEET = WASTE_ATLAS_DIR / "static" / "css" / "waste_atlas.css"
 MAP_ROUTE = "waste-atlas-germany-collection-system-map"
 
 
-class MapPageControlLayoutTests(TestCase):
-    """Everything but the map itself is reachable without scrolling."""
+class MapPageChromeTests(TestCase):
+    """Everything but the map is reachable from one panel, without scrolling."""
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user(username="layout-user", password="secret")
         group, _ = Group.objects.get_or_create(name="waste_atlas")
+        cls.user = User.objects.create_user(username="layout-user", password="secret")
         cls.user.groups.add(group)
+        cls.staff = User.objects.create_user(
+            username="layout-staff", password="secret", is_staff=True
+        )
+        cls.staff.groups.add(group)
 
     def setUp(self):
         self.client.force_login(self.user)
@@ -35,6 +41,27 @@ class MapPageControlLayoutTests(TestCase):
         self.assertEqual(response.status_code, 200)
         return response.content.decode()
 
+    def _section(self, content, start, end):
+        return content.split(start)[1].split(end)[0]
+
+    # ---- context header ---------------------------------------------------
+
+    def test_header_holds_the_title_and_nothing_else(self):
+        content = self._content()
+        header = self._section(content, '<header class="atlas-context"', "</header>")
+
+        self.assertIn("atlas-context-title", header)
+        self.assertNotIn("atlas-context-actions", header)
+        self.assertNotIn("<button", header)
+        self.assertNotIn("btn", header)
+
+    def test_header_does_not_repeat_the_breadcrumb_location(self):
+        """The breadcrumb rail above already names the region."""
+        content = self._content()
+        header = self._section(content, '<header class="atlas-context"', "</header>")
+
+        self.assertNotIn("atlas-eyebrow", header)
+
     def test_no_controls_are_buried_below_the_canvas(self):
         content = self._content()
 
@@ -42,57 +69,100 @@ class MapPageControlLayoutTests(TestCase):
         canvas_end = content.index("</svg>")
         panel_start = content.index('id="atlas-side"')
         self.assertLess(canvas_end, panel_start)
-        # Nothing interactive between the canvas and the controls panel.
         self.assertNotIn("<button", content[canvas_end:panel_start])
 
-    def test_export_actions_live_in_the_controls_panel(self):
+    # ---- panel ------------------------------------------------------------
+
+    def test_panel_uses_the_shared_sidebar_tabs_pattern(self):
         content = self._content()
 
-        self.assertIn('id="atlas-export"', content)
-        self.assertLess(
-            content.index('id="atlas-side"'),
-            content.index('id="btn-export-svg"'),
+        self.assertIn("sidebar-tabs", content)
+        self.assertIn('data-bs-toggle="tab"', content)
+        for element_id in (
+            "atlas-map-tab",
+            "atlas-options-tab",
+            "atlas-map-pane",
+            "atlas-options-pane",
+        ):
+            with self.subTest(element_id=element_id):
+                self.assertIn(f'id="{element_id}"', content)
+
+    def test_panel_has_exactly_two_tabs(self):
+        content = self._content()
+        tabs = self._section(content, 'id="atlas-panel-tabs"', "</ul>")
+
+        self.assertEqual(tabs.count('data-bs-toggle="tab"'), 2)
+
+    def test_map_tab_holds_the_selector_and_the_view_switch(self):
+        content = self._content()
+        pane = self._section(content, 'id="atlas-map-pane"', 'id="atlas-options-pane"')
+
+        self.assertIn("atlas-selector-form", pane)
+        self.assertIn("atlas-mode-toggle", pane)
+
+    def test_options_tab_holds_the_toggles_and_the_export_trigger(self):
+        content = self._content()
+        pane = self._section(
+            content, 'id="atlas-options-pane"', "</div>\n        </div>"
         )
+
+        self.assertIn('id="atlas-map-tools"', pane)
+        self.assertIn('data-bs-target="#atlas-export-modal"', pane)
+
+    # ---- export modal -----------------------------------------------------
+
+    def test_export_opens_a_modal_offering_each_format(self):
+        content = self._content()
+
+        self.assertIn('id="atlas-export-modal"', content)
+        modal = self._section(content, 'id="atlas-export-modal"', "</div>\n</div>")
+        self.assertIn('id="btn-export-svg"', modal)
+        self.assertIn('id="btn-export-png"', modal)
 
     def test_export_labels_are_short_with_descriptive_tooltips(self):
         content = self._content()
 
         self.assertIn("PNG (300 DPI)", content)
         self.assertNotIn("Download PNG (Word-ready, 300 DPI)", content)
-        # The long explanation stays available on hover and to screen readers.
         self.assertIn('title="Download a PNG at 300 DPI, ready for Word"', content)
         self.assertIn('title="Download a vector SVG"', content)
 
-    def test_map_options_live_in_a_titled_card(self):
+    # ---- shell toolbar ----------------------------------------------------
+
+    def test_toolbar_drops_the_brand_the_breadcrumb_already_shows(self):
         content = self._content()
 
-        self.assertIn('id="atlas-map-options"', content)
-        self.assertIn("Map options", content)
-        card = content.split('id="atlas-map-options"')[1].split("</section>")[0]
-        self.assertIn('id="atlas-map-tools"', card)
+        self.assertNotIn("atlas-shell-brand", content)
+        self.assertIn("page-breadcrumb-rail", content)
 
-    def test_options_card_starts_hidden_until_a_toggle_is_added(self):
-        """Only some maps offer quartiles or the conflict aid."""
+    def test_toolbar_actions_share_one_button_family(self):
         content = self._content()
 
-        marker = content.index('id="atlas-map-options"')
-        tag = content[
-            content.rindex("<section", 0, marker) : content.index(">", marker)
-        ]
-        self.assertIn("hidden", tag)
+        self.assertNotIn("atlas-feedback-link", content)
+        self.assertNotIn("atlas-hero-link", content)
+        toolbar = self._section(
+            content, 'class="atlas-shell-toolbar-actions"', "</div>\n    </div>"
+        )
+        self.assertIn("mailto:info@bioresource-tools.net", toolbar)
+        self.assertEqual(toolbar.count("btn btn-sm btn-outline-secondary"), 1)
 
-    def test_navigation_stays_in_the_context_header(self):
+    def test_editing_the_configuration_moves_into_the_staff_tools_menu(self):
+        self.client.force_login(self.staff)
         content = self._content()
 
-        header = content.split('class="atlas-context-actions"')[1].split("</header>")[0]
-        self.assertIn("Map overview", header)
-        self.assertIn("atlas-mode-toggle", header)
-        # Output is not navigation; downloads belong to the controls panel.
-        self.assertNotIn("btn-export", header)
+        header = self._section(content, '<header class="atlas-context"', "</header>")
+        self.assertNotIn("Edit configuration", header)
+        menu = self._section(content, 'aria-labelledby="atlas-tools-menu"', "</ul>")
+        self.assertIn("Edit configuration", menu)
+
+    def test_non_staff_see_no_configuration_entry(self):
+        content = self._content()
+
+        self.assertNotIn("Edit configuration", content)
 
 
-class MapPageControlLayoutAssetTests(SimpleTestCase):
-    """The renderer and stylesheet back the panel layout."""
+class MapPageChromeAssetTests(SimpleTestCase):
+    """The stylesheet and renderer follow the panel restructure."""
 
     @classmethod
     def setUpClass(cls):
@@ -100,18 +170,57 @@ class MapPageControlLayoutAssetTests(SimpleTestCase):
         cls.script = CHOROPLETH_SCRIPT.read_text()
         cls.stylesheet = ATLAS_STYLESHEET.read_text()
 
-    def test_renderer_reveals_the_options_card_when_it_adds_a_toggle(self):
-        self.assertIn("atlas-map-options", self.script)
-        self.assertIn("removeAttribute('hidden')", self.script)
+    def test_orphaned_toolbar_styles_are_gone(self):
+        for selector in (
+            ".atlas-shell-brand",
+            ".atlas-feedback-link",
+            ".atlas-hero-link",
+        ):
+            with self.subTest(selector=selector):
+                self.assertNotIn(selector, self.stylesheet)
 
-    def test_stylesheet_lays_out_the_panel_cards(self):
-        self.assertIn(".atlas-side-card-title", self.stylesheet)
+    def test_toggles_are_flattened_inside_the_panel(self):
+        """The toggle bar carries its own frame; nested boxes look wrong."""
+        self.assertIn(".atlas-side .atlas-map-toggles", self.stylesheet)
+
+    def test_export_actions_are_laid_out_for_the_modal(self):
         self.assertIn(".atlas-export-actions", self.stylesheet)
 
-    def test_toggles_are_flattened_inside_a_panel_card(self):
-        """The toggle bar carries its own frame; nested boxes look wrong."""
-        self.assertIn(".atlas-side-card .atlas-map-toggles", self.stylesheet)
+    def test_renderer_no_longer_reveals_a_separate_options_card(self):
+        """Export lives in the Options tab, so the tab is always present."""
+        self.assertNotIn("atlas-map-options", self.script)
 
     def test_legacy_europe_pages_keep_their_own_export_row(self):
         """karte0/karte41 have short canvases and no controls panel."""
         self.assertIn("#export-buttons", self.stylesheet)
+
+
+class CatchmentFocusRingTests(SimpleTestCase):
+    """Clicking a catchment must not leave a rectangle over the map.
+
+    Catchment paths carry ``tabindex`` so they can be reached by keyboard, and a
+    user-agent focus ring on an SVG path is drawn around its *bounding box*
+    rather than its outline, which shows up as a stray rectangle.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.stylesheet = ATLAS_STYLESHEET.read_text()
+
+    def test_pointer_focus_draws_no_bounding_box_ring(self):
+        self.assertIn("#atlas-svg .layer-catchments path:focus {", self.stylesheet)
+        rule = self.stylesheet.split("#atlas-svg .layer-catchments path:focus {")[1]
+        self.assertIn("outline: none", rule.split("}")[0])
+
+    def test_keyboard_focus_keeps_a_visible_indicator(self):
+        """Suppressing the ring must not leave keyboard users guessing."""
+        self.assertIn(
+            "#atlas-svg .layer-catchments path:focus-visible {", self.stylesheet
+        )
+        rule = self.stylesheet.split(
+            "#atlas-svg .layer-catchments path:focus-visible {"
+        )[1].split("}")[0]
+        # A stroke follows the catchment outline; an outline would box it again.
+        self.assertIn("stroke", rule)
+        self.assertIn("outline: none", rule)
