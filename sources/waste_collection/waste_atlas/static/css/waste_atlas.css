@@ -540,6 +540,20 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
 #atlas-svg:active {
   cursor: grabbing;
 }
+/*
+ * Catchments are focusable so they can be reached by keyboard, but a focus ring
+ * on an SVG path is drawn around its bounding box, so clicking one left a stray
+ * rectangle across the map. Drop the ring for pointer focus and give keyboard
+ * focus an indicator that follows the catchment outline instead.
+ */
+#atlas-svg .layer-catchments path:focus {
+  outline: none;
+}
+#atlas-svg .layer-catchments path:focus-visible {
+  outline: none;
+  stroke: var(--bs-primary, #0d6efd);
+  stroke-width: 2;
+}
 
 /* Manual sizing handles, overlaid on the map canvas */
 .atlas-map-zoom {

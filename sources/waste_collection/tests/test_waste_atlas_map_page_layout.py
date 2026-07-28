@@ -115,3 +115,34 @@ class MapPageControlLayoutAssetTests(SimpleTestCase):
     def test_legacy_europe_pages_keep_their_own_export_row(self):
         """karte0/karte41 have short canvases and no controls panel."""
         self.assertIn("#export-buttons", self.stylesheet)
+
+
+class CatchmentFocusRingTests(SimpleTestCase):
+    """Clicking a catchment must not leave a rectangle over the map.
+
+    Catchment paths carry ``tabindex`` so they can be reached by keyboard, and a
+    user-agent focus ring on an SVG path is drawn around its *bounding box*
+    rather than its outline, which shows up as a stray rectangle.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.stylesheet = ATLAS_STYLESHEET.read_text()
+
+    def test_pointer_focus_draws_no_bounding_box_ring(self):
+        self.assertIn("#atlas-svg .layer-catchments path:focus {", self.stylesheet)
+        rule = self.stylesheet.split("#atlas-svg .layer-catchments path:focus {")[1]
+        self.assertIn("outline: none", rule.split("}")[0])
+
+    def test_keyboard_focus_keeps_a_visible_indicator(self):
+        """Suppressing the ring must not leave keyboard users guessing."""
+        self.assertIn(
+            "#atlas-svg .layer-catchments path:focus-visible {", self.stylesheet
+        )
+        rule = self.stylesheet.split(
+            "#atlas-svg .layer-catchments path:focus-visible {"
+        )[1].split("}")[0]
+        # A stroke follows the catchment outline; an outline would box it again.
+        self.assertIn("stroke", rule)
+        self.assertIn("outline: none", rule)
