@@ -4717,6 +4717,64 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(cfg["nutsPrefix"], "DE1,DEB")
         self.assertEqual(cfg["nutsLevel"], 1)
 
+    def test_bw_map_set_matches_germany_themes_and_uses_baden_wuerttemberg_scope(self):
+        from sources.waste_collection.waste_atlas.map_selection import (
+            WASTE_ATLAS_MAP_SELECTIONS,
+        )
+
+        bw_rp_themes = WASTE_ATLAS_MAP_SELECTIONS["DE-BW-RP"]["themes"]
+        bw_themes = WASTE_ATLAS_MAP_SELECTIONS["DE-BW"]["themes"]
+
+        self.assertEqual(set(bw_themes), set(bw_rp_themes))
+        self.assertEqual(
+            bw_themes["collection_system"]["route_name"],
+            "waste-atlas-bw-collection-system-map",
+        )
+
+        response = self.client.get(reverse("waste-atlas-bw-orga-level-map"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="DE-BW"')
+        self.assertContains(response, "selected>Baden-Württemberg</option>")
+        cfg = self._map_config(response)
+        self.assertEqual(cfg["nutsPrefix"], "DE1")
+        self.assertEqual(cfg["nutsLevel"], 1)
+
+        overview = self.client.get(reverse("waste-atlas-overview"))
+        self.assertContains(overview, "Baden-Württemberg")
+        self.assertContains(
+            overview, f'href="{reverse("waste-atlas-bw-collection-system-map")}"'
+        )
+
+    def test_rp_map_set_matches_germany_themes_and_uses_rheinland_pfalz_scope(self):
+        from sources.waste_collection.waste_atlas.map_selection import (
+            WASTE_ATLAS_MAP_SELECTIONS,
+        )
+
+        bw_rp_themes = WASTE_ATLAS_MAP_SELECTIONS["DE-BW-RP"]["themes"]
+        rp_themes = WASTE_ATLAS_MAP_SELECTIONS["DE-RP"]["themes"]
+
+        self.assertEqual(set(rp_themes), set(bw_rp_themes))
+        self.assertEqual(
+            rp_themes["collection_system"]["route_name"],
+            "waste-atlas-rp-collection-system-map",
+        )
+
+        response = self.client.get(reverse("waste-atlas-rp-orga-level-map"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="DE-RP"')
+        self.assertContains(response, "selected>Rheinland-Pfalz</option>")
+        cfg = self._map_config(response)
+        self.assertEqual(cfg["nutsPrefix"], "DEB")
+        self.assertEqual(cfg["nutsLevel"], 1)
+
+        overview = self.client.get(reverse("waste-atlas-overview"))
+        self.assertContains(overview, "Rheinland-Pfalz")
+        self.assertContains(
+            overview, f'href="{reverse("waste-atlas-rp-collection-system-map")}"'
+        )
+
     def test_nrw_map_set_matches_germany_themes_and_uses_bundesland_scope(self):
         from sources.waste_collection.waste_atlas.map_selection import (
             WASTE_ATLAS_MAP_SELECTIONS,
@@ -5449,7 +5507,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         germany = next(group for group in groups if group["id"] == "germany")
         self.assertEqual(
             [region["value"] for region in germany["regions"]],
-            ["DE", "DE-BW-RP", "DE-NW"],
+            ["DE", "DE-BW-RP", "DE-BW", "DE-RP", "DE-NW"],
         )
         de = germany["regions"][0]
         titles = {entry["title"] for s in de["sections"] for entry in s["maps"]}
