@@ -193,13 +193,21 @@ def get_catchment_cache_key(catchment_id=None, filters=None):
     return key
 
 
-def get_nuts_region_cache_key(level=None, parent_id=None, nuts_id=None, filters=None):
-    """Generate a cache key for NUTS region GeoJSON data."""
+def get_nuts_region_cache_key(
+    level=None, parent_id=None, nuts_id=None, filters=None, version=None
+):
+    """Generate a cache key for NUTS region GeoJSON data.
+
+    ``version`` is the vintage year the response was scoped to; the same
+    code and level yield different geometries per vintage.
+    """
     # Prioritize specific NUTS ID if provided
     if nuts_id:
         return f"nuts_geojson:id:{nuts_id}"
 
     parts = ["nuts_geojson"]
+    if version is not None:
+        parts.append(f"vintage:{version}")
     if level is not None:
         parts.append(f"level:{level}")
     if parent_id is not None:
@@ -210,6 +218,7 @@ def get_nuts_region_cache_key(level=None, parent_id=None, nuts_id=None, filters=
     filters_copy.pop("levl_code", None)  # Already handled by 'level' parameter
     filters_copy.pop("parent_id", None)  # Already handled by 'parent_id' parameter
     filters_copy.pop("id", None)  # Already handled by 'nuts_id' parameter
+    filters_copy.pop("version", None)  # Already handled by 'version' parameter
 
     if filters_copy:
         filter_part = _generate_filter_key_part(filters_copy)

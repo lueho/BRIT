@@ -398,9 +398,11 @@ def set_country(sender, instance, created, **kwargs):
         # Buffer the region’s geometry by the tolerance.
         buffered_geom = instance.borders.geom.buffer(-settings.GEO_BORDER_TOLERANCE)
         # Look for a candidate country (NutsRegion with levl_code=0) whose borders contain the buffered geometry.
-        candidate = NutsRegion.objects.filter(
-            levl_code=0, borders__geom__contains=buffered_geom
-        ).first()
+        candidate = (
+            NutsRegion.objects.in_vintage()
+            .filter(levl_code=0, borders__geom__contains=buffered_geom)
+            .first()
+        )
         if candidate and candidate.cntr_code:
             instance.country = candidate.cntr_code
             instance.save(update_fields=["country"])
@@ -447,6 +449,21 @@ class NutsVintage(models.Model):
         return cls.objects.filter(year=int(match.group(1))).first()
 
 
+class NutsRegionQuerySet(UserCreatedObjectQuerySet):
+    def in_vintage(self, vintage=None):
+        """Scope to a single vintage, the current one unless given.
+
+        Codes repeat across vintages, so any user-facing query must pick one:
+        otherwise pickers list a territory once per vintage and map layers draw
+        duplicate overlapping features.
+        """
+        return self.filter(version=vintage or NutsVintage.current())
+
+
+class NutsRegionManager(models.Manager.from_queryset(NutsRegionQuerySet)):
+    pass
+
+
 class NutsRegion(Region):
     nuts_id = models.CharField(max_length=5, blank=True, null=True)
     version = models.ForeignKey(
@@ -466,6 +483,8 @@ class NutsRegion(Region):
         "self", related_name="children", on_delete=models.PROTECT, null=True
     )
 
+    objects = NutsRegionManager()
+
     @property
     def pedigree(self):
         pedigree = {}
@@ -479,7 +498,7 @@ class NutsRegion(Region):
         # add children
         for lvl in range(self.levl_code + 1, 4):
             pedigree[f"qs_{lvl}"] = NutsRegion.objects.filter(
-                levl_code=lvl, nuts_id__startswith=self.nuts_id
+                levl_code=lvl, nuts_id__startswith=self.nuts_id, version=self.version_id
             )
         if self.levl_code == 3:
             pedigree["qs_4"] = self.lau_children.all()
