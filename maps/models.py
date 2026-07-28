@@ -453,7 +453,6 @@ class NutsRegion(Region):
         NutsVintage,
         related_name="regions",
         on_delete=models.PROTECT,
-        null=True,
         blank=True,
     )
     levl_code = models.IntegerField(blank=True, null=True)

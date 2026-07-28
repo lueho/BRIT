@@ -46,6 +46,19 @@ class NutsRegionVersionTestCase(TestCase):
         self.assertEqual(other.version, vintage_2024)
         self.assertEqual(NutsRegion.objects.filter(nuts_id="DEG0B").count(), 2)
 
+    def test_version_is_required_on_paths_that_bypass_save(self):
+        """loaddata and QuerySet.update() skip save(); the database must reject NULL.
+
+        A NULL version would also defeat unique_nuts_id_per_version, since
+        Postgres treats NULLs in a unique constraint as distinct.
+        """
+        region = NutsRegion.objects.create(
+            name="A", country="DE", nuts_id="DE94A", levl_code=3
+        )
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                NutsRegion.objects.filter(pk=region.pk).update(version=None)
+
     def test_code_is_unique_within_a_vintage(self):
         NutsRegion.objects.create(name="A", country="DE", nuts_id="DEG0B", levl_code=3)
         with self.assertRaises(IntegrityError):
