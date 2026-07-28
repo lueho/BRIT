@@ -103,6 +103,26 @@ class NutsRegionGeoJSONVintageScopeTestCase(TwoVintageTestCase):
         results = payload["results"] if isinstance(payload, dict) else payload
         self.assertEqual([entry["id"] for entry in results], [self.region_2021.pk])
 
+    def test_geojson_by_id_is_not_served_from_another_requests_cache(self):
+        first = self.client.get(self.url, {"id": self.region_2021.pk})
+        second = self.client.get(
+            self.url, {"id": self.region_2024.pk, "version": "2024"}
+        )
+        self.assertEqual(_x_origin(first.json()["features"][0]), 0.0)
+        self.assertEqual(_x_origin(second.json()["features"][0]), 10.0)
+
+    def test_cache_keys_for_one_region_still_differ_per_vintage(self):
+        self.assertNotEqual(
+            get_nuts_region_cache_key(nuts_id=4, version=2021),
+            get_nuts_region_cache_key(nuts_id=4, version=2024),
+        )
+
+    def test_cache_keys_differ_per_region(self):
+        self.assertNotEqual(
+            get_nuts_region_cache_key(nuts_id=4, version=2021),
+            get_nuts_region_cache_key(nuts_id=5, version=2021),
+        )
+
     def test_cache_keys_differ_per_vintage(self):
         self.assertNotEqual(
             get_nuts_region_cache_key(

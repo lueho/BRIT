@@ -199,15 +199,14 @@ def get_nuts_region_cache_key(
     """Generate a cache key for NUTS region GeoJSON data.
 
     ``version`` is the vintage year the response was scoped to; the same
-    code and level yield different geometries per vintage.
+    code and level yield different geometries per vintage, so every key
+    — including one naming a single region — carries it.
     """
-    # Prioritize specific NUTS ID if provided
-    if nuts_id:
-        return f"nuts_geojson:id:{nuts_id}"
-
     parts = ["nuts_geojson"]
     if version is not None:
         parts.append(f"vintage:{version}")
+    if nuts_id:
+        parts.append(f"id:{nuts_id}")
     if level is not None:
         parts.append(f"level:{level}")
     if parent_id is not None:
@@ -223,7 +222,7 @@ def get_nuts_region_cache_key(
     if filters_copy:
         filter_part = _generate_filter_key_part(filters_copy)
         parts.append(f"filter:{filter_part}")
-    elif len(parts) == 1:  # Only "nuts_geojson"
+    elif len(parts) == 1:  # Only "nuts_geojson", no vintage/level/parent/id
         parts.append(
             "all"
         )  # Indicate fetching all NUTS regions if no level/parent/filter

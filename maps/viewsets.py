@@ -176,6 +176,7 @@ class NutsRegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         return get_nuts_region_cache_key(
             level=filters.get("levl_code"),
             parent_id=filters.get("parent_id"),
+            nuts_id=filters.get("id"),
             filters=filters,
             version=vintage.year if vintage else None,
         )
