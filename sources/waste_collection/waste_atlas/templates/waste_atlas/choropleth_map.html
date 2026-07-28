@@ -7,41 +7,10 @@
   waste atlas, {{ map_title|lower }}
 {% endblock meta_keywords %}
 {% block atlas_workspace %}
+  {# Title only: the breadcrumb rail names the location and the panel holds the controls. #}
   <header class="atlas-context">
     <div class="atlas-context-heading">
-      <div class="atlas-eyebrow">
-        {% firstof breadcrumb_section_label "Waste Atlas" %}
-      </div>
       <h1 class="atlas-context-title">{{ map_title }}</h1>
-    </div>
-    <div class="atlas-context-actions">
-      {% if request.user.is_staff %}
-        <a href="{{ map_configuration_edit_url }}"
-           class="btn btn-outline-secondary btn-sm atlas-hero-btn">
-          <i class="fas fa-sliders-h"></i> Edit configuration
-        </a>
-      {% endif %}
-      {% if map_toggle_url %}
-        <div class="atlas-mode-toggle" role="group" aria-label="Map mode">
-          {% if is_change_map %}
-            <a class="atlas-mode"
-               id="btn-toggle-change"
-               href="{{ map_toggle_url }}"
-               title="View current map">Current</a>
-            <span class="atlas-mode atlas-mode--active" aria-current="page">Changes</span>
-          {% else %}
-            <span class="atlas-mode atlas-mode--active" aria-current="page">Current</span>
-            <a class="atlas-mode"
-               id="btn-toggle-change"
-               href="{{ map_toggle_url }}"
-               title="View changes for this map">Changes</a>
-          {% endif %}
-        </div>
-      {% endif %}
-      <a href="{% url map_overview_url %}{% if not is_change_map and atlas_map_set %}?region={{ atlas_map_set }}{% endif %}"
-         class="btn btn-outline-primary btn-sm atlas-hero-btn">
-        <i class="fas fa-th-list"></i> {{ map_overview_label|default:"Map overview" }}
-      </a>
     </div>
   </header>
   <div class="atlas-stage">
@@ -84,36 +53,128 @@
       </div>
     </div>
     <aside class="atlas-side" id="atlas-side">
-      <section class="atlas-side-card" id="atlas-controls">
-        {% block atlas_selector %}
-          {% include "waste_atlas/includes/map_selector.html" with atlas_selector_button_label="Load" %}
-        {% endblock atlas_selector %}
-      </section>
-      {# Revealed by the renderer when the map supports quartiles or the conflict aid. #}
-      <section class="atlas-side-card" id="atlas-map-options" hidden>
-        <h3 class="atlas-side-card-title">Map options</h3>
-        <div id="atlas-map-tools"></div>
-      </section>
-      <section class="atlas-side-card" id="atlas-export">
-        <h3 class="atlas-side-card-title">Export</h3>
-        <div class="atlas-export-actions">
-          <button class="btn btn-outline-secondary btn-sm"
-                  id="btn-export-svg"
-                  type="button"
-                  title="Download a vector SVG"
-                  disabled>
-            <i class="fas fa-download" aria-hidden="true"></i> SVG
-          </button>
-          <button class="btn btn-outline-secondary btn-sm"
-                  id="btn-export-png"
-                  type="button"
-                  title="Download a PNG at 300 DPI, ready for Word"
-                  disabled>
-            <i class="fas fa-image" aria-hidden="true"></i> PNG (300 DPI)
-          </button>
+      {# Same sidebar-tabs pattern as maps/templates/filtered_map.html. #}
+      <div class="card atlas-side-panel" id="atlas-controls">
+        <div class="card-header p-0">
+          <ul class="nav nav-pills sidebar-tabs px-3 pt-3 pb-2"
+              id="atlas-panel-tabs"
+              role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active"
+                      id="atlas-map-tab"
+                      data-bs-toggle="tab"
+                      data-bs-target="#atlas-map-pane"
+                      type="button"
+                      role="tab"
+                      aria-controls="atlas-map-pane"
+                      aria-selected="true">
+                <i class="fas fa-map" aria-hidden="true"></i> Map
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link"
+                      id="atlas-options-tab"
+                      data-bs-toggle="tab"
+                      data-bs-target="#atlas-options-pane"
+                      type="button"
+                      role="tab"
+                      aria-controls="atlas-options-pane"
+                      aria-selected="false">
+                <i class="fas fa-gear" aria-hidden="true"></i> Options
+              </button>
+            </li>
+          </ul>
         </div>
-      </section>
+        <div class="card-body">
+          <div class="tab-content">
+            <div class="tab-pane fade show active"
+                 id="atlas-map-pane"
+                 role="tabpanel"
+                 aria-labelledby="atlas-map-tab"
+                 tabindex="0">
+              {% block atlas_selector %}
+                {% include "waste_atlas/includes/map_selector.html" with atlas_selector_button_label="Load" %}
+              {% endblock atlas_selector %}
+              {% if map_toggle_url %}
+                <div class="atlas-side-group">
+                  <h3 class="atlas-side-group-title">View</h3>
+                  <div class="atlas-mode-toggle" role="group" aria-label="Map mode">
+                    {% if is_change_map %}
+                      <a class="atlas-mode"
+                         id="btn-toggle-change"
+                         href="{{ map_toggle_url }}"
+                         title="View current map">Current</a>
+                      <span class="atlas-mode atlas-mode--active" aria-current="page">Changes</span>
+                    {% else %}
+                      <span class="atlas-mode atlas-mode--active" aria-current="page">Current</span>
+                      <a class="atlas-mode"
+                         id="btn-toggle-change"
+                         href="{{ map_toggle_url }}"
+                         title="View changes for this map">Changes</a>
+                    {% endif %}
+                  </div>
+                </div>
+              {% endif %}
+              {% if is_change_map %}
+                <a class="atlas-side-link" href="{% url map_overview_url %}">
+                  <i class="fas fa-th-list" aria-hidden="true"></i>
+                  {{ map_overview_label|default:"Map overview" }}
+                </a>
+              {% endif %}
+            </div>
+            <div class="tab-pane fade"
+                 id="atlas-options-pane"
+                 role="tabpanel"
+                 aria-labelledby="atlas-options-tab"
+                 tabindex="0">
+              {# The renderer mounts quartile/conflict toggles here when the map offers them. #}
+              <div id="atlas-map-tools"></div>
+              <button class="btn btn-sm btn-outline-secondary atlas-side-action"
+                      type="button"
+                      data-bs-toggle="modal"
+                      data-bs-target="#atlas-export-modal">
+                <i class="fas fa-download" aria-hidden="true"></i> Export map…
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </aside>
+  </div>
+  <div class="modal fade"
+       id="atlas-export-modal"
+       tabindex="-1"
+       aria-labelledby="atlas-export-modal-title"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="atlas-export-modal-title">Export map</h2>
+          <button type="button"
+                  class="btn-close"
+                  data-bs-dismiss="modal"
+                  aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="atlas-export-actions">
+            <button class="btn btn-outline-secondary btn-sm"
+                    id="btn-export-svg"
+                    type="button"
+                    title="Download a vector SVG"
+                    disabled>
+              <i class="fas fa-download" aria-hidden="true"></i> SVG
+            </button>
+            <button class="btn btn-outline-secondary btn-sm"
+                    id="btn-export-png"
+                    type="button"
+                    title="Download a PNG at 300 DPI, ready for Word"
+                    disabled>
+              <i class="fas fa-image" aria-hidden="true"></i> PNG (300 DPI)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 {% endblock atlas_workspace %}
 {% block atlas_vendor_javascript %}

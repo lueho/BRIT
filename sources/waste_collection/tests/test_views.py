@@ -4301,7 +4301,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
             f'data-url="{reverse("waste-atlas-south-tyrol-orga-level-map")}"',
         )
         self.assertContains(response, "Administrative level of collectors")
-        self.assertContains(response, "Map overview")
+        self.assertContains(response, "sidebar-tabs")
         self.assertContains(response, "Theme")
         self.assertContains(response, "No data")
         self.assertNotContains(response, "nutsPrefix:")
@@ -4450,7 +4450,9 @@ class WasteAtlasMapViewsTestCase(TestCase):
         response = self.client.get(reverse("waste-atlas-overview"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "sb-sidenav-toggled")
-        self.assertContains(response, "atlas-feedback-link")
+        # The toolbar link now uses the shared button styling, so assert the
+        # link itself rather than a bespoke class.
+        self.assertContains(response, "mailto:info@bioresource-tools.net")
 
     def test_detail_page_collapses_sidebar(self):
         response = self.client.get(
@@ -4519,16 +4521,17 @@ class WasteAtlasMapViewsTestCase(TestCase):
         # The same theme in another region is still one link away in the tree.
         self.assertContains(response, reverse("waste-atlas-nrw-collection-system-map"))
 
-    def test_detail_page_actions_live_in_hero_actions(self):
+    def test_detail_page_chrome_is_a_title_plus_one_control_panel(self):
         response = self.client.get(reverse("waste-atlas-germany-collection-system-map"))
         self.assertEqual(response.status_code, 200)
-        # The map navigation actions share one context-header row (and the
-        # Feedback link sits in the shared shell toolbar) so the buttons sit in
-        # a consistent place across atlas pages.
-        self.assertContains(response, "atlas-context-actions")
-        self.assertContains(response, "atlas-feedback-link")
+        # Per-map controls share the right-hand panel instead of being spread
+        # between the context header, the canvas and the area below it.
+        self.assertNotContains(response, "atlas-context-actions")
+        self.assertContains(response, "sidebar-tabs")
+        self.assertContains(response, 'id="atlas-map-pane"')
+        self.assertContains(response, 'id="atlas-options-pane"')
+        # The Current/Changes switch moved into the panel with the selection.
         self.assertContains(response, "View changes for this map")
-        self.assertContains(response, "Map overview")
 
     def test_generic_map_preserves_nuts_region_in_selector(self):
         response = self.client.get(
@@ -4671,7 +4674,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertContains(response, 'value="2024" selected')
         self.assertContains(response, "Administrative level of collectors")
-        self.assertContains(response, "Map overview")
+        self.assertContains(response, "sidebar-tabs")
         self.assertContains(response, "Theme")
         cfg = self._map_config(response)
         self.assertEqual(cfg["nutsPrefix"], "ITH10")
@@ -4786,7 +4789,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertContains(response, f'value="{expected_country}"')
                 self.assertContains(response, f'value="{expected_year}" selected')
                 self.assertContains(response, "Administrative level of collectors")
-                self.assertContains(response, "Map overview")
+                self.assertContains(response, "sidebar-tabs")
                 self.assertContains(response, "No data")
 
     def test_sweden_orga_level_map_uses_collector_orga_level_api(self):
@@ -4906,7 +4909,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertContains(response, "selected>The Netherlands</option>")
                 self.assertContains(response, 'value="2024" selected')
                 self.assertContains(response, expected_title)
-                self.assertContains(response, "Map overview")
+                self.assertContains(response, "sidebar-tabs")
 
     def test_italy_bundle_maps_default_to_it_without_regional_filter(self):
         map_names = [
@@ -4932,7 +4935,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertContains(response, 'value="2024" selected')
                 self.assertNotContains(response, "nutsPrefix:")
                 self.assertNotContains(response, "nutsLevel:")
-                self.assertContains(response, "Map overview")
+                self.assertContains(response, "sidebar-tabs")
 
     def test_catalonia_pages_reuse_germany_map_metadata(self):
         from sources.waste_collection.waste_atlas.pages import MAP_PAGES
@@ -4996,7 +4999,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
             response,
             "/waste_collection/api/waste-atlas/collection-count-ratio/",
         )
-        self.assertContains(response, "Map overview")
+        self.assertContains(response, "sidebar-tabs")
 
     def test_south_tyrol_bundle_maps_default_to_regional_filter(self):
         map_names = [
@@ -5032,7 +5035,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 cfg = self._map_config(response)
                 self.assertEqual(cfg["nutsPrefix"], "ITH10")
                 self.assertEqual(cfg["nutsLevel"], 3)
-                self.assertContains(response, "Map overview")
+                self.assertContains(response, "sidebar-tabs")
 
     def test_sweden_bin_configuration_map_defaults_to_se_2024_and_english_labels(self):
         """Sweden bin-configuration map defaults to country SE and year 2024."""
@@ -5043,7 +5046,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "selected>Sweden</option>")
         self.assertContains(response, 'value="2024" selected')
         self.assertContains(response, "Bin configuration of waste fractions")
-        self.assertContains(response, "Map overview")
+        self.assertContains(response, "sidebar-tabs")
         self.assertContains(response, "No data")
 
     def test_sweden_bundle_maps_default_to_se_2024(self):
@@ -5072,7 +5075,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 self.assertEqual(cfg["country"], "SE")
                 self.assertEqual(cfg["year"], 2024)
                 self.assertTrue(cfg["fileBase"].startswith("sweden_"))
-                self.assertContains(response, "Map overview")
+                self.assertContains(response, "sidebar-tabs")
 
     def test_sweden_population_density_map_defaults_to_se_and_uses_population_api(self):
         response = self.client.get(reverse("waste-atlas-sweden-population-density-map"))
@@ -5091,7 +5094,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
             "Urban (> 1 500 / km²)",
             [category["label"] for category in cfg["categories"]],
         )
-        self.assertContains(response, "Map overview")
+        self.assertContains(response, "sidebar-tabs")
 
     def test_belgium_flanders_orga_level_map_defaults_to_be_2024_and_english_labels(
         self,
@@ -5106,7 +5109,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, "selected>Flanders + Brussels</option>")
         self.assertContains(response, 'value="2024" selected')
         self.assertContains(response, "Administrative level of collectors")
-        self.assertContains(response, "Map overview")
+        self.assertContains(response, "sidebar-tabs")
         self.assertContains(response, "No data")
         self.assertContains(response, "BE1,BE2")
 
