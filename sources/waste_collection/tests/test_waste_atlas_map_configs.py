@@ -406,7 +406,7 @@ class WasteAtlasMapConfigTests(TestCase):
             MAP_SELECTION_THEME_ORDER["participation_policy"],
         )
 
-        for map_set in ("DE", "DE-NW", "DE-BW-RP", "ES-CT"):
+        for map_set in ("DE", "DE-NW", "DE-BW-RP", "DE-BW", "DE-RP", "ES-CT"):
             with self.subTest(map_set=map_set):
                 self.assertIn(
                     "participation_policy",

@@ -102,7 +102,11 @@ MAP_SET_REGION_SCOPES = _build_map_set_region_scopes()
 # query-string value and the tab pane id (``atlas-<id>``).
 OVERVIEW_REGION_GROUPS = (
     {"id": "europe", "label": "Europe", "map_sets": ()},
-    {"id": "germany", "label": "Germany", "map_sets": ("DE", "DE-BW-RP", "DE-NW")},
+    {
+        "id": "germany",
+        "label": "Germany",
+        "map_sets": ("DE", "DE-BW-RP", "DE-BW", "DE-RP", "DE-NW"),
+    },
     {"id": "catalonia", "label": "Catalonia", "map_sets": ("ES-CT",)},
     {
         "id": "italy-south-tyrol",
