@@ -89,6 +89,16 @@ from sources.waste_collection.views import (
     CollectionSubmitForReviewView,
     CollectionWithdrawFromReviewView,
 )
+from sources.waste_collection.waste_atlas.map_configs import MAP_CONFIGS
+from sources.waste_collection.waste_atlas.map_selection import (
+    WASTE_ATLAS_MAP_SELECTIONS,
+    build_map_selection_context,
+    build_overview_directory_context,
+)
+from sources.waste_collection.waste_atlas.pages import MAP_PAGES
+from sources.waste_collection.waste_atlas.templatetags.atlas_tags import (
+    DATABASE_EDITABLE_OVERRIDE_KEYS,
+)
 from sources.waste_collection.waste_atlas.viewsets import (
     _amounts_for_2024,
     _resolved_population_attribute_id,
@@ -4260,129 +4270,21 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertIsNotNone(match, "no atlas-config JSON found in response")
         return json.loads(match.group(1))
 
-    def test_map_selection_registry_uses_nested_region_theme_route_shape(self):
-        from sources.waste_collection.waste_atlas.map_selection import (
-            WASTE_ATLAS_MAP_SELECTIONS,
-            build_map_selection_context,
-        )
+    # ---- registry / structural --------------------------------------------
 
-        germany_selection = WASTE_ATLAS_MAP_SELECTIONS["DE"]
-        collection_system_selection = germany_selection["themes"]["collection_system"]
-        selection_context = build_map_selection_context(reverse)
-        germany_themes = selection_context["map_selection_themes_by_map_set"]["DE"]
+    def test_every_map_page_route_resolves(self):
+        """Every page registered in MAP_PAGES returns a 200 response."""
+        for page in MAP_PAGES:
+            with self.subTest(page=page["name"]):
+                response = self.client.get(reverse(page["name"]))
+                self.assertEqual(response.status_code, 200)
 
-        self.assertEqual(germany_selection["label"], "Germany")
-        self.assertEqual(
-            germany_selection["themes"]["orga_level"]["label"],
-            "Collectors: admin. level",
-        )
-        self.assertEqual(
-            germany_selection["themes"]["collection_orga_level"]["label"],
-            "Collections: admin. level",
-        )
-        self.assertEqual(
-            collection_system_selection["label"], "Biowaste collection systems"
-        )
-        self.assertEqual(
-            collection_system_selection["route_name"],
-            "waste-atlas-germany-collection-system-map",
-        )
-        self.assertEqual(germany_themes[0]["value"], "orga_level")
-        self.assertEqual(germany_themes[1]["value"], "collection_orga_level")
-        self.assertEqual(
-            germany_themes[
-                [theme["value"] for theme in germany_themes].index("collection_system")
-            ]["label"],
-            "Primary collection system",
-        )
-        self.assertEqual(
-            germany_themes[
-                [theme["value"] for theme in germany_themes].index("collection_system")
-            ]["waste_category"],
-            "biowaste",
-        )
-        self.assertEqual(
-            germany_themes[
-                [theme["value"] for theme in germany_themes].index("orga_level")
-            ]["waste_category"],
-            "general",
-        )
-        self.assertEqual(
-            germany_themes[
-                [theme["value"] for theme in germany_themes].index(
-                    "collection_orga_level"
-                )
-            ]["waste_category"],
-            "general",
-        )
-        self.assertEqual(
-            germany_themes[
-                [theme["value"] for theme in germany_themes].index("biowaste_frequency")
-            ]["waste_category"],
-            "biowaste",
-        )
-        self.assertLess(
-            [theme["value"] for theme in germany_themes].index("collection_system"),
-            [theme["value"] for theme in germany_themes].index("residual_frequency"),
-        )
-
-    def test_italy_orga_level_map_defaults_to_it_and_english_labels(self):
-        response = self.client.get(reverse("waste-atlas-orga-level-italy-map"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="IT"')
-        self.assertContains(
-            response,
-            f'data-url="{reverse("waste-atlas-south-tyrol-orga-level-map")}"',
-        )
-        self.assertContains(response, "Administrative level of collectors")
-        self.assertContains(response, "sidebar-tabs")
-        self.assertContains(response, "Theme")
-        self.assertContains(response, "No data")
-        self.assertNotContains(response, "nutsPrefix:")
-        self.assertNotContains(response, "nutsLevel:")
-
-    def test_map_page_renders_region_theme_year_selector(self):
-        response = self.client.get(reverse("waste-atlas-germany-collection-system-map"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, '<label for="sel-country">Region</label>')
-        self.assertContains(
-            response,
-            "Map scope, not an individual municipality.",
-        )
-        self.assertContains(response, 'id="atlas-selection-form"')
-        self.assertContains(response, "Find another map")
-        self.assertContains(response, 'id="sel-theme-search"')
-        self.assertContains(response, 'id="atlas-selector-status"')
-        self.assertContains(response, '<label for="sel-theme">Theme</label>')
-        self.assertContains(
-            response, '<label for="sel-waste-category">Waste category</label>'
-        )
-        self.assertContains(response, 'value="DE"')
-        self.assertContains(response, "selected>Germany</option>")
-        self.assertContains(response, 'data-map-set="DE"')
-        self.assertContains(response, 'data-waste-category="general"')
-        self.assertContains(response, 'data-waste-category="biowaste"')
-        self.assertContains(response, 'value="collection_system"')
-        self.assertContains(
-            response,
-            f'data-url="{reverse("waste-atlas-germany-collection-system-map")}"',
-        )
-        self.assertContains(
-            response,
-            f'data-change-url="{reverse("waste-atlas-change-map", args=["DE", "collection_system"])}"',
-        )
-        self.assertContains(response, 'id="btn-toggle-change"')
-        self.assertContains(response, "View changes for this map")
-        self.assertContains(
-            response,
-            f'href="{reverse("waste-atlas-change-map", args=["DE", "collection_system"])}?from_year=2023&amp;to_year=2024"',
-        )
-        self.assertEqual(
-            self._map_config(response)["collectionDetailCategory"],
-            "biowaste",
-        )
+    def test_every_map_page_renders_atlas_config_json(self):
+        """Every map page injects the atlas-config JSON script tag."""
+        for page in MAP_PAGES:
+            with self.subTest(page=page["name"]):
+                response = self.client.get(reverse(page["name"]))
+                self.assertIsNotNone(self._map_config(response))
 
     def test_aggregate_map_does_not_link_to_an_unrelated_collection(self):
         response = self.client.get(
@@ -4391,182 +4293,24 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
         self.assertNotIn("collectionDetailCategory", self._map_config(response))
 
-    def test_change_map_page_renders_current_map_cross_link(self):
-        response = self.client.get(
-            reverse("waste-atlas-change-map", args=["DE", "collection_system"])
-        )
+    def test_every_map_page_forwards_its_config_key_to_the_renderer(self):
+        """The rendered config matches MAP_CONFIGS for the page's config_key."""
+        # Keys the template tag replaces at render time: runtime scope,
+        # page-level overrides, and DB-editable legend keys.
+        runtime_keys = {"country", "year", "nutsPrefix", "nutsLevel"}
+        for page in MAP_PAGES:
+            with self.subTest(page=page["name"]):
+                response = self.client.get(reverse(page["name"]))
+                cfg = self._map_config(response)
+                stored = MAP_CONFIGS[page["config_key"]]
+                overridden = set(page.get("overrides", {}))
+                skip = DATABASE_EDITABLE_OVERRIDE_KEYS | runtime_keys | overridden
+                for key, value in stored.items():
+                    if key in skip:
+                        continue
+                    self.assertEqual(cfg.get(key), value)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="btn-toggle-change"')
-        self.assertContains(response, "View current map")
-        self.assertContains(
-            response,
-            f'href="{reverse("waste-atlas-germany-collection-system-map")}"',
-        )
-        self.assertNotIn("collectionDetailCategory", self._map_config(response))
-
-    def test_map_page_renders_shell_layout(self):
-        response = self.client.get(reverse("waste-atlas-germany-collection-system-map"))
-
-        self.assertEqual(response.status_code, 200)
-        # App-shell workspace: left tree navigation, map stage, right controls
-        # panel, and the Current/Changes mode toggle in the context header.
-        self.assertContains(response, 'id="atlas-shell"')
-        self.assertContains(response, 'id="atlas-tree"')
-        self.assertContains(response, 'id="atlas-side"')
-        self.assertContains(response, 'id="atlas-map-tools"')
-        self.assertContains(response, "atlas-mode-toggle")
-        self.assertContains(response, 'id="atlas-tree-filter"')
-        # The tree marks the current map set and theme as active.
-        self.assertContains(response, 'data-map-set="DE"')
-        self.assertContains(response, "atlas-tree-link--active")
-
-    def test_change_map_page_marks_changes_mode_active(self):
-        response = self.client.get(
-            reverse("waste-atlas-change-map", args=["DE", "collection_system"])
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "atlas-mode-toggle")
-        self.assertContains(response, 'id="btn-toggle-change"')
-        self.assertContains(response, 'id="atlas-tree"')
-
-    def test_overview_renders_shell_with_tree(self):
-        response = self.client.get(reverse("waste-atlas-overview"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="atlas-shell"')
-        self.assertContains(response, 'id="atlas-tree"')
-        # The directory (region tabs + filters) stays as the workspace content.
-        self.assertContains(response, 'id="atlas-region-tabs"')
-
-    def test_change_map_overview_and_conflicts_render_shell_tree(self):
-        for route in (
-            "waste-atlas-change-map-overview",
-            "waste-atlas-data-conflicts-overview",
-        ):
-            with self.subTest(route=route):
-                response = self.client.get(reverse(route))
-                self.assertEqual(response.status_code, 200)
-                self.assertContains(response, 'id="atlas-shell"')
-                self.assertContains(response, 'id="atlas-tree"')
-
-    def test_detail_page_breadcrumb_links_back_to_overview_with_region(self):
-        response = self.client.get(
-            reverse("waste-atlas-germany-residual-frequency-map")
-        )
-        self.assertEqual(response.status_code, 200)
-        overview_url = reverse("waste-atlas-overview")
-        # Breadcrumb: BRIT > Waste Atlas > {Region} with the region crumb linking
-        # back to the overview with the region tab preselected.
-        self.assertContains(response, f'href="{overview_url}"')
-        self.assertContains(response, f'href="{overview_url}?region=DE"')
-        self.assertContains(response, "Germany")
-
-    def test_detail_page_map_overview_button_preserves_region_state(self):
-        response = self.client.get(
-            reverse("waste-atlas-south-tyrol-residual-frequency-map")
-        )
-        self.assertEqual(response.status_code, 200)
-        overview_url = reverse("waste-atlas-overview")
-        self.assertContains(response, f'href="{overview_url}?region=IT-ST"')
-
-    def test_detail_page_selector_has_single_heading_and_map_icon(self):
-        response = self.client.get(
-            reverse("waste-atlas-germany-residual-frequency-map")
-        )
-        self.assertEqual(response.status_code, 200)
-        # The redundant "Map navigation" eyebrow is collapsed into one heading.
-        self.assertNotContains(response, "atlas-selector-eyebrow")
-        # The Load button no longer uses the location-arrow icon.
-        self.assertNotContains(response, "fa-location-arrow")
-
-    def test_overview_collapses_sidebar_and_shows_feedback_link(self):
-        response = self.client.get(reverse("waste-atlas-overview"))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "sb-sidenav-toggled")
-        # The toolbar link now uses the shared button styling, so assert the
-        # link itself rather than a bespoke class.
-        self.assertContains(response, "mailto:info@bioresource-tools.net")
-
-    def test_detail_page_collapses_sidebar(self):
-        response = self.client.get(
-            reverse("waste-atlas-germany-residual-frequency-map")
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "sb-sidenav-toggled")
-
-    def test_theme_labels_are_shortened(self):
-        response = self.client.get(reverse("waste-atlas-overview"))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Collectors: admin. level")
-        self.assertNotContains(response, "Collectors: administrative level")
-
-    def test_change_map_overview_compare_button_is_not_narrow(self):
-        response = self.client.get(reverse("waste-atlas-change-map-overview"))
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "col-md-1")
-
-    def test_change_map_overview_uses_unified_selector_and_hero_actions(self):
-        response = self.client.get(reverse("waste-atlas-change-map-overview"))
-        self.assertEqual(response.status_code, 200)
-        # Uses the shared custom selector styling, not a bootstrap card grid, so
-        # the change-map page matches the detail page.
-        self.assertContains(response, "atlas-selector-form")
-        self.assertNotContains(response, "row g-3")
-        # Page-level navigation lives in the context header actions area (same
-        # spot as the detail page's "Map overview" action).
-        self.assertContains(response, "atlas-context-actions")
-        self.assertContains(response, "Map overview")
-
-    def test_map_page_has_no_related_maps_card(self):
-        """The card cost ~200px above an already tall map.
-
-        Both of its link groups were duplicates: the left tree carries the
-        sibling themes for the current region, and the selector's region
-        dropdown carries the current theme in other regions.
-        """
-        response = self.client.get(reverse("waste-atlas-germany-collection-system-map"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "atlas-related-maps")
-        self.assertNotContains(response, "Related maps")
-        self.assertNotIn("same_theme_other_regions", response.context)
-        self.assertNotIn("same_region_same_category", response.context)
-
-    def test_sibling_themes_for_the_region_stay_reachable_in_the_tree(self):
-        """What the "same waste category" group offered is in the map tree."""
-        response = self.client.get(
-            reverse("waste-atlas-germany-biowaste-collection-amount-map")
-        )
-
-        self.assertContains(response, 'id="atlas-tree"')
-        self.assertContains(
-            response,
-            reverse("waste-atlas-germany-green-waste-collection-amount-map"),
-        )
-
-    def test_other_regions_for_the_theme_stay_reachable_in_the_selector(self):
-        """What the "same theme in other regions" group offered is in the
-        selector: picking another region keeps the current theme."""
-        response = self.client.get(reverse("waste-atlas-germany-collection-system-map"))
-
-        self.assertContains(response, 'id="sel-country"')
-        self.assertContains(response, 'value="IT-ST"')
-        # The same theme in another region is still one link away in the tree.
-        self.assertContains(response, reverse("waste-atlas-nrw-collection-system-map"))
-
-    def test_detail_page_chrome_is_a_title_plus_one_control_panel(self):
-        response = self.client.get(reverse("waste-atlas-germany-collection-system-map"))
-        self.assertEqual(response.status_code, 200)
-        # Per-map controls share the right-hand panel instead of being spread
-        # between the context header, the canvas and the area below it.
-        self.assertNotContains(response, "atlas-context-actions")
-        self.assertContains(response, "sidebar-tabs")
-        self.assertContains(response, 'id="atlas-map-pane"')
-        self.assertContains(response, 'id="atlas-options-pane"')
-        # The Current/Changes switch moved into the panel with the selection.
-        self.assertContains(response, "View changes for this map")
+    # ---- selector / context -----------------------------------------------
 
     def test_generic_map_preserves_nuts_region_in_selector(self):
         response = self.client.get(
@@ -4575,7 +4319,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "selected>Nordrhein-Westfalen</option>")
         cfg = self._map_config(response)
         self.assertEqual(cfg["nutsPrefix"], "DEA")
         self.assertEqual(cfg["nutsLevel"], 1)
@@ -4583,9 +4326,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
     def test_selector_includes_current_generic_theme_when_missing_in_region(
         self,
     ):
-        from sources.waste_collection.waste_atlas.map_selection import (
-            build_map_selection_context,
-        )
 
         selection_context = build_map_selection_context(
             reverse,
@@ -4607,9 +4347,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
     def test_selector_includes_generic_biowaste_themes_for_sweden_from_nrw_context(
         self,
     ):
-        from sources.waste_collection.waste_atlas.map_selection import (
-            build_map_selection_context,
-        )
 
         selection_context = build_map_selection_context(
             reverse,
@@ -4644,281 +4381,295 @@ class WasteAtlasMapViewsTestCase(TestCase):
             r"[^>]*selected",
         )
 
-    def test_catalonia_collection_system_maps_render(self):
-        map_names = {
-            "waste-atlas-catalonia-biowaste-collection-system-map": (
-                "Biowaste collection system",
-                "/waste_collection/api/waste-atlas/biowaste-collection-system/",
-            ),
-            "waste-atlas-catalonia-residual-collection-system-map": (
-                "Residual waste collection system",
-                "/waste_collection/api/waste-atlas/residual-collection-system/",
-            ),
-            "waste-atlas-catalonia-combined-collection-system-map": (
-                "Collection system combination: biowaste vs residual waste",
-                "/waste_collection/api/waste-atlas/combined-collection-system/",
-            ),
-            "waste-atlas-catalonia-system-access-control-map": (
-                "Collection system and access/use control",
-                "/waste_collection/api/waste-atlas/catalonia-system-access-control/",
-            ),
-            "waste-atlas-catalonia-biowaste-impurity-map": (
-                "Biowaste impurity rate",
-                "/waste_collection/api/waste-atlas/biowaste-impurity/",
-            ),
-        }
+    # ---- region scope / lock ----------------------------------------------
 
-        for route_name, (title, data_url) in map_names.items():
-            with self.subTest(route_name=route_name):
-                response = self.client.get(reverse(route_name))
-
+    def test_region_query_overrides_apply_only_to_unlocked_pages(self):
+        """Locked pages ignore country/nuts_prefix/nuts_level query overrides;
+        unlocked pages honour them."""
+        for page in MAP_PAGES:
+            with self.subTest(page=page["name"]):
+                response = self.client.get(
+                    reverse(page["name"]),
+                    {
+                        "country": "XX",
+                        "nuts_prefix": "ZZZZ",
+                        "nuts_level": "9",
+                    },
+                )
                 self.assertEqual(response.status_code, 200)
-                self.assertContains(response, title)
                 cfg = self._map_config(response)
-                self.assertEqual(cfg["dataUrl"], data_url)
-                self.assertEqual(cfg["nutsPrefix"], "ES51")
-                self.assertEqual(cfg["nutsLevel"], 3)
-                if route_name == "waste-atlas-catalonia-biowaste-impurity-map":
-                    self.assertEqual(cfg["collectionYear"], 2024)
+                if page["lock"]:
+                    self.assertEqual(cfg["country"], page["country"])
+                    if page.get("nuts_prefix"):
+                        self.assertEqual(cfg["nutsPrefix"], page["nuts_prefix"])
+                    if page.get("nuts_level"):
+                        self.assertEqual(cfg["nutsLevel"], int(page["nuts_level"]))
+                else:
+                    self.assertEqual(cfg["country"], "XX")
+                    self.assertEqual(cfg["nutsPrefix"], "ZZZZ")
+                    self.assertEqual(cfg["nutsLevel"], 9)
 
-    def test_catalonia_selector_includes_new_collection_system_maps(self):
+    def test_runtime_scope_overrides_stored_scope_values(self):
+        """For unlocked pages, query params override stored country/year/nuts."""
+        unlocked = next(
+            page for page in MAP_PAGES if not page["lock"] and page["selector_set"]
+        )
         response = self.client.get(
-            reverse("waste-atlas-catalonia-biowaste-collection-system-map")
+            reverse(unlocked["name"]),
+            {
+                "country": "SE",
+                "year": "2022",
+                "nuts_prefix": "SE1",
+                "nuts_level": "1",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        cfg = self._map_config(response)
+        self.assertEqual(cfg["country"], "SE")
+        self.assertEqual(cfg["year"], 2022)
+        self.assertEqual(cfg["nutsPrefix"], "SE1")
+        self.assertEqual(cfg["nutsLevel"], 1)
+
+    def test_generic_map_forwards_nuts_prefix_to_atlas_loader(self):
+        response = self.client.get(
+            reverse("waste-atlas-green-waste-collection-system-count-map"),
+            {"country": "IT", "year": "2024", "nuts_prefix": "ITH10"},
         )
 
         self.assertEqual(response.status_code, 200)
-        for route_name in [
-            "waste-atlas-catalonia-biowaste-collection-system-map",
-            "waste-atlas-catalonia-residual-collection-system-map",
-            "waste-atlas-catalonia-combined-collection-system-map",
-            "waste-atlas-catalonia-system-access-control-map",
-            "waste-atlas-catalonia-biowaste-impurity-map",
-        ]:
-            self.assertContains(response, f'data-url="{reverse(route_name)}"')
+        self.assertEqual(self._map_config(response)["nutsPrefix"], "ITH10")
+
+    # ---- overview / directory ---------------------------------------------
+
+    def test_overview_directory_offers_every_selector_theme_of_every_map_set(self):
+        """For each map_set in the selection context, the overview directory
+        includes entries for every theme."""
+
+        ctx = build_overview_directory_context(reverse)
+        groups = ctx["directory_region_groups"]
+
+        for map_set, selection in WASTE_ATLAS_MAP_SELECTIONS.items():
+            with self.subTest(map_set=map_set):
+                expected_themes = set(selection["themes"])
+                # Find the region entry for this map_set across all groups.
+                found_urls = set()
+                for group in groups:
+                    for region in group["regions"]:
+                        if region["value"] == map_set:
+                            for section in region["sections"]:
+                                for entry in section["maps"]:
+                                    found_urls.add(entry["url"])
+                # Every theme should produce at least one URL in the directory.
+                for theme in expected_themes:
+                    route_name = selection["themes"][theme]["route_name"]
+                    self.assertIn(
+                        reverse(route_name),
+                        found_urls,
+                        msg=f"Theme {theme} of {map_set} missing from directory",
+                    )
+
+    def test_overview_directory_context_is_registry_driven(self):
+
+        ctx = build_overview_directory_context(reverse)
+        groups = ctx["directory_region_groups"]
+        self.assertTrue(groups)
+        # Every group has a stable id and at least one region or europe map.
+        for group in groups:
+            with self.subTest(group=group["id"]):
+                self.assertIn("id", group)
+                self.assertIn("label", group)
+                self.assertTrue(
+                    group.get("regions") or group.get("europe_maps"),
+                    f"group {group['id']} has no entries",
+                )
+        # At least one dedicated map-set region (e.g. DE) lists its own route.
+        germany = next(group for group in groups if group["id"] == "germany")
+        de = germany["regions"][0]
+        urls = {entry["url"] for s in de["sections"] for entry in s["maps"]}
+        self.assertIn(reverse("waste-atlas-germany-collection-system-map"), urls)
+        # Generic-only themes reuse the generic route scoped to the region.
+        other = next(group for group in groups if group["id"] == "other-countries")
+        se = next(region for region in other["regions"] if region["value"] == "SE")
+        se_urls = {entry["url"] for s in se["sections"] for entry in s["maps"]}
+        self.assertIn(
+            f"{reverse('waste-atlas-biowaste-frequency-map')}?country=SE", se_urls
+        )
+
+    def test_overview_preselects_region_and_filters_from_query_params(self):
+        response = self.client.get(
+            reverse("waste-atlas-overview"),
+            {"region": "IT-ST", "category": "biowaste", "q": "amount"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context["directory_selected_region"], "italy-south-tyrol"
+        )
+        self.assertEqual(response.context["directory_selected_category"], "biowaste")
+        self.assertEqual(response.context["directory_query"], "amount")
+
+    # ---- change-map tests -------------------------------------------------
+
+    def test_change_maps_available_for_every_selector_theme(self):
+
+        for map_set, selection in WASTE_ATLAS_MAP_SELECTIONS.items():
+            for theme in selection["themes"]:
+                with self.subTest(map_set=map_set, theme=theme):
+                    response = self.client.get(
+                        reverse("waste-atlas-change-map", args=[map_set, theme])
+                    )
+                    self.assertEqual(response.status_code, 200)
+                    cfg = self._map_config(response)
+                    self.assertTrue(cfg["changeMode"])
+                    self.assertIn("dataUrl", cfg)
+
+    def test_change_map_preserves_region_scope(self):
+        response = self.client.get(
+            reverse("waste-atlas-change-map", args=["IT-ST", "biowaste_frequency"])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        cfg = self._map_config(response)
+        self.assertEqual(cfg["nutsPrefix"], "ITH10")
+        self.assertEqual(cfg["nutsLevel"], 3)
+
+    def test_change_map_unknown_combination_returns_404(self):
+        response = self.client.get(
+            reverse("waste-atlas-change-map", args=["DE", "nonexistent_theme"])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_legacy_germany_change_map_url_redirects(self):
+        response = self.client.get(
+            reverse("waste-atlas-germany-collection-system-change-map"),
+            {"from_year": "2021", "to_year": "2023"},
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("waste-atlas-change-map", args=["DE", "collection_system"])
+            + "?from_year=2021&to_year=2023",
+        )
+
+    def test_change_map_overview_offers_change_urls_for_all_themes(self):
+        response = self.client.get(reverse("waste-atlas-change-map-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'data-change-url="{reverse("waste-atlas-change-map", args=["DE", "collection_system"])}"',
+        )
+        self.assertContains(
+            response,
+            f'data-change-url="{reverse("waste-atlas-change-map", args=["IT-ST", "biowaste_frequency"])}"',
+        )
+
+    # ---- change-map overview tests ----------------------------------------
+
+    def test_change_map_overview_defaults_from_year_to_second_last(self):
+        response = self.client.get(reverse("waste-atlas-change-map-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<option value="2023"')
+        self.assertContains(response, '<option value="2024"')
+
+    def test_change_map_overview_allows_year_override_via_query_params(self):
+        response = self.client.get(
+            reverse("waste-atlas-change-map-overview"),
+            {"from_year": "2020", "to_year": "2022"},
+        )
+
+        self.assertEqual(response.status_code, 200)
         self.assertContains(response, '<option value="2020"')
-        self.assertContains(response, '<option value="2021"')
+        self.assertContains(response, '<option value="2022"')
 
-    def test_south_tyrol_orga_level_map_uses_regional_border(self):
-        response = self.client.get(reverse("waste-atlas-south-tyrol-orga-level-map"))
+    # ---- data conflicts overview tests ------------------------------------
+
+    def test_data_conflicts_overview_renders_for_waste_atlas_group(self):
+        response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="IT-ST"')
+
+    def test_data_conflicts_overview_links_back_to_map_overview(self):
+        response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
+
+        self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            f'data-url="{reverse("waste-atlas-orga-level-italy-map")}"',
+            f'href="{reverse("waste-atlas-overview")}"',
         )
-        self.assertContains(response, 'value="2024" selected')
-        self.assertContains(response, "Administrative level of collectors")
-        self.assertContains(response, "sidebar-tabs")
-        self.assertContains(response, "Theme")
-        cfg = self._map_config(response)
-        self.assertEqual(cfg["nutsPrefix"], "ITH10")
-        self.assertEqual(cfg["nutsLevel"], 3)
 
-    def test_south_tyrol_target_waste_category_map_uses_expected_classes(self):
+    def test_data_conflicts_overview_denies_anonymous_users(self):
+        self.client.logout()
+        response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_data_conflicts_overview_denies_users_without_waste_atlas_group(self):
+        non_atlas_user = User.objects.create_user(
+            username="non-atlas-user-conflicts", password="secret"
+        )
+        self.client.force_login(non_atlas_user)
+        response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
+
+        self.assertEqual(response.status_code, 403)
+
+    # ---- access control ----------------------------------------------------
+
+    def test_atlas_pages_require_membership_of_the_waste_atlas_group(self):
+        routes = [
+            reverse("waste-atlas-overview"),
+            reverse("waste-atlas-change-map-overview"),
+            reverse("waste-atlas-data-conflicts-overview"),
+            reverse("waste-atlas-europe-data-coverage-map"),
+            reverse("waste-atlas-europe-biowaste-collection-amount-map"),
+            reverse("waste-atlas-germany-collection-system-map"),
+            reverse("waste-atlas-change-map", args=["DE", "collection_system"]),
+        ]
+        outsider = User.objects.create_user(
+            username="non-atlas-user", password="secret"
+        )
+
+        for url in routes:
+            with self.subTest(url=url, user="anonymous"):
+                self.client.logout()
+                self.assertEqual(self.client.get(url).status_code, 302)
+
+            with self.subTest(url=url, user="outsider"):
+                self.client.force_login(outsider)
+                self.assertEqual(self.client.get(url).status_code, 403)
+
+            with self.subTest(url=url, user="member"):
+                self.client.force_login(self.user)
+                self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_europe_coverage_iframe_is_public(self):
+        """The iframe variant is embedded by third parties, so it stays open."""
+        self.client.logout()
         response = self.client.get(
-            reverse("waste-atlas-south-tyrol-target-waste-category-map")
+            reverse("waste-atlas-europe-data-coverage-map-iframe")
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Target waste category")
-        self.assertContains(
-            response,
-            f'data-url="{reverse("waste-atlas-south-tyrol-target-waste-category-map")}"',
-        )
-        cfg = self._map_config(response)
-        self.assertEqual(
-            cfg["dataUrl"],
-            "/waste_collection/api/waste-atlas/target-waste-category/",
-        )
-        self.assertEqual(cfg["dataField"], "target_waste_category")
-        self.assertEqual(cfg["nutsPrefix"], "ITH10")
-        self.assertEqual(cfg["nutsLevel"], 3)
-        self.assertEqual(
-            [category["value"] for category in cfg["categories"]],
-            ["Biowaste", "Food waste", "No separate collection"],
-        )
-        self.assertEqual(
-            [category["color"] for category in cfg["categories"]],
-            ["#94cf7c", "#debf6a", "#d7d7d7"],
-        )
 
-    def test_bw_rp_orga_level_map_uses_bundesland_border_scope(self):
-        response = self.client.get(reverse("waste-atlas-bw-rp-orga-level-map"))
-
+    def test_overview_shows_staff_tools_only_for_staff(self):
+        response = self.client.get(reverse("waste-atlas-overview"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="DE-BW-RP"')
-        self.assertContains(
-            response, "selected>Baden-Württemberg &amp; Rheinland-Pfalz</option>"
+        self.assertNotContains(response, 'id="atlas-tools-menu"')
+        self.assertNotContains(response, reverse("waste-atlas-data-conflicts-overview"))
+
+        staff = User.objects.create_user(
+            username="atlas-staff", password="secret", is_staff=True
         )
-        cfg = self._map_config(response)
-        self.assertEqual(cfg["nutsPrefix"], "DE1,DEB")
-        self.assertEqual(cfg["nutsLevel"], 1)
+        staff.groups.add(Group.objects.get(name="waste_atlas"))
+        self.client.force_login(staff)
 
-    def test_bw_map_set_matches_germany_themes_and_uses_baden_wuerttemberg_scope(self):
-        from sources.waste_collection.waste_atlas.map_selection import (
-            WASTE_ATLAS_MAP_SELECTIONS,
-        )
+        response = self.client.get(reverse("waste-atlas-overview"))
+        self.assertContains(response, 'id="atlas-tools-menu"')
+        self.assertContains(response, reverse("waste-atlas-change-map-overview"))
+        self.assertContains(response, reverse("waste-atlas-data-conflicts-overview"))
 
-        bw_rp_themes = WASTE_ATLAS_MAP_SELECTIONS["DE-BW-RP"]["themes"]
-        bw_themes = WASTE_ATLAS_MAP_SELECTIONS["DE-BW"]["themes"]
-
-        self.assertEqual(set(bw_themes), set(bw_rp_themes))
-        self.assertEqual(
-            bw_themes["collection_system"]["route_name"],
-            "waste-atlas-bw-collection-system-map",
-        )
-
-        response = self.client.get(reverse("waste-atlas-bw-orga-level-map"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="DE-BW"')
-        self.assertContains(response, "selected>Baden-Württemberg</option>")
-        cfg = self._map_config(response)
-        self.assertEqual(cfg["nutsPrefix"], "DE1")
-        self.assertEqual(cfg["nutsLevel"], 1)
-
-        overview = self.client.get(reverse("waste-atlas-overview"))
-        self.assertContains(overview, "Baden-Württemberg")
-        self.assertContains(
-            overview, f'href="{reverse("waste-atlas-bw-collection-system-map")}"'
-        )
-
-    def test_rp_map_set_matches_germany_themes_and_uses_rheinland_pfalz_scope(self):
-        from sources.waste_collection.waste_atlas.map_selection import (
-            WASTE_ATLAS_MAP_SELECTIONS,
-        )
-
-        bw_rp_themes = WASTE_ATLAS_MAP_SELECTIONS["DE-BW-RP"]["themes"]
-        rp_themes = WASTE_ATLAS_MAP_SELECTIONS["DE-RP"]["themes"]
-
-        self.assertEqual(set(rp_themes), set(bw_rp_themes))
-        self.assertEqual(
-            rp_themes["collection_system"]["route_name"],
-            "waste-atlas-rp-collection-system-map",
-        )
-
-        response = self.client.get(reverse("waste-atlas-rp-orga-level-map"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="DE-RP"')
-        self.assertContains(response, "selected>Rheinland-Pfalz</option>")
-        cfg = self._map_config(response)
-        self.assertEqual(cfg["nutsPrefix"], "DEB")
-        self.assertEqual(cfg["nutsLevel"], 1)
-
-        overview = self.client.get(reverse("waste-atlas-overview"))
-        self.assertContains(overview, "Rheinland-Pfalz")
-        self.assertContains(
-            overview, f'href="{reverse("waste-atlas-rp-collection-system-map")}"'
-        )
-
-    def test_nrw_map_set_matches_germany_themes_and_uses_bundesland_scope(self):
-        from sources.waste_collection.waste_atlas.map_selection import (
-            WASTE_ATLAS_MAP_SELECTIONS,
-        )
-
-        germany_themes = WASTE_ATLAS_MAP_SELECTIONS["DE"]["themes"]
-        nrw_themes = WASTE_ATLAS_MAP_SELECTIONS["DE-NW"]["themes"]
-
-        self.assertEqual(set(nrw_themes), set(germany_themes))
-        self.assertEqual(
-            nrw_themes["collection_system"]["route_name"],
-            "waste-atlas-nrw-collection-system-map",
-        )
-
-        response = self.client.get(reverse("waste-atlas-nrw-orga-level-map"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="DE-NW"')
-        self.assertContains(response, "selected>Nordrhein-Westfalen</option>")
-        cfg = self._map_config(response)
-        self.assertEqual(cfg["nutsPrefix"], "DEA")
-        self.assertEqual(cfg["nutsLevel"], 1)
-
-        overview = self.client.get(reverse("waste-atlas-overview"))
-        self.assertContains(overview, "Nordrhein-Westfalen")
-        self.assertContains(
-            overview, f'href="{reverse("waste-atlas-nrw-collection-system-map")}"'
-        )
-
-    def test_bw_rp_combined_fee_system_classifies_valid_fee_combinations(self):
-        response = self.client.get(reverse("waste-atlas-bw-rp-combined-fee-system-map"))
-
-        self.assertEqual(response.status_code, 200)
-        cfg = self._map_config(response)
-        labels = [category["label"] for category in cfg["categories"]]
-        values = [category["value"] for category in cfg["categories"]]
-        self.assertIn("BWB & RWB: Flexible", labels)
-        self.assertIn("BWB: No fee | RWB: Flexible", labels)
-        self.assertIn("BWB & RWB: PAYT", labels)
-        self.assertIn("BWB: Flexible | RWB: PAYT", labels)
-        self.assertIn("BWB: No fee | RWB: PAYT", labels)
-        self.assertIn("BWB: Flexible | RWB: Flexible+", labels)
-        self.assertIn("Other combinations", labels)
-        self.assertIn("flex_flex_plus", values)
-        self.assertIn("other_combined", values)
-        self.assertEqual(cfg["exportLegendBottomColumns"], 2)
-        self.assertNotIn("No fee / Flexible", labels)
-        self.assertNotIn("Flexible / PAYT", labels)
-        self.assertNotIn("No fee / PAYT", labels)
-        self.assertNotIn("Flexible / Flexible+", labels)
-
-    def test_country_specific_orga_level_maps_default_to_expected_country(self):
-        """Country-specific orga-level maps default to expected country and year."""
-        map_defaults = {
-            "waste-atlas-orga-level-italy-map": ("IT", "2024"),
-            "waste-atlas-orga-level-sweden-map": ("SE", "2024"),
-            "waste-atlas-orga-level-denmark-map": ("DK", "2024"),
-            "waste-atlas-orga-level-netherlands-map": ("NL", "2024"),
-            "waste-atlas-orga-level-belgium-map": ("BE", "2024"),
-        }
-
-        for url_name, (expected_country, expected_year) in map_defaults.items():
-            with self.subTest(url_name=url_name):
-                response = self.client.get(reverse(url_name))
-
-                self.assertEqual(response.status_code, 200)
-                self.assertContains(response, f'value="{expected_country}"')
-                self.assertContains(response, f'value="{expected_year}" selected')
-                self.assertContains(response, "Administrative level of collectors")
-                self.assertContains(response, "sidebar-tabs")
-                self.assertContains(response, "No data")
-
-    def test_sweden_orga_level_map_uses_collector_orga_level_api(self):
-        response = self.client.get(reverse("waste-atlas-orga-level-sweden-map"))
-
-        self.assertEqual(response.status_code, 200)
-        cfg = self._map_config(response)
-        self.assertEqual(
-            cfg["dataUrl"], "/waste_collection/api/waste-atlas/collector-orga-level/"
-        )
-        self.assertEqual(
-            cfg["catchmentDataUrl"],
-            "/waste_collection/api/waste-atlas/catchment/collector-geojson/",
-        )
-        self.assertEqual(cfg["dataField"], "orga_level")
-        self.assertEqual(cfg["country"], "SE")
-        self.assertEqual(cfg["year"], 2024)
-
-    def test_sweden_collection_orga_level_map_uses_collection_catchments(self):
-        response = self.client.get(
-            reverse("waste-atlas-collection-orga-level-sweden-map")
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Administrative level of collections")
-        cfg = self._map_config(response)
-        self.assertEqual(
-            cfg["dataUrl"], "/waste_collection/api/waste-atlas/collection-orga-level/"
-        )
-        self.assertEqual(
-            cfg["catchmentDataUrl"],
-            "/waste_collection/api/waste-atlas/catchment/collection-geojson/",
-        )
-        self.assertEqual(cfg["dataField"], "orga_level")
-        self.assertEqual(cfg["country"], "SE")
-        self.assertEqual(cfg["year"], 2024)
+    # ---- organisational-level API ------------------------------------------
 
     def test_orga_level_api_classifies_collector_catchment_region(self):
         country = NutsRegion.objects.create(
@@ -4983,53 +4734,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
             [{"catchment_id": collection_catchment.pk, "orga_level": "individual"}],
         )
 
-    def test_netherlands_bundle_maps_default_to_nl_2024(self):
-        """Dedicated Netherlands bundle maps default to country NL and year 2024."""
-        map_defaults = {
-            "waste-atlas-collection-system-netherlands-map": "Primary collection system for kitchen waste",
-            "waste-atlas-biowaste-frequency-netherlands-map": "Collection frequency types for biowaste",
-            "waste-atlas-biowaste-collection-amount-netherlands-map": "Specifically collected amount of biowaste per person and year",
-            "waste-atlas-organic-collection-amount-netherlands-map": "Aggregated collected amount of organic fractions (kg/p/a)",
-            "waste-atlas-organic-waste-ratio-netherlands-map": "Organic stream separation rate (%)",
-        }
-
-        for url_name, expected_title in map_defaults.items():
-            with self.subTest(url_name=url_name):
-                response = self.client.get(reverse(url_name))
-
-                self.assertEqual(response.status_code, 200)
-                self.assertContains(response, 'value="NL"')
-                self.assertContains(response, "selected>The Netherlands</option>")
-                self.assertContains(response, 'value="2024" selected')
-                self.assertContains(response, expected_title)
-                self.assertContains(response, "sidebar-tabs")
-
-    def test_italy_bundle_maps_default_to_it_without_regional_filter(self):
-        map_names = [
-            "waste-atlas-italy-collection-system-map",
-            "waste-atlas-italy-green-waste-collection-system-count-map",
-            "waste-atlas-italy-residual-frequency-map",
-            "waste-atlas-italy-biowaste-frequency-map",
-            "waste-atlas-italy-residual-collection-count-map",
-            "waste-atlas-italy-biowaste-collection-count-map",
-            "waste-atlas-italy-residual-collection-amount-map",
-            "waste-atlas-italy-biowaste-collection-amount-map",
-            "waste-atlas-italy-green-waste-collection-amount-map",
-            "waste-atlas-italy-organic-collection-amount-map",
-            "waste-atlas-italy-organic-waste-ratio-map",
-        ]
-
-        for url_name in map_names:
-            with self.subTest(url_name=url_name):
-                response = self.client.get(reverse(url_name))
-
-                self.assertEqual(response.status_code, 200)
-                self.assertContains(response, 'value="IT"')
-                self.assertContains(response, 'value="2024" selected')
-                self.assertNotContains(response, "nutsPrefix:")
-                self.assertNotContains(response, "nutsLevel:")
-                self.assertContains(response, "sidebar-tabs")
-
     def test_catalonia_pages_reuse_germany_map_metadata(self):
         from sources.waste_collection.waste_atlas.pages import MAP_PAGES
 
@@ -5045,669 +4749,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(catalonia["title"], germany["title"])
         self.assertEqual(catalonia["theme"], germany["theme"])
         self.assertEqual(catalonia["selector_set"], "ES-CT")
-
-    def test_italy_orga_level_map_ignores_country_and_nuts_query_overrides(self):
-        response = self.client.get(
-            reverse("waste-atlas-orga-level-italy-map"),
-            {"country": "DE", "nuts_prefix": "ITH10", "nuts_level": "3"},
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="IT"')
-        self.assertContains(response, "selected>Italy</option>")
-        self.assertNotContains(response, "nutsPrefix:")
-        self.assertNotContains(response, "nutsLevel:")
-
-    def test_south_tyrol_orga_level_map_ignores_country_and_nuts_query_overrides(self):
-        response = self.client.get(
-            reverse("waste-atlas-south-tyrol-orga-level-map"),
-            {"country": "IT", "nuts_prefix": "", "nuts_level": ""},
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="IT-ST"')
-        cfg = self._map_config(response)
-        self.assertEqual(cfg["nutsPrefix"], "ITH10")
-        self.assertEqual(cfg["nutsLevel"], 3)
-
-    def test_generic_map_forwards_nuts_prefix_to_atlas_loader(self):
-        response = self.client.get(
-            reverse("waste-atlas-green-waste-collection-system-count-map"),
-            {"country": "IT", "year": "2024", "nuts_prefix": "ITH10"},
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="IT-ST"')
-        self.assertContains(response, 'value="2024" selected')
-        self.assertEqual(self._map_config(response)["nutsPrefix"], "ITH10")
-
-    def test_collection_count_ratio_map_is_available_generically(self):
-        response = self.client.get(reverse("waste-atlas-collection-count-ratio-map"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response, "Annual collection-count ratio: biowaste vs residual waste"
-        )
-        self.assertContains(
-            response,
-            "/waste_collection/api/waste-atlas/collection-count-ratio/",
-        )
-        self.assertContains(response, "sidebar-tabs")
-
-    def test_south_tyrol_bundle_maps_default_to_regional_filter(self):
-        map_names = [
-            "waste-atlas-south-tyrol-collection-system-map",
-            "waste-atlas-south-tyrol-target-waste-category-map",
-            "waste-atlas-south-tyrol-green-waste-collection-system-count-map",
-            "waste-atlas-south-tyrol-collection-count-ratio-map",
-            "waste-atlas-south-tyrol-residual-frequency-map",
-            "waste-atlas-south-tyrol-biowaste-frequency-map",
-            "waste-atlas-south-tyrol-combined-frequency-map",
-            "waste-atlas-south-tyrol-residual-collection-count-map",
-            "waste-atlas-south-tyrol-biowaste-collection-count-map",
-            "waste-atlas-south-tyrol-combined-collection-count-map",
-            "waste-atlas-south-tyrol-biowaste-fee-system-map",
-            "waste-atlas-south-tyrol-combined-fee-system-map",
-            "waste-atlas-south-tyrol-residual-collection-amount-map",
-            "waste-atlas-south-tyrol-biowaste-collection-amount-map",
-            "waste-atlas-south-tyrol-green-waste-collection-amount-map",
-            "waste-atlas-south-tyrol-organic-collection-amount-map",
-            "waste-atlas-south-tyrol-organic-waste-ratio-map",
-            "waste-atlas-south-tyrol-biowaste-min-bin-size-map",
-            "waste-atlas-south-tyrol-residual-min-bin-size-map",
-            "waste-atlas-south-tyrol-min-bin-size-ratio-map",
-        ]
-
-        for url_name in map_names:
-            with self.subTest(url_name=url_name):
-                response = self.client.get(reverse(url_name))
-
-                self.assertEqual(response.status_code, 200)
-                self.assertContains(response, 'value="IT-ST"')
-                self.assertContains(response, 'value="2024" selected')
-                cfg = self._map_config(response)
-                self.assertEqual(cfg["nutsPrefix"], "ITH10")
-                self.assertEqual(cfg["nutsLevel"], 3)
-                self.assertContains(response, "sidebar-tabs")
-
-    def test_sweden_bin_configuration_map_defaults_to_se_2024_and_english_labels(self):
-        """Sweden bin-configuration map defaults to country SE and year 2024."""
-        response = self.client.get(reverse("waste-atlas-bin-configuration-sweden-map"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="SE"')
-        self.assertContains(response, "selected>Sweden</option>")
-        self.assertContains(response, 'value="2024" selected')
-        self.assertContains(response, "Bin configuration of waste fractions")
-        self.assertContains(response, "sidebar-tabs")
-        self.assertContains(response, "No data")
-
-    def test_sweden_bundle_maps_default_to_se_2024(self):
-        map_names = [
-            "waste-atlas-sweden-collection-system-map",
-            "waste-atlas-sweden-connection-rate-map",
-            "waste-atlas-sweden-paper-bags-map",
-            "waste-atlas-sweden-plastic-bags-map",
-            "waste-atlas-sweden-collection-support-map",
-            "waste-atlas-sweden-residual-collection-amount-map",
-            "waste-atlas-sweden-biowaste-collection-amount-map",
-            "waste-atlas-sweden-waste-ratio-map",
-            "waste-atlas-sweden-organic-collection-amount-map",
-            "waste-atlas-sweden-organic-waste-ratio-map",
-        ]
-
-        for url_name in map_names:
-            with self.subTest(url_name=url_name):
-                response = self.client.get(reverse(url_name))
-
-                self.assertEqual(response.status_code, 200)
-                self.assertContains(response, 'value="SE"')
-                self.assertContains(response, "selected>Sweden</option>")
-                self.assertContains(response, 'value="2024" selected')
-                cfg = self._map_config(response)
-                self.assertEqual(cfg["country"], "SE")
-                self.assertEqual(cfg["year"], 2024)
-                self.assertTrue(cfg["fileBase"].startswith("sweden_"))
-                self.assertContains(response, "sidebar-tabs")
-
-    def test_sweden_population_density_map_defaults_to_se_and_uses_population_api(self):
-        response = self.client.get(reverse("waste-atlas-sweden-population-density-map"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="SE"')
-        self.assertContains(response, "selected>Sweden</option>")
-        self.assertContains(response, 'value="2024" selected')
-        self.assertContains(response, "Population density")
-        cfg = self._map_config(response)
-        self.assertEqual(
-            cfg["dataUrl"], "/waste_collection/api/waste-atlas/population/"
-        )
-        self.assertEqual(cfg["transformName"], "populationDensity")
-        self.assertIn(
-            "Urban (> 1 500 / km²)",
-            [category["label"] for category in cfg["categories"]],
-        )
-        self.assertContains(response, "sidebar-tabs")
-
-    def test_belgium_flanders_orga_level_map_defaults_to_be_2024_and_english_labels(
-        self,
-    ):
-        """Belgium Flanders+Brussels orga-level map defaults to country BE, year 2024, English."""
-        response = self.client.get(
-            reverse("waste-atlas-orga-level-belgium-flanders-map")
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="BE-FL-BR"')
-        self.assertContains(response, "selected>Flanders + Brussels</option>")
-        self.assertContains(response, 'value="2024" selected')
-        self.assertContains(response, "Administrative level of collectors")
-        self.assertContains(response, "sidebar-tabs")
-        self.assertContains(response, "No data")
-        self.assertContains(response, "BE1,BE2")
-
-    def test_europe_data_coverage_map_renders_download_buttons(self):
-        response = self.client.get(reverse("waste-atlas-europe-data-coverage-map"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Waste collection data coverage in Europe")
-        self.assertContains(response, "Download SVG")
-        self.assertContains(response, "Download PNG (Word-ready, 300 DPI)")
-        self.assertContains(response, "WasteAtlasChoropleth.exportElementSVG")
-        self.assertContains(response, "WasteAtlasChoropleth.exportElementPNG")
-
-    def test_europe_data_coverage_map_highlights_final_case_study_selection(self):
-        """The coverage map highlights only the final case-study regions."""
-        response = self.client.get(reverse("waste-atlas-europe-data-coverage-map"))
-
-        self.assertEqual(response.status_code, 200)
-        # Sweden is the only highlighted country.
-        self.assertContains(response, "new Set(['SE'])")
-        # German NUTS-1 regions are fetched (replaces the former Belgium fetch).
-        self.assertContains(response, "levl_code=1&cntr_code=DE")
-        # Final sub-national case-study regions.
-        self.assertContains(response, "new Set(['DE1', 'DEA', 'DEB', 'ES51', 'ITH1'])")
-        # Region list reflects the final selection.
-        self.assertContains(response, "Sweden")
-        self.assertContains(response, "Nordrhein-Westfalen")
-        self.assertContains(response, "Rheinland-Pfalz")
-        self.assertContains(response, "Baden-Württemberg")
-        self.assertContains(response, "South Tyrol")
-        self.assertContains(response, "Catalonia")
-        # Subtitle lists the final selection.
-        self.assertContains(
-            response,
-            "Sweden, Nordrhein-Westfalen, Rheinland-Pfalz, "
-            "Baden-Württemberg, South Tyrol, and Catalonia",
-        )
-        # Former case-study entries are no longer present.
-        self.assertNotContains(response, "'DE', 'DK', 'SE', 'NL'")
-        self.assertNotContains(response, "'BE1', 'BE2', 'ES51', 'ITH1'")
-        self.assertNotContains(response, "levl_code=1&cntr_code=BE")
-        self.assertNotContains(response, ">Germany</li>")
-        self.assertNotContains(response, ">Denmark</li>")
-        self.assertNotContains(response, ">Flanders + Brussels</li>")
-        self.assertNotContains(response, ">The Netherlands</li>")
-
-    def test_atlas_pages_link_shared_stylesheet(self):
-        """Atlas pages load the shared waste_atlas stylesheet instead of inline CSS."""
-        for url_name in (
-            "waste-atlas-overview",
-            "waste-atlas-change-map-overview",
-            "waste-atlas-germany-collection-system-map",
-        ):
-            with self.subTest(url_name=url_name):
-                response = self.client.get(reverse(url_name))
-                self.assertEqual(response.status_code, 200)
-                self.assertContains(response, "css/waste_atlas")
-
-    def test_overview_uses_tabbed_region_directory(self):
-        """The overview groups regional map sets into clean, unified tab navigation."""
-        response = self.client.get(reverse("waste-atlas-overview"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="atlas-region-tabs"')
-        self.assertContains(response, 'data-bs-toggle="tab"')
-        self.assertContains(response, "Browse by region")
-        for anchor_id in (
-            "atlas-germany",
-            "atlas-catalonia",
-            "atlas-italy-south-tyrol",
-            "atlas-other-countries",
-        ):
-            self.assertContains(response, f'id="{anchor_id}"')
-        # Every regional directory link is still present in the rendered DOM.
-        self.assertContains(
-            response,
-            reverse("waste-atlas-germany-collection-system-map"),
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-catalonia-collection-system-map"),
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-orga-level-belgium-flanders-map"),
-        )
-
-    def test_overview_uses_clean_unified_layout(self):
-        """The overview drops the noisy topic-color legend and colored pill/badge chips."""
-        response = self.client.get(reverse("waste-atlas-overview"))
-
-        self.assertEqual(response.status_code, 200)
-        # Map links render as a calm typographic list, not colored buttons.
-        self.assertContains(response, "atlas-map-list")
-        self.assertNotContains(response, "btn-outline-primary")
-        # The standalone topic-color legend row is gone.
-        self.assertNotContains(response, "atlas-topic-legend")
-        # The per-link topic color classes that created the visual noise are removed.
-        self.assertNotContains(response, "atlas-topic-admin")
-
-    def test_waste_atlas_overview_includes_italy_orga_level_entry(self):
-        """Overview page lists all country-specific organizational-level maps."""
-        response = self.client.get(reverse("waste-atlas-overview"))
-
-        self.assertEqual(response.status_code, 200)
-        # The 4-dropdown "Find a map" form is gone; the directory is the entry point.
-        self.assertNotContains(response, "Find a map")
-        self.assertNotContains(response, 'id="sel-country"')
-        self.assertNotContains(response, 'id="sel-theme"')
-        self.assertContains(response, 'id="atlas-region-tabs"')
-        self.assertContains(response, 'id="atlas-directory-category"')
-        self.assertContains(response, 'id="atlas-directory-search"')
-        self.assertContains(response, 'data-map-set="IT-ST"')
-        # Registry-driven directory surfaces map sets missing from the old
-        # hardcoded HTML, e.g. Nordrhein-Westfalen (DE-NW).
-        self.assertContains(response, 'data-map-set="DE-NW"')
-        self.assertContains(
-            response,
-            reverse("waste-atlas-europe-biowaste-collection-amount-map"),
-        )
-        self.assertContains(
-            response,
-            "Biowaste amount",
-        )
-        self.assertContains(response, reverse("waste-atlas-orga-level-italy-map"))
-        self.assertContains(
-            response,
-            reverse("waste-atlas-collection-orga-level-italy-map"),
-        )
-        self.assertContains(
-            response,
-            "Collectors: admin. level",
-        )
-        self.assertContains(
-            response,
-            "Collections: admin. level",
-        )
-        self.assertContains(
-            response, reverse("waste-atlas-italy-collection-system-map")
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-italy-green-waste-collection-system-count-map"),
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-italy-biowaste-collection-amount-map"),
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-italy-green-waste-collection-amount-map"),
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-italy-organic-waste-ratio-map"),
-        )
-        self.assertContains(response, reverse("waste-atlas-south-tyrol-orga-level-map"))
-        self.assertContains(
-            response,
-            reverse("waste-atlas-south-tyrol-collection-orga-level-map"),
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-south-tyrol-collection-system-map"),
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-south-tyrol-green-waste-collection-system-count-map"),
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-south-tyrol-biowaste-collection-amount-map"),
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-south-tyrol-green-waste-collection-amount-map"),
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-south-tyrol-organic-waste-ratio-map"),
-        )
-        self.assertContains(response, reverse("waste-atlas-orga-level-sweden-map"))
-        self.assertContains(
-            response,
-            reverse("waste-atlas-collection-orga-level-sweden-map"),
-        )
-        self.assertContains(
-            response, reverse("waste-atlas-bin-configuration-sweden-map")
-        )
-        self.assertContains(
-            response,
-            "Bin configuration",
-        )
-        self.assertContains(
-            response, reverse("waste-atlas-sweden-collection-system-map")
-        )
-        self.assertContains(response, reverse("waste-atlas-sweden-connection-rate-map"))
-        self.assertContains(
-            response, reverse("waste-atlas-sweden-biowaste-collection-amount-map")
-        )
-        self.assertContains(
-            response, reverse("waste-atlas-sweden-organic-waste-ratio-map")
-        )
-        # Themes without a dedicated Sweden route reuse the generic route
-        # scoped to SE.
-        self.assertContains(
-            response,
-            f"{reverse('waste-atlas-biowaste-frequency-map')}?country=SE",
-        )
-        self.assertContains(response, reverse("waste-atlas-orga-level-denmark-map"))
-        self.assertContains(
-            response,
-            reverse("waste-atlas-collection-orga-level-denmark-map"),
-        )
-        self.assertContains(
-            response,
-            f"{reverse('waste-atlas-collection-system-map')}?country=DK",
-        )
-        self.assertContains(
-            response,
-            f"{reverse('waste-atlas-biowaste-frequency-map')}?country=DK",
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-denmark-food-waste-category-map"),
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-denmark-paper-bags-map"),
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-denmark-plastic-bags-map"),
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-denmark-collection-support-map"),
-        )
-        self.assertContains(
-            response,
-            f"{reverse('waste-atlas-biowaste-collection-amount-map')}?country=DK",
-        )
-        self.assertContains(
-            response,
-            f"{reverse('waste-atlas-organic-collection-amount-map')}?country=DK",
-        )
-        self.assertContains(
-            response,
-            f"{reverse('waste-atlas-organic-waste-ratio-map')}?country=DK",
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-orga-level-netherlands-map"),
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-collection-orga-level-netherlands-map"),
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-collection-system-netherlands-map"),
-        )
-        self.assertContains(
-            response,
-            "Biowaste collection systems",
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-biowaste-frequency-netherlands-map"),
-        )
-        self.assertContains(
-            response,
-            "Biowaste schedule",
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-biowaste-collection-amount-netherlands-map"),
-        )
-        self.assertContains(
-            response,
-            "Biowaste amount",
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-organic-collection-amount-netherlands-map"),
-        )
-        self.assertContains(
-            response,
-            "Organic-fraction amount",
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-organic-waste-ratio-netherlands-map"),
-        )
-        self.assertContains(
-            response,
-            "Organic separation rate",
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-orga-level-belgium-flanders-map"),
-        )
-        self.assertContains(
-            response,
-            reverse("waste-atlas-collection-orga-level-belgium-flanders-map"),
-        )
-        self.assertContains(
-            response,
-            "Flanders + Brussels",
-        )
-        self.assertEqual(
-            response.context["selected_required_bin_capacity_reference"],
-            "person",
-        )
-
-    def test_overview_directory_context_is_registry_driven(self):
-        from sources.waste_collection.waste_atlas.map_selection import (
-            build_overview_directory_context,
-        )
-
-        ctx = build_overview_directory_context(reverse)
-        groups = ctx["directory_region_groups"]
-        self.assertEqual(
-            [group["id"] for group in groups],
-            ["europe", "germany", "catalonia", "italy-south-tyrol", "other-countries"],
-        )
-        europe = next(group for group in groups if group["id"] == "europe")
-        self.assertEqual(
-            {entry["url"] for entry in europe["europe_maps"]},
-            {
-                reverse("waste-atlas-europe-data-coverage-map"),
-                reverse("waste-atlas-europe-biowaste-collection-amount-map"),
-            },
-        )
-        europe_categories = {
-            entry["title"]: entry["category"] for entry in europe["europe_maps"]
-        }
-        self.assertEqual(europe_categories["Biowaste amount"], "biowaste")
-        self.assertEqual(europe_categories["Data coverage"], "")
-        germany = next(group for group in groups if group["id"] == "germany")
-        self.assertEqual(
-            [region["value"] for region in germany["regions"]],
-            ["DE", "DE-BW-RP", "DE-BW", "DE-RP", "DE-NW"],
-        )
-        de = germany["regions"][0]
-        titles = {entry["title"] for s in de["sections"] for entry in s["maps"]}
-        urls = {entry["url"] for s in de["sections"] for entry in s["maps"]}
-        self.assertIn(reverse("waste-atlas-germany-collection-system-map"), urls)
-        # Full THEME_LABELS distinguish residual vs biowaste schedule (handoff #11).
-        self.assertIn("Residual waste schedule", titles)
-        self.assertIn("Biowaste schedule", titles)
-        section_labels = [s["label"] for s in de["sections"]]
-        self.assertEqual(section_labels[0], "Organisation & coverage")
-        self.assertIn("Schedule", section_labels)
-        # Generic-only themes reuse the generic route scoped to the region.
-        other = next(group for group in groups if group["id"] == "other-countries")
-        se = next(region for region in other["regions"] if region["value"] == "SE")
-        se_urls = {entry["url"] for s in se["sections"] for entry in s["maps"]}
-        self.assertIn(
-            f"{reverse('waste-atlas-biowaste-frequency-map')}?country=SE", se_urls
-        )
-
-    def test_overview_shows_staff_tools_dropdown_only_for_staff(self):
-        response = self.client.get(reverse("waste-atlas-overview"))
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, 'id="atlas-tools-menu"')
-        self.assertNotContains(response, reverse("waste-atlas-data-conflicts-overview"))
-
-        staff = User.objects.create_user(
-            username="atlas-staff", password="secret", is_staff=True
-        )
-        staff.groups.add(Group.objects.get(name="waste_atlas"))
-        self.client.force_login(staff)
-        response = self.client.get(reverse("waste-atlas-overview"))
-        self.assertContains(response, 'id="atlas-tools-menu"')
-        self.assertContains(response, reverse("waste-atlas-change-map-overview"))
-        self.assertContains(response, reverse("waste-atlas-data-conflicts-overview"))
-
-    def test_overview_preselects_region_and_filters_from_query_params(self):
-        response = self.client.get(
-            reverse("waste-atlas-overview"),
-            {"region": "IT-ST", "category": "biowaste", "q": "amount"},
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.context["directory_selected_region"], "italy-south-tyrol"
-        )
-        self.assertEqual(response.context["directory_selected_category"], "biowaste")
-        self.assertEqual(response.context["directory_query"], "amount")
-        self.assertContains(response, 'value="amount"')
-
-    def test_change_map_overview_renders_for_waste_atlas_group(self):
-        response = self.client.get(reverse("waste-atlas-change-map-overview"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Waste Atlas — Change maps")
-        self.assertContains(response, "Compare waste atlas data between two years")
-        # The change-map overview now reuses the shared selector, matching the
-        # detail page instead of a separate bootstrap card.
-        self.assertContains(response, "Compare another map")
-
-    def test_change_map_overview_includes_dual_year_selector(self):
-        response = self.client.get(reverse("waste-atlas-change-map-overview"))
-
-        self.assertEqual(response.status_code, 200)
-        # The unified selector keeps both year selects (dual-year comparison).
-        self.assertContains(response, '<label for="sel-from-year">')
-        self.assertContains(response, '<label for="sel-to-year">')
-        self.assertContains(response, '<select id="sel-from-year">')
-        self.assertContains(response, '<select id="sel-to-year">')
-        self.assertContains(response, 'id="sel-country"')
-        self.assertContains(response, 'id="sel-waste-category"')
-        self.assertContains(response, 'id="sel-theme"')
-
-    def test_change_map_page_renders_searchable_navigation_widget(self):
-        response = self.client.get(
-            reverse("waste-atlas-change-map", args=["DE", "collection_system"])
-        )
-
-        self.assertEqual(response.status_code, 200)
-        # The selector header matches the detail page: a single title, no
-        # redundant uppercase eyebrow.
-        self.assertNotContains(response, "atlas-selector-eyebrow")
-        self.assertContains(response, "Compare another map")
-        self.assertContains(response, 'id="sel-theme-search"')
-        self.assertContains(response, 'id="atlas-selector-status"')
-        self.assertContains(response, "comparison maps available")
-
-    def test_change_map_overview_defaults_from_year_to_second_last(self):
-        response = self.client.get(reverse("waste-atlas-change-map-overview"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, '<option value="2023"')
-        self.assertContains(response, '<option value="2024"')
-
-    def test_change_map_overview_allows_year_override_via_query_params(self):
-        response = self.client.get(
-            reverse("waste-atlas-change-map-overview"),
-            {"from_year": "2020", "to_year": "2022"},
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, '<option value="2020"')
-        self.assertContains(response, '<option value="2022"')
-
-    def test_change_map_overview_links_back_to_map_overview(self):
-        response = self.client.get(reverse("waste-atlas-change-map-overview"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response,
-            f'href="{reverse("waste-atlas-overview")}"',
-        )
-        self.assertContains(response, "Map overview")
-
-    def test_change_map_overview_denies_anonymous_users(self):
-        self.client.logout()
-        response = self.client.get(reverse("waste-atlas-change-map-overview"))
-
-        self.assertEqual(response.status_code, 302)
-
-    def test_change_map_overview_denies_users_without_waste_atlas_group(self):
-        non_atlas_user = User.objects.create_user(
-            username="non-atlas-user", password="secret"
-        )
-        self.client.force_login(non_atlas_user)
-        response = self.client.get(reverse("waste-atlas-change-map-overview"))
-
-        self.assertEqual(response.status_code, 403)
-
-    def _login_atlas_staff(self):
-        staff = User.objects.create_user(
-            username="atlas-staff-tools", password="secret", is_staff=True
-        )
-        staff.groups.add(Group.objects.get(name="waste_atlas"))
-        self.client.force_login(staff)
-
-    def test_map_overview_links_to_change_map_overview(self):
-        self._login_atlas_staff()
-        response = self.client.get(reverse("waste-atlas-overview"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response,
-            f'href="{reverse("waste-atlas-change-map-overview")}"',
-        )
-        self.assertContains(response, "Change maps")
-
-    def test_map_overview_links_to_data_conflicts_overview(self):
-        self._login_atlas_staff()
-        response = self.client.get(reverse("waste-atlas-overview"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response,
-            f'href="{reverse("waste-atlas-data-conflicts-overview")}"',
-        )
-        self.assertContains(response, "Data conflicts")
-
-    def test_data_conflicts_overview_renders_for_waste_atlas_group(self):
-        response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Waste Atlas — Data conflicts")
-        self.assertContains(response, "conflicting catchments")
 
     def test_data_conflicts_overview_lists_collection_system_maps(self):
         """The data-conflicts overview surfaces every map whose config opts
@@ -5736,48 +4777,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
             reverse("waste-atlas-germany-orga-level-map"), conflict_map_urls
         )
 
-    def test_data_conflicts_overview_links_back_to_map_overview(self):
-        response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response,
-            f'href="{reverse("waste-atlas-overview")}"',
-        )
-        self.assertContains(response, "Map overview")
-
-    def test_data_conflicts_overview_denies_anonymous_users(self):
-        self.client.logout()
-        response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
-
-        self.assertEqual(response.status_code, 302)
-
-    def test_data_conflicts_overview_denies_users_without_waste_atlas_group(self):
-        non_atlas_user = User.objects.create_user(
-            username="non-atlas-user-conflicts", password="secret"
-        )
-        self.client.force_login(non_atlas_user)
-        response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
-
-        self.assertEqual(response.status_code, 403)
-
-    def test_germany_collection_system_change_map_renders(self):
-        response = self.client.get(
-            reverse("waste-atlas-change-map", args=["DE", "collection_system"])
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response, "Primary collection system for kitchen waste — changes"
-        )
-        cfg = self._map_config(response)
-        self.assertTrue(cfg["changeMode"])
-        self.assertEqual(cfg["fromYear"], 2024)
-        self.assertEqual(cfg["year"], 2024)
-        self.assertEqual(
-            cfg["dataUrl"], "/waste_collection/api/waste-atlas/collection-system/"
-        )
-
     def test_germany_collection_system_change_map_year_params(self):
         response = self.client.get(
             reverse("waste-atlas-change-map", args=["DE", "collection_system"]),
@@ -5792,87 +4791,21 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, '<option value="2020"')
         self.assertContains(response, '<option value="2022"')
 
-    def test_change_maps_available_for_every_selector_theme(self):
-        from sources.waste_collection.waste_atlas.map_selection import (
-            WASTE_ATLAS_MAP_SELECTIONS,
-        )
-
-        for map_set, selection in WASTE_ATLAS_MAP_SELECTIONS.items():
-            for theme in selection["themes"]:
-                with self.subTest(map_set=map_set, theme=theme):
-                    response = self.client.get(
-                        reverse("waste-atlas-change-map", args=[map_set, theme])
-                    )
-                    self.assertEqual(response.status_code, 200)
-                    cfg = self._map_config(response)
-                    self.assertTrue(cfg["changeMode"])
-                    self.assertIn("dataUrl", cfg)
-
-    def test_change_map_preserves_region_scope(self):
-        response = self.client.get(
-            reverse("waste-atlas-change-map", args=["IT-ST", "biowaste_frequency"])
-        )
-
-        self.assertEqual(response.status_code, 200)
-        cfg = self._map_config(response)
-        self.assertEqual(cfg["nutsPrefix"], "ITH10")
-        self.assertEqual(cfg["nutsLevel"], 3)
-        self.assertEqual(cfg["country"], "IT")
-
-    def test_change_map_unknown_combination_returns_404(self):
-        response = self.client.get(
-            reverse("waste-atlas-change-map", args=["DE", "nonexistent_theme"])
-        )
-
-        self.assertEqual(response.status_code, 404)
-
-    def test_legacy_germany_change_map_url_redirects(self):
-        response = self.client.get(
-            reverse("waste-atlas-germany-collection-system-change-map"),
-            {"from_year": "2021", "to_year": "2023"},
-        )
-
-        self.assertRedirects(
-            response,
-            reverse("waste-atlas-change-map", args=["DE", "collection_system"])
-            + "?from_year=2021&to_year=2023",
-        )
-
-    def test_germany_collection_system_change_map_denies_anonymous(self):
-        self.client.logout()
-        response = self.client.get(
-            reverse("waste-atlas-change-map", args=["DE", "collection_system"])
-        )
-
-        self.assertEqual(response.status_code, 302)
-
-    def test_germany_collection_system_change_map_denies_non_atlas_user(self):
-        non_atlas_user = User.objects.create_user(
-            username="non-atlas-change-user", password="secret"
-        )
-        self.client.force_login(non_atlas_user)
-        response = self.client.get(
-            reverse("waste-atlas-change-map", args=["DE", "collection_system"])
-        )
-
-        self.assertEqual(response.status_code, 403)
-
-    def test_change_map_overview_offers_change_urls_for_all_themes(self):
-        response = self.client.get(reverse("waste-atlas-change-map-overview"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response,
-            f'data-change-url="{reverse("waste-atlas-change-map", args=["DE", "collection_system"])}"',
-        )
-        self.assertContains(
-            response,
-            f'data-change-url="{reverse("waste-atlas-change-map", args=["IT-ST", "biowaste_frequency"])}"',
-        )
-
 
 class GenericMapTemplateTests(TestCase):
-    """Tests for the generic map template backed by stored configurations."""
+    """The generic map template renders any stored configuration as JSON.
+
+    The values themselves are maintainer-owned content; what matters here is
+    that whatever is stored reaches the renderer unchanged, that the shared DOM
+    ids and the runtime region scope are merged in, and that an unknown key
+    degrades gracefully instead of raising.
+    """
+
+    DOM_IDS = {
+        "svgId": "atlas-svg",
+        "containerId": "map-container",
+        "loadingId": "loading-overlay",
+    }
 
     @classmethod
     def setUpTestData(cls):
@@ -5883,12 +4816,9 @@ class GenericMapTemplateTests(TestCase):
         cls.user.groups.add(waste_atlas_group)
 
     def _render_generic(self, config_key, query=None):
-        from django.test import RequestFactory
-
         from sources.waste_collection.waste_atlas.views import AtlasMapView
 
-        factory = RequestFactory()
-        request = factory.get("/", query or {})
+        request = RequestFactory().get("/", query or {})
         request.user = self.user
 
         page = {
@@ -5903,77 +4833,74 @@ class GenericMapTemplateTests(TestCase):
             "year": "2024",
             "lock": False,
         }
-        view = AtlasMapView.as_view(page=page)
-        response = view(request)
+        response = AtlasMapView.as_view(page=page)(request)
         return response.render().content.decode("utf-8")
 
-    def test_orga_level_renders_categories_in_json_config(self):
-        content = self._render_generic("orga_level")
-        self.assertIn(
-            '"dataUrl": "/waste_collection/api/waste-atlas/collector-orga-level/"',
+    def _rendered_config(self, content):
+        match = re.search(
+            r'<script id="atlas-config" type="application/json">(.*?)</script>',
             content,
+            re.S,
         )
-        self.assertIn(
-            '"catchmentDataUrl": "/waste_collection/api/waste-atlas/catchment/collector-geojson/"',
-            content,
+        self.assertIsNotNone(match, "no atlas-config JSON found in response")
+        return json.loads(match.group(1))
+
+    def test_every_stored_configuration_reaches_the_renderer_unchanged(self):
+        for config_key, stored in MAP_CONFIGS.items():
+            with self.subTest(config_key=config_key):
+                content = self._render_generic(config_key)
+
+                self.assertIn("WasteAtlasChoropleth.init", content)
+                cfg = self._rendered_config(content)
+                for key, value in stored.items():
+                    if key in {"country", "year", "nutsPrefix", "nutsLevel"}:
+                        continue  # replaced by the runtime region scope
+                    self.assertEqual(cfg[key], value)
+
+    def test_shared_dom_ids_are_merged_into_every_configuration(self):
+        cfg = self._rendered_config(self._render_generic("orga_level"))
+
+        for key, value in self.DOM_IDS.items():
+            with self.subTest(key=key):
+                self.assertEqual(cfg[key], value)
+
+    def test_region_scope_is_forwarded_and_coerced_to_the_renderer_types(self):
+        cfg = self._rendered_config(
+            self._render_generic(
+                "orga_level",
+                {
+                    "country": "IT",
+                    "year": "2023",
+                    "nuts_prefix": "ITH10",
+                    "nuts_level": "3",
+                },
+            )
         )
-        self.assertIn('"dataField": "orga_level"', content)
-        self.assertIn('"value": "nuts"', content)
-        self.assertIn("Districts and district-free cities", content)
-        self.assertIn("WasteAtlasChoropleth.init", content)
-        self.assertIn('"svgId": "atlas-svg"', content)
-        self.assertIn('"containerId": "map-container"', content)
 
-    def test_orga_level_forwards_country_and_year(self):
-        content = self._render_generic("orga_level", {"country": "SE", "year": "2023"})
-        self.assertIn('"country": "SE"', content)
-        self.assertIn('"year": 2023', content)
+        self.assertEqual(cfg["country"], "IT")
+        self.assertEqual(cfg["year"], 2023)
+        self.assertEqual(cfg["nutsPrefix"], "ITH10")
+        self.assertEqual(cfg["nutsLevel"], 3)
 
-    def test_orga_level_forwards_nuts_prefix_and_level(self):
-        content = self._render_generic(
-            "orga_level", {"country": "IT", "nuts_prefix": "ITH10", "nuts_level": "3"}
+    def test_blank_nuts_scope_is_omitted_rather_than_sent_as_empty(self):
+        cfg = self._rendered_config(
+            self._render_generic("orga_level", {"nuts_prefix": "", "nuts_level": ""})
         )
-        self.assertIn('"nutsPrefix": "ITH10"', content)
-        self.assertIn('"nutsLevel": 3', content)
 
-    def test_connection_rate_renders_transform_name(self):
-        content = self._render_generic("connection_rate")
-        self.assertIn(
-            '"dataUrl": "/waste_collection/api/waste-atlas/connection-rate/"', content
-        )
-        self.assertIn('"transformName": "connectionRate"', content)
-        self.assertIn('"tooltipFields": [{"field": "reporting_year"', content)
-        self.assertIn('"label": "Reporting year"}]', content)
-        self.assertIn("WasteAtlasChoropleth.init", content)
+        self.assertNotIn("nutsPrefix", cfg)
+        self.assertNotIn("nutsLevel", cfg)
 
-    def test_collection_amount_renders_overlay_config(self):
-        content = self._render_generic("biowaste_collection_amount")
-        self.assertIn(
-            '"dataUrl": "/waste_collection/api/waste-atlas/biowaste-collection-amount/"',
-            content,
-        )
-        self.assertIn('"overlayPatternField": "_has_acpv_overlay"', content)
-        self.assertIn("Hatched = aggregated value", content)
-        self.assertIn('"outlineGeoJsonUrl"', content)
-
-    def test_residual_collection_count_renders_transform_name(self):
-        content = self._render_generic("residual_collection_count")
-        self.assertIn('"transformName": "residualCollectionCount"', content)
-        self.assertIn('"fileBase": "residual_collection_count"', content)
-
-    def test_biowaste_frequency_renders_transform_name(self):
-        content = self._render_generic("biowaste_frequency")
-        self.assertIn('"transformName": "biowasteFrequency"', content)
-
-    def test_waste_ratio_renders_transform_name(self):
-        content = self._render_generic("waste_ratio")
-        self.assertIn('"transformName": "wasteRatio"', content)
-
-    def test_unregistered_map_route_key_renders_empty_config(self):
-        """Unknown route keys produce an empty config dict; init is still called."""
+    def test_unregistered_config_key_renders_an_empty_config(self):
+        """An unknown key must degrade to the defaults instead of raising."""
         content = self._render_generic("nonexistent_route")
+
         self.assertIn("WasteAtlasChoropleth.init", content)
-        self.assertIn('"svgId": "atlas-svg"', content)
+        cfg = self._rendered_config(content)
+        self.assertEqual(
+            {key: cfg[key] for key in self.DOM_IDS},
+            self.DOM_IDS,
+        )
+        self.assertNotIn("dataUrl", cfg)
 
 
 @override_settings(

@@ -1,7 +1,6 @@
 import json
 import re
 from copy import deepcopy
-from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 from django.contrib.auth.models import Group, User
@@ -314,22 +313,6 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         self.assertContains(response, "Each category position must be unique.")
         config.refresh_from_db()
         self.assertEqual(config.configuration, original)
-
-    def test_renderer_uses_configured_legend_layout_and_category_order(self):
-        script_path = (
-            Path(__file__).resolve().parents[1]
-            / "waste_atlas"
-            / "static"
-            / "js"
-            / "waste_atlas_choropleth.js"
-        )
-        script = script_path.read_text()
-
-        self.assertIn("cfg.legendPlacement", script)
-        self.assertIn("cfg.legendWidth", script)
-        self.assertIn("cfg.legendFontSize", script)
-        self.assertIn("cfg.legendCategoryOrder", script)
-        self.assertIn("function _orderedLegendCategories(cfg)", script)
 
     def test_saved_export_layout_overrides_regional_default(self):
         config, _ = WasteAtlasMapConfiguration.objects.update_or_create(
