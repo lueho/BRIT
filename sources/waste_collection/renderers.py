@@ -74,7 +74,7 @@ _STATIC_LABELS = {
     "forbidden_materials": "Forbidden Materials",
     "fee_system": "Fee System",
     "frequency": "Frequency",
-    "min_bin_size": "Minimum bin size (L)",
+    "min_bin_size": "Smallest available bin size (L)",
     "required_bin_capacity": "Minimum required specific bin capacity (L/reference unit)",
     "required_bin_capacity_reference": "Reference unit for minimum required specific bin capacity",
     "established": "Year established",
