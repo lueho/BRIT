@@ -3864,6 +3864,116 @@ class OrganicAmountViewSetTests(APITestCase):
         self.assertIsNone(by_catchment[self.catchment_residual_only.id]["ratio"])
 
 
+@override_settings(
+    WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_ID=None,
+    WASTE_COLLECTION_TOTAL_WASTE_PROPERTY_ID=None,
+    WASTE_COLLECTION_SPECIFIC_WASTE_UNIT_ID=None,
+    WASTE_COLLECTION_TOTAL_WASTE_UNIT_ID=None,
+    WASTE_COLLECTION_POPULATION_ATTRIBUTE_ID=None,
+    WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_NAME="specific waste collected [ratio-type-test]",
+    WASTE_COLLECTION_TOTAL_WASTE_PROPERTY_NAME="total waste collected [ratio-type-test]",
+    WASTE_COLLECTION_SPECIFIC_WASTE_UNIT_NAME="kg/(cap.*a) [ratio-type-test]",
+    WASTE_COLLECTION_TOTAL_WASTE_UNIT_NAME="Mg/a [ratio-type-test]",
+    WASTE_COLLECTION_POPULATION_ATTRIBUTE_NAME="Population [ratio-type-test]",
+)
+class WasteRatioMixedNumericTypesTests(APITestCase):
+    """Regression tests for ratios combining direct and fallback amounts."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.specific_property = Property.objects.create(
+            name="specific waste collected [ratio-type-test]"
+        )
+        cls.total_property = Property.objects.create(
+            name="total waste collected [ratio-type-test]"
+        )
+        cls.specific_unit = Unit.objects.create(name="kg/(cap.*a) [ratio-type-test]")
+        cls.total_unit = Unit.objects.create(name="Mg/a [ratio-type-test]")
+        cls.population_attribute = RegionProperty.objects.create(
+            name="Population [ratio-type-test]",
+            unit="cap",
+        )
+
+        bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
+        residual_category, _ = WasteCategory.objects.get_or_create(
+            name="Residual waste"
+        )
+        collection_system, _ = CollectionSystem.objects.get_or_create(
+            name="Door to door"
+        )
+        region = Region.objects.create(name="Ratio Type Region", country="DE")
+        cls.catchment = CollectionCatchment.objects.create(
+            name="Ratio Type Catchment",
+            region=region,
+        )
+        bio_collection = Collection.objects.create(
+            name="Ratio Type Biowaste",
+            catchment=cls.catchment,
+            waste_category=bio_category,
+            collection_system=collection_system,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+        residual_collection = Collection.objects.create(
+            name="Ratio Type Residual",
+            catchment=cls.catchment,
+            waste_category=residual_category,
+            collection_system=collection_system,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+
+        RegionAttributeValue.objects.create(
+            name="Ratio Type Population",
+            region=region,
+            property=cls.population_attribute,
+            date=date(2024, 1, 1),
+            value=1000,
+        )
+        CollectionPropertyValue.objects.bulk_create(
+            [
+                CollectionPropertyValue(
+                    name="Ratio Type Biowaste Total",
+                    collection=bio_collection,
+                    property=cls.total_property,
+                    unit=cls.total_unit,
+                    year=2024,
+                    average=100.0,
+                    publication_status="published",
+                ),
+                CollectionPropertyValue(
+                    name="Ratio Type Residual Specific",
+                    collection=residual_collection,
+                    property=cls.specific_property,
+                    unit=cls.specific_unit,
+                    year=2024,
+                    average=50.0,
+                    publication_status="published",
+                ),
+            ]
+        )
+
+    def setUp(self):
+        clear_derived_value_config_cache()
+
+    def tearDown(self):
+        clear_derived_value_config_cache()
+
+    def test_waste_ratio_combines_fallback_and_direct_amounts(self):
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/waste-ratio/",
+            {"country": "DE", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        row = next(
+            item for item in response.data if item["catchment_id"] == self.catchment.id
+        )
+        self.assertEqual(row["bio_amount"], 100.0)
+        self.assertEqual(row["residual_amount"], 50.0)
+        self.assertAlmostEqual(row["ratio"], 2 / 3)
+
+
 class SouthTyrolCollectionPointTests(APITestCase):
     """Regression tests for South Tyrol collection-point atlas fix.
 
