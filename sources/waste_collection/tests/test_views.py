@@ -713,6 +713,41 @@ class CollectionFrequencyCRUDViewsTestCase(
         self.assertIsNone(self.options_2.option_2)
         self.assertIsNone(self.options_2.option_3)
 
+    def test_update_ignores_unchanged_empty_extra_season_form(self):
+        frequency = CollectionFrequency.objects.create(
+            owner=self.owner_user,
+            name="Frequency without a schedule",
+            type="Fixed-Seasonal",
+        )
+        self.client.force_login(self.owner_user)
+        data = {
+            "name": "Updated frequency without a schedule",
+            "type": "Fixed-Seasonal",
+            "description": "",
+            "form-TOTAL_FORMS": "1",
+            "form-INITIAL_FORMS": "0",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-distribution": str(self.distribution.pk),
+            "form-0-first_timestep": "",
+            "form-0-last_timestep": "",
+            "form-0-standard_cadence": "",
+            "form-0-standard": "",
+            "form-0-option_1_cadence": "",
+            "form-0-option_1": "",
+            "form-0-option_2_cadence": "",
+            "form-0-option_2": "",
+            "form-0-option_3_cadence": "",
+            "form-0-option_3": "",
+        }
+
+        response = self.client.post(self.get_update_url(frequency.pk), data)
+
+        self.assertEqual(response.status_code, 302)
+        frequency.refresh_from_db()
+        self.assertEqual(frequency.name, "Updated frequency without a schedule")
+        self.assertFalse(frequency.seasons.exists())
+
 
 # ----------- CollectionPropertyValue CRUD -----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
