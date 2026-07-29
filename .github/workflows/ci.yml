@@ -132,4 +132,4 @@ jobs:
           POSTGRES_PORT: 5432
           REDIS_URL: redis://localhost:6379/0
           SECRET_KEY: ci-test-key-not-secret
-        run: uv run python manage.py test --settings=brit.settings.testrunner --parallel 2
+        run: uv run python manage.py test --settings=brit.settings.testrunner --parallel 2 --noinput
