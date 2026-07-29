@@ -106,6 +106,9 @@ class CollectionsPerYearFilterTestCase(TestCase):
         seasonal_frequency = CollectionFrequency.objects.create(
             name="Seasonal Frequency"
         )
+        uncountable_frequency = CollectionFrequency.objects.create(
+            name="Frequency Without Count Options"
+        )
 
         CollectionCountOptions.objects.create(
             frequency=continuous_frequency, season=whole_year, standard=35, option_1=70
@@ -127,6 +130,9 @@ class CollectionsPerYearFilterTestCase(TestCase):
             name="Collection 3", frequency=seasonal_frequency
         )
         cls.collection4 = Collection.objects.create(name="Collection 4")
+        cls.collection5 = Collection.objects.create(
+            name="Collection 5", frequency=uncountable_frequency
+        )
 
     def test_filter_by_collections_per_year(self):
         filter_ = CollectionsPerYearFilter()
@@ -145,9 +151,19 @@ class CollectionsPerYearFilterTestCase(TestCase):
         filter_ = CollectionsPerYearFilter()
         qs = filter_.filter(Collection.objects.all(), (slice(52, 100), True))
         expected = Collection.objects.filter(
-            pk__in=[self.collection3.pk, self.collection4.pk]
+            pk__in=[self.collection3.pk, self.collection4.pk, self.collection5.pk]
         )
         self.assertQuerySetEqual(qs, expected, ordered=False)
+
+    def test_frequency_without_count_options_is_treated_as_null(self):
+        filter_ = CollectionsPerYearFilter()
+        qs = filter_.filter(Collection.objects.all(), (slice(0, 100), True))
+        self.assertIn(self.collection5, qs)
+
+    def test_frequency_without_count_options_is_excluded_without_nulls(self):
+        filter_ = CollectionsPerYearFilter()
+        qs = filter_.filter(Collection.objects.all(), (slice(0, 100), False))
+        self.assertNotIn(self.collection5, qs)
 
 
 class ConnectionRateFilterTestCase(TestCase):
