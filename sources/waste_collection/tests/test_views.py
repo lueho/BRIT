@@ -6305,7 +6305,7 @@ class DerivedValuesTestCase(TestCase):
             col_to_cid={collection.pk: catchment.pk},
             catchment_ids=[catchment.pk],
         )
-        self.assertEqual(amounts[catchment.pk], Decimal("2.6"))
+        self.assertEqual(amounts[catchment.pk], 2.6)
 
     def test_amounts_fallback_does_not_use_population_from_another_year(self):
         collection, catchment = self._create_collection(

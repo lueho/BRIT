@@ -1838,7 +1838,7 @@ def _amounts_for_year(
             continue
         pop = region_pop.get(region_id)
         if pop and pop > 0:
-            result[cid] = convert_total_to_specific(total_mg, pop, ndigits=1)
+            result[cid] = float(convert_total_to_specific(total_mg, pop, ndigits=1))
             value_sources[cid] = "cpv"
     if include_metadata:
         return result, value_sources, acpv_group_keys
@@ -2081,7 +2081,9 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
                     continue
                 pop = region_pop.get(region_id)
                 if pop and pop > 0:
-                    amounts[cid] = convert_total_to_specific(total_mg, pop, ndigits=1)
+                    amounts[cid] = float(
+                        convert_total_to_specific(total_mg, pop, ndigits=1)
+                    )
 
     data = []
     for cid, row in best.items():
