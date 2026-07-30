@@ -883,6 +883,11 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
   margin-top: .9rem;
   padding-top: .8rem;
 }
+.atlas-side-group:first-child {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
 .atlas-side-group-title {
   color: var(--atlas-eyebrow);
   font-size: .76rem;
@@ -900,16 +905,20 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
 }
 .atlas-side-link {
   color: var(--atlas-link);
-  display: inline-block;
+  display: block;
   font-size: .86rem;
-  margin-top: .9rem;
   text-decoration: none;
 }
 .atlas-side-link:hover,
 .atlas-side-link:focus-visible {
   color: var(--bs-primary);
 }
-.atlas-side-action {
+button.atlas-side-link {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
   width: 100%;
 }
 /* Downloads stack full width so the long PNG label never truncates. */

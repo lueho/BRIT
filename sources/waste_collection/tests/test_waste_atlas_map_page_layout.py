@@ -103,6 +103,26 @@ class MapPageChromeTests(TestCase):
         # Map pane so they are visible without switching to Options.
         self.assertIn('id="atlas-map-tools"', pane)
 
+    def test_map_pane_wraps_display_toggles_in_a_side_group(self):
+        """The quartile/conflict toggles sit in a titled group like View."""
+        content = self._content()
+        pane = self._section(content, 'id="atlas-map-pane"', 'id="atlas-options-pane"')
+        tools_pos = pane.index('id="atlas-map-tools"')
+        group_pos = pane.rfind("atlas-side-group", 0, tools_pos)
+        self.assertGreater(tools_pos, group_pos)
+        title_pos = pane.rfind("atlas-side-group-title", 0, tools_pos)
+        self.assertGreater(tools_pos, title_pos)
+
+    def test_options_pane_groups_actions_under_side_group_titles(self):
+        """Export and administration actions each carry a group title."""
+        self.client.force_login(self.staff)
+        content = self._content()
+        pane = self._section(
+            content, 'id="atlas-options-pane"', "</div>\n        </div>"
+        )
+        self.assertIn("atlas-side-group", pane)
+        self.assertGreaterEqual(pane.count("atlas-side-group-title"), 2)
+
     def test_options_tab_holds_the_export_trigger_and_config_link(self):
         content = self._content()
         pane = self._section(
@@ -111,6 +131,16 @@ class MapPageChromeTests(TestCase):
 
         self.assertNotIn('id="atlas-map-tools"', pane)
         self.assertIn('data-bs-target="#atlas-export-modal"', pane)
+
+    def test_export_trigger_uses_side_link_styling(self):
+        """The export button matches the side-link style, not a Bootstrap button."""
+        content = self._content()
+        pane = self._section(
+            content, 'id="atlas-options-pane"', "</div>\n        </div>"
+        )
+        self.assertIn("atlas-side-link", pane)
+        self.assertNotIn("btn-outline-secondary", pane)
+        self.assertNotIn("atlas-side-action", pane)
 
     # ---- export modal -----------------------------------------------------
 
@@ -204,6 +234,18 @@ class MapPageChromeAssetTests(SimpleTestCase):
 
     def test_export_actions_are_laid_out_for_the_modal(self):
         self.assertIn(".atlas-export-actions", self.stylesheet)
+
+    def test_side_action_class_is_gone(self):
+        """The Bootstrap button wrapper is replaced by atlas-side-link."""
+        self.assertNotIn(".atlas-side-action", self.stylesheet)
+
+    def test_side_link_resets_button_styles(self):
+        """A <button> styled as side-link must shed Bootstrap button chrome."""
+        self.assertIn("button.atlas-side-link", self.stylesheet)
+
+    def test_first_side_group_drops_the_top_divider(self):
+        """The first group in a pane needs no separator border."""
+        self.assertIn(".atlas-side-group:first-child", self.stylesheet)
 
     def test_renderer_no_longer_reveals_a_separate_options_card(self):
         """Export lives in the Options tab, so the tab is always present."""
