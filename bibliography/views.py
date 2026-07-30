@@ -87,6 +87,13 @@ class AuthorPrivateListView(PrivateObjectFilterView):
     ordering = "last_names"
 
 
+class AuthorReviewListView(ReviewObjectFilterView):
+    model = Author
+    filterset_class = AuthorFilterSet
+    dashboard_url = reverse_lazy("bibliography-explorer")
+    ordering = "last_names"
+
+
 class AuthorCreateView(UserCreatedObjectCreateView):
     form_class = AuthorModelForm
     permission_required = "bibliography.add_author"
@@ -152,6 +159,12 @@ class LicencePublishedListView(PublishedObjectFilterView):
 
 
 class LicencePrivateListView(PrivateObjectFilterView):
+    model = Licence
+    filterset_class = LicenceListFilter
+    dashboard_url = reverse_lazy("bibliography-explorer")
+
+
+class LicenceReviewListView(ReviewObjectFilterView):
     model = Licence
     filterset_class = LicenceListFilter
     dashboard_url = reverse_lazy("bibliography-explorer")
