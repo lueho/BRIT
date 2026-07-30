@@ -635,6 +635,12 @@ class StickyFilterOffsetAssetTests(SimpleTestCase):
     (`.page-breadcrumb-rail`, top: 56px, min-height: 3rem). Their sticky
     offset must account for both the topbar and the rail so they don't
     slide underneath the rail when scrolling.
+
+    The shared custom properties (``--brit-topnav-height``,
+    ``--brit-breadcrumb-rail-height``, ``--brit-sticky-offset``) are declared
+    globally in ``brit-theme.css`` (see
+    ``BreadcrumbRailGlobalStylingAssetTests``); ``filtered-list.css`` only
+    consumes them.
     """
 
     def _read_asset(self, relative_path):
@@ -648,17 +654,6 @@ class StickyFilterOffsetAssetTests(SimpleTestCase):
         )
         return asset_path.read_text(encoding="utf-8")
 
-    def test_filtered_list_css_defines_shared_sticky_offset_variables(self):
-        css = self._read_asset("css/filtered-list.css")
-
-        self.assertIn("--brit-topnav-height: 56px", css)
-        self.assertIn("--brit-breadcrumb-rail-height: 3rem", css)
-        self.assertIn(
-            "--brit-sticky-offset: calc(var(--brit-topnav-height)"
-            " + var(--brit-breadcrumb-rail-height) + 1rem)",
-            css,
-        )
-
     def test_filter_sticky_uses_shared_offset_and_not_topnav_alone(self):
         css = self._read_asset("css/filtered-list.css")
 
@@ -668,11 +663,145 @@ class StickyFilterOffsetAssetTests(SimpleTestCase):
     def test_filtered_list_minified_css_mirrors_source(self):
         minified = self._read_asset("css/filtered-list.min.css")
 
-        self.assertRegex(
-            minified,
-            r"--brit-sticky-offset:\s*calc\(var\(--brit-topnav-height\)",
-        )
         self.assertIn(
             ".filter-sticky{position:sticky;top:var(--brit-sticky-offset)", minified
         )
         self.assertNotIn("top:calc(56px + 1rem)", minified)
+
+
+class BreadcrumbRailGlobalStylingAssetTests(SimpleTestCase):
+    """Asset-level regression tests for the global .page-breadcrumb-rail styling.
+
+    The breadcrumb rail is rendered by base.html on every page that does not
+    override ``{% block page_chrome %}``. Its styling must live in the global
+    theme (``brit-theme.css``) — not in a component stylesheet — so the rail
+    has a consistent height, sticky position, background, and bottom margin on
+    every page without per-page spacing hacks.
+    """
+
+    def _read_asset(self, relative_path):
+        base_dir = Path(settings.BASE_DIR) if hasattr(settings, "BASE_DIR") else None
+        if base_dir is None:
+            self.skipTest("settings.BASE_DIR is not configured")
+        asset_path = base_dir / "brit" / "static" / relative_path
+        self.assertTrue(
+            asset_path.exists(),
+            f"Expected static asset {asset_path} to exist",
+        )
+        return asset_path.read_text(encoding="utf-8")
+
+    def test_brit_theme_css_defines_page_breadcrumb_rail(self):
+        """The rail must be styled globally in brit-theme.css."""
+        css = self._read_asset("css/brit-theme.css")
+
+        self.assertIn(".page-breadcrumb-rail", css)
+
+    def test_brit_theme_css_makes_rail_sticky_below_topnav(self):
+        css = self._read_asset("css/brit-theme.css")
+
+        # The rail must stick below the fixed topnav.
+        self.assertRegex(
+            css,
+            r"\.page-breadcrumb-rail\s*\{[^}]*position:\s*sticky",
+        )
+        self.assertRegex(
+            css,
+            r"\.page-breadcrumb-rail\s*\{[^}]*top:\s*var\(--brit-topnav-height\)",
+        )
+
+    def test_brit_theme_css_gives_rail_consistent_min_height(self):
+        css = self._read_asset("css/brit-theme.css")
+
+        self.assertRegex(
+            css,
+            r"\.page-breadcrumb-rail\s*\{[^}]*min-height:\s*var\(--brit-breadcrumb-rail-height\)",
+        )
+
+    def test_brit_theme_css_gives_rail_opaque_background(self):
+        """The rail needs an opaque background so scrolling content does not show through."""
+        css = self._read_asset("css/brit-theme.css")
+
+        self.assertRegex(
+            css,
+            r"\.page-breadcrumb-rail\s*\{[^}]*background",
+        )
+
+    def test_brit_theme_css_gives_rail_bottom_margin(self):
+        """A consistent margin-bottom replaces per-page spacing hacks."""
+        css = self._read_asset("css/brit-theme.css")
+
+        self.assertRegex(
+            css,
+            r"\.page-breadcrumb-rail\s*\{[^}]*margin-bottom",
+        )
+
+    def test_brit_theme_css_defines_shared_sticky_offset_variables(self):
+        """The shared custom properties must move to the global theme."""
+        css = self._read_asset("css/brit-theme.css")
+
+        self.assertIn("--brit-topnav-height: 56px", css)
+        self.assertIn("--brit-breadcrumb-rail-height: 3rem", css)
+        self.assertIn(
+            "--brit-sticky-offset: calc(var(--brit-topnav-height)"
+            " + var(--brit-breadcrumb-rail-height) + 1rem)",
+            css,
+        )
+
+    def test_brit_theme_minified_css_mirrors_rail_source(self):
+        minified = self._read_asset("css/brit-theme.min.css")
+
+        self.assertIn(".page-breadcrumb-rail", minified)
+        self.assertRegex(
+            minified,
+            r"--brit-sticky-offset:\s*calc\(var\(--brit-topnav-height\)",
+        )
+
+    def test_filtered_list_css_no_longer_redefines_shared_variables(self):
+        """filtered-list.css must not re-declare the shared custom properties.
+
+        They now live in the global theme; re-declaring them in a component
+        stylesheet would create a maintenance hazard and shadow the global
+        values on pages that load filtered-list.css.
+        """
+        css = self._read_asset("css/filtered-list.css")
+
+        self.assertNotIn("--brit-topnav-height: 56px", css)
+        self.assertNotIn("--brit-breadcrumb-rail-height: 3rem", css)
+        # The sticky-offset variable must also not be re-declared here.
+        self.assertNotIn("--brit-sticky-offset: calc(", css)
+
+    def test_filtered_list_css_still_consumes_shared_offset(self):
+        """filtered-list.css must still use the shared offset variable."""
+        css = self._read_asset("css/filtered-list.css")
+
+        self.assertIn("top: var(--brit-sticky-offset);", css)
+
+    def test_waste_atlas_css_drops_per_page_margin_top_hack(self):
+        """The atlas shell must not carry a per-page margin-top hack.
+
+        The global breadcrumb rail margin-bottom now provides the spacing.
+        """
+        base_dir = Path(settings.BASE_DIR) if hasattr(settings, "BASE_DIR") else None
+        if base_dir is None:
+            self.skipTest("settings.BASE_DIR is not configured")
+        asset_path = (
+            base_dir
+            / "sources"
+            / "waste_collection"
+            / "waste_atlas"
+            / "static"
+            / "css"
+            / "waste_atlas.css"
+        )
+        self.assertTrue(
+            asset_path.exists(),
+            f"Expected static asset {asset_path} to exist",
+        )
+        css = asset_path.read_text(encoding="utf-8")
+
+        # The .atlas-shell rule must not set margin-top.
+        import re
+
+        match = re.search(r"\.atlas-shell\s*\{([^}]*)\}", css)
+        self.assertIsNotNone(match, ".atlas-shell rule not found in waste_atlas.css")
+        self.assertNotIn("margin-top", match.group(1))

@@ -665,7 +665,6 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
   display: flex;
   flex-direction: column;
   margin-bottom: 2rem;
-  margin-top: 1.5rem;
   min-height: 70vh;
 }
 
