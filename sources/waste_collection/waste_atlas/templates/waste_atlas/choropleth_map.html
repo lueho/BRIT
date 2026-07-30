@@ -95,6 +95,8 @@
               {% block atlas_selector %}
                 {% include "waste_atlas/includes/map_selector.html" with atlas_selector_button_label="Load" %}
               {% endblock atlas_selector %}
+              {# The renderer mounts quartile/conflict toggles here when the map offers them. #}
+              <div id="atlas-map-tools"></div>
               {% if map_toggle_url %}
                 <div class="atlas-side-group">
                   <h3 class="atlas-side-group-title">View</h3>
@@ -127,8 +129,6 @@
                  role="tabpanel"
                  aria-labelledby="atlas-options-tab"
                  tabindex="0">
-              {# The renderer mounts quartile/conflict toggles here when the map offers them. #}
-              <div id="atlas-map-tools"></div>
               <button class="btn btn-sm btn-outline-secondary atlas-side-action"
                       type="button"
                       data-bs-toggle="modal"

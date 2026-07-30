@@ -93,20 +93,23 @@ class MapPageChromeTests(TestCase):
 
         self.assertEqual(tabs.count('data-bs-toggle="tab"'), 2)
 
-    def test_map_tab_holds_the_selector_and_the_view_switch(self):
+    def test_map_tab_holds_the_selector_the_view_switch_and_the_map_toggles(self):
         content = self._content()
         pane = self._section(content, 'id="atlas-map-pane"', 'id="atlas-options-pane"')
 
         self.assertIn("atlas-selector-form", pane)
         self.assertIn("atlas-mode-toggle", pane)
+        # The renderer mounts quartile/conflict toggles here; they belong in the
+        # Map pane so they are visible without switching to Options.
+        self.assertIn('id="atlas-map-tools"', pane)
 
-    def test_options_tab_holds_the_toggles_and_the_export_trigger(self):
+    def test_options_tab_holds_the_export_trigger_and_config_link(self):
         content = self._content()
         pane = self._section(
             content, 'id="atlas-options-pane"', "</div>\n        </div>"
         )
 
-        self.assertIn('id="atlas-map-tools"', pane)
+        self.assertNotIn('id="atlas-map-tools"', pane)
         self.assertIn('data-bs-target="#atlas-export-modal"', pane)
 
     # ---- export modal -----------------------------------------------------
