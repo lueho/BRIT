@@ -135,6 +135,12 @@
                       data-bs-target="#atlas-export-modal">
                 <i class="fas fa-download" aria-hidden="true"></i> Export map…
               </button>
+              {% if request.user.is_staff and map_configuration_edit_url %}
+                <a class="atlas-side-link"
+                   href="{{ map_configuration_edit_url }}">
+                  <i class="fas fa-sliders-h" aria-hidden="true"></i> Edit configuration
+                </a>
+              {% endif %}
             </div>
           </div>
         </div>

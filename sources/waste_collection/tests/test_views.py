@@ -4652,10 +4652,11 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
-    def test_overview_shows_staff_tools_only_for_staff(self):
+    def test_overview_shows_maintainer_links_only_for_staff(self):
         response = self.client.get(reverse("waste-atlas-overview"))
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'id="atlas-tools-menu"')
+        self.assertNotContains(response, reverse("waste-atlas-change-map-overview"))
         self.assertNotContains(response, reverse("waste-atlas-data-conflicts-overview"))
 
         staff = User.objects.create_user(
@@ -4665,7 +4666,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.client.force_login(staff)
 
         response = self.client.get(reverse("waste-atlas-overview"))
-        self.assertContains(response, 'id="atlas-tools-menu"')
+        self.assertNotContains(response, 'id="atlas-tools-menu"')
         self.assertContains(response, reverse("waste-atlas-change-map-overview"))
         self.assertContains(response, reverse("waste-atlas-data-conflicts-overview"))
 

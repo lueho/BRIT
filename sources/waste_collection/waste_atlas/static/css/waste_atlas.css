@@ -650,7 +650,7 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
 
 /* ============================ App shell ============================ */
 /*
- * The atlas app shell: sub-app toolbar, left map tree, and workspace.
+ * The atlas app shell: left map tree and workspace.
  * Scoped to .atlas-shell so BRIT core pages are unaffected; the --brit-*
  * aliases let a future core design shift adopt the same tokens.
  */
@@ -668,24 +668,10 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
   min-height: 70vh;
 }
 
-.atlas-shell-toolbar {
-  align-items: center;
-  background: var(--brit-surface);
-  border: 1px solid var(--brit-border);
-  border-radius: var(--brit-radius);
-  box-shadow: var(--atlas-shadow-sm);
-  display: flex;
-  gap: .9rem;
-  margin-bottom: 1rem;
-  padding: .55rem .9rem;
-}
-.atlas-shell-toolbar-actions {
-  align-items: center;
-  display: flex;
-  gap: .75rem;
-  margin-left: auto;
-}
-
+/*
+ * Mobile-only Maps toggle; lives at the top of the workspace and is hidden
+ * on desktop where the tree is always visible in the left column.
+ */
 .atlas-tree-toggle {
   align-items: center;
   background: var(--brit-surface);
@@ -696,6 +682,7 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
   font-size: .85rem;
   font-weight: 700;
   gap: .45rem;
+  margin-bottom: 1rem;
   padding: .35rem .7rem;
 }
 

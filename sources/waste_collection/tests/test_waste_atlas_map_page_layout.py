@@ -127,7 +127,7 @@ class MapPageChromeTests(TestCase):
         self.assertIn('title="Download a PNG at 300 DPI, ready for Word"', content)
         self.assertIn('title="Download a vector SVG"', content)
 
-    # ---- shell toolbar ----------------------------------------------------
+    # ---- shell toolbar (removed) -----------------------------------------
 
     def test_toolbar_drops_the_brand_the_breadcrumb_already_shows(self):
         content = self._content()
@@ -135,25 +135,38 @@ class MapPageChromeTests(TestCase):
         self.assertNotIn("atlas-shell-brand", content)
         self.assertIn("page-breadcrumb-rail", content)
 
-    def test_toolbar_actions_share_one_button_family(self):
+    def test_shell_has_no_toolbar_card_or_tools_dropdown(self):
+        """The empty toolbar card and the Tools dropdown are gone."""
         content = self._content()
 
-        self.assertNotIn("atlas-feedback-link", content)
-        self.assertNotIn("atlas-hero-link", content)
-        toolbar = self._section(
-            content, 'class="atlas-shell-toolbar-actions"', "</div>\n    </div>"
-        )
-        self.assertIn("mailto:info@bioresource-tools.net", toolbar)
-        self.assertEqual(toolbar.count("btn btn-sm btn-outline-secondary"), 1)
+        self.assertNotIn("atlas-shell-toolbar", content)
+        self.assertNotIn("atlas-shell-toolbar-actions", content)
+        self.assertNotIn("atlas-hero-tools", content)
+        self.assertNotIn('id="atlas-tools-menu"', content)
+        # The atlas shell no longer carries its own feedback button; the
+        # core sidebar still renders the shared "Contact / Feedback" link.
+        shell = self._section(content, 'id="atlas-shell"', "</main>")
+        self.assertNotIn("atlas-feedback-link", shell)
+        self.assertNotIn("Waste%20Atlas%20feedback", shell)
 
-    def test_editing_the_configuration_moves_into_the_staff_tools_menu(self):
+    def test_mobile_maps_toggle_survives_outside_the_toolbar(self):
+        """The tree toggle moves to the workspace but keeps its wiring id."""
+        content = self._content()
+
+        self.assertIn('id="atlas-tree-toggle"', content)
+        self.assertIn('aria-controls="atlas-tree"', content)
+
+    def test_edit_configuration_lives_in_the_options_pane_for_staff(self):
         self.client.force_login(self.staff)
         content = self._content()
 
         header = self._section(content, '<header class="atlas-context"', "</header>")
         self.assertNotIn("Edit configuration", header)
-        menu = self._section(content, 'aria-labelledby="atlas-tools-menu"', "</ul>")
-        self.assertIn("Edit configuration", menu)
+        pane = self._section(
+            content, 'id="atlas-options-pane"', "</div>\n        </div>"
+        )
+        self.assertIn("Edit configuration", pane)
+        self.assertIn("/configurations/", pane)
 
     def test_non_staff_see_no_configuration_entry(self):
         content = self._content()
@@ -173,8 +186,11 @@ class MapPageChromeAssetTests(SimpleTestCase):
     def test_orphaned_toolbar_styles_are_gone(self):
         for selector in (
             ".atlas-shell-brand",
+            ".atlas-shell-toolbar",
+            ".atlas-shell-toolbar-actions",
             ".atlas-feedback-link",
             ".atlas-hero-link",
+            ".atlas-hero-tools",
         ):
             with self.subTest(selector=selector):
                 self.assertNotIn(selector, self.stylesheet)
