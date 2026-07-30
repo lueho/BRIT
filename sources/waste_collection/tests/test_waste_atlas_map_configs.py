@@ -32,7 +32,6 @@ REQUIRED_CONFIG_KEYS = frozenset(
         "categories",
         "noDataColor",
         "legendTitle",
-        "fileBase",
     }
 )
 

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static atlas_tags %}
 {% block title %}
   Waste Atlas — {{ map_title }}
 {% endblock title %}
@@ -661,12 +661,12 @@
       });
       if (btnSVG) {
         btnSVG.addEventListener('click', function () {
-          WasteAtlasChoropleth.exportElementSVG(svgEl, 'waste_atlas_europe_biowaste_collection_amount.svg');
+          WasteAtlasChoropleth.exportElementSVG(svgEl, '{% atlas_export_file_base "" "europe_biowaste_collection_amount" %}.svg');
         });
       }
       if (btnPNG) {
         btnPNG.addEventListener('click', function () {
-          WasteAtlasChoropleth.exportElementPNG(svgEl, 'waste_atlas_europe_biowaste_collection_amount.png');
+          WasteAtlasChoropleth.exportElementPNG(svgEl, '{% atlas_export_file_base "" "europe_biowaste_collection_amount" %}.png');
         });
       }
     });
