@@ -337,6 +337,23 @@ class CatchmentBiowasteImpuritySerializer(serializers.Serializer):
         return data
 
 
+class CatchmentResidualWasteCompositionSerializer(serializers.Serializer):
+    """Flat composition-analysis values for residual-waste catchments."""
+
+    catchment_id = serializers.IntegerField()
+    bw_rw_percentage = serializers.FloatField(allow_null=True)
+    bw_rw_kg = serializers.FloatField(allow_null=True)
+    fwtot_rw_kg = serializers.FloatField(allow_null=True)
+    analysis_year = serializers.IntegerField(allow_null=True)
+    amount_basis_year = serializers.IntegerField()
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        for field in ("bw_rw_percentage", "bw_rw_kg", "fwtot_rw_kg"):
+            data[field] = _round_one_decimal(data.get(field))
+        return data
+
+
 class CatchmentWeeklyBpAccessDaysSerializer(serializers.Serializer):
     """Flat JSON serializer for weekly bring-point access days per catchment."""
 

@@ -2259,6 +2259,27 @@ MAP_PAGES = [
     ),
     _page(
         "rp",
+        "bw_rw_percentage",
+        "Total biowaste in residual waste",
+        "map/rp/biowaste-in-residual-waste-percentage/",
+        "waste-atlas-rp-bw-rw-percentage-map",
+    ),
+    _page(
+        "rp",
+        "bw_rw_kg",
+        "Total biowaste in residual waste",
+        "map/rp/biowaste-in-residual-waste-amount/",
+        "waste-atlas-rp-bw-rw-kg-map",
+    ),
+    _page(
+        "rp",
+        "fwtot_rw_kg",
+        "Total food waste in residual waste",
+        "map/rp/food-waste-in-residual-waste-amount/",
+        "waste-atlas-rp-fwtot-rw-kg-map",
+    ),
+    _page(
+        "rp",
         "biowaste_collection_amount",
         "Specifically collected amount of biowaste",
         "map/rp/biowaste-collection-amount/",
