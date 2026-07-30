@@ -47,6 +47,7 @@ from .viewsets import (
     ResidualFrequencyTypeViewSet,
     ResidualMinBinSizeViewSet,
     ResidualRequiredBinCapacityViewSet,
+    ResidualWasteCompositionViewSet,
     TargetWasteCategoryViewSet,
     WasteRatioViewSet,
     WeeklyBpAccessDaysViewSet,
@@ -293,6 +294,11 @@ router.register(
     "biowaste-impurity",
     BiowasteImpurityViewSet,
     basename="api-waste-atlas-biowaste-impurity",
+)
+router.register(
+    "residual-waste-composition",
+    ResidualWasteCompositionViewSet,
+    basename="api-waste-atlas-residual-waste-composition",
 )
 router.register(
     "weekly-bp-access-days",

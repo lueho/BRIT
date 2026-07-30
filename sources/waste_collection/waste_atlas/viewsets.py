@@ -69,6 +69,7 @@ from .serializers import (
     CatchmentParticipationPolicySerializer,
     CatchmentPopulationSerializer,
     CatchmentRequiredBinCapacitySerializer,
+    CatchmentResidualWasteCompositionSerializer,
     CatchmentTargetWasteCategorySerializer,
     CatchmentWasteRatioSerializer,
     CatchmentWeeklyBpAccessDaysSerializer,
@@ -144,6 +145,10 @@ CONNECTION_RATE_PROPERTY_ID = 4
 COLLECTION_POINT_COUNT_PROPERTY_NAME = "number of collection points"
 BIOWASTE_IMPURITY_RATE_PROPERTY_NAME = "biowaste impurity rate"
 WEEKLY_BP_ACCESS_DAYS_PROPERTY_NAME = "weekly bring-point access days"
+BIOWASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME = "total biowaste in residual waste"
+FOOD_WASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME = "total food waste in residual waste"
+PERCENTAGE_UNIT_NAME = "%"
+SPECIFIC_AMOUNT_UNIT_NAME = "kg/(cap.*a)"
 
 # Priority for picking the primary collection system per catchment.
 # Lower number = higher priority.
@@ -457,6 +462,58 @@ def _latest_connection_rate_values(collection_ids):
         if latest is not None:
             latest_by_selected_id[selected_id] = latest
 
+    return latest_by_selected_id
+
+
+def _latest_property_values(
+    collection_ids,
+    *,
+    property_name,
+    unit_name,
+    year=None,
+    user=None,
+):
+    """Return the latest matching value from each selected collection's chain."""
+    version_chains = _collection_version_chains(collection_ids)
+    if not version_chains:
+        return {}
+
+    all_chain_ids = set().union(*version_chains.values())
+    filters = {
+        "collection_id__in": all_chain_ids,
+        "property__name": property_name,
+        "unit__name": unit_name,
+        "average__isnull": False,
+        "publication_status__in": _visible_statuses(user),
+    }
+    if year is not None:
+        filters["year"] = year
+
+    values_by_collection_id = {}
+    for row in CollectionPropertyValue.objects.filter(**filters).values(
+        "id",
+        "collection_id",
+        "average",
+        "year",
+    ):
+        values_by_collection_id.setdefault(row["collection_id"], []).append(row)
+
+    latest_by_selected_id = {}
+    for selected_id, chain_ids in version_chains.items():
+        candidates = [
+            candidate
+            for chain_id in chain_ids
+            for candidate in values_by_collection_id.get(chain_id, ())
+        ]
+        if candidates:
+            latest_by_selected_id[selected_id] = max(
+                candidates,
+                key=lambda candidate: (
+                    candidate["year"] is not None,
+                    candidate["year"] or 0,
+                    candidate["id"],
+                ),
+            )
     return latest_by_selected_id
 
 
@@ -3152,6 +3209,82 @@ class BiowasteImpurityViewSet(WasteAtlasViewSet):
             )
 
         serializer = CatchmentBiowasteImpuritySerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class ResidualWasteCompositionViewSet(WasteAtlasViewSet):
+    """Return residual-waste composition analyses for atlas maps.
+
+    The selected collection is scoped by the requested atlas year. Percentage
+    values retain the analysis year stored on the property value, while the
+    amount fields use statistics from the requested year.
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        best = _select_primary_collections(
+            country,
+            year,
+            ["Residual waste"],
+            nuts_prefixes,
+            user=request.user,
+        )
+        collection_ids = [row["collection_id"] for row in best.values()]
+
+        percentage_values = _latest_property_values(
+            collection_ids,
+            property_name=BIOWASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME,
+            unit_name=PERCENTAGE_UNIT_NAME,
+            user=request.user,
+        )
+        biowaste_amounts = _latest_property_values(
+            collection_ids,
+            property_name=BIOWASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME,
+            unit_name=SPECIFIC_AMOUNT_UNIT_NAME,
+            year=year,
+            user=request.user,
+        )
+        food_waste_amounts = _latest_property_values(
+            collection_ids,
+            property_name=FOOD_WASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME,
+            unit_name=SPECIFIC_AMOUNT_UNIT_NAME,
+            year=year,
+            user=request.user,
+        )
+
+        data = []
+        for catchment_id, collection_row in best.items():
+            collection_id = collection_row["collection_id"]
+            percentage = percentage_values.get(collection_id)
+            biowaste_amount = biowaste_amounts.get(collection_id)
+            food_waste_amount = food_waste_amounts.get(collection_id)
+            data.append(
+                {
+                    "catchment_id": catchment_id,
+                    "bw_rw_percentage": (
+                        percentage["average"] if percentage is not None else None
+                    ),
+                    "bw_rw_kg": (
+                        biowaste_amount["average"]
+                        if biowaste_amount is not None
+                        else None
+                    ),
+                    "fwtot_rw_kg": (
+                        food_waste_amount["average"]
+                        if food_waste_amount is not None
+                        else None
+                    ),
+                    "analysis_year": (
+                        percentage["year"] if percentage is not None else None
+                    ),
+                    "amount_basis_year": year,
+                }
+            )
+
+        serializer = CatchmentResidualWasteCompositionSerializer(data, many=True)
         return Response(serializer.data)
 
 

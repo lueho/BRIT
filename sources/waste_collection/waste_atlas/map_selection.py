@@ -23,6 +23,8 @@ THEME_LABELS = {
     "biowaste_impurity": "Biowaste impurity",
     "biowaste_min_bin_size": "Biowaste bin size",
     "biowaste_required_bin_capacity": "Biowaste bin capacity",
+    "bw_rw_kg": "Biowaste in residual waste (kg)",
+    "bw_rw_percentage": "Biowaste in residual waste (%)",
     "collection_count_ratio": "Collection-count ratio",
     "collection_orga_level": "Collections: admin. level",
     "collection_point_count": "Collection points",
@@ -36,6 +38,7 @@ THEME_LABELS = {
     "connection_rate": "Connection rate",
     "participation_policy": "Participation Policy",
     "food_waste_category": "Accepted food waste",
+    "fwtot_rw_kg": "Food waste in residual waste (kg)",
     "green_waste_collection_amount": "Green waste amount",
     "green_waste_collection_system_count": "Green waste system count",
     "min_bin_size_ratio": "Minimum bin-size ratio",
@@ -191,6 +194,9 @@ DIRECTORY_THEME_GROUP_SECTIONS = {
     "collection_count_ratio": "counts",
     "fee_system": "fees",
     "collection_amount": "amounts",
+    "bw_rw_percentage": "amounts",
+    "bw_rw_kg": "amounts",
+    "fwtot_rw_kg": "amounts",
     "waste_ratio": "amounts",
 }
 
@@ -231,6 +237,9 @@ MAP_SELECTION_THEME_ORDER = {
     "organic_collection_amount": 630,
     "waste_ratio": 640,
     "organic_waste_ratio": 650,
+    "bw_rw_percentage": 660,
+    "bw_rw_kg": 661,
+    "fwtot_rw_kg": 662,
     "connection_rate": 700,
     "participation_policy": 710,
 }
@@ -278,6 +287,9 @@ MAP_SELECTION_WASTE_CATEGORY_OVERRIDES = {
     "paper_bags": "biowaste",
     "plastic_bags": "biowaste",
     "collection_support": "biowaste",
+    "bw_rw_percentage": "residual",
+    "bw_rw_kg": "residual",
+    "fwtot_rw_kg": "residual",
 }
 
 # Themes whose displayed value is derived from one deterministic primary
@@ -286,6 +298,8 @@ MAP_SELECTION_WASTE_CATEGORY_OVERRIDES = {
 COLLECTION_DETAIL_CATEGORY_BY_THEME = {
     "access_control": "biowaste",
     "bin_configuration": "biowaste",
+    "bw_rw_percentage": "residual",
+    "bw_rw_kg": "residual",
     "biowaste_collection_point_count": "biowaste",
     "biowaste_collection_system": "biowaste",
     "biowaste_fee_system": "biowaste",
@@ -295,6 +309,7 @@ COLLECTION_DETAIL_CATEGORY_BY_THEME = {
     "collection_support": "biowaste",
     "collection_system": "biowaste",
     "food_waste_category": "biowaste",
+    "fwtot_rw_kg": "residual",
     "paper_bags": "biowaste",
     "participation_policy": "biowaste",
     "plastic_bags": "biowaste",
