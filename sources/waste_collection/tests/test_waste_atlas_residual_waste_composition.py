@@ -222,17 +222,14 @@ class RheinlandPfalzResidualWasteCompositionMapTests(TestCase):
         "bw_rw_percentage": {
             "title": "Total biowaste in residual waste",
             "legend_title": "Share of residual waste (%)",
-            "file_base": "rp_bw_rw_percentage",
         },
         "bw_rw_kg": {
             "title": "Total biowaste in residual waste",
             "legend_title": "Amount (kg/cap/a)",
-            "file_base": "rp_bw_rw_kg",
         },
         "fwtot_rw_kg": {
             "title": "Total food waste in residual waste",
             "legend_title": "Amount (kg/cap/a)",
-            "file_base": "rp_fwtot_rw_kg",
         },
     }
 
@@ -270,7 +267,7 @@ class RheinlandPfalzResidualWasteCompositionMapTests(TestCase):
                 self.assertEqual(len(config["quartileColors"]), 4)
                 self.assertTrue(config["enableQuartiles"])
                 self.assertEqual(config["legendTitle"], expected["legend_title"])
-                self.assertEqual(config["fileBase"], expected["file_base"])
+                self.assertNotIn("fileBase", config)
 
     def test_amount_maps_explain_the_2024_statistics_basis(self):
         for theme in ("bw_rw_kg", "fwtot_rw_kg"):
