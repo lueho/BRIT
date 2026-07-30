@@ -188,6 +188,50 @@ def set_lau_catchment_parent(sender, instance, created, **kwargs):
         Catchment.objects.filter(pk=instance.pk).update(parent_id=correct_parent.pk)
 
 
+@receiver(post_save, sender=Catchment)
+def warn_custom_catchment_parent_mismatch(sender, instance, **kwargs):
+    """Warn when a custom catchment barely overlaps its tree parent.
+
+    Custom catchments (e.g. waste-management associations) are user-defined
+    areas whose tree ``parent`` is set manually — typically via the admin.
+    Unlike the NUTS / LAU / administrative hierarchy, the tree parent does
+    not guarantee spatial containment.  A custom catchment may legitimately
+    *partially* overlap its parent, but a negligible overlap (below 1% of
+    the smaller geometry's area — usually a coordinate sliver) means the
+    parent assignment is almost certainly wrong and will cause unrelated
+    collections to surface in ``downstream_collections`` lookups.
+
+    This signal logs a warning (non-blocking) so that data curators are
+    alerted to the mismatch without preventing the save.
+    """
+    if instance.type != "custom":
+        return
+    if instance.parent_id is None:
+        return
+
+    own_geom = instance.geom
+    parent_geom = instance.parent.geom
+    if own_geom is None or parent_geom is None:
+        return
+
+    smaller_area = min(own_geom.area, parent_geom.area)
+    if smaller_area == 0:
+        return
+    overlap_pct = own_geom.intersection(parent_geom).area / smaller_area * 100
+    if overlap_pct < 1.0:
+        logger.warning(
+            "Custom catchment %r (id=%s) has only %.4f%% spatial overlap with "
+            "its tree parent %r (id=%s). The parent assignment is likely "
+            "incorrect and may cause unrelated collections to appear in "
+            "downstream lookups.",
+            instance.name,
+            instance.pk,
+            overlap_pct,
+            instance.parent.name,
+            instance.parent_id,
+        )
+
+
 @receiver(post_save, sender=LauRegion)
 @receiver(post_delete, sender=LauRegion)
 def invalidate_lau_region_cache(sender, instance, **kwargs):
