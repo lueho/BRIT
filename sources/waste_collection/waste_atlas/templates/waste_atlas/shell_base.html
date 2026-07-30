@@ -1,74 +1,26 @@
 {% extends "base.html" %}
 {% load static %}
 {% block style_sheets %}
-  <link href="{% static 'css/waste_atlas.min.css' %}?v=20260727-7"
+  <link href="{% static 'css/waste_atlas.min.css' %}?v=20260730-4"
         rel="stylesheet">
 {% endblock style_sheets %}
 {% block body_class %} sb-sidenav-toggled{% endblock body_class %}
 {% block content %}
   <div class="atlas-shell" id="atlas-shell">
-    <div class="atlas-shell-toolbar">
-      <button class="atlas-tree-toggle"
-              id="atlas-tree-toggle"
-              type="button"
-              aria-controls="atlas-tree"
-              aria-expanded="false">
-        <i class="fas fa-bars"></i>
-        <span>Maps</span>
-      </button>
-      <div class="atlas-shell-toolbar-actions">
-        <a class="btn btn-sm btn-outline-secondary"
-           href="mailto:info@bioresource-tools.net?subject=Waste%20Atlas%20feedback">
-          <i class="fas fa-comment-dots"></i> Feedback
-        </a>
-        {% if request.user.is_staff %}
-          <div class="atlas-hero-tools dropdown">
-            <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
-                    type="button"
-                    id="atlas-tools-menu"
-                    data-bs-toggle="dropdown"
-                    aria-expanded="false">
-              <i class="fas fa-cog"></i> Tools
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="atlas-tools-menu">
-              {% if map_configuration_edit_url %}
-                <li>
-                  <a class="dropdown-item" href="{{ map_configuration_edit_url }}">
-                    <i class="fas fa-sliders-h"></i> Edit configuration
-                  </a>
-                </li>
-                <li>
-                  <hr class="dropdown-divider">
-                </li>
-              {% endif %}
-              <li>
-                <a class="dropdown-item" href="{% url 'waste-atlas-change-map-overview' %}">
-                  <i class="fas fa-exchange-alt"></i> Change maps
-                </a>
-              </li>
-              <li>
-                <a class="dropdown-item"
-                   href="{% url 'waste-atlas-data-conflicts-overview' %}">
-                  <i class="fas fa-exclamation-triangle"></i> Data conflicts
-                </a>
-              </li>
-              <li>
-                <a class="dropdown-item"
-                   href="{% url 'waste-atlas-map-configuration-list' %}">
-                  <i class="fas fa-sliders-h"></i> Map configurations
-                </a>
-              </li>
-            </ul>
-          </div>
-        {% endif %}
-      </div>
-    </div>
     <div class="atlas-shell-main">
       <nav class="atlas-tree" id="atlas-tree" aria-label="Waste Atlas maps">
         {% include "waste_atlas/includes/shell_tree.html" %}
       </nav>
       <div class="atlas-tree-scrim" id="atlas-tree-scrim"></div>
       <div class="atlas-workspace">
+        <button class="atlas-tree-toggle"
+                id="atlas-tree-toggle"
+                type="button"
+                aria-controls="atlas-tree"
+                aria-expanded="false">
+          <i class="fas fa-bars"></i>
+          <span>Maps</span>
+        </button>
         {% block atlas_workspace %}
         {% endblock atlas_workspace %}
       </div>
@@ -79,7 +31,7 @@
   {{ block.super }}
   {% block atlas_vendor_javascript %}
   {% endblock atlas_vendor_javascript %}
-  <script src="{% static 'js/waste_atlas_choropleth.min.js' %}?v=20260727-7"></script>
+  <script src="{% static 'js/waste_atlas_choropleth.min.js' %}?v=20260730-4"></script>
   <script>WasteAtlasChoropleth.initShell();</script>
   {% block atlas_page_javascript %}
   {% endblock atlas_page_javascript %}

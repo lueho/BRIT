@@ -93,21 +93,54 @@ class MapPageChromeTests(TestCase):
 
         self.assertEqual(tabs.count('data-bs-toggle="tab"'), 2)
 
-    def test_map_tab_holds_the_selector_and_the_view_switch(self):
+    def test_map_tab_holds_the_selector_the_view_switch_and_the_map_toggles(self):
         content = self._content()
         pane = self._section(content, 'id="atlas-map-pane"', 'id="atlas-options-pane"')
 
         self.assertIn("atlas-selector-form", pane)
         self.assertIn("atlas-mode-toggle", pane)
+        # The renderer mounts quartile/conflict toggles here; they belong in the
+        # Map pane so they are visible without switching to Options.
+        self.assertIn('id="atlas-map-tools"', pane)
 
-    def test_options_tab_holds_the_toggles_and_the_export_trigger(self):
+    def test_map_pane_wraps_display_toggles_in_a_side_group(self):
+        """The quartile/conflict toggles sit in a titled group like View."""
+        content = self._content()
+        pane = self._section(content, 'id="atlas-map-pane"', 'id="atlas-options-pane"')
+        tools_pos = pane.index('id="atlas-map-tools"')
+        group_pos = pane.rfind("atlas-side-group", 0, tools_pos)
+        self.assertGreater(tools_pos, group_pos)
+        title_pos = pane.rfind("atlas-side-group-title", 0, tools_pos)
+        self.assertGreater(tools_pos, title_pos)
+
+    def test_options_pane_groups_actions_under_side_group_titles(self):
+        """Export and administration actions each carry a group title."""
+        self.client.force_login(self.staff)
+        content = self._content()
+        pane = self._section(
+            content, 'id="atlas-options-pane"', "</div>\n        </div>"
+        )
+        self.assertIn("atlas-side-group", pane)
+        self.assertGreaterEqual(pane.count("atlas-side-group-title"), 2)
+
+    def test_options_tab_holds_the_export_trigger_and_config_link(self):
         content = self._content()
         pane = self._section(
             content, 'id="atlas-options-pane"', "</div>\n        </div>"
         )
 
-        self.assertIn('id="atlas-map-tools"', pane)
+        self.assertNotIn('id="atlas-map-tools"', pane)
         self.assertIn('data-bs-target="#atlas-export-modal"', pane)
+
+    def test_export_trigger_uses_side_link_styling(self):
+        """The export button matches the side-link style, not a Bootstrap button."""
+        content = self._content()
+        pane = self._section(
+            content, 'id="atlas-options-pane"', "</div>\n        </div>"
+        )
+        self.assertIn("atlas-side-link", pane)
+        self.assertNotIn("btn-outline-secondary", pane)
+        self.assertNotIn("atlas-side-action", pane)
 
     # ---- export modal -----------------------------------------------------
 
@@ -127,7 +160,7 @@ class MapPageChromeTests(TestCase):
         self.assertIn('title="Download a PNG at 300 DPI, ready for Word"', content)
         self.assertIn('title="Download a vector SVG"', content)
 
-    # ---- shell toolbar ----------------------------------------------------
+    # ---- shell toolbar (removed) -----------------------------------------
 
     def test_toolbar_drops_the_brand_the_breadcrumb_already_shows(self):
         content = self._content()
@@ -135,25 +168,38 @@ class MapPageChromeTests(TestCase):
         self.assertNotIn("atlas-shell-brand", content)
         self.assertIn("page-breadcrumb-rail", content)
 
-    def test_toolbar_actions_share_one_button_family(self):
+    def test_shell_has_no_toolbar_card_or_tools_dropdown(self):
+        """The empty toolbar card and the Tools dropdown are gone."""
         content = self._content()
 
-        self.assertNotIn("atlas-feedback-link", content)
-        self.assertNotIn("atlas-hero-link", content)
-        toolbar = self._section(
-            content, 'class="atlas-shell-toolbar-actions"', "</div>\n    </div>"
-        )
-        self.assertIn("mailto:info@bioresource-tools.net", toolbar)
-        self.assertEqual(toolbar.count("btn btn-sm btn-outline-secondary"), 1)
+        self.assertNotIn("atlas-shell-toolbar", content)
+        self.assertNotIn("atlas-shell-toolbar-actions", content)
+        self.assertNotIn("atlas-hero-tools", content)
+        self.assertNotIn('id="atlas-tools-menu"', content)
+        # The atlas shell no longer carries its own feedback button; the
+        # core sidebar still renders the shared "Contact / Feedback" link.
+        shell = self._section(content, 'id="atlas-shell"', "</main>")
+        self.assertNotIn("atlas-feedback-link", shell)
+        self.assertNotIn("Waste%20Atlas%20feedback", shell)
 
-    def test_editing_the_configuration_moves_into_the_staff_tools_menu(self):
+    def test_mobile_maps_toggle_survives_outside_the_toolbar(self):
+        """The tree toggle moves to the workspace but keeps its wiring id."""
+        content = self._content()
+
+        self.assertIn('id="atlas-tree-toggle"', content)
+        self.assertIn('aria-controls="atlas-tree"', content)
+
+    def test_edit_configuration_lives_in_the_options_pane_for_staff(self):
         self.client.force_login(self.staff)
         content = self._content()
 
         header = self._section(content, '<header class="atlas-context"', "</header>")
         self.assertNotIn("Edit configuration", header)
-        menu = self._section(content, 'aria-labelledby="atlas-tools-menu"', "</ul>")
-        self.assertIn("Edit configuration", menu)
+        pane = self._section(
+            content, 'id="atlas-options-pane"', "</div>\n        </div>"
+        )
+        self.assertIn("Edit configuration", pane)
+        self.assertIn("/configurations/", pane)
 
     def test_non_staff_see_no_configuration_entry(self):
         content = self._content()
@@ -173,8 +219,11 @@ class MapPageChromeAssetTests(SimpleTestCase):
     def test_orphaned_toolbar_styles_are_gone(self):
         for selector in (
             ".atlas-shell-brand",
+            ".atlas-shell-toolbar",
+            ".atlas-shell-toolbar-actions",
             ".atlas-feedback-link",
             ".atlas-hero-link",
+            ".atlas-hero-tools",
         ):
             with self.subTest(selector=selector):
                 self.assertNotIn(selector, self.stylesheet)
@@ -185,6 +234,30 @@ class MapPageChromeAssetTests(SimpleTestCase):
 
     def test_export_actions_are_laid_out_for_the_modal(self):
         self.assertIn(".atlas-export-actions", self.stylesheet)
+
+    def test_side_action_class_is_gone(self):
+        """The Bootstrap button wrapper is replaced by atlas-side-link."""
+        self.assertNotIn(".atlas-side-action", self.stylesheet)
+
+    def test_side_link_resets_button_styles(self):
+        """A <button> styled as side-link must shed Bootstrap button chrome."""
+        self.assertIn("button.atlas-side-link", self.stylesheet)
+
+    def test_first_side_group_drops_the_top_divider(self):
+        """The first group in a pane needs no separator border."""
+        self.assertIn(".atlas-side-group:first-child", self.stylesheet)
+
+    def test_conflict_toggle_is_not_red(self):
+        """The conflict label uses the same ink colour as the other toggles."""
+        self.assertNotIn("atlas-map-toggle--conflict", self.stylesheet)
+
+    def test_empty_display_group_is_hidden(self):
+        """The Display group collapses when no toggles are mounted into it."""
+        self.assertIn(".atlas-side-group:has(#atlas-map-tools:empty)", self.stylesheet)
+
+    def test_renderer_no_longer_adds_conflict_color_class(self):
+        """The conflict toggle drops the red modifier class."""
+        self.assertNotIn("atlas-map-toggle--conflict", self.script)
 
     def test_renderer_no_longer_reveals_a_separate_options_card(self):
         """Export lives in the Options tab, so the tab is always present."""

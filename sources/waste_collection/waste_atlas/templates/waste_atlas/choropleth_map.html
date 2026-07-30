@@ -95,6 +95,11 @@
               {% block atlas_selector %}
                 {% include "waste_atlas/includes/map_selector.html" with atlas_selector_button_label="Load" %}
               {% endblock atlas_selector %}
+              <div class="atlas-side-group">
+                <h3 class="atlas-side-group-title">Display</h3>
+                {# The renderer mounts quartile/conflict toggles here when the map offers them. #}
+                <div id="atlas-map-tools"></div>
+              </div>
               {% if map_toggle_url %}
                 <div class="atlas-side-group">
                   <h3 class="atlas-side-group-title">View</h3>
@@ -127,14 +132,23 @@
                  role="tabpanel"
                  aria-labelledby="atlas-options-tab"
                  tabindex="0">
-              {# The renderer mounts quartile/conflict toggles here when the map offers them. #}
-              <div id="atlas-map-tools"></div>
-              <button class="btn btn-sm btn-outline-secondary atlas-side-action"
-                      type="button"
-                      data-bs-toggle="modal"
-                      data-bs-target="#atlas-export-modal">
-                <i class="fas fa-download" aria-hidden="true"></i> Export map…
-              </button>
+              <div class="atlas-side-group">
+                <h3 class="atlas-side-group-title">Export</h3>
+                <button class="atlas-side-link"
+                        type="button"
+                        data-bs-toggle="modal"
+                        data-bs-target="#atlas-export-modal">
+                  <i class="fas fa-download" aria-hidden="true"></i> Export map…
+                </button>
+              </div>
+              {% if request.user.is_staff and map_configuration_edit_url %}
+                <div class="atlas-side-group">
+                  <h3 class="atlas-side-group-title">Administration</h3>
+                  <a class="atlas-side-link" href="{{ map_configuration_edit_url }}">
+                    <i class="fas fa-sliders-h" aria-hidden="true"></i> Edit configuration
+                  </a>
+                </div>
+              {% endif %}
             </div>
           </div>
         </div>
