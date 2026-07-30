@@ -7,7 +7,7 @@ from django.test import TestCase
 
 from utils.object_management.models import get_default_owner
 from utils.properties.models import NumericMeasurementMixin, Property, Unit
-from utils.properties.units import UnitConversionError
+from utils.properties.units import UnitConversionError, get_unit_registry
 from utils.properties.utils import format_measurement_display
 
 
@@ -184,3 +184,35 @@ class NumericMeasurementMixinTestCase(TestCase):
         self.assertEqual(measurement.measurement_unit_label, "1/km²")
         self.assertEqual(measurement.display_average, 123.321)
         self.assertEqual(measurement.display_standard_deviation, 1.25)
+
+
+class CustomPintDefinitionsTestCase(TestCase):
+    """Verify custom pint definitions for chemistry units used in BRIT."""
+
+    def test_milliequivalent_is_defined(self):
+        registry = get_unit_registry()
+        self.assertIsNotNone(registry)
+        unit = registry.Unit("meq")
+        self.assertEqual(str(unit), "milliequivalent")
+
+    def test_count_per_1000ml_symbol_resolves(self):
+        """Unit 57 (N/1000 mL, where N = count) uses count_1000mL."""
+        registry = get_unit_registry()
+        unit = registry.Unit("count_1000mL")
+        self.assertIn("count_per_1000mL".lower(), str(unit).lower())
+
+    def test_meq_per_100g_symbol_resolves(self):
+        """Unit 60 (meq/100 g) uses the custom meq_100g pint symbol."""
+        registry = get_unit_registry()
+        unit = registry.Unit("meq_100g")
+        self.assertIn("meq_per_100g", str(unit).lower())
+
+    def test_unit_pint_unit_resolves_for_count_per_1000ml_symbol(self):
+        unit = Unit.objects.create(name="N/1000 mL", symbol="count_1000mL")
+        self.assertIsNotNone(unit.pint_unit)
+        unit.delete()
+
+    def test_unit_pint_unit_resolves_for_meq_per_100g_symbol(self):
+        unit = Unit.objects.create(name="meq/100 g", symbol="meq_100g")
+        self.assertIsNotNone(unit.pint_unit)
+        unit.delete()
