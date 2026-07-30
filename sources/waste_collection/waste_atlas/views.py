@@ -243,6 +243,7 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
         region_label = MAP_SET_LABELS.get(selected_map_set, "")
         overview_href = reverse("waste-atlas-overview")
         ctx["atlas_map_set"] = selected_map_set
+        ctx["atlas_page_selector_set"] = page.get("selector_set")
         ctx["breadcrumb_module_label"] = "Waste Atlas"
         ctx["breadcrumb_module_url"] = overview_href
         if region_label:

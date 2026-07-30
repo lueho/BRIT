@@ -167,7 +167,6 @@ MAP_PAGES = [
         "map/italy/administrative-level/",
         "waste-atlas-orga-level-italy-map",
         config_key="orga_level_eu",
-        overrides={"fileBase": "map29_orga_level_italy"},
     ),
     _page(
         "italy",
@@ -176,7 +175,6 @@ MAP_PAGES = [
         "map/italy/administrative-level/collections/",
         "waste-atlas-collection-orga-level-italy-map",
         config_key="collection_orga_level_eu",
-        overrides={"fileBase": "map29_collection_orga_level_italy"},
     ),
     _page(
         "italy",
@@ -270,7 +268,6 @@ MAP_PAGES = [
         "map/south-tyrol/administrative-level/",
         "waste-atlas-south-tyrol-orga-level-map",
         config_key="orga_level_eu",
-        overrides={"fileBase": "map29_orga_level_italy"},
     ),
     _page(
         "south_tyrol",
@@ -279,7 +276,6 @@ MAP_PAGES = [
         "map/south-tyrol/administrative-level/collections/",
         "waste-atlas-south-tyrol-collection-orga-level-map",
         config_key="collection_orga_level_eu",
-        overrides={"fileBase": "map29_collection_orga_level_italy"},
     ),
     _page(
         "south_tyrol",
@@ -464,7 +460,6 @@ MAP_PAGES = [
         "map/sweden/administrative-level/",
         "waste-atlas-orga-level-sweden-map",
         config_key="orga_level_eu",
-        overrides={"fileBase": "map30_orga_level_sweden"},
     ),
     _page(
         "sweden",
@@ -473,7 +468,6 @@ MAP_PAGES = [
         "map/sweden/administrative-level/collections/",
         "waste-atlas-collection-orga-level-sweden-map",
         config_key="collection_orga_level_eu",
-        overrides={"fileBase": "map30_collection_orga_level_sweden"},
     ),
     _page(
         "sweden",
@@ -495,7 +489,6 @@ MAP_PAGES = [
         "Primary collection system for kitchen waste",
         "map/sweden/collection-system/",
         "waste-atlas-sweden-collection-system-map",
-        overrides={"fileBase": "sweden_collection_system"},
     ),
     _page(
         "sweden",
@@ -503,7 +496,6 @@ MAP_PAGES = [
         "Connection rates for door-to-door biowaste collection",
         "map/sweden/connection-rate/",
         "waste-atlas-sweden-connection-rate-map",
-        overrides={"fileBase": "sweden_connection_rate"},
     ),
     _page(
         "sweden",
@@ -511,7 +503,6 @@ MAP_PAGES = [
         "Use of paper bags for biowaste collection",
         "map/sweden/paper-bags/",
         "waste-atlas-sweden-paper-bags-map",
-        overrides={"fileBase": "sweden_paper_bags"},
     ),
     _page(
         "sweden",
@@ -519,7 +510,6 @@ MAP_PAGES = [
         "Use of compostable plastic bags for biowaste collection",
         "map/sweden/plastic-bags/",
         "waste-atlas-sweden-plastic-bags-map",
-        overrides={"fileBase": "sweden_plastic_bags"},
     ),
     _page(
         "sweden",
@@ -527,7 +517,6 @@ MAP_PAGES = [
         "Accepted materials for collection aids",
         "map/sweden/collection-support/",
         "waste-atlas-sweden-collection-support-map",
-        overrides={"fileBase": "sweden_collection_support"},
     ),
     _page(
         "sweden",
@@ -536,7 +525,6 @@ MAP_PAGES = [
         "map/sweden/residual-collection-amount/",
         "waste-atlas-sweden-residual-collection-amount-map",
         overrides={
-            "fileBase": "sweden_residual_collection_amount",
             "exportLegendTitle": "Collected amount (kg / cap / a)",
         },
     ),
@@ -546,7 +534,6 @@ MAP_PAGES = [
         "Specifically collected amount of biowaste",
         "map/sweden/biowaste-collection-amount/",
         "waste-atlas-sweden-biowaste-collection-amount-map",
-        overrides={"fileBase": "sweden_biowaste_collection_amount"},
     ),
     _page(
         "sweden",
@@ -554,7 +541,6 @@ MAP_PAGES = [
         "Separation rate – Biowaste stream (%)",
         "map/sweden/waste-ratio/",
         "waste-atlas-sweden-waste-ratio-map",
-        overrides={"fileBase": "sweden_waste_ratio"},
     ),
     _page(
         "sweden",
@@ -562,7 +548,6 @@ MAP_PAGES = [
         "Aggregated collected amount of organic fractions (kg/cap/a)",
         "map/sweden/organic-collection-amount/",
         "waste-atlas-sweden-organic-collection-amount-map",
-        overrides={"fileBase": "sweden_organic_collection_amount"},
     ),
     _page(
         "sweden",
@@ -570,7 +555,6 @@ MAP_PAGES = [
         "Organic stream separation rate (%)",
         "map/sweden/organic-waste-ratio/",
         "waste-atlas-sweden-organic-waste-ratio-map",
-        overrides={"fileBase": "sweden_organic_waste_ratio"},
     ),
     # ── denmark ──
     _page(
@@ -580,7 +564,6 @@ MAP_PAGES = [
         "map/denmark/administrative-level/",
         "waste-atlas-orga-level-denmark-map",
         config_key="orga_level_eu",
-        overrides={"fileBase": "map31_orga_level_denmark"},
         lock=False,
     ),
     _page(
@@ -590,7 +573,6 @@ MAP_PAGES = [
         "map/denmark/administrative-level/collections/",
         "waste-atlas-collection-orga-level-denmark-map",
         config_key="collection_orga_level_eu",
-        overrides={"fileBase": "map31_collection_orga_level_denmark"},
         lock=False,
     ),
     _page(
@@ -633,7 +615,6 @@ MAP_PAGES = [
         "map/netherlands/administrative-level/",
         "waste-atlas-orga-level-netherlands-map",
         config_key="orga_level_eu",
-        overrides={"fileBase": "map32_orga_level_netherlands"},
     ),
     _page(
         "netherlands",
@@ -642,7 +623,6 @@ MAP_PAGES = [
         "map/netherlands/administrative-level/collections/",
         "waste-atlas-collection-orga-level-netherlands-map",
         config_key="collection_orga_level_eu",
-        overrides={"fileBase": "map32_collection_orga_level_netherlands"},
     ),
     _page(
         "netherlands",
@@ -687,7 +667,6 @@ MAP_PAGES = [
         "map/belgium/administrative-level/",
         "waste-atlas-orga-level-belgium-map",
         config_key="orga_level_eu",
-        overrides={"fileBase": "map33_orga_level_belgium"},
     ),
     _page(
         "belgium",
@@ -696,7 +675,6 @@ MAP_PAGES = [
         "map/belgium/administrative-level/collections/",
         "waste-atlas-collection-orga-level-belgium-map",
         config_key="collection_orga_level_eu",
-        overrides={"fileBase": "map33_collection_orga_level_belgium"},
     ),
     # ── belgium_flanders ──
     _page(
@@ -706,7 +684,6 @@ MAP_PAGES = [
         "map/belgium-flanders/administrative-level/",
         "waste-atlas-orga-level-belgium-flanders-map",
         config_key="orga_level_eu",
-        overrides={"fileBase": "map35_orga_level_belgium_flanders"},
     ),
     _page(
         "belgium_flanders",
@@ -715,7 +692,6 @@ MAP_PAGES = [
         "map/belgium-flanders/administrative-level/collections/",
         "waste-atlas-collection-orga-level-belgium-flanders-map",
         config_key="collection_orga_level_eu",
-        overrides={"fileBase": "map35_collection_orga_level_belgium_flanders"},
     ),
     # ── generic ──
     _page(
