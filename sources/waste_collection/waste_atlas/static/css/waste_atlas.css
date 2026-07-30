@@ -349,6 +349,9 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
 #atlas-controls {
   margin-bottom: 1.25rem;
 }
+#atlas-controls > .card-body {
+  padding: 1.25rem;
+}
 .atlas-hero-btn {
   border-radius: 999px;
   white-space: nowrap;
@@ -788,7 +791,7 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
 .atlas-workspace {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
   min-width: 0;
 }
 .atlas-context {
@@ -807,7 +810,7 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
 .atlas-context-title {
   font-size: 1.45rem;
   font-weight: 800;
-  margin: .1rem 0 .25rem;
+  margin: .1rem 0 .35rem;
 }
 .atlas-context-actions {
   align-items: center;
@@ -848,8 +851,8 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
 .atlas-stage {
   align-items: start;
   display: grid;
-  gap: 1.25rem;
-  grid-template-columns: minmax(0, 1fr) 19rem;
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr) 20rem;
 }
 .atlas-stage-main {
   display: flex;
@@ -877,8 +880,8 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
 /* Groups inside a panel tab, e.g. the Current/Changes switch under the selector. */
 .atlas-side-group {
   border-top: 1px solid var(--atlas-border-soft);
-  margin-top: .9rem;
-  padding-top: .8rem;
+  margin-top: 1.1rem;
+  padding-top: 1rem;
 }
 .atlas-side-group:first-child {
   border-top: 0;
@@ -934,12 +937,22 @@ button.atlas-side-link {
   width: 100%;
 }
 .atlas-side .atlas-selector-grid {
+  gap: 1rem;
   grid-template-columns: 1fr;
 }
 .atlas-side .atlas-selector-form {
   border: 0;
   box-shadow: none;
   padding: 0;
+}
+/* Stack the selector header vertically in the narrow panel — title above help. */
+.atlas-side .atlas-selector-header {
+  display: block;
+  margin-bottom: 1.1rem;
+}
+.atlas-side .atlas-selector-help {
+  margin-top: .3rem;
+  max-width: none;
 }
 .atlas-side .atlas-map-toggles {
   align-items: stretch;
