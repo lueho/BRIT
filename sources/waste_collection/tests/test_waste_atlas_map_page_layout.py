@@ -247,6 +247,18 @@ class MapPageChromeAssetTests(SimpleTestCase):
         """The first group in a pane needs no separator border."""
         self.assertIn(".atlas-side-group:first-child", self.stylesheet)
 
+    def test_conflict_toggle_is_not_red(self):
+        """The conflict label uses the same ink colour as the other toggles."""
+        self.assertNotIn("atlas-map-toggle--conflict", self.stylesheet)
+
+    def test_empty_display_group_is_hidden(self):
+        """The Display group collapses when no toggles are mounted into it."""
+        self.assertIn(".atlas-side-group:has(#atlas-map-tools:empty)", self.stylesheet)
+
+    def test_renderer_no_longer_adds_conflict_color_class(self):
+        """The conflict toggle drops the red modifier class."""
+        self.assertNotIn("atlas-map-toggle--conflict", self.script)
+
     def test_renderer_no_longer_reveals_a_separate_options_card(self):
         """Export lives in the Options tab, so the tab is always present."""
         self.assertNotIn("atlas-map-options", self.script)

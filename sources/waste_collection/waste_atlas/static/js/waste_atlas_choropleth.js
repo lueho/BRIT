@@ -3010,7 +3010,7 @@ var WasteAtlasChoropleth = (function () {
     // one collection competing for the single displayed theme value.
     if (atlasControls && cfg.conflictUrl && cfg.conflictTheme && !cfg.changeMode) {
       var conflictWrap = document.createElement('label');
-      conflictWrap.className = 'atlas-map-toggle atlas-map-toggle--conflict';
+      conflictWrap.className = 'atlas-map-toggle';
 
       var conflictCheckbox = document.createElement('input');
       conflictCheckbox.type = 'checkbox';

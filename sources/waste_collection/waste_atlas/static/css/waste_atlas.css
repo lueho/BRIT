@@ -470,9 +470,6 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
 .atlas-map-toggle input {
   cursor: pointer;
 }
-.atlas-map-toggle--conflict {
-  color: #d7263d;
-}
 
 .atlas-year-input { width: 5.5rem; }
 
@@ -887,6 +884,11 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
   border-top: 0;
   margin-top: 0;
   padding-top: 0;
+}
+/* The Display group wraps #atlas-map-tools; collapse it when the renderer
+   has not mounted any toggles (no quartile/conflict aid for this map). */
+.atlas-side-group:has(#atlas-map-tools:empty) {
+  display: none;
 }
 .atlas-side-group-title {
   color: var(--atlas-eyebrow);
