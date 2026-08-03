@@ -1,3 +1,5 @@
+import re
+
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -6,6 +8,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models, transaction
+from django.db.models import Q
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django.urls import NoReverseMatch, reverse
@@ -403,8 +406,55 @@ def set_country(sender, instance, created, **kwargs):
             instance.save(update_fields=["country"])
 
 
+class NutsVintage(models.Model):
+    """A NUTS classification vintage, e.g. NUTS 2021.
+
+    Codes are only unique within a vintage: a revision may recode identical
+    geography (DEG0B -> DEG0Q) or reuse a code for a different territory.
+    Exactly one vintage is marked current; it is the default for user-facing
+    queries and for imports that do not declare a version.
+    """
+
+    year = models.PositiveSmallIntegerField(unique=True)
+    is_current = models.BooleanField(default=False)
+    source_release = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        ordering = ["-year"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["is_current"],
+                condition=Q(is_current=True),
+                name="unique_current_nuts_vintage",
+            )
+        ]
+
+    def __str__(self):
+        return f"NUTS {self.year}"
+
+    @classmethod
+    def current(cls):
+        return cls.objects.filter(is_current=True).first()
+
+    @classmethod
+    def resolve(cls, label):
+        """Resolve a provider version label such as ``"NUTS2021"`` to a vintage."""
+        if label is None:
+            return None
+        match = re.search(r"(\d{4})", str(label))
+        if match is None:
+            return None
+        return cls.objects.filter(year=int(match.group(1))).first()
+
+
 class NutsRegion(Region):
     nuts_id = models.CharField(max_length=5, blank=True, null=True)
+    version = models.ForeignKey(
+        NutsVintage,
+        related_name="regions",
+        on_delete=models.PROTECT,
+        blank=True,
+    )
     levl_code = models.IntegerField(blank=True, null=True)
     cntr_code = models.CharField(max_length=2, blank=True, null=True)
     name_latn = models.CharField(max_length=70, blank=True, null=True)
@@ -437,12 +487,23 @@ class NutsRegion(Region):
         return pedigree
 
     def save(self, *args, **kwargs):
-        """Automatically set type to 'nuts' for NUTS regions."""
+        """Set type to 'nuts' and default the vintage to the current one."""
         self.type = "nuts"
+        if self.version_id is None:
+            self.version = NutsVintage.current()
         super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.nuts_name} ({self.nuts_id})"
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["nuts_id", "version"],
+                name="unique_nuts_id_per_version",
+            )
+        ]
 
 
 class LauRegion(Region):

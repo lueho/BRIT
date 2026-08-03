@@ -13,7 +13,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 
-from maps.models import LauRegion, NutsRegion
+from maps.models import LauRegion, NutsRegion, NutsVintage
 
 from .contracts import UNIT_TO_PERSONS
 from .models import PopulationDataset, PopulationImportRun, PopulationObservation
@@ -30,6 +30,8 @@ class ImportReport:
     updated: int = 0
     unchanged: int = 0
     errors: list = field(default_factory=list)
+    warnings: list = field(default_factory=list)
+    resolutions: dict = field(default_factory=dict)
     import_run_id: int | None = None
 
 
@@ -37,17 +39,82 @@ def _value_in_persons(raw_value, unit):
     return (Decimal(raw_value) * UNIT_TO_PERSONS[unit]).quantize(Decimal("0.001"))
 
 
-def _match_region(scheme, code):
-    if scheme == "NUTS":
-        qs = NutsRegion.objects.filter(nuts_id=code)
-    else:
-        qs = LauRegion.objects.filter(lau_id=code)
-    regions = list(qs[:2])
+@dataclass
+class RegionMatch:
+    region: object | None
+    resolution: str
+    error: str | None = None
+    matched_version: str = ""
+
+
+class VintageResolver:
+    """Resolves version labels to vintages, caching lookups for one import.
+
+    Version labels repeat across every observation of a dataset, so the handful
+    of distinct labels is resolved once instead of once per row.
+    """
+
+    def __init__(self):
+        self._by_label = {}
+
+    def resolve(self, region_version, classification_version):
+        """Select the NUTS vintage a provider code refers to.
+
+        ``region_version`` (per observation) wins over the dataset's
+        ``classification_version``; without either, the current vintage applies.
+        """
+        label = region_version or classification_version
+        resolution = "exact" if label else "current_vintage"
+        if label not in self._by_label:
+            self._by_label[label] = (
+                NutsVintage.resolve(label) if label else NutsVintage.current()
+            )
+        return self._by_label[label], resolution
+
+
+def _unique_or_error(regions, resolution, matched_version=""):
     if len(regions) == 1:
-        return regions[0], None
+        return RegionMatch(regions[0], resolution, matched_version=matched_version)
     if not regions:
-        return None, "no matching region"
-    return None, "ambiguous region code (multiple matches)"
+        return RegionMatch(None, resolution, error="no matching region")
+    return RegionMatch(
+        None, resolution, error="ambiguous region code (multiple matches)"
+    )
+
+
+def _match_region(
+    scheme, code, region_version="", classification_version="", resolver=None
+):
+    """Match a provider region code, scoped to the requested NUTS vintage.
+
+    Codes are only unique within a vintage, so an unscoped lookup would report
+    every code carried by more than one vintage as ambiguous. When BRIT does not
+    hold the requested vintage but the code exists in exactly one held vintage,
+    that row is matched and the fallback is reported.
+    """
+    if scheme != "NUTS":
+        return _unique_or_error(
+            list(LauRegion.objects.filter(lau_id=code)[:2]), "exact"
+        )
+
+    resolver = resolver or VintageResolver()
+    vintage, resolution = resolver.resolve(region_version, classification_version)
+    if vintage is not None:
+        regions = list(NutsRegion.objects.filter(nuts_id=code, version=vintage)[:2])
+        if regions:
+            return _unique_or_error(
+                regions, resolution, matched_version=str(vintage.year)
+            )
+
+    regions = list(
+        NutsRegion.objects.filter(nuts_id=code).select_related("version")[:2]
+    )
+    match = _unique_or_error(regions, "fallback_vintage")
+    if match.region is not None:
+        match.matched_version = (
+            str(match.region.version.year) if match.region.version_id else ""
+        )
+    return match
 
 
 def _upsert_dataset(data):
@@ -94,20 +161,45 @@ def import_population_payload(payload, *, user=None, dry_run=False):
             structure_version=payload["dataset"].get("release", ""),
         )
 
+        classification_version = payload["dataset"].get("classification_version", "")
+        resolver = VintageResolver()
+
         for index, observation in enumerate(payload["observations"]):
-            region, error = _match_region(
-                observation["region_scheme"], observation["region_code"]
+            requested_version = observation.get("region_version", "")
+            match = _match_region(
+                observation["region_scheme"],
+                observation["region_code"],
+                region_version=requested_version,
+                classification_version=classification_version,
+                resolver=resolver,
             )
-            if error is not None:
+            if match.error is not None:
                 report.errors.append(
                     {
                         "index": index,
                         "region_scheme": observation["region_scheme"],
                         "region_code": observation["region_code"],
-                        "reason": error,
+                        "reason": match.error,
                     }
                 )
                 continue
+
+            region = match.region
+            report.resolutions[match.resolution] = (
+                report.resolutions.get(match.resolution, 0) + 1
+            )
+            if match.resolution == "fallback_vintage":
+                report.warnings.append(
+                    {
+                        "index": index,
+                        "region_scheme": observation["region_scheme"],
+                        "region_code": observation["region_code"],
+                        "requested_version": requested_version
+                        or classification_version,
+                        "matched_version": match.matched_version,
+                        "resolution": "fallback_vintage",
+                    }
+                )
 
             value = _value_in_persons(observation["value"], observation["unit"])
             year = observation["reference_period"]
