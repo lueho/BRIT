@@ -68,23 +68,35 @@ def _upsert_geometry(region, geometry):
     return True
 
 
-def _resolve_parent(data, vintage, report):
-    """The region's parent in its own vintage, or None at level 0."""
+def _resolve_parent(data, vintage, report, dry_run):
+    """The region's parent in its own vintage, or None at level 0.
+
+    A dry run rolls back, so regions sent in an earlier request of the same load
+    are invisible to it and a missing parent is only a warning there.
+    """
     code = parent_code(data["nuts_id"]) if data["levl_code"] else None
     if code is None:
         return None
     parent = NutsRegion.objects.filter(nuts_id=code, version=vintage).first()
     if parent is None:
-        report.errors.append(
+        message = (
             f"{data['nuts_id']}: parent {code} is not in NUTS {vintage.year}; "
             "send lower levels first"
         )
+        (report.warnings if dry_run else report.errors).append(message)
     return parent
 
 
-def _upsert_region(data, vintage, user, report):
-    parent = _resolve_parent(data, vintage, report)
-    if parent is None and data["levl_code"]:
+def _upsert_region(data, vintage, user, report, dry_run=False):
+    if data["levl_code"] and parent_code(data["nuts_id"]) is None:
+        report.errors.append(
+            f"{data['nuts_id']}: a level {data['levl_code']} code cannot be "
+            f"{len(data['nuts_id'])} characters long"
+        )
+        return
+
+    parent = _resolve_parent(data, vintage, report, dry_run)
+    if parent is None and data["levl_code"] and not dry_run:
         return
 
     region = NutsRegion.objects.filter(nuts_id=data["nuts_id"], version=vintage).first()
@@ -93,34 +105,43 @@ def _upsert_region(data, vintage, user, report):
             nuts_id=data["nuts_id"],
             version=vintage,
             owner=user,
-            name=data["name_latn"] or data["nuts_id"],
+            # Vintages are authoritative reference geodata, not a user's draft:
+            # a private row would be invisible to every public consumer.
+            publication_status=NutsRegion.STATUS_PUBLISHED,
+            name=data.get("name_latn") or data["nuts_id"],
             country=data["cntr_code"],
             parent=parent,
-            **{name: data[name] for name in FIELDS},
+            **{name: data.get(name) for name in FIELDS},
         )
         region.borders = (
             GeoPolygon.objects.create(geom=data["geometry"])
-            if data["geometry"]
+            if data.get("geometry")
             else None
         )
         region.save()
         report.created += 1
         return
 
-    changed = [name for name in FIELDS if getattr(region, name) != data[name]]
+    # Only fields the provider actually sent are touched; an omitted one keeps
+    # what BRIT holds rather than being blanked by a serializer default.
+    changed = [
+        name for name in FIELDS if name in data and getattr(region, name) != data[name]
+    ]
+    for name in changed:
+        setattr(region, name, data[name])
     if region.parent_id != (parent.pk if parent else None):
         region.parent = parent
         changed.append("parent")
-    if data["name_latn"] and region.name != data["name_latn"]:
+    if data.get("name_latn") and region.name != data["name_latn"]:
         region.name = data["name_latn"]
         changed.append("name")
-    geometry_changed = _upsert_geometry(region, data["geometry"])
+    if region.publication_status != NutsRegion.STATUS_PUBLISHED:
+        region.publication_status = NutsRegion.STATUS_PUBLISHED
+        changed.append("publication_status")
+    geometry_changed = _upsert_geometry(region, data.get("geometry"))
     if not changed and not geometry_changed:
         report.unchanged += 1
         return
-    for name in changed:
-        if name in FIELDS:
-            setattr(region, name, data[name])
     region.save()
     report.updated += 1
 
@@ -149,8 +170,10 @@ def import_nuts_payload(payload, user=None, dry_run=False):
                 vintage.source_release = vintage_data["source_release"]
                 vintage.save(update_fields=["source_release"])
 
-            for data in payload["regions"]:
-                _upsert_region(data, vintage, user, report)
+            # Parents have to exist before their children, whatever order the
+            # provider listed the levels in.
+            for data in sorted(payload["regions"], key=lambda r: r["levl_code"]):
+                _upsert_region(data, vintage, user, report, dry_run)
 
             if report.errors:
                 raise _Rollback

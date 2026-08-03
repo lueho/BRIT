@@ -34,19 +34,21 @@ class GeometryField(serializers.JSONField):
 
 
 class ImportRegionSerializer(serializers.Serializer):
+    """One region of a vintage.
+
+    Optional fields carry no defaults on purpose: an omitted field means "leave
+    what BRIT holds", which a default would turn into "blank it".
+    """
+
     nuts_id = serializers.CharField(max_length=5)
     levl_code = serializers.IntegerField(min_value=0, max_value=3)
     cntr_code = serializers.CharField(max_length=2)
-    name_latn = serializers.CharField(
-        max_length=70, required=False, allow_blank=True, default=""
-    )
-    nuts_name = serializers.CharField(
-        max_length=106, required=False, allow_blank=True, default=""
-    )
-    mount_type = serializers.IntegerField(required=False, allow_null=True, default=None)
-    urbn_type = serializers.IntegerField(required=False, allow_null=True, default=None)
-    coast_type = serializers.IntegerField(required=False, allow_null=True, default=None)
-    geometry = GeometryField(required=False, allow_null=True, default=None)
+    name_latn = serializers.CharField(max_length=70, required=False, allow_blank=True)
+    nuts_name = serializers.CharField(max_length=106, required=False, allow_blank=True)
+    mount_type = serializers.IntegerField(required=False, allow_null=True)
+    urbn_type = serializers.IntegerField(required=False, allow_null=True)
+    coast_type = serializers.IntegerField(required=False, allow_null=True)
+    geometry = GeometryField(required=False, allow_null=True)
 
 
 class NutsImportSerializer(serializers.Serializer):

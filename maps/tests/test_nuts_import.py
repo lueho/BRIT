@@ -125,6 +125,35 @@ class NutsImportApiTestCase(TestCase):
         self.assertEqual(child.parent.nuts_id, "DE")
         self.assertEqual(child.parent.version.year, 2024)
 
+    def test_levels_may_arrive_in_one_payload_in_any_order(self):
+        """Parents are created first, so the provider need not sort its levels."""
+        response = self.post(
+            self.payload(
+                [
+                    region("DE1", 1, "Baden-Württemberg", DE1_GEOMETRY),
+                    region("DE", 0, "Deutschland", DE_GEOMETRY),
+                ]
+            )
+        )
+        self.assertEqual(response.status_code, 201, response.json())
+        self.assertEqual(
+            NutsRegion.objects.get(nuts_id="DE1", version__year=2024).parent.nuts_id,
+            "DE",
+        )
+
+    def test_a_dry_run_only_warns_about_a_parent_it_cannot_see(self):
+        """A dry run rolls back, so parents of earlier requests are invisible."""
+        response = self.post(
+            self.payload(
+                [region("DE1", 1, "Baden-Württemberg", DE1_GEOMETRY)], dry_run=True
+            )
+        )
+        self.assertEqual(response.status_code, 200, response.json())
+        report = response.json()
+        self.assertEqual(report["errors"], [])
+        self.assertIn("parent DE", report["warnings"][0])
+        self.assertEqual(report["created"], 1)
+
     def test_a_missing_parent_is_reported_instead_of_guessed(self):
         response = self.post(
             self.payload([region("DE1", 1, "Baden-Württemberg", DE1_GEOMETRY)])
@@ -168,6 +197,58 @@ class NutsImportApiTestCase(TestCase):
         )
         self.assertEqual(NutsVintage.current().year, 2024)
         self.assertEqual(NutsVintage.objects.filter(is_current=True).count(), 1)
+
+    def test_imported_regions_are_published_reference_data(self):
+        """A private row would be invisible to every public consumer."""
+        self.post(self.payload([region("DE", 0, "Deutschland", DE_GEOMETRY)]))
+        imported = NutsRegion.objects.get(nuts_id="DE", version__year=2024)
+        self.assertEqual(imported.publication_status, NutsRegion.STATUS_PUBLISHED)
+        self.assertIn(imported, NutsRegion.objects.published())
+
+    def test_a_region_left_private_is_published_on_reimport(self):
+        self.post(self.payload([region("DE", 0, "Deutschland", DE_GEOMETRY)]))
+        NutsRegion.objects.filter(nuts_id="DE", version__year=2024).update(
+            publication_status=NutsRegion.STATUS_PRIVATE
+        )
+        response = self.post(
+            self.payload([region("DE", 0, "Deutschland", DE_GEOMETRY)])
+        )
+        self.assertEqual(response.json()["updated"], 1)
+        self.assertEqual(
+            NutsRegion.objects.get(nuts_id="DE", version__year=2024).publication_status,
+            NutsRegion.STATUS_PUBLISHED,
+        )
+
+    def test_omitted_fields_keep_what_brit_already_holds(self):
+        """A slimmed-down re-import must not blank names and type flags."""
+        self.post(
+            self.payload(
+                [region("DE", 0, "Deutschland", DE_GEOMETRY, mount_type=1, urbn_type=2)]
+            )
+        )
+        response = self.post(
+            self.payload(
+                [
+                    {
+                        "nuts_id": "DE",
+                        "levl_code": 0,
+                        "cntr_code": "DE",
+                        "geometry": DE_GEOMETRY,
+                    }
+                ]
+            )
+        )
+        self.assertEqual(response.json()["unchanged"], 1)
+        imported = NutsRegion.objects.get(nuts_id="DE", version__year=2024)
+        self.assertEqual(imported.name_latn, "Deutschland")
+        self.assertEqual((imported.mount_type, imported.urbn_type), (1, 2))
+
+    def test_a_code_too_short_for_its_level_is_rejected(self):
+        response = self.post(
+            self.payload([region("DE", 1, "Not a level 1 code", DE_GEOMETRY)])
+        )
+        self.assertEqual(response.status_code, 400, response.json())
+        self.assertIn("cannot be 2 characters", str(response.json()["errors"]))
 
     def test_importing_needs_the_nuts_region_permissions(self):
         response = self.post(
