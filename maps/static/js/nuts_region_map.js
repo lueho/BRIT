@@ -268,21 +268,42 @@ async function updateMapAccordingToSelection() {
     }
 }
 
+/**
+ * Empty one region picker and make it fetch its options again.
+ *
+ * Emptying alone is not enough: TomSelect skips a query it has already loaded
+ * and virtual_scroll skips one it has already paged, so a picker whose options
+ * were dropped would stay empty forever. The reload has to bypass
+ * ``shouldLoad``, which django-tomselect uses to refuse the empty query.
+ */
+function resetPicker(ts) {
+    ts.clear(true);
+    if (ts.clearPagination) {
+        ts.clearPagination();
+    }
+    ts.clearOptions();
+    ts.loadedSearches = {};
+    ts.lastQuery = null;
+    ts.settings.pagination = {};
+
+    const shouldLoad = ts.settings.shouldLoad;
+    ts.settings.shouldLoad = () => true;
+    try {
+        ts.load('');
+    } finally {
+        setTimeout(() => {
+            ts.settings.shouldLoad = shouldLoad;
+        }, 0);
+    }
+}
+
 function clearFields(fields) {
     setProgrammaticChange(() => {
         fields.forEach(function (field) {
             const element = document.getElementById(`id_${field}`);
             if (element) {
                 if (element.tomselect) {
-                    const ts = element.tomselect;
-                    ts.clear(true);
-                    if (ts.clearPagination) {
-                        // virtual_scroll remembers a page per query, and a
-                        // remembered query is never fetched again — the emptied
-                        // dropdown would stay empty.
-                        ts.clearPagination();
-                    }
-                    ts.clearOptions();
+                    resetPicker(element.tomselect);
                 }
                 element.value = null;
                 const event = new Event('change', { bubbles: true });
