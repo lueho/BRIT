@@ -174,3 +174,36 @@ class WasteAtlasRendererHasNoHardcodedDefaultsTests(TestCase):
     def test_renderer_applies_the_injected_defaults(self):
         source = CHOROPLETH_JS.read_text()
         self.assertIn("renderDefaults", source)
+
+
+class SeededMapConfigurationsDeferToGlobalNoDataColorTests(TestCase):
+    """Seeded maps must inherit the global no-data color."""
+
+    def test_no_seeded_configuration_repeats_the_global_no_data_color(self):
+        repeated = [
+            key
+            for key, configuration in WasteAtlasMapConfiguration.objects.values_list(
+                "key", "configuration"
+            )
+            if "noDataColor" in configuration
+        ]
+        self.assertEqual(repeated, [])
+
+    def test_global_no_data_color_reaches_the_renderer(self):
+        settings = WasteAtlasRenderingSettings.load()
+        settings.no_data_color = "#123456"
+        settings.save(update_fields=["no_data_color"])
+        key = WasteAtlasMapConfiguration.objects.values_list("key", flat=True).first()
+
+        config = atlas_js_config({}, key)
+
+        self.assertEqual(config["noDataColor"], "#123456")
+
+    def test_explicit_per_map_no_data_color_still_wins(self):
+        configuration = WasteAtlasMapConfiguration.objects.first()
+        configuration.configuration["noDataColor"] = "#abcdef"
+        configuration.save(update_fields=["configuration"])
+
+        config = atlas_js_config({}, configuration.key)
+
+        self.assertEqual(config["noDataColor"], "#abcdef")

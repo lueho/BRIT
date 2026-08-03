@@ -30,7 +30,6 @@ REQUIRED_CONFIG_KEYS = frozenset(
         "dataUrl",
         "dataField",
         "categories",
-        "noDataColor",
         "legendTitle",
     }
 )
@@ -94,7 +93,9 @@ class WasteAtlasMapConfigStructureTests(TestCase):
     def test_no_data_entries_share_the_shared_no_data_color(self):
         for config_key, config in MAP_CONFIGS.items():
             with self.subTest(config_key=config_key, entry="fallback"):
-                self.assertEqual(config["noDataColor"], no_data_color())
+                self.assertEqual(
+                    config.get("noDataColor", no_data_color()), no_data_color()
+                )
 
             for entry in self._all_entries(config):
                 if not self._is_no_data_entry(entry):
