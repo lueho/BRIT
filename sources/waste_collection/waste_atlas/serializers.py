@@ -282,6 +282,7 @@ class CatchmentWasteRatioSerializer(serializers.Serializer):
     bio_amount = serializers.FloatField(allow_null=True)
     residual_amount = serializers.FloatField(allow_null=True)
     ratio = serializers.FloatField(allow_null=True)
+    uses_aggregated_amount = serializers.BooleanField(default=False)
 
 
 class CatchmentOrganicRatioSerializer(serializers.Serializer):
