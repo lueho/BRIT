@@ -168,7 +168,12 @@ class NutsRegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         return vintage
 
     def get_queryset(self):
-        return super().get_queryset().in_vintage(self.get_vintage())
+        queryset = super().get_queryset()
+        if self.action == "retrieve":
+            # A primary key already names one row of one vintage; scoping it
+            # would only turn a valid lookup into a 404.
+            return queryset
+        return queryset.in_vintage(self.get_vintage())
 
     def get_cache_key(self, request):
         filters = request.query_params.dict()

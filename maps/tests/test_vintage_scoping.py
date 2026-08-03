@@ -291,3 +291,47 @@ class SetCountryVintageScopeTestCase(TwoVintageTestCase):
 
         region = Region.objects.create(name="Child", borders=_borders())
         self.assertEqual(region.country, "DE")
+
+
+class NutsConsumerVintageTestCase(TwoVintageTestCase):
+    """Consumers a visitor reaches once BRIT holds more than one vintage."""
+
+    def test_a_region_detail_is_served_whatever_vintage_it_belongs_to(self):
+        """A primary key names one row, so scoping it to a vintage only 404s."""
+        for region in (self.region_2021, self.region_2024):
+            response = self.client.get(
+                reverse("api-nuts-region-detail", kwargs={"pk": region.pk})
+            )
+            self.assertEqual(response.status_code, 200, region.version)
+            self.assertEqual(response.json()["id"], region.pk)
+
+    def test_the_nuts_picker_narrows_options_by_what_was_typed(self):
+        response = self.client.get(
+            reverse("nutsregion-autocomplete"), {"q": "Flensburg"}
+        )
+        results = response.json()["results"]
+        self.assertEqual([entry["nuts_id"] for entry in results], ["DE111"])
+
+    def test_the_nuts_picker_also_searches_by_code(self):
+        response = self.client.get(reverse("nutsregion-autocomplete"), {"q": "DE111"})
+        self.assertEqual(
+            [entry["nuts_id"] for entry in response.json()["results"]], ["DE111"]
+        )
+
+    def _publish(self, *regions):
+        Region.objects.filter(pk__in=[region.pk for region in regions]).update(
+            publication_status=Region.STATUS_PUBLISHED
+        )
+
+    def test_the_generic_region_picker_offers_each_territory_once(self):
+        """Regions of other vintages are the same territory under another code."""
+        self._publish(self.region_2021, self.region_2024)
+        response = self.client.get(reverse("region-autocomplete"), {"q": "Flensburg"})
+        results = response.json()["results"]
+        self.assertEqual([entry["id"] for entry in results], [self.region_2021.pk])
+
+    def test_the_generic_region_picker_keeps_regions_that_are_not_nuts(self):
+        custom = Region.objects.create(name="Flensburg harbour")
+        self._publish(custom)
+        response = self.client.get(reverse("region-autocomplete"), {"q": "Flensburg"})
+        self.assertIn(custom.pk, [entry["id"] for entry in response.json()["results"]])
