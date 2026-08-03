@@ -106,6 +106,12 @@ async function updateLayers({ region_params, catchment_params, feature_params } 
     if (feature_params) {
         feature_params = withVintage(feature_params);
     }
+    if (!catchment_params && catchmentLayer) {
+        // The highlight of a region that is no longer selected would otherwise
+        // stay on the map, showing a shape from the vintage just left behind.
+        removeExistingLayer(catchmentLayer);
+        catchmentLayer = null;
+    }
     const promises = [
         region_params && fetchRegionGeometry(region_params),
         catchment_params && fetchCatchmentGeometry(catchment_params),
