@@ -49,6 +49,54 @@ function selectedVintage() {
     return field ? field.value : '';
 }
 
+const AUTOCOMPLETE_PATH = '/maps/nutsregions/autocomplete/';
+
+/**
+ * Add the selected vintage and the nearest selected ancestor to a NUTS
+ * autocomplete request.
+ *
+ * Done at the fetch layer rather than by patching TomSelect's ``firstUrl``:
+ * django-tomselect restores its own URL builder whenever it resets a widget
+ * (which clearing a field does), so an override there silently disappears and
+ * the picker starts offering another vintage's regions.
+ */
+function withAutocompleteParams(input) {
+    const url = new URL(input, window.location.origin);
+    if (!url.pathname.startsWith(AUTOCOMPLETE_PATH)) {
+        return input;
+    }
+    const vintage = selectedVintage();
+    if (vintage) {
+        url.searchParams.set('version', vintage);
+    }
+    const level = url.pathname.match(/level(\d)\/$/);
+    if (level) {
+        const ancestor = getAncestorNutsId(Number(level[1]));
+        if (ancestor) {
+            url.searchParams.set('ancestor', ancestor);
+        }
+    }
+    return url.pathname + url.search;
+}
+
+function patchAutocompleteFetch() {
+    const originalFetch = window.fetch;
+    window.fetch = function (resource, ...rest) {
+        if (typeof resource === 'string') {
+            resource = withAutocompleteParams(resource);
+        } else if (resource instanceof Request) {
+            const rewritten = withAutocompleteParams(resource.url);
+            if (rewritten !== resource.url) {
+                resource = new Request(rewritten, resource);
+            }
+        }
+        return originalFetch.call(this, resource, ...rest);
+    };
+}
+
+// Installed at parse time so no widget can load before the wrapper is in place.
+patchAutocompleteFetch();
+
 function withVintage(params) {
     const vintage = selectedVintage();
     return vintage ? { ...params, version: vintage } : params;
@@ -333,49 +381,4 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-
-    setTimeout(() => {
-        // Map each field to its level code
-        const levelCodeMap = {
-            'id_level_0': 0,
-            'id_level_1': 1,
-            'id_level_2': 2,
-            'id_level_3': 3
-        };
-
-        // For each field, intercept the TomSelect firstUrl function to add ancestor filtering
-        Object.entries(levelCodeMap).forEach(([fieldId, levelCode]) => {
-            const field = document.getElementById(fieldId);
-            if (!field || !field.tomselect) return;
-
-            const ts = field.tomselect;
-
-            // Store the original firstUrl function
-            const originalFirstUrl = ts.settings.firstUrl || ts.settings.originalFirstUrl;
-            if (!originalFirstUrl) return;
-
-            // Override firstUrl to add the vintage and ancestor parameters
-            ts.settings.firstUrl = function (query) {
-                // Get the base URL from original function
-                let url = originalFirstUrl.call(this, query);
-
-                // Keep the options in the vintage the map is showing
-                const vintage = selectedVintage();
-                if (vintage) {
-                    url += `&version=${encodeURIComponent(vintage)}`;
-                }
-
-                // Get ancestor nuts_id for filtering (levels > 0 only)
-                const ancestorNutsId =
-                    levelCode === 0 ? null : getAncestorNutsId(levelCode);
-
-                // Add ancestor parameter if we have one
-                if (ancestorNutsId) {
-                    url += `&ancestor=${encodeURIComponent(ancestorNutsId)}`;
-                }
-
-                return url;
-            };
-        });
-    }, 500); // Give TomSelect time to initialize
 });
