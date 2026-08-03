@@ -10,9 +10,9 @@ from django.test import TestCase
 from django.urls import Resolver404, resolve
 
 from sources.waste_collection.waste_atlas.map_configs import (
-    BIOWASTE_NO_COLLECTION_COLOR,
     MAP_CONFIGS,
-    NO_DATA_COLOR,
+    no_collection_color,
+    no_data_color,
 )
 from sources.waste_collection.waste_atlas.map_selection import (
     MAP_SELECTION_THEME_ORDER,
@@ -30,7 +30,6 @@ REQUIRED_CONFIG_KEYS = frozenset(
         "dataUrl",
         "dataField",
         "categories",
-        "noDataColor",
         "legendTitle",
     }
 )
@@ -117,13 +116,15 @@ class WasteAtlasMapConfigStructureTests(TestCase):
     def test_no_data_entries_share_the_shared_no_data_color(self):
         for config_key, config in MAP_CONFIGS.items():
             with self.subTest(config_key=config_key, entry="fallback"):
-                self.assertEqual(config["noDataColor"], NO_DATA_COLOR)
+                self.assertEqual(
+                    config.get("noDataColor", no_data_color()), no_data_color()
+                )
 
             for entry in self._all_entries(config):
                 if not self._is_no_data_entry(entry):
                     continue
                 with self.subTest(config_key=config_key, entry=entry.get("label")):
-                    self.assertEqual(entry["color"], NO_DATA_COLOR)
+                    self.assertEqual(entry["color"], no_data_color())
 
     def test_biowaste_no_collection_entries_share_the_shared_color(self):
         for config_key, config in MAP_CONFIGS.items():
@@ -131,7 +132,7 @@ class WasteAtlasMapConfigStructureTests(TestCase):
                 if not self._is_biowaste_no_collection_entry(entry):
                     continue
                 with self.subTest(config_key=config_key, entry=entry.get("label")):
-                    self.assertEqual(entry["color"], BIOWASTE_NO_COLLECTION_COLOR)
+                    self.assertEqual(entry["color"], no_collection_color())
 
     @staticmethod
     def _all_entries(config):

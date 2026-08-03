@@ -2,12 +2,9 @@ from copy import deepcopy
 
 from django import forms
 
-LEGEND_PLACEMENT_CHOICES = (
-    ("bottom-left", "Bottom left"),
-    ("bottom-right", "Bottom right"),
-    ("top-left", "Top left"),
-    ("top-right", "Top right"),
-)
+from .models import LEGEND_PLACEMENTS, WasteAtlasRenderingSettings
+
+LEGEND_PLACEMENT_CHOICES = LEGEND_PLACEMENTS
 EXPORT_LEGEND_PLACEMENT_CHOICES = (
     ("", "Automatic"),
     ("right", "Right"),
@@ -80,6 +77,7 @@ class WasteAtlasMapConfigurationForm(forms.Form):
 
     def __init__(self, *args, instance, **kwargs):
         self.instance = instance
+        self._defaults = WasteAtlasRenderingSettings.load()
         self._configuration = deepcopy(instance.configuration)
         self._categories = self._configuration.get("categories", [])
 
@@ -91,12 +89,15 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         )
         initial.setdefault(
             "legend_placement",
-            self._configuration.get("legendPlacement", "bottom-left"),
+            self._configuration.get("legendPlacement", self._defaults.legend_placement),
         )
-        initial.setdefault("legend_width", self._configuration.get("legendWidth", 300))
+        initial.setdefault(
+            "legend_width",
+            self._configuration.get("legendWidth", self._defaults.legend_width),
+        )
         initial.setdefault(
             "legend_font_size",
-            self._configuration.get("legendFontSize", 12),
+            self._configuration.get("legendFontSize", self._defaults.legend_font_size),
         )
         initial.setdefault(
             "export_legend_placement",
@@ -104,11 +105,19 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         )
         initial.setdefault(
             "export_legend_width",
-            round(self._configuration.get("exportLegendWidth", 0.52) * 100),
+            round(
+                self._configuration.get(
+                    "exportLegendWidth",
+                    self._defaults.export_legend_width_fraction,
+                )
+                * 100
+            ),
         )
         initial.setdefault(
             "export_legend_columns",
-            self._configuration.get("exportLegendColumns", 1),
+            self._configuration.get(
+                "exportLegendColumns", self._defaults.export_legend_columns
+            ),
         )
         initial.setdefault(
             "export_legend_fit_content",

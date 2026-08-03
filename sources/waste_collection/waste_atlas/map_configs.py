@@ -2,8 +2,19 @@
 
 from collections.abc import Mapping
 
-NO_DATA_COLOR = "#e0e0e0"
-BIOWASTE_NO_COLLECTION_COLOR = "#fff696"
+
+def no_data_color():
+    """Return the configured fill for regions without data."""
+    from .models import WasteAtlasRenderingSettings
+
+    return WasteAtlasRenderingSettings.load().no_data_color
+
+
+def no_collection_color():
+    """Return the configured fill for regions without separate collection."""
+    from .models import WasteAtlasRenderingSettings
+
+    return WasteAtlasRenderingSettings.load().no_collection_color
 
 
 class DatabaseMapConfigurations(Mapping):

@@ -5,9 +5,16 @@ from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from sources.waste_collection.models import CollectionCatchment
 
-# Geometry simplification tolerance in degrees (approx 100m at equator)
-# Lower values = more detail, higher values = more simplification
-GEOMETRY_SIMPLIFY_TOLERANCE = 0.001
+from .models import WasteAtlasRenderingSettings
+
+
+def geometry_simplify_tolerance():
+    """Return the configured simplification tolerance in degrees.
+
+    Lower values keep more detail; the value is maintained in the Waste Atlas
+    rendering settings so it can be tuned without a deployment.
+    """
+    return WasteAtlasRenderingSettings.load().geometry_simplify_tolerance
 
 
 def _round_one_decimal(value):

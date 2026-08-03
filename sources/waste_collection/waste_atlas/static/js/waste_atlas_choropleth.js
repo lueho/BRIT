@@ -16,10 +16,14 @@
  *       { value: 'nuts', label: 'Landkreise', color: '#93d163' },
  *       ...
  *     ],
- *     noDataColor:  '#e0e0e0',            // optional, default grey
  *     noDataLabel:  'Keine Daten',        // optional
  *     legendTitle:  'Legend',              // optional
  *   });
+ *
+ * Atlas-wide values (palette, legend defaults, export page geometry) are not
+ * hard-coded here: they are read from the JSON script element
+ * ``#waste-atlas-render-defaults`` that the ``atlas_render_defaults`` template
+ * tag renders from the database, or from ``cfg.renderDefaults``.
  */
 
 /* global d3 */
@@ -27,25 +31,84 @@
 var WasteAtlasChoropleth = (function () {
   'use strict';
 
-  var COUNTRY_FILL = '#f0f0f0';
-  var BUNDESLAND_STROKE = '#666666';
-  var BUNDESLAND_STROKE_WIDTH = 1.0;   // Thinner than country border
-  var COUNTRY_STROKE = '#000000';
-  var COUNTRY_STROKE_WIDTH = 1.5;      // Thicker than Bundesläender border
-  var CATCHMENT_STROKE = '#232323';
-  var CATCHMENT_STROKE_WIDTH = 0.35;   // ≈ 0.1 mm at 96 DPI
-  // Maintainer aid: outline style for catchments with conflicting collections.
-  var CONFLICT_STROKE = '#d7263d';
-  var CONFLICT_STROKE_WIDTH = 1.6;
-  var CONFLICT_STROKE_DASHARRAY = '3 2';
-  var EXPORT_DPI = 300;
-  var EXPORT_WIDTH_MM = 160;
-  var EXPORT_HEIGHT_MM = 110;
-  var EXPORT_MAX_HEIGHT_MM = 180;
-  var EXPORT_WIDTH = Math.round(EXPORT_WIDTH_MM / 25.4 * EXPORT_DPI);
-  var EXPORT_HEIGHT = Math.round(EXPORT_HEIGHT_MM / 25.4 * EXPORT_DPI);
-  var EXPORT_LEGEND_FONT_SIZE = 11 / 72 * EXPORT_DPI;
-  var EXPORT_LEGEND_FONT_FAMILY = "'Calibri', 'Carlito', Arial, sans-serif";
+  var RENDER_DEFAULTS_ELEMENT_ID = 'waste-atlas-render-defaults';
+  var _renderDefaults = null;
+
+  /**
+   * Return the database-backed atlas defaults.
+   *
+   * Reads the JSON script element rendered by the ``atlas_render_defaults``
+   * template tag once and caches it. ``setRenderDefaults`` lets callers (the
+   * page config injected into ``init``) supply the same payload directly.
+   */
+  function _defaults() {
+    if (_renderDefaults) return _renderDefaults;
+    var el = document.getElementById(RENDER_DEFAULTS_ELEMENT_ID);
+    if (el) {
+      try {
+        _renderDefaults = JSON.parse(el.textContent);
+      } catch (error) {
+        _renderDefaults = null;
+      }
+    }
+    if (!_renderDefaults) {
+      throw new Error(
+        'Waste Atlas rendering defaults are missing: render the '
+        + 'atlas_render_defaults template tag on this page.'
+      );
+    }
+    return _renderDefaults;
+  }
+
+  function setRenderDefaults(defaults) {
+    if (defaults) _renderDefaults = defaults;
+  }
+
+  function _exportDefaults() {
+    return _defaults().export;
+  }
+
+  function _exportPx(millimetres) {
+    return Math.round(millimetres / 25.4 * _exportDefaults().dpi);
+  }
+
+  function _exportWidth() {
+    return _exportPx(_exportDefaults().widthMm);
+  }
+
+  function _exportHeight() {
+    return _exportPx(_exportDefaults().heightMm);
+  }
+
+  function _exportLegendFontSize() {
+    return _exportDefaults().legendFontSizePt / 72 * _exportDefaults().dpi;
+  }
+
+  function _defaultFileBase() {
+    return _defaults().exportFileNamePrefix + '_map';
+  }
+
+  function _exportLegendFontFamily() {
+    return _exportDefaults().legendFontFamily;
+  }
+
+  /**
+   * Page heights the export layout may choose from, in millimetres.
+   *
+   * The preferred height comes first so it wins on equal score; taller pages
+   * are tried in ~20 mm steps up to the configured maximum.
+   */
+  function _exportHeightCandidatesMm() {
+    var preferred = _exportDefaults().heightMm;
+    var maximum = _exportDefaults().maxHeightMm;
+    var candidates = [preferred];
+    var step = 20;
+    for (var height = preferred + step; height < maximum; height += step) {
+      candidates.push(height);
+    }
+    if (maximum > preferred) candidates.push(maximum);
+    return candidates;
+  }
   // On-screen canvas: the SVG always spans the container width, the height
   // follows the projected geometry so DE, EU and single-region maps each get
   // sensible proportions instead of one hard-coded aspect ratio.
@@ -226,7 +289,7 @@ var WasteAtlasChoropleth = (function () {
   }
 
   function _colorFor(value, categories, noDataColor) {
-    if (value == null) return noDataColor || '#e0e0e0';
+    if (value == null) return noDataColor || _defaults().noDataColor;
     for (var i = 0; i < categories.length; i++) {
       var cat = categories[i];
       if (typeof cat.test === 'function') {
@@ -235,7 +298,7 @@ var WasteAtlasChoropleth = (function () {
         return cat.color;
       }
     }
-    return noDataColor || '#e0e0e0';
+    return noDataColor || _defaults().noDataColor;
   }
 
   /**
@@ -373,22 +436,24 @@ var WasteAtlasChoropleth = (function () {
   // ---- change maps (two-year diff) ------------------------------------------
 
   function _changeCategories(toYear) {
+    var colors = _defaults().changeColors;
     return [
-      { value: 'no_change', label: 'No change', color: '#c8e6c9' },
-      { value: 'changed', label: 'Category changed', color: '#ffb74d' },
-      { value: 'new', label: 'New in ' + toYear, color: '#64b5f6' },
-      { value: 'removed', label: 'Removed in ' + toYear, color: '#bdbdbd' }
+      { value: 'no_change', label: 'No change', color: colors.noChange },
+      { value: 'changed', label: 'Category changed', color: colors.changed },
+      { value: 'new', label: 'New in ' + toYear, color: colors['new'] },
+      { value: 'removed', label: 'Removed in ' + toYear, color: colors.removed }
     ];
   }
 
   function _numericChangeCategories(toYear) {
+    var colors = _defaults().changeColors;
     return [
-      { value: 'decrease', label: 'Decrease', color: '#d73027' },
-      { value: 'no_change', label: 'No numeric change', color: '#c8e6c9' },
-      { value: 'increase', label: 'Increase', color: '#1a9850' },
-      { value: 'changed', label: 'Category changed', color: '#ffb74d' },
-      { value: 'new', label: 'New value in ' + toYear, color: '#64b5f6' },
-      { value: 'removed', label: 'Value removed in ' + toYear, color: '#bdbdbd' }
+      { value: 'decrease', label: 'Decrease', color: colors.decrease },
+      { value: 'no_change', label: 'No numeric change', color: colors.noChange },
+      { value: 'increase', label: 'Increase', color: colors.increase },
+      { value: 'changed', label: 'Category changed', color: colors.changed },
+      { value: 'new', label: 'New value in ' + toYear, color: colors['new'] },
+      { value: 'removed', label: 'Value removed in ' + toYear, color: colors.removed }
     ];
   }
 
@@ -931,7 +996,7 @@ var WasteAtlasChoropleth = (function () {
       _measureCtx = document.createElement('canvas').getContext('2d');
     }
     if (!_measureCtx) return String(text).length * fontSize * 0.52;
-    _measureCtx.font = (fontWeight ? fontWeight + ' ' : '') + fontSize + 'px ' + EXPORT_LEGEND_FONT_FAMILY;
+    _measureCtx.font = (fontWeight ? fontWeight + ' ' : '') + fontSize + 'px ' + _exportLegendFontFamily();
     return _measureCtx.measureText(text).width;
   }
 
@@ -1041,7 +1106,7 @@ var WasteAtlasChoropleth = (function () {
     if (cfg.noDataLabel && cfg._hasFallbackNoData) {
       items.push({
         label: exportMode && cfg.exportNoDataLabel ? cfg.exportNoDataLabel : cfg.noDataLabel,
-        color: cfg.noDataColor || '#e0e0e0'
+        color: cfg.noDataColor || _defaults().noDataColor
       });
     }
     return items;
@@ -1064,7 +1129,7 @@ var WasteAtlasChoropleth = (function () {
   }
 
   function _measureExportLegend(cfg, width, columnCount) {
-    var swatchSize = Math.round(EXPORT_LEGEND_FONT_SIZE * 0.72);
+    var swatchSize = Math.round(_exportLegendFontSize() * 0.72);
     var opts = {
       paddingX: 20,
       paddingY: 18,
@@ -1075,9 +1140,9 @@ var WasteAtlasChoropleth = (function () {
       titleGap: 14,
       columnGap: 34,
       columnCount: columnCount || 1,
-      fontSize: EXPORT_LEGEND_FONT_SIZE,
-      titleFontSize: EXPORT_LEGEND_FONT_SIZE,
-      fontFamily: EXPORT_LEGEND_FONT_FAMILY
+      fontSize: _exportLegendFontSize(),
+      titleFontSize: _exportLegendFontSize(),
+      fontFamily: _exportLegendFontFamily()
     };
     opts.lineHeight = Math.round(opts.fontSize * 1.12);
     if (cfg.exportLegendFitContent && opts.columnCount === 1) {
@@ -1196,7 +1261,7 @@ var WasteAtlasChoropleth = (function () {
 
   function _fitBottomRightLegend(cfg, geometryData, fitData, mapExtent, maxWidth,
     columnCount, exportHeight, margin, gap) {
-    var documentRight = EXPORT_WIDTH - margin;
+    var documentRight = _exportWidth() - margin;
     var widthLimit = maxWidth;
     var legend;
     var mapRight = -Infinity;
@@ -1235,8 +1300,8 @@ var WasteAtlasChoropleth = (function () {
     var candidates = [];
     var preferredLegendSpec = cfg.exportLegendPlacement && {
       placement: cfg.exportLegendPlacement,
-      width: cfg.exportLegendWidth || 0.52,
-      columns: cfg.exportLegendColumns || 1,
+      width: cfg.exportLegendWidth || _exportDefaults().legendWidth,
+      columns: cfg.exportLegendColumns || _exportDefaults().legendColumns,
       avoidMapOverlap: Boolean(cfg.exportLegendAvoidMapOverlap),
       overlay: true
     };
@@ -1249,23 +1314,27 @@ var WasteAtlasChoropleth = (function () {
       { placement: 'bottom-left', width: 0.52, columns: 2, overlay: true },
       { placement: 'top-right', width: 0.52, columns: 2, overlay: true },
       { placement: 'top-left', width: 0.52, columns: 2, overlay: true },
-      { placement: 'bottom', width: 0.88, columns: cfg.exportLegendBottomColumns || 3 }
+      {
+        placement: 'bottom',
+        width: 0.88,
+        columns: cfg.exportLegendBottomColumns || _exportDefaults().legendBottomColumns
+      }
     ];
-    [EXPORT_HEIGHT_MM, 130, 150, 170, EXPORT_MAX_HEIGHT_MM].forEach(function (heightMm) {
-      var exportHeight = Math.round(heightMm / 25.4 * EXPORT_DPI);
+    _exportHeightCandidatesMm().forEach(function (heightMm) {
+      var exportHeight = Math.round(heightMm / 25.4 * _exportDefaults().dpi);
       legendSpecs.forEach(function (spec) {
-        var maxLegendWidth = Math.round(EXPORT_WIDTH * spec.width);
+        var maxLegendWidth = Math.round(_exportWidth() * spec.width);
         var legend = _measureExportLegend(cfg, maxLegendWidth, spec.columns);
         var x = margin;
         var y = titleBlock;
         var mapRight = -Infinity;
-        var mapExtent = [[margin, titleBlock], [EXPORT_WIDTH - margin, exportHeight - margin]];
+        var mapExtent = [[margin, titleBlock], [_exportWidth() - margin, exportHeight - margin]];
         if (spec.placement === 'right') {
-          x = EXPORT_WIDTH - margin - legend.width;
+          x = _exportWidth() - margin - legend.width;
           mapExtent = [[margin, titleBlock], [x - gap, exportHeight - margin]];
         } else if (spec.placement === 'left') {
           x = margin;
-          mapExtent = [[x + legend.width + gap, titleBlock], [EXPORT_WIDTH - margin, exportHeight - margin]];
+          mapExtent = [[x + legend.width + gap, titleBlock], [_exportWidth() - margin, exportHeight - margin]];
         } else if (spec.placement === 'bottom-right') {
           if (spec.avoidMapOverlap) {
             var fittedLegend = _fitBottomRightLegend(
@@ -1284,22 +1353,22 @@ var WasteAtlasChoropleth = (function () {
             y = fittedLegend.y;
             mapRight = fittedLegend.mapRight;
           } else {
-            x = EXPORT_WIDTH - margin - legend.width;
+            x = _exportWidth() - margin - legend.width;
             y = exportHeight - margin - legend.height;
           }
         } else if (spec.placement === 'bottom-left') {
           x = margin;
           y = exportHeight - margin - legend.height;
         } else if (spec.placement === 'top-right') {
-          x = EXPORT_WIDTH - margin - legend.width;
+          x = _exportWidth() - margin - legend.width;
           y = titleBlock;
         } else if (spec.placement === 'top-left') {
           x = margin;
           y = titleBlock;
         } else if (spec.placement === 'bottom') {
-          x = Math.round((EXPORT_WIDTH - legend.width) / 2);
+          x = Math.round((_exportWidth() - legend.width) / 2);
           y = exportHeight - margin - legend.height;
-          mapExtent = [[margin, titleBlock], [EXPORT_WIDTH - margin, y - gap]];
+          mapExtent = [[margin, titleBlock], [_exportWidth() - margin, y - gap]];
         }
         legend = Object.assign({}, legend, { x: x, y: y });
         candidates.push({
@@ -1318,7 +1387,7 @@ var WasteAtlasChoropleth = (function () {
       var legendOverflow = Math.max(0, margin - candidate.legend.y)
         + Math.max(0, candidate.legend.y + candidate.legend.height - (candidate.height - margin))
         + Math.max(0, margin - candidate.legend.x)
-        + Math.max(0, candidate.legend.x + candidate.legend.width - (EXPORT_WIDTH - margin));
+        + Math.max(0, candidate.legend.x + candidate.legend.width - (_exportWidth() - margin));
       var mapW = candidate.mapExtent[1][0] - candidate.mapExtent[0][0];
       var mapH = candidate.mapExtent[1][1] - candidate.mapExtent[0][1];
       var invalidMap = mapW <= 0 || mapH <= 0;
@@ -1340,7 +1409,7 @@ var WasteAtlasChoropleth = (function () {
       var mapArea = mapBounds.width * mapBounds.height;
       var usedArea = mapArea + legendArea - scoredOverlap;
       candidate.score = mapBounds.scale * 100000 + usedArea / 1000
-        - (candidate.heightMm - EXPORT_HEIGHT_MM) * 120000
+        - (candidate.heightMm - _exportDefaults().heightMm) * 120000
         - legendOverflow * 1000000
         - scoredOverlap * 1000
         - (invalidOverlay ? 1000000000 : 0)
@@ -1351,9 +1420,9 @@ var WasteAtlasChoropleth = (function () {
     }, null);
     return {
       exportMode: true,
-      width: EXPORT_WIDTH,
+      width: _exportWidth(),
       height: best.height,
-      widthMm: EXPORT_WIDTH_MM,
+      widthMm: _exportDefaults().widthMm,
       heightMm: best.heightMm,
       mapExtent: best.mapExtent,
       showHeader: false,
@@ -1376,7 +1445,7 @@ var WasteAtlasChoropleth = (function () {
     var q3 = d3.quantile(sorted, 0.75);
     var min = sorted[0];
     var max = sorted[sorted.length - 1];
-    colors = colors || ['#d9f0d3', '#a6d96a', '#66bd63', '#1a9850'];
+    colors = colors || _defaults().quartileColors;
     displayMultiplier = displayMultiplier || 1;
 
     function fmt(v) {
@@ -2103,7 +2172,7 @@ var WasteAtlasChoropleth = (function () {
         .data(fillData.features)
         .enter().append('path')
         .attr('d', path)
-        .attr('fill', COUNTRY_FILL)
+        .attr('fill', _defaults().countryFill)
         .attr('stroke', 'none');
     }
 
@@ -2115,8 +2184,8 @@ var WasteAtlasChoropleth = (function () {
         .enter().append('path')
         .attr('d', path)
         .attr('fill', 'none')
-        .attr('stroke', CATCHMENT_STROKE)
-        .attr('stroke-width', CATCHMENT_STROKE_WIDTH);
+        .attr('stroke', _defaults().catchmentStroke)
+        .attr('stroke-width', _defaults().catchmentStrokeWidth);
     }
 
     // Layer 3: catchments with data (thin borders)
@@ -2129,8 +2198,8 @@ var WasteAtlasChoropleth = (function () {
         .attr('fill', function (d) {
           return _colorFor(d.properties._thematic_value, cfg.categories, cfg.noDataColor);
         })
-        .attr('stroke', CATCHMENT_STROKE)
-        .attr('stroke-width', CATCHMENT_STROKE_WIDTH);
+        .attr('stroke', _defaults().catchmentStroke)
+        .attr('stroke-width', _defaults().catchmentStrokeWidth);
 
       if (!layout.exportMode) {
         catchmentPaths
@@ -2236,9 +2305,9 @@ var WasteAtlasChoropleth = (function () {
         .enter().append('path')
         .attr('d', path)
         .attr('fill', 'none')
-        .attr('stroke', CONFLICT_STROKE)
-        .attr('stroke-width', CONFLICT_STROKE_WIDTH)
-        .attr('stroke-dasharray', CONFLICT_STROKE_DASHARRAY)
+        .attr('stroke', _defaults().conflictStroke)
+        .attr('stroke-width', _defaults().conflictStrokeWidth)
+        .attr('stroke-dasharray', _defaults().conflictStrokeDasharray)
         .attr('stroke-linejoin', 'round')
         .attr('pointer-events', 'none');
     }
@@ -2254,15 +2323,15 @@ var WasteAtlasChoropleth = (function () {
         .enter().append('path')
         .attr('d', path)
         .attr('fill', 'none')
-        .attr('stroke', BUNDESLAND_STROKE)
-        .attr('stroke-width', BUNDESLAND_STROKE_WIDTH);
+        .attr('stroke', _defaults().subdivisionStroke)
+        .attr('stroke-width', _defaults().subdivisionStrokeWidth);
     }
 
     // Layer 5: outer border (very top) — always show country border for full maps,
     // but show Bundesläender borders as outer border for regional maps (when nutsPrefix is set)
     var borderData = data.countryBorder;
-    var borderStroke = COUNTRY_STROKE;
-    var borderWidth = COUNTRY_STROKE_WIDTH;
+    var borderStroke = _defaults().countryStroke;
+    var borderWidth = _defaults().countryStrokeWidth;
 
     if (hasRegionalBorder) {
       // For regional maps (with nutsPrefix), use Bundesläender as outer border instead of country border
@@ -2395,7 +2464,7 @@ var WasteAtlasChoropleth = (function () {
       return;
     }
 
-    var fontSize = Math.max(8, Math.min(24, Number(cfg.legendFontSize) || 12));
+    var fontSize = Math.max(8, Math.min(24, Number(cfg.legendFontSize) || _defaults().legend.fontSize));
     var lineHeight = Math.round(fontSize * 1.18);
     var swatchH = Math.max(12, Math.round(fontSize * 1.3));
     var swatchW = Math.round(swatchH * 1.375);
@@ -2403,7 +2472,7 @@ var WasteAtlasChoropleth = (function () {
     var paddingX = 10;
     var paddingY = 12;
     var labelGap = 8;
-    var requestedWidth = Number(cfg.legendWidth) || 300;
+    var requestedWidth = Number(cfg.legendWidth) || _defaults().legend.width;
     var legendWidth = Math.max(120, Math.min(requestedWidth, width - 32));
     var textWidth = legendWidth - paddingX * 2 - swatchW - labelGap;
     var screenItems = _orderedLegendCategories(cfg).map(function (item) {
@@ -2422,7 +2491,7 @@ var WasteAtlasChoropleth = (function () {
     }
     if (cfg.noDataLabel && cfg._hasFallbackNoData) {
       screenItems.push({
-        color: cfg.noDataColor || '#e0e0e0',
+        color: cfg.noDataColor || _defaults().noDataColor,
         lines: _wrapTextToWidth(cfg.noDataLabel, textWidth, fontSize),
         kind: 'no-data'
       });
@@ -2451,7 +2520,7 @@ var WasteAtlasChoropleth = (function () {
       ? gap + 7 + footnoteLines.length * Math.max(10, lineHeight - 2)
       : 0;
     var totalH = paddingY * 2 + titleHeight + itemsHeight + footnoteHeight;
-    var placement = cfg.legendPlacement || 'bottom-left';
+    var placement = cfg.legendPlacement || _defaults().legend.placement;
     var margin = 32;
     // Honour the configured side, but keep the vertical anchor at the top on
     // screen: the canvas is taller than the viewport, so a bottom legend would
@@ -2495,9 +2564,9 @@ var WasteAtlasChoropleth = (function () {
         .attr('fill', item.color).attr('stroke', '#333');
       if (item.kind === 'conflict') {
         swatch
-          .attr('stroke', CONFLICT_STROKE)
+          .attr('stroke', _defaults().conflictStroke)
           .attr('stroke-width', 1.4)
-          .attr('stroke-dasharray', CONFLICT_STROKE_DASHARRAY);
+          .attr('stroke-dasharray', _defaults().conflictStrokeDasharray);
       }
       var textX = paddingX + swatchW + labelGap;
       var label = g.append('text')
@@ -2753,7 +2822,7 @@ var WasteAtlasChoropleth = (function () {
   function exportSVG(filename) {
     var source = _svgSource(_buildExportSVGElement());
     var blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
-    _downloadBlob(blob, filename || 'waste_atlas_map.svg');
+    _downloadBlob(blob, filename || _defaultFileBase() + '.svg');
   }
 
   function _crc32(bytes) {
@@ -2833,7 +2902,7 @@ var WasteAtlasChoropleth = (function () {
 
   function exportPNG(filename) {
     var svgEl = _buildExportSVGElement();
-    var layout = svgEl.__wasteAtlasExportLayout || { width: EXPORT_WIDTH, height: EXPORT_HEIGHT };
+    var layout = svgEl.__wasteAtlasExportLayout || { width: _exportWidth(), height: _exportHeight() };
     var w = layout.width;
     var h = layout.height;
     var canvas = document.createElement('canvas');
@@ -2849,8 +2918,8 @@ var WasteAtlasChoropleth = (function () {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, w, h);
       canvas.toBlob(function (blob) {
-        _pngWithDpi(blob, EXPORT_DPI).then(function (pngBlob) {
-          _downloadBlob(pngBlob, filename || 'waste_atlas_map.png');
+        _pngWithDpi(blob, _exportDefaults().dpi).then(function (pngBlob) {
+          _downloadBlob(pngBlob, filename || _defaultFileBase() + '.png');
         });
       }, 'image/png');
     };
@@ -2860,12 +2929,12 @@ var WasteAtlasChoropleth = (function () {
   function exportElementSVG(svgEl, filename) {
     var source = _svgSource(svgEl);
     var blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
-    _downloadBlob(blob, filename || 'waste_atlas_map.svg');
+    _downloadBlob(blob, filename || _defaultFileBase() + '.svg');
   }
 
   function exportElementPNG(svgEl, filename, dpi) {
-    var width = parseInt(svgEl.getAttribute('width'), 10) || svgEl.viewBox.baseVal.width || EXPORT_WIDTH;
-    var height = parseInt(svgEl.getAttribute('height'), 10) || svgEl.viewBox.baseVal.height || EXPORT_HEIGHT;
+    var width = parseInt(svgEl.getAttribute('width'), 10) || svgEl.viewBox.baseVal.width || _exportWidth();
+    var height = parseInt(svgEl.getAttribute('height'), 10) || svgEl.viewBox.baseVal.height || _exportHeight();
     var canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
@@ -2878,8 +2947,8 @@ var WasteAtlasChoropleth = (function () {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, width, height);
       canvas.toBlob(function (blob) {
-        _pngWithDpi(blob, dpi || EXPORT_DPI).then(function (pngBlob) {
-          _downloadBlob(pngBlob, filename || 'waste_atlas_map.png');
+        _pngWithDpi(blob, dpi || _exportDefaults().dpi).then(function (pngBlob) {
+          _downloadBlob(pngBlob, filename || _defaultFileBase() + '.png');
         });
       }, 'image/png');
     };
@@ -2890,10 +2959,11 @@ var WasteAtlasChoropleth = (function () {
 
   function init(cfg) {
     _cfg = cfg;
+    setRenderDefaults(cfg.renderDefaults);
     var loadingEl = document.getElementById(cfg.loadingId);
     var btnSVG = document.getElementById('btn-export-svg');
     var btnPNG = document.getElementById('btn-export-png');
-    var fileBase = cfg.fileBase || 'waste_atlas_map';
+    var fileBase = cfg.fileBase || _defaultFileBase();
     var isQuartileMode = _isQuartileEnabled(cfg) && !cfg.changeMode;
 
     function _exportFileBase() {
@@ -3200,6 +3270,7 @@ var WasteAtlasChoropleth = (function () {
 
   return {
     init: init,
+    setRenderDefaults: setRenderDefaults,
     initSelectorControls: initSelectorControls,
     initOverviewDirectory: initOverviewDirectory,
     initShell: initShell,
