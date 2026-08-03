@@ -226,8 +226,15 @@ function clearFields(fields) {
             const element = document.getElementById(`id_${field}`);
             if (element) {
                 if (element.tomselect) {
-                    element.tomselect.clear(true);
-                    element.tomselect.clearOptions();
+                    const ts = element.tomselect;
+                    ts.clear(true);
+                    if (ts.clearPagination) {
+                        // virtual_scroll remembers a page per query, and a
+                        // remembered query is never fetched again — the emptied
+                        // dropdown would stay empty.
+                        ts.clearPagination();
+                    }
+                    ts.clearOptions();
                 }
                 element.value = null;
                 const event = new Event('change', { bubbles: true });
