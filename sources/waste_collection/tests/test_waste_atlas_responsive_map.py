@@ -90,11 +90,13 @@ class WasteAtlasResponsiveMapScriptTests(TestCase):
     def test_zoom_is_reset_when_a_new_selection_is_loaded(self):
         self.assertIn("function _resetZoom(", self.script)
 
-    def test_exports_keep_the_sixteen_centimetre_width_and_auto_height(self):
-        self.assertIn("var EXPORT_WIDTH_MM = 160;", self.script)
-        self.assertIn("var EXPORT_MAX_HEIGHT_MM = 180;", self.script)
+    def test_exports_take_their_page_geometry_from_the_database_defaults(self):
+        """Page width and the height ladder come from the stored export defaults."""
+        self.assertIn("return _exportPx(_exportDefaults().widthMm);", self.script)
+        self.assertIn("var preferred = _exportDefaults().heightMm;", self.script)
+        self.assertIn("var maximum = _exportDefaults().maxHeightMm;", self.script)
         self.assertIn(
-            "[EXPORT_HEIGHT_MM, 130, 150, 170, EXPORT_MAX_HEIGHT_MM].forEach(function (heightMm)",
+            "_exportHeightCandidatesMm().forEach(function (heightMm)",
             self.script,
         )
 
