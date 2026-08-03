@@ -78,6 +78,29 @@ class WasteAtlasMapConfigStructureTests(TestCase):
                         set(entry),
                     )
 
+    def test_amount_maps_mark_aggregated_values(self):
+        for config_key in (
+            "biowaste_collection_amount",
+            "residual_collection_amount",
+        ):
+            with self.subTest(config_key=config_key):
+                config = MAP_CONFIGS[config_key]
+                self.assertEqual(config["overlayPatternField"], "_has_acpv_overlay")
+                self.assertIn("acpv-outline-geojson/", config["outlineGeoJsonUrl"])
+                self.assertEqual(
+                    config["overlayPatternLegendLabel"],
+                    "Hatched = aggregated value",
+                )
+
+    def test_waste_ratio_marks_values_that_include_aggregated_amounts(self):
+        config = MAP_CONFIGS["waste_ratio"]
+
+        self.assertEqual(config["overlayPatternField"], "uses_aggregated_amount")
+        self.assertEqual(
+            config["overlayPatternLegendLabel"],
+            "Hatched = includes aggregated value",
+        )
+
     def test_configured_api_urls_resolve_to_a_served_route(self):
         """A typo in a stored endpoint must fail here, not silently in the browser."""
         for config_key, config in MAP_CONFIGS.items():
