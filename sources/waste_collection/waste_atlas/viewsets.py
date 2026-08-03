@@ -1906,11 +1906,13 @@ def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
     return _amounts_for_year(year, all_collection_ids, col_to_cid, catchment_ids)
 
 
-def _get_biowaste_acpv_outline_geojson(country, year, nuts_prefixes=(), user=None):
+def _get_acpv_outline_geojson(
+    country, year, waste_categories, nuts_prefixes=(), user=None
+):
     amount_rows = _get_collection_amount(
         country,
         year,
-        ["Biowaste", "Food waste"],
+        waste_categories,
         nuts_prefixes,
         include_value_source=True,
         include_acpv_group_key=True,
@@ -2172,10 +2174,30 @@ class ResidualCollectionAmountViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         data = _get_collection_amount(
-            country, year, ["Residual waste"], nuts_prefixes, user=request.user
+            country,
+            year,
+            ["Residual waste"],
+            nuts_prefixes,
+            include_value_source=True,
+            include_acpv_group_key=True,
+            user=request.user,
         )
         serializer = CatchmentCollectionAmountSerializer(data, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="acpv-outline-geojson")
+    def acpv_outline_geojson(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        return Response(
+            _get_acpv_outline_geojson(
+                country,
+                year,
+                ["Residual waste"],
+                nuts_prefixes,
+                user=request.user,
+            )
+        )
 
 
 class BiowasteCollectionAmountViewSet(WasteAtlasViewSet):
@@ -2209,8 +2231,12 @@ class BiowasteCollectionAmountViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         return Response(
-            _get_biowaste_acpv_outline_geojson(
-                country, year, nuts_prefixes, user=request.user
+            _get_acpv_outline_geojson(
+                country,
+                year,
+                ["Biowaste", "Food waste"],
+                nuts_prefixes,
+                user=request.user,
             )
         )
 
@@ -2610,30 +2636,34 @@ class WasteRatioViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         bio = {
-            r["catchment_id"]: r["amount"]
+            r["catchment_id"]: r
             for r in _get_collection_amount(
                 country,
                 year,
                 ["Biowaste", "Food waste"],
                 nuts_prefixes,
+                include_value_source=True,
                 user=request.user,
             )
         }
         res = {
-            r["catchment_id"]: r["amount"]
+            r["catchment_id"]: r
             for r in _get_collection_amount(
                 country,
                 year,
                 ["Residual waste"],
                 nuts_prefixes,
+                include_value_source=True,
                 user=request.user,
             )
         }
         all_ids = set(bio) | set(res)
         data = []
         for cid in all_ids:
-            b = bio.get(cid)
-            r = res.get(cid)
+            bio_row = bio.get(cid, {})
+            residual_row = res.get(cid, {})
+            b = bio_row.get("amount")
+            r = residual_row.get("amount")
             if b is not None and r is not None and (b + r) > 0:
                 ratio = b / (b + r)
             else:
@@ -2644,6 +2674,10 @@ class WasteRatioViewSet(WasteAtlasViewSet):
                     "bio_amount": b,
                     "residual_amount": r,
                     "ratio": ratio,
+                    "uses_aggregated_amount": (
+                        bio_row.get("value_source") == "acpv"
+                        or residual_row.get("value_source") == "acpv"
+                    ),
                 }
             )
         serializer = CatchmentWasteRatioSerializer(data, many=True)

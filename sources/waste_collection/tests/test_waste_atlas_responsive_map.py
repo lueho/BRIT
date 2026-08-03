@@ -90,6 +90,29 @@ class WasteAtlasResponsiveMapScriptTests(TestCase):
     def test_zoom_is_reset_when_a_new_selection_is_loaded(self):
         self.assertIn("function _resetZoom(", self.script)
 
+    def test_exports_keep_the_sixteen_centimetre_width_and_auto_height(self):
+        self.assertIn("var EXPORT_WIDTH_MM = 160;", self.script)
+        self.assertIn("var EXPORT_MAX_HEIGHT_MM = 180;", self.script)
+        self.assertIn(
+            "[EXPORT_HEIGHT_MM, 130, 150, 170, EXPORT_MAX_HEIGHT_MM].forEach(function (heightMm)",
+            self.script,
+        )
+
+    def test_amount_transforms_preserve_aggregated_value_metadata(self):
+        for transform_name in (
+            "biowasteCollectionAmount",
+            "residualCollectionAmount",
+        ):
+            with self.subTest(transform=transform_name):
+                transform_body = self.script.split(f"{transform_name}: function")[1]
+                transform_body = transform_body.split("    },", 1)[0]
+                self.assertIn("_has_acpv_overlay", transform_body)
+                self.assertIn("_acpv_group_key", transform_body)
+
+        waste_ratio_body = self.script.split("wasteRatio: function")[1]
+        waste_ratio_body = waste_ratio_body.split("    },", 1)[0]
+        self.assertIn("uses_aggregated_amount", waste_ratio_body)
+
     def test_exports_are_rendered_without_the_screen_zoom_transform(self):
         render_body = self.script.split("function _render(data, cfg, options)")[1]
         render_body = render_body.split("function _drawExportLegendItem")[0]

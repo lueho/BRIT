@@ -24,6 +24,7 @@ def restore_no_data_color(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("waste_atlas", "0007_seed_rendering_settings"),
+        ("waste_atlas", "0007_add_waste_ratio_aggregated_overlay"),
     ]
 
     operations = [

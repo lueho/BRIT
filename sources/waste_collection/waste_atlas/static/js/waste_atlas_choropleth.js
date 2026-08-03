@@ -1979,7 +1979,12 @@ var WasteAtlasChoropleth = (function () {
         } else {
           cls = 'very_low';
         }
-        return { catchment_id: r.catchment_id, _classified: cls };
+        return {
+          catchment_id: r.catchment_id,
+          _classified: cls,
+          _has_acpv_overlay: r.value_source === 'acpv',
+          _acpv_group_key: r.acpv_group_key
+        };
       });
     },
     residualCollectionCount: function (records) {
@@ -2071,7 +2076,11 @@ var WasteAtlasChoropleth = (function () {
         } else {
           cls = 'very_low';
         }
-        return { catchment_id: r.catchment_id, _classified: cls };
+        return {
+          catchment_id: r.catchment_id,
+          _classified: cls,
+          uses_aggregated_amount: r.uses_aggregated_amount
+        };
       });
     },
     weeklyBpAccessDays: function (records) {

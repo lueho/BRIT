@@ -36,6 +36,12 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
         "/waste_collection/api/waste-atlas/biowaste-collection-amount/"
         "acpv-outline-geojson/"
     )
+    residual_endpoint = "/waste_collection/api/waste-atlas/residual-collection-amount/"
+    residual_outline_endpoint = (
+        "/waste_collection/api/waste-atlas/residual-collection-amount/"
+        "acpv-outline-geojson/"
+    )
+    ratio_endpoint = "/waste_collection/api/waste-atlas/waste-ratio/"
 
     @classmethod
     def setUpTestData(cls):
@@ -53,6 +59,7 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
         )
 
         cls.biowaste, _ = WasteCategory.objects.get_or_create(name="Biowaste")
+        cls.residual, _ = WasteCategory.objects.get_or_create(name="Residual waste")
         cls.d2d, _ = CollectionSystem.objects.get_or_create(name="Door to door")
         cls.no_collection, _ = CollectionSystem.objects.get_or_create(
             name="No separate collection"
@@ -139,6 +146,30 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
             collection_system=cls.no_collection,
             year=2022,
         )
+        cls._create_collection(
+            catchment=cls.catchment_acpv_group_a_1,
+            collection_system=cls.d2d,
+            year=2022,
+            waste_category=cls.residual,
+        )
+        cls._create_collection(
+            catchment=cls.catchment_acpv_group_a_2,
+            collection_system=cls.d2d,
+            year=2022,
+            waste_category=cls.residual,
+        )
+        cls.residual_acpv_source_collection_1 = cls._create_collection(
+            catchment=cls.catchment_acpv_group_a_1,
+            collection_system=cls.d2d,
+            year=2020,
+            waste_category=cls.residual,
+        )
+        cls.residual_acpv_source_collection_2 = cls._create_collection(
+            catchment=cls.catchment_acpv_group_a_2,
+            collection_system=cls.d2d,
+            year=2020,
+            waste_category=cls.residual,
+        )
 
         cls.acpv_group_a = cls._create_agg_value(
             collections=[
@@ -156,6 +187,16 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
             unit_obj=cls.specific_unit,
             year=2022,
             average=95.0,
+        )
+        cls.residual_acpv_group = cls._create_agg_value(
+            collections=[
+                cls.residual_acpv_source_collection_1,
+                cls.residual_acpv_source_collection_2,
+            ],
+            property_obj=cls.specific_property,
+            unit_obj=cls.specific_unit,
+            year=2022,
+            average=75.0,
         )
         cls._create_cpv(
             collection=cls.cpv_source_collection,
@@ -182,11 +223,13 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
         )
 
     @classmethod
-    def _create_collection(cls, *, catchment, collection_system, year):
+    def _create_collection(
+        cls, *, catchment, collection_system, year, waste_category=None
+    ):
         return Collection.objects.create(
             name=f"{catchment.name}-{collection_system.name}-{year}",
             catchment=catchment,
-            waste_category=cls.biowaste,
+            waste_category=waste_category or cls.biowaste,
             collection_system=collection_system,
             valid_from=date(year, 1, 1),
             publication_status="published",
@@ -311,3 +354,66 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
             features_by_group[f"acpv-{self.acpv_group_a.id}"]["geometry"]["type"],
             {"Polygon", "MultiPolygon"},
         )
+
+    def test_returns_acpv_metadata_and_outline_for_residual_waste(self):
+        response = self.client.get(
+            self.residual_endpoint,
+            {"country": "DE", "year": 2022},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data_by_catchment = {row["catchment_id"]: row for row in response.data}
+        for catchment in (
+            self.catchment_acpv_group_a_1,
+            self.catchment_acpv_group_a_2,
+        ):
+            with self.subTest(catchment=catchment.id):
+                self.assertEqual(data_by_catchment[catchment.id]["amount"], 75.0)
+                self.assertEqual(
+                    data_by_catchment[catchment.id]["value_source"],
+                    "acpv",
+                )
+                self.assertEqual(
+                    data_by_catchment[catchment.id]["acpv_group_key"],
+                    f"acpv-{self.residual_acpv_group.id}",
+                )
+
+        outline_response = self.client.get(
+            self.residual_outline_endpoint,
+            {"country": "DE", "year": 2022},
+        )
+
+        self.assertEqual(outline_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            outline_response.data["features"][0]["properties"],
+            {
+                "acpv_group_key": f"acpv-{self.residual_acpv_group.id}",
+                "catchment_ids": sorted(
+                    [
+                        self.catchment_acpv_group_a_1.id,
+                        self.catchment_acpv_group_a_2.id,
+                    ]
+                ),
+            },
+        )
+
+    def test_marks_ratio_values_that_include_aggregated_amounts(self):
+        response = self.client.get(
+            self.ratio_endpoint,
+            {"country": "DE", "year": 2022},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data_by_catchment = {row["catchment_id"]: row for row in response.data}
+        for catchment in (
+            self.catchment_acpv_group_a_1,
+            self.catchment_acpv_group_a_2,
+        ):
+            with self.subTest(catchment=catchment.id):
+                self.assertEqual(data_by_catchment[catchment.id]["bio_amount"], 85.0)
+                self.assertEqual(
+                    data_by_catchment[catchment.id]["residual_amount"], 75.0
+                )
+                self.assertTrue(
+                    data_by_catchment[catchment.id]["uses_aggregated_amount"]
+                )
