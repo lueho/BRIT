@@ -57,9 +57,22 @@ class RegionFilterSet(UserCreatedObjectScopedFilterSet):
         )
 
 
+def _nuts_level_queryset(level):
+    """Current-vintage regions of one level, resolved per request.
+
+    A callable keeps the vintage lookup out of import time and picks up a
+    change of current vintage without a restart.
+    """
+
+    def queryset(request):
+        return NutsRegion.objects.in_vintage().filter(levl_code=level)
+
+    return queryset
+
+
 class NutsRegionFilterSet(BaseCrispyFilterSet):
     level_0 = ModelChoiceFilter(
-        queryset=NutsRegion.objects.filter(levl_code=0),
+        queryset=_nuts_level_queryset(0),
         field_name="region_ptr",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -73,7 +86,7 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
     )
 
     level_1 = ModelChoiceFilter(
-        queryset=NutsRegion.objects.filter(levl_code=1),
+        queryset=_nuts_level_queryset(1),
         field_name="region_ptr",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -88,7 +101,7 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
     )
 
     level_2 = ModelChoiceFilter(
-        queryset=NutsRegion.objects.filter(levl_code=2),
+        queryset=_nuts_level_queryset(2),
         field_name="levl_code",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -103,7 +116,7 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
     )
 
     level_3 = ModelChoiceFilter(
-        queryset=NutsRegion.objects.filter(levl_code=3),
+        queryset=_nuts_level_queryset(3),
         field_name="levl_code",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(

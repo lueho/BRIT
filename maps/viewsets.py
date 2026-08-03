@@ -2,13 +2,14 @@ import hashlib
 
 from django.db.models import Count, Max, Min
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from utils.viewsets import AutoPermModelViewSet
 
 from .filters import CatchmentFilterSet, RegionFilterSet
 from .mixins import CachedGeoJSONMixin, get_unbounded_geojson_rejection_response
-from .models import Catchment, Location, NutsRegion, Region
+from .models import Catchment, Location, NutsRegion, NutsVintage, Region
 from .serializers import (
     CatchmentGeoFeatureModelSerializer,
     CatchmentModelSerializer,
@@ -154,11 +155,31 @@ class NutsRegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         "version": None,
     }
 
+    def get_vintage(self):
+        """The vintage this request is scoped to; the current one by default."""
+        label = self.request.query_params.get("version")
+        if not label:
+            return NutsVintage.current()
+        vintage = NutsVintage.resolve(label)
+        if vintage is None:
+            raise ValidationError(
+                {"version": f"Unknown NUTS vintage '{label}'."},
+            )
+        return vintage
+
+    def get_queryset(self):
+        return super().get_queryset().in_vintage(self.get_vintage())
+
     def get_cache_key(self, request):
         filters = request.query_params.dict()
-        level = filters.get("levl_code")
-        parent_id = filters.get("parent_id")
-        return get_nuts_region_cache_key(level, parent_id, filters)
+        vintage = self.get_vintage()
+        return get_nuts_region_cache_key(
+            level=filters.get("levl_code"),
+            parent_id=filters.get("parent_id"),
+            nuts_id=filters.get("id"),
+            filters=filters,
+            version=vintage.year if vintage else None,
+        )
 
     def get_serializer_class(self):
         if self.action == "geojson":

@@ -1335,6 +1335,10 @@ class NutsRegionAutocompleteView(UserCreatedObjectAutocompleteView):
     search_lookups = ["region_ptr", "name_latn__icontains", "levl_code__icontains"]
     value_fields = ["id", "name_latn", "levl_code", "parent_id", "nuts_id"]
 
+    def hook_queryset(self, queryset):
+        """Offer each territory once, from the current vintage only."""
+        return queryset.in_vintage()
+
     def apply_filters(self, queryset):
         # Check for ancestor filtering (nuts_id prefix matching)
         # When ancestor is provided, skip the standard filter_by (parent_id) logic
@@ -1364,22 +1368,22 @@ class NutsRegionAutocompleteView(UserCreatedObjectAutocompleteView):
 
 class NutsRegionLevel0AutocompleteView(NutsRegionAutocompleteView):
     def hook_queryset(self, queryset):
-        return queryset.filter(levl_code=0)
+        return super().hook_queryset(queryset).filter(levl_code=0)
 
 
 class NutsRegionLevel1AutocompleteView(NutsRegionAutocompleteView):
     def hook_queryset(self, queryset):
-        return queryset.filter(levl_code=1)
+        return super().hook_queryset(queryset).filter(levl_code=1)
 
 
 class NutsRegionLevel2AutocompleteView(NutsRegionAutocompleteView):
     def hook_queryset(self, queryset):
-        return queryset.filter(levl_code=2)
+        return super().hook_queryset(queryset).filter(levl_code=2)
 
 
 class NutsRegionLevel3AutocompleteView(NutsRegionAutocompleteView):
     def hook_queryset(self, queryset):
-        return queryset.filter(levl_code=3)
+        return super().hook_queryset(queryset).filter(levl_code=3)
 
 
 class RegionOfLauAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -1516,7 +1520,9 @@ class NutsRegionPedigreeAPI(APIView):
         if request.query_params["direction"] == "children":
             for lvl in range(instance.levl_code + 1, 4):
                 qs = NutsRegion.objects.filter(
-                    levl_code=lvl, nuts_id__startswith=instance.nuts_id
+                    levl_code=lvl,
+                    nuts_id__startswith=instance.nuts_id,
+                    version=instance.version_id,
                 )
                 serializer = NutsRegionOptionSerializer(qs, many=True)
                 data[f"id_level_{lvl}"] = serializer.data
@@ -1567,7 +1573,9 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
             for lvl in range(instance.levl_code + 1, 4):
                 # Prefetch needed: serializer accesses region_ptr.catchment_set in get_id
                 qs = NutsRegion.objects.filter(
-                    levl_code=lvl, nuts_id__startswith=instance.nuts_id
+                    levl_code=lvl,
+                    nuts_id__startswith=instance.nuts_id,
+                    version=instance.version_id,
                 ).prefetch_related("region_ptr__catchment_set")
                 serializer = NutsRegionCatchmentOptionSerializer(qs, many=True)
                 data[f"id_level_{lvl}"] = serializer.data
