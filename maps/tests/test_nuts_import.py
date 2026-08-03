@@ -277,3 +277,20 @@ class NutsImportApiTestCase(TestCase):
             self.payload([region("DE", 0, "Deutschland", {"type": "Polygon"})])
         )
         self.assertEqual(response.status_code, 400)
+
+    def test_a_geometry_without_any_parts_is_a_bad_request(self):
+        """Empty borders would be stored on an update but dropped on a create."""
+        response = self.post(
+            self.payload(
+                [
+                    region(
+                        "DE",
+                        0,
+                        "Deutschland",
+                        {"type": "MultiPolygon", "coordinates": []},
+                    )
+                ]
+            )
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(NutsRegion.objects.filter(version__year=2024).exists())

@@ -34,6 +34,8 @@ class GeometryField(serializers.JSONField):
             raise serializers.ValidationError(
                 f"Expected a Polygon or MultiPolygon, got {geometry.geom_type}."
             )
+        if geometry.empty:
+            raise serializers.ValidationError("A geometry without any parts.")
         return geometry
 
 
