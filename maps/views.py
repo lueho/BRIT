@@ -6,7 +6,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.gis.geos import MultiPolygon
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
-from django.db.models import Subquery
+from django.db.models import Q, Subquery
 from django.forms import formset_factory
 from django.http import Http404, JsonResponse, StreamingHttpResponse
 from django.urls import NoReverseMatch, reverse, reverse_lazy
@@ -1330,10 +1330,26 @@ class CatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
 class RegionAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Region
 
+    def hook_queryset(self, queryset):
+        """Offer each territory once even while several NUTS vintages are held.
+
+        A NUTS region of another vintage is the same territory under another
+        code, and the two are indistinguishable in a picker.
+        """
+        queryset = super().hook_queryset(queryset)
+        vintage = NutsVintage.default()
+        if vintage is None:
+            return queryset
+        return queryset.exclude(
+            Q(nutsregion__isnull=False) & ~Q(nutsregion__version=vintage)
+        )
+
 
 class NutsRegionAutocompleteView(UserCreatedObjectAutocompleteView):
     model = NutsRegion
-    search_lookups = ["region_ptr", "name_latn__icontains", "levl_code__icontains"]
+    # Lookups that cannot take a search term (an id, an integer level) make
+    # django-tomselect drop the whole search and list everything instead.
+    search_lookups = ["name__icontains", "name_latn__icontains", "nuts_id__icontains"]
     value_fields = ["id", "name_latn", "levl_code", "parent_id", "nuts_id"]
 
     def hook_queryset(self, queryset):
