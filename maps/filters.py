@@ -17,6 +17,7 @@ from .models import (
     GeoDataset,
     Location,
     NutsRegion,
+    NutsVintage,
     Region,
 )
 
@@ -58,19 +59,27 @@ class RegionFilterSet(UserCreatedObjectScopedFilterSet):
 
 
 def _nuts_level_queryset(level):
-    """Current-vintage regions of one level, resolved per request.
+    """Regions of one level in the requested vintage, resolved per request.
 
-    A callable keeps the vintage lookup out of import time and picks up a
-    change of current vintage without a restart.
+    A callable keeps the vintage lookup out of import time, follows the
+    ``version`` the visitor picked, and picks up a change of current vintage
+    without a restart.
     """
 
     def queryset(request):
-        return NutsRegion.objects.in_vintage().filter(levl_code=level)
+        vintage = NutsVintage.from_request(request)
+        return NutsRegion.objects.in_vintage(vintage).filter(levl_code=level)
 
     return queryset
 
 
 class NutsRegionFilterSet(BaseCrispyFilterSet):
+    version = ChoiceFilter(
+        field_name="version__year",
+        label="NUTS vintage",
+        empty_label=None,
+    )
+
     level_0 = ModelChoiceFilter(
         queryset=_nuts_level_queryset(0),
         field_name="region_ptr",
@@ -132,7 +141,30 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
 
     class Meta:
         model = NutsRegion
-        fields = ["level_0", "level_1", "level_2", "level_3"]
+        fields = ["version", "level_0", "level_1", "level_2", "level_3"]
+
+    def __init__(self, data=None, *args, **kwargs):
+        current = NutsVintage.current()
+        if data is not None and not data.get("version") and current is not None:
+            # The form is bound, so the select would otherwise show the newest
+            # vintage while the map draws the current one.
+            data = data.copy()
+            data["version"] = str(current.year)
+        super().__init__(data, *args, **kwargs)
+        field = self.filters["version"].field
+        field.choices = [
+            (str(vintage.year), str(vintage))
+            for vintage in NutsVintage.objects.order_by("-year")
+        ]
+        current = NutsVintage.current()
+        field.initial = str(current.year) if current else None
+
+    def filter_queryset(self, queryset):
+        """Never draw more than one vintage, even with no vintage selected."""
+        queryset = super().filter_queryset(queryset)
+        if not self.form.cleaned_data.get("version"):
+            queryset = queryset.in_vintage()
+        return queryset
 
 
 class GeoDataSetFilterSet(UserCreatedObjectScopedFilterSet):

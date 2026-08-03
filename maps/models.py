@@ -448,6 +448,16 @@ class NutsVintage(models.Model):
             return None
         return cls.objects.filter(year=int(match.group(1))).first()
 
+    @classmethod
+    def from_request(cls, request):
+        """The vintage a request asks for via ``?version=``, else the current one.
+
+        Lenient by design: pickers and autocompletes fall back to the current
+        vintage rather than erroring on a label BRIT does not hold.
+        """
+        label = getattr(request, "GET", {}).get("version") if request else None
+        return (cls.resolve(label) if label else None) or cls.current()
+
 
 class NutsRegionQuerySet(UserCreatedObjectQuerySet):
     def in_vintage(self, vintage=None):

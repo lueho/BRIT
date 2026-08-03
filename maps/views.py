@@ -86,6 +86,7 @@ from .models import (
     MapConfiguration,
     ModelMapConfiguration,
     NutsRegion,
+    NutsVintage,
     Region,
     RegionAttributeValue,
     RegionProperty,
@@ -1336,8 +1337,8 @@ class NutsRegionAutocompleteView(UserCreatedObjectAutocompleteView):
     value_fields = ["id", "name_latn", "levl_code", "parent_id", "nuts_id"]
 
     def hook_queryset(self, queryset):
-        """Offer each territory once, from the current vintage only."""
-        return queryset.in_vintage()
+        """Offer each territory once, from the vintage the map is showing."""
+        return queryset.in_vintage(NutsVintage.from_request(self.request))
 
     def apply_filters(self, queryset):
         # Check for ancestor filtering (nuts_id prefix matching)

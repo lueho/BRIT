@@ -1,10 +1,20 @@
 """User-facing NUTS queries must show one vintage, not every vintage at once."""
 
 from django.contrib.gis.geos import MultiPolygon, Polygon
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
-from ..models import GeoPolygon, NutsRegion, NutsVintage, Region
+from ..filters import NutsRegionFilterSet
+from ..models import (
+    GeoDataset,
+    GeoPolygon,
+    MapConfiguration,
+    MapLayerConfiguration,
+    MapLayerStyle,
+    NutsRegion,
+    NutsVintage,
+    Region,
+)
 from ..utils import get_nuts_region_cache_key
 
 
@@ -134,6 +144,78 @@ class NutsRegionGeoJSONVintageScopeTestCase(TwoVintageTestCase):
         )
 
 
+class NutsRegionMapFilterVintageTestCase(TwoVintageTestCase):
+    """The NUTS map lets a visitor pick the vintage and draws only that one."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        style = MapLayerStyle.objects.create(name="default")
+        layer = MapLayerConfiguration.objects.create(
+            name="default", layer_type="features", style=style
+        )
+        map_config = MapConfiguration.objects.create(name="default")
+        map_config.layers.add(layer)
+        GeoDataset.objects.create(
+            name="NUTS",
+            region=Region.objects.create(name="Test Region"),
+            model_name="NutsRegion",
+            map_configuration=map_config,
+        )
+
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def _filterset(self, data=None):
+        data = data or {}
+        request = self.factory.get(reverse("NutsRegion"), data)
+        return NutsRegionFilterSet(
+            data=data, queryset=NutsRegion.objects.all(), request=request
+        )
+
+    def test_version_choices_are_the_held_vintages_newest_first(self):
+        field = self._filterset().form.fields["version"]
+        self.assertEqual(
+            [value for value, _label in field.choices if value], ["2024", "2021"]
+        )
+
+    def test_version_defaults_to_the_current_vintage(self):
+        self.assertEqual(self._filterset().form.fields["version"].initial, "2021")
+
+    def test_the_selector_shows_the_vintage_the_map_draws(self):
+        """The bound form would otherwise display the newest choice, 2024."""
+        self.assertEqual(self._filterset().form["version"].value(), "2021")
+
+    def test_unfiltered_map_shows_each_territory_once(self):
+        self.assertEqual(
+            list(self._filterset().qs.order_by("nuts_id")),
+            [self.country_2021, self.region_2021],
+        )
+
+    def test_selected_vintage_replaces_the_current_one(self):
+        filterset = self._filterset({"version": "2024"})
+        self.assertEqual(
+            list(filterset.qs.order_by("nuts_id")),
+            [self.country_2024, self.region_2024],
+        )
+
+    def test_level_pickers_follow_the_selected_vintage(self):
+        form = self._filterset({"version": "2024"}).form
+        self.assertEqual(list(form.fields["level_0"].queryset), [self.country_2024])
+        self.assertEqual(list(form.fields["level_3"].queryset), [self.region_2024])
+
+    def test_the_map_page_renders_a_vintage_selector(self):
+        response = self.client.get(reverse("NutsRegion"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="version"')
+        self.assertContains(response, "NUTS 2024")
+
+    def test_an_unheld_vintage_is_rejected(self):
+        filterset = self._filterset({"version": "2016"})
+        self.assertFalse(filterset.form.is_valid())
+        self.assertIn("version", filterset.form.errors)
+
+
 class NutsRegionHierarchyVintageScopeTestCase(TwoVintageTestCase):
     def test_pedigree_children_stay_within_the_regions_vintage(self):
         children = self.country_2024.pedigree["qs_3"]
@@ -157,6 +239,14 @@ class NutsRegionAutocompleteVintageScopeTestCase(TwoVintageTestCase):
         self.assertEqual(response.status_code, 200)
         ids = [result["id"] for result in response.json()["results"]]
         self.assertEqual(ids, [self.region_2021.pk])
+
+    def test_autocomplete_follows_an_explicitly_requested_vintage(self):
+        response = self.client.get(
+            reverse("nutsregion-autocomplete-level3"), {"version": "2024"}
+        )
+        self.assertEqual(response.status_code, 200)
+        ids = [result["id"] for result in response.json()["results"]]
+        self.assertEqual(ids, [self.region_2024.pk])
 
 
 class SetCountryVintageScopeTestCase(TwoVintageTestCase):

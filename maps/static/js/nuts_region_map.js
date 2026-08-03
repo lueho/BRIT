@@ -40,7 +40,24 @@ function unlockForm() {
         });
 }
 
+/**
+ * The NUTS vintage selected in the filter form, e.g. '2021'.
+ * Codes repeat across vintages, so every feature query must name one.
+ */
+function selectedVintage() {
+    const field = document.getElementById('id_version');
+    return field ? field.value : '';
+}
+
+function withVintage(params) {
+    const vintage = selectedVintage();
+    return vintage ? { ...params, version: vintage } : params;
+}
+
 async function updateLayers({ region_params, catchment_params, feature_params } = {}) {
+    if (feature_params) {
+        feature_params = withVintage(feature_params);
+    }
     const promises = [
         region_params && fetchRegionGeometry(region_params),
         catchment_params && fetchCatchmentGeometry(catchment_params),
@@ -100,6 +117,12 @@ function getQueryParameters() {
 
         const newUrl = `${window.location.pathname}?${params.toString()}`;
         window.history.replaceState({}, '', newUrl);
+    }
+    if (!params.has('version')) {
+        const vintage = selectedVintage();
+        if (vintage) {
+            params.set('version', vintage);
+        }
     }
     return params;
 }
@@ -202,6 +225,10 @@ function clearFields(fields) {
         fields.forEach(function (field) {
             const element = document.getElementById(`id_${field}`);
             if (element) {
+                if (element.tomselect) {
+                    element.tomselect.clear(true);
+                    element.tomselect.clearOptions();
+                }
                 element.value = null;
                 const event = new Event('change', { bubbles: true });
                 element.dispatchEvent(event);
@@ -224,6 +251,14 @@ const changedSelect = async function (e) {
 
     const changedField = e.target.id;
     let regionId = e.target.value;
+
+    if (changedField === 'id_version') {
+        // Region ids belong to one vintage, so no selection survives a switch.
+        clearFields(['level_0', 'level_1', 'level_2', 'level_3']);
+        resetFeatureDetails();
+        await updateMapAccordingToSelection();
+        return;
+    }
 
     if (regionId) {
         // await populateParents(regionId);
@@ -308,20 +343,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const ts = field.tomselect;
 
-            // Only modify levels > 0 (they can have ancestors)
-            if (levelCode === 0) return;
-
             // Store the original firstUrl function
             const originalFirstUrl = ts.settings.firstUrl || ts.settings.originalFirstUrl;
             if (!originalFirstUrl) return;
 
-            // Override firstUrl to add ancestor parameter
+            // Override firstUrl to add the vintage and ancestor parameters
             ts.settings.firstUrl = function (query) {
                 // Get the base URL from original function
                 let url = originalFirstUrl.call(this, query);
 
-                // Get ancestor nuts_id for filtering
-                const ancestorNutsId = getAncestorNutsId(levelCode);
+                // Keep the options in the vintage the map is showing
+                const vintage = selectedVintage();
+                if (vintage) {
+                    url += `&version=${encodeURIComponent(vintage)}`;
+                }
+
+                // Get ancestor nuts_id for filtering (levels > 0 only)
+                const ancestorNutsId =
+                    levelCode === 0 ? null : getAncestorNutsId(levelCode);
 
                 // Add ancestor parameter if we have one
                 if (ancestorNutsId) {
