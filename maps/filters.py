@@ -144,21 +144,20 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
         fields = ["version", "level_0", "level_1", "level_2", "level_3"]
 
     def __init__(self, data=None, *args, **kwargs):
-        current = NutsVintage.current()
-        if current is not None and not (data or {}).get("version"):
+        default = NutsVintage.default()
+        if default is not None and not (data or {}).get("version"):
             # Binding the form is what scopes the queryset at all — a bare page
             # load passes ``data=None`` — and without a value the bound select
-            # would show the newest vintage while the map draws the current one.
+            # would show the newest vintage while the map draws the default one.
             data = {} if data is None else data.copy()
-            data["version"] = str(current.year)
+            data["version"] = str(default.year)
         super().__init__(data, *args, **kwargs)
         field = self.filters["version"].field
         field.choices = [
             (str(vintage.year), str(vintage))
             for vintage in NutsVintage.objects.order_by("-year")
         ]
-        current = NutsVintage.current()
-        field.initial = str(current.year) if current else None
+        field.initial = str(default.year) if default else None
 
     def filter_queryset(self, queryset):
         """Never draw more than one vintage, even with no vintage selected."""

@@ -204,6 +204,19 @@ class NutsRegionMapFilterVintageTestCase(TwoVintageTestCase):
             [self.country_2021, self.region_2021],
         )
 
+    def test_one_vintage_is_shown_even_with_none_marked_current(self):
+        """Without a current vintage the map must still not draw two editions."""
+        NutsVintage.objects.filter(is_current=True).update(is_current=False)
+        filterset = NutsRegionFilterSet(
+            data=None,
+            queryset=NutsRegion.objects.all(),
+            request=self.factory.get(reverse("NutsRegion")),
+        )
+        self.assertEqual(
+            list(filterset.qs.order_by("nuts_id")),
+            [self.country_2024, self.region_2024],
+        )
+
     def test_selected_vintage_replaces_the_current_one(self):
         filterset = self._filterset({"version": "2024"})
         self.assertEqual(
