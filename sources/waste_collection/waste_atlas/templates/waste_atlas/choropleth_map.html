@@ -1,5 +1,5 @@
 {% extends "waste_atlas/shell_base.html" %}
-{% load static %}
+{% load static atlas_tags %}
 {% block title %}
   Waste Atlas — {{ map_title }}
 {% endblock title %}
@@ -7,6 +7,7 @@
   waste atlas, {{ map_title|lower }}
 {% endblock meta_keywords %}
 {% block atlas_workspace %}
+  {% atlas_render_defaults as atlas_defaults %}
   {# Title only: the breadcrumb rail names the location and the panel holds the controls. #}
   <header class="atlas-context">
     <div class="atlas-context-heading">
@@ -181,9 +182,9 @@
             <button class="btn btn-outline-secondary btn-sm"
                     id="btn-export-png"
                     type="button"
-                    title="Download a PNG at 300 DPI, ready for Word"
+                    title="Download a PNG at {{ atlas_defaults.export.dpi }} DPI, ready for Word"
                     disabled>
-              <i class="fas fa-image" aria-hidden="true"></i> PNG (300 DPI)
+              <i class="fas fa-image" aria-hidden="true"></i> PNG ({{ atlas_defaults.export.dpi }} DPI)
             </button>
           </div>
         </div>

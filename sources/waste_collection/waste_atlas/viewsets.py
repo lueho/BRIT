@@ -39,7 +39,6 @@ from sources.waste_collection.models import (
 from utils.object_management.models import UserCreatedObject
 
 from .serializers import (
-    GEOMETRY_SIMPLIFY_TOLERANCE,
     CatchmentAccessControlSerializer,
     CatchmentBinConfigurationSerializer,
     CatchmentBiowasteImpuritySerializer,
@@ -73,6 +72,7 @@ from .serializers import (
     CatchmentTargetWasteCategorySerializer,
     CatchmentWasteRatioSerializer,
     CatchmentWeeklyBpAccessDaysSerializer,
+    geometry_simplify_tolerance,
 )
 
 _PUBLISHED = UserCreatedObject.STATUS_PUBLISHED
@@ -603,7 +603,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
         queryset = queryset.annotate(
             simplified_geom=SimplifyPreserveTopology(
                 F("region__borders__geom"),
-                GEOMETRY_SIMPLIFY_TOLERANCE,
+                geometry_simplify_tolerance(),
             )
         )
         queryset = self._with_atlas_collection(request, queryset)
@@ -680,7 +680,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
         queryset = queryset.annotate(
             simplified_geom=SimplifyPreserveTopology(
                 F("region__borders__geom"),
-                GEOMETRY_SIMPLIFY_TOLERANCE,
+                geometry_simplify_tolerance(),
             )
         )
         queryset = self._with_atlas_collection(request, queryset)
