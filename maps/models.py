@@ -439,6 +439,16 @@ class NutsVintage(models.Model):
         return cls.objects.filter(is_current=True).first()
 
     @classmethod
+    def default(cls):
+        """The vintage user-facing queries fall back to.
+
+        Normally the current one; the newest held vintage if no vintage is
+        flagged, so a mislabelled database shows one edition rather than all of
+        them overlapping, or none at all.
+        """
+        return cls.current() or cls.objects.order_by("-year").first()
+
+    @classmethod
     def resolve(cls, label):
         """Resolve a provider version label such as ``"NUTS2021"`` to a vintage."""
         if label is None:
@@ -447,6 +457,16 @@ class NutsVintage(models.Model):
         if match is None:
             return None
         return cls.objects.filter(year=int(match.group(1))).first()
+
+    @classmethod
+    def from_request(cls, request):
+        """The vintage a request asks for via ``?version=``, else the current one.
+
+        Lenient by design: pickers and autocompletes fall back to the current
+        vintage rather than erroring on a label BRIT does not hold.
+        """
+        label = getattr(request, "GET", {}).get("version") if request else None
+        return (cls.resolve(label) if label else None) or cls.default()
 
 
 class NutsRegionQuerySet(UserCreatedObjectQuerySet):
@@ -457,7 +477,7 @@ class NutsRegionQuerySet(UserCreatedObjectQuerySet):
         otherwise pickers list a territory once per vintage and map layers draw
         duplicate overlapping features.
         """
-        return self.filter(version=vintage or NutsVintage.current())
+        return self.filter(version=vintage or NutsVintage.default())
 
 
 class NutsRegionManager(models.Manager.from_queryset(NutsRegionQuerySet)):

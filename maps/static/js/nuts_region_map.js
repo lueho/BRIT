@@ -40,7 +40,72 @@ function unlockForm() {
         });
 }
 
+/**
+ * The NUTS vintage selected in the filter form, e.g. '2021'.
+ * Codes repeat across vintages, so every feature query must name one.
+ */
+function selectedVintage() {
+    const field = document.getElementById('id_version');
+    return field ? field.value : '';
+}
+
+const AUTOCOMPLETE_PATH = '/maps/nutsregions/autocomplete/';
+
+/**
+ * Add the selected vintage and the nearest selected ancestor to a NUTS
+ * autocomplete request.
+ *
+ * Done at the fetch layer rather than by patching TomSelect's ``firstUrl``:
+ * django-tomselect restores its own URL builder whenever it resets a widget
+ * (which clearing a field does), so an override there silently disappears and
+ * the picker starts offering another vintage's regions.
+ */
+function withAutocompleteParams(input) {
+    const url = new URL(input, window.location.origin);
+    if (!url.pathname.startsWith(AUTOCOMPLETE_PATH)) {
+        return input;
+    }
+    const vintage = selectedVintage();
+    if (vintage) {
+        url.searchParams.set('version', vintage);
+    }
+    const level = url.pathname.match(/level(\d)\/$/);
+    if (level) {
+        const ancestor = getAncestorNutsId(Number(level[1]));
+        if (ancestor) {
+            url.searchParams.set('ancestor', ancestor);
+        }
+    }
+    return url.pathname + url.search;
+}
+
+function patchAutocompleteFetch() {
+    const originalFetch = window.fetch;
+    window.fetch = function (resource, ...rest) {
+        if (typeof resource === 'string') {
+            resource = withAutocompleteParams(resource);
+        } else if (resource instanceof Request) {
+            const rewritten = withAutocompleteParams(resource.url);
+            if (rewritten !== resource.url) {
+                resource = new Request(rewritten, resource);
+            }
+        }
+        return originalFetch.call(this, resource, ...rest);
+    };
+}
+
+// Installed at parse time so no widget can load before the wrapper is in place.
+patchAutocompleteFetch();
+
+function withVintage(params) {
+    const vintage = selectedVintage();
+    return vintage ? { ...params, version: vintage } : params;
+}
+
 async function updateLayers({ region_params, catchment_params, feature_params } = {}) {
+    if (feature_params) {
+        feature_params = withVintage(feature_params);
+    }
     const promises = [
         region_params && fetchRegionGeometry(region_params),
         catchment_params && fetchCatchmentGeometry(catchment_params),
@@ -100,6 +165,12 @@ function getQueryParameters() {
 
         const newUrl = `${window.location.pathname}?${params.toString()}`;
         window.history.replaceState({}, '', newUrl);
+    }
+    if (!params.has('version')) {
+        const vintage = selectedVintage();
+        if (vintage) {
+            params.set('version', vintage);
+        }
     }
     return params;
 }
@@ -197,11 +268,43 @@ async function updateMapAccordingToSelection() {
     }
 }
 
+/**
+ * Empty one region picker and make it fetch its options again.
+ *
+ * Emptying alone is not enough: TomSelect skips a query it has already loaded
+ * and virtual_scroll skips one it has already paged, so a picker whose options
+ * were dropped would stay empty forever. The reload has to bypass
+ * ``shouldLoad``, which django-tomselect uses to refuse the empty query.
+ */
+function resetPicker(ts) {
+    ts.clear(true);
+    if (ts.clearPagination) {
+        ts.clearPagination();
+    }
+    ts.clearOptions();
+    ts.loadedSearches = {};
+    ts.lastQuery = null;
+    ts.settings.pagination = {};
+
+    const shouldLoad = ts.settings.shouldLoad;
+    ts.settings.shouldLoad = () => true;
+    try {
+        ts.load('');
+    } finally {
+        setTimeout(() => {
+            ts.settings.shouldLoad = shouldLoad;
+        }, 0);
+    }
+}
+
 function clearFields(fields) {
     setProgrammaticChange(() => {
         fields.forEach(function (field) {
             const element = document.getElementById(`id_${field}`);
             if (element) {
+                if (element.tomselect) {
+                    resetPicker(element.tomselect);
+                }
                 element.value = null;
                 const event = new Event('change', { bubbles: true });
                 element.dispatchEvent(event);
@@ -224,6 +327,14 @@ const changedSelect = async function (e) {
 
     const changedField = e.target.id;
     let regionId = e.target.value;
+
+    if (changedField === 'id_version') {
+        // Region ids belong to one vintage, so no selection survives a switch.
+        clearFields(['level_0', 'level_1', 'level_2', 'level_3']);
+        resetFeatureDetails();
+        await updateMapAccordingToSelection();
+        return;
+    }
 
     if (regionId) {
         // await populateParents(regionId);
@@ -291,45 +402,4 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-
-    setTimeout(() => {
-        // Map each field to its level code
-        const levelCodeMap = {
-            'id_level_0': 0,
-            'id_level_1': 1,
-            'id_level_2': 2,
-            'id_level_3': 3
-        };
-
-        // For each field, intercept the TomSelect firstUrl function to add ancestor filtering
-        Object.entries(levelCodeMap).forEach(([fieldId, levelCode]) => {
-            const field = document.getElementById(fieldId);
-            if (!field || !field.tomselect) return;
-
-            const ts = field.tomselect;
-
-            // Only modify levels > 0 (they can have ancestors)
-            if (levelCode === 0) return;
-
-            // Store the original firstUrl function
-            const originalFirstUrl = ts.settings.firstUrl || ts.settings.originalFirstUrl;
-            if (!originalFirstUrl) return;
-
-            // Override firstUrl to add ancestor parameter
-            ts.settings.firstUrl = function (query) {
-                // Get the base URL from original function
-                let url = originalFirstUrl.call(this, query);
-
-                // Get ancestor nuts_id for filtering
-                const ancestorNutsId = getAncestorNutsId(levelCode);
-
-                // Add ancestor parameter if we have one
-                if (ancestorNutsId) {
-                    url += `&ancestor=${encodeURIComponent(ancestorNutsId)}`;
-                }
-
-                return url;
-            };
-        });
-    }, 500); // Give TomSelect time to initialize
 });
