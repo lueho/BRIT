@@ -1,5 +1,8 @@
 """Serializers implementing the versioned NUTS vintage import contract."""
 
+import json
+
+from django.contrib.gis.gdal.error import GDALException
 from django.contrib.gis.geos import GEOSGeometry, MultiPolygon
 from django.contrib.gis.geos.error import GEOSException
 from rest_framework import serializers
@@ -20,9 +23,10 @@ class GeometryField(serializers.JSONField):
 
     def to_internal_value(self, data):
         data = super().to_internal_value(data)
+        raw = data if isinstance(data, str) else json.dumps(data)
         try:
-            geometry = GEOSGeometry(str(data).replace("'", '"'), srid=4326)
-        except (GEOSException, ValueError, TypeError) as error:
+            geometry = GEOSGeometry(raw, srid=4326)
+        except (GDALException, GEOSException, ValueError, TypeError) as error:
             raise serializers.ValidationError(f"Invalid geometry: {error}") from error
         if geometry.geom_type == "Polygon":
             geometry = MultiPolygon(geometry, srid=4326)
