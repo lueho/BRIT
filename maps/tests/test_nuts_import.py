@@ -263,3 +263,17 @@ class NutsImportApiTestCase(TestCase):
         self.assertEqual(
             response.json()["properties"]["schema_version"]["const"], "1.0"
         )
+
+    def test_a_geometry_carrying_the_members_geojson_allows_is_accepted(self):
+        """GeoJSON may carry ``bbox``/``crs``, and names may contain quotes."""
+        geometry = dict(DE_GEOMETRY, bbox=None, crs={"name": "l'ETRS89"})
+        response = self.post(self.payload([region("DE", 0, "Deutschland", geometry)]))
+        self.assertEqual(response.status_code, 201, response.json())
+        imported = NutsRegion.objects.get(nuts_id="DE", version__year=2024)
+        self.assertEqual(imported.geom.geom_type, "MultiPolygon")
+
+    def test_a_geometry_that_cannot_be_read_is_a_bad_request(self):
+        response = self.post(
+            self.payload([region("DE", 0, "Deutschland", {"type": "Polygon"})])
+        )
+        self.assertEqual(response.status_code, 400)
