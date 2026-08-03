@@ -192,6 +192,18 @@ class NutsRegionMapFilterVintageTestCase(TwoVintageTestCase):
             [self.country_2021, self.region_2021],
         )
 
+    def test_an_unbound_filterset_shows_each_territory_once(self):
+        """A bare page load passes ``data=None``, which used to skip scoping."""
+        filterset = NutsRegionFilterSet(
+            data=None,
+            queryset=NutsRegion.objects.all(),
+            request=self.factory.get(reverse("NutsRegion")),
+        )
+        self.assertEqual(
+            list(filterset.qs.order_by("nuts_id")),
+            [self.country_2021, self.region_2021],
+        )
+
     def test_selected_vintage_replaces_the_current_one(self):
         filterset = self._filterset({"version": "2024"})
         self.assertEqual(

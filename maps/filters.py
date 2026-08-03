@@ -145,10 +145,11 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
 
     def __init__(self, data=None, *args, **kwargs):
         current = NutsVintage.current()
-        if data is not None and not data.get("version") and current is not None:
-            # The form is bound, so the select would otherwise show the newest
-            # vintage while the map draws the current one.
-            data = data.copy()
+        if current is not None and not (data or {}).get("version"):
+            # Binding the form is what scopes the queryset at all — a bare page
+            # load passes ``data=None`` — and without a value the bound select
+            # would show the newest vintage while the map draws the current one.
+            data = {} if data is None else data.copy()
             data["version"] = str(current.year)
         super().__init__(data, *args, **kwargs)
         field = self.filters["version"].field
