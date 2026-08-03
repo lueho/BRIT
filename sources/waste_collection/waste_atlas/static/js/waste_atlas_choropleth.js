@@ -32,6 +32,7 @@ var WasteAtlasChoropleth = (function () {
   'use strict';
 
   var RENDER_DEFAULTS_ELEMENT_ID = 'waste-atlas-render-defaults';
+  var OVERLAY_PATTERN_COLOR = '#1f2937';
   var _renderDefaults = null;
 
   /**
@@ -370,8 +371,8 @@ var WasteAtlasChoropleth = (function () {
       .attr('y1', 0)
       .attr('x2', 0)
       .attr('y2', 6)
-      .attr('stroke', '#ffffff')
-      .attr('stroke-opacity', 0.6)
+      .attr('stroke', OVERLAY_PATTERN_COLOR)
+      .attr('stroke-opacity', 0.9)
       .attr('stroke-width', 2);
   }
 
