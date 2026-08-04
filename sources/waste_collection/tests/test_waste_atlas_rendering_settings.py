@@ -145,7 +145,13 @@ class WasteAtlasLegendFormDefaultTests(TestCase):
         self.assertEqual(form.initial["legend_placement"], "top-right")
         self.assertEqual(form.initial["legend_width"], 360)
         self.assertEqual(form.initial["legend_font_size"], 14)
-        self.assertEqual(form.initial["export_legend_width"], 60)
+        # The maximum export width inherits while it is unset: the field stays
+        # blank and only advertises the atlas default as a placeholder, so
+        # reopening and saving the form does not freeze the inherited value.
+        self.assertIsNone(form.initial.get("export_legend_width"))
+        self.assertEqual(
+            form.fields["export_legend_width"].widget.attrs["placeholder"], 60
+        )
 
 
 class WasteAtlasRendererHasNoHardcodedDefaultsTests(TestCase):
@@ -174,6 +180,22 @@ class WasteAtlasRendererHasNoHardcodedDefaultsTests(TestCase):
     def test_renderer_applies_the_injected_defaults(self):
         source = CHOROPLETH_JS.read_text()
         self.assertIn("renderDefaults", source)
+
+
+class ChangeLegendCategoriesAreDistinguishableTests(TestCase):
+    """Every change legend entry needs its own swatch to be readable."""
+
+    def test_reassigned_territory_has_its_own_color(self):
+        colors = WasteAtlasRenderingSettings.load().client_defaults()["changeColors"]
+
+        self.assertNotEqual(colors["boundaryChanged"], colors["changed"])
+
+    def test_renderer_paints_reassigned_territory_with_its_own_color(self):
+        source = CHOROPLETH_JS.read_text()
+
+        for line in source.splitlines():
+            if "boundary_changed" in line and "label:" in line:
+                self.assertIn("colors.boundaryChanged", line)
 
 
 class SeededMapConfigurationsDeferToGlobalNoDataColorTests(TestCase):

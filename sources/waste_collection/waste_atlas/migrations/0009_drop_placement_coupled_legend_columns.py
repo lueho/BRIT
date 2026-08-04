@@ -5,23 +5,29 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('waste_atlas', '0008_drop_redundant_no_data_color'),
+        ("waste_atlas", "0008_drop_redundant_no_data_color"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='wasteatlasrenderingsettings',
-            name='export_legend_bottom_columns',
+            model_name="wasteatlasrenderingsettings",
+            name="export_legend_bottom_columns",
         ),
         migrations.RemoveField(
-            model_name='wasteatlasrenderingsettings',
-            name='export_legend_columns',
+            model_name="wasteatlasrenderingsettings",
+            name="export_legend_columns",
         ),
         migrations.AlterField(
-            model_name='wasteatlasrenderingsettings',
-            name='export_legend_width_fraction',
-            field=models.FloatField(default=0.52, help_text='Default maximum legend width in exports as a fraction of the page. The renderer fits the legend to its content and never exceeds this bound.', validators=[django.core.validators.MinValueValidator(0.2), django.core.validators.MaxValueValidator(0.9)]),
+            model_name="wasteatlasrenderingsettings",
+            name="export_legend_width_fraction",
+            field=models.FloatField(
+                default=0.52,
+                help_text="Default maximum legend width in exports as a fraction of the page. The renderer fits the legend to its content and never exceeds this bound.",
+                validators=[
+                    django.core.validators.MinValueValidator(0.2),
+                    django.core.validators.MaxValueValidator(0.9),
+                ],
+            ),
         ),
     ]

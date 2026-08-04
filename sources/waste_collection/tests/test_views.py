@@ -97,7 +97,7 @@ from sources.waste_collection.waste_atlas.map_selection import (
 )
 from sources.waste_collection.waste_atlas.pages import MAP_PAGES
 from sources.waste_collection.waste_atlas.templatetags.atlas_tags import (
-    DATABASE_EDITABLE_OVERRIDE_KEYS,
+    RENDER_TIME_RESOLVED_KEYS,
 )
 from sources.waste_collection.waste_atlas.viewsets import (
     _amounts_for_2024,
@@ -4304,7 +4304,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 cfg = self._map_config(response)
                 stored = MAP_CONFIGS[page["config_key"]]
                 overridden = set(page.get("overrides", {}))
-                skip = DATABASE_EDITABLE_OVERRIDE_KEYS | runtime_keys | overridden
+                skip = RENDER_TIME_RESOLVED_KEYS | runtime_keys | overridden
                 for key, value in stored.items():
                     if key in skip:
                         continue
@@ -4856,6 +4856,8 @@ class GenericMapTemplateTests(TestCase):
                 for key, value in stored.items():
                     if key in {"country", "year", "nutsPrefix", "nutsLevel"}:
                         continue  # replaced by the runtime region scope
+                    if key in RENDER_TIME_RESOLVED_KEYS:
+                        continue  # resolved into the exportLegend object
                     self.assertEqual(cfg[key], value)
 
     def test_shared_dom_ids_are_merged_into_every_configuration(self):

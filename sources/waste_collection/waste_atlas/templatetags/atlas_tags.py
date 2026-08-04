@@ -20,6 +20,9 @@ _EXPORT_LEGEND_LAYOUT_KEYS = frozenset(
     (*EXPORT_LEGEND_OVERRIDE_KEYS, *LEGACY_EXPORT_LEGEND_KEYS)
 )
 _STAFF_EDITABLE_TEXT_KEYS = frozenset({"exportLegendTitle"})
+# Stored keys whose emitted value is not the raw ``MAP_CONFIGS`` value because the
+# tag resolves or strips them at render time.
+RENDER_TIME_RESOLVED_KEYS = _EXPORT_LEGEND_LAYOUT_KEYS | _STAFF_EDITABLE_TEXT_KEYS
 
 
 def export_file_base(map_set, theme, prefix=None):

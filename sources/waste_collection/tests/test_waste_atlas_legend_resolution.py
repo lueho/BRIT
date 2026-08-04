@@ -131,7 +131,11 @@ class AtlasJsConfigExportLegendTests(TestCase):
         config = self._config()
         self.assertEqual(config["exportLegend"], ATLAS_DEFAULTS)
         # Flat/legacy layout keys are never emitted to the renderer.
-        for key in ("exportLegendPlacement", "exportLegendColumns", "exportLegendWidth"):
+        for key in (
+            "exportLegendPlacement",
+            "exportLegendColumns",
+            "exportLegendWidth",
+        ):
             self.assertNotIn(key, config)
 
     def test_stored_fixed_values_reach_the_resolved_object(self):
@@ -147,9 +151,7 @@ class AtlasJsConfigExportLegendTests(TestCase):
 
     def test_page_override_wins_over_stored_theme_config(self):
         self._store(exportLegendPlacement="left", exportLegendColumns=2)
-        config = self._config(
-            map_config_overrides={"exportLegendPlacement": "bottom"}
-        )
+        config = self._config(map_config_overrides={"exportLegendPlacement": "bottom"})
         self.assertEqual(config["exportLegend"]["placement"], "bottom")
         self.assertEqual(config["exportLegend"]["columns"], 2)
 

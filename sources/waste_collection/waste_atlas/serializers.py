@@ -34,6 +34,7 @@ class CatchmentGeometrySerializer(GeoFeatureModelSerializer):
     catchment_id = serializers.IntegerField(source="id")
     catchment_name = serializers.CharField(source="name")
     catchment_type = serializers.CharField(source="type")
+    catchment_revision_id = serializers.IntegerField(read_only=True, allow_null=True)
     collection_detail_url = serializers.SerializerMethodField()
     collection_details = serializers.SerializerMethodField()
     geom = GeometrySerializerMethodField()
@@ -45,6 +46,7 @@ class CatchmentGeometrySerializer(GeoFeatureModelSerializer):
             "catchment_id",
             "catchment_name",
             "catchment_type",
+            "catchment_revision_id",
             "collection_detail_url",
             "collection_details",
         ]
@@ -85,6 +87,8 @@ class CatchmentGeometrySerializer(GeoFeatureModelSerializer):
         """Return simplified geometry if available, otherwise original."""
         if hasattr(instance, "simplified_geom") and instance.simplified_geom:
             return instance.simplified_geom
+        if hasattr(instance, "atlas_geom") and instance.atlas_geom:
+            return instance.atlas_geom
         return getattr(instance, "geom", None)
 
 

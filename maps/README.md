@@ -26,7 +26,8 @@ The Maps module is a core component of the Bioresource Inventory Tool (BRIT) tha
 - **Region**: Represents a geographic region with borders
 - **NutsRegion**: Extends Region for NUTS (Nomenclature of Territorial Units for Statistics) regions
 - **LauRegion**: Extends Region for LAU (Local Administrative Units) regions
-- **Catchment**: Represents a catchment area within a region
+- **Catchment**: Stable identity for a collection catchment
+- **CatchmentRevision**: Immutable, effective-dated boundary snapshot for a catchment
 
 ### Data Management
 - **GeoDataset**: Holds metadata about geographic datasets
@@ -58,7 +59,42 @@ erDiagram
     Attribute ||--o{ RegionAttributeTextValue : "defines"
 
     Catchment ||--o{ Catchment : "parent_of"
+    Catchment ||--o{ CatchmentRevision : "has_boundary_history"
+    CatchmentRevision }o--o{ Region : "composed_of"
+    CatchmentRevision }o--o{ CatchmentRevision : "succeeds"
 ```
+
+## Versioning catchment boundaries
+
+`Catchment` is the stable identity referenced by collections and collectors.
+Its `region` remains a compatibility representation of the current geography;
+it is not the historical record. Each authoritative boundary is stored as a
+`CatchmentRevision` with a direct geometry snapshot and a half-open effective
+period (`effective_from <= date < effective_to`). Published and archived
+periods for one catchment cannot overlap.
+
+Published geometry, dates, catchment assignment, and member composition are
+immutable. To record a change:
+
+1. Create a private successor revision, preferably with
+   `CatchmentRevision.objects.create_from_members(...)` so the geometry is the
+   validated union of its LAU/NUTS members.
+2. Give it the real effective date, change reason, sources, and its prior
+   same-catchment revision as a predecessor.
+3. Use the Catchment Revision admin actions to submit and approve it. Approval
+   atomically ends and archives the prior revision at the successor's start
+   date, then publishes the successor.
+
+For example, if Attendorn entered ZAKO's catchment on 1 January 2024, the
+pre-2024 revision remains unchanged and the successor starts on 2024-01-01
+with Attendorn among its members. Do not rewrite the earlier geometry.
+
+Annual Waste Atlas maps resolve the revision effective on 31 December of the
+selected year. Change maps request a spatial overlay of both selected years;
+the response distinguishes stable, added, removed, and reassigned territory
+and carries both revision and catchment IDs. The migration creates one
+unbounded initial snapshot from each existing georeferenced catchment because
+the legacy data does not establish a defensible historical start date.
 
 ## Views
 The module provides a comprehensive set of views for managing and visualizing geographic data:

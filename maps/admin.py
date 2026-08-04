@@ -1,9 +1,12 @@
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.contrib.gis.admin import GISModelAdmin
+from django.core.exceptions import ValidationError
 from django.utils.html import format_html, format_html_join
 
 from .models import (
     Attribute,
     Catchment,
+    CatchmentRevision,
     CategoricalAttribute,
     GeoDataset,
     GeoDatasetColumnPolicy,
@@ -51,6 +54,74 @@ class CategoricalAttributeModelAdmin(admin.ModelAdmin):
 class CatchmentModelAdmin(admin.ModelAdmin):
     autocomplete_fields = ["region", "parent_region", "parent"]
     search_fields = ["name"]
+
+
+@admin.register(CatchmentRevision)
+class CatchmentRevisionModelAdmin(GISModelAdmin):
+    actions = ["submit_selected_for_review", "approve_selected"]
+    list_display = [
+        "name",
+        "catchment",
+        "effective_from",
+        "effective_to",
+        "change_reason",
+        "publication_status",
+    ]
+    list_filter = ["publication_status", "change_reason"]
+    search_fields = ["name", "catchment__name", "description"]
+    autocomplete_fields = ["catchment", "members", "sources"]
+    filter_horizontal = ["predecessors"]
+    readonly_fields = [
+        "geom_hash",
+        "publication_status",
+        "submitted_at",
+        "approved_at",
+        "approved_by",
+    ]
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = list(super().get_readonly_fields(request, obj))
+        if obj is not None and obj.publication_status in obj.IMMUTABLE_STATUSES:
+            readonly_fields.extend(
+                field
+                for field in (
+                    "catchment",
+                    "effective_from",
+                    "effective_to",
+                    "geom",
+                    "members",
+                )
+                if field not in readonly_fields
+            )
+        return readonly_fields
+
+    @admin.action(description="Submit selected revisions for review")
+    def submit_selected_for_review(self, request, queryset):
+        self._transition_selected(request, queryset, "submit_for_review")
+
+    @admin.action(description="Approve selected revisions")
+    def approve_selected(self, request, queryset):
+        self._transition_selected(request, queryset, "approve", user=request.user)
+
+    def _transition_selected(self, request, queryset, transition, **kwargs):
+        completed = 0
+        for revision in queryset.order_by("effective_from", "pk"):
+            try:
+                getattr(revision, transition)(**kwargs)
+            except ValidationError as error:
+                self.message_user(
+                    request,
+                    f"{revision}: {'; '.join(error.messages)}",
+                    level=messages.ERROR,
+                )
+            else:
+                completed += 1
+        if completed:
+            self.message_user(
+                request,
+                f"Updated {completed} catchment revision(s).",
+                level=messages.SUCCESS,
+            )
 
 
 @admin.register(GeoDataset)
