@@ -6,7 +6,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.gis.geos import MultiPolygon
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
-from django.db.models import Subquery
+from django.db.models import Q, Subquery
 from django.forms import formset_factory
 from django.http import Http404, JsonResponse, StreamingHttpResponse
 from django.urls import NoReverseMatch, reverse, reverse_lazy
@@ -86,6 +86,7 @@ from .models import (
     MapConfiguration,
     ModelMapConfiguration,
     NutsRegion,
+    NutsVintage,
     Region,
     RegionAttributeValue,
     RegionProperty,
@@ -1329,11 +1330,32 @@ class CatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
 class RegionAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Region
 
+    def hook_queryset(self, queryset):
+        """Offer each territory once even while several NUTS vintages are held.
+
+        A NUTS region of another vintage is the same territory under another
+        code, and the two are indistinguishable in a picker.
+        """
+        queryset = super().hook_queryset(queryset)
+        vintage = NutsVintage.default()
+        if vintage is None:
+            return queryset
+        return queryset.exclude(
+            Q(nutsregion__isnull=False) & ~Q(nutsregion__version=vintage)
+        )
+
 
 class NutsRegionAutocompleteView(UserCreatedObjectAutocompleteView):
     model = NutsRegion
-    search_lookups = ["region_ptr", "name_latn__icontains", "levl_code__icontains"]
+    # Lookups that cannot take a search term (an id, an integer level) make
+    # django-tomselect drop the whole search and list everything instead.
+    search_lookups = ["name__icontains", "name_latn__icontains", "nuts_id__icontains"]
     value_fields = ["id", "name_latn", "levl_code", "parent_id", "nuts_id"]
+
+    def hook_queryset(self, queryset):
+        """Offer each territory once, from the vintage the map is showing."""
+        queryset = super().hook_queryset(queryset)
+        return queryset.in_vintage(NutsVintage.from_request(self.request))
 
     def apply_filters(self, queryset):
         # Check for ancestor filtering (nuts_id prefix matching)
@@ -1364,22 +1386,22 @@ class NutsRegionAutocompleteView(UserCreatedObjectAutocompleteView):
 
 class NutsRegionLevel0AutocompleteView(NutsRegionAutocompleteView):
     def hook_queryset(self, queryset):
-        return queryset.filter(levl_code=0)
+        return super().hook_queryset(queryset).filter(levl_code=0)
 
 
 class NutsRegionLevel1AutocompleteView(NutsRegionAutocompleteView):
     def hook_queryset(self, queryset):
-        return queryset.filter(levl_code=1)
+        return super().hook_queryset(queryset).filter(levl_code=1)
 
 
 class NutsRegionLevel2AutocompleteView(NutsRegionAutocompleteView):
     def hook_queryset(self, queryset):
-        return queryset.filter(levl_code=2)
+        return super().hook_queryset(queryset).filter(levl_code=2)
 
 
 class NutsRegionLevel3AutocompleteView(NutsRegionAutocompleteView):
     def hook_queryset(self, queryset):
-        return queryset.filter(levl_code=3)
+        return super().hook_queryset(queryset).filter(levl_code=3)
 
 
 class RegionOfLauAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -1516,7 +1538,9 @@ class NutsRegionPedigreeAPI(APIView):
         if request.query_params["direction"] == "children":
             for lvl in range(instance.levl_code + 1, 4):
                 qs = NutsRegion.objects.filter(
-                    levl_code=lvl, nuts_id__startswith=instance.nuts_id
+                    levl_code=lvl,
+                    nuts_id__startswith=instance.nuts_id,
+                    version=instance.version_id,
                 )
                 serializer = NutsRegionOptionSerializer(qs, many=True)
                 data[f"id_level_{lvl}"] = serializer.data
@@ -1567,7 +1591,9 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
             for lvl in range(instance.levl_code + 1, 4):
                 # Prefetch needed: serializer accesses region_ptr.catchment_set in get_id
                 qs = NutsRegion.objects.filter(
-                    levl_code=lvl, nuts_id__startswith=instance.nuts_id
+                    levl_code=lvl,
+                    nuts_id__startswith=instance.nuts_id,
+                    version=instance.version_id,
                 ).prefetch_related("region_ptr__catchment_set")
                 serializer = NutsRegionCatchmentOptionSerializer(qs, many=True)
                 data[f"id_level_{lvl}"] = serializer.data
