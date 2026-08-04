@@ -13,6 +13,17 @@ from django.db import migrations, models
 
 import utils.object_management.models
 
+INITIAL_REVISION_SUFFIX = " — initial boundary"
+NAME_MAX_LENGTH = 255
+
+
+def initial_revision_name(catchment_name):
+    """Return a snapshot name that fits the name column for any catchment."""
+    base = catchment_name or "Catchment"
+    return base[: NAME_MAX_LENGTH - len(INITIAL_REVISION_SUFFIX)] + (
+        INITIAL_REVISION_SUFFIX
+    )
+
 
 def backfill_catchment_revisions(apps, schema_editor):
     Catchment = apps.get_model("maps", "Catchment")
@@ -41,7 +52,7 @@ def backfill_catchment_revisions(apps, schema_editor):
             revisions.append(
                 CatchmentRevision(
                     catchment_id=catchment.pk,
-                    name=f"{catchment.name or 'Catchment'} — initial boundary",
+                    name=initial_revision_name(catchment.name),
                     description=(
                         "Initial immutable snapshot migrated from the legacy catchment "
                         "geometry. Its lower effective bound is unknown."
@@ -162,7 +173,7 @@ class Migration(migrations.Migration):
                 (
                     "catchment",
                     models.ForeignKey(
-                        on_delete=django.db.models.deletion.PROTECT,
+                        on_delete=django.db.models.deletion.CASCADE,
                         related_name="revisions",
                         to="maps.catchment",
                     ),

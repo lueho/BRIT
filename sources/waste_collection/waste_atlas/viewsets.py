@@ -829,11 +829,12 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
                 "pk", flat=True
             )
 
-        return Response(
-            _build_change_geometry(
-                _revision_snapshots(catchment_ids(from_year), from_year, request.user),
-                _revision_snapshots(catchment_ids(to_year), to_year, request.user),
-            )
+        return self._change_geojson_response(
+            request,
+            catchment_ids(from_year),
+            from_year,
+            catchment_ids(to_year),
+            to_year,
         )
 
     @action(detail=False, methods=["get"], url_path="collector-change-geojson")
@@ -850,10 +851,36 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
                 .distinct()
             )
 
+        return self._change_geojson_response(
+            request,
+            catchment_ids(from_year),
+            from_year,
+            catchment_ids(to_year),
+            to_year,
+        )
+
+    @staticmethod
+    def _change_geojson_response(request, from_ids, from_year, to_ids, to_year):
+        """Overlay two atlas years, refusing unbounded country-wide requests.
+
+        The overlay unions, intersects and differences every involved geometry,
+        so the same feature ceiling as the plain geometry endpoints applies to
+        the union of both years.
+        """
+        from_ids = set(from_ids)
+        to_ids = set(to_ids)
+        rejection_response = get_unbounded_geojson_rejection_response(
+            request,
+            len(from_ids | to_ids),
+            bounded_query_params={"country", "id", "nuts_prefix"},
+        )
+        if rejection_response is not None:
+            return rejection_response
+
         return Response(
             _build_change_geometry(
-                _revision_snapshots(catchment_ids(from_year), from_year, request.user),
-                _revision_snapshots(catchment_ids(to_year), to_year, request.user),
+                _revision_snapshots(from_ids, from_year, request.user),
+                _revision_snapshots(to_ids, to_year, request.user),
             )
         )
 

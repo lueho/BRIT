@@ -79,6 +79,22 @@ class CatchmentRevisionModelAdmin(GISModelAdmin):
         "approved_by",
     ]
 
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = list(super().get_readonly_fields(request, obj))
+        if obj is not None and obj.publication_status in obj.IMMUTABLE_STATUSES:
+            readonly_fields.extend(
+                field
+                for field in (
+                    "catchment",
+                    "effective_from",
+                    "effective_to",
+                    "geom",
+                    "members",
+                )
+                if field not in readonly_fields
+            )
+        return readonly_fields
+
     @admin.action(description="Submit selected revisions for review")
     def submit_selected_for_review(self, request, queryset):
         self._transition_selected(request, queryset, "submit_for_review")

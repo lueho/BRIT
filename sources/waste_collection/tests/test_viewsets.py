@@ -5172,6 +5172,25 @@ class WasteAtlasTemporalCatchmentGeometryTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         return response.data["features"]
 
+    def test_change_geometry_rejects_large_unbounded_requests(self):
+        with patch("maps.mixins.MAX_UNBOUNDED_GEOJSON_FEATURES", 0):
+            response = self.client.get(
+                "/waste_collection/api/waste-atlas/catchment/"
+                "collection-change-geojson/",
+                {"from_year": 2022, "to_year": 2024},
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_collector_change_geometry_rejects_large_unbounded_requests(self):
+        with patch("maps.mixins.MAX_UNBOUNDED_GEOJSON_FEATURES", 0):
+            response = self.client.get(
+                "/waste_collection/api/waste-atlas/catchment/collector-change-geojson/",
+                {"from_year": 2022, "to_year": 2024},
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_change_geometry_splits_stable_and_added_territory(self):
         features = self._change_features()
         related = [

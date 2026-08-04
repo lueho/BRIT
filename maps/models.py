@@ -706,7 +706,7 @@ class CatchmentRevision(NamedUserCreatedObject):
     )
 
     catchment = models.ForeignKey(
-        Catchment, on_delete=models.PROTECT, related_name="revisions"
+        Catchment, on_delete=models.CASCADE, related_name="revisions"
     )
     effective_from = models.DateField(blank=True, null=True)
     effective_to = models.DateField(blank=True, null=True)
@@ -758,6 +758,9 @@ class CatchmentRevision(NamedUserCreatedObject):
     def clean(self):
         super().clean()
         errors = {}
+        immutable_error = self._immutable_change_error()
+        if immutable_error:
+            errors["__all__"] = immutable_error
         if (
             self.effective_from
             and self.effective_to
@@ -771,18 +774,30 @@ class CatchmentRevision(NamedUserCreatedObject):
         if errors:
             raise ValidationError(errors)
 
+    def _immutable_change_error(self):
+        """Return the immutability message when a locked snapshot is edited."""
+        if not self.pk:
+            return None
+        previous = type(self).objects.filter(pk=self.pk).first()
+        if (
+            previous is None
+            or previous.publication_status not in self.IMMUTABLE_STATUSES
+        ):
+            return None
+        changed = any(
+            getattr(previous, field_name) != getattr(self, field_name)
+            for field_name in self.IMMUTABLE_FIELDS
+        )
+        if not changed:
+            return None
+        return (
+            "Published catchment revisions are immutable; create a successor revision."
+        )
+
     def save(self, *args, **kwargs):
-        if self.pk:
-            previous = type(self).objects.filter(pk=self.pk).first()
-            if previous and previous.publication_status in self.IMMUTABLE_STATUSES:
-                changed = any(
-                    getattr(previous, field_name) != getattr(self, field_name)
-                    for field_name in self.IMMUTABLE_FIELDS
-                )
-                if changed:
-                    raise ValidationError(
-                        "Published catchment revisions are immutable; create a successor revision."
-                    )
+        immutable_error = self._immutable_change_error()
+        if immutable_error:
+            raise ValidationError(immutable_error)
         if self.geom:
             self.geom_hash = hashlib.sha256(bytes(self.geom.ewkb)).hexdigest()
         super().save(*args, **kwargs)
@@ -884,10 +899,27 @@ class CatchmentRevision(NamedUserCreatedObject):
 
 
 @receiver(m2m_changed, sender=CatchmentRevision.members.through)
-def protect_published_catchment_revision_members(sender, instance, action, **kwargs):
-    if action in {"pre_add", "pre_remove", "pre_clear"} and (
-        instance.pk and instance.publication_status in instance.IMMUTABLE_STATUSES
-    ):
+def protect_published_catchment_revision_members(
+    sender, instance, action, reverse=False, pk_set=None, **kwargs
+):
+    if action not in {"pre_add", "pre_remove", "pre_clear"}:
+        return
+
+    if reverse:
+        revisions = CatchmentRevision.objects.filter(
+            publication_status__in=CatchmentRevision.IMMUTABLE_STATUSES
+        )
+        if pk_set is None:
+            revisions = revisions.filter(members=instance)
+        else:
+            revisions = revisions.filter(pk__in=pk_set)
+        locked = revisions.exists()
+    else:
+        locked = bool(instance.pk) and (
+            instance.publication_status in instance.IMMUTABLE_STATUSES
+        )
+
+    if locked:
         raise ValidationError(
             "Published catchment revisions are immutable; create a successor revision."
         )
