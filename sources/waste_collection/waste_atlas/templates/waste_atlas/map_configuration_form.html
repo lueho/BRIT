@@ -60,7 +60,10 @@
       </div>
     </fieldset>
     <fieldset class="mb-4">
-      <legend class="h5">Online preview</legend>
+      <legend class="h5">On-screen preview legend</legend>
+      <p class="text-muted small mb-3">
+        Controls the interactive web map only. Width is in screen pixels.
+      </p>
       <div class="row g-3">
         <div class="col-12 col-md-4">
           <label class="form-label"
@@ -82,39 +85,41 @@
       </div>
     </fieldset>
     <fieldset class="mb-4">
-      <legend class="h5">Export</legend>
-      <div class="row g-3 align-items-end">
+      <legend class="h5">Downloaded export legend</legend>
+      <p class="text-muted small mb-3">
+        These settings apply only to downloaded SVG/PNG exports (measured as a
+        fraction of the printed page), not to the on-screen preview above.
+      </p>
+      <div class="form-check mb-3">
+        {{ form.export_legend_customize }}
+        <label class="form-check-label"
+               for="{{ form.export_legend_customize.id_for_label }}">
+          {{ form.export_legend_customize.label }}
+        </label>
+        <div class="form-text">{{ form.export_legend_customize.help_text }}</div>
+      </div>
+      <div class="atlas-export-legend-custom row g-3 align-items-start"
+           data-atlas-target="export-legend-custom">
         <div class="col-12 col-md-4">
           <label class="form-label"
                  for="{{ form.export_legend_placement.id_for_label }}">{{ form.export_legend_placement.label }}</label>
           {{ form.export_legend_placement }}
+          <div class="form-text">{{ form.export_legend_placement.help_text }}</div>
           {{ form.export_legend_placement.errors }}
-        </div>
-        <div class="col-6 col-md-4">
-          <label class="form-label"
-                 for="{{ form.export_legend_width.id_for_label }}">{{ form.export_legend_width.label }}</label>
-          {{ form.export_legend_width }}
-          {{ form.export_legend_width.errors }}
         </div>
         <div class="col-6 col-md-4">
           <label class="form-label"
                  for="{{ form.export_legend_columns.id_for_label }}">{{ form.export_legend_columns.label }}</label>
           {{ form.export_legend_columns }}
+          <div class="form-text">{{ form.export_legend_columns.help_text }}</div>
           {{ form.export_legend_columns.errors }}
         </div>
-        <div class="col-12 col-md-4">
-          <div class="form-check">
-            {{ form.export_legend_fit_content }}
-            <label class="form-check-label"
-                   for="{{ form.export_legend_fit_content.id_for_label }}">{{ form.export_legend_fit_content.label }}</label>
-          </div>
-        </div>
-        <div class="col-12 col-md-4">
-          <div class="form-check">
-            {{ form.export_legend_avoid_map_overlap }}
-            <label class="form-check-label"
-                   for="{{ form.export_legend_avoid_map_overlap.id_for_label }}">{{ form.export_legend_avoid_map_overlap.label }}</label>
-          </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label"
+                 for="{{ form.export_legend_width.id_for_label }}">{{ form.export_legend_width.label }}</label>
+          {{ form.export_legend_width }}
+          <div class="form-text">{{ form.export_legend_width.help_text }}</div>
+          {{ form.export_legend_width.errors }}
         </div>
       </div>
     </fieldset>
@@ -179,4 +184,16 @@
          href="{% url 'waste-atlas-map-configuration-list' %}">Cancel</a>
     </div>
   </form>
+  <script>
+    (function () {
+      var toggle = document.querySelector('[data-atlas-toggle="export-legend-custom"]');
+      var panel = document.querySelector('[data-atlas-target="export-legend-custom"]');
+      if (!toggle || !panel) return;
+      function sync() {
+        panel.hidden = !toggle.checked;
+      }
+      toggle.addEventListener('change', sync);
+      sync();
+    })();
+  </script>
 {% endblock atlas_workspace %}

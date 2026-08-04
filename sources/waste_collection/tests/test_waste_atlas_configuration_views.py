@@ -33,22 +33,31 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         return WasteAtlasMapConfiguration.objects.get(key="collection_system")
 
     def _form_data(self, configuration, **overrides):
+        stored_columns = configuration.get("exportLegendColumns", "auto")
         data = {
             "legend_title": configuration["legendTitle"],
             "export_legend_title": configuration.get("exportLegendTitle", ""),
             "legend_placement": configuration.get("legendPlacement", "bottom-left"),
             "legend_width": configuration.get("legendWidth", 300),
             "legend_font_size": configuration.get("legendFontSize", 12),
-            "export_legend_placement": configuration.get("exportLegendPlacement", ""),
+            "export_legend_placement": configuration.get(
+                "exportLegendPlacement", "auto"
+            ),
             "export_legend_width": round(
                 configuration.get("exportLegendWidth", 0.52) * 100
             ),
-            "export_legend_columns": configuration.get("exportLegendColumns", 1),
+            "export_legend_columns": str(stored_columns),
         }
-        if configuration.get("exportLegendFitContent"):
-            data["export_legend_fit_content"] = "on"
-        if configuration.get("exportLegendAvoidMapOverlap"):
-            data["export_legend_avoid_map_overlap"] = "on"
+        # Any stored export-legend override means the map customizes the export.
+        if any(
+            key in configuration
+            for key in (
+                "exportLegendPlacement",
+                "exportLegendColumns",
+                "exportLegendWidth",
+            )
+        ):
+            data["export_legend_customize"] = "on"
         for index, category in enumerate(configuration["categories"]):
             data[f"category_{index}_label"] = category["label"]
             data[f"category_{index}_export_label"] = category.get("exportLabel", "")
@@ -124,11 +133,10 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
                 legend_placement="top-right",
                 legend_width=420,
                 legend_font_size=15,
+                export_legend_customize="on",
                 export_legend_placement="left",
                 export_legend_width=38,
-                export_legend_columns=2,
-                export_legend_fit_content="on",
-                export_legend_avoid_map_overlap="on",
+                export_legend_columns="2",
                 return_to=map_url,
             ),
         )
@@ -165,8 +173,9 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         self.assertEqual(config.configuration["exportLegendPlacement"], "left")
         self.assertEqual(config.configuration["exportLegendWidth"], 0.38)
         self.assertEqual(config.configuration["exportLegendColumns"], 2)
-        self.assertIs(config.configuration["exportLegendFitContent"], True)
-        self.assertIs(config.configuration["exportLegendAvoidMapOverlap"], True)
+        # Retired options are never persisted.
+        self.assertNotIn("exportLegendFitContent", config.configuration)
+        self.assertNotIn("exportLegendAvoidMapOverlap", config.configuration)
         self.assertEqual(
             config.configuration["legendCategoryOrder"][:2],
             [
@@ -214,12 +223,54 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         self.assertEqual(rendered_config["legendPlacement"], "top-right")
         self.assertEqual(rendered_config["legendWidth"], 420)
         self.assertEqual(rendered_config["legendFontSize"], 15)
-        self.assertEqual(rendered_config["exportLegendPlacement"], "left")
-        self.assertEqual(rendered_config["exportLegendWidth"], 0.38)
-        self.assertEqual(rendered_config["exportLegendColumns"], 2)
+        # The renderer receives one resolved object, not flat layout keys.
+        self.assertEqual(
+            rendered_config["exportLegend"],
+            {"placement": "left", "columns": 2, "maxWidthFraction": 0.38},
+        )
+        self.assertNotIn("exportLegendPlacement", rendered_config)
         self.assertEqual(
             rendered_config["legendCategoryOrder"],
             config.configuration["legendCategoryOrder"],
+        )
+
+    def test_automatic_placement_with_width_and_columns_persists(self):
+        """Regression: Automatic placement must still persist width and columns.
+
+        The reported bug used Automatic placement, 52% maximum width and one
+        column, yet the export rendered a wide three-column bottom legend
+        because the form dropped width/columns whenever placement was blank.
+        With the redesign, Automatic is an explicit ``auto`` value that keeps
+        the constraints and reaches the resolved ``exportLegend`` config.
+        """
+        config = self._configuration()
+        map_url = reverse("waste-atlas-germany-collection-system-map")
+        original = deepcopy(config.configuration)
+        self.client.force_login(self.staff)
+
+        response = self.client.post(
+            reverse("waste-atlas-map-configuration-update", args=[config.key]),
+            self._form_data(
+                original,
+                export_legend_customize="on",
+                export_legend_placement="auto",
+                export_legend_width=52,
+                export_legend_columns="1",
+                return_to=map_url,
+            ),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        config.refresh_from_db()
+        self.assertEqual(config.configuration["exportLegendPlacement"], "auto")
+        self.assertEqual(config.configuration["exportLegendColumns"], 1)
+        self.assertEqual(config.configuration["exportLegendWidth"], 0.52)
+
+        map_response = self.client.get(response["Location"])
+        rendered_config = self._rendered_map_config(map_response)
+        self.assertEqual(
+            rendered_config["exportLegend"],
+            {"placement": "auto", "columns": 1, "maxWidthFraction": 0.52},
         )
 
     def test_blank_export_text_uses_preview_text_fallback(self):
@@ -337,18 +388,20 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
             reverse("waste-atlas-map-configuration-update", args=[config.key]),
             self._form_data(
                 original,
+                export_legend_customize="on",
                 export_legend_placement="top-left",
                 export_legend_width=45,
-                export_legend_columns=2,
+                export_legend_columns="2",
                 return_to=reverse("waste-atlas-sweden-residual-collection-amount-map"),
             ),
         )
 
         map_response = self.client.get(response["Location"])
         rendered_config = self._rendered_map_config(map_response)
-        self.assertEqual(rendered_config["exportLegendPlacement"], "top-left")
-        self.assertEqual(rendered_config["exportLegendWidth"], 0.45)
-        self.assertEqual(rendered_config["exportLegendColumns"], 2)
+        self.assertEqual(
+            rendered_config["exportLegend"],
+            {"placement": "top-left", "columns": 2, "maxWidthFraction": 0.45},
+        )
 
 
 class WasteAtlasExportFileNameTestCase(TestCase):

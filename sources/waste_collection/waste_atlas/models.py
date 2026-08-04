@@ -199,17 +199,11 @@ class WasteAtlasRenderingSettings(models.Model):
     export_legend_width_fraction = models.FloatField(
         default=0.52,
         validators=[MinValueValidator(0.2), MaxValueValidator(0.9)],
-        help_text="Default legend width in exports as a fraction of the page.",
-    )
-    export_legend_columns = models.PositiveIntegerField(
-        default=1,
-        validators=[MinValueValidator(1), MaxValueValidator(4)],
-        help_text="Default number of legend columns in exports.",
-    )
-    export_legend_bottom_columns = models.PositiveIntegerField(
-        default=3,
-        validators=[MinValueValidator(1), MaxValueValidator(6)],
-        help_text="Legend columns used when the legend sits below the map.",
+        help_text=(
+            "Default maximum legend width in exports as a fraction of the "
+            "page. The renderer fits the legend to its content and never "
+            "exceeds this bound."
+        ),
     )
     export_file_name_prefix = models.SlugField(
         max_length=50,
@@ -302,8 +296,22 @@ class WasteAtlasRenderingSettings(models.Model):
                 "maxHeightMm": self.export_max_height_mm,
                 "legendFontSizePt": self.export_legend_font_size_pt,
                 "legendFontFamily": self.export_legend_font_family,
-                "legendWidth": self.export_legend_width_fraction,
-                "legendColumns": self.export_legend_columns,
-                "legendBottomColumns": self.export_legend_bottom_columns,
+                "legendMaxWidthFraction": self.export_legend_width_fraction,
             },
+            "exportLegend": self.export_legend_defaults(),
+        }
+
+    def export_legend_defaults(self):
+        """Atlas-level fallback for the resolved export-legend config.
+
+        Placement and columns default to ``auto`` so, unless a theme or page
+        pins them, the layout engine chooses; the width fraction is the hard
+        upper bound stored on this row.
+        """
+        from .legend import AUTO
+
+        return {
+            "placement": AUTO,
+            "columns": AUTO,
+            "maxWidthFraction": self.export_legend_width_fraction,
         }

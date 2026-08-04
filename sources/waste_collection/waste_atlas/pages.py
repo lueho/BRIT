@@ -110,16 +110,13 @@ MAP_SET_LABELS = {
     "SE": "Sweden",
 }
 
-REGION_MAP_OVERRIDES = {
-    "sweden": {
-        "exportLegendPlacement": "bottom-right",
-        "exportLegendWidth": 0.64,
-        "exportLegendColumns": 1,
-        "exportLegendFitContent": True,
-        "exportLegendAvoidMapOverlap": True,
-    },
-    "nrw": {"exportLegendBottomColumns": 2},
-}
+# Escape hatch for genuine page-specific export exceptions, keyed by region.
+# The automatic layout engine now measures each map and fits the legend, so
+# regions no longer need bespoke placement/width/column exceptions (Sweden and
+# NRW previously did). Add an entry here only when a single region genuinely
+# cannot be served by the shared theme configuration; values use the same
+# ``exportLegend*`` keys as a stored configuration and win over it.
+REGION_MAP_OVERRIDES = {}
 
 
 def _page(region, theme, title, path, name, **extra):
