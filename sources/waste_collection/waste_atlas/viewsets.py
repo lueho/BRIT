@@ -1,8 +1,10 @@
+import hashlib
 import json
 from datetime import date
 
 from django.conf import settings
 from django.contrib.gis.db.models import MultiPolygonField
+from django.contrib.gis.geos import GeometryCollection
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import (
     Case,
@@ -11,6 +13,7 @@ from django.db.models import (
     Exists,
     F,
     FloatField,
+    Max,
     OuterRef,
     Prefetch,
     Q,
@@ -34,6 +37,8 @@ from maps.models import (
     RegionProperty,
 )
 from maps.population.services import population_values_by_region
+from maps.throttling import GeoJSONAnonThrottle
+from maps.utils import get_or_set_cache
 from sources.waste_collection.derived_values import (
     convert_total_to_specific,
     get_derived_property_config,
@@ -346,6 +351,10 @@ def _with_catchment_revision(queryset, year, user=None):
     The legacy Region geometry remains a compatibility fallback for catchments
     created before a revision has been saved. Migrated databases have an initial
     unbounded revision for every georeferenced catchment.
+
+    Catchments that resolve to no geometry at all are dropped: they would be
+    served as features with a ``null`` shape and inflate the feature count the
+    unbounded-request guard works on.
     """
     revisions = (
         CatchmentRevision.objects.valid_on(_atlas_reference_date(year))
@@ -365,7 +374,7 @@ def _with_catchment_revision(queryset, year, user=None):
             F("region__borders__geom"),
             output_field=MultiPolygonField(srid=4326),
         ),
-    )
+    ).exclude(atlas_geom__isnull=True)
 
 
 def _parse_change_years(request):
@@ -378,14 +387,22 @@ def _parse_change_years(request):
 
 
 def _revision_snapshots(catchment_ids, year, user=None):
-    """Return one visible geometry snapshot per catchment for an atlas year."""
+    """Return one visible geometry snapshot per catchment for an atlas year.
+
+    Geometries are simplified in PostGIS before they reach the overlay, which
+    computes unions, intersections and differences over all of them: the change
+    map is rendered at map resolution, so carrying full-resolution boundaries
+    through that work only costs time.
+    """
     catchment_ids = set(catchment_ids)
+    tolerance = geometry_simplify_tolerance()
     revisions = (
         CatchmentRevision.objects.valid_on(_atlas_reference_date(year))
         .filter(
             catchment_id__in=catchment_ids,
             publication_status__in=_visible_statuses(user),
         )
+        .annotate(simplified_geom=SimplifyPreserveTopology(F("geom"), tolerance))
         .select_related("catchment")
         .order_by("catchment_id", F("effective_from").desc(nulls_last=True), "-pk")
     )
@@ -396,29 +413,85 @@ def _revision_snapshots(catchment_ids, year, user=None):
             {
                 "revision_id": revision.pk,
                 "catchment_name": revision.catchment.name,
-                "geom": revision.geom,
+                "geom": revision.simplified_geom or revision.geom,
             },
         )
 
     missing_ids = catchment_ids - snapshots.keys()
     if missing_ids:
-        for catchment in CollectionCatchment.objects.filter(
-            pk__in=missing_ids, region__borders__geom__isnull=False
-        ).select_related("region__borders"):
+        for catchment in (
+            CollectionCatchment.objects.filter(
+                pk__in=missing_ids, region__borders__geom__isnull=False
+            )
+            .annotate(
+                simplified_geom=SimplifyPreserveTopology(
+                    F("region__borders__geom"), tolerance
+                )
+            )
+            .select_related("region__borders")
+        ):
             snapshots[catchment.pk] = {
                 "revision_id": None,
                 "catchment_name": catchment.name,
-                "geom": catchment.region.borders.geom,
+                "geom": catchment.simplified_geom or catchment.region.borders.geom,
             }
     return snapshots
 
 
 def _union_geometries(snapshots):
-    union = None
-    for snapshot in snapshots.values():
-        geom = snapshot["geom"]
-        union = geom.clone() if union is None else union.union(geom)
-    return union
+    """Union all snapshot geometries in one cascaded pass.
+
+    Accumulating pairwise (``union = union.union(geom)``) reprocesses the whole
+    accumulated polygon on every step, which is quadratic in total vertex count.
+    GEOS' cascaded union over the whole collection stays roughly linear.
+    """
+    geometries = [snapshot["geom"] for snapshot in snapshots.values()]
+    if not geometries:
+        return None
+    if len(geometries) == 1:
+        return geometries[0].clone()
+    collection = GeometryCollection(
+        *(geom.clone() for geom in geometries), srid=geometries[0].srid
+    )
+    return collection.unary_union
+
+
+_CHANGE_OVERLAY_ACTIONS = frozenset(
+    {"collection_change_geojson", "collector_change_geojson"}
+)
+# Bounded lifetime for cached overlays: the cache key versions revision edits,
+# but the legacy Region-geometry fallback carries no timestamp to version.
+_CHANGE_OVERLAY_CACHE_TIMEOUT = 3600
+
+
+def _change_overlay_cache_key(from_ids, from_year, to_ids, to_year, user=None):
+    """Cache key for one change overlay, invalidated by boundary edits.
+
+    The involved catchments plus the number and latest modification of their
+    revisions version the key, so editing, adding or removing a snapshot yields
+    a different key instead of serving a stale overlay.  Visibility only depends
+    on whether the requester is staff, so the key does not need the user.
+
+    Geometry taken from the legacy Region fallback cannot be versioned this way,
+    which is why cached overlays also expire after
+    ``_CHANGE_OVERLAY_CACHE_TIMEOUT``.
+    """
+    catchment_ids = sorted(set(from_ids) | set(to_ids))
+    versions = CatchmentRevision.objects.filter(
+        catchment_id__in=catchment_ids
+    ).aggregate(count=Count("pk"), latest=Max("lastmodified_at"))
+    latest = versions["latest"]
+    fingerprint = ":".join(
+        (
+            ",".join(str(pk) for pk in sorted(from_ids)),
+            ",".join(str(pk) for pk in sorted(to_ids)),
+            str(versions["count"] or 0),
+            str(int(latest.timestamp()) if latest else 0),
+        )
+    )
+    digest = hashlib.sha1(fingerprint.encode("utf-8")).hexdigest()[:16]
+    scope = "staff" if _is_staff(user) else "public"
+    return f"waste_atlas_change_overlay:{from_year}:{to_year}:{scope}:{digest}"
 
 
 def _append_change_feature(
@@ -859,13 +932,25 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
             to_year,
         )
 
+    def get_throttles(self):
+        """Rate limit the expensive public change overlays per client subnet.
+
+        The overlay actions do far more work per request than the plain
+        geometry endpoints, so they use the stricter subnet-aware GeoJSON
+        throttle instead of the shared atlas scope.
+        """
+        if getattr(self, "action", None) in _CHANGE_OVERLAY_ACTIONS:
+            return [GeoJSONAnonThrottle()]
+        return super().get_throttles()
+
     @staticmethod
     def _change_geojson_response(request, from_ids, from_year, to_ids, to_year):
         """Overlay two atlas years, refusing unbounded country-wide requests.
 
         The overlay unions, intersects and differences every involved geometry,
         so the same feature ceiling as the plain geometry endpoints applies to
-        the union of both years.
+        the union of both years.  The result is cached per boundary version, so
+        repeated requests for the same overlay do not recompute it.
         """
         from_ids = set(from_ids)
         to_ids = set(to_ids)
@@ -877,12 +962,17 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
         if rejection_response is not None:
             return rejection_response
 
-        return Response(
-            _build_change_geometry(
+        payload, _hit = get_or_set_cache(
+            _change_overlay_cache_key(
+                from_ids, from_year, to_ids, to_year, request.user
+            ),
+            lambda: _build_change_geometry(
                 _revision_snapshots(from_ids, from_year, request.user),
                 _revision_snapshots(to_ids, to_year, request.user),
-            )
+            ),
+            timeout=_CHANGE_OVERLAY_CACHE_TIMEOUT,
         )
+        return Response(payload)
 
     def _geojson_response(self, request, queryset):
         _country, year = _parse_country_year(request)

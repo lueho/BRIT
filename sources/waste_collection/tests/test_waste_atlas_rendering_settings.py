@@ -145,7 +145,13 @@ class WasteAtlasLegendFormDefaultTests(TestCase):
         self.assertEqual(form.initial["legend_placement"], "top-right")
         self.assertEqual(form.initial["legend_width"], 360)
         self.assertEqual(form.initial["legend_font_size"], 14)
-        self.assertEqual(form.initial["export_legend_width"], 60)
+        # The maximum export width inherits while it is unset: the field stays
+        # blank and only advertises the atlas default as a placeholder, so
+        # reopening and saving the form does not freeze the inherited value.
+        self.assertIsNone(form.initial.get("export_legend_width"))
+        self.assertEqual(
+            form.fields["export_legend_width"].widget.attrs["placeholder"], 60
+        )
 
 
 class WasteAtlasRendererHasNoHardcodedDefaultsTests(TestCase):

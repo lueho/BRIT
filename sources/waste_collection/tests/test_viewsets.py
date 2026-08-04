@@ -2,9 +2,10 @@ from datetime import date
 from unittest.mock import patch
 from uuid import uuid4
 
+from django.conf import settings
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
-from django.core.cache import cache
+from django.core.cache import cache, caches
 from django.db import connection
 from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
@@ -22,6 +23,7 @@ from maps.models import (
     RegionAttributeValue,
     RegionProperty,
 )
+from maps.throttling import GeoJSONAnonThrottle
 from materials.models import Material
 from sources.waste_collection.derived_values import clear_derived_value_config_cache
 from sources.waste_collection.importers import CollectionImporter
@@ -42,6 +44,7 @@ from sources.waste_collection.models import (
     WasteFlyer,
 )
 from sources.waste_collection.viewsets import CollectionViewSet
+from sources.waste_collection.waste_atlas import viewsets as atlas_viewsets
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.properties.models import Property, Unit
 
@@ -3019,7 +3022,9 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
             cntr_code="BE",
             nuts_id="BE1",
             levl_code=1,
-            borders=GeoPolygon.objects.create(),
+            borders=GeoPolygon.objects.create(
+                geom="MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))"
+            ),
         )
         cls.be2_region = NutsRegion.objects.create(
             name="Flanders",
@@ -3027,7 +3032,9 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
             cntr_code="BE",
             nuts_id="BE2",
             levl_code=1,
-            borders=GeoPolygon.objects.create(),
+            borders=GeoPolygon.objects.create(
+                geom="MULTIPOLYGON(((2 0, 2 1, 3 1, 3 0, 2 0)))"
+            ),
         )
         cls.be3_region = NutsRegion.objects.create(
             name="Wallonia",
@@ -3035,7 +3042,9 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
             cntr_code="BE",
             nuts_id="BE3",
             levl_code=1,
-            borders=GeoPolygon.objects.create(),
+            borders=GeoPolygon.objects.create(
+                geom="MULTIPOLYGON(((4 0, 4 1, 5 1, 5 0, 4 0)))"
+            ),
         )
 
         cls.catchment_be1 = CollectionCatchment.objects.create(
@@ -5275,3 +5284,60 @@ class WasteAtlasTemporalCatchmentGeometryTests(APITestCase):
         self.assertEqual(
             revision_only["properties"]["catchment_revision_id"], revision.pk
         )
+
+    def _catchment_without_any_geometry(self):
+        region = Region.objects.create(name="Geometry-less region", country="DE")
+        catchment = CollectionCatchment.objects.create(
+            name="Geometry-less catchment", region=region
+        )
+        collector = Collector.objects.create(
+            name="Geometry-less collector", catchment=catchment
+        )
+        Collection.objects.create(
+            name="Geometry-less collection",
+            catchment=catchment,
+            collector=collector,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+        return catchment
+
+    def test_catchments_without_any_boundary_are_left_out_of_the_map(self):
+        catchment = self._catchment_without_any_geometry()
+
+        for action in ("collection-geojson", "collector-geojson"):
+            with self.subTest(action=action):
+                response = self.client.get(
+                    f"/waste_collection/api/waste-atlas/catchment/{action}/",
+                    {"country": "DE", "year": 2024},
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                served = {
+                    feature["properties"]["catchment_id"]
+                    for feature in response.data["features"]
+                }
+                self.assertNotIn(catchment.pk, served)
+
+    def test_identical_change_overlay_requests_are_computed_once(self):
+        caches[getattr(settings, "GEOJSON_CACHE", "default")].clear()
+        with patch(
+            "sources.waste_collection.waste_atlas.viewsets._build_change_geometry",
+            wraps=atlas_viewsets._build_change_geometry,
+        ) as build:
+            first = self._change_features()
+            second = self._change_features()
+
+        self.assertEqual(build.call_count, 1)
+        self.assertEqual(first, second)
+
+    def test_change_overlay_actions_are_rate_limited_for_anonymous_clients(self):
+        for action in ("collection_change_geojson", "collector_change_geojson"):
+            with self.subTest(action=action):
+                viewset = atlas_viewsets.CatchmentViewSet()
+                viewset.action = action
+
+                self.assertIn(
+                    GeoJSONAnonThrottle,
+                    [type(throttle) for throttle in viewset.get_throttles()],
+                )
