@@ -115,6 +115,14 @@ class WasteAtlasResponsiveMapScriptTests(TestCase):
         waste_ratio_body = waste_ratio_body.split("    },", 1)[0]
         self.assertIn("uses_aggregated_amount", waste_ratio_body)
 
+    def test_aggregated_overlay_uses_a_dark_neutral_hatching(self):
+        self.assertIn("var OVERLAY_PATTERN_COLOR = '#1f2937';", self.script)
+        pattern_body = self.script.split("function _defineOverlayPattern(cfg)")[1]
+        pattern_body = pattern_body.split("// ---- data fetching", 1)[0]
+        self.assertIn(".attr('stroke', OVERLAY_PATTERN_COLOR)", pattern_body)
+        self.assertIn(".attr('stroke-opacity', 0.9)", pattern_body)
+        self.assertNotIn(".attr('stroke', '#ffffff')", pattern_body)
+
     def test_exports_are_rendered_without_the_screen_zoom_transform(self):
         render_body = self.script.split("function _render(data, cfg, options)")[1]
         render_body = render_body.split("function _drawExportLegendItem")[0]
