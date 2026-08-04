@@ -2,21 +2,24 @@
 
 from django import template
 
+from ..legend import (
+    EXPORT_LEGEND_OVERRIDE_KEYS,
+    LEGACY_EXPORT_LEGEND_KEYS,
+    resolve_export_legend,
+)
 from ..map_configs import MAP_CONFIGS
 from ..models import WasteAtlasRenderingSettings
 
 register = template.Library()
 
-DATABASE_EDITABLE_OVERRIDE_KEYS = frozenset(
-    {
-        "exportLegendTitle",
-        "exportLegendPlacement",
-        "exportLegendWidth",
-        "exportLegendColumns",
-        "exportLegendFitContent",
-        "exportLegendAvoidMapOverlap",
-    }
+# Layout keys are resolved centrally by ``resolve_export_legend`` and stripped
+# from the emitted config; the renderer reads only the resolved ``exportLegend``
+# object.  ``exportLegendTitle`` stays a flat key: it is staff-editable text, so
+# a stored (theme) value wins over a page/region override.
+_EXPORT_LEGEND_LAYOUT_KEYS = frozenset(
+    (*EXPORT_LEGEND_OVERRIDE_KEYS, *LEGACY_EXPORT_LEGEND_KEYS)
 )
+_STAFF_EDITABLE_TEXT_KEYS = frozenset({"exportLegendTitle"})
 
 
 def export_file_base(map_set, theme, prefix=None):
@@ -70,13 +73,33 @@ def atlas_js_config(context, config_key):
     ``fileBase`` is ignored so file naming stays homogeneous across maps.
     """
     settings = WasteAtlasRenderingSettings.load()
-    config = dict(MAP_CONFIGS.get(config_key, {}))
-    config.pop("fileBase", None)
-    for key, value in (context.get("map_config_overrides") or {}).items():
+    stored = dict(MAP_CONFIGS.get(config_key, {}))
+    stored.pop("fileBase", None)
+    page_overrides = context.get("map_config_overrides") or {}
+
+    config = dict(stored)
+    for key, value in page_overrides.items():
         if key == "fileBase":
             continue
-        if key not in DATABASE_EDITABLE_OVERRIDE_KEYS or key not in config:
-            config[key] = value
+        # Export-legend layout is resolved below with explicit precedence.
+        if key in _EXPORT_LEGEND_LAYOUT_KEYS:
+            continue
+        # Staff-edited text wins over a page/region default.
+        if key in _STAFF_EDITABLE_TEXT_KEYS and key in stored:
+            continue
+        config[key] = value
+
+    # Resolve the one effective export-legend layout: page/region override ->
+    # stored theme config -> atlas defaults.  The renderer reads only this
+    # object, so strip the flat/legacy layout keys that fed the old
+    # placement-coupled defaults.
+    config["exportLegend"] = resolve_export_legend(
+        stored=stored,
+        page_overrides=page_overrides,
+        defaults=settings.export_legend_defaults(),
+    )
+    for key in _EXPORT_LEGEND_LAYOUT_KEYS:
+        config.pop(key, None)
 
     # DOM ids shared by every map
     config.setdefault("svgId", "atlas-svg")

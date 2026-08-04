@@ -1193,6 +1193,9 @@ var WasteAtlasChoropleth = (function () {
     return items;
   }
 
+  // Smallest width (<= maxWidth) that fits the measured content for the given
+  // column count. Applied to every legend: the engine never uses more width
+  // than the content needs, whether the legend has one column or several.
   function _fitExportLegendWidth(cfg, maxWidth, opts) {
     var titleWidth = String(cfg.exportLegendTitle || cfg.legendTitle || '')
       .split(/\r?\n/)
@@ -1202,10 +1205,10 @@ var WasteAtlasChoropleth = (function () {
     var labelWidth = _legendItems(cfg, true).reduce(function (widest, item) {
       return Math.max(widest, _measureTextWidth(item.label, opts.fontSize));
     }, 0);
-    var contentWidth = Math.max(
-      titleWidth,
-      opts.swatchW + opts.labelGap + labelWidth
-    );
+    var columnContent = opts.swatchW + opts.labelGap + labelWidth;
+    var columnsWidth = opts.columnCount * columnContent
+      + (opts.columnCount - 1) * opts.columnGap;
+    var contentWidth = Math.max(titleWidth, columnsWidth);
     return Math.min(maxWidth, Math.ceil(contentWidth + opts.paddingX * 2 + 2));
   }
 
@@ -1226,9 +1229,9 @@ var WasteAtlasChoropleth = (function () {
       fontFamily: _exportLegendFontFamily()
     };
     opts.lineHeight = Math.round(opts.fontSize * 1.12);
-    if (cfg.exportLegendFitContent && opts.columnCount === 1) {
-      width = _fitExportLegendWidth(cfg, width, opts);
-    }
+    // Always fit width to content (no user opt-in); the caller passes the hard
+    // maximum and the legend shrinks to what its content needs.
+    width = _fitExportLegendWidth(cfg, width, opts);
     opts.width = width;
     opts.columnWidth = (
       width - opts.paddingX * 2 - (opts.columnCount - 1) * opts.columnGap
@@ -1247,6 +1250,12 @@ var WasteAtlasChoropleth = (function () {
         height: Math.max(opts.swatchH, lines.length * opts.lineHeight)
       });
     });
+    opts.itemCount = opts.items.length;
+    // Extra label lines beyond one per item — a readability cost the scorer
+    // uses to prefer layouts that wrap labels less.
+    opts.wrappedLines = opts.items.reduce(function (total, item) {
+      return total + Math.max(0, item.lines.length - 1);
+    }, 0);
     opts.columns = [];
     for (var i = 0; i < opts.columnCount; i++) opts.columns.push([]);
     opts.items.forEach(function (item) {
@@ -1304,21 +1313,32 @@ var WasteAtlasChoropleth = (function () {
     };
   }
 
-  function _projectedRightEdgeInBand(geometryData, fitData, extent, minY, maxY) {
+  // Min/max projected x of the mapped geometry within a vertical band. Used to
+  // tell whether a page corner is genuinely empty space beside the shapes.
+  function _projectedEdgesInBand(geometryData, fitData, extent, minY, maxY) {
     var projection = d3.geoMercator().fitExtent(extent, fitData);
     var rightEdge = -Infinity;
+    var leftEdge = Infinity;
     var previous = null;
     var inLine = false;
+    function record(x, y) {
+      if (y >= minY && y <= maxY) {
+        rightEdge = Math.max(rightEdge, x);
+        leftEdge = Math.min(leftEdge, x);
+      }
+    }
     var stream = {
       point: function (x, y) {
-        if (y >= minY && y <= maxY) rightEdge = Math.max(rightEdge, x);
+        record(x, y);
         if (inLine && previous && y !== previous[1]) {
           [minY, maxY].forEach(function (boundaryY) {
             var crossesBoundary = (previous[1] < boundaryY && y > boundaryY)
               || (previous[1] > boundaryY && y < boundaryY);
             if (crossesBoundary) {
               var ratio = (boundaryY - previous[1]) / (y - previous[1]);
-              rightEdge = Math.max(rightEdge, previous[0] + (x - previous[0]) * ratio);
+              var crossingX = previous[0] + (x - previous[0]) * ratio;
+              rightEdge = Math.max(rightEdge, crossingX);
+              leftEdge = Math.min(leftEdge, crossingX);
             }
           });
         }
@@ -1337,171 +1357,286 @@ var WasteAtlasChoropleth = (function () {
       sphere: function () { }
     };
     d3.geoStream(geometryData, projection.stream(stream));
-    return rightEdge;
+    return { left: leftEdge, right: rightEdge };
   }
 
-  function _fitBottomRightLegend(cfg, geometryData, fitData, mapExtent, maxWidth,
-    columnCount, exportHeight, margin, gap) {
-    var documentRight = _exportWidth() - margin;
-    var widthLimit = maxWidth;
-    var legend;
-    var mapRight = -Infinity;
-    while (true) {
-      legend = _measureExportLegend(cfg, widthLimit, columnCount);
-      var legendTop = exportHeight - margin - legend.height;
-      mapRight = _projectedRightEdgeInBand(
-        geometryData,
-        fitData,
-        mapExtent,
-        legendTop,
-        exportHeight - margin
-      );
-      var availableWidth = mapRight === -Infinity
-        ? maxWidth
-        : Math.max(1, Math.floor(documentRight - mapRight - gap));
-      if (availableWidth >= legend.width || widthLimit <= 1) break;
-      widthLimit = Math.min(widthLimit, availableWidth);
+  // ---- export legend layout (constraint-driven) ----------------------------
+  // The renderer consumes one resolved config, ``cfg.exportLegend`` =
+  // { placement, columns, maxWidthFraction } with explicit auto/fixed values.
+  // From it we generate candidate layouts, reject any that violate a hard
+  // invariant (clipping, empty map, unreadable text, or overlapping mapped
+  // geometry), then score the survivors deterministically.
+
+  var EXPORT_LEGEND_MARGIN = 46;
+  var EXPORT_LEGEND_TITLE_BLOCK = 46;
+  var EXPORT_LEGEND_GAP = 46;
+  // Placements that split the page so the map never sits under the legend.
+  var EXPORT_LEGEND_DEDICATED = ['right', 'left', 'bottom'];
+  // Page corners: valid only where there is genuinely empty space beside shapes.
+  var EXPORT_LEGEND_OVERLAY = [
+    'top-right', 'bottom-right', 'top-left', 'bottom-left'
+  ];
+  // When no candidate is fully valid, the least-bad one is chosen by summed
+  // violation cost first: clipping the legend or destroying the map area are
+  // far worse than an over-wide column count or slightly tight text.
+  var EXPORT_LEGEND_VIOLATION_COST = {
+    'clipped': 1000000,
+    'invalid-map': 1000000,
+    'overlap': 100000,
+    'readability': 1000,
+    'columns': 100
+  };
+
+  function _exportCandidateViolationCost(candidate) {
+    return candidate.violations.reduce(function (total, violation) {
+      return total + (EXPORT_LEGEND_VIOLATION_COST[violation] || 1);
+    }, 0);
+  }
+
+  // Choose the least-bad candidate: lowest summed violation cost wins, and the
+  // normal score breaks ties. Deterministic given the fixed generation order.
+  function _pickLeastBadExportCandidate(pool) {
+    return pool.reduce(function (selected, candidate) {
+      if (!selected) return candidate;
+      if (candidate.violationCost < selected.violationCost) return candidate;
+      if (
+        candidate.violationCost === selected.violationCost
+        && candidate.score > selected.score
+      ) {
+        return candidate;
+      }
+      return selected;
+    }, null);
+  }
+
+  function _resolvedExportLegend(cfg) {
+    var resolved = cfg && cfg.exportLegend;
+    var defaults = _exportDefaults();
+    var fallbackWidth = defaults.legendMaxWidthFraction || 0.52;
+    if (!resolved) {
+      // Backward compatibility for any caller that still passes flat keys.
+      resolved = {
+        placement: cfg && cfg.exportLegendPlacement,
+        columns: cfg && cfg.exportLegendColumns,
+        maxWidthFraction: cfg && cfg.exportLegendWidth
+      };
     }
+    var placement = resolved.placement || 'auto';
+    var columns = resolved.columns == null ? 'auto' : resolved.columns;
+    var maxWidthFraction = Number(resolved.maxWidthFraction) || fallbackWidth;
     return {
-      legend: legend,
-      x: documentRight - legend.width,
-      y: exportHeight - margin - legend.height,
-      mapRight: mapRight
+      placement: placement,
+      columns: columns,
+      maxWidthFraction: maxWidthFraction
     };
+  }
+
+  function _exportLegendPlacementCandidates(placement) {
+    if (placement && placement !== 'auto') return [placement];
+    // Dedicated placements first: they never overlap and are preferred on ties.
+    return EXPORT_LEGEND_DEDICATED.concat(EXPORT_LEGEND_OVERLAY);
+  }
+
+  function _exportLegendColumnCandidates(columns) {
+    if (columns && columns !== 'auto') return [Number(columns)];
+    return [1, 2, 3, 4];
+  }
+
+  function _exportCandidateViolations(candidate) {
+    var violations = [];
+    var right = _exportWidth() - EXPORT_LEGEND_MARGIN;
+    var bottom = candidate.height - EXPORT_LEGEND_MARGIN;
+    var l = candidate.legend;
+    if (
+      l.x < EXPORT_LEGEND_MARGIN - 0.5
+      || l.y < EXPORT_LEGEND_MARGIN - 0.5
+      || l.x + l.width > right + 0.5
+      || l.y + l.height > bottom + 0.5
+    ) {
+      violations.push('clipped');
+    }
+    if (candidate.mapWidth <= 0 || candidate.mapHeight <= 0) {
+      violations.push('invalid-map');
+    }
+    if (candidate.textWidth < candidate.minTextWidth) {
+      violations.push('readability');
+    }
+    if (candidate.columns > candidate.itemCount) {
+      violations.push('columns');
+    }
+    if (candidate.overlay && candidate.overlapsShapes) {
+      violations.push('overlap');
+    }
+    return violations;
+  }
+
+  function _scoreExportCandidate(candidate, preferredHeightMm) {
+    var pageArea = _exportWidth() * candidate.height;
+    var usedAreaRatio = pageArea > 0
+      ? (candidate.mapArea + candidate.legendArea) / pageArea
+      : 0;
+    return candidate.mapScale * 100000
+      - (candidate.heightMm - preferredHeightMm) * 120000
+      - candidate.wrappedLines * 4000
+      + usedAreaRatio * 500;
   }
 
   function _exportLayout(data, cfg) {
     // Ensure cfg._hasNoData is up to date before measuring the legend.
     _annotateFeatures(data, cfg);
-    var margin = 46;
-    var titleBlock = 46;
-    var gap = 46;
-    // Use the same logic as main rendering: country border for full maps, Bundesläender for regional maps
+    var margin = EXPORT_LEGEND_MARGIN;
+    var titleBlock = EXPORT_LEGEND_TITLE_BLOCK;
+    var gap = EXPORT_LEGEND_GAP;
+    var exportWidth = _exportWidth();
+    var preferredHeightMm = _exportDefaults().heightMm;
+    // Country border for full maps, subdivisions for regional maps.
     var fitData = _fitGeometry(data, cfg);
+    var resolved = _resolvedExportLegend(cfg);
+    var placements = _exportLegendPlacementCandidates(resolved.placement);
+    var columnOptions = _exportLegendColumnCandidates(resolved.columns);
+    var maxLegendWidth = Math.round(exportWidth * resolved.maxWidthFraction);
+    var minTextWidth = Math.max(40, Math.round(_exportLegendFontSize() * 2));
+    var order = 0;
     var candidates = [];
-    var preferredLegendSpec = cfg.exportLegendPlacement && {
-      placement: cfg.exportLegendPlacement,
-      width: cfg.exportLegendWidth || _exportDefaults().legendWidth,
-      columns: cfg.exportLegendColumns || _exportDefaults().legendColumns,
-      avoidMapOverlap: Boolean(cfg.exportLegendAvoidMapOverlap),
-      overlay: true
-    };
-    var legendSpecs = preferredLegendSpec ? [preferredLegendSpec] : [
-      { placement: 'right', width: 0.32, columns: 1 },
-      { placement: 'right', width: 0.40, columns: 1 },
-      { placement: 'left', width: 0.32, columns: 1 },
-      { placement: 'left', width: 0.40, columns: 1 },
-      { placement: 'bottom-right', width: 0.52, columns: 2, overlay: true },
-      { placement: 'bottom-left', width: 0.52, columns: 2, overlay: true },
-      { placement: 'top-right', width: 0.52, columns: 2, overlay: true },
-      { placement: 'top-left', width: 0.52, columns: 2, overlay: true },
-      {
-        placement: 'bottom',
-        width: 0.88,
-        columns: cfg.exportLegendBottomColumns || _exportDefaults().legendBottomColumns
+
+    // Within one layout pass cfg and the maximum width are constant, so a
+    // measured legend depends only on the column count. Memoising it avoids
+    // re-measuring the same legend for every page-height/placement combination.
+    var measureCache = {};
+    function measureLegend(columnCount) {
+      var key = maxLegendWidth + ':' + columnCount;
+      if (!(key in measureCache)) {
+        measureCache[key] = _measureExportLegend(cfg, maxLegendWidth, columnCount);
       }
-    ];
+      return measureCache[key];
+    }
+    // A projected-edge scan is a full d3.geoStream pass; cache it by the exact
+    // inputs that change the result (map extent and the vertical band).
+    var edgesCache = {};
+    function projectedEdgesInBand(extent, minY, maxY) {
+      var key = extent[0][0] + ',' + extent[0][1] + ','
+        + extent[1][0] + ',' + extent[1][1] + ':' + minY + ',' + maxY;
+      if (!(key in edgesCache)) {
+        edgesCache[key] = _projectedEdgesInBand(
+          data.catchments, fitData, extent, minY, maxY
+        );
+      }
+      return edgesCache[key];
+    }
+
     _exportHeightCandidatesMm().forEach(function (heightMm) {
       var exportHeight = Math.round(heightMm / 25.4 * _exportDefaults().dpi);
-      legendSpecs.forEach(function (spec) {
-        var maxLegendWidth = Math.round(_exportWidth() * spec.width);
-        var legend = _measureExportLegend(cfg, maxLegendWidth, spec.columns);
-        var x = margin;
-        var y = titleBlock;
-        var mapRight = -Infinity;
-        var mapExtent = [[margin, titleBlock], [_exportWidth() - margin, exportHeight - margin]];
-        if (spec.placement === 'right') {
-          x = _exportWidth() - margin - legend.width;
-          mapExtent = [[margin, titleBlock], [x - gap, exportHeight - margin]];
-        } else if (spec.placement === 'left') {
-          x = margin;
-          mapExtent = [[x + legend.width + gap, titleBlock], [_exportWidth() - margin, exportHeight - margin]];
-        } else if (spec.placement === 'bottom-right') {
-          if (spec.avoidMapOverlap) {
-            var fittedLegend = _fitBottomRightLegend(
-              cfg,
-              data.catchments,
-              fitData,
-              mapExtent,
-              maxLegendWidth,
-              spec.columns,
-              exportHeight,
-              margin,
-              gap
-            );
-            legend = fittedLegend.legend;
-            x = fittedLegend.x;
-            y = fittedLegend.y;
-            mapRight = fittedLegend.mapRight;
-          } else {
-            x = _exportWidth() - margin - legend.width;
+      placements.forEach(function (placement) {
+        var overlay = EXPORT_LEGEND_OVERLAY.indexOf(placement) !== -1;
+        columnOptions.forEach(function (columnCount) {
+          var legend = measureLegend(columnCount);
+          var x = margin;
+          var y = titleBlock;
+          var mapExtent = [[margin, titleBlock], [exportWidth - margin, exportHeight - margin]];
+          if (placement === 'right') {
+            x = exportWidth - margin - legend.width;
+            mapExtent = [[margin, titleBlock], [x - gap, exportHeight - margin]];
+          } else if (placement === 'left') {
+            x = margin;
+            mapExtent = [[x + legend.width + gap, titleBlock], [exportWidth - margin, exportHeight - margin]];
+          } else if (placement === 'bottom') {
+            x = Math.round((exportWidth - legend.width) / 2);
             y = exportHeight - margin - legend.height;
+            mapExtent = [[margin, titleBlock], [exportWidth - margin, y - gap]];
+          } else if (placement === 'bottom-right') {
+            x = exportWidth - margin - legend.width;
+            y = exportHeight - margin - legend.height;
+          } else if (placement === 'bottom-left') {
+            x = margin;
+            y = exportHeight - margin - legend.height;
+          } else if (placement === 'top-right') {
+            x = exportWidth - margin - legend.width;
+            y = titleBlock;
+          } else if (placement === 'top-left') {
+            x = margin;
+            y = titleBlock;
           }
-        } else if (spec.placement === 'bottom-left') {
-          x = margin;
-          y = exportHeight - margin - legend.height;
-        } else if (spec.placement === 'top-right') {
-          x = _exportWidth() - margin - legend.width;
-          y = titleBlock;
-        } else if (spec.placement === 'top-left') {
-          x = margin;
-          y = titleBlock;
-        } else if (spec.placement === 'bottom') {
-          x = Math.round((_exportWidth() - legend.width) / 2);
-          y = exportHeight - margin - legend.height;
-          mapExtent = [[margin, titleBlock], [_exportWidth() - margin, y - gap]];
-        }
-        legend = Object.assign({}, legend, { x: x, y: y });
-        candidates.push({
-          name: spec.placement,
-          heightMm: heightMm,
-          height: exportHeight,
-          legend: legend,
-          mapExtent: mapExtent,
-          overlay: Boolean(spec.overlay),
-          avoidMapOverlap: Boolean(spec.avoidMapOverlap),
-          mapRight: mapRight
+          legend = Object.assign({}, legend, { x: x, y: y });
+
+          var mapWidth = mapExtent[1][0] - mapExtent[0][0];
+          var mapHeight = mapExtent[1][1] - mapExtent[0][1];
+          var invalidMap = mapWidth <= 0 || mapHeight <= 0;
+          var mapBounds = invalidMap
+            ? { x: 0, y: 0, width: 0, height: 0, scale: 0 }
+            : _mapBoundsForExtent(fitData, mapExtent);
+
+          // Overlay corners are only valid over genuinely empty space: the
+          // legend must clear the mapped geometry within its own vertical band.
+          var overlapsShapes = false;
+          if (overlay && !invalidMap) {
+            var edges = projectedEdgesInBand(mapExtent, y, y + legend.height);
+            var isRight = placement.indexOf('right') !== -1;
+            if (isRight) {
+              overlapsShapes = edges.right !== -Infinity
+                && x < edges.right + gap;
+            } else {
+              overlapsShapes = edges.left !== Infinity
+                && x + legend.width > edges.left - gap;
+            }
+          }
+
+          candidates.push({
+            order: order++,
+            name: placement,
+            overlay: overlay,
+            columns: columnCount,
+            heightMm: heightMm,
+            height: exportHeight,
+            legend: legend,
+            mapExtent: mapExtent,
+            mapWidth: mapWidth,
+            mapHeight: mapHeight,
+            mapScale: mapBounds.scale,
+            mapArea: mapBounds.width * mapBounds.height,
+            legendArea: legend.width * legend.height,
+            textWidth: legend.textWidth,
+            minTextWidth: minTextWidth,
+            itemCount: legend.itemCount,
+            wrappedLines: legend.wrappedLines,
+            overlapsShapes: overlapsShapes
+          });
         });
       });
     });
-    var best = candidates.reduce(function (selected, candidate) {
-      var legendOverflow = Math.max(0, margin - candidate.legend.y)
-        + Math.max(0, candidate.legend.y + candidate.legend.height - (candidate.height - margin))
-        + Math.max(0, margin - candidate.legend.x)
-        + Math.max(0, candidate.legend.x + candidate.legend.width - (_exportWidth() - margin));
-      var mapW = candidate.mapExtent[1][0] - candidate.mapExtent[0][0];
-      var mapH = candidate.mapExtent[1][1] - candidate.mapExtent[0][1];
-      var invalidMap = mapW <= 0 || mapH <= 0;
-      var mapBounds = invalidMap
-        ? { x: 0, y: 0, width: 0, height: 0, scale: 0 }
-        : _mapBoundsForExtent(fitData, candidate.mapExtent);
-      var legendRect = {
-        x: candidate.legend.x,
-        y: candidate.legend.y,
-        width: candidate.legend.width,
-        height: candidate.legend.height
-      };
-      var overlap = _rectIntersectionArea(mapBounds, legendRect);
-      var legendArea = candidate.legend.width * candidate.legend.height;
-      var shapeOverlap = candidate.avoidMapOverlap && candidate.mapRight !== -Infinity
-        && candidate.legend.x < candidate.mapRight + gap;
-      var scoredOverlap = candidate.avoidMapOverlap ? 0 : overlap;
-      var invalidOverlay = candidate.overlay && scoredOverlap > legendArea * 0.02;
-      var mapArea = mapBounds.width * mapBounds.height;
-      var usedArea = mapArea + legendArea - scoredOverlap;
-      candidate.score = mapBounds.scale * 100000 + usedArea / 1000
-        - (candidate.heightMm - _exportDefaults().heightMm) * 120000
-        - legendOverflow * 1000000
-        - scoredOverlap * 1000
-        - (invalidOverlay ? 1000000000 : 0)
-        - (shapeOverlap ? 1000000000 : 0)
-        - (invalidMap ? 1000000000 : 0);
-      if (!selected || candidate.score > selected.score) return candidate;
-      return selected;
-    }, null);
+
+    candidates.forEach(function (candidate) {
+      candidate.violations = _exportCandidateViolations(candidate);
+      candidate.valid = candidate.violations.length === 0;
+      candidate.violationCost = _exportCandidateViolationCost(candidate);
+      candidate.score = _scoreExportCandidate(candidate, preferredHeightMm);
+    });
+
+    function pickBest(pool) {
+      return pool.reduce(function (selected, candidate) {
+        // Strict ``>`` keeps the first candidate on ties, so selection is
+        // deterministic given the fixed generation order.
+        if (!selected || candidate.score > selected.score) return candidate;
+        return selected;
+      }, null);
+    }
+
+    var valid = candidates.filter(function (c) { return c.valid; });
+    var warning = null;
+    var best = pickBest(valid);
+    if (!best) {
+      // No layout satisfies the constraints; surface an actionable warning
+      // instead of silently ignoring a setting, but still render the least-bad
+      // option so the export is inspectable. Rank by summed violation severity
+      // first (clipping/invalid map dominate), then by the normal score.
+      best = _pickLeastBadExportCandidate(candidates);
+      warning = 'No export legend layout satisfies the configured constraints'
+        + ' (' + (best ? best.violations.join(', ') : 'none') + ').'
+        + ' Adjust placement, columns or maximum width.';
+    }
+
     return {
       exportMode: true,
-      width: _exportWidth(),
+      width: exportWidth,
       height: best.height,
       widthMm: _exportDefaults().widthMm,
       heightMm: best.heightMm,
@@ -1511,7 +1646,10 @@ var WasteAtlasChoropleth = (function () {
       subtitleY: 82,
       titleFontSize: 38,
       subtitleFontSize: 22,
-      legend: best.legend
+      legend: best.legend,
+      legendPlacement: best.name,
+      legendColumns: best.columns,
+      warning: warning
     };
   }
 
@@ -2875,6 +3013,9 @@ var WasteAtlasChoropleth = (function () {
     var node = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     var layout = _exportLayout(_lastData, _lastLoadCfg);
     node.__wasteAtlasExportLayout = layout;
+    if (layout.warning && typeof console !== 'undefined' && console.warn) {
+      console.warn('Waste Atlas export: ' + layout.warning);
+    }
     _render(_lastData, _lastLoadCfg, {
       layout: layout,
       svgSelection: d3.select(node)
@@ -3365,6 +3506,18 @@ var WasteAtlasChoropleth = (function () {
     exportPNG: exportPNG,
     exportElementSVG: exportElementSVG,
     exportElementPNG: exportElementPNG,
-    transforms: transforms
+    transforms: transforms,
+    // Pure helpers for the export legend layout engine, exposed for tests and
+    // for a future export preview that must share this exact layout path.
+    layout: {
+      resolveExportLegend: _resolvedExportLegend,
+      placementCandidates: _exportLegendPlacementCandidates,
+      columnCandidates: _exportLegendColumnCandidates,
+      candidateViolations: _exportCandidateViolations,
+      candidateViolationCost: _exportCandidateViolationCost,
+      pickLeastBad: _pickLeastBadExportCandidate,
+      scoreCandidate: _scoreExportCandidate,
+      exportLayout: _exportLayout
+    }
   };
 })();

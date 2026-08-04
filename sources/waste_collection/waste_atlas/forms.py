@@ -2,18 +2,33 @@ from copy import deepcopy
 
 from django import forms
 
+from .legend import (
+    AUTO,
+    EXPORT_LEGEND_OVERRIDE_KEYS,
+    LEGACY_EXPORT_LEGEND_KEYS,
+    normalize_columns,
+    normalize_placement,
+    normalize_width_fraction,
+)
 from .models import LEGEND_PLACEMENTS, WasteAtlasRenderingSettings
 
 LEGEND_PLACEMENT_CHOICES = LEGEND_PLACEMENTS
 EXPORT_LEGEND_PLACEMENT_CHOICES = (
-    ("", "Automatic"),
-    ("right", "Right"),
-    ("left", "Left"),
-    ("bottom", "Bottom"),
-    ("bottom-right", "Bottom right"),
-    ("bottom-left", "Bottom left"),
-    ("top-right", "Top right"),
-    ("top-left", "Top left"),
+    (AUTO, "Automatic"),
+    ("right", "Right of map"),
+    ("left", "Left of map"),
+    ("bottom", "Below map"),
+    ("bottom-right", "Page corner: bottom right"),
+    ("bottom-left", "Page corner: bottom left"),
+    ("top-right", "Page corner: top right"),
+    ("top-left", "Page corner: top left"),
+)
+EXPORT_LEGEND_COLUMN_CHOICES = (
+    (AUTO, "Automatic"),
+    ("1", "1"),
+    ("2", "2"),
+    ("3", "3"),
+    ("4", "4"),
 )
 
 
@@ -46,33 +61,44 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         max_value=24,
         widget=forms.NumberInput(attrs={"class": "form-control"}),
     )
+    export_legend_customize = forms.BooleanField(
+        label="Customize the export legend for this map",
+        required=False,
+        help_text=(
+            "When off, every export of this map uses the atlas defaults. "
+            "Turn it on to set placement, columns and maximum width."
+        ),
+        widget=forms.CheckboxInput(
+            attrs={
+                "class": "form-check-input",
+                "data-atlas-toggle": "export-legend-custom",
+            }
+        ),
+    )
     export_legend_placement = forms.ChoiceField(
         label="Placement",
         choices=EXPORT_LEGEND_PLACEMENT_CHOICES,
         required=False,
+        help_text="Automatic lets the layout engine choose the best position.",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    export_legend_columns = forms.ChoiceField(
+        label="Columns",
+        choices=EXPORT_LEGEND_COLUMN_CHOICES,
+        required=False,
+        help_text="Automatic chooses a suitable count; or pin an exact number.",
         widget=forms.Select(attrs={"class": "form-select"}),
     )
     export_legend_width = forms.IntegerField(
-        label="Maximum width (%)",
+        label="Maximum width (% of page)",
         min_value=20,
         max_value=90,
+        required=False,
+        help_text=(
+            "Hard upper bound. The legend is fitted to its content and may be "
+            "narrower."
+        ),
         widget=forms.NumberInput(attrs={"class": "form-control", "step": 1}),
-    )
-    export_legend_columns = forms.TypedChoiceField(
-        label="Columns",
-        choices=((1, "1"), (2, "2"), (3, "3"), (4, "4")),
-        coerce=int,
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
-    export_legend_fit_content = forms.BooleanField(
-        label="Fit width to content",
-        required=False,
-        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
-    )
-    export_legend_avoid_map_overlap = forms.BooleanField(
-        label="Avoid map overlap",
-        required=False,
-        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
     )
 
     def __init__(self, *args, instance, **kwargs):
@@ -99,35 +125,38 @@ class WasteAtlasMapConfigurationForm(forms.Form):
             "legend_font_size",
             self._configuration.get("legendFontSize", self._defaults.legend_font_size),
         )
+        has_custom_export_legend = any(
+            key in self._configuration for key in EXPORT_LEGEND_OVERRIDE_KEYS
+        )
+        initial.setdefault("export_legend_customize", has_custom_export_legend)
         initial.setdefault(
             "export_legend_placement",
-            self._configuration.get("exportLegendPlacement", ""),
+            normalize_placement(self._configuration.get("exportLegendPlacement"))
+            or AUTO,
         )
-        initial.setdefault(
-            "export_legend_width",
-            round(
-                self._configuration.get(
-                    "exportLegendWidth",
-                    self._defaults.export_legend_width_fraction,
-                )
-                * 100
-            ),
+        stored_columns = normalize_columns(
+            self._configuration.get("exportLegendColumns")
         )
         initial.setdefault(
             "export_legend_columns",
-            self._configuration.get(
-                "exportLegendColumns", self._defaults.export_legend_columns
-            ),
+            AUTO if stored_columns in (None, AUTO) else str(stored_columns),
         )
-        initial.setdefault(
-            "export_legend_fit_content",
-            self._configuration.get("exportLegendFitContent", False),
+        stored_width = normalize_width_fraction(
+            self._configuration.get("exportLegendWidth")
         )
-        initial.setdefault(
-            "export_legend_avoid_map_overlap",
-            self._configuration.get("exportLegendAvoidMapOverlap", False),
-        )
+        # Only pre-fill the width when an override is actually stored. Leaving
+        # the field blank when it inherits keeps inheritance durable: a blank
+        # reopen saves blank, so the map keeps tracking the atlas default rather
+        # than freezing the resolved value on the next save.
+        if stored_width is not None:
+            initial.setdefault("export_legend_width", round(stored_width * 100))
         super().__init__(*args, **kwargs)
+
+        # Surface the inherited atlas default as a placeholder (not a value) so a
+        # blank field still communicates the effective maximum width.
+        self.fields["export_legend_width"].widget.attrs.setdefault(
+            "placeholder", round(self._defaults.export_legend_width_fraction * 100)
+        )
 
         category_order = self._category_order()
         for index, category in enumerate(self._categories):
@@ -244,31 +273,30 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         else:
             configuration.pop("exportLegendTitle", None)
 
-        export_placement = self.cleaned_data["export_legend_placement"]
-        export_keys = (
-            "exportLegendPlacement",
-            "exportLegendWidth",
-            "exportLegendColumns",
-            "exportLegendFitContent",
-            "exportLegendAvoidMapOverlap",
-        )
-        if export_placement:
-            configuration["exportLegendPlacement"] = export_placement
-            configuration["exportLegendWidth"] = (
-                self.cleaned_data["export_legend_width"] / 100
+        # "Use atlas defaults" (customize off) removes the theme-level override
+        # rather than copying global values, so inheritance stays distinct from
+        # an explicit automatic value.
+        if self.cleaned_data.get("export_legend_customize"):
+            configuration["exportLegendPlacement"] = (
+                self.cleaned_data.get("export_legend_placement") or AUTO
             )
-            configuration["exportLegendColumns"] = self.cleaned_data[
-                "export_legend_columns"
-            ]
-            configuration["exportLegendFitContent"] = self.cleaned_data[
-                "export_legend_fit_content"
-            ]
-            configuration["exportLegendAvoidMapOverlap"] = self.cleaned_data[
-                "export_legend_avoid_map_overlap"
-            ]
+            columns = self.cleaned_data.get("export_legend_columns") or AUTO
+            configuration["exportLegendColumns"] = (
+                AUTO if columns == AUTO else int(columns)
+            )
+            width_percent = self.cleaned_data.get("export_legend_width")
+            if width_percent is None:
+                # A blank maximum width must keep inheriting from the atlas
+                # default rather than freezing the current value.
+                configuration.pop("exportLegendWidth", None)
+            else:
+                configuration["exportLegendWidth"] = width_percent / 100
         else:
-            for key in export_keys:
+            for key in EXPORT_LEGEND_OVERRIDE_KEYS:
                 configuration.pop(key, None)
+        # Retired options must never linger with a misleading effect.
+        for key in LEGACY_EXPORT_LEGEND_KEYS:
+            configuration.pop(key, None)
 
         categories = configuration.get("categories", [])
         for index, category in enumerate(categories):
