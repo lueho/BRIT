@@ -151,6 +151,32 @@ test("scoring prefers the preferred page height", () => {
   assert.ok(preferred > taller);
 });
 
+function scoredCandidate(violations, score) {
+  return { violations, violationCost: layout.candidateViolationCost({ violations }), score };
+}
+
+test("violation cost sums per-violation weights", () => {
+  assert.equal(layout.candidateViolationCost({ violations: [] }), 0);
+  assert.equal(layout.candidateViolationCost({ violations: ["columns"] }), 100);
+  assert.equal(
+    layout.candidateViolationCost({ violations: ["clipped", "columns"] }),
+    1000100,
+  );
+});
+
+test("least-bad prefers a columns-only violation over a clipped legend", () => {
+  const clipped = scoredCandidate(["clipped"], 9e9);
+  const columnsOnly = scoredCandidate(["columns"], -9e9);
+  // Despite its far higher score, the clipped candidate must lose.
+  assert.strictEqual(layout.pickLeastBad([clipped, columnsOnly]), columnsOnly);
+});
+
+test("least-bad breaks equal-cost ties by score", () => {
+  const worse = scoredCandidate(["columns"], 10);
+  const better = scoredCandidate(["columns"], 50);
+  assert.strictEqual(layout.pickLeastBad([worse, better]), better);
+});
+
 test("scoring prefers a larger map and penalises label wrapping", () => {
   const bigMap = layout.scoreCandidate(validCandidate({ mapScale: 1200 }), 110);
   const smallMap = layout.scoreCandidate(validCandidate({ mapScale: 900 }), 110);

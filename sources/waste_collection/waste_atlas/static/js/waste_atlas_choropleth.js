@@ -1296,6 +1296,38 @@ var WasteAtlasChoropleth = (function () {
   var EXPORT_LEGEND_OVERLAY = [
     'top-right', 'bottom-right', 'top-left', 'bottom-left'
   ];
+  // When no candidate is fully valid, the least-bad one is chosen by summed
+  // violation cost first: clipping the legend or destroying the map area are
+  // far worse than an over-wide column count or slightly tight text.
+  var EXPORT_LEGEND_VIOLATION_COST = {
+    'clipped': 1000000,
+    'invalid-map': 1000000,
+    'overlap': 100000,
+    'readability': 1000,
+    'columns': 100
+  };
+
+  function _exportCandidateViolationCost(candidate) {
+    return candidate.violations.reduce(function (total, violation) {
+      return total + (EXPORT_LEGEND_VIOLATION_COST[violation] || 1);
+    }, 0);
+  }
+
+  // Choose the least-bad candidate: lowest summed violation cost wins, and the
+  // normal score breaks ties. Deterministic given the fixed generation order.
+  function _pickLeastBadExportCandidate(pool) {
+    return pool.reduce(function (selected, candidate) {
+      if (!selected) return candidate;
+      if (candidate.violationCost < selected.violationCost) return candidate;
+      if (
+        candidate.violationCost === selected.violationCost
+        && candidate.score > selected.score
+      ) {
+        return candidate;
+      }
+      return selected;
+    }, null);
+  }
 
   function _resolvedExportLegend(cfg) {
     var resolved = cfg && cfg.exportLegend;
@@ -1387,12 +1419,37 @@ var WasteAtlasChoropleth = (function () {
     var order = 0;
     var candidates = [];
 
+    // Within one layout pass cfg and the maximum width are constant, so a
+    // measured legend depends only on the column count. Memoising it avoids
+    // re-measuring the same legend for every page-height/placement combination.
+    var measureCache = {};
+    function measureLegend(columnCount) {
+      var key = maxLegendWidth + ':' + columnCount;
+      if (!(key in measureCache)) {
+        measureCache[key] = _measureExportLegend(cfg, maxLegendWidth, columnCount);
+      }
+      return measureCache[key];
+    }
+    // A projected-edge scan is a full d3.geoStream pass; cache it by the exact
+    // inputs that change the result (map extent and the vertical band).
+    var edgesCache = {};
+    function projectedEdgesInBand(extent, minY, maxY) {
+      var key = extent[0][0] + ',' + extent[0][1] + ','
+        + extent[1][0] + ',' + extent[1][1] + ':' + minY + ',' + maxY;
+      if (!(key in edgesCache)) {
+        edgesCache[key] = _projectedEdgesInBand(
+          data.catchments, fitData, extent, minY, maxY
+        );
+      }
+      return edgesCache[key];
+    }
+
     _exportHeightCandidatesMm().forEach(function (heightMm) {
       var exportHeight = Math.round(heightMm / 25.4 * _exportDefaults().dpi);
       placements.forEach(function (placement) {
         var overlay = EXPORT_LEGEND_OVERLAY.indexOf(placement) !== -1;
         columnOptions.forEach(function (columnCount) {
-          var legend = _measureExportLegend(cfg, maxLegendWidth, columnCount);
+          var legend = measureLegend(columnCount);
           var x = margin;
           var y = titleBlock;
           var mapExtent = [[margin, titleBlock], [exportWidth - margin, exportHeight - margin]];
@@ -1432,9 +1489,7 @@ var WasteAtlasChoropleth = (function () {
           // legend must clear the mapped geometry within its own vertical band.
           var overlapsShapes = false;
           if (overlay && !invalidMap) {
-            var edges = _projectedEdgesInBand(
-              data.catchments, fitData, mapExtent, y, y + legend.height
-            );
+            var edges = projectedEdgesInBand(mapExtent, y, y + legend.height);
             var isRight = placement.indexOf('right') !== -1;
             if (isRight) {
               overlapsShapes = edges.right !== -Infinity
@@ -1472,6 +1527,7 @@ var WasteAtlasChoropleth = (function () {
     candidates.forEach(function (candidate) {
       candidate.violations = _exportCandidateViolations(candidate);
       candidate.valid = candidate.violations.length === 0;
+      candidate.violationCost = _exportCandidateViolationCost(candidate);
       candidate.score = _scoreExportCandidate(candidate, preferredHeightMm);
     });
 
@@ -1490,8 +1546,9 @@ var WasteAtlasChoropleth = (function () {
     if (!best) {
       // No layout satisfies the constraints; surface an actionable warning
       // instead of silently ignoring a setting, but still render the least-bad
-      // option so the export is inspectable.
-      best = pickBest(candidates);
+      // option so the export is inspectable. Rank by summed violation severity
+      // first (clipping/invalid map dominate), then by the normal score.
+      best = _pickLeastBadExportCandidate(candidates);
       warning = 'No export legend layout satisfies the configured constraints'
         + ' (' + (best ? best.violations.join(', ') : 'none') + ').'
         + ' Adjust placement, columns or maximum width.';
@@ -3372,6 +3429,8 @@ var WasteAtlasChoropleth = (function () {
       placementCandidates: _exportLegendPlacementCandidates,
       columnCandidates: _exportLegendColumnCandidates,
       candidateViolations: _exportCandidateViolations,
+      candidateViolationCost: _exportCandidateViolationCost,
+      pickLeastBad: _pickLeastBadExportCandidate,
       scoreCandidate: _scoreExportCandidate,
       exportLayout: _exportLayout
     }

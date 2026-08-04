@@ -277,10 +277,11 @@ class WasteAtlasMapConfigurationForm(forms.Form):
             )
             width_percent = self.cleaned_data.get("export_legend_width")
             if width_percent is None:
-                width_fraction = self._defaults.export_legend_width_fraction
+                # A blank maximum width must keep inheriting from the atlas
+                # default rather than freezing the current value.
+                configuration.pop("exportLegendWidth", None)
             else:
-                width_fraction = width_percent / 100
-            configuration["exportLegendWidth"] = width_fraction
+                configuration["exportLegendWidth"] = width_percent / 100
         else:
             for key in EXPORT_LEGEND_OVERRIDE_KEYS:
                 configuration.pop(key, None)
