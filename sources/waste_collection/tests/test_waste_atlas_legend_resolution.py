@@ -247,6 +247,27 @@ class ExportLegendFormSemanticsTests(TestCase):
         # A blank width must inherit rather than freeze the atlas default.
         self.assertNotIn("exportLegendWidth", configuration.configuration)
 
+        # Inheritance must be durable: reopening shows a blank width (the atlas
+        # default is only a placeholder), and saving again keeps it inherited
+        # instead of freezing the resolved value.
+        reopened = WasteAtlasMapConfigurationForm(instance=configuration)
+        self.assertIsNone(reopened.initial.get("export_legend_width"))
+
+        resave = WasteAtlasMapConfigurationForm(
+            data=self._base_data(
+                configuration,
+                export_legend_customize="on",
+                export_legend_placement="auto",
+                export_legend_columns="1",
+                **{"export_legend_width": ""},
+            ),
+            instance=configuration,
+        )
+        self.assertTrue(resave.is_valid(), resave.errors)
+        resave.save()
+        configuration.refresh_from_db()
+        self.assertNotIn("exportLegendWidth", configuration.configuration)
+
     def test_customize_toggle_initial_reflects_stored_override(self):
         configuration = self._configuration()
         inherit_form = WasteAtlasMapConfigurationForm(instance=configuration)

@@ -144,10 +144,19 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         stored_width = normalize_width_fraction(
             self._configuration.get("exportLegendWidth")
         )
-        if stored_width is None:
-            stored_width = self._defaults.export_legend_width_fraction
-        initial.setdefault("export_legend_width", round(stored_width * 100))
+        # Only pre-fill the width when an override is actually stored. Leaving
+        # the field blank when it inherits keeps inheritance durable: a blank
+        # reopen saves blank, so the map keeps tracking the atlas default rather
+        # than freezing the resolved value on the next save.
+        if stored_width is not None:
+            initial.setdefault("export_legend_width", round(stored_width * 100))
         super().__init__(*args, **kwargs)
+
+        # Surface the inherited atlas default as a placeholder (not a value) so a
+        # blank field still communicates the effective maximum width.
+        self.fields["export_legend_width"].widget.attrs.setdefault(
+            "placeholder", round(self._defaults.export_legend_width_fraction * 100)
+        )
 
         category_order = self._category_order()
         for index, category in enumerate(self._categories):
