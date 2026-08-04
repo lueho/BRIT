@@ -90,6 +90,39 @@ class WasteAtlasResponsiveMapScriptTests(TestCase):
     def test_zoom_is_reset_when_a_new_selection_is_loaded(self):
         self.assertIn("function _resetZoom(", self.script)
 
+    def test_exports_take_their_page_geometry_from_the_database_defaults(self):
+        """Page width and the height ladder come from the stored export defaults."""
+        self.assertIn("return _exportPx(_exportDefaults().widthMm);", self.script)
+        self.assertIn("var preferred = _exportDefaults().heightMm;", self.script)
+        self.assertIn("var maximum = _exportDefaults().maxHeightMm;", self.script)
+        self.assertIn(
+            "_exportHeightCandidatesMm().forEach(function (heightMm)",
+            self.script,
+        )
+
+    def test_amount_transforms_preserve_aggregated_value_metadata(self):
+        for transform_name in (
+            "biowasteCollectionAmount",
+            "residualCollectionAmount",
+        ):
+            with self.subTest(transform=transform_name):
+                transform_body = self.script.split(f"{transform_name}: function")[1]
+                transform_body = transform_body.split("    },", 1)[0]
+                self.assertIn("_has_acpv_overlay", transform_body)
+                self.assertIn("_acpv_group_key", transform_body)
+
+        waste_ratio_body = self.script.split("wasteRatio: function")[1]
+        waste_ratio_body = waste_ratio_body.split("    },", 1)[0]
+        self.assertIn("uses_aggregated_amount", waste_ratio_body)
+
+    def test_aggregated_overlay_uses_a_dark_neutral_hatching(self):
+        self.assertIn("var OVERLAY_PATTERN_COLOR = '#1f2937';", self.script)
+        pattern_body = self.script.split("function _defineOverlayPattern(cfg)")[1]
+        pattern_body = pattern_body.split("// ---- data fetching", 1)[0]
+        self.assertIn(".attr('stroke', OVERLAY_PATTERN_COLOR)", pattern_body)
+        self.assertIn(".attr('stroke-opacity', 0.9)", pattern_body)
+        self.assertNotIn(".attr('stroke', '#ffffff')", pattern_body)
+
     def test_exports_are_rendered_without_the_screen_zoom_transform(self):
         render_body = self.script.split("function _render(data, cfg, options)")[1]
         render_body = render_body.split("function _drawExportLegendItem")[0]

@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib.gis.geos import GEOSGeometry, Point
 from django.db.models import QuerySet
 from django.test import TestCase
@@ -383,6 +385,100 @@ class LauCatchmentParentSignalTestCase(TestCase):
         self.lau_catchment.refresh_from_db()
         descendants = list(self.nuts3_catchment.descendants(include_self=True))
         self.assertIn(self.lau_catchment, descendants)
+
+
+class CustomCatchmentParentMismatchSignalTestCase(TestCase):
+    """A warning is logged when a custom catchment has negligible spatial
+    overlap (< 1% of the smaller geometry's area) with its tree parent.
+
+    Custom catchments (e.g. waste-management associations) may legitimately
+    partially overlap their parent, but a sliver-level overlap means the
+    parent assignment is wrong.  The signal warns non-blocking so the save
+    still succeeds.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.parent_region = Region.objects.create(
+            name="Parent Region",
+            country="DE",
+            type="nuts",
+            borders=GeoPolygon.objects.create(
+                geom=GEOSGeometry(
+                    "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))", srid=4326
+                )
+            ),
+        )
+        cls.parent_catchment = Catchment.objects.create(
+            name="Parent NUTS",
+            type="nuts",
+            region=cls.parent_region,
+        )
+
+    def test_warning_logged_when_custom_catchment_has_negligible_overlap(self):
+        outside_region = Region.objects.create(
+            name="Outside Region",
+            country="DE",
+            type="custom",
+            borders=GeoPolygon.objects.create(
+                geom=GEOSGeometry(
+                    "MULTIPOLYGON(((2 2, 2 3, 3 3, 3 2, 2 2)))", srid=4326
+                )
+            ),
+        )
+        with self.assertLogs("maps.signals", level="WARNING") as cm:
+            Catchment.objects.create(
+                name="Outside Custom",
+                type="custom",
+                parent=self.parent_catchment,
+                region=outside_region,
+            )
+        self.assertIn("spatial overlap with", "\n".join(cm.output))
+
+    def test_no_warning_when_custom_catchment_substantially_overlaps_parent(self):
+        inside_region = Region.objects.create(
+            name="Inside Region",
+            country="DE",
+            type="custom",
+            borders=GeoPolygon.objects.create(
+                geom=GEOSGeometry(
+                    "MULTIPOLYGON(((0.1 0.1, 0.1 0.9, 0.9 0.9, 0.9 0.1, 0.1 0.1)))",
+                    srid=4326,
+                )
+            ),
+        )
+        with self.assertLogs("maps.signals", level="WARNING") as cm:
+            Catchment.objects.create(
+                name="Inside Custom",
+                type="custom",
+                parent=self.parent_catchment,
+                region=inside_region,
+            )
+            # assertLogs requires at least one log record; emit a dummy one
+            # so the assertion doesn't fail when no warning is produced.
+            logging.getLogger("maps.signals").warning("dummy")
+        self.assertNotIn("spatial overlap with", "\n".join(cm.output))
+
+    def test_no_warning_for_non_custom_catchment(self):
+        admin_region = Region.objects.create(
+            name="Admin Region",
+            country="DE",
+            type="administrative",
+            borders=GeoPolygon.objects.create(
+                geom=GEOSGeometry(
+                    "MULTIPOLYGON(((2 2, 2 3, 3 3, 3 2, 2 2)))", srid=4326
+                )
+            ),
+        )
+        with self.assertLogs("maps.signals", level="WARNING") as cm:
+            Catchment.objects.create(
+                name="Admin Child",
+                type="administrative",
+                parent=self.parent_catchment,
+                region=admin_region,
+            )
+            logging.getLogger("maps.signals").warning("dummy")
+        self.assertNotIn("spatial overlap with", "\n".join(cm.output))
 
 
 class NutsRegionTestCase(TestCase):

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static atlas_tags %}
 {% block title %}
   Waste Atlas — {{ map_title }}
 {% endblock title %}
@@ -8,6 +8,7 @@
   <link href="{% static 'css/waste_atlas.min.css' %}" rel="stylesheet">
 {% endblock style_sheets %}
 {% block content %}
+  {% atlas_render_defaults as atlas_defaults %}
   <div class="coverage-page">
     <h1>Waste Atlas — {{ map_title }}</h1>
     <p class="lead">
@@ -41,7 +42,7 @@
               id="btn-export-png"
               type="button"
               disabled>
-        <i class="fas fa-image"></i> Download PNG (Word-ready, 300 DPI)
+        <i class="fas fa-image"></i> Download PNG (Word-ready, {{ atlas_defaults.export.dpi }} DPI)
       </button>
     </div>
     <div class="card">
@@ -58,6 +59,7 @@
 {% block javascript %}
   {{ block.super }}
   <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  {% include "waste_atlas/includes/render_defaults.html" %}
   <script src="{% static 'js/waste_atlas_choropleth.min.js' %}?v=20260615-1"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -661,12 +663,12 @@
       });
       if (btnSVG) {
         btnSVG.addEventListener('click', function () {
-          WasteAtlasChoropleth.exportElementSVG(svgEl, 'waste_atlas_europe_biowaste_collection_amount.svg');
+          WasteAtlasChoropleth.exportElementSVG(svgEl, '{% atlas_export_file_base "" "europe_biowaste_collection_amount" %}.svg');
         });
       }
       if (btnPNG) {
         btnPNG.addEventListener('click', function () {
-          WasteAtlasChoropleth.exportElementPNG(svgEl, 'waste_atlas_europe_biowaste_collection_amount.png');
+          WasteAtlasChoropleth.exportElementPNG(svgEl, '{% atlas_export_file_base "" "europe_biowaste_collection_amount" %}.png');
         });
       }
     });

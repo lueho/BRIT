@@ -343,13 +343,21 @@ class CollectionsPerYearFilter(NullableRangeFilter):
     def apply_range(self, qs, value_slice: slice, include_nulls: bool):
         freqs = CollectionFrequency.objects.annotate(
             collection_count=Sum("collectioncountoptions__standard")
-        ).filter(
-            collection_count__gte=value_slice.start,
-            collection_count__lte=value_slice.stop,
         )
-        filtered = qs.filter(frequency__in=freqs)
+        filtered = qs.filter(
+            frequency__in=freqs.filter(
+                collection_count__gte=value_slice.start,
+                collection_count__lte=value_slice.stop,
+            )
+        )
         if include_nulls:
-            filtered = filtered | qs.filter(frequency__isnull=True)
+            # A frequency without collection count options yields no countable
+            # value, so those collections count as null just like collections
+            # without any frequency at all.
+            filtered = filtered | qs.filter(
+                Q(frequency__isnull=True)
+                | Q(frequency__in=freqs.filter(collection_count__isnull=True))
+            )
         return filtered
 
 

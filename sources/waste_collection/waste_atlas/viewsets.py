@@ -39,7 +39,6 @@ from sources.waste_collection.models import (
 from utils.object_management.models import UserCreatedObject
 
 from .serializers import (
-    GEOMETRY_SIMPLIFY_TOLERANCE,
     CatchmentAccessControlSerializer,
     CatchmentBinConfigurationSerializer,
     CatchmentBiowasteImpuritySerializer,
@@ -69,9 +68,11 @@ from .serializers import (
     CatchmentParticipationPolicySerializer,
     CatchmentPopulationSerializer,
     CatchmentRequiredBinCapacitySerializer,
+    CatchmentResidualWasteCompositionSerializer,
     CatchmentTargetWasteCategorySerializer,
     CatchmentWasteRatioSerializer,
     CatchmentWeeklyBpAccessDaysSerializer,
+    geometry_simplify_tolerance,
 )
 
 _PUBLISHED = UserCreatedObject.STATUS_PUBLISHED
@@ -144,6 +145,10 @@ CONNECTION_RATE_PROPERTY_ID = 4
 COLLECTION_POINT_COUNT_PROPERTY_NAME = "number of collection points"
 BIOWASTE_IMPURITY_RATE_PROPERTY_NAME = "biowaste impurity rate"
 WEEKLY_BP_ACCESS_DAYS_PROPERTY_NAME = "weekly bring-point access days"
+BIOWASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME = "total biowaste in residual waste"
+FOOD_WASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME = "total food waste in residual waste"
+PERCENTAGE_UNIT_NAME = "%"
+SPECIFIC_AMOUNT_UNIT_NAME = "kg/(cap.*a)"
 
 # Priority for picking the primary collection system per catchment.
 # Lower number = higher priority.
@@ -460,6 +465,58 @@ def _latest_connection_rate_values(collection_ids):
     return latest_by_selected_id
 
 
+def _latest_property_values(
+    collection_ids,
+    *,
+    property_name,
+    unit_name,
+    year=None,
+    user=None,
+):
+    """Return the latest matching value from each selected collection's chain."""
+    version_chains = _collection_version_chains(collection_ids)
+    if not version_chains:
+        return {}
+
+    all_chain_ids = set().union(*version_chains.values())
+    filters = {
+        "collection_id__in": all_chain_ids,
+        "property__name": property_name,
+        "unit__name": unit_name,
+        "average__isnull": False,
+        "publication_status__in": _visible_statuses(user),
+    }
+    if year is not None:
+        filters["year"] = year
+
+    values_by_collection_id = {}
+    for row in CollectionPropertyValue.objects.filter(**filters).values(
+        "id",
+        "collection_id",
+        "average",
+        "year",
+    ):
+        values_by_collection_id.setdefault(row["collection_id"], []).append(row)
+
+    latest_by_selected_id = {}
+    for selected_id, chain_ids in version_chains.items():
+        candidates = [
+            candidate
+            for chain_id in chain_ids
+            for candidate in values_by_collection_id.get(chain_id, ())
+        ]
+        if candidates:
+            latest_by_selected_id[selected_id] = max(
+                candidates,
+                key=lambda candidate: (
+                    candidate["year"] is not None,
+                    candidate["year"] or 0,
+                    candidate["id"],
+                ),
+            )
+    return latest_by_selected_id
+
+
 def _catchment_orga_level_case(catchment_path="catchment__"):
     """Classify the administrative type of the catchment region on a queryset."""
     nuts_exists = Exists(
@@ -546,7 +603,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
         queryset = queryset.annotate(
             simplified_geom=SimplifyPreserveTopology(
                 F("region__borders__geom"),
-                GEOMETRY_SIMPLIFY_TOLERANCE,
+                geometry_simplify_tolerance(),
             )
         )
         queryset = self._with_atlas_collection(request, queryset)
@@ -623,7 +680,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
         queryset = queryset.annotate(
             simplified_geom=SimplifyPreserveTopology(
                 F("region__borders__geom"),
-                GEOMETRY_SIMPLIFY_TOLERANCE,
+                geometry_simplify_tolerance(),
             )
         )
         queryset = self._with_atlas_collection(request, queryset)
@@ -1838,7 +1895,7 @@ def _amounts_for_year(
             continue
         pop = region_pop.get(region_id)
         if pop and pop > 0:
-            result[cid] = convert_total_to_specific(total_mg, pop, ndigits=1)
+            result[cid] = float(convert_total_to_specific(total_mg, pop, ndigits=1))
             value_sources[cid] = "cpv"
     if include_metadata:
         return result, value_sources, acpv_group_keys
@@ -1849,11 +1906,13 @@ def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
     return _amounts_for_year(year, all_collection_ids, col_to_cid, catchment_ids)
 
 
-def _get_biowaste_acpv_outline_geojson(country, year, nuts_prefixes=(), user=None):
+def _get_acpv_outline_geojson(
+    country, year, waste_categories, nuts_prefixes=(), user=None
+):
     amount_rows = _get_collection_amount(
         country,
         year,
-        ["Biowaste", "Food waste"],
+        waste_categories,
         nuts_prefixes,
         include_value_source=True,
         include_acpv_group_key=True,
@@ -2081,7 +2140,9 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
                     continue
                 pop = region_pop.get(region_id)
                 if pop and pop > 0:
-                    amounts[cid] = convert_total_to_specific(total_mg, pop, ndigits=1)
+                    amounts[cid] = float(
+                        convert_total_to_specific(total_mg, pop, ndigits=1)
+                    )
 
     data = []
     for cid, row in best.items():
@@ -2113,10 +2174,30 @@ class ResidualCollectionAmountViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         data = _get_collection_amount(
-            country, year, ["Residual waste"], nuts_prefixes, user=request.user
+            country,
+            year,
+            ["Residual waste"],
+            nuts_prefixes,
+            include_value_source=True,
+            include_acpv_group_key=True,
+            user=request.user,
         )
         serializer = CatchmentCollectionAmountSerializer(data, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="acpv-outline-geojson")
+    def acpv_outline_geojson(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        return Response(
+            _get_acpv_outline_geojson(
+                country,
+                year,
+                ["Residual waste"],
+                nuts_prefixes,
+                user=request.user,
+            )
+        )
 
 
 class BiowasteCollectionAmountViewSet(WasteAtlasViewSet):
@@ -2150,8 +2231,12 @@ class BiowasteCollectionAmountViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         return Response(
-            _get_biowaste_acpv_outline_geojson(
-                country, year, nuts_prefixes, user=request.user
+            _get_acpv_outline_geojson(
+                country,
+                year,
+                ["Biowaste", "Food waste"],
+                nuts_prefixes,
+                user=request.user,
             )
         )
 
@@ -2551,30 +2636,34 @@ class WasteRatioViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         bio = {
-            r["catchment_id"]: r["amount"]
+            r["catchment_id"]: r
             for r in _get_collection_amount(
                 country,
                 year,
                 ["Biowaste", "Food waste"],
                 nuts_prefixes,
+                include_value_source=True,
                 user=request.user,
             )
         }
         res = {
-            r["catchment_id"]: r["amount"]
+            r["catchment_id"]: r
             for r in _get_collection_amount(
                 country,
                 year,
                 ["Residual waste"],
                 nuts_prefixes,
+                include_value_source=True,
                 user=request.user,
             )
         }
         all_ids = set(bio) | set(res)
         data = []
         for cid in all_ids:
-            b = bio.get(cid)
-            r = res.get(cid)
+            bio_row = bio.get(cid, {})
+            residual_row = res.get(cid, {})
+            b = bio_row.get("amount")
+            r = residual_row.get("amount")
             if b is not None and r is not None and (b + r) > 0:
                 ratio = b / (b + r)
             else:
@@ -2585,6 +2674,10 @@ class WasteRatioViewSet(WasteAtlasViewSet):
                     "bio_amount": b,
                     "residual_amount": r,
                     "ratio": ratio,
+                    "uses_aggregated_amount": (
+                        bio_row.get("value_source") == "acpv"
+                        or residual_row.get("value_source") == "acpv"
+                    ),
                 }
             )
         serializer = CatchmentWasteRatioSerializer(data, many=True)
@@ -3150,6 +3243,82 @@ class BiowasteImpurityViewSet(WasteAtlasViewSet):
             )
 
         serializer = CatchmentBiowasteImpuritySerializer(data, many=True)
+        return Response(serializer.data)
+
+
+class ResidualWasteCompositionViewSet(WasteAtlasViewSet):
+    """Return residual-waste composition analyses for atlas maps.
+
+    The selected collection is scoped by the requested atlas year. Percentage
+    values retain the analysis year stored on the property value, while the
+    amount fields use statistics from the requested year.
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        country, year = _parse_country_year(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+        best = _select_primary_collections(
+            country,
+            year,
+            ["Residual waste"],
+            nuts_prefixes,
+            user=request.user,
+        )
+        collection_ids = [row["collection_id"] for row in best.values()]
+
+        percentage_values = _latest_property_values(
+            collection_ids,
+            property_name=BIOWASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME,
+            unit_name=PERCENTAGE_UNIT_NAME,
+            user=request.user,
+        )
+        biowaste_amounts = _latest_property_values(
+            collection_ids,
+            property_name=BIOWASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME,
+            unit_name=SPECIFIC_AMOUNT_UNIT_NAME,
+            year=year,
+            user=request.user,
+        )
+        food_waste_amounts = _latest_property_values(
+            collection_ids,
+            property_name=FOOD_WASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME,
+            unit_name=SPECIFIC_AMOUNT_UNIT_NAME,
+            year=year,
+            user=request.user,
+        )
+
+        data = []
+        for catchment_id, collection_row in best.items():
+            collection_id = collection_row["collection_id"]
+            percentage = percentage_values.get(collection_id)
+            biowaste_amount = biowaste_amounts.get(collection_id)
+            food_waste_amount = food_waste_amounts.get(collection_id)
+            data.append(
+                {
+                    "catchment_id": catchment_id,
+                    "bw_rw_percentage": (
+                        percentage["average"] if percentage is not None else None
+                    ),
+                    "bw_rw_kg": (
+                        biowaste_amount["average"]
+                        if biowaste_amount is not None
+                        else None
+                    ),
+                    "fwtot_rw_kg": (
+                        food_waste_amount["average"]
+                        if food_waste_amount is not None
+                        else None
+                    ),
+                    "analysis_year": (
+                        percentage["year"] if percentage is not None else None
+                    ),
+                    "amount_basis_year": year,
+                }
+            )
+
+        serializer = CatchmentResidualWasteCompositionSerializer(data, many=True)
         return Response(serializer.data)
 
 

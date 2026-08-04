@@ -39,6 +39,12 @@ CUSTOM_PINT_DEFINITIONS = (
     ("percent", "percent = 0.01 * count = %"),
     ("permille", "permille = 0.001 * count = ‰"),
     ("dry_matter_basis", "dry_matter_basis = [] = DM"),
+    ("milliequivalent", "milliequivalent = 0.001 * mole = meq"),
+    ("meq_per_100g", "meq_per_100g = 0.01 * milliequivalent / gram = meq_100g"),
+    (
+        "count_per_1000mL",
+        "count_per_1000mL = 0.001 * count / milliliter = count_1000mL",
+    ),
 )
 
 

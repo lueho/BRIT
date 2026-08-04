@@ -314,6 +314,9 @@ class CollectionSeasonForm(SimpleForm):
         return cleaned_data
 
     def save(self):
+        if not self.cleaned_data:
+            return None
+
         self.instance, _ = CollectionSeason.objects.get_or_create(
             distribution=self.cleaned_data["distribution"],
             first_timestep=self.cleaned_data["first_timestep"],
@@ -341,6 +344,8 @@ class CollectionSeasonFormSet(M2MInlineFormSet):
         child_objects = super().save(commit=commit)
 
         for form in self.forms:
+            if not form.cleaned_data:
+                continue
             options = CollectionCountOptions.objects.get(
                 frequency=self.parent_object, season=form.instance
             )

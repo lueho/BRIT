@@ -373,7 +373,7 @@ class OwnershipSharingViewTests(TestCase):
             {"new_owner": self.new_owner.username, "next": f"{detail_url}?tab=info"},
         )
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, "/")
+        self.assertEqual(response.url, f"{Collection.private_list_url()}?scope=private")
 
     def test_manage_access_modal_dispatches_transfer_post(self):
         # django-bootstrap-modal-forms rewrites the form action to the modal
@@ -520,7 +520,19 @@ class OwnershipSharingViewTests(TestCase):
             {"new_owner": self.other.username},
         )
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, "/")
+        self.assertEqual(response.url, f"{Collection.private_list_url()}?scope=private")
+
+    def test_transfer_of_published_object_stays_on_detail(self):
+        self.collection.publication_status = UserCreatedObject.STATUS_PUBLISHED
+        self.collection.save()
+        self.client.force_login(self.staff)
+        detail_url = self.collection.get_absolute_url()
+        response = self.client.post(
+            self._url("transfer_ownership"),
+            {"new_owner": self.other.username, "next": detail_url},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, detail_url)
 
     def test_external_next_url_is_ignored(self):
         self.client.force_login(self.owner)

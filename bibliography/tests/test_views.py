@@ -440,6 +440,89 @@ class SourceReviewListRegressionTest(ViewWithPermissionsTestCase):
         )
 
 
+class AuthorReviewListRegressionTest(ViewWithPermissionsTestCase):
+    member_permissions = ["can_moderate_author"]
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.review_author = Author.objects.create(
+            owner=cls.outsider,
+            first_names="Review",
+            last_names="Author",
+            publication_status="review",
+        )
+
+    def test_review_list_is_reachable_for_moderator(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(reverse("author-list-review"), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.redirect_chain,
+            [(f"{reverse('author-list-review')}?scope=review", 302)],
+        )
+        self.assertContains(response, str(self.review_author))
+
+    def test_private_list_uses_dedicated_review_route_for_scope_toggle(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(reverse("author-list-owned"), {"scope": "private"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context["review_representation_url"],
+            reverse("author-list-review"),
+        )
+        self.assertContains(
+            response,
+            f'href="{reverse("author-list-review")}?scope=review"',
+            html=False,
+        )
+
+
+class LicenceReviewListRegressionTest(ViewWithPermissionsTestCase):
+    member_permissions = ["can_moderate_licence"]
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.review_licence = Licence.objects.create(
+            owner=cls.outsider,
+            name="Review Licence",
+            publication_status="review",
+        )
+
+    def test_review_list_is_reachable_for_moderator(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(reverse("licence-list-review"), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.redirect_chain,
+            [(f"{reverse('licence-list-review')}?scope=review", 302)],
+        )
+        self.assertContains(response, self.review_licence.name)
+
+    def test_private_list_uses_dedicated_review_route_for_scope_toggle(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(reverse("licence-list-owned"), {"scope": "private"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context["review_representation_url"],
+            reverse("licence-list-review"),
+        )
+        self.assertContains(
+            response,
+            f'href="{reverse("licence-list-review")}?scope=review"',
+            html=False,
+        )
+
+
 class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ["can_moderate_source"]
 

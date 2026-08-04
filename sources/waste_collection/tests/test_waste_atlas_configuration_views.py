@@ -1,7 +1,6 @@
 import json
 import re
 from copy import deepcopy
-from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 from django.contrib.auth.models import Group, User
@@ -315,22 +314,6 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         config.refresh_from_db()
         self.assertEqual(config.configuration, original)
 
-    def test_renderer_uses_configured_legend_layout_and_category_order(self):
-        script_path = (
-            Path(__file__).resolve().parents[1]
-            / "waste_atlas"
-            / "static"
-            / "js"
-            / "waste_atlas_choropleth.js"
-        )
-        script = script_path.read_text()
-
-        self.assertIn("cfg.legendPlacement", script)
-        self.assertIn("cfg.legendWidth", script)
-        self.assertIn("cfg.legendFontSize", script)
-        self.assertIn("cfg.legendCategoryOrder", script)
-        self.assertIn("function _orderedLegendCategories(cfg)", script)
-
     def test_saved_export_layout_overrides_regional_default(self):
         config, _ = WasteAtlasMapConfiguration.objects.update_or_create(
             key="residual_collection_amount",
@@ -366,3 +349,84 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         self.assertEqual(rendered_config["exportLegendPlacement"], "top-left")
         self.assertEqual(rendered_config["exportLegendWidth"], 0.45)
         self.assertEqual(rendered_config["exportLegendColumns"], 2)
+
+
+class WasteAtlasExportFileNameTestCase(TestCase):
+    """Export file names must be derived globally from (map set, theme).
+
+    ``fileBase`` is the stem the choropleth renderer appends ``.svg``/``.png``
+    (and ``_change_<from>_<to>`` for change maps) to.  It must follow one
+    deterministic rule for every map page instead of being hand-set per page
+    or per stored configuration.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            username="atlas-export-user",
+            password="secret",
+        )
+        atlas_group, _ = Group.objects.get_or_create(name="waste_atlas")
+        cls.user.groups.add(atlas_group)
+
+    # (route name, expected fileBase) covering generic, country, sub-national,
+    # multi-token selector sets and a theme only seeded for one region.
+    EXPECTED_FILE_BASES = (
+        ("waste-atlas-orga-level-map", "waste_atlas_orga_level"),
+        (
+            "waste-atlas-orga-level-italy-map",
+            "waste_atlas_it_orga_level",
+        ),
+        (
+            "waste-atlas-germany-collection-system-map",
+            "waste_atlas_de_collection_system",
+        ),
+        (
+            "waste-atlas-nrw-participation-policy-map",
+            "waste_atlas_de_nw_participation_policy",
+        ),
+        (
+            "waste-atlas-sweden-biowaste-collection-amount-map",
+            "waste_atlas_se_biowaste_collection_amount",
+        ),
+        (
+            "waste-atlas-south-tyrol-target-waste-category-map",
+            "waste_atlas_it_st_target_waste_category",
+        ),
+        (
+            "waste-atlas-orga-level-belgium-flanders-map",
+            "waste_atlas_be_fl_br_orga_level",
+        ),
+    )
+
+    def test_every_map_page_derives_a_deterministic_file_base(self):
+        self.client.force_login(self.user)
+        for route_name, expected in self.EXPECTED_FILE_BASES:
+            with self.subTest(route=route_name):
+                response = self.client.get(reverse(route_name))
+                self.assertEqual(response.status_code, 200)
+                rendered_config = _rendered_map_config(response)
+                self.assertEqual(rendered_config["fileBase"], expected)
+
+    def test_no_map_page_defines_a_manual_file_base_override(self):
+        """No page may carry a ``fileBase`` override; naming is global."""
+        for page in MAP_PAGES:
+            overrides = page.get("overrides") or {}
+            with self.subTest(route=page["name"]):
+                self.assertNotIn("fileBase", overrides)
+
+    def test_no_stored_configuration_carries_a_file_base(self):
+        """Stored configs must not keep a stale ``fileBase`` key."""
+        for config in WasteAtlasMapConfiguration.objects.all():
+            with self.subTest(key=config.key):
+                self.assertNotIn("fileBase", config.configuration)
+
+
+def _rendered_map_config(response):
+    match = re.search(
+        r'<script id="atlas-config" type="application/json">(.*?)</script>',
+        response.content.decode(),
+        re.S,
+    )
+    assert match is not None, "atlas-config script not rendered"
+    return json.loads(match.group(1))

@@ -23,6 +23,8 @@ THEME_LABELS = {
     "biowaste_impurity": "Biowaste impurity",
     "biowaste_min_bin_size": "Biowaste bin size",
     "biowaste_required_bin_capacity": "Biowaste bin capacity",
+    "bw_rw_kg": "Biowaste in residual waste (kg)",
+    "bw_rw_percentage": "Biowaste in residual waste (%)",
     "collection_count_ratio": "Collection-count ratio",
     "collection_orga_level": "Collections: admin. level",
     "collection_point_count": "Collection points",
@@ -36,6 +38,7 @@ THEME_LABELS = {
     "connection_rate": "Connection rate",
     "participation_policy": "Participation Policy",
     "food_waste_category": "Accepted food waste",
+    "fwtot_rw_kg": "Food waste in residual waste (kg)",
     "green_waste_collection_amount": "Green waste amount",
     "green_waste_collection_system_count": "Green waste system count",
     "min_bin_size_ratio": "Minimum bin-size ratio",
@@ -102,7 +105,11 @@ MAP_SET_REGION_SCOPES = _build_map_set_region_scopes()
 # query-string value and the tab pane id (``atlas-<id>``).
 OVERVIEW_REGION_GROUPS = (
     {"id": "europe", "label": "Europe", "map_sets": ()},
-    {"id": "germany", "label": "Germany", "map_sets": ("DE", "DE-BW-RP", "DE-NW")},
+    {
+        "id": "germany",
+        "label": "Germany",
+        "map_sets": ("DE", "DE-BW-RP", "DE-BW", "DE-RP", "DE-NW"),
+    },
     {"id": "catalonia", "label": "Catalonia", "map_sets": ("ES-CT",)},
     {
         "id": "italy-south-tyrol",
@@ -187,6 +194,9 @@ DIRECTORY_THEME_GROUP_SECTIONS = {
     "collection_count_ratio": "counts",
     "fee_system": "fees",
     "collection_amount": "amounts",
+    "bw_rw_percentage": "amounts",
+    "bw_rw_kg": "amounts",
+    "fwtot_rw_kg": "amounts",
     "waste_ratio": "amounts",
 }
 
@@ -227,6 +237,9 @@ MAP_SELECTION_THEME_ORDER = {
     "organic_collection_amount": 630,
     "waste_ratio": 640,
     "organic_waste_ratio": 650,
+    "bw_rw_percentage": 660,
+    "bw_rw_kg": 661,
+    "fwtot_rw_kg": 662,
     "connection_rate": 700,
     "participation_policy": 710,
 }
@@ -274,6 +287,9 @@ MAP_SELECTION_WASTE_CATEGORY_OVERRIDES = {
     "paper_bags": "biowaste",
     "plastic_bags": "biowaste",
     "collection_support": "biowaste",
+    "bw_rw_percentage": "residual",
+    "bw_rw_kg": "residual",
+    "fwtot_rw_kg": "residual",
 }
 
 # Themes whose displayed value is derived from one deterministic primary
@@ -282,6 +298,8 @@ MAP_SELECTION_WASTE_CATEGORY_OVERRIDES = {
 COLLECTION_DETAIL_CATEGORY_BY_THEME = {
     "access_control": "biowaste",
     "bin_configuration": "biowaste",
+    "bw_rw_percentage": "residual",
+    "bw_rw_kg": "residual",
     "biowaste_collection_point_count": "biowaste",
     "biowaste_collection_system": "biowaste",
     "biowaste_fee_system": "biowaste",
@@ -291,6 +309,7 @@ COLLECTION_DETAIL_CATEGORY_BY_THEME = {
     "collection_support": "biowaste",
     "collection_system": "biowaste",
     "food_waste_category": "biowaste",
+    "fwtot_rw_kg": "residual",
     "paper_bags": "biowaste",
     "participation_policy": "biowaste",
     "plastic_bags": "biowaste",
@@ -327,32 +346,6 @@ def collection_detail_categories_for_theme(theme):
     return (single,) if single else ()
 
 
-TOPIC_COLOR_CLASSES = {
-    "orga_level": "atlas-topic-admin",
-    "collection_orga_level": "atlas-topic-admin",
-    "population_density": "atlas-topic-admin",
-    "collection_system": "atlas-topic-system",
-    "collection_system_count": "atlas-topic-system",
-    "connection_rate": "atlas-topic-system",
-    "participation_policy": "atlas-topic-coverage",
-    "food_waste_category": "atlas-topic-material",
-    "target_waste_category": "atlas-topic-material",
-    "paper_bags": "atlas-topic-material",
-    "plastic_bags": "atlas-topic-material",
-    "collection_support": "atlas-topic-material",
-    "min_bin_size": "atlas-topic-bin",
-    "required_bin_capacity": "atlas-topic-bin",
-    "frequency": "atlas-topic-schedule",
-    "collection_count": "atlas-topic-count",
-    "collection_count_ratio": "atlas-topic-count",
-    "collection_point_count": "atlas-topic-count",
-    "collection_point_count_ratio": "atlas-topic-count",
-    "fee_system": "atlas-topic-fee",
-    "collection_amount": "atlas-topic-amount-bio",
-    "waste_ratio": "atlas-topic-amount-ratio",
-}
-
-
 def _selection_waste_category(theme):
     if theme in MAP_SELECTION_WASTE_CATEGORY_OVERRIDES:
         return MAP_SELECTION_WASTE_CATEGORY_OVERRIDES[theme]
@@ -374,17 +367,6 @@ def _selection_theme_label(theme, theme_selection):
         return MAP_SELECTION_EXACT_THEME_LABELS[theme]
     theme_group = _selection_theme_group(theme)
     return MAP_SELECTION_THEME_LABELS.get(theme_group, theme_selection["label"])
-
-
-def _topic_color_class(theme):
-    theme_group = _selection_theme_group(theme)
-    if theme_group == "collection_amount":
-        waste_category = _selection_waste_category(theme)
-        if waste_category == "residual":
-            return "atlas-topic-amount-residual"
-        if waste_category == "organic":
-            return "atlas-topic-amount-organic"
-    return TOPIC_COLOR_CLASSES.get(theme_group, "atlas-topic-coverage")
 
 
 def _theme_sort_key(theme_item):
@@ -449,17 +431,6 @@ def _add_generic_theme_fallbacks(themes_by_map_set, reverse_func):
         selected_themes.sort(key=_theme_context_sort_key)
 
 
-def _related_map_entry(page, reverse_func, label=None):
-    theme = page["theme"]
-    map_set = page["selector_set"]
-    return {
-        "label": label or _selection_theme_label(theme, {"label": THEME_LABELS[theme]}),
-        "url": reverse_func(page["name"]),
-        "topic_color_class": _topic_color_class(theme),
-        "region_label": MAP_SET_LABELS.get(map_set, ""),
-    }
-
-
 def _map_set_scope_params(map_set):
     scope = MAP_SET_REGION_SCOPES.get(map_set)
     if not scope:
@@ -490,65 +461,6 @@ def resolve_map_set(country, nuts_prefix="", nuts_level=""):
         ):
             return map_set
     return country
-
-
-def build_related_maps_context(selected_map_set, selected_theme, reverse_func):
-    seen_map_sets = set()
-    same_theme_other_regions = []
-    for page in MAP_PAGES:
-        map_set = page["selector_set"]
-        if (
-            map_set is None
-            or map_set == selected_map_set
-            or page["theme"] != selected_theme
-            or map_set in seen_map_sets
-        ):
-            continue
-        same_theme_other_regions.append(
-            _related_map_entry(
-                page,
-                reverse_func,
-                label=MAP_SET_LABELS[map_set],
-            )
-        )
-        seen_map_sets.add(map_set)
-
-    selection_context = build_map_selection_context(
-        reverse_func,
-        selected_map_set=selected_map_set,
-        selected_theme=selected_theme,
-    )
-    selected_waste_category = _selection_waste_category(selected_theme)
-    selected_theme_group = _selection_theme_group(selected_theme)
-    seen_themes = {selected_theme}
-    same_region_same_category = []
-    for theme in selection_context["map_selection_themes_by_map_set"].get(
-        selected_map_set, []
-    ):
-        theme_value = theme["value"]
-        if theme_value in seen_themes or (
-            theme["waste_category"] != selected_waste_category
-            and theme["theme_group"] != selected_theme_group
-        ):
-            continue
-        same_region_same_category.append(
-            {
-                "label": THEME_LABELS.get(theme_value, theme["label"]),
-                "url": (
-                    _url_with_map_set_scope(theme["url"], selected_map_set)
-                    if not theme["change_url"]
-                    else theme["url"]
-                ),
-                "topic_color_class": _topic_color_class(theme_value),
-                "region_label": MAP_SET_LABELS.get(selected_map_set, ""),
-            }
-        )
-        seen_themes.add(theme_value)
-
-    return {
-        "same_theme_other_regions": same_theme_other_regions,
-        "same_region_same_category": same_region_same_category,
-    }
 
 
 def build_map_selection_context(

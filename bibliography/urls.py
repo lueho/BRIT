@@ -12,6 +12,7 @@ from .views import (
     AuthorPrivateListView,
     AuthorPublishedListView,
     AuthorQuickCreateView,
+    AuthorReviewListView,
     AuthorUpdateView,
     BibliographyExplorerView,
     LicenceAutocompleteView,
@@ -23,6 +24,7 @@ from .views import (
     LicenceModalUpdateView,
     LicencePrivateListView,
     LicencePublishedListView,
+    LicenceReviewListView,
     LicenceUpdateView,
     SourceAutocompleteView,
     SourceBibtexArticleImportView,
@@ -50,6 +52,11 @@ urlpatterns = [
     ),
     path("authors/", AuthorPublishedListView.as_view(), name="author-list"),
     path("authors/user/", AuthorPrivateListView.as_view(), name="author-list-owned"),
+    path(
+        "authors/review/",
+        AuthorReviewListView.as_view(),
+        name="author-list-review",
+    ),
     path("authors/create/", AuthorCreateView.as_view(), name="author-create"),
     path(
         "authors/create/modal/",
@@ -92,6 +99,11 @@ urlpatterns = [
         "licences/user/",
         LicencePrivateListView.as_view(),
         name="licence-list-owned",
+    ),
+    path(
+        "licences/review/",
+        LicenceReviewListView.as_view(),
+        name="licence-list-review",
     ),
     path("licences/create/", LicenceCreateView.as_view(), name="licence-create"),
     path(

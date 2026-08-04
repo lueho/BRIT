@@ -5,9 +5,16 @@ from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from sources.waste_collection.models import CollectionCatchment
 
-# Geometry simplification tolerance in degrees (approx 100m at equator)
-# Lower values = more detail, higher values = more simplification
-GEOMETRY_SIMPLIFY_TOLERANCE = 0.001
+from .models import WasteAtlasRenderingSettings
+
+
+def geometry_simplify_tolerance():
+    """Return the configured simplification tolerance in degrees.
+
+    Lower values keep more detail; the value is maintained in the Waste Atlas
+    rendering settings so it can be tuned without a deployment.
+    """
+    return WasteAtlasRenderingSettings.load().geometry_simplify_tolerance
 
 
 def _round_one_decimal(value):
@@ -282,6 +289,7 @@ class CatchmentWasteRatioSerializer(serializers.Serializer):
     bio_amount = serializers.FloatField(allow_null=True)
     residual_amount = serializers.FloatField(allow_null=True)
     ratio = serializers.FloatField(allow_null=True)
+    uses_aggregated_amount = serializers.BooleanField(default=False)
 
 
 class CatchmentOrganicRatioSerializer(serializers.Serializer):
@@ -334,6 +342,23 @@ class CatchmentBiowasteImpuritySerializer(serializers.Serializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["impurity_rate"] = _round_one_decimal(data.get("impurity_rate"))
+        return data
+
+
+class CatchmentResidualWasteCompositionSerializer(serializers.Serializer):
+    """Flat composition-analysis values for residual-waste catchments."""
+
+    catchment_id = serializers.IntegerField()
+    bw_rw_percentage = serializers.FloatField(allow_null=True)
+    bw_rw_kg = serializers.FloatField(allow_null=True)
+    fwtot_rw_kg = serializers.FloatField(allow_null=True)
+    analysis_year = serializers.IntegerField(allow_null=True)
+    amount_basis_year = serializers.IntegerField()
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        for field in ("bw_rw_percentage", "bw_rw_kg", "fwtot_rw_kg"):
+            data[field] = _round_one_decimal(data.get(field))
         return data
 
 

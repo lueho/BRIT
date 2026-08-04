@@ -16,7 +16,6 @@ from .map_selection import (
     build_conflict_maps_context,
     build_map_selection_context,
     build_overview_directory_context,
-    build_related_maps_context,
     collection_detail_categories_for_theme,
     resolve_map_set,
 )
@@ -244,6 +243,7 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
         region_label = MAP_SET_LABELS.get(selected_map_set, "")
         overview_href = reverse("waste-atlas-overview")
         ctx["atlas_map_set"] = selected_map_set
+        ctx["atlas_page_selector_set"] = page.get("selector_set")
         ctx["breadcrumb_module_label"] = "Waste Atlas"
         ctx["breadcrumb_module_url"] = overview_href
         if region_label:
@@ -275,7 +275,6 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
                 selected_theme=page["theme"],
             )
         )
-        ctx.update(build_related_maps_context(selected_map_set, page["theme"], reverse))
         selected_theme_option = next(
             (
                 theme
