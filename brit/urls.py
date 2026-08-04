@@ -43,6 +43,7 @@ urlpatterns = [
     path("distributions/", include("distributions.urls")),
     path("maps/", include("maps.urls")),
     path("population/", include("maps.population.urls")),
+    path("nuts/", include("maps.nuts_import.urls")),
     path("materials/", include("materials.urls")),
     path("processes/", include("processes.urls")),
     path("sources/", include("sources.urls")),

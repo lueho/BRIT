@@ -17,6 +17,7 @@ from .models import (
     GeoDataset,
     Location,
     NutsRegion,
+    NutsVintage,
     Region,
 )
 
@@ -57,9 +58,30 @@ class RegionFilterSet(UserCreatedObjectScopedFilterSet):
         )
 
 
+def _nuts_level_queryset(level):
+    """Regions of one level in the requested vintage, resolved per request.
+
+    A callable keeps the vintage lookup out of import time, follows the
+    ``version`` the visitor picked, and picks up a change of current vintage
+    without a restart.
+    """
+
+    def queryset(request):
+        vintage = NutsVintage.from_request(request)
+        return NutsRegion.objects.in_vintage(vintage).filter(levl_code=level)
+
+    return queryset
+
+
 class NutsRegionFilterSet(BaseCrispyFilterSet):
+    version = ChoiceFilter(
+        field_name="version__year",
+        label="NUTS vintage",
+        empty_label=None,
+    )
+
     level_0 = ModelChoiceFilter(
-        queryset=NutsRegion.objects.filter(levl_code=0),
+        queryset=_nuts_level_queryset(0),
         field_name="region_ptr",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -73,7 +95,7 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
     )
 
     level_1 = ModelChoiceFilter(
-        queryset=NutsRegion.objects.filter(levl_code=1),
+        queryset=_nuts_level_queryset(1),
         field_name="region_ptr",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -88,7 +110,7 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
     )
 
     level_2 = ModelChoiceFilter(
-        queryset=NutsRegion.objects.filter(levl_code=2),
+        queryset=_nuts_level_queryset(2),
         field_name="levl_code",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -103,7 +125,7 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
     )
 
     level_3 = ModelChoiceFilter(
-        queryset=NutsRegion.objects.filter(levl_code=3),
+        queryset=_nuts_level_queryset(3),
         field_name="levl_code",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -119,7 +141,30 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
 
     class Meta:
         model = NutsRegion
-        fields = ["level_0", "level_1", "level_2", "level_3"]
+        fields = ["version", "level_0", "level_1", "level_2", "level_3"]
+
+    def __init__(self, data=None, *args, **kwargs):
+        default = NutsVintage.default()
+        if default is not None and not (data or {}).get("version"):
+            # Binding the form is what scopes the queryset at all — a bare page
+            # load passes ``data=None`` — and without a value the bound select
+            # would show the newest vintage while the map draws the default one.
+            data = {} if data is None else data.copy()
+            data["version"] = str(default.year)
+        super().__init__(data, *args, **kwargs)
+        field = self.filters["version"].field
+        field.choices = [
+            (str(vintage.year), str(vintage))
+            for vintage in NutsVintage.objects.order_by("-year")
+        ]
+        field.initial = str(default.year) if default else None
+
+    def filter_queryset(self, queryset):
+        """Never draw more than one vintage, even with no vintage selected."""
+        queryset = super().filter_queryset(queryset)
+        if not self.form.cleaned_data.get("version"):
+            queryset = queryset.in_vintage()
+        return queryset
 
 
 class GeoDataSetFilterSet(UserCreatedObjectScopedFilterSet):
