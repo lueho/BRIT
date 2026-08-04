@@ -1,23 +1,28 @@
+import hashlib
 import re
 
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.db.models import MultiPolygonField, PointField
-from django.contrib.gis.geos import GEOSGeometry
-from django.core.exceptions import ObjectDoesNotExist
+from django.contrib.gis.geos import GEOSGeometry, MultiPolygon
+from django.contrib.postgres.constraints import ExclusionConstraint
+from django.contrib.postgres.fields import DateRangeField, RangeOperators
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models, transaction
-from django.db.models import Q
-from django.db.models.signals import post_delete, post_save, pre_save
+from django.db.models import F, Func, Q
+from django.db.models.signals import m2m_changed, post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django.urls import NoReverseMatch, reverse
+from django.utils import timezone
 from tree_queries.models import TreeNode
 from tree_queries.query import TreeQuerySet
 
 from bibliography.models import Source
 from utils.object_management.models import (
     NamedUserCreatedObject,
+    UserCreatedObjectManager,
     UserCreatedObjectQuerySet,
 )
 from utils.properties.models import (
@@ -590,6 +595,263 @@ class Catchment(NamedUserCreatedObject, TreeNode):
 
     def __str__(self):
         return self.name if self.name else self.region.__str__()
+
+    def revision_for_date(self, on_date, statuses=("published", "archived")):
+        """Return the immutable boundary snapshot effective on ``on_date``."""
+        return (
+            self.revisions.valid_on(on_date)
+            .filter(publication_status__in=statuses)
+            .order_by(F("effective_from").desc(nulls_last=True), "-pk")
+            .first()
+        )
+
+
+class CatchmentRevisionQuerySet(UserCreatedObjectQuerySet):
+    def valid_on(self, on_date):
+        """Return revisions effective on a date using half-open periods."""
+        return self.filter(
+            Q(effective_from__lte=on_date) | Q(effective_from__isnull=True),
+            Q(effective_to__gt=on_date) | Q(effective_to__isnull=True),
+        )
+
+
+class CatchmentRevisionManager(UserCreatedObjectManager):
+    def get_queryset(self):
+        return CatchmentRevisionQuerySet(self.model, using=self._db)
+
+    def valid_on(self, on_date):
+        return self.get_queryset().valid_on(on_date)
+
+    def create_from_members(self, *, catchment, members, **kwargs):
+        """Create a revision with a geometry snapshot dissolved from members."""
+        from maps.validation import validate_region_composition
+
+        members = list(members)
+        validate_region_composition(members)
+        geoms = [member.geom for member in members if member.geom is not None]
+        if not geoms:
+            raise ValidationError("At least one component must have geometry.")
+
+        geom = geoms[0].clone()
+        for member_geom in geoms[1:]:
+            geom = geom.union(member_geom)
+        geom.normalize()
+        if not isinstance(geom, MultiPolygon):
+            geom = MultiPolygon(geom, srid=geom.srid)
+
+        with transaction.atomic():
+            revision = self.create(catchment=catchment, geom=geom, **kwargs)
+            revision.members.set(members)
+        return revision
+
+
+class CatchmentRevision(NamedUserCreatedObject):
+    """Immutable, effective-dated geometry snapshot for a logical catchment."""
+
+    CHANGE_REASON_CHOICES = (
+        ("initial", "Initial snapshot"),
+        ("addition", "Territory added"),
+        ("removal", "Territory removed"),
+        ("transfer", "Territory transferred"),
+        ("split", "Catchment split"),
+        ("merge", "Catchments merged"),
+        ("administrative", "Administrative boundary revision"),
+        ("correction", "Data correction"),
+    )
+    IMMUTABLE_STATUSES = ("published", "archived")
+    IMMUTABLE_FIELDS = (
+        "catchment_id",
+        "effective_from",
+        "effective_to",
+        "geom",
+    )
+
+    catchment = models.ForeignKey(
+        Catchment, on_delete=models.PROTECT, related_name="revisions"
+    )
+    effective_from = models.DateField(blank=True, null=True)
+    effective_to = models.DateField(blank=True, null=True)
+    geom = MultiPolygonField(srid=4326)
+    geom_hash = models.CharField(max_length=64, editable=False)
+    members = models.ManyToManyField(
+        Region, blank=True, related_name="catchment_revisions"
+    )
+    predecessors = models.ManyToManyField(
+        "self", blank=True, symmetrical=False, related_name="successors"
+    )
+    change_reason = models.CharField(
+        max_length=20, choices=CHANGE_REASON_CHOICES, default="initial"
+    )
+    sources = models.ManyToManyField(Source, blank=True)
+
+    objects = CatchmentRevisionManager()
+
+    class Meta(NamedUserCreatedObject.Meta):
+        ordering = ["catchment_id", "effective_from", "id"]
+        indexes = [models.Index(fields=["catchment", "effective_from", "effective_to"])]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(effective_from__isnull=True)
+                    | Q(effective_to__isnull=True)
+                    | Q(effective_from__lt=F("effective_to"))
+                ),
+                name="catchment_revision_effective_period_valid",
+            ),
+            ExclusionConstraint(
+                name="catchment_revision_no_public_period_overlap",
+                expressions=[
+                    ("catchment", RangeOperators.EQUAL),
+                    (
+                        Func(
+                            F("effective_from"),
+                            F("effective_to"),
+                            function="DATERANGE",
+                            output_field=DateRangeField(),
+                        ),
+                        RangeOperators.OVERLAPS,
+                    ),
+                ],
+                condition=Q(publication_status__in=("published", "archived")),
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if (
+            self.effective_from
+            and self.effective_to
+            and self.effective_from >= self.effective_to
+        ):
+            errors["effective_to"] = "Effective to must be later than effective from."
+        if self.geom is None or self.geom.empty:
+            errors["geom"] = "A non-empty boundary geometry is required."
+        elif not self.geom.valid:
+            errors["geom"] = "Boundary geometry must be valid."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous = type(self).objects.filter(pk=self.pk).first()
+            if previous and previous.publication_status in self.IMMUTABLE_STATUSES:
+                changed = any(
+                    getattr(previous, field_name) != getattr(self, field_name)
+                    for field_name in self.IMMUTABLE_FIELDS
+                )
+                if changed:
+                    raise ValidationError(
+                        "Published catchment revisions are immutable; create a successor revision."
+                    )
+        if self.geom:
+            self.geom_hash = hashlib.sha256(bytes(self.geom.ewkb)).hexdigest()
+        super().save(*args, **kwargs)
+
+    def validate_components(self):
+        """Ensure recorded provenance composes exactly to the snapshot geometry."""
+        from maps.validation import validate_region_composition
+
+        members = list(self.members.all())
+        if not members:
+            return
+        validate_region_composition(members)
+        member_geoms = [member.geom for member in members if member.geom is not None]
+        if len(member_geoms) != len(members):
+            raise ValidationError("Every catchment revision member needs geometry.")
+        union = member_geoms[0].clone()
+        for member_geom in member_geoms[1:]:
+            union = union.union(member_geom)
+        if not self.geom.equals(union):
+            raise ValidationError(
+                "Catchment revision geometry must equal the union of its members."
+            )
+
+    def approve(self, user=None):
+        with transaction.atomic():
+            self.full_clean()
+            self.validate_components()
+            self._close_superseded_boundary()
+            self._validate_public_period_available()
+            return super().approve(user=user)
+
+    def _validate_public_period_available(self):
+        overlapping = (
+            type(self)
+            .objects.filter(
+                catchment_id=self.catchment_id,
+                publication_status__in=self.IMMUTABLE_STATUSES,
+            )
+            .exclude(pk=self.pk)
+        )
+        if self.effective_from is not None:
+            overlapping = overlapping.filter(
+                Q(effective_to__gt=self.effective_from) | Q(effective_to__isnull=True)
+            )
+        if self.effective_to is not None:
+            overlapping = overlapping.filter(
+                Q(effective_from__lt=self.effective_to) | Q(effective_from__isnull=True)
+            )
+        if overlapping.exists():
+            raise ValidationError(
+                "This catchment revision overlaps a published period. Link the "
+                "current revision as its predecessor or correct the effective dates."
+            )
+
+    def _close_superseded_boundary(self):
+        """End same-catchment predecessors immediately before publication.
+
+        Cross-catchment predecessors record lineage for transfers, splits, and
+        merges but do not imply that the source catchment ceases to exist.
+        """
+        predecessors = (
+            type(self)
+            .objects.select_for_update()
+            .filter(
+                successors=self,
+                catchment_id=self.catchment_id,
+                publication_status__in=self.IMMUTABLE_STATUSES,
+            )
+        )
+        if not predecessors.exists():
+            return
+        if self.effective_from is None:
+            raise ValidationError(
+                {"effective_from": "A successor revision needs an effective date."}
+            )
+
+        for predecessor in predecessors:
+            if (
+                predecessor.effective_from is not None
+                and predecessor.effective_from >= self.effective_from
+            ):
+                raise ValidationError(
+                    {
+                        "effective_from": (
+                            "A successor must start after its predecessor."
+                        )
+                    }
+                )
+            if (
+                predecessor.effective_to is not None
+                and predecessor.effective_to <= self.effective_from
+            ):
+                continue
+            type(self).objects.filter(pk=predecessor.pk).update(
+                effective_to=self.effective_from,
+                publication_status=self.STATUS_ARCHIVED,
+                lastmodified_at=timezone.now(),
+            )
+
+
+@receiver(m2m_changed, sender=CatchmentRevision.members.through)
+def protect_published_catchment_revision_members(sender, instance, action, **kwargs):
+    if action in {"pre_add", "pre_remove", "pre_clear"} and (
+        instance.pk and instance.publication_status in instance.IMMUTABLE_STATUSES
+    ):
+        raise ValidationError(
+            "Published catchment revisions are immutable; create a successor revision."
+        )
 
 
 @receiver(post_delete, sender=Catchment)

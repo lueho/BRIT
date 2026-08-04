@@ -1,6 +1,8 @@
 import json
+from datetime import date
 
 from django.conf import settings
+from django.contrib.gis.db.models import MultiPolygonField
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import (
     Case,
@@ -16,6 +18,7 @@ from django.db.models import (
     Value,
     When,
 )
+from django.db.models.functions import Coalesce
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -23,7 +26,13 @@ from rest_framework.throttling import ScopedRateThrottle
 
 from maps.db_functions import SimplifyPreserveTopology
 from maps.mixins import get_unbounded_geojson_rejection_response
-from maps.models import LauRegion, NutsRegion, RegionAttributeValue, RegionProperty
+from maps.models import (
+    CatchmentRevision,
+    LauRegion,
+    NutsRegion,
+    RegionAttributeValue,
+    RegionProperty,
+)
 from maps.population.services import population_values_by_region
 from sources.waste_collection.derived_values import (
     convert_total_to_specific,
@@ -326,6 +335,219 @@ def _build_feature_collection(features):
     return {"type": "FeatureCollection", "features": features}
 
 
+def _atlas_reference_date(year):
+    """Boundary snapshot date used by annual Waste Atlas maps."""
+    return date(year, 12, 31)
+
+
+def _with_catchment_revision(queryset, year, user=None):
+    """Annotate catchments with the immutable boundary effective for an atlas year.
+
+    The legacy Region geometry remains a compatibility fallback for catchments
+    created before a revision has been saved. Migrated databases have an initial
+    unbounded revision for every georeferenced catchment.
+    """
+    revisions = (
+        CatchmentRevision.objects.valid_on(_atlas_reference_date(year))
+        .filter(
+            catchment_id=OuterRef("pk"),
+            publication_status__in=_visible_statuses(user),
+        )
+        .order_by(F("effective_from").desc(nulls_last=True), "-pk")
+    )
+    return queryset.annotate(
+        catchment_revision_id=Subquery(revisions.values("pk")[:1]),
+        atlas_geom=Coalesce(
+            Subquery(
+                revisions.values("geom")[:1],
+                output_field=MultiPolygonField(srid=4326),
+            ),
+            F("region__borders__geom"),
+            output_field=MultiPolygonField(srid=4326),
+        ),
+    )
+
+
+def _parse_change_years(request):
+    try:
+        from_year = int(request.query_params.get("from_year", 2023))
+        to_year = int(request.query_params.get("to_year", 2024))
+    except (TypeError, ValueError):
+        from_year, to_year = 2023, 2024
+    return from_year, to_year
+
+
+def _revision_snapshots(catchment_ids, year, user=None):
+    """Return one visible geometry snapshot per catchment for an atlas year."""
+    catchment_ids = set(catchment_ids)
+    revisions = (
+        CatchmentRevision.objects.valid_on(_atlas_reference_date(year))
+        .filter(
+            catchment_id__in=catchment_ids,
+            publication_status__in=_visible_statuses(user),
+        )
+        .select_related("catchment")
+        .order_by("catchment_id", F("effective_from").desc(nulls_last=True), "-pk")
+    )
+    snapshots = {}
+    for revision in revisions:
+        snapshots.setdefault(
+            revision.catchment_id,
+            {
+                "revision_id": revision.pk,
+                "catchment_name": revision.catchment.name,
+                "geom": revision.geom,
+            },
+        )
+
+    missing_ids = catchment_ids - snapshots.keys()
+    if missing_ids:
+        for catchment in CollectionCatchment.objects.filter(
+            pk__in=missing_ids, region__borders__geom__isnull=False
+        ).select_related("region__borders"):
+            snapshots[catchment.pk] = {
+                "revision_id": None,
+                "catchment_name": catchment.name,
+                "geom": catchment.region.borders.geom,
+            }
+    return snapshots
+
+
+def _union_geometries(snapshots):
+    union = None
+    for snapshot in snapshots.values():
+        geom = snapshot["geom"]
+        union = geom.clone() if union is None else union.union(geom)
+    return union
+
+
+def _append_change_feature(
+    features,
+    geom,
+    spatial_change,
+    *,
+    from_catchment_id=None,
+    from_catchment_name=None,
+    from_revision_id=None,
+    to_catchment_id=None,
+    to_catchment_name=None,
+    to_revision_id=None,
+):
+    if geom is None or geom.empty or geom.area <= 0:
+        return
+    area = geom.area
+    simplified = geom.simplify(geometry_simplify_tolerance(), preserve_topology=True)
+    feature_id = f"change-{len(features) + 1}"
+    if from_catchment_name and to_catchment_name:
+        catchment_name = (
+            from_catchment_name
+            if from_catchment_name == to_catchment_name
+            else f"{from_catchment_name} → {to_catchment_name}"
+        )
+    else:
+        catchment_name = to_catchment_name or from_catchment_name
+    features.append(
+        {
+            "type": "Feature",
+            "properties": {
+                "catchment_id": feature_id,
+                "change_feature_id": feature_id,
+                "catchment_name": catchment_name,
+                "from_catchment_id": from_catchment_id,
+                "from_catchment_name": from_catchment_name,
+                "from_revision_id": from_revision_id,
+                "to_catchment_id": to_catchment_id,
+                "to_catchment_name": to_catchment_name,
+                "to_revision_id": to_revision_id,
+                "spatial_change": spatial_change,
+                "area": area,
+            },
+            "geometry": json.loads(simplified.geojson),
+        }
+    )
+
+
+def _overlapping_snapshot_pairs(from_snapshots, to_snapshots):
+    """Yield bbox-overlapping pairs without comparing every possible pair."""
+    from_items = sorted(
+        from_snapshots.items(), key=lambda item: (item[1]["geom"].extent[0], item[0])
+    )
+    to_items = sorted(
+        (
+            (catchment_id, snapshot, snapshot["geom"].extent)
+            for catchment_id, snapshot in to_snapshots.items()
+        ),
+        key=lambda item: (item[2][0], item[0]),
+    )
+    active = []
+    to_cursor = 0
+
+    for from_id, from_snapshot in from_items:
+        from_extent = from_snapshot["geom"].extent
+        while to_cursor < len(to_items) and to_items[to_cursor][2][0] <= from_extent[2]:
+            active.append(to_items[to_cursor])
+            to_cursor += 1
+        active = [item for item in active if item[2][2] >= from_extent[0]]
+        for to_id, to_snapshot, to_extent in active:
+            if to_extent[0] > from_extent[2]:
+                continue
+            if to_extent[1] <= from_extent[3] and to_extent[3] >= from_extent[1]:
+                yield from_id, from_snapshot, to_id, to_snapshot
+
+
+def _build_change_geometry(from_snapshots, to_snapshots):
+    """Overlay two non-overlapping catchment sets into atomic change polygons."""
+    features = []
+    from_union = _union_geometries(from_snapshots)
+    to_union = _union_geometries(to_snapshots)
+
+    for from_id, from_snapshot, to_id, to_snapshot in _overlapping_snapshot_pairs(
+        from_snapshots, to_snapshots
+    ):
+        from_geom = from_snapshot["geom"]
+        to_geom = to_snapshot["geom"]
+        if not from_geom.intersects(to_geom):
+            continue
+        intersection = from_geom.intersection(to_geom)
+        _append_change_feature(
+            features,
+            intersection,
+            "stable" if from_id == to_id else "transferred",
+            from_catchment_id=from_id,
+            from_catchment_name=from_snapshot["catchment_name"],
+            from_revision_id=from_snapshot["revision_id"],
+            to_catchment_id=to_id,
+            to_catchment_name=to_snapshot["catchment_name"],
+            to_revision_id=to_snapshot["revision_id"],
+        )
+
+    for from_id, from_snapshot in sorted(from_snapshots.items()):
+        from_geom = from_snapshot["geom"]
+        removed = from_geom if to_union is None else from_geom.difference(to_union)
+        _append_change_feature(
+            features,
+            removed,
+            "removed",
+            from_catchment_id=from_id,
+            from_catchment_name=from_snapshot["catchment_name"],
+            from_revision_id=from_snapshot["revision_id"],
+        )
+
+    for to_id, to_snapshot in sorted(to_snapshots.items()):
+        to_geom = to_snapshot["geom"]
+        added = to_geom if from_union is None else to_geom.difference(from_union)
+        _append_change_feature(
+            features,
+            added,
+            "added",
+            to_catchment_id=to_id,
+            to_catchment_name=to_snapshot["catchment_name"],
+            to_revision_id=to_snapshot["revision_id"],
+        )
+
+    return _build_feature_collection(features)
+
+
 def _filter_by_waste_categories(queryset, categories):
     """Filter collections by inline waste category."""
     return queryset.filter(waste_category__name__in=categories)
@@ -570,7 +792,6 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
                 _country_filter_q("", country),
                 _publication_q(user, prefix="collections__"),
                 collections__valid_from__year=year,
-                region__borders__isnull=False,
             )
             .distinct()
             .select_related("region", "region__borders")
@@ -591,7 +812,54 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
             request, self.filter_queryset(self.get_queryset())
         )
 
+    @action(detail=False, methods=["get"], url_path="collection-change-geojson")
+    def collection_change_geojson(self, request, *args, **kwargs):
+        """Return the spatial overlay of collection catchments for two years."""
+        country = request.query_params.get("country", "DE")
+        from_year, to_year = _parse_change_years(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+
+        def catchment_ids(year):
+            qs = CollectionCatchment.objects.filter(
+                _country_filter_q("", country),
+                _publication_q(request.user, prefix="collections__"),
+                collections__valid_from__year=year,
+            ).distinct()
+            return _apply_nuts_prefix_filter(qs, nuts_prefixes).values_list(
+                "pk", flat=True
+            )
+
+        return Response(
+            _build_change_geometry(
+                _revision_snapshots(catchment_ids(from_year), from_year, request.user),
+                _revision_snapshots(catchment_ids(to_year), to_year, request.user),
+            )
+        )
+
+    @action(detail=False, methods=["get"], url_path="collector-change-geojson")
+    def collector_change_geojson(self, request, *args, **kwargs):
+        """Return the spatial overlay of collector coverage for two years."""
+        country = request.query_params.get("country", "DE")
+        from_year, to_year = _parse_change_years(request)
+        nuts_prefixes = _parse_nuts_prefixes(request)
+
+        def catchment_ids(year):
+            return (
+                _active_collector_scope(country, year, nuts_prefixes, user=request.user)
+                .values_list("catchment_id", flat=True)
+                .distinct()
+            )
+
+        return Response(
+            _build_change_geometry(
+                _revision_snapshots(catchment_ids(from_year), from_year, request.user),
+                _revision_snapshots(catchment_ids(to_year), to_year, request.user),
+            )
+        )
+
     def _geojson_response(self, request, queryset):
+        _country, year = _parse_country_year(request)
+        queryset = _with_catchment_revision(queryset, year, request.user)
         rejection_response = get_unbounded_geojson_rejection_response(
             request,
             queryset.count(),
@@ -602,7 +870,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
 
         queryset = queryset.annotate(
             simplified_geom=SimplifyPreserveTopology(
-                F("region__borders__geom"),
+                F("atlas_geom"),
                 geometry_simplify_tolerance(),
             )
         )
@@ -661,7 +929,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
         nuts_prefixes = _parse_nuts_prefixes(request)
         collector_scope = _active_collector_scope(
             country, year, nuts_prefixes, user=request.user
-        ).filter(catchment__region__borders__isnull=False)
+        )
         queryset = (
             CollectionCatchment.objects.filter(
                 id__in=collector_scope.values("catchment_id")
@@ -669,6 +937,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
             .distinct()
             .select_related("region", "region__borders")
         )
+        queryset = _with_catchment_revision(queryset, year, request.user)
         rejection_response = get_unbounded_geojson_rejection_response(
             request,
             queryset.count(),
@@ -679,7 +948,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
 
         queryset = queryset.annotate(
             simplified_geom=SimplifyPreserveTopology(
-                F("region__borders__geom"),
+                F("atlas_geom"),
                 geometry_simplify_tolerance(),
             )
         )

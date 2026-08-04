@@ -15,6 +15,7 @@ from rest_framework.test import APIRequestFactory, APITestCase
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import (
+    CatchmentRevision,
     GeoPolygon,
     NutsRegion,
     Region,
@@ -5005,3 +5006,253 @@ class WasteAtlasPublicationScopingTests(APITestCase):
             self.assertEqual(response.status_code, status.HTTP_200_OK, key)
             ids = self._catchment_ids(response)
             self.assertIn(self.archived_catchment.id, ids, key)
+
+
+class WasteAtlasTemporalCatchmentGeometryTests(APITestCase):
+    """Atlas years select immutable boundary snapshots, not current geometry."""
+
+    @staticmethod
+    def _polygon(xmax):
+        return f"MULTIPOLYGON(((0 0, 0 1, {xmax} 1, {xmax} 0, 0 0)))"
+
+    @classmethod
+    def setUpTestData(cls):
+        borders = GeoPolygon.objects.create(geom=cls._polygon(2))
+        region = Region.objects.create(
+            name="Mutable current region", country="DE", borders=borders
+        )
+        cls.catchment = CollectionCatchment.objects.create(
+            name="Temporal atlas catchment", region=region
+        )
+        cls.old_revision = CatchmentRevision.objects.create(
+            catchment=cls.catchment,
+            name="Old atlas boundary",
+            effective_from=date(2020, 1, 1),
+            effective_to=date(2024, 1, 1),
+            geom=cls._polygon(1),
+            publication_status="published",
+        )
+        cls.current_revision = CatchmentRevision.objects.create(
+            catchment=cls.catchment,
+            name="Expanded atlas boundary",
+            effective_from=date(2024, 1, 1),
+            geom=cls._polygon(2),
+            publication_status="published",
+        )
+        collector = Collector.objects.create(
+            name="Temporal atlas collector", catchment=cls.catchment
+        )
+        for year in (2022, 2024):
+            Collection.objects.create(
+                name=f"Temporal collection {year}",
+                catchment=cls.catchment,
+                collector=collector,
+                valid_from=date(year, 1, 1),
+                publication_status="published",
+            )
+
+        removed_region = Region.objects.create(
+            name="Removed region",
+            country="DE",
+            borders=GeoPolygon.objects.create(
+                geom="MULTIPOLYGON(((3 0, 3 1, 4 1, 4 0, 3 0)))"
+            ),
+        )
+        cls.removed_catchment = CollectionCatchment.objects.create(
+            name="Removed catchment", region=removed_region
+        )
+        CatchmentRevision.objects.create(
+            catchment=cls.removed_catchment,
+            name="Removed boundary",
+            geom=removed_region.geom,
+            publication_status="published",
+        )
+        Collection.objects.create(
+            name="Removed collection 2022",
+            catchment=cls.removed_catchment,
+            valid_from=date(2022, 1, 1),
+            publication_status="published",
+        )
+
+        transfer_geom = "MULTIPOLYGON(((10 0, 10 1, 11 1, 11 0, 10 0)))"
+        transfer_from_region = Region.objects.create(
+            name="Transfer from region",
+            country="DE",
+            borders=GeoPolygon.objects.create(geom=transfer_geom),
+        )
+        cls.transfer_from = CollectionCatchment.objects.create(
+            name="Transfer from", region=transfer_from_region
+        )
+        CatchmentRevision.objects.create(
+            catchment=cls.transfer_from,
+            name="Transfer from boundary",
+            geom=transfer_geom,
+            publication_status="published",
+        )
+        Collection.objects.create(
+            name="Transfer source 2022",
+            catchment=cls.transfer_from,
+            valid_from=date(2022, 1, 1),
+            publication_status="published",
+        )
+
+        transfer_to_region = Region.objects.create(
+            name="Transfer to region",
+            country="DE",
+            borders=GeoPolygon.objects.create(geom=transfer_geom),
+        )
+        cls.transfer_to = CollectionCatchment.objects.create(
+            name="Transfer to", region=transfer_to_region
+        )
+        CatchmentRevision.objects.create(
+            catchment=cls.transfer_to,
+            name="Transfer to boundary",
+            geom=transfer_geom,
+            publication_status="published",
+        )
+        Collection.objects.create(
+            name="Transfer destination 2024",
+            catchment=cls.transfer_to,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+
+    @staticmethod
+    def _maximum_x(geometry):
+        positions = []
+
+        def collect(value):
+            if value and isinstance(value[0], (int, float)):
+                positions.append(value)
+                return
+            for child in value:
+                collect(child)
+
+        collect(geometry["coordinates"])
+        return max(position[0] for position in positions)
+
+    def _feature(self, action, year):
+        response = self.client.get(
+            f"/waste_collection/api/waste-atlas/catchment/{action}/",
+            {"country": "DE", "year": year},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return next(
+            feature
+            for feature in response.data["features"]
+            if feature["properties"]["catchment_id"] == self.catchment.pk
+        )
+
+    def test_collection_geometry_uses_revision_effective_in_selected_year(self):
+        historical = self._feature("collection-geojson", 2022)
+        current = self._feature("collection-geojson", 2024)
+
+        self.assertEqual(self._maximum_x(historical["geometry"]), 1)
+        self.assertEqual(self._maximum_x(current["geometry"]), 2)
+        self.assertEqual(
+            historical["properties"]["catchment_revision_id"], self.old_revision.pk
+        )
+        self.assertEqual(
+            current["properties"]["catchment_revision_id"],
+            self.current_revision.pk,
+        )
+
+    def test_collector_geometry_uses_revision_effective_in_selected_year(self):
+        historical = self._feature("collector-geojson", 2022)
+        current = self._feature("collector-geojson", 2024)
+
+        self.assertEqual(self._maximum_x(historical["geometry"]), 1)
+        self.assertEqual(self._maximum_x(current["geometry"]), 2)
+
+    def _change_features(self, action="collection-change-geojson"):
+        response = self.client.get(
+            f"/waste_collection/api/waste-atlas/catchment/{action}/",
+            {"country": "DE", "from_year": 2022, "to_year": 2024},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return response.data["features"]
+
+    def test_change_geometry_splits_stable_and_added_territory(self):
+        features = self._change_features()
+        related = [
+            feature
+            for feature in features
+            if feature["properties"].get("from_catchment_id") == self.catchment.pk
+            or feature["properties"].get("to_catchment_id") == self.catchment.pk
+        ]
+
+        by_change = {
+            feature["properties"]["spatial_change"]: feature for feature in related
+        }
+        self.assertEqual(set(by_change), {"stable", "added"})
+        self.assertAlmostEqual(by_change["stable"]["properties"]["area"], 1.0)
+        self.assertAlmostEqual(by_change["added"]["properties"]["area"], 1.0)
+        self.assertEqual(
+            by_change["stable"]["properties"]["catchment_name"],
+            "Temporal atlas catchment",
+        )
+
+    def test_change_geometry_includes_removed_territory(self):
+        feature = next(
+            feature
+            for feature in self._change_features()
+            if feature["properties"].get("from_catchment_id")
+            == self.removed_catchment.pk
+        )
+
+        self.assertEqual(feature["properties"]["spatial_change"], "removed")
+        self.assertIsNone(feature["properties"]["to_catchment_id"])
+
+    def test_change_geometry_classifies_transfer_between_catchments(self):
+        feature = next(
+            feature
+            for feature in self._change_features()
+            if feature["properties"].get("from_catchment_id") == self.transfer_from.pk
+            and feature["properties"].get("to_catchment_id") == self.transfer_to.pk
+        )
+
+        self.assertEqual(feature["properties"]["spatial_change"], "transferred")
+
+    def test_collector_change_geometry_uses_temporal_revisions(self):
+        features = self._change_features("collector-change-geojson")
+        changes = {
+            feature["properties"]["spatial_change"]
+            for feature in features
+            if feature["properties"].get("from_catchment_id") == self.catchment.pk
+            or feature["properties"].get("to_catchment_id") == self.catchment.pk
+        }
+
+        self.assertEqual(changes, {"stable", "added"})
+
+    def test_revision_geometry_does_not_depend_on_mutable_legacy_borders(self):
+        region = Region.objects.create(name="Revision-only region", country="DE")
+        catchment = CollectionCatchment.objects.create(
+            name="Revision-only catchment", region=region
+        )
+        revision = CatchmentRevision.objects.create(
+            catchment=catchment,
+            name="Authoritative direct geometry",
+            effective_from=date(2024, 1, 1),
+            geom=self._polygon(1),
+            publication_status="published",
+        )
+        Collection.objects.create(
+            name="Revision-only collection",
+            catchment=catchment,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/catchment/collection-geojson/",
+            {"country": "DE", "year": 2024},
+        )
+        revision_only = next(
+            item
+            for item in response.data["features"]
+            if item["properties"]["catchment_id"] == catchment.pk
+        )
+
+        self.assertEqual(
+            revision_only["properties"]["catchment_revision_id"], revision.pk
+        )
