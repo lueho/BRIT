@@ -71,6 +71,16 @@ NUTS_IMPORT_SCHEMA = {
                 "additionalProperties": False,
                 "properties": {
                     "nuts_id": {"type": "string", "maxLength": 5},
+                    "parent_nuts_id": {
+                        "type": "string",
+                        "maxLength": 5,
+                        "description": (
+                            "The parent's code, for the rare region whose own "
+                            "code does not imply it (NUTS 2016 files UKN10-"
+                            "UKN16 under UKN0). Omit it and the parent is the "
+                            "code minus its last character."
+                        ),
+                    },
                     "levl_code": {"type": "integer", "minimum": 0, "maximum": 3},
                     "cntr_code": {"type": "string", "maxLength": 2},
                     "name_latn": {"type": "string", "maxLength": 70},

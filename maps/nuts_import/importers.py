@@ -71,10 +71,16 @@ def _upsert_geometry(region, geometry):
 def _resolve_parent(data, vintage, report, dry_run):
     """The region's parent in its own vintage, or None at level 0.
 
+    A provider may state ``parent_nuts_id`` where the code does not imply the
+    parent, as in NUTS 2016, whose ``UKN0`` holds ``UKN10``-``UKN16``.
+
     A dry run rolls back, so regions sent in an earlier request of the same load
     are invisible to it and a missing parent is only a warning there.
     """
-    code = parent_code(data["nuts_id"]) if data["levl_code"] else None
+    if data["levl_code"] and data.get("parent_nuts_id"):
+        code = data["parent_nuts_id"]
+    else:
+        code = parent_code(data["nuts_id"]) if data["levl_code"] else None
     if code is None:
         return None
     parent = NutsRegion.objects.filter(nuts_id=code, version=vintage).first()
@@ -88,7 +94,11 @@ def _resolve_parent(data, vintage, report, dry_run):
 
 
 def _upsert_region(data, vintage, user, report, dry_run=False):
-    if data["levl_code"] and parent_code(data["nuts_id"]) is None:
+    if (
+        data["levl_code"]
+        and not data.get("parent_nuts_id")
+        and parent_code(data["nuts_id"]) is None
+    ):
         report.errors.append(
             f"{data['nuts_id']}: a level {data['levl_code']} code cannot be "
             f"{len(data['nuts_id'])} characters long"

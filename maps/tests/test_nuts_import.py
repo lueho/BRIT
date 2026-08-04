@@ -294,3 +294,43 @@ class NutsImportApiTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertFalse(NutsRegion.objects.filter(version__year=2024).exists())
+
+    def test_a_parent_that_the_code_does_not_imply_can_be_stated(self):
+        """NUTS 2016 codes UKN0's children UKN10-UKN16, breaking the position rule."""
+        self.post(
+            self.payload(
+                [
+                    region("UK", 0, "United Kingdom", DE_GEOMETRY),
+                    region("UKN", 1, "Northern Ireland", DE1_GEOMETRY),
+                    region("UKN0", 2, "Northern Ireland", DE1_GEOMETRY),
+                ]
+            )
+        )
+        response = self.post(
+            self.payload(
+                [
+                    region(
+                        "UKN10",
+                        3,
+                        "Belfast",
+                        DE1_GEOMETRY,
+                        parent_nuts_id="UKN0",
+                    )
+                ]
+            )
+        )
+
+        self.assertEqual(response.status_code, 201, response.json())
+        self.assertEqual(response.json()["errors"], [])
+        imported = NutsRegion.objects.get(nuts_id="UKN10", version__year=2024)
+        self.assertEqual(imported.parent.nuts_id, "UKN0")
+
+    def test_a_stated_parent_must_exist_in_the_same_vintage(self):
+        response = self.post(
+            self.payload(
+                [region("UKN10", 3, "Belfast", DE1_GEOMETRY, parent_nuts_id="UKN0")]
+            )
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("UKN0", response.json()["errors"][0])

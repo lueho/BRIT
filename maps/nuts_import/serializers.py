@@ -47,6 +47,11 @@ class ImportRegionSerializer(serializers.Serializer):
     """
 
     nuts_id = serializers.CharField(max_length=5)
+    # Codes are positional, but not always: NUTS 2016 files UKN10-UKN16 under
+    # UKN0, so a provider may name the parent instead.
+    parent_nuts_id = serializers.CharField(
+        max_length=5, required=False, allow_blank=True
+    )
     levl_code = serializers.IntegerField(min_value=0, max_value=3)
     cntr_code = serializers.CharField(max_length=2)
     name_latn = serializers.CharField(max_length=70, required=False, allow_blank=True)
