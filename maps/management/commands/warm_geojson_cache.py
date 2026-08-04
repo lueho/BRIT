@@ -26,13 +26,13 @@ from django.contrib.gis.db.models.functions import NumPoints
 from django.core.cache import caches
 from django.core.management.base import BaseCommand
 
-from maps.models import NutsRegion, Region
+from maps.models import NutsRegion, NutsVintage, Region
 from maps.registry import get_source_domain_geojson_cache_warmers
 from maps.serializers import (
     NutsRegionGeometrySerializer,
     RegionGeoFeatureModelSerializer,
 )
-from maps.utils import get_region_cache_key
+from maps.utils import get_nuts_region_cache_key, get_region_cache_key
 
 # Number of largest regions to warm by default. The H27 "Client Request
 # Interrupted" warnings come almost entirely from crawlers fetching the few
@@ -196,20 +196,26 @@ class Command(BaseCommand):
 
         self.stdout.write("Warming up NUTS GeoJSON cache...")
 
-        # Cache NUTS regions by level
+        # Requests are served one vintage at a time, and the keys carry that
+        # vintage, so warming anything but the vintage on display is a no-op.
+        vintage = NutsVintage.default()
+        year = vintage.year if vintage else None
+
         for level in nuts_levels:
             self.stdout.write(f"Caching NUTS level {level} regions...")
             queryset = NutsRegion.objects.filter(levl_code=level)
+            if vintage:
+                queryset = queryset.in_vintage(vintage)
             if limit:
                 queryset = queryset[:limit]
 
             for region in queryset:
-                cache_key = f"nuts_geojson:level:{level}:id:{region.id}"
+                cache_key = get_nuts_region_cache_key(nuts_id=region.id, version=year)
                 serializer = NutsRegionGeometrySerializer([region], many=True)
                 geojson_cache.set(cache_key, serializer.data)
 
             # Also cache the collection
-            cache_key = f"nuts_geojson:level:{level}"
+            cache_key = get_nuts_region_cache_key(level=level, version=year)
             serializer = NutsRegionGeometrySerializer(queryset, many=True)
             geojson_cache.set(cache_key, serializer.data)
 
