@@ -40,7 +40,11 @@ def _borders(offset=0.0):
 
 
 class TwoVintageTestCase(TestCase):
-    """DE111 exists in both NUTS 2021 (current) and NUTS 2024."""
+    """DE111 exists in both NUTS 2021 (current) and NUTS 2024.
+
+    Reference regions are published, as the import API publishes everything it
+    writes; an unpublished one is a region still being worked on.
+    """
 
     @classmethod
     def setUpTestData(cls):
@@ -52,6 +56,7 @@ class TwoVintageTestCase(TestCase):
             levl_code=0,
             cntr_code="DE",
             version=cls.v2021,
+            publication_status=NutsRegion.STATUS_PUBLISHED,
         )
         cls.country_2024 = NutsRegion.objects.create(
             name="Deutschland",
@@ -59,6 +64,7 @@ class TwoVintageTestCase(TestCase):
             levl_code=0,
             cntr_code="DE",
             version=cls.v2024,
+            publication_status=NutsRegion.STATUS_PUBLISHED,
         )
         cls.region_2021 = NutsRegion.objects.create(
             name="Flensburg",
@@ -68,6 +74,7 @@ class TwoVintageTestCase(TestCase):
             parent=cls.country_2021,
             version=cls.v2021,
             borders=_borders(),
+            publication_status=NutsRegion.STATUS_PUBLISHED,
         )
         cls.region_2024 = NutsRegion.objects.create(
             name="Flensburg",
@@ -77,6 +84,7 @@ class TwoVintageTestCase(TestCase):
             parent=cls.country_2024,
             version=cls.v2024,
             borders=_borders(10.0),
+            publication_status=NutsRegion.STATUS_PUBLISHED,
         )
 
 
@@ -272,6 +280,16 @@ class NutsRegionAutocompleteVintageScopeTestCase(TwoVintageTestCase):
         self.assertEqual(response.status_code, 200)
         ids = [result["id"] for result in response.json()["results"]]
         self.assertEqual(ids, [self.region_2024.pk])
+
+    def test_autocomplete_keeps_an_unpublished_region_out_of_sight(self):
+        """Vintage scoping must not cost the picker its visibility filtering."""
+        self.region_2021.publication_status = NutsRegion.STATUS_PRIVATE
+        self.region_2021.save(update_fields=["publication_status"])
+
+        response = self.client.get(reverse("nutsregion-autocomplete-level3"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["results"], [])
 
 
 class SetCountryVintageScopeTestCase(TwoVintageTestCase):

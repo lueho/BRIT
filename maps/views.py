@@ -1354,6 +1354,7 @@ class NutsRegionAutocompleteView(UserCreatedObjectAutocompleteView):
 
     def hook_queryset(self, queryset):
         """Offer each territory once, from the vintage the map is showing."""
+        queryset = super().hook_queryset(queryset)
         return queryset.in_vintage(NutsVintage.from_request(self.request))
 
     def apply_filters(self, queryset):

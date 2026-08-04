@@ -11,8 +11,14 @@ from django.test import TestCase
 from utils.object_management.models import get_default_owner
 from utils.properties.models import Unit
 
-from ..models import Region, RegionAttributeValue, RegionProperty
-from ..utils import get_region_cache_key
+from ..models import (
+    NutsRegion,
+    NutsVintage,
+    Region,
+    RegionAttributeValue,
+    RegionProperty,
+)
+from ..utils import get_nuts_region_cache_key, get_region_cache_key
 
 
 class RegionAttributeValueUnitBackfillCommandTests(TestCase):
@@ -240,4 +246,35 @@ class WarmGeojsonCacheRegionsTests(TestCase):
         )
         self.assertIsNone(
             self.geojson_cache.get(get_region_cache_key(region_id=small.id))
+        )
+
+
+class WarmGeojsonCacheNutsTests(TestCase):
+    """Warmed NUTS entries must land where the viewset looks for them."""
+
+    def setUp(self):
+        self.geojson_cache = caches[getattr(settings, "GEOJSON_CACHE", "default")]
+        self.geojson_cache.clear()
+        self.vintage = NutsVintage.default()
+        self.region = NutsRegion.objects.create(
+            name="Deutschland",
+            nuts_id="DE",
+            levl_code=0,
+            cntr_code="DE",
+            version=self.vintage,
+        )
+
+    def test_warmed_keys_carry_the_vintage_the_viewset_asks_for(self):
+        call_command(
+            "warm_geojson_cache", nuts=True, nuts_levels="0", stdout=io.StringIO()
+        )
+
+        year = self.vintage.year
+        self.assertIsNotNone(
+            self.geojson_cache.get(get_nuts_region_cache_key(level=0, version=year))
+        )
+        self.assertIsNotNone(
+            self.geojson_cache.get(
+                get_nuts_region_cache_key(nuts_id=self.region.id, version=year)
+            )
         )
