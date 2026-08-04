@@ -936,11 +936,13 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
         """Rate limit the expensive public change overlays per client subnet.
 
         The overlay actions do far more work per request than the plain
-        geometry endpoints, so they use the stricter subnet-aware GeoJSON
-        throttle instead of the shared atlas scope.
+        geometry endpoints, so they add the stricter subnet-aware GeoJSON
+        throttle on top of the shared atlas scope.  The added throttle only
+        buckets anonymous clients, so the scoped throttle has to stay to keep
+        authenticated clients limited.
         """
         if getattr(self, "action", None) in _CHANGE_OVERLAY_ACTIONS:
-            return [GeoJSONAnonThrottle()]
+            return [GeoJSONAnonThrottle(), *super().get_throttles()]
         return super().get_throttles()
 
     @staticmethod

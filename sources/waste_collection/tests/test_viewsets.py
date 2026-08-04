@@ -12,6 +12,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
+from rest_framework.throttling import ScopedRateThrottle
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
@@ -5337,7 +5338,9 @@ class WasteAtlasTemporalCatchmentGeometryTests(APITestCase):
                 viewset = atlas_viewsets.CatchmentViewSet()
                 viewset.action = action
 
-                self.assertIn(
-                    GeoJSONAnonThrottle,
-                    [type(throttle) for throttle in viewset.get_throttles()],
-                )
+                throttles = [type(throttle) for throttle in viewset.get_throttles()]
+
+                # The subnet throttle only buckets anonymous clients, so the
+                # shared atlas scope must stay for authenticated ones.
+                self.assertIn(GeoJSONAnonThrottle, throttles)
+                self.assertIn(ScopedRateThrottle, throttles)
