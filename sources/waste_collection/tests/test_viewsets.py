@@ -5332,6 +5332,20 @@ class WasteAtlasTemporalCatchmentGeometryTests(APITestCase):
         self.assertEqual(build.call_count, 1)
         self.assertEqual(first, second)
 
+    def test_change_overlay_resolves_the_simplify_tolerance_once(self):
+        caches[getattr(settings, "GEOJSON_CACHE", "default")].clear()
+
+        with CaptureQueriesContext(connection) as queries:
+            features = self._change_features()
+
+        settings_queries = [
+            query
+            for query in queries.captured_queries
+            if "wasteatlasrenderingsettings" in query["sql"].lower()
+        ]
+        self.assertGreater(len(features), 1)
+        self.assertLessEqual(len(settings_queries), 2)
+
     def test_change_overlay_actions_are_rate_limited_for_anonymous_clients(self):
         for action in ("collection_change_geojson", "collector_change_geojson"):
             with self.subTest(action=action):

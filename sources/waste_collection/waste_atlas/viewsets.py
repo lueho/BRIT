@@ -509,7 +509,6 @@ def _append_change_feature(
     if geom is None or geom.empty or geom.area <= 0:
         return
     area = geom.area
-    simplified = geom.simplify(geometry_simplify_tolerance(), preserve_topology=True)
     feature_id = f"change-{len(features) + 1}"
     if from_catchment_name and to_catchment_name:
         catchment_name = (
@@ -535,7 +534,7 @@ def _append_change_feature(
                 "spatial_change": spatial_change,
                 "area": area,
             },
-            "geometry": json.loads(simplified.geojson),
+            "geometry": json.loads(geom.geojson),
         }
     )
 
@@ -569,7 +568,11 @@ def _overlapping_snapshot_pairs(from_snapshots, to_snapshots):
 
 
 def _build_change_geometry(from_snapshots, to_snapshots):
-    """Overlay two non-overlapping catchment sets into atomic change polygons."""
+    """Overlay two non-overlapping catchment sets into atomic change polygons.
+
+    The snapshots arrive simplified from PostGIS, so the fragments cut out of
+    them are already at map resolution and are emitted as they are.
+    """
     features = []
     from_union = _union_geometries(from_snapshots)
     to_union = _union_geometries(to_snapshots)
