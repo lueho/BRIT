@@ -134,6 +134,10 @@ class WasteAtlasRenderingSettings(models.Model):
         "Change maps: regions whose category changed.",
         default="#ffb74d",
     )
+    change_boundary_changed_color = _color_field(
+        "Change maps: territory reassigned to a different catchment.",
+        default="#ba68c8",
+    )
     change_new_color = _color_field(
         "Change maps: regions with data only in the later year.",
         default="#64b5f6",
@@ -279,6 +283,7 @@ class WasteAtlasRenderingSettings(models.Model):
             "changeColors": {
                 "noChange": self.change_no_change_color,
                 "changed": self.change_changed_color,
+                "boundaryChanged": self.change_boundary_changed_color,
                 "new": self.change_new_color,
                 "removed": self.change_removed_color,
                 "increase": self.change_increase_color,

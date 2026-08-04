@@ -182,6 +182,22 @@ class WasteAtlasRendererHasNoHardcodedDefaultsTests(TestCase):
         self.assertIn("renderDefaults", source)
 
 
+class ChangeLegendCategoriesAreDistinguishableTests(TestCase):
+    """Every change legend entry needs its own swatch to be readable."""
+
+    def test_reassigned_territory_has_its_own_color(self):
+        colors = WasteAtlasRenderingSettings.load().client_defaults()["changeColors"]
+
+        self.assertNotEqual(colors["boundaryChanged"], colors["changed"])
+
+    def test_renderer_paints_reassigned_territory_with_its_own_color(self):
+        source = CHOROPLETH_JS.read_text()
+
+        for line in source.splitlines():
+            if "boundary_changed" in line and "label:" in line:
+                self.assertIn("colors.boundaryChanged", line)
+
+
 class SeededMapConfigurationsDeferToGlobalNoDataColorTests(TestCase):
     """Seeded maps must inherit the global no-data color."""
 

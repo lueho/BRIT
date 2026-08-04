@@ -1,3 +1,4 @@
+import math
 from datetime import date
 from unittest.mock import patch
 from uuid import uuid4
@@ -11,6 +12,7 @@ from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
+from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory, APITestCase
 from rest_framework.throttling import ScopedRateThrottle
 
@@ -5358,3 +5360,106 @@ class WasteAtlasTemporalCatchmentGeometryTests(APITestCase):
                 # shared atlas scope must stay for authenticated ones.
                 self.assertIn(GeoJSONAnonThrottle, throttles)
                 self.assertIn(ScopedRateThrottle, throttles)
+
+
+class WasteAtlasChangeOverlayPrecisionTests(APITestCase):
+    """Change overlays compare boundaries at source precision."""
+
+    @staticmethod
+    def _shared_border():
+        """A shared border whose wiggle is coarser than the atlas simplify tolerance.
+
+        Simplifying each catchment on its own drops different vertices of this
+        chain, which moves the two copies of the same border apart.
+        """
+        steps = 60
+        return [
+            (1 + 0.0015 * math.sin(3 * step / steps * math.pi), step / steps)
+            for step in range(steps + 1)
+        ]
+
+    @classmethod
+    def _multipolygon(cls, ring):
+        closed = [*ring, ring[0]]
+        coordinates = ", ".join(f"{x:.8f} {y:.8f}" for x, y in closed)
+        return f"MULTIPOLYGON((({coordinates})))"
+
+    @classmethod
+    def _catchment(cls, name, ring):
+        region = Region.objects.create(
+            name=f"{name} region",
+            country="DE",
+            borders=GeoPolygon.objects.create(geom=cls._multipolygon(ring)),
+        )
+        catchment = CollectionCatchment.objects.create(name=name, region=region)
+        CatchmentRevision.objects.create(
+            catchment=catchment,
+            name=f"{name} boundary",
+            geom=cls._multipolygon(ring),
+            publication_status="published",
+        )
+        for year in (2022, 2024):
+            Collection.objects.create(
+                name=f"{name} collection {year}",
+                catchment=catchment,
+                valid_from=date(year, 1, 1),
+                publication_status="published",
+            )
+        return catchment
+
+    @classmethod
+    def setUpTestData(cls):
+        border = cls._shared_border()
+        cls.west = cls._catchment("Western neighbour", [*border, (0, 1), (0, 0)])
+        cls.east = cls._catchment(
+            "Eastern neighbour", [*reversed(border), (3, 0), (3, 1)]
+        )
+
+    def _features(self):
+        caches[getattr(settings, "GEOJSON_CACHE", "default")].clear()
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/catchment/collection-change-geojson/",
+            {"country": "DE", "from_year": 2022, "to_year": 2024},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return response.data["features"]
+
+    def test_unchanged_neighbours_do_not_produce_transferred_slivers(self):
+        changes = {
+            feature["properties"]["spatial_change"] for feature in self._features()
+        }
+
+        self.assertEqual(changes, {"stable"})
+
+    def test_unchanged_neighbours_stay_whole(self):
+        stable = {
+            feature["properties"]["from_catchment_id"]: feature["properties"]["area"]
+            for feature in self._features()
+            if feature["properties"]["spatial_change"] == "stable"
+        }
+
+        self.assertAlmostEqual(stable[self.west.pk], 1.0, places=3)
+        self.assertAlmostEqual(stable[self.east.pk], 2.0, places=3)
+
+
+class WasteAtlasChangeYearParsingTests(APITestCase):
+    """Overlay years are bounded so anonymous clients cannot walk the cache."""
+
+    def _years(self, params):
+        return atlas_viewsets._parse_change_years(
+            Request(APIRequestFactory().get("/", params))
+        )
+
+    def test_out_of_range_years_are_clamped_to_the_atlas_range(self):
+        self.assertEqual(
+            self._years({"from_year": 1900, "to_year": 3000}),
+            (atlas_viewsets.MIN_ATLAS_YEAR, atlas_viewsets.MAX_ATLAS_YEAR),
+        )
+
+    def test_supported_years_pass_through(self):
+        self.assertEqual(
+            self._years({"from_year": 2022, "to_year": 2023}), (2022, 2023)
+        )
+
+    def test_unparsable_years_fall_back_to_the_defaults(self):
+        self.assertEqual(self._years({"from_year": "n/a"}), (2023, 2024))

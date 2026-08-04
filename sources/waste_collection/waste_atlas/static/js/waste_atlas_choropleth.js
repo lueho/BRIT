@@ -457,7 +457,7 @@ var WasteAtlasChoropleth = (function () {
     return [
       { value: 'no_change', label: 'No change', color: colors.noChange },
       { value: 'changed', label: 'Category changed', color: colors.changed },
-      { value: 'boundary_changed', label: 'Catchment reassigned', color: colors.changed },
+      { value: 'boundary_changed', label: 'Catchment reassigned', color: colors.boundaryChanged },
       { value: 'new', label: 'New in ' + toYear, color: colors['new'] },
       { value: 'removed', label: 'Removed in ' + toYear, color: colors.removed }
     ];
@@ -470,7 +470,7 @@ var WasteAtlasChoropleth = (function () {
       { value: 'no_change', label: 'No numeric change', color: colors.noChange },
       { value: 'increase', label: 'Increase', color: colors.increase },
       { value: 'changed', label: 'Category changed', color: colors.changed },
-      { value: 'boundary_changed', label: 'Catchment reassigned', color: colors.changed },
+      { value: 'boundary_changed', label: 'Catchment reassigned', color: colors.boundaryChanged },
       { value: 'new', label: 'New value in ' + toYear, color: colors['new'] },
       { value: 'removed', label: 'Value removed in ' + toYear, color: colors.removed }
     ];

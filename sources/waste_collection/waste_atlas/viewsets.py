@@ -52,6 +52,7 @@ from sources.waste_collection.models import (
 )
 from utils.object_management.models import UserCreatedObject
 
+from .map_selection import MAP_SELECTION_YEARS
 from .serializers import (
     CatchmentAccessControlSerializer,
     CatchmentBinConfigurationSerializer,
@@ -88,6 +89,11 @@ from .serializers import (
     CatchmentWeeklyBpAccessDaysSerializer,
     geometry_simplify_tolerance,
 )
+
+# Atlas maps only exist for the selectable years, so requests are clamped to
+# them instead of being trusted with arbitrary integers.
+MIN_ATLAS_YEAR = min(int(year) for year in MAP_SELECTION_YEARS)
+MAX_ATLAS_YEAR = max(int(year) for year in MAP_SELECTION_YEARS)
 
 _PUBLISHED = UserCreatedObject.STATUS_PUBLISHED
 _ARCHIVED = UserCreatedObject.STATUS_ARCHIVED
@@ -378,31 +384,39 @@ def _with_catchment_revision(queryset, year, user=None):
 
 
 def _parse_change_years(request):
-    try:
-        from_year = int(request.query_params.get("from_year", 2023))
-        to_year = int(request.query_params.get("to_year", 2024))
-    except (TypeError, ValueError):
-        from_year, to_year = 2023, 2024
-    return from_year, to_year
+    """Return the two atlas years of a change request, clamped to the atlas range.
+
+    The years are part of the overlay cache key, so accepting arbitrary integers
+    would let an anonymous client walk an unbounded number of cache misses, each
+    one recomputing and storing a full overlay.
+    """
+
+    def year(param, default):
+        try:
+            requested = int(request.query_params.get(param, default))
+        except (TypeError, ValueError):
+            return default
+        return min(max(requested, MIN_ATLAS_YEAR), MAX_ATLAS_YEAR)
+
+    return year("from_year", 2023), year("to_year", 2024)
 
 
 def _revision_snapshots(catchment_ids, year, user=None):
     """Return one visible geometry snapshot per catchment for an atlas year.
 
-    Geometries are simplified in PostGIS before they reach the overlay, which
-    computes unions, intersections and differences over all of them: the change
-    map is rendered at map resolution, so carrying full-resolution boundaries
-    through that work only costs time.
+    Geometries are loaded at source precision: the overlay intersects and
+    subtracts boundaries of *different* catchments, and simplifying each of them
+    on its own moves shared borders apart, which turns unchanged neighbours into
+    slivers of reassigned territory.  Only the resulting fragments are coarsened
+    to map resolution.
     """
     catchment_ids = set(catchment_ids)
-    tolerance = geometry_simplify_tolerance()
     revisions = (
         CatchmentRevision.objects.valid_on(_atlas_reference_date(year))
         .filter(
             catchment_id__in=catchment_ids,
             publication_status__in=_visible_statuses(user),
         )
-        .annotate(simplified_geom=SimplifyPreserveTopology(F("geom"), tolerance))
         .select_related("catchment")
         .order_by("catchment_id", F("effective_from").desc(nulls_last=True), "-pk")
     )
@@ -413,27 +427,19 @@ def _revision_snapshots(catchment_ids, year, user=None):
             {
                 "revision_id": revision.pk,
                 "catchment_name": revision.catchment.name,
-                "geom": revision.simplified_geom or revision.geom,
+                "geom": revision.geom,
             },
         )
 
     missing_ids = catchment_ids - snapshots.keys()
     if missing_ids:
-        for catchment in (
-            CollectionCatchment.objects.filter(
-                pk__in=missing_ids, region__borders__geom__isnull=False
-            )
-            .annotate(
-                simplified_geom=SimplifyPreserveTopology(
-                    F("region__borders__geom"), tolerance
-                )
-            )
-            .select_related("region__borders")
-        ):
+        for catchment in CollectionCatchment.objects.filter(
+            pk__in=missing_ids, region__borders__geom__isnull=False
+        ).select_related("region__borders"):
             snapshots[catchment.pk] = {
                 "revision_id": None,
                 "catchment_name": catchment.name,
-                "geom": catchment.simplified_geom or catchment.region.borders.geom,
+                "geom": catchment.region.borders.geom,
             }
     return snapshots
 
@@ -498,6 +504,7 @@ def _append_change_feature(
     features,
     geom,
     spatial_change,
+    tolerance,
     *,
     from_catchment_id=None,
     from_catchment_name=None,
@@ -509,6 +516,9 @@ def _append_change_feature(
     if geom is None or geom.empty or geom.area <= 0:
         return
     area = geom.area
+    simplified = geom.simplify(tolerance, preserve_topology=True)
+    if simplified.empty:
+        return
     feature_id = f"change-{len(features) + 1}"
     if from_catchment_name and to_catchment_name:
         catchment_name = (
@@ -534,7 +544,7 @@ def _append_change_feature(
                 "spatial_change": spatial_change,
                 "area": area,
             },
-            "geometry": json.loads(geom.geojson),
+            "geometry": json.loads(simplified.geojson),
         }
     )
 
@@ -570,9 +580,10 @@ def _overlapping_snapshot_pairs(from_snapshots, to_snapshots):
 def _build_change_geometry(from_snapshots, to_snapshots):
     """Overlay two non-overlapping catchment sets into atomic change polygons.
 
-    The snapshots arrive simplified from PostGIS, so the fragments cut out of
-    them are already at map resolution and are emitted as they are.
+    The set operations run on the stored boundaries; only the fragments they cut
+    out are simplified, with one tolerance lookup for the whole overlay.
     """
+    tolerance = geometry_simplify_tolerance()
     features = []
     from_union = _union_geometries(from_snapshots)
     to_union = _union_geometries(to_snapshots)
@@ -589,6 +600,7 @@ def _build_change_geometry(from_snapshots, to_snapshots):
             features,
             intersection,
             "stable" if from_id == to_id else "transferred",
+            tolerance,
             from_catchment_id=from_id,
             from_catchment_name=from_snapshot["catchment_name"],
             from_revision_id=from_snapshot["revision_id"],
@@ -604,6 +616,7 @@ def _build_change_geometry(from_snapshots, to_snapshots):
             features,
             removed,
             "removed",
+            tolerance,
             from_catchment_id=from_id,
             from_catchment_name=from_snapshot["catchment_name"],
             from_revision_id=from_snapshot["revision_id"],
@@ -616,6 +629,7 @@ def _build_change_geometry(from_snapshots, to_snapshots):
             features,
             added,
             "added",
+            tolerance,
             to_catchment_id=to_id,
             to_catchment_name=to_snapshot["catchment_name"],
             to_revision_id=to_snapshot["revision_id"],
