@@ -47,6 +47,25 @@ required/optional variable reference is in
 docker compose up
 ```
 
+### How the local image is built
+
+`compose.yml` builds `web` from the Dockerfile's `dev` target, which contains the
+virtual environment but no application source: the checkout is bind-mounted at
+`/app` instead. Editing source therefore never invalidates the image, and
+`docker compose build web` stays a cache hit until `pyproject.toml`, `uv.lock` or
+the `Dockerfile` changes.
+
+Build the image through Compose, not by hand. A plain `docker build -t brit-web .`
+builds the default `runtime` target, which bakes the source into the image, and
+`celery` and `flower` consume the `brit-web` tag without a build section — so
+mixing both paths leaves those services running the baked source instead of your
+checkout:
+
+```sh
+docker compose build web          # dev target, source comes from the bind mount
+docker build --target runtime .   # what heroku.yml deploys
+```
+
 ### Access local services
 
 - **Application**

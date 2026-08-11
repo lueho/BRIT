@@ -31,6 +31,9 @@ services:
   web:
     build:
       context: .
+      # The `dev` target carries no source layer; the checkout is bind-mounted
+      # below, so editing source never invalidates the image.
+      target: dev
       args:
         INSTALL_DEV: true
         INSTALL_PDF_PARSING: true
@@ -90,6 +93,8 @@ services:
 
   flower:
     image: brit-web
+    volumes:
+      - ./:/app
     command: celery --app=brit flower
     ports:
       - "5555:5555"

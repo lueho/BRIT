@@ -1,3 +1,6 @@
+# Kept free of BuildKit-only syntax (cache/bind mounts): Heroku builds this
+# file with a pre-BuildKit Docker daemon that fails on `RUN --mount`.
+
 ####################################
 # ---------- builder --------------
 ####################################
@@ -15,22 +18,23 @@ ARG INSTALL_DEV=false
 # Optional build-time flag: set to "true" to include PDF parsing dependencies/tools
 ARG INSTALL_PDF_PARSING=false
 
-# System build dependencies (kept only in this stage)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    libproj-dev \
-    libgdal-dev \
-    gdal-bin \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# The environment is built under the uid the runtime stages run as, so copying
+# it needs no `--chown` pass over ~500 MB of files and the runtime user can
+# still install into it, e.g. while debugging inside a running container.
+RUN useradd --system --uid 1000 --create-home --shell /bin/bash standard_user \
+    && install -d -o standard_user -g standard_user /opt/venv /app
 
 WORKDIR /app
 
 # Copy dependency metadata only
-COPY pyproject.toml uv.lock* ./
+COPY --chown=standard_user:standard_user pyproject.toml uv.lock* ./
 
-# Resolve & install deps into .venv with --frozen for reproducibility (without BuildKit cache)
+USER standard_user
+
+# Resolve & install deps into /opt/venv with --frozen for reproducibility.
+# Every locked distribution ships a wheel, so no compiler or -dev headers are
+# installed here; a dependency without a wheel would fail this step and needs
+# build-essential plus its own headers added back.
 RUN if [ "$INSTALL_DEV" = "true" ]; then \
         if [ "$INSTALL_PDF_PARSING" = "true" ]; then \
             uv sync --locked --dev --group pdf_parsing; \
@@ -45,12 +49,10 @@ RUN if [ "$INSTALL_DEV" = "true" ]; then \
         fi; \
     fi
 
-COPY . .
-
 ####################################
-# ---------- runtime --------------
+# ---------- runtime base ---------
 ####################################
-FROM python:3.12-slim-bookworm
+FROM python:3.12-slim-bookworm AS runtime-base
 
 ARG INSTALL_PDF_PARSING=false
 
@@ -69,15 +71,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fi \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 1000 --create-home --shell /bin/bash standard_user \
-    && install -d -o standard_user -g standard_user /app/staticfiles
+    && install -d -o standard_user -g standard_user /app/staticfiles /opt/venv
 
 # Virtual environment first on PATH
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# Copy the virtual environment and project from builder with proper ownership
-COPY --from=builder --chown=standard_user:standard_user /opt/venv /opt/venv
-COPY --from=builder --chown=standard_user:standard_user /app /app
+# Already owned by uid 1000 in the builder, so no ownership rewrite here.
+COPY --from=builder /opt/venv /opt/venv
 
 WORKDIR /app
 
@@ -94,3 +95,19 @@ HEALTHCHECK --interval=30s --timeout=5s \
 
 # Default command (production-ready with Gunicorn)
 CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT} --workers ${WORKERS:-3} $DJANGO_WSGI"]
+
+####################################
+# ---------- dev ------------------
+####################################
+# Target used by compose.yml, which bind-mounts the checkout at /app. Carrying
+# no source layer keeps this image valid across source edits, so local builds
+# stay cache hits until a dependency input changes.
+FROM runtime-base AS dev
+
+####################################
+# ---------- runtime --------------
+####################################
+# Default target: self-contained image for Heroku and any other deployment.
+FROM runtime-base AS runtime
+
+COPY --chown=standard_user:standard_user . /app
