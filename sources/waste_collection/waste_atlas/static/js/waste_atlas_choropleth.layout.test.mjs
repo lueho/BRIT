@@ -30,23 +30,40 @@ vm.runInContext(source, sandbox);
 const { layout, setRenderDefaults } = sandbox.WasteAtlasChoropleth;
 
 // Minimal render defaults so DOM-free helpers that read export geometry work.
-setRenderDefaults({
-  export: {
-    dpi: 300,
-    widthMm: 160,
-    heightMm: 110,
-    maxHeightMm: 180,
-    legendFontSizePt: 9,
-    legendFontFamily: "sans-serif",
-    legendMaxWidthFraction: 0.52,
-  },
-  exportLegend: {
-    placement: "auto",
-    columns: "auto",
-    itemFlow: "column",
-    maxWidthFraction: 0.52,
-  },
-});
+function renderDefaults(exportLegend = {}) {
+  return {
+    export: {
+      dpi: 300,
+      widthMm: 160,
+      heightMm: 110,
+      maxHeightMm: 180,
+      legendFontSizePt: 9,
+      legendFontFamily: "sans-serif",
+      legendMaxWidthFraction: 0.52,
+    },
+    exportLegend: Object.assign(
+      {
+        placement: "auto",
+        columns: "auto",
+        itemFlow: "column",
+        maxWidthFraction: 0.52,
+      },
+      exportLegend,
+    ),
+  };
+}
+
+setRenderDefaults(renderDefaults());
+
+// Run `body` against atlas-wide defaults overridden by `exportLegend`.
+function withAtlasDefaults(exportLegend, body) {
+  setRenderDefaults(renderDefaults(exportLegend));
+  try {
+    body();
+  } finally {
+    setRenderDefaults(renderDefaults());
+  }
+}
 
 const EXPORT_WIDTH = Math.round((160 / 25.4) * 300); // 1890
 const PAGE_HEIGHT = Math.round((110 / 25.4) * 300); // 1299
@@ -117,6 +134,23 @@ test("resolveExportLegend rejects an unknown item flow", () => {
     layout.resolveExportLegend({ exportLegend: { itemFlow: "diagonal" } }).itemFlow,
     "column",
   );
+});
+
+test("resolveExportLegend inherits the atlas-wide item flow", () => {
+  withAtlasDefaults({ itemFlow: "row" }, () => {
+    // Absent, invalid and flat-key configs all fall back to the atlas default,
+    // exactly like the maximum width does.
+    assert.equal(layout.resolveExportLegend({}).itemFlow, "row");
+    assert.equal(
+      layout.resolveExportLegend({ exportLegend: { itemFlow: "diagonal" } }).itemFlow,
+      "row",
+    );
+    assert.equal(layout.resolveExportLegend({ exportLegendColumns: 2 }).itemFlow, "row");
+    assert.equal(
+      layout.resolveExportLegend({ exportLegendItemFlow: "column" }).itemFlow,
+      "column",
+    );
+  });
 });
 
 function flowItems(heights) {

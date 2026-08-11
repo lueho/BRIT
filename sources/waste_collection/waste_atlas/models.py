@@ -2,6 +2,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 
+from .legend import AUTO, COLUMN_FLOW, EXPORT_LEGEND_ITEM_FLOW_CHOICES
+
 HEX_COLOR_VALIDATOR = RegexValidator(
     regex=r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
     message="Enter a hex color such as #e0e0e0.",
@@ -12,11 +14,6 @@ LEGEND_PLACEMENTS = (
     ("bottom-right", "Bottom right"),
     ("top-left", "Top left"),
     ("top-right", "Top right"),
-)
-
-EXPORT_LEGEND_ITEM_FLOWS = (
-    ("column", "By column (fill one column, then the next)"),
-    ("row", "By row (fill across the columns)"),
 )
 
 
@@ -216,8 +213,8 @@ class WasteAtlasRenderingSettings(models.Model):
     )
     export_legend_item_flow = models.CharField(
         max_length=10,
-        choices=EXPORT_LEGEND_ITEM_FLOWS,
-        default="column",
+        choices=EXPORT_LEGEND_ITEM_FLOW_CHOICES,
+        default=COLUMN_FLOW,
         help_text=(
             "Default arrangement of legend entries across the legend columns "
             "in exports."
@@ -327,8 +324,6 @@ class WasteAtlasRenderingSettings(models.Model):
         pins them, the layout engine chooses; the item flow and the width
         fraction are the values stored on this row.
         """
-        from .legend import AUTO
-
         return {
             "placement": AUTO,
             "columns": AUTO,

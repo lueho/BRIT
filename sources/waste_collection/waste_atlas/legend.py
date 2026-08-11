@@ -40,10 +40,19 @@ FIXED_EXPORT_LEGEND_PLACEMENTS = (
 )
 EXPORT_LEGEND_PLACEMENTS = (AUTO, *FIXED_EXPORT_LEGEND_PLACEMENTS)
 FIXED_EXPORT_LEGEND_COLUMNS = (1, 2, 3, 4)
-# How legend entries are arranged across the columns.
+# How legend entries are arranged across the columns.  These labelled choices
+# are the single source of truth: the model field, the form select and
+# ``normalize_item_flow`` all derive from them, so a new arrangement can never
+# be selectable while the normalizer rejects it.
 COLUMN_FLOW = "column"
 ROW_FLOW = "row"
-EXPORT_LEGEND_ITEM_FLOWS = (COLUMN_FLOW, ROW_FLOW)
+EXPORT_LEGEND_ITEM_FLOW_CHOICES = (
+    (COLUMN_FLOW, "By column (fill one column, then the next)"),
+    (ROW_FLOW, "By row (fill across the columns)"),
+)
+EXPORT_LEGEND_ITEM_FLOWS = tuple(
+    value for value, _label in EXPORT_LEGEND_ITEM_FLOW_CHOICES
+)
 
 # Persisted flat keys that describe the export legend layout.
 EXPORT_LEGEND_OVERRIDE_KEYS = (

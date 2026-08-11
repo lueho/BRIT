@@ -4,6 +4,7 @@ from django import forms
 
 from .legend import (
     AUTO,
+    EXPORT_LEGEND_ITEM_FLOW_CHOICES,
     EXPORT_LEGEND_OVERRIDE_KEYS,
     LEGACY_EXPORT_LEGEND_KEYS,
     normalize_columns,
@@ -12,7 +13,6 @@ from .legend import (
     normalize_width_fraction,
 )
 from .models import (
-    EXPORT_LEGEND_ITEM_FLOWS,
     LEGEND_PLACEMENTS,
     WasteAtlasRenderingSettings,
 )
@@ -37,7 +37,10 @@ EXPORT_LEGEND_COLUMN_CHOICES = (
 )
 # A blank arrangement inherits the atlas default, the same way a blank maximum
 # width does; there is no "automatic" arrangement to decide.
-EXPORT_LEGEND_ITEM_FLOW_CHOICES = (("", "Atlas default"), *EXPORT_LEGEND_ITEM_FLOWS)
+EXPORT_LEGEND_ITEM_FLOW_FORM_CHOICES = (
+    ("", "Atlas default"),
+    *EXPORT_LEGEND_ITEM_FLOW_CHOICES,
+)
 
 
 class WasteAtlasMapConfigurationForm(forms.Form):
@@ -100,7 +103,7 @@ class WasteAtlasMapConfigurationForm(forms.Form):
     )
     export_legend_item_flow = forms.ChoiceField(
         label="Arrangement",
-        choices=EXPORT_LEGEND_ITEM_FLOW_CHOICES,
+        choices=EXPORT_LEGEND_ITEM_FLOW_FORM_CHOICES,
         required=False,
         help_text=(
             "Whether entries fill one column after another or read across the "

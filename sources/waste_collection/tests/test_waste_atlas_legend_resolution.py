@@ -14,6 +14,8 @@ from sources.waste_collection.waste_atlas.forms import (
     WasteAtlasMapConfigurationForm,
 )
 from sources.waste_collection.waste_atlas.legend import (
+    EXPORT_LEGEND_ITEM_FLOWS,
+    normalize_item_flow,
     resolve_export_legend,
 )
 from sources.waste_collection.waste_atlas.models import (
@@ -402,6 +404,24 @@ class ExportLegendItemFlowFormTests(TestCase):
         resave.save()
         configuration.refresh_from_db()
         self.assertNotIn("exportLegendItemFlow", configuration.configuration)
+
+    def test_every_selectable_arrangement_is_accepted(self):
+        """The select, the model field and the normalizer share one source.
+
+        A third arrangement added in one place only would be selectable but
+        rejected by ``normalize_item_flow``, which silently drops the value.
+        """
+        field = WasteAtlasRenderingSettings._meta.get_field("export_legend_item_flow")
+        selectable = {value for value, _label in field.choices}
+        form_field = WasteAtlasMapConfigurationForm(
+            instance=self._configuration()
+        ).fields["export_legend_item_flow"]
+        self.assertEqual(
+            {value for value, _label in form_field.choices} - {""}, selectable
+        )
+        self.assertEqual(set(EXPORT_LEGEND_ITEM_FLOWS), selectable)
+        for value in selectable:
+            self.assertEqual(normalize_item_flow(value), value)
 
     def test_atlas_default_arrangement_is_configurable(self):
         settings = WasteAtlasRenderingSettings.load()

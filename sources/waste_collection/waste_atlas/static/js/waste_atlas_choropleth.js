@@ -1444,7 +1444,9 @@ var WasteAtlasChoropleth = (function () {
   function _resolvedExportLegend(cfg) {
     var resolved = cfg && cfg.exportLegend;
     var defaults = _exportDefaults();
+    var atlasLegend = _defaults().exportLegend || {};
     var fallbackWidth = defaults.legendMaxWidthFraction || 0.52;
+    var fallbackItemFlow = atlasLegend.itemFlow === 'row' ? 'row' : 'column';
     if (!resolved) {
       // Backward compatibility for any caller that still passes flat keys.
       resolved = {
@@ -1457,10 +1459,12 @@ var WasteAtlasChoropleth = (function () {
     var placement = resolved.placement || 'auto';
     var columns = resolved.columns == null ? 'auto' : resolved.columns;
     var maxWidthFraction = Number(resolved.maxWidthFraction) || fallbackWidth;
+    var itemFlow = resolved.itemFlow;
+    if (itemFlow !== 'row' && itemFlow !== 'column') itemFlow = fallbackItemFlow;
     return {
       placement: placement,
       columns: columns,
-      itemFlow: resolved.itemFlow === 'row' ? 'row' : 'column',
+      itemFlow: itemFlow,
       maxWidthFraction: maxWidthFraction
     };
   }
