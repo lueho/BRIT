@@ -378,6 +378,19 @@ var WasteAtlasChoropleth = (function () {
 
   // ---- data fetching --------------------------------------------------------
 
+  function _changeCatchmentUrl(catchmentDataUrl) {
+    if (catchmentDataUrl.indexOf('collector-geojson') !== -1) {
+      return catchmentDataUrl.replace('collector-geojson', 'collector-change-geojson');
+    }
+    if (catchmentDataUrl.indexOf('collection-geojson') !== -1) {
+      return catchmentDataUrl.replace('collection-geojson', 'collection-change-geojson');
+    }
+    if (catchmentDataUrl.indexOf('geojson') !== -1) {
+      return catchmentDataUrl.replace('geojson', 'collection-change-geojson');
+    }
+    return '/waste_collection/api/waste-atlas/catchment/collection-change-geojson/';
+  }
+
   function _fetchAll(cfg) {
     var base = '/waste_collection/api/waste-atlas/';
     var nutsSuffix = cfg.nutsPrefix ? '&nuts_prefix=' + encodeURIComponent(cfg.nutsPrefix) : '';
@@ -387,8 +400,11 @@ var WasteAtlasChoropleth = (function () {
     var collectionDetailSuffix = cfg.collectionDetailCategory
       ? '&collection_detail_category=' + encodeURIComponent(cfg.collectionDetailCategory)
       : '';
-    var catchUrl = catchmentDataUrl + '?country=' + cfg.country + '&year=' + collectionYear
-      + nutsSuffix + collectionDetailSuffix;
+    var catchUrl = cfg.changeMode
+      ? _changeCatchmentUrl(catchmentDataUrl) + '?country=' + cfg.country
+        + '&from_year=' + cfg.fromYear + '&to_year=' + cfg.year + nutsSuffix
+      : catchmentDataUrl + '?country=' + cfg.country + '&year=' + collectionYear
+        + nutsSuffix + collectionDetailSuffix;
     var nuts0Url = '/maps/api/nuts_region/geojson/?levl_code=0&cntr_code=' + cfg.country;
     var nutsLevel = cfg.nutsLevel || 1;
     var nutsRegionUrl = '/maps/api/nuts_region/geojson/?levl_code=' + nutsLevel + '&cntr_code=' + cfg.country;
@@ -441,6 +457,7 @@ var WasteAtlasChoropleth = (function () {
     return [
       { value: 'no_change', label: 'No change', color: colors.noChange },
       { value: 'changed', label: 'Category changed', color: colors.changed },
+      { value: 'boundary_changed', label: 'Catchment reassigned', color: colors.boundaryChanged },
       { value: 'new', label: 'New in ' + toYear, color: colors['new'] },
       { value: 'removed', label: 'Removed in ' + toYear, color: colors.removed }
     ];
@@ -453,6 +470,7 @@ var WasteAtlasChoropleth = (function () {
       { value: 'no_change', label: 'No numeric change', color: colors.noChange },
       { value: 'increase', label: 'Increase', color: colors.increase },
       { value: 'changed', label: 'Category changed', color: colors.changed },
+      { value: 'boundary_changed', label: 'Catchment reassigned', color: colors.boundaryChanged },
       { value: 'new', label: 'New value in ' + toYear, color: colors['new'] },
       { value: 'removed', label: 'Value removed in ' + toYear, color: colors.removed }
     ];
@@ -494,7 +512,10 @@ var WasteAtlasChoropleth = (function () {
     return isNaN(number) ? null : number;
   }
 
-  function _changeRecords(cfg, fromRaw, toRaw) {
+  function _changeRecords(cfg, fromRaw, toRaw, changeFeatures) {
+    if (changeFeatures) {
+      return _spatialChangeRecords(cfg, fromRaw, toRaw, changeFeatures);
+    }
     if (cfg.numericField) {
       return _numericChangeRecords(cfg, fromRaw, toRaw);
     }
@@ -511,6 +532,62 @@ var WasteAtlasChoropleth = (function () {
       else if (to != null) change = 'new';
       else if (from != null) change = 'removed';
       return { catchment_id: parseInt(id, 10) || id, change_type: change };
+    });
+  }
+
+  function _spatialChangeRecords(cfg, fromRaw, toRaw, changeFeatures) {
+    var fromRecords = _recordLookup(fromRaw);
+    var toRecords = _recordLookup(toRaw);
+    var fromClasses = _classifyRecords(cfg, fromRaw);
+    var toClasses = _classifyRecords(cfg, toRaw);
+
+    return changeFeatures.map(function (feature) {
+      var properties = feature.properties || {};
+      var fromId = properties.from_catchment_id;
+      var toId = properties.to_catchment_id;
+      var spatialChange = properties.spatial_change;
+      var fromClass = fromId == null ? null : fromClasses[fromId];
+      var toClass = toId == null ? null : toClasses[toId];
+      var fromValue = cfg.numericField && fromId != null
+        ? _numericValue(fromRecords[fromId], cfg.numericField)
+        : null;
+      var toValue = cfg.numericField && toId != null
+        ? _numericValue(toRecords[toId], cfg.numericField)
+        : null;
+      var difference = null;
+      var change = null;
+
+      if (spatialChange === 'added') {
+        change = 'new';
+      } else if (spatialChange === 'removed') {
+        change = 'removed';
+      } else if (spatialChange === 'transferred') {
+        change = 'boundary_changed';
+      } else if (cfg.numericField && fromValue != null && toValue != null) {
+        difference = toValue - fromValue;
+        if (Math.abs(difference) < 1e-9) {
+          change = 'no_change';
+        } else {
+          change = difference > 0 ? 'increase' : 'decrease';
+        }
+      } else if (fromClass != null && toClass != null) {
+        change = fromClass === toClass ? 'no_change' : 'changed';
+      } else if (toClass != null || toValue != null) {
+        change = 'new';
+      } else if (fromClass != null || fromValue != null) {
+        change = 'removed';
+      }
+
+      return {
+        catchment_id: properties.change_feature_id || properties.catchment_id,
+        change_type: change,
+        spatial_change: spatialChange,
+        from_catchment_id: fromId,
+        to_catchment_id: toId,
+        from_value: fromValue,
+        to_value: toValue,
+        difference: difference
+      };
     });
   }
 
@@ -573,12 +650,15 @@ var WasteAtlasChoropleth = (function () {
       noDataLabel: 'No data',
       title: (baseTitle || '') + ' — changes (' + loadCfg.fromYear + ' → ' + loadCfg.year + ')'
     });
+    renderCfg.tooltipFields = [
+      { field: 'spatial_change', label: 'Boundary' }
+    ];
     if (isNumericChange) {
-      renderCfg.tooltipFields = [
+      renderCfg.tooltipFields = renderCfg.tooltipFields.concat([
         { field: 'from_value', label: String(loadCfg.fromYear) },
         { field: 'to_value', label: String(loadCfg.year) },
         { field: 'difference', label: 'Difference' }
-      ];
+      ]);
     }
     return renderCfg;
   }
@@ -3138,7 +3218,12 @@ var WasteAtlasChoropleth = (function () {
           var renderCfg = loadCfg;
           if (loadCfg.changeMode) {
             data = Object.assign({}, data, {
-              thematicData: _changeRecords(loadCfg, data.fromThematicData, data.thematicData)
+              thematicData: _changeRecords(
+                loadCfg,
+                data.fromThematicData,
+                data.thematicData,
+                data.catchments.features
+              )
             });
             renderCfg = _changeRenderConfig(loadCfg, cfg.title);
           }

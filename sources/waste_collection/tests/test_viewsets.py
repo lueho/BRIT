@@ -1,26 +1,32 @@
+import math
 from datetime import date
 from unittest.mock import patch
 from uuid import uuid4
 
+from django.conf import settings
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
-from django.core.cache import cache
+from django.core.cache import cache, caches
 from django.db import connection
 from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
+from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory, APITestCase
+from rest_framework.throttling import ScopedRateThrottle
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import (
+    CatchmentRevision,
     GeoPolygon,
     NutsRegion,
     Region,
     RegionAttributeValue,
     RegionProperty,
 )
+from maps.throttling import GeoJSONAnonThrottle
 from materials.models import Material
 from sources.waste_collection.derived_values import clear_derived_value_config_cache
 from sources.waste_collection.importers import CollectionImporter
@@ -41,6 +47,7 @@ from sources.waste_collection.models import (
     WasteFlyer,
 )
 from sources.waste_collection.viewsets import CollectionViewSet
+from sources.waste_collection.waste_atlas import viewsets as atlas_viewsets
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.properties.models import Property, Unit
 
@@ -3018,7 +3025,9 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
             cntr_code="BE",
             nuts_id="BE1",
             levl_code=1,
-            borders=GeoPolygon.objects.create(),
+            borders=GeoPolygon.objects.create(
+                geom="MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))"
+            ),
         )
         cls.be2_region = NutsRegion.objects.create(
             name="Flanders",
@@ -3026,7 +3035,9 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
             cntr_code="BE",
             nuts_id="BE2",
             levl_code=1,
-            borders=GeoPolygon.objects.create(),
+            borders=GeoPolygon.objects.create(
+                geom="MULTIPOLYGON(((2 0, 2 1, 3 1, 3 0, 2 0)))"
+            ),
         )
         cls.be3_region = NutsRegion.objects.create(
             name="Wallonia",
@@ -3034,7 +3045,9 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
             cntr_code="BE",
             nuts_id="BE3",
             levl_code=1,
-            borders=GeoPolygon.objects.create(),
+            borders=GeoPolygon.objects.create(
+                geom="MULTIPOLYGON(((4 0, 4 1, 5 1, 5 0, 4 0)))"
+            ),
         )
 
         cls.catchment_be1 = CollectionCatchment.objects.create(
@@ -5005,3 +5018,448 @@ class WasteAtlasPublicationScopingTests(APITestCase):
             self.assertEqual(response.status_code, status.HTTP_200_OK, key)
             ids = self._catchment_ids(response)
             self.assertIn(self.archived_catchment.id, ids, key)
+
+
+class WasteAtlasTemporalCatchmentGeometryTests(APITestCase):
+    """Atlas years select immutable boundary snapshots, not current geometry."""
+
+    @staticmethod
+    def _polygon(xmax):
+        return f"MULTIPOLYGON(((0 0, 0 1, {xmax} 1, {xmax} 0, 0 0)))"
+
+    @classmethod
+    def setUpTestData(cls):
+        borders = GeoPolygon.objects.create(geom=cls._polygon(2))
+        region = Region.objects.create(
+            name="Mutable current region", country="DE", borders=borders
+        )
+        cls.catchment = CollectionCatchment.objects.create(
+            name="Temporal atlas catchment", region=region
+        )
+        cls.old_revision = CatchmentRevision.objects.create(
+            catchment=cls.catchment,
+            name="Old atlas boundary",
+            effective_from=date(2020, 1, 1),
+            effective_to=date(2024, 1, 1),
+            geom=cls._polygon(1),
+            publication_status="published",
+        )
+        cls.current_revision = CatchmentRevision.objects.create(
+            catchment=cls.catchment,
+            name="Expanded atlas boundary",
+            effective_from=date(2024, 1, 1),
+            geom=cls._polygon(2),
+            publication_status="published",
+        )
+        collector = Collector.objects.create(
+            name="Temporal atlas collector", catchment=cls.catchment
+        )
+        for year in (2022, 2024):
+            Collection.objects.create(
+                name=f"Temporal collection {year}",
+                catchment=cls.catchment,
+                collector=collector,
+                valid_from=date(year, 1, 1),
+                publication_status="published",
+            )
+
+        removed_region = Region.objects.create(
+            name="Removed region",
+            country="DE",
+            borders=GeoPolygon.objects.create(
+                geom="MULTIPOLYGON(((3 0, 3 1, 4 1, 4 0, 3 0)))"
+            ),
+        )
+        cls.removed_catchment = CollectionCatchment.objects.create(
+            name="Removed catchment", region=removed_region
+        )
+        CatchmentRevision.objects.create(
+            catchment=cls.removed_catchment,
+            name="Removed boundary",
+            geom=removed_region.geom,
+            publication_status="published",
+        )
+        Collection.objects.create(
+            name="Removed collection 2022",
+            catchment=cls.removed_catchment,
+            valid_from=date(2022, 1, 1),
+            publication_status="published",
+        )
+
+        transfer_geom = "MULTIPOLYGON(((10 0, 10 1, 11 1, 11 0, 10 0)))"
+        transfer_from_region = Region.objects.create(
+            name="Transfer from region",
+            country="DE",
+            borders=GeoPolygon.objects.create(geom=transfer_geom),
+        )
+        cls.transfer_from = CollectionCatchment.objects.create(
+            name="Transfer from", region=transfer_from_region
+        )
+        CatchmentRevision.objects.create(
+            catchment=cls.transfer_from,
+            name="Transfer from boundary",
+            geom=transfer_geom,
+            publication_status="published",
+        )
+        Collection.objects.create(
+            name="Transfer source 2022",
+            catchment=cls.transfer_from,
+            valid_from=date(2022, 1, 1),
+            publication_status="published",
+        )
+
+        transfer_to_region = Region.objects.create(
+            name="Transfer to region",
+            country="DE",
+            borders=GeoPolygon.objects.create(geom=transfer_geom),
+        )
+        cls.transfer_to = CollectionCatchment.objects.create(
+            name="Transfer to", region=transfer_to_region
+        )
+        CatchmentRevision.objects.create(
+            catchment=cls.transfer_to,
+            name="Transfer to boundary",
+            geom=transfer_geom,
+            publication_status="published",
+        )
+        Collection.objects.create(
+            name="Transfer destination 2024",
+            catchment=cls.transfer_to,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+
+    @staticmethod
+    def _maximum_x(geometry):
+        positions = []
+
+        def collect(value):
+            if value and isinstance(value[0], (int, float)):
+                positions.append(value)
+                return
+            for child in value:
+                collect(child)
+
+        collect(geometry["coordinates"])
+        return max(position[0] for position in positions)
+
+    def _feature(self, action, year):
+        response = self.client.get(
+            f"/waste_collection/api/waste-atlas/catchment/{action}/",
+            {"country": "DE", "year": year},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return next(
+            feature
+            for feature in response.data["features"]
+            if feature["properties"]["catchment_id"] == self.catchment.pk
+        )
+
+    def test_collection_geometry_uses_revision_effective_in_selected_year(self):
+        historical = self._feature("collection-geojson", 2022)
+        current = self._feature("collection-geojson", 2024)
+
+        self.assertEqual(self._maximum_x(historical["geometry"]), 1)
+        self.assertEqual(self._maximum_x(current["geometry"]), 2)
+        self.assertEqual(
+            historical["properties"]["catchment_revision_id"], self.old_revision.pk
+        )
+        self.assertEqual(
+            current["properties"]["catchment_revision_id"],
+            self.current_revision.pk,
+        )
+
+    def test_collector_geometry_uses_revision_effective_in_selected_year(self):
+        historical = self._feature("collector-geojson", 2022)
+        current = self._feature("collector-geojson", 2024)
+
+        self.assertEqual(self._maximum_x(historical["geometry"]), 1)
+        self.assertEqual(self._maximum_x(current["geometry"]), 2)
+
+    def _change_features(self, action="collection-change-geojson"):
+        response = self.client.get(
+            f"/waste_collection/api/waste-atlas/catchment/{action}/",
+            {"country": "DE", "from_year": 2022, "to_year": 2024},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return response.data["features"]
+
+    def test_change_geometry_rejects_large_unbounded_requests(self):
+        with patch("maps.mixins.MAX_UNBOUNDED_GEOJSON_FEATURES", 0):
+            response = self.client.get(
+                "/waste_collection/api/waste-atlas/catchment/"
+                "collection-change-geojson/",
+                {"from_year": 2022, "to_year": 2024},
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_collector_change_geometry_rejects_large_unbounded_requests(self):
+        with patch("maps.mixins.MAX_UNBOUNDED_GEOJSON_FEATURES", 0):
+            response = self.client.get(
+                "/waste_collection/api/waste-atlas/catchment/collector-change-geojson/",
+                {"from_year": 2022, "to_year": 2024},
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_change_geometry_splits_stable_and_added_territory(self):
+        features = self._change_features()
+        related = [
+            feature
+            for feature in features
+            if feature["properties"].get("from_catchment_id") == self.catchment.pk
+            or feature["properties"].get("to_catchment_id") == self.catchment.pk
+        ]
+
+        by_change = {
+            feature["properties"]["spatial_change"]: feature for feature in related
+        }
+        self.assertEqual(set(by_change), {"stable", "added"})
+        self.assertAlmostEqual(by_change["stable"]["properties"]["area"], 1.0)
+        self.assertAlmostEqual(by_change["added"]["properties"]["area"], 1.0)
+        self.assertEqual(
+            by_change["stable"]["properties"]["catchment_name"],
+            "Temporal atlas catchment",
+        )
+
+    def test_change_geometry_includes_removed_territory(self):
+        feature = next(
+            feature
+            for feature in self._change_features()
+            if feature["properties"].get("from_catchment_id")
+            == self.removed_catchment.pk
+        )
+
+        self.assertEqual(feature["properties"]["spatial_change"], "removed")
+        self.assertIsNone(feature["properties"]["to_catchment_id"])
+
+    def test_change_geometry_classifies_transfer_between_catchments(self):
+        feature = next(
+            feature
+            for feature in self._change_features()
+            if feature["properties"].get("from_catchment_id") == self.transfer_from.pk
+            and feature["properties"].get("to_catchment_id") == self.transfer_to.pk
+        )
+
+        self.assertEqual(feature["properties"]["spatial_change"], "transferred")
+
+    def test_collector_change_geometry_uses_temporal_revisions(self):
+        features = self._change_features("collector-change-geojson")
+        changes = {
+            feature["properties"]["spatial_change"]
+            for feature in features
+            if feature["properties"].get("from_catchment_id") == self.catchment.pk
+            or feature["properties"].get("to_catchment_id") == self.catchment.pk
+        }
+
+        self.assertEqual(changes, {"stable", "added"})
+
+    def test_revision_geometry_does_not_depend_on_mutable_legacy_borders(self):
+        region = Region.objects.create(name="Revision-only region", country="DE")
+        catchment = CollectionCatchment.objects.create(
+            name="Revision-only catchment", region=region
+        )
+        revision = CatchmentRevision.objects.create(
+            catchment=catchment,
+            name="Authoritative direct geometry",
+            effective_from=date(2024, 1, 1),
+            geom=self._polygon(1),
+            publication_status="published",
+        )
+        Collection.objects.create(
+            name="Revision-only collection",
+            catchment=catchment,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/catchment/collection-geojson/",
+            {"country": "DE", "year": 2024},
+        )
+        revision_only = next(
+            item
+            for item in response.data["features"]
+            if item["properties"]["catchment_id"] == catchment.pk
+        )
+
+        self.assertEqual(
+            revision_only["properties"]["catchment_revision_id"], revision.pk
+        )
+
+    def _catchment_without_any_geometry(self):
+        region = Region.objects.create(name="Geometry-less region", country="DE")
+        catchment = CollectionCatchment.objects.create(
+            name="Geometry-less catchment", region=region
+        )
+        collector = Collector.objects.create(
+            name="Geometry-less collector", catchment=catchment
+        )
+        Collection.objects.create(
+            name="Geometry-less collection",
+            catchment=catchment,
+            collector=collector,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+        return catchment
+
+    def test_catchments_without_any_boundary_are_left_out_of_the_map(self):
+        catchment = self._catchment_without_any_geometry()
+
+        for action in ("collection-geojson", "collector-geojson"):
+            with self.subTest(action=action):
+                response = self.client.get(
+                    f"/waste_collection/api/waste-atlas/catchment/{action}/",
+                    {"country": "DE", "year": 2024},
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                served = {
+                    feature["properties"]["catchment_id"]
+                    for feature in response.data["features"]
+                }
+                self.assertNotIn(catchment.pk, served)
+
+    def test_identical_change_overlay_requests_are_computed_once(self):
+        caches[getattr(settings, "GEOJSON_CACHE", "default")].clear()
+        with patch(
+            "sources.waste_collection.waste_atlas.viewsets._build_change_geometry",
+            wraps=atlas_viewsets._build_change_geometry,
+        ) as build:
+            first = self._change_features()
+            second = self._change_features()
+
+        self.assertEqual(build.call_count, 1)
+        self.assertEqual(first, second)
+
+    def test_change_overlay_resolves_the_simplify_tolerance_once(self):
+        caches[getattr(settings, "GEOJSON_CACHE", "default")].clear()
+
+        with CaptureQueriesContext(connection) as queries:
+            features = self._change_features()
+
+        settings_queries = [
+            query
+            for query in queries.captured_queries
+            if "wasteatlasrenderingsettings" in query["sql"].lower()
+        ]
+        self.assertGreater(len(features), 1)
+        self.assertLessEqual(len(settings_queries), 2)
+
+    def test_change_overlay_actions_are_rate_limited_for_anonymous_clients(self):
+        for action in ("collection_change_geojson", "collector_change_geojson"):
+            with self.subTest(action=action):
+                viewset = atlas_viewsets.CatchmentViewSet()
+                viewset.action = action
+
+                throttles = [type(throttle) for throttle in viewset.get_throttles()]
+
+                # The subnet throttle only buckets anonymous clients, so the
+                # shared atlas scope must stay for authenticated ones.
+                self.assertIn(GeoJSONAnonThrottle, throttles)
+                self.assertIn(ScopedRateThrottle, throttles)
+
+
+class WasteAtlasChangeOverlayPrecisionTests(APITestCase):
+    """Change overlays compare boundaries at source precision."""
+
+    @staticmethod
+    def _shared_border():
+        """A shared border whose wiggle is coarser than the atlas simplify tolerance.
+
+        Simplifying each catchment on its own drops different vertices of this
+        chain, which moves the two copies of the same border apart.
+        """
+        steps = 60
+        return [
+            (1 + 0.0015 * math.sin(3 * step / steps * math.pi), step / steps)
+            for step in range(steps + 1)
+        ]
+
+    @classmethod
+    def _multipolygon(cls, ring):
+        closed = [*ring, ring[0]]
+        coordinates = ", ".join(f"{x:.8f} {y:.8f}" for x, y in closed)
+        return f"MULTIPOLYGON((({coordinates})))"
+
+    @classmethod
+    def _catchment(cls, name, ring):
+        region = Region.objects.create(
+            name=f"{name} region",
+            country="DE",
+            borders=GeoPolygon.objects.create(geom=cls._multipolygon(ring)),
+        )
+        catchment = CollectionCatchment.objects.create(name=name, region=region)
+        CatchmentRevision.objects.create(
+            catchment=catchment,
+            name=f"{name} boundary",
+            geom=cls._multipolygon(ring),
+            publication_status="published",
+        )
+        for year in (2022, 2024):
+            Collection.objects.create(
+                name=f"{name} collection {year}",
+                catchment=catchment,
+                valid_from=date(year, 1, 1),
+                publication_status="published",
+            )
+        return catchment
+
+    @classmethod
+    def setUpTestData(cls):
+        border = cls._shared_border()
+        cls.west = cls._catchment("Western neighbour", [*border, (0, 1), (0, 0)])
+        cls.east = cls._catchment(
+            "Eastern neighbour", [*reversed(border), (3, 0), (3, 1)]
+        )
+
+    def _features(self):
+        caches[getattr(settings, "GEOJSON_CACHE", "default")].clear()
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/catchment/collection-change-geojson/",
+            {"country": "DE", "from_year": 2022, "to_year": 2024},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return response.data["features"]
+
+    def test_unchanged_neighbours_do_not_produce_transferred_slivers(self):
+        changes = {
+            feature["properties"]["spatial_change"] for feature in self._features()
+        }
+
+        self.assertEqual(changes, {"stable"})
+
+    def test_unchanged_neighbours_stay_whole(self):
+        stable = {
+            feature["properties"]["from_catchment_id"]: feature["properties"]["area"]
+            for feature in self._features()
+            if feature["properties"]["spatial_change"] == "stable"
+        }
+
+        self.assertAlmostEqual(stable[self.west.pk], 1.0, places=3)
+        self.assertAlmostEqual(stable[self.east.pk], 2.0, places=3)
+
+
+class WasteAtlasChangeYearParsingTests(APITestCase):
+    """Overlay years are bounded so anonymous clients cannot walk the cache."""
+
+    def _years(self, params):
+        return atlas_viewsets._parse_change_years(
+            Request(APIRequestFactory().get("/", params))
+        )
+
+    def test_out_of_range_years_are_clamped_to_the_atlas_range(self):
+        self.assertEqual(
+            self._years({"from_year": 1900, "to_year": 3000}),
+            (atlas_viewsets.MIN_ATLAS_YEAR, atlas_viewsets.MAX_ATLAS_YEAR),
+        )
+
+    def test_supported_years_pass_through(self):
+        self.assertEqual(
+            self._years({"from_year": 2022, "to_year": 2023}), (2022, 2023)
+        )
+
+    def test_unparsable_years_fall_back_to_the_defaults(self):
+        self.assertEqual(self._years({"from_year": "n/a"}), (2023, 2024))

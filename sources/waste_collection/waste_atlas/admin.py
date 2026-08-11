@@ -64,6 +64,7 @@ class WasteAtlasRenderingSettingsAdmin(admin.ModelAdmin):
                 "fields": (
                     "change_no_change_color",
                     "change_changed_color",
+                    "change_boundary_changed_color",
                     "change_new_color",
                     "change_removed_color",
                     "change_increase_color",

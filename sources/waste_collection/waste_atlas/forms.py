@@ -95,8 +95,7 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         max_value=90,
         required=False,
         help_text=(
-            "Hard upper bound. The legend is fitted to its content and may be "
-            "narrower."
+            "Hard upper bound. The legend is fitted to its content and may be narrower."
         ),
         widget=forms.NumberInput(attrs={"class": "form-control", "step": 1}),
     )
