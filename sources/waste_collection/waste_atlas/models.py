@@ -2,6 +2,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 
+from .legend import AUTO, COLUMN_FLOW, EXPORT_LEGEND_ITEM_FLOW_CHOICES
+
 HEX_COLOR_VALIDATOR = RegexValidator(
     regex=r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
     message="Enter a hex color such as #e0e0e0.",
@@ -209,6 +211,15 @@ class WasteAtlasRenderingSettings(models.Model):
             "exceeds this bound."
         ),
     )
+    export_legend_item_flow = models.CharField(
+        max_length=10,
+        choices=EXPORT_LEGEND_ITEM_FLOW_CHOICES,
+        default=COLUMN_FLOW,
+        help_text=(
+            "Default arrangement of legend entries across the legend columns "
+            "in exports."
+        ),
+    )
     export_file_name_prefix = models.SlugField(
         max_length=50,
         default="waste_atlas",
@@ -310,13 +321,12 @@ class WasteAtlasRenderingSettings(models.Model):
         """Atlas-level fallback for the resolved export-legend config.
 
         Placement and columns default to ``auto`` so, unless a theme or page
-        pins them, the layout engine chooses; the width fraction is the hard
-        upper bound stored on this row.
+        pins them, the layout engine chooses; the item flow and the width
+        fraction are the values stored on this row.
         """
-        from .legend import AUTO
-
         return {
             "placement": AUTO,
             "columns": AUTO,
+            "itemFlow": self.export_legend_item_flow,
             "maxWidthFraction": self.export_legend_width_fraction,
         }

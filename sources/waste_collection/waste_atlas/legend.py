@@ -1,11 +1,14 @@
 """Single source of truth for export-legend configuration semantics.
 
-The Waste Atlas export legend has three *independent* settings:
+The Waste Atlas export legend has four *independent* settings:
 
 ``placement``
     ``auto`` (choose automatically) or one of the fixed placements.
 ``columns``
     ``auto`` (choose automatically) or an exact count ``1``-``4``.
+``itemFlow``
+    ``column`` (fill one column after another) or ``row`` (fill across the
+    columns, so entries read left to right).
 ``maxWidthFraction``
     A hard upper bound on legend width as a fraction of the page; the
     renderer measures content and never uses more width than needed, so the
@@ -37,11 +40,25 @@ FIXED_EXPORT_LEGEND_PLACEMENTS = (
 )
 EXPORT_LEGEND_PLACEMENTS = (AUTO, *FIXED_EXPORT_LEGEND_PLACEMENTS)
 FIXED_EXPORT_LEGEND_COLUMNS = (1, 2, 3, 4)
+# How legend entries are arranged across the columns.  These labelled choices
+# are the single source of truth: the model field, the form select and
+# ``normalize_item_flow`` all derive from them, so a new arrangement can never
+# be selectable while the normalizer rejects it.
+COLUMN_FLOW = "column"
+ROW_FLOW = "row"
+EXPORT_LEGEND_ITEM_FLOW_CHOICES = (
+    (COLUMN_FLOW, "By column (fill one column, then the next)"),
+    (ROW_FLOW, "By row (fill across the columns)"),
+)
+EXPORT_LEGEND_ITEM_FLOWS = tuple(
+    value for value, _label in EXPORT_LEGEND_ITEM_FLOW_CHOICES
+)
 
 # Persisted flat keys that describe the export legend layout.
 EXPORT_LEGEND_OVERRIDE_KEYS = (
     "exportLegendPlacement",
     "exportLegendColumns",
+    "exportLegendItemFlow",
     "exportLegendWidth",
 )
 # Retired keys.  "Fit width to content" and "avoid map overlap" are now hard
@@ -94,6 +111,16 @@ def normalize_columns(value):
     return None
 
 
+def normalize_item_flow(value):
+    """Return a canonical item flow, or ``None`` when the value means inherit."""
+    if value is None:
+        return None
+    value = str(value).strip()
+    if value in EXPORT_LEGEND_ITEM_FLOWS:
+        return value
+    return None
+
+
 def normalize_width_fraction(value):
     """Return a clamped width fraction, or ``None`` when it means inherit."""
     if value is None or value == "":
@@ -122,8 +149,8 @@ def resolve_export_legend(*, stored, page_overrides, defaults):
     """Resolve the one effective export-legend config the renderer consumes.
 
     ``defaults`` is the atlas-level fallback object
-    (``{"placement", "columns", "maxWidthFraction"}``) and is always fully
-    populated, so the returned object never contains ``None``.
+    (``{"placement", "columns", "itemFlow", "maxWidthFraction"}``) and is always
+    fully populated, so the returned object never contains ``None``.
     """
     layers = (page_overrides or {}, stored or {})
     return {
@@ -138,6 +165,12 @@ def resolve_export_legend(*, stored, page_overrides, defaults):
             normalize_columns,
             layers,
             defaults["columns"],
+        ),
+        "itemFlow": _resolve(
+            "exportLegendItemFlow",
+            normalize_item_flow,
+            layers,
+            defaults["itemFlow"],
         ),
         "maxWidthFraction": _resolve(
             "exportLegendWidth",

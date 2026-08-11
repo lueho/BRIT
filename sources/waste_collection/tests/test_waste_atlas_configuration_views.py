@@ -47,6 +47,8 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
                 configuration.get("exportLegendWidth", 0.52) * 100
             ),
             "export_legend_columns": str(stored_columns),
+            # Blank means "inherit the atlas default".
+            "export_legend_item_flow": configuration.get("exportLegendItemFlow", ""),
         }
         # Any stored export-legend override means the map customizes the export.
         if any(
@@ -54,6 +56,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
             for key in (
                 "exportLegendPlacement",
                 "exportLegendColumns",
+                "exportLegendItemFlow",
                 "exportLegendWidth",
             )
         ):
@@ -137,6 +140,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
                 export_legend_placement="left",
                 export_legend_width=38,
                 export_legend_columns="2",
+                export_legend_item_flow="row",
                 return_to=map_url,
             ),
         )
@@ -173,6 +177,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         self.assertEqual(config.configuration["exportLegendPlacement"], "left")
         self.assertEqual(config.configuration["exportLegendWidth"], 0.38)
         self.assertEqual(config.configuration["exportLegendColumns"], 2)
+        self.assertEqual(config.configuration["exportLegendItemFlow"], "row")
         # Retired options are never persisted.
         self.assertNotIn("exportLegendFitContent", config.configuration)
         self.assertNotIn("exportLegendAvoidMapOverlap", config.configuration)
@@ -194,6 +199,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
             value.pop("exportLegendPlacement", None)
             value.pop("exportLegendWidth", None)
             value.pop("exportLegendColumns", None)
+            value.pop("exportLegendItemFlow", None)
             value.pop("exportLegendFitContent", None)
             value.pop("exportLegendAvoidMapOverlap", None)
             value.pop("legendCategoryOrder", None)
@@ -226,7 +232,12 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         # The renderer receives one resolved object, not flat layout keys.
         self.assertEqual(
             rendered_config["exportLegend"],
-            {"placement": "left", "columns": 2, "maxWidthFraction": 0.38},
+            {
+                "placement": "left",
+                "columns": 2,
+                "itemFlow": "row",
+                "maxWidthFraction": 0.38,
+            },
         )
         self.assertNotIn("exportLegendPlacement", rendered_config)
         self.assertEqual(
@@ -270,7 +281,12 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         rendered_config = self._rendered_map_config(map_response)
         self.assertEqual(
             rendered_config["exportLegend"],
-            {"placement": "auto", "columns": 1, "maxWidthFraction": 0.52},
+            {
+                "placement": "auto",
+                "columns": 1,
+                "itemFlow": "column",
+                "maxWidthFraction": 0.52,
+            },
         )
 
     def test_blank_export_text_uses_preview_text_fallback(self):
@@ -400,7 +416,12 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         rendered_config = self._rendered_map_config(map_response)
         self.assertEqual(
             rendered_config["exportLegend"],
-            {"placement": "top-left", "columns": 2, "maxWidthFraction": 0.45},
+            {
+                "placement": "top-left",
+                "columns": 2,
+                "itemFlow": "column",
+                "maxWidthFraction": 0.45,
+            },
         )
 
 

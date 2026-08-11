@@ -1,10 +1,10 @@
 """Export-legend configuration semantics: inherit / auto / fixed + precedence.
 
-The export legend has three independent settings (placement, columns, maximum
-width). Each is resolved with explicit *inherit* (missing), *auto* (decide
-automatically) and *fixed* semantics, with precedence page/region override ->
-stored theme config -> atlas defaults. These tests pin that resolution down
-directly and through the form and template tag.
+The export legend has four independent settings (placement, columns, item flow,
+maximum width). Each is resolved with explicit *inherit* (missing), *auto*
+(decide automatically) and *fixed* semantics, with precedence page/region
+override -> stored theme config -> atlas defaults. These tests pin that
+resolution down directly and through the form and template tag.
 """
 
 from django.template import Context
@@ -14,6 +14,8 @@ from sources.waste_collection.waste_atlas.forms import (
     WasteAtlasMapConfigurationForm,
 )
 from sources.waste_collection.waste_atlas.legend import (
+    EXPORT_LEGEND_ITEM_FLOWS,
+    normalize_item_flow,
     resolve_export_legend,
 )
 from sources.waste_collection.waste_atlas.models import (
@@ -24,7 +26,12 @@ from sources.waste_collection.waste_atlas.templatetags.atlas_tags import (
     atlas_js_config,
 )
 
-ATLAS_DEFAULTS = {"placement": "auto", "columns": "auto", "maxWidthFraction": 0.52}
+ATLAS_DEFAULTS = {
+    "placement": "auto",
+    "columns": "auto",
+    "itemFlow": "column",
+    "maxWidthFraction": 0.52,
+}
 
 
 class ResolveExportLegendTests(TestCase):
@@ -48,7 +55,12 @@ class ResolveExportLegendTests(TestCase):
         )
         self.assertEqual(
             resolved,
-            {"placement": "auto", "columns": "auto", "maxWidthFraction": 0.4},
+            {
+                "placement": "auto",
+                "columns": "auto",
+                "itemFlow": "column",
+                "maxWidthFraction": 0.4,
+            },
         )
 
     def test_fixed_values_are_honoured(self):
@@ -56,12 +68,18 @@ class ResolveExportLegendTests(TestCase):
             stored={
                 "exportLegendPlacement": "left",
                 "exportLegendColumns": 1,
+                "exportLegendItemFlow": "row",
                 "exportLegendWidth": 0.52,
             }
         )
         self.assertEqual(
             resolved,
-            {"placement": "left", "columns": 1, "maxWidthFraction": 0.52},
+            {
+                "placement": "left",
+                "columns": 1,
+                "itemFlow": "row",
+                "maxWidthFraction": 0.52,
+            },
         )
 
     def test_page_override_wins_over_stored_theme_config(self):
@@ -74,19 +92,30 @@ class ResolveExportLegendTests(TestCase):
             page_overrides={
                 "exportLegendPlacement": "right",
                 "exportLegendColumns": 1,
+                "exportLegendItemFlow": "row",
             },
         )
-        # Placement/columns come from the page; width still inherits the theme.
+        # Placement/columns/flow come from the page; width inherits the theme.
         self.assertEqual(
             resolved,
-            {"placement": "right", "columns": 1, "maxWidthFraction": 0.4},
+            {
+                "placement": "right",
+                "columns": 1,
+                "itemFlow": "row",
+                "maxWidthFraction": 0.4,
+            },
         )
 
     def test_stored_wins_over_atlas_default_when_no_page_override(self):
         resolved = self._resolve(stored={"exportLegendWidth": 0.7})
         self.assertEqual(
             resolved,
-            {"placement": "auto", "columns": "auto", "maxWidthFraction": 0.7},
+            {
+                "placement": "auto",
+                "columns": "auto",
+                "itemFlow": "column",
+                "maxWidthFraction": 0.7,
+            },
         )
 
     def test_retired_keys_do_not_affect_resolution(self):
@@ -110,10 +139,12 @@ class ResolveExportLegendTests(TestCase):
             stored={
                 "exportLegendPlacement": "nonsense",
                 "exportLegendColumns": 9,
+                "exportLegendItemFlow": "diagonal",
             }
         )
         self.assertEqual(resolved["placement"], "auto")
         self.assertEqual(resolved["columns"], "auto")
+        self.assertEqual(resolved["itemFlow"], "column")
 
 
 class AtlasJsConfigExportLegendTests(TestCase):
@@ -134,6 +165,7 @@ class AtlasJsConfigExportLegendTests(TestCase):
         for key in (
             "exportLegendPlacement",
             "exportLegendColumns",
+            "exportLegendItemFlow",
             "exportLegendWidth",
         ):
             self.assertNotIn(key, config)
@@ -142,11 +174,17 @@ class AtlasJsConfigExportLegendTests(TestCase):
         self._store(
             exportLegendPlacement="right",
             exportLegendColumns=1,
+            exportLegendItemFlow="row",
             exportLegendWidth=0.52,
         )
         self.assertEqual(
             self._config()["exportLegend"],
-            {"placement": "right", "columns": 1, "maxWidthFraction": 0.52},
+            {
+                "placement": "right",
+                "columns": 1,
+                "itemFlow": "row",
+                "maxWidthFraction": 0.52,
+            },
         )
 
     def test_page_override_wins_over_stored_theme_config(self):
@@ -175,6 +213,7 @@ class ExportLegendFormSemanticsTests(TestCase):
             "legend_font_size": 12,
             "export_legend_placement": "auto",
             "export_legend_columns": "auto",
+            "export_legend_item_flow": "column",
             "export_legend_width": 52,
         }
         for index, category in enumerate(configuration.configuration["categories"]):
@@ -190,6 +229,7 @@ class ExportLegendFormSemanticsTests(TestCase):
             {
                 "exportLegendPlacement": "left",
                 "exportLegendColumns": 2,
+                "exportLegendItemFlow": "row",
                 "exportLegendWidth": 0.4,
             }
         )
@@ -206,6 +246,7 @@ class ExportLegendFormSemanticsTests(TestCase):
         for key in (
             "exportLegendPlacement",
             "exportLegendColumns",
+            "exportLegendItemFlow",
             "exportLegendWidth",
         ):
             self.assertNotIn(key, configuration.configuration)
@@ -280,3 +321,116 @@ class ExportLegendFormSemanticsTests(TestCase):
         custom_form = WasteAtlasMapConfigurationForm(instance=configuration)
         self.assertTrue(custom_form.initial["export_legend_customize"])
         self.assertEqual(custom_form.initial["export_legend_placement"], "auto")
+
+
+class ExportLegendItemFlowFormTests(TestCase):
+    """The arrangement of legend entries is staff-configurable per map."""
+
+    def _configuration(self):
+        return WasteAtlasMapConfiguration.objects.get(key="collection_system")
+
+    def _data(self, configuration, **overrides):
+        data = {
+            "legend_title": configuration.configuration["legendTitle"],
+            "export_legend_title": "",
+            "legend_placement": "bottom-left",
+            "legend_width": 300,
+            "legend_font_size": 12,
+            "export_legend_customize": "on",
+            "export_legend_placement": "auto",
+            "export_legend_columns": "2",
+            "export_legend_item_flow": "row",
+            "export_legend_width": 52,
+        }
+        for index, category in enumerate(configuration.configuration["categories"]):
+            data[f"category_{index}_label"] = category["label"]
+            data[f"category_{index}_export_label"] = category.get("exportLabel", "")
+            data[f"category_{index}_order"] = index + 1
+        data.update(overrides)
+        return data
+
+    def test_row_arrangement_is_stored_and_reaches_the_renderer(self):
+        configuration = self._configuration()
+        form = WasteAtlasMapConfigurationForm(
+            data=self._data(configuration), instance=configuration
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+
+        configuration.refresh_from_db()
+        self.assertEqual(configuration.configuration["exportLegendItemFlow"], "row")
+
+        config = atlas_js_config(Context({}), "collection_system")
+        self.assertEqual(config["exportLegend"]["itemFlow"], "row")
+
+    def test_initial_reflects_the_stored_arrangement(self):
+        configuration = self._configuration()
+        configuration.configuration["exportLegendItemFlow"] = "row"
+        configuration.save(update_fields=["configuration"])
+        form = WasteAtlasMapConfigurationForm(instance=configuration)
+        self.assertTrue(form.initial["export_legend_customize"])
+        self.assertEqual(form.initial["export_legend_item_flow"], "row")
+
+    def test_blank_arrangement_preserves_inheritance(self):
+        configuration = self._configuration()
+        form = WasteAtlasMapConfigurationForm(
+            data=self._data(configuration, export_legend_item_flow=""),
+            instance=configuration,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+
+        configuration.refresh_from_db()
+        # Customizing placement, columns or width must not freeze a copy of the
+        # atlas-wide arrangement onto this map.
+        self.assertNotIn("exportLegendItemFlow", configuration.configuration)
+        self.assertEqual(configuration.configuration["exportLegendColumns"], 2)
+
+        settings = WasteAtlasRenderingSettings.load()
+        settings.export_legend_item_flow = "row"
+        settings.save()
+        config = atlas_js_config(Context({}), "collection_system")
+        self.assertEqual(config["exportLegend"]["itemFlow"], "row")
+
+        # Inheritance must be durable: reopening shows a blank arrangement and
+        # saving again keeps it inherited.
+        reopened = WasteAtlasMapConfigurationForm(instance=configuration)
+        self.assertEqual(reopened.initial["export_legend_item_flow"], "")
+        resave = WasteAtlasMapConfigurationForm(
+            data=self._data(configuration, export_legend_item_flow=""),
+            instance=configuration,
+        )
+        self.assertTrue(resave.is_valid(), resave.errors)
+        resave.save()
+        configuration.refresh_from_db()
+        self.assertNotIn("exportLegendItemFlow", configuration.configuration)
+
+    def test_every_selectable_arrangement_is_accepted(self):
+        """The select, the model field and the normalizer share one source.
+
+        A third arrangement added in one place only would be selectable but
+        rejected by ``normalize_item_flow``, which silently drops the value.
+        """
+        field = WasteAtlasRenderingSettings._meta.get_field("export_legend_item_flow")
+        selectable = {value for value, _label in field.choices}
+        form_field = WasteAtlasMapConfigurationForm(
+            instance=self._configuration()
+        ).fields["export_legend_item_flow"]
+        self.assertEqual(
+            {value for value, _label in form_field.choices} - {""}, selectable
+        )
+        self.assertEqual(set(EXPORT_LEGEND_ITEM_FLOWS), selectable)
+        for value in selectable:
+            self.assertEqual(normalize_item_flow(value), value)
+
+    def test_atlas_default_arrangement_is_configurable(self):
+        settings = WasteAtlasRenderingSettings.load()
+        settings.export_legend_item_flow = "row"
+        settings.save()
+        self.assertEqual(settings.export_legend_defaults()["itemFlow"], "row")
+        self.assertEqual(
+            atlas_js_config(Context({}), "collection_system")["exportLegend"][
+                "itemFlow"
+            ],
+            "row",
+        )

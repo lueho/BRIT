@@ -30,17 +30,40 @@ vm.runInContext(source, sandbox);
 const { layout, setRenderDefaults } = sandbox.WasteAtlasChoropleth;
 
 // Minimal render defaults so DOM-free helpers that read export geometry work.
-setRenderDefaults({
-  export: {
-    dpi: 300,
-    widthMm: 160,
-    heightMm: 110,
-    maxHeightMm: 180,
-    legendFontSizePt: 9,
-    legendFontFamily: "sans-serif",
-    legendMaxWidthFraction: 0.52,
-  },
-});
+function renderDefaults(exportLegend = {}) {
+  return {
+    export: {
+      dpi: 300,
+      widthMm: 160,
+      heightMm: 110,
+      maxHeightMm: 180,
+      legendFontSizePt: 9,
+      legendFontFamily: "sans-serif",
+      legendMaxWidthFraction: 0.52,
+    },
+    exportLegend: Object.assign(
+      {
+        placement: "auto",
+        columns: "auto",
+        itemFlow: "column",
+        maxWidthFraction: 0.52,
+      },
+      exportLegend,
+    ),
+  };
+}
+
+setRenderDefaults(renderDefaults());
+
+// Run `body` against atlas-wide defaults overridden by `exportLegend`.
+function withAtlasDefaults(exportLegend, body) {
+  setRenderDefaults(renderDefaults(exportLegend));
+  try {
+    body();
+  } finally {
+    setRenderDefaults(renderDefaults());
+  }
+}
 
 const EXPORT_WIDTH = Math.round((160 / 25.4) * 300); // 1890
 const PAGE_HEIGHT = Math.round((110 / 25.4) * 300); // 1299
@@ -74,16 +97,26 @@ test("resolveExportLegend returns explicit auto values verbatim", () => {
     layout.resolveExportLegend({
       exportLegend: { placement: "auto", columns: "auto", maxWidthFraction: 0.4 },
     }),
-    { placement: "auto", columns: "auto", maxWidthFraction: 0.4 },
+    {
+      placement: "auto",
+      columns: "auto",
+      itemFlow: "column",
+      maxWidthFraction: 0.4,
+    },
   );
 });
 
 test("resolveExportLegend keeps fixed values", () => {
   assert.deepEqual(
     layout.resolveExportLegend({
-      exportLegend: { placement: "left", columns: 2, maxWidthFraction: 0.38 },
+      exportLegend: {
+        placement: "left",
+        columns: 2,
+        itemFlow: "row",
+        maxWidthFraction: 0.38,
+      },
     }),
-    { placement: "left", columns: 2, maxWidthFraction: 0.38 },
+    { placement: "left", columns: 2, itemFlow: "row", maxWidthFraction: 0.38 },
   );
 });
 
@@ -91,8 +124,65 @@ test("resolveExportLegend falls back to atlas defaults when absent", () => {
   assert.deepEqual(layout.resolveExportLegend({}), {
     placement: "auto",
     columns: "auto",
+    itemFlow: "column",
     maxWidthFraction: 0.52,
   });
+});
+
+test("resolveExportLegend rejects an unknown item flow", () => {
+  assert.equal(
+    layout.resolveExportLegend({ exportLegend: { itemFlow: "diagonal" } }).itemFlow,
+    "column",
+  );
+});
+
+test("resolveExportLegend inherits the atlas-wide item flow", () => {
+  withAtlasDefaults({ itemFlow: "row" }, () => {
+    // Absent, invalid and flat-key configs all fall back to the atlas default,
+    // exactly like the maximum width does.
+    assert.equal(layout.resolveExportLegend({}).itemFlow, "row");
+    assert.equal(
+      layout.resolveExportLegend({ exportLegend: { itemFlow: "diagonal" } }).itemFlow,
+      "row",
+    );
+    assert.equal(layout.resolveExportLegend({ exportLegendColumns: 2 }).itemFlow, "row");
+    assert.equal(
+      layout.resolveExportLegend({ exportLegendItemFlow: "column" }).itemFlow,
+      "column",
+    );
+  });
+});
+
+function flowItems(heights) {
+  return heights.map((height, index) => ({ label: "item " + index, height: height }));
+}
+
+test("column flow balances the columns", () => {
+  const columns = layout.distributeLegendItems(flowItems([10, 10, 10, 10]), 2, "column", 0);
+  assert.deepEqual(
+    columns.map((column) => column.map((item) => item.label)),
+    [
+      ["item 0", "item 2"],
+      ["item 1", "item 3"],
+    ],
+  );
+});
+
+test("row flow fills across the columns in order", () => {
+  const columns = layout.distributeLegendItems(flowItems([10, 10, 10, 10, 10]), 3, "row", 0);
+  assert.deepEqual(
+    columns.map((column) => column.map((item) => item.label)),
+    [["item 0", "item 3"], ["item 1", "item 4"], ["item 2"]],
+  );
+});
+
+test("row flow gives every entry of a row the row's height so rows line up", () => {
+  const items = flowItems([10, 30, 10, 10]);
+  layout.distributeLegendItems(items, 2, "row", 0);
+  assert.deepEqual(
+    items.map((item) => item.slotHeight),
+    [30, 30, 10, 10],
+  );
 });
 
 test("placement candidates: auto expands, fixed pins", () => {
