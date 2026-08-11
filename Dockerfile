@@ -18,10 +18,18 @@ ARG INSTALL_DEV=false
 # Optional build-time flag: set to "true" to include PDF parsing dependencies/tools
 ARG INSTALL_PDF_PARSING=false
 
+# The environment is built under the uid the runtime stages run as, so copying
+# it needs no `--chown` pass over ~500 MB of files and the runtime user can
+# still install into it, e.g. while debugging inside a running container.
+RUN useradd --system --uid 1000 --create-home --shell /bin/bash standard_user \
+    && install -d -o standard_user -g standard_user /opt/venv /app
+
 WORKDIR /app
 
 # Copy dependency metadata only
-COPY pyproject.toml uv.lock* ./
+COPY --chown=standard_user:standard_user pyproject.toml uv.lock* ./
+
+USER standard_user
 
 # Resolve & install deps into /opt/venv with --frozen for reproducibility.
 # Every locked distribution ships a wheel, so no compiler or -dev headers are
@@ -63,14 +71,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fi \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 1000 --create-home --shell /bin/bash standard_user \
-    && install -d -o standard_user -g standard_user /app/staticfiles
+    && install -d -o standard_user -g standard_user /app/staticfiles /opt/venv
 
 # Virtual environment first on PATH
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# The virtual environment is only read at runtime, so it stays root-owned:
-# re-owning ~500 MB of files rewrites the whole layer on every build.
+# Already owned by uid 1000 in the builder, so no ownership rewrite here.
 COPY --from=builder /opt/venv /opt/venv
 
 WORKDIR /app
