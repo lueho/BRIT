@@ -35,7 +35,9 @@ EXPORT_LEGEND_COLUMN_CHOICES = (
     ("3", "3"),
     ("4", "4"),
 )
-EXPORT_LEGEND_ITEM_FLOW_CHOICES = EXPORT_LEGEND_ITEM_FLOWS
+# A blank arrangement inherits the atlas default, the same way a blank maximum
+# width does; there is no "automatic" arrangement to decide.
+EXPORT_LEGEND_ITEM_FLOW_CHOICES = (("", "Atlas default"), *EXPORT_LEGEND_ITEM_FLOWS)
 
 
 class WasteAtlasMapConfigurationForm(forms.Form):
@@ -102,7 +104,7 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         required=False,
         help_text=(
             "Whether entries fill one column after another or read across the "
-            "columns row by row."
+            "columns row by row. Blank keeps the atlas default."
         ),
         widget=forms.Select(attrs={"class": "form-select"}),
     )
@@ -157,10 +159,12 @@ class WasteAtlasMapConfigurationForm(forms.Form):
             "export_legend_columns",
             AUTO if stored_columns in (None, AUTO) else str(stored_columns),
         )
+        # Blank unless an override is stored, so inheritance stays durable: a
+        # map customized for placement, columns or width keeps tracking the
+        # atlas-wide arrangement instead of freezing today's value.
         initial.setdefault(
             "export_legend_item_flow",
-            normalize_item_flow(self._configuration.get("exportLegendItemFlow"))
-            or self._defaults.export_legend_item_flow,
+            normalize_item_flow(self._configuration.get("exportLegendItemFlow")) or "",
         )
         stored_width = normalize_width_fraction(
             self._configuration.get("exportLegendWidth")
@@ -305,10 +309,13 @@ class WasteAtlasMapConfigurationForm(forms.Form):
             configuration["exportLegendColumns"] = (
                 AUTO if columns == AUTO else int(columns)
             )
-            configuration["exportLegendItemFlow"] = (
-                normalize_item_flow(self.cleaned_data.get("export_legend_item_flow"))
-                or self._defaults.export_legend_item_flow
+            item_flow = normalize_item_flow(
+                self.cleaned_data.get("export_legend_item_flow")
             )
+            if item_flow is None:
+                configuration.pop("exportLegendItemFlow", None)
+            else:
+                configuration["exportLegendItemFlow"] = item_flow
             width_percent = self.cleaned_data.get("export_legend_width")
             if width_percent is None:
                 # A blank maximum width must keep inheriting from the atlas

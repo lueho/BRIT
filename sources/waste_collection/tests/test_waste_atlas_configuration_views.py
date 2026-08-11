@@ -47,9 +47,8 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
                 configuration.get("exportLegendWidth", 0.52) * 100
             ),
             "export_legend_columns": str(stored_columns),
-            "export_legend_item_flow": configuration.get(
-                "exportLegendItemFlow", "column"
-            ),
+            # Blank means "inherit the atlas default".
+            "export_legend_item_flow": configuration.get("exportLegendItemFlow", ""),
         }
         # Any stored export-legend override means the map customizes the export.
         if any(

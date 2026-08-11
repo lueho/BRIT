@@ -369,6 +369,40 @@ class ExportLegendItemFlowFormTests(TestCase):
         self.assertTrue(form.initial["export_legend_customize"])
         self.assertEqual(form.initial["export_legend_item_flow"], "row")
 
+    def test_blank_arrangement_preserves_inheritance(self):
+        configuration = self._configuration()
+        form = WasteAtlasMapConfigurationForm(
+            data=self._data(configuration, export_legend_item_flow=""),
+            instance=configuration,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+
+        configuration.refresh_from_db()
+        # Customizing placement, columns or width must not freeze a copy of the
+        # atlas-wide arrangement onto this map.
+        self.assertNotIn("exportLegendItemFlow", configuration.configuration)
+        self.assertEqual(configuration.configuration["exportLegendColumns"], 2)
+
+        settings = WasteAtlasRenderingSettings.load()
+        settings.export_legend_item_flow = "row"
+        settings.save()
+        config = atlas_js_config(Context({}), "collection_system")
+        self.assertEqual(config["exportLegend"]["itemFlow"], "row")
+
+        # Inheritance must be durable: reopening shows a blank arrangement and
+        # saving again keeps it inherited.
+        reopened = WasteAtlasMapConfigurationForm(instance=configuration)
+        self.assertEqual(reopened.initial["export_legend_item_flow"], "")
+        resave = WasteAtlasMapConfigurationForm(
+            data=self._data(configuration, export_legend_item_flow=""),
+            instance=configuration,
+        )
+        self.assertTrue(resave.is_valid(), resave.errors)
+        resave.save()
+        configuration.refresh_from_db()
+        self.assertNotIn("exportLegendItemFlow", configuration.configuration)
+
     def test_atlas_default_arrangement_is_configurable(self):
         settings = WasteAtlasRenderingSettings.load()
         settings.export_legend_item_flow = "row"
