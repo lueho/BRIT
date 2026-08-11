@@ -87,6 +87,7 @@ class WasteAtlasRenderingSettingsAdmin(admin.ModelAdmin):
                     "export_legend_font_size_pt",
                     "export_legend_font_family",
                     "export_legend_width_fraction",
+                    "export_legend_item_flow",
                     "export_file_name_prefix",
                 )
             },

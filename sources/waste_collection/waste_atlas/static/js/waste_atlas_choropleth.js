@@ -1212,7 +1212,49 @@ var WasteAtlasChoropleth = (function () {
     return Math.min(maxWidth, Math.ceil(contentWidth + opts.paddingX * 2 + 2));
   }
 
-  function _measureExportLegend(cfg, width, columnCount) {
+  // Arrange the measured items into ``columnCount`` columns.
+  //
+  // ``column`` flow fills one column after another and balances the columns by
+  // height. ``row`` flow reads across the columns instead, so entry order runs
+  // left to right; every entry of a row then gets the row's tallest height as
+  // its ``slotHeight`` so the rows line up across columns.
+  function _distributeLegendItems(items, columnCount, itemFlow, rowGap) {
+    var columns = [];
+    for (var i = 0; i < columnCount; i++) columns.push([]);
+    if (itemFlow === 'row') {
+      var rowHeights = [];
+      items.forEach(function (item, index) {
+        var row = Math.floor(index / columnCount);
+        rowHeights[row] = Math.max(rowHeights[row] || 0, item.height);
+      });
+      items.forEach(function (item, index) {
+        item.slotHeight = rowHeights[Math.floor(index / columnCount)];
+        columns[index % columnCount].push(item);
+      });
+      return columns;
+    }
+    function columnHeight(column) {
+      return column.reduce(function (total, item, index) {
+        return total + _legendSlotHeight(item) + (index ? rowGap : 0);
+      }, 0);
+    }
+    items.forEach(function (item) {
+      var shortestIndex = 0;
+      columns.forEach(function (column, index) {
+        if (columnHeight(column) < columnHeight(columns[shortestIndex])) {
+          shortestIndex = index;
+        }
+      });
+      columns[shortestIndex].push(item);
+    });
+    return columns;
+  }
+
+  function _legendSlotHeight(item) {
+    return item.slotHeight == null ? item.height : item.slotHeight;
+  }
+
+  function _measureExportLegend(cfg, width, columnCount, itemFlow) {
     var swatchSize = Math.round(_exportLegendFontSize() * 0.72);
     var opts = {
       paddingX: 20,
@@ -1224,6 +1266,7 @@ var WasteAtlasChoropleth = (function () {
       titleGap: 14,
       columnGap: 34,
       columnCount: columnCount || 1,
+      itemFlow: itemFlow === 'row' ? 'row' : 'column',
       fontSize: _exportLegendFontSize(),
       titleFontSize: _exportLegendFontSize(),
       fontFamily: _exportLegendFontFamily()
@@ -1256,24 +1299,12 @@ var WasteAtlasChoropleth = (function () {
     opts.wrappedLines = opts.items.reduce(function (total, item) {
       return total + Math.max(0, item.lines.length - 1);
     }, 0);
-    opts.columns = [];
-    for (var i = 0; i < opts.columnCount; i++) opts.columns.push([]);
-    opts.items.forEach(function (item) {
-      var shortestIndex = 0;
-      opts.columns.forEach(function (column, index) {
-        var columnHeight = column.reduce(function (total, columnItem, itemIndex) {
-          return total + columnItem.height + (itemIndex ? opts.rowGap : 0);
-        }, 0);
-        var shortestHeight = opts.columns[shortestIndex].reduce(function (total, columnItem, itemIndex) {
-          return total + columnItem.height + (itemIndex ? opts.rowGap : 0);
-        }, 0);
-        if (columnHeight < shortestHeight) shortestIndex = index;
-      });
-      opts.columns[shortestIndex].push(item);
-    });
+    opts.columns = _distributeLegendItems(
+      opts.items, opts.columnCount, opts.itemFlow, opts.rowGap
+    );
     opts.columnHeights = opts.columns.map(function (column) {
       return column.reduce(function (total, item, index) {
-        return total + item.height + (index ? opts.rowGap : 0);
+        return total + _legendSlotHeight(item) + (index ? opts.rowGap : 0);
       }, 0);
     });
     // Footnote for overlay pattern hint (rendered separately, not as a category)
@@ -1362,7 +1393,8 @@ var WasteAtlasChoropleth = (function () {
 
   // ---- export legend layout (constraint-driven) ----------------------------
   // The renderer consumes one resolved config, ``cfg.exportLegend`` =
-  // { placement, columns, maxWidthFraction } with explicit auto/fixed values.
+  // { placement, columns, itemFlow, maxWidthFraction } with explicit auto/fixed
+  // values.
   // From it we generate candidate layouts, reject any that violate a hard
   // invariant (clipping, empty map, unreadable text, or overlapping mapped
   // geometry), then score the survivors deterministically.
@@ -1418,6 +1450,7 @@ var WasteAtlasChoropleth = (function () {
       resolved = {
         placement: cfg && cfg.exportLegendPlacement,
         columns: cfg && cfg.exportLegendColumns,
+        itemFlow: cfg && cfg.exportLegendItemFlow,
         maxWidthFraction: cfg && cfg.exportLegendWidth
       };
     }
@@ -1427,6 +1460,7 @@ var WasteAtlasChoropleth = (function () {
     return {
       placement: placement,
       columns: columns,
+      itemFlow: resolved.itemFlow === 'row' ? 'row' : 'column',
       maxWidthFraction: maxWidthFraction
     };
   }
@@ -1506,7 +1540,9 @@ var WasteAtlasChoropleth = (function () {
     function measureLegend(columnCount) {
       var key = maxLegendWidth + ':' + columnCount;
       if (!(key in measureCache)) {
-        measureCache[key] = _measureExportLegend(cfg, maxLegendWidth, columnCount);
+        measureCache[key] = _measureExportLegend(
+          cfg, maxLegendWidth, columnCount, resolved.itemFlow
+        );
       }
       return measureCache[key];
     }
@@ -1649,6 +1685,7 @@ var WasteAtlasChoropleth = (function () {
       legend: best.legend,
       legendPlacement: best.name,
       legendColumns: best.columns,
+      legendItemFlow: resolved.itemFlow,
       warning: warning
     };
   }
@@ -2601,7 +2638,10 @@ var WasteAtlasChoropleth = (function () {
   }
 
   function _drawExportLegendItem(g, cat, x, y, opts) {
-    var itemHeight = Math.max(opts.swatchH, cat.lines.length * opts.lineHeight);
+    var itemHeight = Math.max(
+      _legendSlotHeight(cat) || 0,
+      Math.max(opts.swatchH, cat.lines.length * opts.lineHeight)
+    );
     var textBaselineY = y + opts.fontSize;
     var capCenterY = textBaselineY - Math.round(opts.fontSize * 0.36);
     var swatchY = capCenterY - Math.round(opts.swatchH / 2);
@@ -3513,6 +3553,7 @@ var WasteAtlasChoropleth = (function () {
       resolveExportLegend: _resolvedExportLegend,
       placementCandidates: _exportLegendPlacementCandidates,
       columnCandidates: _exportLegendColumnCandidates,
+      distributeLegendItems: _distributeLegendItems,
       candidateViolations: _exportCandidateViolations,
       candidateViolationCost: _exportCandidateViolationCost,
       pickLeastBad: _pickLeastBadExportCandidate,

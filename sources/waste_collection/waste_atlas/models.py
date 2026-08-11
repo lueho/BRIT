@@ -14,6 +14,11 @@ LEGEND_PLACEMENTS = (
     ("top-right", "Top right"),
 )
 
+EXPORT_LEGEND_ITEM_FLOWS = (
+    ("column", "By column (fill one column, then the next)"),
+    ("row", "By row (fill across the columns)"),
+)
+
 
 def _color_field(help_text, **kwargs):
     return models.CharField(
@@ -209,6 +214,15 @@ class WasteAtlasRenderingSettings(models.Model):
             "exceeds this bound."
         ),
     )
+    export_legend_item_flow = models.CharField(
+        max_length=10,
+        choices=EXPORT_LEGEND_ITEM_FLOWS,
+        default="column",
+        help_text=(
+            "Default arrangement of legend entries across the legend columns "
+            "in exports."
+        ),
+    )
     export_file_name_prefix = models.SlugField(
         max_length=50,
         default="waste_atlas",
@@ -310,13 +324,14 @@ class WasteAtlasRenderingSettings(models.Model):
         """Atlas-level fallback for the resolved export-legend config.
 
         Placement and columns default to ``auto`` so, unless a theme or page
-        pins them, the layout engine chooses; the width fraction is the hard
-        upper bound stored on this row.
+        pins them, the layout engine chooses; the item flow and the width
+        fraction are the values stored on this row.
         """
         from .legend import AUTO
 
         return {
             "placement": AUTO,
             "columns": AUTO,
+            "itemFlow": self.export_legend_item_flow,
             "maxWidthFraction": self.export_legend_width_fraction,
         }

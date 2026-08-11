@@ -7,10 +7,15 @@ from .legend import (
     EXPORT_LEGEND_OVERRIDE_KEYS,
     LEGACY_EXPORT_LEGEND_KEYS,
     normalize_columns,
+    normalize_item_flow,
     normalize_placement,
     normalize_width_fraction,
 )
-from .models import LEGEND_PLACEMENTS, WasteAtlasRenderingSettings
+from .models import (
+    EXPORT_LEGEND_ITEM_FLOWS,
+    LEGEND_PLACEMENTS,
+    WasteAtlasRenderingSettings,
+)
 
 LEGEND_PLACEMENT_CHOICES = LEGEND_PLACEMENTS
 EXPORT_LEGEND_PLACEMENT_CHOICES = (
@@ -30,6 +35,7 @@ EXPORT_LEGEND_COLUMN_CHOICES = (
     ("3", "3"),
     ("4", "4"),
 )
+EXPORT_LEGEND_ITEM_FLOW_CHOICES = EXPORT_LEGEND_ITEM_FLOWS
 
 
 class WasteAtlasMapConfigurationForm(forms.Form):
@@ -66,7 +72,8 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         required=False,
         help_text=(
             "When off, every export of this map uses the atlas defaults. "
-            "Turn it on to set placement, columns and maximum width."
+            "Turn it on to set placement, columns, arrangement and maximum "
+            "width."
         ),
         widget=forms.CheckboxInput(
             attrs={
@@ -87,6 +94,16 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         choices=EXPORT_LEGEND_COLUMN_CHOICES,
         required=False,
         help_text="Automatic chooses a suitable count; or pin an exact number.",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    export_legend_item_flow = forms.ChoiceField(
+        label="Arrangement",
+        choices=EXPORT_LEGEND_ITEM_FLOW_CHOICES,
+        required=False,
+        help_text=(
+            "Whether entries fill one column after another or read across the "
+            "columns row by row."
+        ),
         widget=forms.Select(attrs={"class": "form-select"}),
     )
     export_legend_width = forms.IntegerField(
@@ -139,6 +156,11 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         initial.setdefault(
             "export_legend_columns",
             AUTO if stored_columns in (None, AUTO) else str(stored_columns),
+        )
+        initial.setdefault(
+            "export_legend_item_flow",
+            normalize_item_flow(self._configuration.get("exportLegendItemFlow"))
+            or self._defaults.export_legend_item_flow,
         )
         stored_width = normalize_width_fraction(
             self._configuration.get("exportLegendWidth")
@@ -282,6 +304,10 @@ class WasteAtlasMapConfigurationForm(forms.Form):
             columns = self.cleaned_data.get("export_legend_columns") or AUTO
             configuration["exportLegendColumns"] = (
                 AUTO if columns == AUTO else int(columns)
+            )
+            configuration["exportLegendItemFlow"] = (
+                normalize_item_flow(self.cleaned_data.get("export_legend_item_flow"))
+                or self._defaults.export_legend_item_flow
             )
             width_percent = self.cleaned_data.get("export_legend_width")
             if width_percent is None:

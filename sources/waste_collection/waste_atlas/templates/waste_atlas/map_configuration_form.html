@@ -116,6 +116,13 @@
         </div>
         <div class="col-6 col-md-4">
           <label class="form-label"
+                 for="{{ form.export_legend_item_flow.id_for_label }}">{{ form.export_legend_item_flow.label }}</label>
+          {{ form.export_legend_item_flow }}
+          <div class="form-text">{{ form.export_legend_item_flow.help_text }}</div>
+          {{ form.export_legend_item_flow.errors }}
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label"
                  for="{{ form.export_legend_width.id_for_label }}">{{ form.export_legend_width.label }}</label>
           {{ form.export_legend_width }}
           <div class="form-text">{{ form.export_legend_width.help_text }}</div>
