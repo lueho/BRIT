@@ -11,6 +11,8 @@ from .legend import (
     normalize_item_flow,
     normalize_placement,
     normalize_width_fraction,
+    order_legend_values,
+    quartile_legend_entries,
 )
 from .models import (
     LEGEND_PLACEMENTS,
@@ -127,6 +129,7 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         self._defaults = WasteAtlasRenderingSettings.load()
         self._configuration = deepcopy(instance.configuration)
         self._categories = self._configuration.get("categories", [])
+        self._quartile_entries = quartile_legend_entries(self._configuration)
 
         initial = kwargs.setdefault("initial", {})
         initial.setdefault("legend_title", self._configuration.get("legendTitle", ""))
@@ -186,7 +189,6 @@ class WasteAtlasMapConfigurationForm(forms.Form):
             "placeholder", round(self._defaults.export_legend_width_fraction * 100)
         )
 
-        category_order = self._category_order()
         for index, category in enumerate(self._categories):
             self.fields[f"category_{index}_label"] = forms.CharField(
                 label="Preview name",
@@ -199,11 +201,13 @@ class WasteAtlasMapConfigurationForm(forms.Form):
                 required=False,
                 widget=forms.TextInput(attrs={"class": "form-control"}),
             )
-            self.fields[f"category_{index}_order"] = forms.IntegerField(
+        entry_order = self._entry_order()
+        for prefix, _value in self._entries():
+            self.fields[f"{prefix}_order"] = forms.IntegerField(
                 label="Order",
-                initial=category_order.index(index) + 1,
+                initial=entry_order.index(prefix) + 1,
                 min_value=1,
-                max_value=len(self._categories),
+                max_value=len(entry_order),
                 widget=forms.NumberInput(attrs={"class": "form-control", "step": 1}),
             )
 
@@ -221,43 +225,69 @@ class WasteAtlasMapConfigurationForm(forms.Form):
             )
         )
 
-    def _category_order(self):
-        configured_order = self._configuration.get("legendCategoryOrder")
-        if isinstance(configured_order, list):
-            ranks = {value: index for index, value in enumerate(configured_order)}
-            return sorted(
-                range(len(self._categories)),
-                key=lambda index: ranks.get(
-                    self._categories[index].get("value"),
-                    len(ranks) + index,
-                ),
-            )
+    def _entries(self):
+        """Return ``(field prefix, legend value)`` for every orderable entry.
 
+        The entries are the stored categories plus, for a quartile map, the
+        classes the renderer derives from the data.  Quartile classification is
+        a runtime toggle, so both sets share one saved order: each side of the
+        toggle reads the positions of the entries it shows.
+        """
+        return [
+            (f"category_{index}", category.get("value", ""))
+            for index, category in enumerate(self._categories)
+        ] + [
+            (f"quartile_{entry['value']}", entry["value"])
+            for entry in self._quartile_entries
+        ]
+
+    def _entry_order(self):
+        """Return the field prefixes in the order the renderer would show them."""
         normal = []
         no_collection = []
         for index, category in enumerate(self._categories):
             target = (
                 no_collection if self._is_no_collection_category(category) else normal
             )
-            target.append(index)
-        return normal + no_collection
+            target.append(f"category_{index}")
+        quartiles = [f"quartile_{entry['value']}" for entry in self._quartile_entries]
+        default_order = normal + quartiles + no_collection
+
+        values = dict(self._entries())
+        ordered_values = order_legend_values(
+            [values[prefix] for prefix in default_order],
+            self._configuration.get("legendCategoryOrder"),
+        )
+        return sorted(
+            default_order,
+            key=lambda prefix: ordered_values.index(values[prefix]),
+        )
 
     @property
     def category_rows(self):
-        rows = [
-            (
-                self[f"category_{index}_order"].value(),
-                index,
-                {
-                    "value": category.get("value", ""),
-                    "color": category.get("color", ""),
-                    "label_field": self[f"category_{index}_label"],
-                    "export_label_field": self[f"category_{index}_export_label"],
-                    "order_field": self[f"category_{index}_order"],
-                },
+        quartile_labels = {
+            f"quartile_{entry['value']}": entry for entry in self._quartile_entries
+        }
+        rows = []
+        for position, (prefix, value) in enumerate(self._entries()):
+            quartile = quartile_labels.get(prefix)
+            category = None if quartile else self._categories[position]
+            rows.append(
+                (
+                    self[f"{prefix}_order"].value(),
+                    position,
+                    {
+                        "value": value,
+                        "color": (quartile or category).get("color", ""),
+                        "label": (quartile or category).get("label", ""),
+                        "label_field": (None if quartile else self[f"{prefix}_label"]),
+                        "export_label_field": (
+                            None if quartile else self[f"{prefix}_export_label"]
+                        ),
+                        "order_field": self[f"{prefix}_order"],
+                    },
+                )
             )
-            for index, category in enumerate(self._categories)
-        ]
 
         def position(entry):
             try:
@@ -275,16 +305,12 @@ class WasteAtlasMapConfigurationForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
-        category_positions = [
-            cleaned_data.get(f"category_{index}_order")
-            for index in range(len(self._categories))
-        ]
-        valid_positions = [
-            position for position in category_positions if position is not None
-        ]
-        if len(valid_positions) == len(self._categories) and len(
-            set(valid_positions)
-        ) != len(valid_positions):
+        entries = self._entries()
+        positions = [cleaned_data.get(f"{prefix}_order") for prefix, _value in entries]
+        valid_positions = [position for position in positions if position is not None]
+        if len(valid_positions) == len(entries) and len(set(valid_positions)) != len(
+            valid_positions
+        ):
             raise forms.ValidationError("Each category position must be unique.")
         return cleaned_data
 
@@ -343,10 +369,10 @@ class WasteAtlasMapConfigurationForm(forms.Form):
                 category.pop("exportLabel", None)
 
         configuration["legendCategoryOrder"] = [
-            categories[index].get("value")
-            for index in sorted(
-                range(len(categories)),
-                key=lambda index: self.cleaned_data[f"category_{index}_order"],
+            value
+            for _position, value in sorted(
+                (self.cleaned_data[f"{prefix}_order"], value)
+                for prefix, value in self._entries()
             )
         ]
 

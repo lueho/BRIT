@@ -161,18 +161,25 @@
                   {% endif %}
                   <code>{{ row.value }}</code>
                 </th>
-                <td>
-                  <label class="visually-hidden"
-                         for="{{ row.label_field.id_for_label }}">{{ row.label_field.label }} for {{ row.value }}</label>
-                  {{ row.label_field }}
-                  {{ row.label_field.errors }}
-                </td>
-                <td>
-                  <label class="visually-hidden"
-                         for="{{ row.export_label_field.id_for_label }}">{{ row.export_label_field.label }} for {{ row.value }}</label>
-                  {{ row.export_label_field }}
-                  {{ row.export_label_field.errors }}
-                </td>
+                {% if row.label_field %}
+                  <td>
+                    <label class="visually-hidden"
+                           for="{{ row.label_field.id_for_label }}">{{ row.label_field.label }} for {{ row.value }}</label>
+                    {{ row.label_field }}
+                    {{ row.label_field.errors }}
+                  </td>
+                  <td>
+                    <label class="visually-hidden"
+                           for="{{ row.export_label_field.id_for_label }}">{{ row.export_label_field.label }} for {{ row.value }}</label>
+                    {{ row.export_label_field }}
+                    {{ row.export_label_field.errors }}
+                  </td>
+                {% else %}
+                  <td colspan="2" class="text-muted small">
+                    {{ row.label }} — the map computes this entry's text from the data;
+                    only its position is configurable.
+                  </td>
+                {% endif %}
               </tr>
             {% empty %}
               <tr>
