@@ -293,33 +293,42 @@ MAP_SELECTION_WASTE_CATEGORY_OVERRIDES = {
 }
 
 # Themes whose displayed value is derived from one deterministic primary
-# collection. Ratio, population, and organisation themes are intentionally
-# omitted because no single collection owns their value.
+# collection. Themes computed from region or collector properties are
+# intentionally omitted because they have no collection behind their value.
 COLLECTION_DETAIL_CATEGORY_BY_THEME = {
     "access_control": "biowaste",
     "bin_configuration": "biowaste",
     "bw_rw_percentage": "residual",
     "bw_rw_kg": "residual",
     "biowaste_collection_amount": "biowaste",
+    "biowaste_collection_count": "biowaste",
     "biowaste_collection_point_count": "biowaste",
     "biowaste_collection_system": "biowaste",
     "biowaste_fee_system": "biowaste",
     "biowaste_frequency": "biowaste",
     "biowaste_impurity": "biowaste",
+    "biowaste_min_bin_size": "biowaste",
+    "biowaste_required_bin_capacity": "biowaste",
+    "collection_orga_level": "all",
     "collection_point_count": "all",
     "collection_support": "biowaste",
     "collection_system": "biowaste",
+    "connection_rate": "biowaste",
     "food_waste_category": "biowaste",
     "fwtot_rw_kg": "residual",
     "green_waste_collection_amount": "green_waste",
+    "green_waste_collection_system_count": "green_waste",
     "paper_bags": "biowaste",
     "participation_policy": "biowaste",
     "plastic_bags": "biowaste",
     "residual_collection_amount": "residual",
+    "residual_collection_count": "residual",
     "residual_collection_point_count": "residual",
     "residual_collection_system": "residual",
     "residual_fee_system": "residual",
     "residual_frequency": "residual",
+    "residual_min_bin_size": "residual",
+    "residual_required_bin_capacity": "residual",
     "target_waste_category": "biowaste",
     "weekly_bp_access_days": "biowaste",
 }
@@ -329,10 +338,15 @@ COLLECTION_DETAIL_CATEGORY_BY_THEME = {
 # contributing collection instead of guessing one.
 COMPOSITE_COLLECTION_DETAIL_CATEGORIES_BY_THEME = {
     "collection_count_ratio": ("biowaste", "residual"),
+    "collection_point_count_ratio": ("biowaste", "residual"),
     "combined_collection_count": ("biowaste", "residual"),
+    "combined_collection_system": ("biowaste", "residual"),
     "combined_fee_system": ("biowaste", "residual"),
     "combined_frequency": ("biowaste", "residual"),
+    "min_bin_size_ratio": ("biowaste", "residual"),
     "organic_collection_amount": ("biowaste", "green_waste"),
+    "organic_waste_ratio": ("biowaste", "green_waste", "residual"),
+    "system_access_control": ("biowaste", "residual"),
     "waste_ratio": ("biowaste", "residual"),
 }
 

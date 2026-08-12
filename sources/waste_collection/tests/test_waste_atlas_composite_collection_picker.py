@@ -38,12 +38,19 @@ class CompositeCollectionDetailCategoryTests(SimpleTestCase):
 
     BIO_RESIDUAL_THEMES = (
         "collection_count_ratio",
+        "collection_point_count_ratio",
         "combined_collection_count",
+        "combined_collection_system",
         "combined_fee_system",
         "combined_frequency",
+        "min_bin_size_ratio",
+        "system_access_control",
         "waste_ratio",
     )
-    COMPOSITE_THEMES = BIO_RESIDUAL_THEMES + ("organic_collection_amount",)
+    COMPOSITE_THEMES = BIO_RESIDUAL_THEMES + (
+        "organic_collection_amount",
+        "organic_waste_ratio",
+    )
 
     def test_composite_themes_resolve_to_both_streams(self):
         for theme in self.BIO_RESIDUAL_THEMES:
