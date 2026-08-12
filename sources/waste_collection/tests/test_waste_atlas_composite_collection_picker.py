@@ -36,16 +36,17 @@ CATCHMENT_GEOJSON_URL = "/waste_collection/api/waste-atlas/catchment/geojson/"
 class CompositeCollectionDetailCategoryTests(SimpleTestCase):
     """Resolving a theme to the collection categories a click may open."""
 
-    COMPOSITE_THEMES = (
+    BIO_RESIDUAL_THEMES = (
         "collection_count_ratio",
         "combined_collection_count",
         "combined_fee_system",
         "combined_frequency",
         "waste_ratio",
     )
+    COMPOSITE_THEMES = BIO_RESIDUAL_THEMES + ("organic_collection_amount",)
 
     def test_composite_themes_resolve_to_both_streams(self):
-        for theme in self.COMPOSITE_THEMES:
+        for theme in self.BIO_RESIDUAL_THEMES:
             with self.subTest(theme=theme):
                 self.assertEqual(
                     collection_detail_categories_for_theme(theme),

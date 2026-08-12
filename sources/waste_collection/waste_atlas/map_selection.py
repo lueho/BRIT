@@ -293,13 +293,14 @@ MAP_SELECTION_WASTE_CATEGORY_OVERRIDES = {
 }
 
 # Themes whose displayed value is derived from one deterministic primary
-# collection. Aggregate, ratio, combined, population, and organisation themes
-# are intentionally omitted because no single collection owns their value.
+# collection. Ratio, population, and organisation themes are intentionally
+# omitted because no single collection owns their value.
 COLLECTION_DETAIL_CATEGORY_BY_THEME = {
     "access_control": "biowaste",
     "bin_configuration": "biowaste",
     "bw_rw_percentage": "residual",
     "bw_rw_kg": "residual",
+    "biowaste_collection_amount": "biowaste",
     "biowaste_collection_point_count": "biowaste",
     "biowaste_collection_system": "biowaste",
     "biowaste_fee_system": "biowaste",
@@ -310,9 +311,11 @@ COLLECTION_DETAIL_CATEGORY_BY_THEME = {
     "collection_system": "biowaste",
     "food_waste_category": "biowaste",
     "fwtot_rw_kg": "residual",
+    "green_waste_collection_amount": "green_waste",
     "paper_bags": "biowaste",
     "participation_policy": "biowaste",
     "plastic_bags": "biowaste",
+    "residual_collection_amount": "residual",
     "residual_collection_point_count": "residual",
     "residual_collection_system": "residual",
     "residual_fee_system": "residual",
@@ -321,14 +324,15 @@ COLLECTION_DETAIL_CATEGORY_BY_THEME = {
     "weekly_bp_access_days": "biowaste",
 }
 
-# Composite themes combine one biowaste and one residual collection into a
-# single displayed value, so no single collection "drives" it. Clicking such a
-# catchment offers every contributing collection instead of guessing one.
+# Composite themes combine several streams into a single displayed value, so no
+# single collection "drives" it. Clicking such a catchment offers every
+# contributing collection instead of guessing one.
 COMPOSITE_COLLECTION_DETAIL_CATEGORIES_BY_THEME = {
     "collection_count_ratio": ("biowaste", "residual"),
     "combined_collection_count": ("biowaste", "residual"),
     "combined_fee_system": ("biowaste", "residual"),
     "combined_frequency": ("biowaste", "residual"),
+    "organic_collection_amount": ("biowaste", "green_waste"),
     "waste_ratio": ("biowaste", "residual"),
 }
 
