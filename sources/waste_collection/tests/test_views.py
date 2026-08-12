@@ -4286,12 +4286,21 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 response = self.client.get(reverse(page["name"]))
                 self.assertIsNotNone(self._map_config(response))
 
-    def test_aggregate_map_does_not_link_to_an_unrelated_collection(self):
+    def test_region_property_map_does_not_link_to_an_unrelated_collection(self):
+        response = self.client.get(
+            reverse("waste-atlas-germany-population-density-map")
+        )
+
+        self.assertNotIn("collectionDetailCategory", self._map_config(response))
+
+    def test_amount_map_links_to_the_collection_behind_the_amount(self):
         response = self.client.get(
             reverse("waste-atlas-germany-biowaste-collection-amount-map")
         )
 
-        self.assertNotIn("collectionDetailCategory", self._map_config(response))
+        self.assertEqual(
+            self._map_config(response)["collectionDetailCategory"], "biowaste"
+        )
 
     def test_every_map_page_forwards_its_config_key_to_the_renderer(self):
         """The rendered config matches MAP_CONFIGS for the page's config_key."""

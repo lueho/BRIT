@@ -157,6 +157,7 @@ _GREEN_WASTE_CATEGORY_NAMES = ["Green waste"]
 _COLLECTION_DETAIL_CATEGORIES = {
     "all": None,
     "biowaste": ["Biowaste", "Food waste"],
+    "green_waste": _GREEN_WASTE_CATEGORY_NAMES,
     "residual": ["Residual waste"],
 }
 
