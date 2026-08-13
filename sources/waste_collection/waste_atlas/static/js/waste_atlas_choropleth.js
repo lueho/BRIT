@@ -32,7 +32,15 @@ var WasteAtlasChoropleth = (function () {
   'use strict';
 
   var RENDER_DEFAULTS_ELEMENT_ID = 'waste-atlas-render-defaults';
-  var OVERLAY_PATTERN_COLOR = '#1f2937';
+  // The canvas the ACPV marker geometry is dimensioned for; every other canvas
+  // scales from it, so screen and export show the same hatch density.
+  var ACPV_REFERENCE_WIDTH = 900;
+  var ACPV_HATCH_SPACING = 6;
+  var ACPV_HATCH_STROKE_WIDTH = 2;
+  var ACPV_HATCH_ANGLE = 45;
+  // Aggregated values are derived centrally from the raw record, not copied
+  // along by every transform; a map opts in by naming this field.
+  var ACPV_OVERLAY_FIELD = '_has_acpv_overlay';
   var _renderDefaults = null;
 
   /**
@@ -309,15 +317,18 @@ var WasteAtlasChoropleth = (function () {
    * the "No data" legend entry is only drawn when such features exist.
    */
   function _annotateFeatures(data, cfg) {
-    var records = Array.isArray(data.thematicData) ? data.thematicData
+    var rawRecords = Array.isArray(data.thematicData) ? data.thematicData
       : (data.thematicData.results || []);
+    var records = rawRecords;
     if (typeof cfg.transformData === 'function') {
-      records = cfg.transformData(records);
+      records = cfg.transformData(rawRecords);
     } else if (cfg.transformName && transforms[cfg.transformName]) {
-      records = transforms[cfg.transformName](records);
+      records = transforms[cfg.transformName](rawRecords);
     }
     var lookup = {};
     records.forEach(function (r) { lookup[r.catchment_id] = r; });
+    var rawLookup = {};
+    rawRecords.forEach(function (r) { rawLookup[r.catchment_id] = r; });
 
     var hasFallbackNoData = false;
     var hasNoDataCategory = false;
@@ -327,9 +338,9 @@ var WasteAtlasChoropleth = (function () {
         var rec = lookup[f.properties.catchment_id];
         f.properties._thematic_value = rec ? rec[cfg.dataField] : null;
         f.properties._thematic_record = rec || null;
-        f.properties._overlay_pattern = rec && cfg.overlayPatternField
-          ? Boolean(rec[cfg.overlayPatternField])
-          : false;
+        f.properties._overlay_pattern = _acpvOverlayFlag(
+          cfg, rec, rawLookup[f.properties.catchment_id]
+        );
         if (f.properties._overlay_pattern) {
           hasOverlayPattern = true;
         }
@@ -351,29 +362,76 @@ var WasteAtlasChoropleth = (function () {
     cfg._hasOverlayPattern = hasOverlayPattern;
   }
 
+  /**
+   * Whether a catchment shows the aggregated-value hatching.
+   *
+   * For the canonical ACPV field the flag is derived here from the raw API
+   * record, so no transform has to carry it along. A map naming any other
+   * field reads it from the transformed record, falling back to the raw one.
+   */
+  function _acpvOverlayFlag(cfg, record, rawRecord) {
+    if (!cfg.overlayPatternField) return false;
+    if (cfg.overlayPatternField === ACPV_OVERLAY_FIELD) {
+      return Boolean(rawRecord && rawRecord.value_source === 'acpv');
+    }
+    if (record && record[cfg.overlayPatternField] != null) {
+      return Boolean(record[cfg.overlayPatternField]);
+    }
+    return Boolean(rawRecord && rawRecord[cfg.overlayPatternField]);
+  }
+
+  function _firstDefined(a, b) {
+    return a == null ? b : a;
+  }
+
+  /**
+   * Resolve the appearance of the ACPV markers for a canvas ``width``.
+   *
+   * Colors and opacities come from the atlas-wide defaults, overridable per
+   * map with the ``acpv*`` config keys. Everything geometric is expressed for
+   * the reference canvas and scaled, so the hatching and the group outline
+   * look the same on screen and in an export.
+   */
+  function _acpvStyle(cfg, width) {
+    cfg = cfg || {};
+    var defaults = _defaults().acpv || {};
+    var scale = (width || ACPV_REFERENCE_WIDTH) / ACPV_REFERENCE_WIDTH;
+    return {
+      hatchColor: _firstDefined(cfg.acpvHatchColor, defaults.hatchColor),
+      hatchOpacity: _firstDefined(cfg.acpvHatchOpacity, defaults.hatchOpacity),
+      hatchSpacing: ACPV_HATCH_SPACING * scale,
+      hatchStrokeWidth: ACPV_HATCH_STROKE_WIDTH * scale,
+      hatchAngle: ACPV_HATCH_ANGLE,
+      outlineColor: _firstDefined(cfg.acpvOutlineColor, defaults.outlineColor),
+      outlineOpacity: _firstDefined(cfg.acpvOutlineOpacity, defaults.outlineOpacity),
+      outlineWidth: _firstDefined(cfg.acpvOutlineWidth, defaults.outlineWidth) * scale
+    };
+  }
+
   function _overlayPatternId(cfg) {
     return (cfg.svgId || 'atlas-svg') + '-overlay-pattern';
   }
 
-  function _defineOverlayPattern(cfg) {
+  function _defineOverlayPattern(cfg, width) {
     if (!cfg.overlayPatternField) return;
 
+    var style = _acpvStyle(cfg, width);
     var pattern = _svg.append('defs')
       .append('pattern')
       .attr('id', _overlayPatternId(cfg))
       .attr('patternUnits', 'userSpaceOnUse')
-      .attr('width', 6)
-      .attr('height', 6)
-      .attr('patternTransform', 'rotate(45)');
+      .attr('width', style.hatchSpacing)
+      .attr('height', style.hatchSpacing)
+      .attr('patternTransform', 'rotate(' + style.hatchAngle + ')');
 
     pattern.append('line')
       .attr('x1', 0)
       .attr('y1', 0)
       .attr('x2', 0)
-      .attr('y2', 6)
-      .attr('stroke', OVERLAY_PATTERN_COLOR)
-      .attr('stroke-opacity', 0.9)
-      .attr('stroke-width', 2);
+      .attr('y2', style.hatchSpacing)
+      .attr('stroke', style.hatchColor)
+      .attr('stroke-opacity', style.hatchOpacity)
+      .attr('stroke-width', style.hatchStrokeWidth);
   }
 
   // ---- data fetching --------------------------------------------------------
@@ -1810,13 +1868,6 @@ var WasteAtlasChoropleth = (function () {
       transformData: function (records) {
         return records.map(function (r) {
           var result = Object.assign({}, r);
-          // Preserve ACPV overlay metadata used by the renderer
-          if (r.value_source !== undefined) {
-            result._has_acpv_overlay = r.value_source === 'acpv';
-          }
-          if (r.acpv_group_key !== undefined) {
-            result._acpv_group_key = r.acpv_group_key;
-          }
           var cls = null;
           var legacy = legacyLookup[r.catchment_id];
           var legacyClass = legacy ? legacy[baseCfg.dataField] : null;
@@ -1859,12 +1910,7 @@ var WasteAtlasChoropleth = (function () {
         } else {
           cls = 'low';
         }
-        return {
-          catchment_id: r.catchment_id,
-          _classified: cls,
-          _has_acpv_overlay: r.value_source === 'acpv',
-          _acpv_group_key: r.acpv_group_key
-        };
+        return { catchment_id: r.catchment_id, _classified: cls };
       });
     },
     biowasteCollectionCount: function (records) {
@@ -2261,12 +2307,7 @@ var WasteAtlasChoropleth = (function () {
         } else {
           cls = 'very_low';
         }
-        return {
-          catchment_id: r.catchment_id,
-          _classified: cls,
-          _has_acpv_overlay: r.value_source === 'acpv',
-          _acpv_group_key: r.acpv_group_key
-        };
+        return { catchment_id: r.catchment_id, _classified: cls };
       });
     },
     residualCollectionCount: function (records) {
@@ -2358,11 +2399,7 @@ var WasteAtlasChoropleth = (function () {
         } else {
           cls = 'very_low';
         }
-        return {
-          catchment_id: r.catchment_id,
-          _classified: cls,
-          uses_aggregated_amount: r.uses_aggregated_amount
-        };
+        return { catchment_id: r.catchment_id, _classified: cls };
       });
     },
     weeklyBpAccessDays: function (records) {
@@ -2434,7 +2471,8 @@ var WasteAtlasChoropleth = (function () {
       .attr('class', 'waste-atlas-export-svg');
 
     _svg.selectAll('*').remove();
-    _defineOverlayPattern(cfg);
+    _defineOverlayPattern(cfg, width);
+    var acpvStyle = _acpvStyle(cfg, width);
 
     // Geographic layers live in one group so the screen zoom transform can move
     // and scale them without touching the title or the legend.
@@ -2566,9 +2604,9 @@ var WasteAtlasChoropleth = (function () {
         .enter().append('path')
         .attr('d', path)
         .attr('fill', 'none')
-        .attr('stroke', cfg.outlineStrokeColor || '#ffffff')
-        .attr('stroke-opacity', cfg.outlineStrokeOpacity == null ? 0.95 : cfg.outlineStrokeOpacity)
-        .attr('stroke-width', cfg.outlineStrokeWidth || 1.35)
+        .attr('stroke', acpvStyle.outlineColor)
+        .attr('stroke-opacity', acpvStyle.outlineOpacity)
+        .attr('stroke-width', acpvStyle.outlineWidth)
         .attr('stroke-linejoin', 'round')
         .attr('stroke-linecap', 'round')
         .attr('pointer-events', 'none');
@@ -3573,6 +3611,11 @@ var WasteAtlasChoropleth = (function () {
     exportElementSVG: exportElementSVG,
     exportElementPNG: exportElementPNG,
     transforms: transforms,
+    // Appearance of the aggregated-value markers, shared by the screen and the
+    // export; exposed for tests and callers that draw their own legend swatch.
+    acpv: {
+      style: _acpvStyle
+    },
     // Legend entry order, shared by the screen legend and the export.
     legend: {
       orderedCategories: _orderedLegendCategories
