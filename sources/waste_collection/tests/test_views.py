@@ -123,6 +123,28 @@ from ..models import (
 )
 from ..tasks import cleanup_orphaned_waste_flyers
 
+_RENDER_DEFAULT_COLOR_KEYS = {
+    "no_collection": "noCollectionColor",
+    "no_data": "noDataColor",
+}
+_RENDER_TIME_RESOLVED_ENTRY_KEYS = {"categories", "quartileSpecialCases"}
+
+
+def _expected_rendered_config_value(key, value, render_defaults):
+    """Resolve stored category color references as the template tag does."""
+    if key not in _RENDER_TIME_RESOLVED_ENTRY_KEYS:
+        return value
+
+    expected = []
+    for stored_entry in value:
+        entry = dict(stored_entry)
+        default_key = _RENDER_DEFAULT_COLOR_KEYS.get(entry.get("colorRef"))
+        if default_key:
+            entry.pop("colorRef")
+            entry["color"] = render_defaults[default_key]
+        expected.append(entry)
+    return expected
+
 
 def setUpModule():
     post_save.disconnect(check_url_valid, sender=WasteFlyer)
@@ -4317,7 +4339,10 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 for key, value in stored.items():
                     if key in skip:
                         continue
-                    self.assertEqual(cfg.get(key), value)
+                    expected = _expected_rendered_config_value(
+                        key, value, cfg["renderDefaults"]
+                    )
+                    self.assertEqual(cfg.get(key), expected)
 
     # ---- selector / context -----------------------------------------------
 
@@ -4867,7 +4892,10 @@ class GenericMapTemplateTests(TestCase):
                         continue  # replaced by the runtime region scope
                     if key in RENDER_TIME_RESOLVED_KEYS:
                         continue  # resolved into the exportLegend object
-                    self.assertEqual(cfg[key], value)
+                    expected = _expected_rendered_config_value(
+                        key, value, cfg["renderDefaults"]
+                    )
+                    self.assertEqual(cfg[key], expected)
 
     def test_shared_dom_ids_are_merged_into_every_configuration(self):
         cfg = self._rendered_config(self._render_generic("orga_level"))
