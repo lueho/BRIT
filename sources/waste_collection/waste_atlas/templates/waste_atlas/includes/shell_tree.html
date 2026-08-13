@@ -11,6 +11,10 @@
      href="{% url 'waste-atlas-overview' %}">
     <i class="fas fa-th-list"></i> All maps
   </a>
+  <a class="atlas-tree-overview-link{% if atlas_tree_dashboard_active %} atlas-tree-link--active{% endif %}"
+     href="{% url 'waste-atlas-dashboard' %}">
+    <i class="fas fa-chart-column"></i> Statistics dashboard
+  </a>
   {% for group in directory_region_groups %}
     <details class="atlas-tree-region"
              data-region="{{ group.id }}"

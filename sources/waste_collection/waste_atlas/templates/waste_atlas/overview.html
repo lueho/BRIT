@@ -12,8 +12,12 @@
                Choose a region, then the information you need — collection systems and bins, schedules and collection counts, fees, or collected amounts.
             </p>
          </div>
-         {% if request.user.is_staff %}
-            <div class="atlas-context-actions">
+         <div class="atlas-context-actions">
+            <a class="btn btn-outline-primary btn-sm atlas-hero-btn"
+               href="{% url 'waste-atlas-dashboard' %}">
+               <i class="fas fa-chart-column"></i> Statistics dashboard
+            </a>
+            {% if request.user.is_staff %}
                <a class="btn btn-outline-primary btn-sm atlas-hero-btn"
                   href="{% url 'waste-atlas-change-map-overview' %}">
                   <i class="fas fa-exchange-alt"></i> Change maps
@@ -22,8 +26,8 @@
                   href="{% url 'waste-atlas-data-conflicts-overview' %}">
                   <i class="fas fa-exclamation-triangle"></i> Data conflicts
                </a>
-            </div>
-         {% endif %}
+            {% endif %}
+         </div>
       </header>
       <section class="atlas-panel atlas-directory" aria-labelledby="atlas-directory-title">
          <div class="atlas-directory-header">

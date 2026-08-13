@@ -4,6 +4,7 @@
 {% endblock page_chrome %}
 {% block content %}
   {% user_in_group user "process-team" as can_view_processes %}
+  {% user_in_group user "waste_atlas" as can_view_waste_atlas %}
   <div class="row g-4 mb-4">
     <div class="col-12 col-md-6">
       <div class="card shadow h-100">
@@ -94,6 +95,34 @@
         </div>
       </div>
     </div>
+    {% if can_view_waste_atlas %}
+      <!-- Waste Atlas statistics dashboard Card -->
+      <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
+        <div class="card shadow h-100">
+          <div class="card-header bg-light border-0 py-3">
+            <h5 class="mb-0">
+              <a href="{% url 'waste-atlas-dashboard' %}"
+                 class="text-decoration-none text-body text-decoration-underline-hover">
+                <i class="fas fa-fw fa-chart-column me-2"></i>Waste Atlas statistics
+              </a>
+            </h5>
+          </div>
+          <div class="card-img-top">
+            <a class="d-flex align-items-center justify-content-center stretched-link py-5"
+               href="{% url 'waste-atlas-dashboard' %}">
+              <i class="fas fa-chart-column fa-5x text-primary" aria-hidden="true"></i>
+            </a>
+          </div>
+          <div class="card-body">
+            <p class="card-text">
+              Interactive statistics behind the Waste Atlas maps: how collection systems, bins,
+              schedules, fees and collected amounts are distributed across a region, and how those
+              shares developed over the years.
+            </p>
+          </div>
+        </div>
+      </div>
+    {% endif %}
     <!-- Materials Card -->
     <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
       <div class="card shadow h-100">

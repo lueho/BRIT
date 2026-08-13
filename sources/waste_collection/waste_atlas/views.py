@@ -10,6 +10,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import FormView, ListView, TemplateView
 
+from .dashboard import build_dashboard_context
 from .forms import WasteAtlasMapConfigurationForm
 from .map_selection import (
     MAP_SELECTION_YEARS,
@@ -360,6 +361,39 @@ class WasteAtlasOverviewView(WasteAtlasGroupMixin, TemplateView):
         ctx["directory_selected_category"] = self.request.GET.get("category", "")
         ctx["directory_query"] = self.request.GET.get("q", "")
         ctx["atlas_tree_overview_active"] = True
+        return ctx
+
+
+class WasteAtlasDashboardView(WasteAtlasGroupMixin, AtlasShellTreeMixin, TemplateView):
+    """Interactive statistics for every map page of one region.
+
+    Each map of the selected region contributes one chart of how its values
+    are distributed across the region's catchments, rendered from the map's own
+    API endpoint and stored configuration.
+    """
+
+    template_name = "waste_atlas/dashboard.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        dashboard = build_dashboard_context(
+            reverse,
+            map_set=self.request.GET.get("region"),
+            year=self.request.GET.get("year"),
+            category=self.request.GET.get("category", ""),
+        )
+        ctx.update(dashboard)
+        ctx.update(
+            build_overview_directory_context(
+                reverse,
+                selected_region=dashboard["dashboard_map_set"],
+            )
+        )
+        ctx["atlas_map_set"] = dashboard["dashboard_map_set"]
+        ctx["breadcrumb_module_label"] = "Waste Atlas"
+        ctx["breadcrumb_module_url"] = reverse("waste-atlas-overview")
+        ctx["breadcrumb_object_label"] = "Statistics dashboard"
+        ctx["atlas_tree_dashboard_active"] = True
         return ctx
 
 

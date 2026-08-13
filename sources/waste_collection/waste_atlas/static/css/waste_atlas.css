@@ -959,6 +959,122 @@ button.atlas-side-link {
   flex-direction: column;
 }
 
+/* Statistics dashboard */
+.dashboard-controls {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  justify-content: space-between;
+}
+.dashboard-kpis {
+  display: flex;
+  gap: 1.6rem;
+  margin: 0;
+}
+.dashboard-kpi dt {
+  color: var(--atlas-eyebrow);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.dashboard-kpi dd {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin: 0;
+}
+.dashboard-grid {
+  display: grid;
+  gap: 1.1rem;
+  grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr));
+}
+.dashboard-card {
+  background: var(--atlas-surface);
+  border: 1px solid var(--atlas-border);
+  border-radius: var(--atlas-radius);
+  margin: 0;
+  padding: .9rem 1rem 1rem;
+}
+.dashboard-card-head {
+  align-items: center;
+  display: flex;
+  gap: .6rem;
+  justify-content: space-between;
+  margin-bottom: .6rem;
+}
+.dashboard-card-title {
+  color: var(--atlas-link);
+  font-size: .92rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.dashboard-card-title:hover,
+.dashboard-card-title:focus-visible {
+  color: var(--bs-primary);
+  text-decoration: underline;
+}
+.dashboard-card-modes {
+  display: flex;
+  gap: .25rem;
+}
+.dashboard-mode {
+  background: none;
+  border: 1px solid var(--atlas-border);
+  border-radius: 999px;
+  color: var(--atlas-eyebrow);
+  cursor: pointer;
+  font-size: .72rem;
+  font-weight: 700;
+  padding: .1rem .55rem;
+}
+.dashboard-mode--active {
+  background: var(--bs-primary);
+  border-color: var(--bs-primary);
+  color: #fff;
+}
+.dashboard-chart-svg {
+  display: block;
+  height: auto;
+  width: 100%;
+}
+.dashboard-chart-status {
+  color: var(--atlas-eyebrow);
+  font-size: .82rem;
+  margin: .6rem 0;
+}
+.dashboard-bar {
+  cursor: pointer;
+  stroke: rgba(0, 0, 0, .18);
+}
+.dashboard-bar:hover,
+.dashboard-bar:focus-visible {
+  stroke: #111827;
+  stroke-width: 1.5;
+}
+.dashboard-bar-value {
+  fill: var(--atlas-eyebrow);
+  font-size: .7rem;
+}
+.dashboard-axis text {
+  fill: var(--atlas-eyebrow);
+  font-size: .7rem;
+}
+.dashboard-point {
+  cursor: pointer;
+}
+.dashboard-tooltip {
+  background: rgba(17, 24, 39, .92);
+  border-radius: .35rem;
+  color: #fff;
+  font-size: .76rem;
+  line-height: 1.35;
+  padding: .35rem .5rem;
+  pointer-events: none;
+  position: absolute;
+  z-index: 1060;
+}
+
 /* Responsive shell */
 @media (max-width: 1199.98px) {
   .atlas-stage {

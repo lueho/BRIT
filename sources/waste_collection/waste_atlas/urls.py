@@ -10,6 +10,7 @@ from .views import (
     EuropeDataCoverageMapIframeView,
     EuropeDataCoverageMapView,
     WasteAtlasChangeMapOverviewView,
+    WasteAtlasDashboardView,
     WasteAtlasDataConflictsOverviewView,
     WasteAtlasMapConfigurationListView,
     WasteAtlasMapConfigurationUpdateView,
@@ -22,6 +23,11 @@ urlpatterns = [
         "map/",
         WasteAtlasOverviewView.as_view(),
         name="waste-atlas-overview",
+    ),
+    path(
+        "dashboard/",
+        WasteAtlasDashboardView.as_view(),
+        name="waste-atlas-dashboard",
     ),
     path(
         "map/changes/",
