@@ -1303,15 +1303,13 @@ var WasteAtlasChoropleth = (function () {
       });
       return columns;
     }
-    function columnHeight(column) {
-      return column.reduce(function (total, item, index) {
-        return total + _legendSlotHeight(item) + (index ? rowGap : 0);
-      }, 0);
-    }
     items.forEach(function (item) {
       var shortestIndex = 0;
       columns.forEach(function (column, index) {
-        if (columnHeight(column) < columnHeight(columns[shortestIndex])) {
+        if (
+          _legendColumnHeight(column, rowGap)
+          < _legendColumnHeight(columns[shortestIndex], rowGap)
+        ) {
           shortestIndex = index;
         }
       });
@@ -1322,6 +1320,14 @@ var WasteAtlasChoropleth = (function () {
 
   function _legendSlotHeight(item) {
     return item.slotHeight == null ? item.height : item.slotHeight;
+  }
+
+  // Height of one laid-out column, measured on the slot heights so that the
+  // rows of a row-flow legend line up across the columns.
+  function _legendColumnHeight(column, rowGap) {
+    return column.reduce(function (total, item, index) {
+      return total + _legendSlotHeight(item) + (index ? rowGap : 0);
+    }, 0);
   }
 
   function _measureExportLegend(cfg, width, columnCount, itemFlow) {
@@ -1373,9 +1379,7 @@ var WasteAtlasChoropleth = (function () {
       opts.items, opts.columnCount, opts.itemFlow, opts.rowGap
     );
     opts.columnHeights = opts.columns.map(function (column) {
-      return column.reduce(function (total, item, index) {
-        return total + _legendSlotHeight(item) + (index ? opts.rowGap : 0);
-      }, 0);
+      return _legendColumnHeight(column, opts.rowGap);
     });
     // Footnote for overlay pattern hint (rendered separately, not as a category)
     opts.footnote = null;
@@ -2899,14 +2903,9 @@ var WasteAtlasChoropleth = (function () {
       fontSize
     );
     var titleHeight = Math.max(fontSize, titleLines.length * lineHeight) + 10;
-    var screenColumns = Array.from({ length: legendColumns }, function () { return []; });
-    screenItems.forEach(function (item, index) {
-      screenColumns[index % legendColumns].push(item);
-    });
+    var screenColumns = _distributeLegendItems(screenItems, legendColumns, 'row', gap);
     var itemsHeight = Math.max.apply(null, screenColumns.map(function (column) {
-      return column.reduce(function (total, item, index) {
-        return total + item.height + (index ? gap : 0);
-      }, 0);
+      return _legendColumnHeight(column, gap);
     }));
     var footnoteLines = hasOverlayLegend
       ? _wrapTextToWidth(
@@ -2960,6 +2959,7 @@ var WasteAtlasChoropleth = (function () {
       column.forEach(function (item, index) {
         if (index) columnY += gap;
         var swatchY = columnY + Math.round((item.height - swatchH) / 2);
+        var slotHeight = _legendSlotHeight(item);
         var swatch = g.append('rect')
           .attr('x', columnX).attr('y', swatchY)
           .attr('width', swatchW).attr('height', swatchH)
@@ -2981,7 +2981,7 @@ var WasteAtlasChoropleth = (function () {
             .attr('dy', lineIndex === 0 ? 0 : lineHeight)
             .text(line);
         });
-        columnY += item.height;
+        columnY += slotHeight;
       });
     });
     currentY += itemsHeight;
@@ -3708,6 +3708,7 @@ var WasteAtlasChoropleth = (function () {
       placementCandidates: _exportLegendPlacementCandidates,
       columnCandidates: _exportLegendColumnCandidates,
       distributeLegendItems: _distributeLegendItems,
+      legendColumnHeight: _legendColumnHeight,
       candidateViolations: _exportCandidateViolations,
       candidateViolationCost: _exportCandidateViolationCost,
       pickLeastBad: _pickLeastBadExportCandidate,
