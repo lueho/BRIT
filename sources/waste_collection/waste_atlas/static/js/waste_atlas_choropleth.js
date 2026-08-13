@@ -2053,7 +2053,7 @@ var WasteAtlasChoropleth = (function () {
         if (r.bio_is_door_to_door === false ||
           (r.bio_is_door_to_door == null && r.residual_count != null)) {
           cls = 'no_bio';
-        } else if (r.ratio === 2) {
+        } else if (r.ratio >= 2) {
           cls = 'two_to_one';
         } else if (r.ratio > 1 && r.ratio < 2) {
           cls = 'between_two_and_one';

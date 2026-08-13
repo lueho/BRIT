@@ -92,3 +92,12 @@ test("a no-data category only shows when the data needs it", () => {
     "no_data",
   ]);
 });
+
+test("RLP ratio values of at least 2 use the 2:1 class", () => {
+  assert.equal(
+    sandbox.WasteAtlasChoropleth.transforms.rpCollectionCountRatio([
+      { catchment_id: 1, bio_is_door_to_door: true, ratio: 3.15 },
+    ])[0]._classified,
+    "two_to_one",
+  );
+});
