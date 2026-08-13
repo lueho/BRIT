@@ -100,7 +100,8 @@ class WasteAtlasResponsiveMapScriptTests(TestCase):
             self.script,
         )
 
-    def test_amount_transforms_preserve_aggregated_value_metadata(self):
+    def test_aggregated_value_metadata_is_derived_once_from_the_raw_record(self):
+        """Every transform would otherwise have to copy the ACPV flag along."""
         for transform_name in (
             "biowasteCollectionAmount",
             "residualCollectionAmount",
@@ -108,20 +109,40 @@ class WasteAtlasResponsiveMapScriptTests(TestCase):
             with self.subTest(transform=transform_name):
                 transform_body = self.script.split(f"{transform_name}: function")[1]
                 transform_body = transform_body.split("    },", 1)[0]
-                self.assertIn("_has_acpv_overlay", transform_body)
-                self.assertIn("_acpv_group_key", transform_body)
+                self.assertNotIn("_has_acpv_overlay", transform_body)
 
-        waste_ratio_body = self.script.split("wasteRatio: function")[1]
-        waste_ratio_body = waste_ratio_body.split("    },", 1)[0]
-        self.assertIn("uses_aggregated_amount", waste_ratio_body)
+        annotate_body = self.script.split("function _annotateFeatures(data, cfg)")[1]
+        annotate_body = annotate_body.split("function _acpvOverlayFlag", 1)[0]
+        self.assertIn("_acpvOverlayFlag(", annotate_body)
 
-    def test_aggregated_overlay_uses_a_dark_neutral_hatching(self):
-        self.assertIn("var OVERLAY_PATTERN_COLOR = '#1f2937';", self.script)
-        pattern_body = self.script.split("function _defineOverlayPattern(cfg)")[1]
+    def test_the_hatch_and_the_group_outline_share_one_resolved_style(self):
+        pattern_body = self.script.split(
+            "function _defineOverlayPattern(cfg, mapWidth)"
+        )[1]
         pattern_body = pattern_body.split("// ---- data fetching", 1)[0]
-        self.assertIn(".attr('stroke', OVERLAY_PATTERN_COLOR)", pattern_body)
-        self.assertIn(".attr('stroke-opacity', 0.9)", pattern_body)
-        self.assertNotIn(".attr('stroke', '#ffffff')", pattern_body)
+        self.assertIn("_acpvStyle(cfg, mapWidth)", pattern_body)
+        self.assertIn(".attr('stroke', style.hatchColor)", pattern_body)
+        self.assertIn(".attr('stroke-opacity', style.hatchOpacity)", pattern_body)
+
+        style_body = self.script.split("function _acpvStyle(cfg, mapWidth)")[1]
+        style_body = style_body.split("\n  }", 1)[0]
+        # Colors are configurable atlas-wide and per map; the geometry scales
+        # with the drawn map so screen and export look the same.
+        self.assertIn("cfg.acpvHatchColor", style_body)
+        self.assertIn("defaults.hatchColor", style_body)
+        self.assertIn("cfg.acpvOutlineColor", style_body)
+        self.assertIn("scale", style_body)
+
+    def test_the_markers_are_sized_against_the_drawn_map_not_the_canvas(self):
+        """An export page has its own aspect ratio and reserves legend space."""
+        render_body = self.script.split("function _render(data, cfg, options)")[1]
+        render_body = render_body.split("function _drawExportLegendItem")[0]
+
+        self.assertIn("var projectedBounds = path.bounds(fitData);", render_body)
+        self.assertIn(
+            "_acpvStyle(cfg, projectedBounds[1][0] - projectedBounds[0][0])",
+            render_body,
+        )
 
     def test_exports_are_rendered_without_the_screen_zoom_transform(self):
         render_body = self.script.split("function _render(data, cfg, options)")[1]
