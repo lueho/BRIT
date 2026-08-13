@@ -1,0 +1,143 @@
+{% extends "waste_atlas/shell_base.html" %}
+{% load static %}
+{% block title %}
+  Waste Atlas — Statistics dashboard
+{% endblock title %}
+{% block meta_keywords %}
+  waste atlas, statistics, dashboard, charts
+{% endblock meta_keywords %}
+{% block atlas_workspace %}
+  <header class="atlas-context">
+    <div class="atlas-context-heading">
+      <div class="atlas-eyebrow">Waste Atlas</div>
+      <h1 class="atlas-context-title">Statistics dashboard</h1>
+      <p class="atlas-hero-lead">
+        How the values behind the atlas maps are distributed across
+        {{ dashboard_map_set_label }} in {{ dashboard_year }}. Every chart uses the
+        classification of its map: click a bar to open that map, or switch a chart
+        to the trend view to compare the selectable years.
+      </p>
+    </div>
+    <div class="atlas-context-actions">
+      <a class="btn btn-outline-primary btn-sm atlas-hero-btn"
+         href="{% url 'waste-atlas-overview' %}">
+        <i class="fas fa-th-list"></i> Map overview
+      </a>
+    </div>
+  </header>
+  <section class="atlas-panel dashboard-controls" aria-label="Dashboard filters">
+    <form class="atlas-directory-filters" id="dashboard-filters" method="get">
+      <div class="atlas-filter">
+        <label for="dashboard-region">Region</label>
+        <select id="dashboard-region"
+                name="region"
+                class="form-select form-select-sm">
+          {% for option in dashboard_map_sets %}
+            <option value="{{ option.value }}"
+                    {% if option.value == dashboard_map_set %}selected{% endif %}>
+              {{ option.label }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="atlas-filter">
+        <label for="dashboard-year">Year</label>
+        <select id="dashboard-year" name="year" class="form-select form-select-sm">
+          {% for option in dashboard_years %}
+            <option value="{{ option }}"
+                    {% if option == dashboard_year|stringformat:"s" %}selected{% endif %}>
+              {{ option }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="atlas-filter">
+        <label for="dashboard-category">Waste category</label>
+        <select id="dashboard-category"
+                name="category"
+                class="form-select form-select-sm">
+          <option value="">All waste categories</option>
+          {% for value, label in dashboard_categories.items %}
+            <option value="{{ value }}"
+                    {% if value == dashboard_selected_category %}selected{% endif %}>
+              {{ label }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <noscript>
+        <button class="btn btn-primary btn-sm" type="submit">Apply</button>
+      </noscript>
+    </form>
+    <dl class="dashboard-kpis" id="dashboard-kpis" aria-live="polite">
+      <div class="dashboard-kpi">
+        <dt>Catchments with data</dt>
+        <dd id="dashboard-kpi-catchments">—</dd>
+      </div>
+      <div class="dashboard-kpi">
+        <dt>Charts with data</dt>
+        <dd id="dashboard-kpi-charts">—</dd>
+      </div>
+      <div class="dashboard-kpi">
+        <dt>Values loaded</dt>
+        <dd id="dashboard-kpi-values">—</dd>
+      </div>
+    </dl>
+  </section>
+  {% for section in dashboard_sections %}
+    <section class="atlas-panel dashboard-section"
+             data-section="{{ section.key }}"
+             aria-labelledby="dashboard-section-{{ section.key }}">
+      <h2 class="atlas-section-title" id="dashboard-section-{{ section.key }}">{{ section.label }}</h2>
+      <div class="dashboard-grid">
+        {% for panel in section.panels %}
+          <figure class="dashboard-card"
+                  data-theme="{{ panel.theme }}"
+                  data-category="{{ panel.wasteCategory }}">
+            <figcaption class="dashboard-card-head">
+              <a class="dashboard-card-title"
+                 href="{{ panel.mapUrl }}"
+                 title="{{ panel.mapTitle }}">{{ panel.title }}</a>
+              <div class="dashboard-card-modes"
+                   role="group"
+                   aria-label="Chart view for {{ panel.title }}">
+                <button class="dashboard-mode dashboard-mode--active"
+                        type="button"
+                        data-mode="shares"
+                        data-theme="{{ panel.theme }}">Shares</button>
+                <button class="dashboard-mode"
+                        type="button"
+                        data-mode="trend"
+                        data-theme="{{ panel.theme }}">Trend</button>
+              </div>
+            </figcaption>
+            <div class="dashboard-chart"
+                 id="{{ panel.chartId }}"
+                 data-theme="{{ panel.theme }}">
+              <p class="dashboard-chart-status">Loading…</p>
+            </div>
+          </figure>
+        {% endfor %}
+      </div>
+    </section>
+  {% empty %}
+    <section class="atlas-panel">
+      <p class="text-muted">No charted maps are configured for this region yet.</p>
+    </section>
+  {% endfor %}
+  <div class="dashboard-tooltip" id="dashboard-tooltip" role="tooltip" hidden></div>
+{% endblock atlas_workspace %}
+{% block atlas_vendor_javascript %}
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+{% endblock atlas_vendor_javascript %}
+{% block atlas_page_javascript %}
+  {{ dashboard_config|json_script:"dashboard-config" }}
+  <script src="{% static 'js/waste_atlas_dashboard.min.js' %}?v=20260813-1"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      WasteAtlasDashboard.init(
+        JSON.parse(document.getElementById('dashboard-config').textContent)
+      );
+    });
+  </script>
+{% endblock atlas_page_javascript %}
