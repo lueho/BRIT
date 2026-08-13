@@ -75,6 +75,65 @@ LEGACY_EXPORT_LEGEND_KEYS = (
 MIN_WIDTH_FRACTION = 0.2
 MAX_WIDTH_FRACTION = 0.9
 
+# Legend entries a quartile map derives from the data instead of from its stored
+# categories: the renderer classifies the values into quartiles and replaces the
+# stored classes with these, so they are the entries such a legend actually shows
+# and must be orderable like any other entry.  Their labels are the value ranges
+# the renderer computes, so only the position is configurable.
+QUARTILE_LEGEND_ENTRY_LABELS = (
+    ("q1", "Lowest quarter (Q1)"),
+    ("q2", "Second quarter (Q2)"),
+    ("q3", "Third quarter (Q3)"),
+    ("q4", "Highest quarter (Q4)"),
+)
+
+
+def quartile_legend_entries(configuration):
+    """Return the quartile legend entries of ``configuration``, if it has any.
+
+    Mirrors the renderer's condition for classifying into quartiles: a numeric
+    field, a quartile palette and no explicit opt-out.
+    """
+    if not configuration.get("numericField"):
+        return []
+    colors = configuration.get("quartileColors") or []
+    if not colors or configuration.get("enableQuartiles") is False:
+        return []
+    return [
+        {
+            "value": value,
+            "label": label,
+            "color": colors[index] if index < len(colors) else "",
+        }
+        for index, (value, label) in enumerate(QUARTILE_LEGEND_ENTRY_LABELS)
+    ]
+
+
+def order_legend_values(default_values, stored_order):
+    """Return ``default_values`` rearranged by the saved ``stored_order``.
+
+    A value the saved order does not mention keeps its position relative to the
+    values it does mention: it stays directly behind the last mentioned value
+    that precedes it in the default order, and in front of everything when no
+    mentioned value precedes it.  A saved order therefore never scatters entries
+    it knows nothing about — quartile classes stay where the default order puts
+    them until they are ordered explicitly.
+    """
+    ranks = {}
+    if isinstance(stored_order, (list, tuple)):
+        ranks = {value: index for index, value in enumerate(stored_order)}
+    keyed = []
+    rank = -1
+    offset = 0
+    for value in default_values:
+        if value in ranks:
+            rank = ranks[value]
+            offset = 0
+        else:
+            offset += 1
+        keyed.append(((rank, offset), value))
+    return [value for _key, value in sorted(keyed, key=lambda item: item[0])]
+
 
 def normalize_placement(value):
     """Return a canonical placement, or ``None`` when the value means inherit."""

@@ -7,6 +7,7 @@ from django.contrib.auth.models import Group, User
 from django.test import TestCase
 from django.urls import reverse
 
+from sources.waste_collection.waste_atlas.legend import quartile_legend_entries
 from sources.waste_collection.waste_atlas.models import (
     WasteAtlasMapConfiguration,
 )
@@ -65,6 +66,11 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
             data[f"category_{index}_label"] = category["label"]
             data[f"category_{index}_export_label"] = category.get("exportLabel", "")
             data[f"category_{index}_order"] = index + 1
+        # Quartile maps also order the data-derived quartile classes.
+        for offset, entry in enumerate(quartile_legend_entries(configuration)):
+            data[f"quartile_{entry['value']}_order"] = (
+                len(configuration["categories"]) + offset + 1
+            )
         data.update(overrides)
         return data
 
@@ -380,6 +386,89 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         self.assertContains(response, "Each category position must be unique.")
         config.refresh_from_db()
         self.assertEqual(config.configuration, original)
+
+    def test_quartile_classes_are_orderable_and_reach_preview_and_export(self):
+        """Regression: an amount map's legend order was silently ignored.
+
+        Amount maps classify the data into quartiles at render time, which
+        replaces the stored classes with ``q1``-``q4``. The editor therefore has
+        to offer those entries as well, otherwise a saved order can only name
+        classes the legend never shows.
+        """
+        config = WasteAtlasMapConfiguration.objects.get(
+            key="biowaste_collection_amount"
+        )
+        original = deepcopy(config.configuration)
+        stored_values = [category["value"] for category in original["categories"]]
+        self.client.force_login(self.staff)
+
+        form_response = self.client.get(
+            reverse("waste-atlas-map-configuration-update", args=[config.key])
+        )
+        self.assertContains(form_response, "quartile_q1_order")
+
+        response = self.client.post(
+            reverse("waste-atlas-map-configuration-update", args=[config.key]),
+            self._form_data(
+                original,
+                # Highest quartile first, "no separate collection" last.
+                quartile_q4_order=1,
+                quartile_q3_order=2,
+                quartile_q2_order=3,
+                quartile_q1_order=4,
+                **{
+                    f"category_{index}_order": index + 5
+                    for index in range(len(stored_values))
+                },
+                return_to=reverse(
+                    "waste-atlas-south-tyrol-biowaste-collection-amount-map"
+                ),
+            ),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        config.refresh_from_db()
+        self.assertEqual(
+            config.configuration["legendCategoryOrder"],
+            ["q4", "q3", "q2", "q1", *stored_values],
+        )
+
+        map_response = self.client.get(response["Location"])
+        rendered_config = self._rendered_map_config(map_response)
+        self.assertEqual(
+            rendered_config["legendCategoryOrder"],
+            config.configuration["legendCategoryOrder"],
+        )
+
+    def test_quartile_classes_default_to_the_order_the_renderer_uses(self):
+        """The editor's initial order must match what the map renders.
+
+        Without a saved order the renderer shows the quartile classes first and
+        the "no separate collection" entry last, so that is where the form has
+        to place them.
+        """
+        config = WasteAtlasMapConfiguration.objects.get(
+            key="biowaste_collection_amount"
+        )
+        configuration = deepcopy(config.configuration)
+        configuration.pop("legendCategoryOrder", None)
+        config.configuration = configuration
+        config.save(update_fields=["configuration"])
+        self.client.force_login(self.staff)
+
+        response = self.client.get(
+            reverse("waste-atlas-map-configuration-update", args=[config.key])
+        )
+
+        rows = response.context["form"].category_rows
+        self.assertEqual(
+            [row["value"] for row in rows],
+            ["very_high", "high", "medium", "low", "q1", "q2", "q3", "q4", "no_bio"],
+        )
+        # Computed entries carry no editable text: their labels are the ranges
+        # the renderer derives from the data.
+        quartile_rows = [row for row in rows if row["value"].startswith("q")]
+        self.assertTrue(all(row["label_field"] is None for row in quartile_rows))
 
     def test_saved_export_layout_overrides_regional_default(self):
         config, _ = WasteAtlasMapConfiguration.objects.update_or_create(
