@@ -185,6 +185,45 @@ test("row flow gives every entry of a row the row's height so rows line up", () 
   );
 });
 
+// A realm with a canvas stub that reports bold text wider than regular text and
+// records every font it measured with, so wrapping can be observed without a DOM.
+function measuringRealm() {
+  const fonts = [];
+  const context = {
+    font: "",
+    measureText(text) {
+      fonts.push(this.font);
+      const perChar = String(this.font).indexOf("bold") === 0 ? 12 : 6;
+      return { width: String(text).length * perChar };
+    },
+  };
+  const realm = {
+    console,
+    document: { createElement: () => ({ getContext: () => context }) },
+  };
+  vm.createContext(realm);
+  vm.runInContext(source, realm);
+  realm.WasteAtlasChoropleth.setRenderDefaults(renderDefaults());
+  return { atlas: realm.WasteAtlasChoropleth, fonts };
+}
+
+test("text is measured with the face it is rendered in", () => {
+  const { atlas, fonts } = measuringRealm();
+  const title = "Annual collection count ratio - Biowaste : Residual waste";
+  const font = { family: atlas.legend.screenFontFamily, weight: "bold" };
+
+  const bold = atlas.layout.wrapTextToWidth(title, 240, 13, font);
+  const regular = atlas.layout.wrapTextToWidth(title, 240, 13, {
+    family: font.family,
+  });
+
+  // The legend title is drawn bold: measuring it regular underestimates its
+  // width and the title then overflows the legend box instead of wrapping.
+  assert.ok(bold.length > regular.length);
+  assert.ok(fonts.includes("bold 13px 'Nunito', sans-serif"));
+  assert.ok(fonts.includes("13px 'Nunito', sans-serif"));
+});
+
 test("a row-flow column is measured on the slot heights, so columns stay aligned", () => {
   // The screen legend shares this measurement, so a wrapped (taller) entry may
   // not push its column out of step with its neighbour.

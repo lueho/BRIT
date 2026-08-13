@@ -22,7 +22,10 @@ from sources.waste_collection.waste_atlas.map_selection import (
     WASTE_ATLAS_MAP_SELECTIONS,
     build_map_selection_context,
 )
-from sources.waste_collection.waste_atlas.models import WasteAtlasRenderingSettings
+from sources.waste_collection.waste_atlas.models import (
+    WasteAtlasMapConfiguration,
+    WasteAtlasRenderingSettings,
+)
 from sources.waste_collection.waste_atlas.pages import MAP_PAGES, MAP_SET_COUNTRIES
 from sources.waste_collection.waste_atlas.templatetags.atlas_tags import (
     atlas_js_config,
@@ -69,7 +72,9 @@ class WasteAtlasMapConfigStructureTests(TestCase):
         for config_key, config in MAP_CONFIGS.items():
             for entry in config["categories"]:
                 with self.subTest(config_key=config_key, entry=entry.get("label")):
-                    self.assertLessEqual({"label", "color"}, set(entry))
+                    self.assertIn("label", entry)
+                    # A fill is either literal or a reference to a shared colour.
+                    self.assertTrue("color" in entry or "colorRef" in entry)
                     self.assertTrue("value" in entry or "classValue" in entry)
 
     def test_every_quartile_special_case_defines_the_field_it_classifies(self):
@@ -137,6 +142,9 @@ class WasteAtlasMapConfigStructureTests(TestCase):
                 if not self._is_biowaste_no_collection_entry(entry):
                     continue
                 with self.subTest(config_key=config_key, entry=entry.get("label")):
+                    if "colorRef" in entry:
+                        self.assertEqual(entry["colorRef"], "no_collection")
+                        continue
                     self.assertEqual(entry["color"], no_collection_color())
 
     @staticmethod
@@ -272,7 +280,13 @@ class WasteAtlasMapConfigStructureTests(TestCase):
                 self.assertEqual(sweden_themes[theme]["route_name"], route_name)
                 self.assertEqual(pages_by_route[route_name]["year"], "2024")
 
-    def test_rp_collection_maps_use_requested_region_specific_legends(self):
+    def test_rp_collection_maps_use_their_own_stored_configurations(self):
+        """The RLP legends are staff-editable data, not page-level Python.
+
+        Their classes differ from the shared themes, so each of those pages
+        points at its own stored configuration instead of overriding the shared
+        one in ``pages.py``.
+        """
         pages = {
             page["theme"]: page
             for page in MAP_PAGES
@@ -286,7 +300,15 @@ class WasteAtlasMapConfigStructureTests(TestCase):
             }
         }
 
-        frequency = pages["combined_frequency"]["overrides"]
+        for theme, page in pages.items():
+            with self.subTest(theme=theme):
+                self.assertEqual(page["config_key"], f"rp_{theme}")
+                overrides = page.get("overrides") or {}
+                self.assertNotIn("categories", overrides)
+                self.assertNotIn("legendTitle", overrides)
+                self.assertNotIn("transformName", overrides)
+
+        frequency = MAP_CONFIGS["rp_combined_frequency"]
         self.assertEqual(
             frequency["legendTitle"],
             "Collection frequency structure: Biowaste / Residual waste",
@@ -295,18 +317,14 @@ class WasteAtlasMapConfigStructureTests(TestCase):
         self.assertEqual(frequency["exportLegendColumns"], 2)
         self.assertEqual(frequency["exportLegendItemFlow"], "row")
         self.assertTrue(frequency["showOnlyPresentCategories"])
-        self.assertTrue(
-            all(
-                entry["label"] == entry["label"].upper()
-                for entry in frequency["categories"]
-            )
-        )
+        self.assertEqual(frequency["transformName"], "combinedFrequency")
 
-        ratio = pages["collection_count_ratio"]["overrides"]
+        ratio = MAP_CONFIGS["rp_collection_count_ratio"]
         self.assertEqual(
             ratio["legendTitle"],
             "Annual collection count ratio - Biowaste : Residual waste",
         )
+        self.assertEqual(ratio["transformName"], "rpCollectionCountRatio")
         self.assertEqual(
             [entry["label"] for entry in ratio["categories"]],
             [
@@ -318,47 +336,90 @@ class WasteAtlasMapConfigStructureTests(TestCase):
             ],
         )
 
-        for theme in ("biowaste_collection_count", "residual_collection_count"):
+        for theme, transform in (
+            ("biowaste_collection_count", "rpBiowasteCollectionCount"),
+            ("residual_collection_count", "rpResidualCollectionCount"),
+        ):
             with self.subTest(theme=theme):
-                categories = pages[theme]["overrides"]["categories"]
+                config = MAP_CONFIGS[f"rp_{theme}"]
+                self.assertEqual(config["transformName"], transform)
+                self.assertFalse(config["enableQuartiles"])
                 self.assertEqual(
-                    [entry["label"] for entry in categories[:7]],
-                    ["< 13", "13", "14 - 25", "26", "27 - 39", "40 - 51", "52"],
+                    [entry["label"] for entry in config["categories"][:8]],
+                    [
+                        "< 13",
+                        "13",
+                        "14 - 25",
+                        "26",
+                        "27 - 39",
+                        "40 - 51",
+                        "52",
+                        "> 52",
+                    ],
                 )
 
         self.assertEqual(
-            pages["biowaste_collection_count"]["overrides"]["categories"][-1]["label"],
+            MAP_CONFIGS["rp_biowaste_collection_count"]["categories"][-1]["label"],
             "No separate door-to-door biowaste collection",
         )
 
-    def test_page_legends_take_the_no_collection_color_from_the_setting(self):
-        """Page-level legends must follow the admin-editable shared fill."""
+    def test_rp_ratio_map_renders_the_stored_legend_title_and_labels(self):
+        """Editing the stored configuration must reach the rendered map.
+
+        Regression: the page overrode ``legendTitle`` and ``categories`` in
+        Python, so the legend ignored what maintainers configured.
+        """
+        page = next(
+            entry
+            for entry in MAP_PAGES
+            if entry["region"] == "rp" and entry["theme"] == "collection_count_ratio"
+        )
+        stored = WasteAtlasMapConfiguration.objects.get(key=page["config_key"])
+        stored.configuration = {
+            **stored.configuration,
+            "legendTitle": "Edited legend title",
+            "categories": [
+                {"value": "two_to_one", "label": "Edited label", "color": "#111111"}
+            ],
+        }
+        stored.save(update_fields=["configuration"])
+
+        config = atlas_js_config(self._page_context(page), page["config_key"])
+
+        self.assertEqual(config["legendTitle"], "Edited legend title")
+        self.assertEqual(
+            [entry["label"] for entry in config["categories"]], ["Edited label"]
+        )
+
+    def test_legends_take_the_no_collection_color_from_the_setting(self):
+        """A ``colorRef`` entry must follow the admin-editable shared fill."""
         settings = WasteAtlasRenderingSettings.load()
         settings.no_collection_color = "#123456"
         settings.save()
 
         checked = 0
         for page in MAP_PAGES:
-            overrides = page.get("overrides") or {}
-            if not overrides.get("categories"):
-                continue
-            context = Context(
-                {
-                    "map_config_overrides": overrides,
-                    "atlas_page_selector_set": page.get("selector_set"),
-                    "atlas_active_theme": page["theme"],
-                }
-            )
-            config = atlas_js_config(context, page["config_key"])
+            config = atlas_js_config(self._page_context(page), page["config_key"])
             for entry in self._all_entries(config):
                 if not self._is_biowaste_no_collection_entry(entry):
                     continue
+                if entry["color"] != "#123456":
+                    continue
                 checked += 1
                 with self.subTest(page=page["name"], entry=entry["label"]):
-                    self.assertEqual(entry["color"], "#123456")
                     self.assertNotIn("colorRef", entry)
 
         self.assertTrue(checked)
+
+    @staticmethod
+    def _page_context(page):
+        return Context(
+            {
+                "map_config_overrides": page.get("overrides") or {},
+                "atlas_page_selector_set": page.get("selector_set"),
+                "atlas_active_theme": page["theme"],
+            }
+        )
 
     def test_collection_system_config_opts_into_conflict_aid(self):
         """The collection_system theme exposes the maintainer conflict aid."""
