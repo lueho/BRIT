@@ -109,7 +109,8 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         required=False,
         help_text=(
             "Whether entries fill one column after another or read across the "
-            "columns row by row. Blank keeps the atlas default."
+            "columns row by row. Applies to the export and to the map page. "
+            "Blank keeps the atlas default."
         ),
         widget=forms.Select(attrs={"class": "form-select"}),
     )
