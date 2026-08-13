@@ -1,7 +1,9 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.test import TestCase
+from django.utils import timezone
 
 from maps.models import GeoPolygon, LauRegion, NutsRegion, Region
 from maps.population.models import (
@@ -315,6 +317,12 @@ class EstimateMaterializationTestCase(PopulationServiceTestCaseBase):
         obs1.save()
         self.assertIn(estimate, PopulationEstimate.objects.stale())
 
+        # A source timestamp can be slightly ahead of the application clock
+        # (or an import can preserve an upstream revision time). Rebuilding an
+        # estimate must still mark it current relative to every component.
+        PopulationObservation.objects.filter(pk=obs1.pk).update(
+            updated_at=timezone.now() + timedelta(seconds=1)
+        )
         refreshed = materialize_estimate(region, 2021)
         self.assertEqual(refreshed.pk, estimate.pk)
         self.assertEqual(refreshed.value, Decimal("91000"))

@@ -186,6 +186,14 @@ def materialize_estimate(region, year):
     if result is None:
         return None
 
+    # An upstream import may preserve an observation revision timestamp that is
+    # fractionally ahead of this worker's clock. An estimate rebuilt from that
+    # observation is current by definition, so its freshness marker must not
+    # be earlier than any component timestamp.
+    calculated_at = max(
+        timezone.now(),
+        *(observation.updated_at for observation in result.observations),
+    )
     estimate, _created = PopulationEstimate.objects.update_or_create(
         region=region,
         year=year,
@@ -193,7 +201,7 @@ def materialize_estimate(region, year):
             "value": result.value,
             "is_mixed_provenance": result.is_mixed_provenance,
             "is_provisional": result.is_provisional,
-            "calculated_at": timezone.now(),
+            "calculated_at": calculated_at,
         },
     )
     estimate.component_links.all().delete()

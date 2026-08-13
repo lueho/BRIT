@@ -273,10 +273,15 @@ class NutsImportApiTestCase(TestCase):
         self.assertEqual(imported.geom.geom_type, "MultiPolygon")
 
     def test_a_geometry_that_cannot_be_read_is_a_bad_request(self):
-        response = self.post(
-            self.payload([region("DE", 0, "Deutschland", {"type": "Polygon"})])
-        )
+        # GDAL reports the parse failure through its logger before the
+        # serializer turns it into the expected validation response. Capture
+        # it here so it does not pollute the test run's output.
+        with self.assertLogs("django.contrib.gis", level="ERROR") as logs:
+            response = self.post(
+                self.payload([region("DE", 0, "Deutschland", {"type": "Polygon"})])
+            )
         self.assertEqual(response.status_code, 400)
+        self.assertIn("GDAL_ERROR", logs.output[0])
 
     def test_a_geometry_without_any_parts_is_a_bad_request(self):
         """Empty borders would be stored on an update but dropped on a create."""
