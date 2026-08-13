@@ -40,13 +40,13 @@ function orderedValues(cfg) {
   return legend.orderedCategories(cfg).map((item) => item.value);
 }
 
-test("without a saved order the no-collection entry goes last", () => {
+test("without a saved order the configured category order is preserved", () => {
   assert.deepEqual(orderedValues({ categories: quartileCategories() }), [
+    "no_bio",
     "q1",
     "q2",
     "q3",
     "q4",
-    "no_bio",
   ]);
 });
 
@@ -60,16 +60,13 @@ test("a saved order naming the quartile classes is applied verbatim", () => {
   );
 });
 
-test("a saved order that only knows the stored classes leaves the quartiles in place", () => {
-  // Regression: the stored classes of an amount map (``very_high``…``low``) are
-  // replaced by the quartile classes, so the saved order mentions only
-  // ``no_bio``. That must not lift ``no_bio`` above the quartile entries.
+test("an explicit order anchors unknown entries relative to their configured order", () => {
   assert.deepEqual(
     orderedValues({
       categories: quartileCategories(),
       legendCategoryOrder: ["very_high", "high", "medium", "low", "no_bio"],
     }),
-    ["q1", "q2", "q3", "q4", "no_bio"],
+    ["no_bio", "q1", "q2", "q3", "q4"],
   );
 });
 

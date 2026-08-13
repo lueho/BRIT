@@ -267,6 +267,64 @@ class WasteAtlasMapConfigStructureTests(TestCase):
                 self.assertEqual(sweden_themes[theme]["route_name"], route_name)
                 self.assertEqual(pages_by_route[route_name]["year"], "2024")
 
+    def test_rp_collection_maps_use_requested_region_specific_legends(self):
+        pages = {
+            page["theme"]: page
+            for page in MAP_PAGES
+            if page["region"] == "rp"
+            and page["theme"]
+            in {
+                "combined_frequency",
+                "biowaste_collection_count",
+                "residual_collection_count",
+                "collection_count_ratio",
+            }
+        }
+
+        frequency = pages["combined_frequency"]["overrides"]
+        self.assertEqual(
+            frequency["legendTitle"],
+            "Collection frequency structure: Biowaste / Residual waste",
+        )
+        self.assertEqual(frequency["legendColumns"], 2)
+        self.assertEqual(frequency["exportLegendColumns"], 2)
+        self.assertEqual(frequency["exportLegendItemFlow"], "row")
+        self.assertTrue(frequency["showOnlyPresentCategories"])
+        self.assertTrue(
+            all(
+                entry["label"] == entry["label"].upper()
+                for entry in frequency["categories"]
+            )
+        )
+
+        ratio = pages["collection_count_ratio"]["overrides"]
+        self.assertEqual(
+            ratio["legendTitle"],
+            "Annual collection count ratio - Biowaste : Residual waste",
+        )
+        self.assertEqual(
+            [entry["label"] for entry in ratio["categories"]],
+            [
+                "2:1",
+                "< 2:1 > 1:1",
+                "1:1",
+                "No separate door-to-door biowaste collection",
+            ],
+        )
+
+        for theme in ("biowaste_collection_count", "residual_collection_count"):
+            with self.subTest(theme=theme):
+                categories = pages[theme]["overrides"]["categories"]
+                self.assertEqual(
+                    [entry["label"] for entry in categories[:6]],
+                    ["13", "14 - 25", "26", "27 - 39", "40 - 51", "52"],
+                )
+
+        self.assertEqual(
+            pages["biowaste_collection_count"]["overrides"]["categories"][-1]["label"],
+            "No separate door-to-door biowaste collection",
+        )
+
     def test_collection_system_config_opts_into_conflict_aid(self):
         """The collection_system theme exposes the maintainer conflict aid."""
         config = MAP_CONFIGS["collection_system"]

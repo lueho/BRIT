@@ -317,7 +317,12 @@ var WasteAtlasChoropleth = (function () {
       records = transforms[cfg.transformName](records);
     }
     var lookup = {};
-    records.forEach(function (r) { lookup[r.catchment_id] = r; });
+    var presentCategoryValues = {};
+    records.forEach(function (r) {
+      lookup[r.catchment_id] = r;
+      if (r[cfg.dataField] != null) presentCategoryValues[r[cfg.dataField]] = true;
+    });
+    cfg._presentCategoryValues = presentCategoryValues;
 
     var hasFallbackNoData = false;
     var hasNoDataCategory = false;
@@ -402,9 +407,9 @@ var WasteAtlasChoropleth = (function () {
       : '';
     var catchUrl = cfg.changeMode
       ? _changeCatchmentUrl(catchmentDataUrl) + '?country=' + cfg.country
-        + '&from_year=' + cfg.fromYear + '&to_year=' + cfg.year + nutsSuffix
+      + '&from_year=' + cfg.fromYear + '&to_year=' + cfg.year + nutsSuffix
       : catchmentDataUrl + '?country=' + cfg.country + '&year=' + collectionYear
-        + nutsSuffix + collectionDetailSuffix;
+      + nutsSuffix + collectionDetailSuffix;
     var nuts0Url = '/maps/api/nuts_region/geojson/?levl_code=0&cntr_code=' + cfg.country;
     var nutsLevel = cfg.nutsLevel || 1;
     var nutsRegionUrl = '/maps/api/nuts_region/geojson/?levl_code=' + nutsLevel + '&cntr_code=' + cfg.country;
@@ -1151,21 +1156,14 @@ var WasteAtlasChoropleth = (function () {
 
   function _visibleLegendCategories(cfg) {
     return cfg.categories.filter(function (item) {
-      return !_isNoDataCategory(item) || cfg._hasNoDataCategory;
+      if (_isNoDataCategory(item) && !cfg._hasNoDataCategory) return false;
+      if (!cfg.showOnlyPresentCategories) return true;
+      return Boolean(cfg._presentCategoryValues && cfg._presentCategoryValues[item.value]);
     });
   }
 
   function _defaultLegendCategories(cfg) {
-    var normal = [];
-    var noCollection = [];
-    _visibleLegendCategories(cfg).forEach(function (item) {
-      if (_isNoCollectionCategory(item)) {
-        noCollection.push(item);
-      } else {
-        normal.push(item);
-      }
-    });
-    return normal.concat(noCollection);
+    return _visibleLegendCategories(cfg);
   }
 
   /**
@@ -1888,6 +1886,56 @@ var WasteAtlasChoropleth = (function () {
         return { catchment_id: r.catchment_id, _classified: cls };
       });
     },
+    rpBiowasteCollectionCount: function (records) {
+      return records.map(function (r) {
+        var count = r.collection_count;
+        var cls;
+        if (r.is_door_to_door === false) {
+          cls = 'no_door_to_door';
+        } else if (count === 13) {
+          cls = '13';
+        } else if (count >= 14 && count <= 25) {
+          cls = '14_25';
+        } else if (count === 26) {
+          cls = '26';
+        } else if (count >= 27 && count <= 39) {
+          cls = '27_39';
+        } else if (count >= 40 && count <= 51) {
+          cls = '40_51';
+        } else if (count === 52) {
+          cls = '52';
+        } else if (count > 52) {
+          cls = 'over_52';
+        } else {
+          cls = null;
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
+    rpResidualCollectionCount: function (records) {
+      return records.map(function (r) {
+        var count = r.collection_count;
+        var cls;
+        if (count === 13) {
+          cls = '13';
+        } else if (count >= 14 && count <= 25) {
+          cls = '14_25';
+        } else if (count === 26) {
+          cls = '26';
+        } else if (count >= 27 && count <= 39) {
+          cls = '27_39';
+        } else if (count >= 40 && count <= 51) {
+          cls = '40_51';
+        } else if (count === 52) {
+          cls = '52';
+        } else if (count > 52) {
+          cls = 'over_52';
+        } else {
+          cls = null;
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
     biowasteCollectionPointCount: function (records) {
       return records.map(function (r) {
         var value = r.collection_point_count;
@@ -1995,6 +2043,24 @@ var WasteAtlasChoropleth = (function () {
           cls = 'bio_half';
         } else {
           cls = 'same';
+        }
+        return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
+    rpCollectionCountRatio: function (records) {
+      return records.map(function (r) {
+        var cls;
+        if (r.bio_is_door_to_door === false ||
+          (r.bio_is_door_to_door == null && r.residual_count != null)) {
+          cls = 'no_bio';
+        } else if (r.ratio === 2) {
+          cls = 'two_to_one';
+        } else if (r.ratio > 1 && r.ratio < 2) {
+          cls = 'between_two_and_one';
+        } else if (r.ratio === 1) {
+          cls = 'one_to_one';
+        } else {
+          cls = null;
         }
         return { catchment_id: r.catchment_id, _classified: cls };
       });
@@ -2759,7 +2825,10 @@ var WasteAtlasChoropleth = (function () {
     var labelGap = 8;
     var requestedWidth = Number(cfg.legendWidth) || _defaults().legend.width;
     var legendWidth = Math.max(120, Math.min(requestedWidth, width - 32));
-    var textWidth = legendWidth - paddingX * 2 - swatchW - labelGap;
+    var legendColumns = Math.max(1, Math.floor(Number(cfg.legendColumns) || 1));
+    var columnGap = gap * 2;
+    var columnWidth = (legendWidth - paddingX * 2 - columnGap * (legendColumns - 1)) / legendColumns;
+    var textWidth = columnWidth - swatchW - labelGap;
     var screenItems = _orderedLegendCategories(cfg).map(function (item) {
       return {
         color: item.color,
@@ -2791,9 +2860,15 @@ var WasteAtlasChoropleth = (function () {
       fontSize
     );
     var titleHeight = Math.max(fontSize, titleLines.length * lineHeight) + 10;
-    var itemsHeight = screenItems.reduce(function (total, item, index) {
-      return total + item.height + (index ? gap : 0);
-    }, 0);
+    var screenColumns = Array.from({ length: legendColumns }, function () { return []; });
+    screenItems.forEach(function (item, index) {
+      screenColumns[index % legendColumns].push(item);
+    });
+    var itemsHeight = Math.max.apply(null, screenColumns.map(function (column) {
+      return column.reduce(function (total, item, index) {
+        return total + item.height + (index ? gap : 0);
+      }, 0);
+    }));
     var footnoteLines = hasOverlayLegend
       ? _wrapTextToWidth(
         cfg.overlayPatternLegendLabel,
@@ -2840,32 +2915,37 @@ var WasteAtlasChoropleth = (function () {
     });
 
     var currentY = paddingY + titleHeight;
-    screenItems.forEach(function (item, index) {
-      if (index) currentY += gap;
-      var swatchY = currentY + Math.round((item.height - swatchH) / 2);
-      var swatch = g.append('rect')
-        .attr('x', paddingX).attr('y', swatchY)
-        .attr('width', swatchW).attr('height', swatchH)
-        .attr('fill', item.color).attr('stroke', '#333');
-      if (item.kind === 'conflict') {
-        swatch
-          .attr('stroke', _defaults().conflictStroke)
-          .attr('stroke-width', 1.4)
-          .attr('stroke-dasharray', _defaults().conflictStrokeDasharray);
-      }
-      var textX = paddingX + swatchW + labelGap;
-      var label = g.append('text')
-        .attr('x', textX).attr('y', currentY + fontSize)
-        .attr('font-size', fontSize)
-        .attr('font-family', "'Nunito', sans-serif");
-      item.lines.forEach(function (line, lineIndex) {
-        label.append('tspan')
-          .attr('x', textX)
-          .attr('dy', lineIndex === 0 ? 0 : lineHeight)
-          .text(line);
+    screenColumns.forEach(function (column, columnIndex) {
+      var columnY = currentY;
+      var columnX = paddingX + columnIndex * (columnWidth + columnGap);
+      column.forEach(function (item, index) {
+        if (index) columnY += gap;
+        var swatchY = columnY + Math.round((item.height - swatchH) / 2);
+        var swatch = g.append('rect')
+          .attr('x', columnX).attr('y', swatchY)
+          .attr('width', swatchW).attr('height', swatchH)
+          .attr('fill', item.color).attr('stroke', '#333');
+        if (item.kind === 'conflict') {
+          swatch
+            .attr('stroke', _defaults().conflictStroke)
+            .attr('stroke-width', 1.4)
+            .attr('stroke-dasharray', _defaults().conflictStrokeDasharray);
+        }
+        var textX = columnX + swatchW + labelGap;
+        var label = g.append('text')
+          .attr('x', textX).attr('y', columnY + fontSize)
+          .attr('font-size', fontSize)
+          .attr('font-family', "'Nunito', sans-serif");
+        item.lines.forEach(function (line, lineIndex) {
+          label.append('tspan')
+            .attr('x', textX)
+            .attr('dy', lineIndex === 0 ? 0 : lineHeight)
+            .text(line);
+        });
+        columnY += item.height;
       });
-      currentY += item.height;
     });
+    currentY += itemsHeight;
 
     if (hasOverlayLegend) {
       var footnoteLineY = currentY + gap;
