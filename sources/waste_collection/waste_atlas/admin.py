@@ -59,6 +59,25 @@ class WasteAtlasRenderingSettingsAdmin(admin.ModelAdmin):
             },
         ),
         (
+            "Aggregated values (ACPV)",
+            {
+                "description": (
+                    "Appearance of the aggregated-value markers, shared by the "
+                    "on-screen maps and the exports. A single map can override "
+                    "any of these with the acpvHatchColor, acpvHatchOpacity, "
+                    "acpvOutlineColor, acpvOutlineOpacity or acpvOutlineWidth "
+                    "key in its configuration."
+                ),
+                "fields": (
+                    "acpv_hatch_color",
+                    "acpv_hatch_opacity",
+                    "acpv_outline_color",
+                    "acpv_outline_opacity",
+                    "acpv_outline_width",
+                ),
+            },
+        ),
+        (
             "Change maps",
             {
                 "fields": (

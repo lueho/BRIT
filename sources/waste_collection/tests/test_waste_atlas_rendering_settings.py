@@ -65,6 +65,20 @@ class WasteAtlasRenderingSettingsModelTests(TestCase):
         self.assertEqual(defaults["quartileColors"][0], "#111111")
         self.assertEqual(defaults["changeColors"]["increase"], "#1a9850")
 
+    def test_client_defaults_expose_the_acpv_marker_appearance(self):
+        settings = WasteAtlasRenderingSettings.load()
+        settings.acpv_hatch_color = "#abcdef"
+        settings.acpv_outline_color = "#fedcba"
+        settings.save()
+
+        defaults = WasteAtlasRenderingSettings.load().client_defaults()["acpv"]
+
+        self.assertEqual(defaults["hatchColor"], "#abcdef")
+        self.assertEqual(defaults["hatchOpacity"], 0.9)
+        self.assertEqual(defaults["outlineColor"], "#fedcba")
+        self.assertEqual(defaults["outlineOpacity"], 0.95)
+        self.assertEqual(defaults["outlineWidth"], 1.35)
+
 
 class WasteAtlasRenderingSettingsConfigTests(TestCase):
     @staticmethod
@@ -168,6 +182,7 @@ class WasteAtlasRendererHasNoHardcodedDefaultsTests(TestCase):
         "#64b5f6",
         "#bdbdbd",
         "#d9f0d3",
+        "#1f2937",
         "'waste_atlas",
     )
 
@@ -229,3 +244,57 @@ class SeededMapConfigurationsDeferToGlobalNoDataColorTests(TestCase):
         config = atlas_js_config({}, configuration.key)
 
         self.assertEqual(config["noDataColor"], "#abcdef")
+
+
+class AcpvMarkerAppearanceIsConfiguredCentrallyTests(TestCase):
+    """Hatching and group outlines are one atlas-wide look, overridable per map."""
+
+    LEGACY_KEYS = (
+        "outlineStrokeColor",
+        "outlineStrokeOpacity",
+        "outlineStrokeWidth",
+    )
+
+    def test_no_seeded_configuration_repeats_the_global_appearance(self):
+        repeated = [
+            (key, legacy_key)
+            for key, configuration in WasteAtlasMapConfiguration.objects.values_list(
+                "key", "configuration"
+            )
+            for legacy_key in self.LEGACY_KEYS
+            if legacy_key in configuration
+        ]
+        self.assertEqual(repeated, [])
+
+    def test_no_seeded_configuration_repeats_the_screen_legend_label(self):
+        """One label serves both renderings unless the export genuinely differs."""
+        repeated = [
+            key
+            for key, configuration in WasteAtlasMapConfiguration.objects.values_list(
+                "key", "configuration"
+            )
+            if configuration.get("exportOverlayPatternLegendLabel")
+            == configuration.get("overlayPatternLegendLabel")
+            and "exportOverlayPatternLegendLabel" in configuration
+        ]
+        self.assertEqual(repeated, [])
+
+    def test_a_map_may_override_the_hatch_color(self):
+        configuration = WasteAtlasMapConfiguration.objects.get(
+            key="residual_collection_amount"
+        )
+        configuration.configuration["acpvHatchColor"] = "#ff00ff"
+        configuration.save(update_fields=["configuration"])
+
+        config = atlas_js_config({}, "residual_collection_amount")
+
+        self.assertEqual(config["acpvHatchColor"], "#ff00ff")
+
+    def test_the_global_hatch_color_reaches_the_renderer(self):
+        settings = WasteAtlasRenderingSettings.load()
+        settings.acpv_hatch_color = "#101010"
+        settings.save(update_fields=["acpv_hatch_color"])
+
+        config = atlas_js_config({}, "residual_collection_amount")
+
+        self.assertEqual(config["renderDefaults"]["acpv"]["hatchColor"], "#101010")

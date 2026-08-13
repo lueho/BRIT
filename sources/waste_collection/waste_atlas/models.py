@@ -124,6 +124,32 @@ class WasteAtlasRenderingSettings(models.Model):
         default="3 2",
         help_text="SVG dash pattern of the conflict highlight.",
     )
+    acpv_hatch_color = _color_field(
+        "Hatching that marks values aggregated over several catchments (ACPV).",
+        default="#1f2937",
+    )
+    acpv_hatch_opacity = models.FloatField(
+        default=0.9,
+        validators=[MinValueValidator(0), MaxValueValidator(1)],
+        help_text="Opacity of the aggregated-value hatching, 0 to 1.",
+    )
+    acpv_outline_color = _color_field(
+        "Outline around a group of catchments sharing an aggregated value.",
+        default="#ffffff",
+    )
+    acpv_outline_opacity = models.FloatField(
+        default=0.95,
+        validators=[MinValueValidator(0), MaxValueValidator(1)],
+        help_text="Opacity of the aggregated-value group outline, 0 to 1.",
+    )
+    acpv_outline_width = models.FloatField(
+        default=1.35,
+        validators=[MinValueValidator(0)],
+        help_text=(
+            "Width of the aggregated-value group outline, in pixels of the "
+            "on-screen map; exports scale it with the page."
+        ),
+    )
     quartile_colors = models.JSONField(
         default=default_quartile_colors,
         help_text="Four hex colors used for quartile classification, low to high.",
@@ -290,6 +316,13 @@ class WasteAtlasRenderingSettings(models.Model):
             "conflictStrokeWidth": self.conflict_stroke_width,
             "conflictStrokeDasharray": self.conflict_stroke_dasharray,
             "quartileColors": list(self.quartile_colors),
+            "acpv": {
+                "hatchColor": self.acpv_hatch_color,
+                "hatchOpacity": self.acpv_hatch_opacity,
+                "outlineColor": self.acpv_outline_color,
+                "outlineOpacity": self.acpv_outline_opacity,
+                "outlineWidth": self.acpv_outline_width,
+            },
             "exportFileNamePrefix": self.export_file_name_prefix,
             "changeColors": {
                 "noChange": self.change_no_change_color,
