@@ -8,7 +8,9 @@ The Waste Atlas export legend has four *independent* settings:
     ``auto`` (choose automatically) or an exact count ``1``-``4``.
 ``itemFlow``
     ``column`` (fill one column after another) or ``row`` (fill across the
-    columns, so entries read left to right).
+    columns, so entries read left to right).  The renderer applies the resolved
+    arrangement to the on-screen legend as well, which keeps its own column
+    count.
 ``maxWidthFraction``
     A hard upper bound on legend width as a fraction of the page; the
     renderer measures content and never uses more width than needed, so the
