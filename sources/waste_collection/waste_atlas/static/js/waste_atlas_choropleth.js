@@ -32,9 +32,11 @@ var WasteAtlasChoropleth = (function () {
   'use strict';
 
   var RENDER_DEFAULTS_ELEMENT_ID = 'waste-atlas-render-defaults';
-  // The canvas the ACPV marker geometry is dimensioned for; every other canvas
-  // scales from it, so screen and export show the same hatch density.
-  var ACPV_REFERENCE_WIDTH = 900;
+  // The width of the drawn map the ACPV marker geometry is dimensioned for.
+  // Scaling follows the projected geography rather than the canvas, because an
+  // export page has its own aspect ratio and reserves room for the legend: only
+  // the map's own size tells how dense the hatching has to be to look the same.
+  var ACPV_REFERENCE_MAP_WIDTH = 900;
   var ACPV_HATCH_SPACING = 6;
   var ACPV_HATCH_STROKE_WIDTH = 2;
   var ACPV_HATCH_ANGLE = 45;
@@ -385,17 +387,18 @@ var WasteAtlasChoropleth = (function () {
   }
 
   /**
-   * Resolve the appearance of the ACPV markers for a canvas ``width``.
+   * Resolve the appearance of the ACPV markers for a map drawn ``mapWidth``
+   * wide.
    *
    * Colors and opacities come from the atlas-wide defaults, overridable per
    * map with the ``acpv*`` config keys. Everything geometric is expressed for
-   * the reference canvas and scaled, so the hatching and the group outline
-   * look the same on screen and in an export.
+   * the reference map width and scaled with the projected geography, so the
+   * hatching and the group outline look the same on screen and in an export.
    */
-  function _acpvStyle(cfg, width) {
+  function _acpvStyle(cfg, mapWidth) {
     cfg = cfg || {};
     var defaults = _defaults().acpv || {};
-    var scale = (width || ACPV_REFERENCE_WIDTH) / ACPV_REFERENCE_WIDTH;
+    var scale = (mapWidth || ACPV_REFERENCE_MAP_WIDTH) / ACPV_REFERENCE_MAP_WIDTH;
     return {
       hatchColor: _firstDefined(cfg.acpvHatchColor, defaults.hatchColor),
       hatchOpacity: _firstDefined(cfg.acpvHatchOpacity, defaults.hatchOpacity),
@@ -412,10 +415,10 @@ var WasteAtlasChoropleth = (function () {
     return (cfg.svgId || 'atlas-svg') + '-overlay-pattern';
   }
 
-  function _defineOverlayPattern(cfg, width) {
+  function _defineOverlayPattern(cfg, mapWidth) {
     if (!cfg.overlayPatternField) return;
 
-    var style = _acpvStyle(cfg, width);
+    var style = _acpvStyle(cfg, mapWidth);
     var pattern = _svg.append('defs')
       .append('pattern')
       .attr('id', _overlayPatternId(cfg))
@@ -2471,8 +2474,6 @@ var WasteAtlasChoropleth = (function () {
       .attr('class', 'waste-atlas-export-svg');
 
     _svg.selectAll('*').remove();
-    _defineOverlayPattern(cfg, width);
-    var acpvStyle = _acpvStyle(cfg, width);
 
     // Geographic layers live in one group so the screen zoom transform can move
     // and scale them without touching the title or the legend.
@@ -2482,6 +2483,11 @@ var WasteAtlasChoropleth = (function () {
     var projection = d3.geoMercator()
       .fitExtent(layout.mapExtent, fitData);
     var path = d3.geoPath().projection(projection);
+
+    // The ACPV markers are sized against the drawn map, not the canvas.
+    var projectedBounds = path.bounds(fitData);
+    var acpvStyle = _acpvStyle(cfg, projectedBounds[1][0] - projectedBounds[0][0]);
+    _defineOverlayPattern(cfg, projectedBounds[1][0] - projectedBounds[0][0]);
 
     // Layer 1: background fill (filtered NUTS1 regions when nutsPrefix set, else full country)
     var fillData = (cfg.nutsPrefix && data.bundeslaender && data.bundeslaender.features && data.bundeslaender.features.length)

@@ -2,7 +2,7 @@
 // outline).
 //
 // Screen and export share one resolver, so the two renderings can only differ
-// by the canvas they are drawn on. Run with:
+// by how large the map itself is drawn. Run with:
 //
 //   docker compose run --rm assets node \
 //     sources/waste_collection/waste_atlas/static/js/waste_atlas_choropleth.acpv.test.mjs
@@ -32,10 +32,10 @@ const ATLAS_DEFAULTS = {
   outlineWidth: 1.35,
 };
 
-// The two canvases the atlas renders on: the screen SVG (CSS pixels) and the
-// export page (160 mm at 300 dpi).
+// Widths of the projected geography, not of the page: the reference map and a
+// map drawn twice as wide.
 const SCREEN_WIDTH = 900;
-const EXPORT_WIDTH = Math.round((160 / 25.4) * 300); // 1890
+const EXPORT_WIDTH = 1800;
 
 setRenderDefaults({ acpv: Object.assign({}, ATLAS_DEFAULTS) });
 
@@ -91,8 +91,8 @@ test("the hatch keeps the same appearance on the screen and on the export page",
   const exported = acpv.style({}, EXPORT_WIDTH);
   const factor = EXPORT_WIDTH / SCREEN_WIDTH;
 
-  // Everything geometric scales with the canvas, so hatch density, line
-  // thickness and outline weight are identical relative to the map.
+  // Everything geometric scales with the drawn map, so hatch density, line
+  // thickness and outline weight are identical relative to the geography.
   assert.ok(Math.abs(exported.hatchSpacing - screen.hatchSpacing * factor) < 1e-9);
   assert.ok(
     Math.abs(exported.hatchStrokeWidth - screen.hatchStrokeWidth * factor) < 1e-9,
@@ -102,11 +102,11 @@ test("the hatch keeps the same appearance on the screen and on the export page",
   assert.equal(exported.hatchColor, screen.hatchColor);
 });
 
-test("a missing canvas width falls back to the reference canvas", () => {
+test("a missing map width falls back to the reference map", () => {
   assert.deepEqual(acpv.style({}), acpv.style({}, SCREEN_WIDTH));
 });
 
-test("the hatch covers a readable share of the reference canvas", () => {
+test("the hatch covers a readable share of the reference map", () => {
   const style = acpv.style({}, SCREEN_WIDTH);
 
   assert.ok(style.hatchStrokeWidth > 0);
