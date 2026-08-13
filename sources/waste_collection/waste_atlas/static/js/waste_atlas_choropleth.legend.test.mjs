@@ -40,13 +40,13 @@ function orderedValues(cfg) {
   return legend.orderedCategories(cfg).map((item) => item.value);
 }
 
-test("without a saved order the no-collection entry goes last", () => {
+test("without a saved order the configured category order is preserved", () => {
   assert.deepEqual(orderedValues({ categories: quartileCategories() }), [
+    "no_bio",
     "q1",
     "q2",
     "q3",
     "q4",
-    "no_bio",
   ]);
 });
 
@@ -60,16 +60,13 @@ test("a saved order naming the quartile classes is applied verbatim", () => {
   );
 });
 
-test("a saved order that only knows the stored classes leaves the quartiles in place", () => {
-  // Regression: the stored classes of an amount map (``very_high``…``low``) are
-  // replaced by the quartile classes, so the saved order mentions only
-  // ``no_bio``. That must not lift ``no_bio`` above the quartile entries.
+test("an explicit order anchors unknown entries relative to their configured order", () => {
   assert.deepEqual(
     orderedValues({
       categories: quartileCategories(),
       legendCategoryOrder: ["very_high", "high", "medium", "low", "no_bio"],
     }),
-    ["q1", "q2", "q3", "q4", "no_bio"],
+    ["no_bio", "q1", "q2", "q3", "q4"],
   );
 });
 
@@ -94,4 +91,47 @@ test("a no-data category only shows when the data needs it", () => {
     "q1",
     "no_data",
   ]);
+});
+
+test("RLP ratio values of at least 2 use the 2:1 class", () => {
+  assert.equal(
+    sandbox.WasteAtlasChoropleth.transforms.rpCollectionCountRatio([
+      { catchment_id: 1, bio_is_door_to_door: true, ratio: 3.15 },
+    ])[0]._classified,
+    "two_to_one",
+  );
+});
+
+test("RLP ratios below one to one are classified, not dropped as no data", () => {
+  const classified = sandbox.WasteAtlasChoropleth.transforms.rpCollectionCountRatio([
+    { catchment_id: 1, bio_is_door_to_door: true, ratio: 0.5 },
+    { catchment_id: 2, bio_is_door_to_door: true, ratio: null },
+  ]);
+  assert.equal(classified[0]._classified, "below_one_to_one");
+  assert.equal(classified[1]._classified, null);
+});
+
+test("RLP collection counts below 13 are classified, not dropped as no data", () => {
+  const { rpBiowasteCollectionCount, rpResidualCollectionCount } =
+    sandbox.WasteAtlasChoropleth.transforms;
+  assert.equal(
+    rpBiowasteCollectionCount([
+      { catchment_id: 1, is_door_to_door: true, collection_count: 12 },
+    ])[0]._classified,
+    "under_13",
+  );
+  assert.equal(
+    rpBiowasteCollectionCount([
+      { catchment_id: 1, is_door_to_door: true, collection_count: null },
+    ])[0]._classified,
+    null,
+  );
+  assert.equal(
+    rpResidualCollectionCount([{ catchment_id: 1, collection_count: 6 }])[0]._classified,
+    "under_13",
+  );
+  assert.equal(
+    rpResidualCollectionCount([{ catchment_id: 1, collection_count: null }])[0]._classified,
+    null,
+  );
 });

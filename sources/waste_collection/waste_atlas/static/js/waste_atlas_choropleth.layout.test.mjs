@@ -185,6 +185,17 @@ test("row flow gives every entry of a row the row's height so rows line up", () 
   );
 });
 
+test("a row-flow column is measured on the slot heights, so columns stay aligned", () => {
+  // The screen legend shares this measurement, so a wrapped (taller) entry may
+  // not push its column out of step with its neighbour.
+  const items = flowItems([10, 30, 10, 10]);
+  const columns = layout.distributeLegendItems(items, 2, "row", 4);
+  assert.deepEqual(
+    columns.map((column) => layout.legendColumnHeight(column, 4)),
+    [44, 44],
+  );
+});
+
 test("placement candidates: auto expands, fixed pins", () => {
   const auto = layout.placementCandidates("auto");
   assert.deepEqual(auto.slice(0, 3), ["right", "left", "bottom"]);

@@ -6,6 +6,7 @@ it is deliberately not asserted here.  These tests only cover the structure the
 renderer and the selector rely on.
 """
 
+from django.template import Context
 from django.test import TestCase
 from django.urls import Resolver404, resolve
 
@@ -21,7 +22,11 @@ from sources.waste_collection.waste_atlas.map_selection import (
     WASTE_ATLAS_MAP_SELECTIONS,
     build_map_selection_context,
 )
+from sources.waste_collection.waste_atlas.models import WasteAtlasRenderingSettings
 from sources.waste_collection.waste_atlas.pages import MAP_PAGES, MAP_SET_COUNTRIES
+from sources.waste_collection.waste_atlas.templatetags.atlas_tags import (
+    atlas_js_config,
+)
 
 # Keys the choropleth renderer reads for every map.
 REQUIRED_CONFIG_KEYS = frozenset(
@@ -266,6 +271,94 @@ class WasteAtlasMapConfigStructureTests(TestCase):
                 self.assertIn(theme, sweden_themes)
                 self.assertEqual(sweden_themes[theme]["route_name"], route_name)
                 self.assertEqual(pages_by_route[route_name]["year"], "2024")
+
+    def test_rp_collection_maps_use_requested_region_specific_legends(self):
+        pages = {
+            page["theme"]: page
+            for page in MAP_PAGES
+            if page["region"] == "rp"
+            and page["theme"]
+            in {
+                "combined_frequency",
+                "biowaste_collection_count",
+                "residual_collection_count",
+                "collection_count_ratio",
+            }
+        }
+
+        frequency = pages["combined_frequency"]["overrides"]
+        self.assertEqual(
+            frequency["legendTitle"],
+            "Collection frequency structure: Biowaste / Residual waste",
+        )
+        self.assertEqual(frequency["legendColumns"], 2)
+        self.assertEqual(frequency["exportLegendColumns"], 2)
+        self.assertEqual(frequency["exportLegendItemFlow"], "row")
+        self.assertTrue(frequency["showOnlyPresentCategories"])
+        self.assertTrue(
+            all(
+                entry["label"] == entry["label"].upper()
+                for entry in frequency["categories"]
+            )
+        )
+
+        ratio = pages["collection_count_ratio"]["overrides"]
+        self.assertEqual(
+            ratio["legendTitle"],
+            "Annual collection count ratio - Biowaste : Residual waste",
+        )
+        self.assertEqual(
+            [entry["label"] for entry in ratio["categories"]],
+            [
+                "2:1",
+                "< 2:1 > 1:1",
+                "1:1",
+                "< 1:1",
+                "No separate door-to-door biowaste collection",
+            ],
+        )
+
+        for theme in ("biowaste_collection_count", "residual_collection_count"):
+            with self.subTest(theme=theme):
+                categories = pages[theme]["overrides"]["categories"]
+                self.assertEqual(
+                    [entry["label"] for entry in categories[:7]],
+                    ["< 13", "13", "14 - 25", "26", "27 - 39", "40 - 51", "52"],
+                )
+
+        self.assertEqual(
+            pages["biowaste_collection_count"]["overrides"]["categories"][-1]["label"],
+            "No separate door-to-door biowaste collection",
+        )
+
+    def test_page_legends_take_the_no_collection_color_from_the_setting(self):
+        """Page-level legends must follow the admin-editable shared fill."""
+        settings = WasteAtlasRenderingSettings.load()
+        settings.no_collection_color = "#123456"
+        settings.save()
+
+        checked = 0
+        for page in MAP_PAGES:
+            overrides = page.get("overrides") or {}
+            if not overrides.get("categories"):
+                continue
+            context = Context(
+                {
+                    "map_config_overrides": overrides,
+                    "atlas_page_selector_set": page.get("selector_set"),
+                    "atlas_active_theme": page["theme"],
+                }
+            )
+            config = atlas_js_config(context, page["config_key"])
+            for entry in self._all_entries(config):
+                if not self._is_biowaste_no_collection_entry(entry):
+                    continue
+                checked += 1
+                with self.subTest(page=page["name"], entry=entry["label"]):
+                    self.assertEqual(entry["color"], "#123456")
+                    self.assertNotIn("colorRef", entry)
+
+        self.assertTrue(checked)
 
     def test_collection_system_config_opts_into_conflict_aid(self):
         """The collection_system theme exposes the maintainer conflict aid."""

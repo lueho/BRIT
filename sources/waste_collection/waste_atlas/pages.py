@@ -118,6 +118,71 @@ MAP_SET_LABELS = {
 # ``exportLegend*`` keys as a stored configuration and win over it.
 REGION_MAP_OVERRIDES = {}
 
+# ``colorRef`` entries take their fill from ``WasteAtlasRenderingSettings`` at
+# render time, so page legends follow the atlas-wide colour like stored configs.
+RP_COLLECTION_COUNT_CATEGORIES = [
+    {"value": "under_13", "label": "< 13", "color": "#fdd0a2"},
+    {"value": "13", "label": "13", "color": "#f7fbff"},
+    {"value": "14_25", "label": "14 - 25", "color": "#c6dbef"},
+    {"value": "26", "label": "26", "color": "#9ecae1"},
+    {"value": "27_39", "label": "27 - 39", "color": "#6baed6"},
+    {"value": "40_51", "label": "40 - 51", "color": "#3182bd"},
+    {"value": "52", "label": "52", "color": "#08519c"},
+    {"value": "over_52", "label": "> 52", "color": "#08306b"},
+]
+RP_BIOWASTE_COLLECTION_COUNT_CATEGORIES = [
+    *RP_COLLECTION_COUNT_CATEGORIES,
+    {
+        "value": "no_door_to_door",
+        "label": "No separate door-to-door biowaste collection",
+        "colorRef": "no_collection",
+    },
+]
+RP_COLLECTION_COUNT_RATIO_CATEGORIES = [
+    {"value": "two_to_one", "label": "2:1", "color": "#1b9e77"},
+    {"value": "between_two_and_one", "label": "< 2:1 > 1:1", "color": "#7570b3"},
+    {"value": "one_to_one", "label": "1:1", "color": "#d95f02"},
+    {"value": "below_one_to_one", "label": "< 1:1", "color": "#a6761d"},
+    {
+        "value": "no_bio",
+        "label": "No separate door-to-door biowaste collection",
+        "colorRef": "no_collection",
+    },
+]
+RP_COMBINED_FREQUENCY_CATEGORIES = [
+    {
+        "value": "bio_seasonal_res_flexible",
+        "label": "SEASONAL / FLEXIBLE",
+        "color": "#2e8b57",
+    },
+    {
+        "value": "bio_flexible_res_flexible",
+        "label": "FLEXIBLE / FLEXIBLE",
+        "color": "#4169e1",
+    },
+    {
+        "value": "bio_fixed_res_flexible",
+        "label": "FIXED / FLEXIBLE",
+        "color": "#9ecae1",
+    },
+    {
+        "value": "bio_seasonal_res_fixed",
+        "label": "SEASONAL / FIXED",
+        "color": "#66cdaa",
+    },
+    {
+        "value": "bio_flexible_res_fixed",
+        "label": "FLEXIBLE / FIXED",
+        "color": "#e08840",
+    },
+    {"value": "bio_fixed_res_fixed", "label": "FIXED / FIXED", "color": "#6a51a3"},
+    {
+        "value": "no_bio_collection",
+        "label": "NO SEPARATE DOOR-TO-DOOR BIOWASTE COLLECTION",
+        "colorRef": "no_collection",
+    },
+]
+
 
 def _page(region, theme, title, path, name, **extra):
     """Build one page entry from region defaults plus page-specific values."""
@@ -2173,6 +2238,14 @@ MAP_PAGES = [
         "Collection frequency type: biowaste vs residual waste",
         "map/rp/combined-frequency/",
         "waste-atlas-rp-combined-frequency-map",
+        overrides={
+            "categories": RP_COMBINED_FREQUENCY_CATEGORIES,
+            "legendColumns": 2,
+            "legendTitle": "Collection frequency structure: Biowaste / Residual waste",
+            "exportLegendColumns": 2,
+            "exportLegendItemFlow": "row",
+            "showOnlyPresentCategories": True,
+        },
     ),
     _page(
         "rp",
@@ -2180,6 +2253,12 @@ MAP_PAGES = [
         "Annual residual waste collection count",
         "map/rp/residual-collection-count/",
         "waste-atlas-rp-residual-collection-count-map",
+        overrides={
+            "categories": RP_COLLECTION_COUNT_CATEGORIES,
+            "enableQuartiles": False,
+            "showOnlyPresentCategories": True,
+            "transformName": "rpResidualCollectionCount",
+        },
     ),
     _page(
         "rp",
@@ -2187,6 +2266,12 @@ MAP_PAGES = [
         "Annual biowaste collection count",
         "map/rp/biowaste-collection-count/",
         "waste-atlas-rp-biowaste-collection-count-map",
+        overrides={
+            "categories": RP_BIOWASTE_COLLECTION_COUNT_CATEGORIES,
+            "enableQuartiles": False,
+            "showOnlyPresentCategories": True,
+            "transformName": "rpBiowasteCollectionCount",
+        },
     ),
     _page(
         "rp",
@@ -2201,6 +2286,12 @@ MAP_PAGES = [
         "Annual collection-count ratio: biowaste vs residual waste",
         "map/rp/collection-count-ratio/",
         "waste-atlas-rp-collection-count-ratio-map",
+        overrides={
+            "categories": RP_COLLECTION_COUNT_RATIO_CATEGORIES,
+            "legendTitle": "Annual collection count ratio - Biowaste : Residual waste",
+            "showOnlyPresentCategories": True,
+            "transformName": "rpCollectionCountRatio",
+        },
     ),
     _page(
         "rp",
