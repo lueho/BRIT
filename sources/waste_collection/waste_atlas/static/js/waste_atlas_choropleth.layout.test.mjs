@@ -157,15 +157,45 @@ function flowItems(heights) {
   return heights.map((height, index) => ({ label: "item " + index, height: height }));
 }
 
-test("column flow balances the columns", () => {
+test("column flow fills one column, then the next", () => {
   const columns = layout.distributeLegendItems(flowItems([10, 10, 10, 10]), 2, "column", 0);
   assert.deepEqual(
     columns.map((column) => column.map((item) => item.label)),
     [
-      ["item 0", "item 2"],
-      ["item 1", "item 3"],
+      ["item 0", "item 1"],
+      ["item 2", "item 3"],
     ],
   );
+});
+
+test("column flow puts the remainder in the leading columns", () => {
+  const columns = layout.distributeLegendItems(flowItems([10, 10, 10, 10, 10]), 3, "column", 0);
+  assert.deepEqual(
+    columns.map((column) => column.map((item) => item.label)),
+    [["item 0", "item 1"], ["item 2", "item 3"], ["item 4"]],
+  );
+});
+
+test("column flow keeps entry order regardless of entry heights", () => {
+  // Height balancing would move the short entries in front of the tall one,
+  // which is exactly what "fill one column, then the next" must not do.
+  const columns = layout.distributeLegendItems(flowItems([40, 10, 10, 10]), 2, "column", 0);
+  assert.deepEqual(
+    columns.map((column) => column.map((item) => item.label)),
+    [
+      ["item 0", "item 1"],
+      ["item 2", "item 3"],
+    ],
+  );
+});
+
+test("the screen legend resolves the same arrangement as the export", () => {
+  assert.equal(layout.legendItemFlow({ exportLegend: { itemFlow: "row" } }), "row");
+  assert.equal(layout.legendItemFlow({ exportLegendItemFlow: "row" }), "row");
+  assert.equal(layout.legendItemFlow({}), "column");
+  withAtlasDefaults({ itemFlow: "row" }, () => {
+    assert.equal(layout.legendItemFlow({}), "row");
+  });
 });
 
 test("row flow fills across the columns in order", () => {

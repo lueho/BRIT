@@ -1284,10 +1284,12 @@ var WasteAtlasChoropleth = (function () {
 
   // Arrange the measured items into ``columnCount`` columns.
   //
-  // ``column`` flow fills one column after another and balances the columns by
-  // height. ``row`` flow reads across the columns instead, so entry order runs
-  // left to right; every entry of a row then gets the row's tallest height as
-  // its ``slotHeight`` so the rows line up across columns.
+  // ``column`` flow fills one column after another: the entries keep their
+  // order down the first column before the next one starts, and a remainder
+  // that does not divide evenly lengthens the leading columns. ``row`` flow
+  // reads across the columns instead, so entry order runs left to right; every
+  // entry of a row then gets the row's tallest height as its ``slotHeight`` so
+  // the rows line up across columns.
   function _distributeLegendItems(items, columnCount, itemFlow, rowGap) {
     var columns = [];
     for (var i = 0; i < columnCount; i++) columns.push([]);
@@ -1303,17 +1305,16 @@ var WasteAtlasChoropleth = (function () {
       });
       return columns;
     }
-    items.forEach(function (item) {
-      var shortestIndex = 0;
-      columns.forEach(function (column, index) {
-        if (
-          _legendColumnHeight(column, rowGap)
-          < _legendColumnHeight(columns[shortestIndex], rowGap)
-        ) {
-          shortestIndex = index;
-        }
-      });
-      columns[shortestIndex].push(item);
+    var perColumn = Math.floor(items.length / columnCount);
+    var remainder = items.length % columnCount;
+    var index = 0;
+    columns.forEach(function (column, columnIndex) {
+      var count = perColumn + (columnIndex < remainder ? 1 : 0);
+      for (var taken = 0; taken < count; taken++) {
+        items[index].slotHeight = null;
+        column.push(items[index]);
+        index += 1;
+      }
     });
     return columns;
   }
@@ -1541,6 +1542,13 @@ var WasteAtlasChoropleth = (function () {
       itemFlow: itemFlow,
       maxWidthFraction: maxWidthFraction
     };
+  }
+
+  // The arrangement of legend entries across the legend columns, shared by the
+  // screen legend and the export so a configured arrangement is honoured in
+  // both. The screen legend has its own column count (``legendColumns``).
+  function _legendItemFlow(cfg) {
+    return _resolvedExportLegend(cfg).itemFlow;
   }
 
   function _exportLegendPlacementCandidates(placement) {
@@ -2903,7 +2911,9 @@ var WasteAtlasChoropleth = (function () {
       fontSize
     );
     var titleHeight = Math.max(fontSize, titleLines.length * lineHeight) + 10;
-    var screenColumns = _distributeLegendItems(screenItems, legendColumns, 'row', gap);
+    var screenColumns = _distributeLegendItems(
+      screenItems, legendColumns, _legendItemFlow(cfg), gap
+    );
     var itemsHeight = Math.max.apply(null, screenColumns.map(function (column) {
       return _legendColumnHeight(column, gap);
     }));
@@ -3705,6 +3715,7 @@ var WasteAtlasChoropleth = (function () {
     // for a future export preview that must share this exact layout path.
     layout: {
       resolveExportLegend: _resolvedExportLegend,
+      legendItemFlow: _legendItemFlow,
       placementCandidates: _exportLegendPlacementCandidates,
       columnCandidates: _exportLegendColumnCandidates,
       distributeLegendItems: _distributeLegendItems,

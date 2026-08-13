@@ -242,8 +242,8 @@ class WasteAtlasRenderingSettings(models.Model):
         choices=EXPORT_LEGEND_ITEM_FLOW_CHOICES,
         default=COLUMN_FLOW,
         help_text=(
-            "Default arrangement of legend entries across the legend columns "
-            "in exports."
+            "Default arrangement of legend entries across the legend columns, "
+            "in exports and on the map page."
         ),
     )
     export_file_name_prefix = models.SlugField(
