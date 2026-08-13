@@ -51,10 +51,10 @@ def centralize(apps, schema_editor):
             # Only a genuine deviation stays; the rest follows the atlas.
             if value != defaults[key]:
                 stored[key] = value
-        if stored.get("exportOverlayPatternLegendLabel") == stored.get(
-            "overlayPatternLegendLabel"
-        ):
-            stored.pop("exportOverlayPatternLegendLabel", None)
+        if "exportOverlayPatternLegendLabel" in stored and stored[
+            "exportOverlayPatternLegendLabel"
+        ] == stored.get("overlayPatternLegendLabel"):
+            del stored["exportOverlayPatternLegendLabel"]
             changed = True
         if changed:
             configuration.configuration = stored
