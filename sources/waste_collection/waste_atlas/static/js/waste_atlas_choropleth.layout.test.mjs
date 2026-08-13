@@ -189,6 +189,51 @@ test("column flow keeps entry order regardless of entry heights", () => {
   );
 });
 
+test("column flow keeps value ranges and trailing status entries in separate columns", () => {
+  const items = [
+    { label: "Q1", height: 10 },
+    { label: "Q2", height: 10 },
+    { label: "Q3", height: 10 },
+    { label: "Q4", height: 10 },
+    { label: "No separate collection", height: 10, breakBefore: true },
+    { label: "No data", height: 10 },
+  ];
+  const columns = layout.distributeLegendItems(items, 2, "column", 0);
+
+  assert.deepEqual(
+    columns.map((column) => column.map((item) => item.label)),
+    [
+      ["Q1", "Q2", "Q3", "Q4"],
+      ["No separate collection", "No data"],
+    ],
+  );
+});
+
+test("quartile legend measurement creates the value/status break automatically", () => {
+  const measured = layout.measureExportLegend(
+    {
+      legendTitle: "Separation rate",
+      categories: [
+        { value: "q1", label: "Q1", threshold: 1 },
+        { value: "q2", label: "Q2", threshold: 2 },
+        { value: "q3", label: "Q3", threshold: 3 },
+        { value: "q4", label: "Q4", threshold: Infinity },
+        { value: "no_bio", label: "No separate biowaste collection" },
+      ],
+      noDataLabel: "No data",
+      _hasFallbackNoData: true,
+    },
+    800,
+    2,
+    "column",
+  );
+
+  assert.deepEqual(
+    measured.columns.map((column) => column.map((item) => item.value || item.label)),
+    [["q1", "q2", "q3", "q4"], ["no_bio", "No data"]],
+  );
+});
+
 test("the screen legend resolves the same arrangement as the export", () => {
   assert.equal(layout.legendItemFlow({ exportLegend: { itemFlow: "row" } }), "row");
   assert.equal(layout.legendItemFlow({ exportLegendItemFlow: "row" }), "row");

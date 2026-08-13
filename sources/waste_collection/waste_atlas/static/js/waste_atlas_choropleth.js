@@ -1270,7 +1270,9 @@ var WasteAtlasChoropleth = (function () {
   function _legendItems(cfg, exportMode) {
     var items = [];
     _orderedLegendCategories(cfg).forEach(function (item) {
-      items.push(exportMode ? Object.assign({}, item, { label: _exportLegendLabel(item) }) : item);
+      items.push(Object.assign({}, item, {
+        label: exportMode ? _exportLegendLabel(item) : item.label
+      }));
     });
     if (cfg.noDataLabel && cfg._hasFallbackNoData) {
       items.push({
@@ -1278,6 +1280,24 @@ var WasteAtlasChoropleth = (function () {
         color: cfg.noDataColor || _defaults().noDataColor
       });
     }
+    return _markTrailingLegendStatuses(items);
+  }
+
+  // Computed value ranges have thresholds; preserved classes, conflict aids
+  // and fallback no-data entries are statuses. When the statuses form one
+  // trailing group, expose that natural boundary to the column distributor so
+  // it can keep unlike entries together without a per-map break setting.
+  function _markTrailingLegendStatuses(items) {
+    var lastValueRange = -1;
+    items.forEach(function (item, index) {
+      if (item.threshold != null) lastValueRange = index;
+      delete item.breakBefore;
+    });
+    if (lastValueRange < 0 || lastValueRange === items.length - 1) return items;
+    var trailingItemsAreStatuses = items.slice(lastValueRange + 1).every(function (item) {
+      return item.threshold == null;
+    });
+    if (trailingItemsAreStatuses) items[lastValueRange + 1].breakBefore = true;
     return items;
   }
 
@@ -1323,6 +1343,20 @@ var WasteAtlasChoropleth = (function () {
       items.forEach(function (item, index) {
         item.slotHeight = rowHeights[Math.floor(index / columnCount)];
         columns[index % columnCount].push(item);
+      });
+      return columns;
+    }
+    var groups = [[]];
+    items.forEach(function (item) {
+      if (item.breakBefore && groups[groups.length - 1].length) groups.push([]);
+      groups[groups.length - 1].push(item);
+    });
+    if (groups.length === columnCount) {
+      groups.forEach(function (group, columnIndex) {
+        group.forEach(function (item) {
+          item.slotHeight = null;
+          columns[columnIndex].push(item);
+        });
       });
       return columns;
     }
@@ -2906,7 +2940,8 @@ var WasteAtlasChoropleth = (function () {
       return {
         color: item.color,
         lines: _wrapTextToWidth(item.label, textWidth, fontSize, SCREEN_LABEL_FONT),
-        kind: 'category'
+        kind: 'category',
+        threshold: item.threshold
       };
     });
     if (hasConflictLegend) {
@@ -2928,6 +2963,7 @@ var WasteAtlasChoropleth = (function () {
         kind: 'no-data'
       });
     }
+    _markTrailingLegendStatuses(screenItems);
 
     screenItems.forEach(function (item) {
       item.height = Math.max(swatchH, item.lines.length * lineHeight);
