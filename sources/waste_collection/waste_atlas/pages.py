@@ -118,7 +118,10 @@ MAP_SET_LABELS = {
 # ``exportLegend*`` keys as a stored configuration and win over it.
 REGION_MAP_OVERRIDES = {}
 
+# ``colorRef`` entries take their fill from ``WasteAtlasRenderingSettings`` at
+# render time, so page legends follow the atlas-wide colour like stored configs.
 RP_COLLECTION_COUNT_CATEGORIES = [
+    {"value": "under_13", "label": "< 13", "color": "#fdd0a2"},
     {"value": "13", "label": "13", "color": "#f7fbff"},
     {"value": "14_25", "label": "14 - 25", "color": "#c6dbef"},
     {"value": "26", "label": "26", "color": "#9ecae1"},
@@ -132,17 +135,18 @@ RP_BIOWASTE_COLLECTION_COUNT_CATEGORIES = [
     {
         "value": "no_door_to_door",
         "label": "No separate door-to-door biowaste collection",
-        "color": "#fff696",
+        "colorRef": "no_collection",
     },
 ]
 RP_COLLECTION_COUNT_RATIO_CATEGORIES = [
     {"value": "two_to_one", "label": "2:1", "color": "#1b9e77"},
     {"value": "between_two_and_one", "label": "< 2:1 > 1:1", "color": "#7570b3"},
     {"value": "one_to_one", "label": "1:1", "color": "#d95f02"},
+    {"value": "below_one_to_one", "label": "< 1:1", "color": "#a6761d"},
     {
         "value": "no_bio",
         "label": "No separate door-to-door biowaste collection",
-        "color": "#fff696",
+        "colorRef": "no_collection",
     },
 ]
 RP_COMBINED_FREQUENCY_CATEGORIES = [
@@ -175,7 +179,7 @@ RP_COMBINED_FREQUENCY_CATEGORIES = [
     {
         "value": "no_bio_collection",
         "label": "NO SEPARATE DOOR-TO-DOOR BIOWASTE COLLECTION",
-        "color": "#fff696",
+        "colorRef": "no_collection",
     },
 ]
 
@@ -2285,6 +2289,7 @@ MAP_PAGES = [
         overrides={
             "categories": RP_COLLECTION_COUNT_RATIO_CATEGORIES,
             "legendTitle": "Annual collection count ratio - Biowaste : Residual waste",
+            "showOnlyPresentCategories": True,
             "transformName": "rpCollectionCountRatio",
         },
     ),

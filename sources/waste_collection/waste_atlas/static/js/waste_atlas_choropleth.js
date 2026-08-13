@@ -1906,6 +1906,8 @@ var WasteAtlasChoropleth = (function () {
           cls = '52';
         } else if (count > 52) {
           cls = 'over_52';
+        } else if (count != null) {
+          cls = 'under_13';
         } else {
           cls = null;
         }
@@ -1930,6 +1932,8 @@ var WasteAtlasChoropleth = (function () {
           cls = '52';
         } else if (count > 52) {
           cls = 'over_52';
+        } else if (count != null) {
+          cls = 'under_13';
         } else {
           cls = null;
         }
@@ -2059,6 +2063,8 @@ var WasteAtlasChoropleth = (function () {
           cls = 'between_two_and_one';
         } else if (r.ratio === 1) {
           cls = 'one_to_one';
+        } else if (r.ratio != null) {
+          cls = 'below_one_to_one';
         } else {
           cls = null;
         }

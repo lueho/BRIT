@@ -20,9 +20,27 @@ _EXPORT_LEGEND_LAYOUT_KEYS = frozenset(
     (*EXPORT_LEGEND_OVERRIDE_KEYS, *LEGACY_EXPORT_LEGEND_KEYS)
 )
 _STAFF_EDITABLE_TEXT_KEYS = frozenset({"exportLegendTitle"})
+# Legend entries may name an atlas-wide fill instead of a literal colour.
+_SHARED_COLOR_REFS = {
+    "no_collection": "no_collection_color",
+    "no_data": "no_data_color",
+}
+_CATEGORY_KEYS = ("categories", "quartileSpecialCases")
 # Stored keys whose emitted value is not the raw ``MAP_CONFIGS`` value because the
 # tag resolves or strips them at render time.
 RENDER_TIME_RESOLVED_KEYS = _EXPORT_LEGEND_LAYOUT_KEYS | _STAFF_EDITABLE_TEXT_KEYS
+
+
+def _resolved_entries(entries, settings):
+    """Replace every ``colorRef`` with the colour the settings row holds."""
+    resolved = []
+    for entry in entries:
+        field = _SHARED_COLOR_REFS.get(entry.get("colorRef"))
+        if field:
+            entry = {key: value for key, value in entry.items() if key != "colorRef"}
+            entry["color"] = getattr(settings, field)
+        resolved.append(entry)
+    return resolved
 
 
 def export_file_base(map_set, theme, prefix=None):
@@ -118,6 +136,11 @@ def atlas_js_config(context, config_key):
         context.get("atlas_active_theme"),
         prefix=settings.export_file_name_prefix,
     )
+
+    for key in _CATEGORY_KEYS:
+        entries = config.get(key)
+        if entries:
+            config[key] = _resolved_entries(entries, settings)
 
     # Atlas-wide rendering and export defaults, editable in the admin.
     defaults = settings.client_defaults()
