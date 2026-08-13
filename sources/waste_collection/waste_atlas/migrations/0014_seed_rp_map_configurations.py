@@ -12,7 +12,16 @@ from django.db import migrations
 
 # Fields the region configuration keeps from the shared theme it is derived
 # from, so a maintainer edit made before this migration is not dropped.
-INHERITED_KEYS = ("title", "dataUrl", "dataField", "noDataLabel", "exportLegendTitle")
+# ``numericField`` also drives the year-comparison map, which shows how much a
+# value changed only when it knows which field holds it.
+INHERITED_KEYS = (
+    "title",
+    "dataUrl",
+    "dataField",
+    "noDataLabel",
+    "numericField",
+    "exportLegendTitle",
+)
 
 NO_COLLECTION_LABEL = "No separate door-to-door biowaste collection"
 

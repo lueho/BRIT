@@ -363,6 +363,15 @@ class WasteAtlasMapConfigStructureTests(TestCase):
             "No separate door-to-door biowaste collection",
         )
 
+    def test_rp_count_maps_keep_the_numeric_field_of_their_shared_theme(self):
+        """The year-comparison map needs it to report by how much a count moved."""
+        for theme in ("biowaste_collection_count", "residual_collection_count"):
+            with self.subTest(theme=theme):
+                self.assertEqual(
+                    MAP_CONFIGS[f"rp_{theme}"]["numericField"],
+                    MAP_CONFIGS[theme]["numericField"],
+                )
+
     def test_rp_ratio_map_renders_the_stored_legend_title_and_labels(self):
         """Editing the stored configuration must reach the rendered map.
 

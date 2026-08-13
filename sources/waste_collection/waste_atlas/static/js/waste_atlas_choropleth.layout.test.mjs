@@ -224,6 +224,29 @@ test("text is measured with the face it is rendered in", () => {
   assert.ok(fonts.includes("13px 'Nunito', sans-serif"));
 });
 
+test("the export legend title is measured in the bold face it is printed in", () => {
+  const { atlas, fonts } = measuringRealm();
+
+  const opts = atlas.layout.measureExportLegend(
+    {
+      legendTitle: "Annual collection count ratio - Biowaste : Residual waste",
+      categories: [{ value: "a", label: "A label", color: "#000000" }],
+    },
+    200,
+    1,
+    "column",
+  );
+
+  // Every title line must fit the box it was wrapped for when measured bold,
+  // the face the export draws it in; measuring it regular overflows the box.
+  const maxWidth = opts.width - opts.paddingX * 2;
+  assert.ok(opts.titleLines.length > 1);
+  opts.titleLines.forEach((line) => {
+    assert.ok(line.length * 12 <= maxWidth, line);
+  });
+  assert.ok(fonts.some((font) => font.indexOf("bold") === 0));
+});
+
 test("a row-flow column is measured on the slot heights, so columns stay aligned", () => {
   // The screen legend shares this measurement, so a wrapped (taller) entry may
   // not push its column out of step with its neighbour.

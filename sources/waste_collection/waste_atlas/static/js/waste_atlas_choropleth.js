@@ -108,6 +108,8 @@ var WasteAtlasChoropleth = (function () {
   var SCREEN_FONT_FAMILY = "'Nunito', sans-serif";
   var SCREEN_LABEL_FONT = { family: SCREEN_FONT_FAMILY };
   var SCREEN_TITLE_FONT = { family: SCREEN_FONT_FAMILY, weight: 'bold' };
+  // The export legend title is printed bold in the export face.
+  var EXPORT_TITLE_FONT = { weight: 'bold' };
 
   /**
    * Page heights the export layout may choose from, in millimetres.
@@ -1288,7 +1290,7 @@ var WasteAtlasChoropleth = (function () {
       .reduce(function (widest, line) {
         return Math.max(
           widest,
-          _measureTextWidth(line, opts.titleFontSize, { weight: 'bold' })
+          _measureTextWidth(line, opts.titleFontSize, EXPORT_TITLE_FONT)
         );
       }, 0);
     var labelWidth = _legendItems(cfg, true).reduce(function (widest, item) {
@@ -1378,7 +1380,8 @@ var WasteAtlasChoropleth = (function () {
     opts.titleLines = _wrapTextToWidth(
       cfg.exportLegendTitle || cfg.legendTitle || '',
       width - opts.paddingX * 2,
-      opts.titleFontSize
+      opts.titleFontSize,
+      EXPORT_TITLE_FONT
     );
     opts.titleHeight = Math.max(opts.titleFontSize, opts.titleLines.length * opts.lineHeight);
     opts.items = _legendItems(cfg, true).map(function (item) {
@@ -3736,6 +3739,7 @@ var WasteAtlasChoropleth = (function () {
       columnCandidates: _exportLegendColumnCandidates,
       distributeLegendItems: _distributeLegendItems,
       wrapTextToWidth: _wrapTextToWidth,
+      measureExportLegend: _measureExportLegend,
       legendColumnHeight: _legendColumnHeight,
       candidateViolations: _exportCandidateViolations,
       candidateViolationCost: _exportCandidateViolationCost,
