@@ -151,6 +151,19 @@ var WasteAtlasDashboard = (function () {
     return d3.select('#dashboard-tooltip');
   }
 
+  /** Escape a configured label so tooltips never render it as markup. */
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, function (character) {
+      return {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[character];
+    });
+  }
+
   function _showTooltip(event, html) {
     _tooltip()
       .attr('hidden', null)
@@ -256,7 +269,7 @@ var WasteAtlasDashboard = (function () {
         _showTooltip(
           event,
           '<strong>' +
-            bar.label +
+            escapeHtml(bar.label) +
             '</strong><br>' +
             bar.count +
             ' of ' +
@@ -406,7 +419,7 @@ var WasteAtlasDashboard = (function () {
           _showTooltip(
             event,
             '<strong>' +
-              item.label +
+              escapeHtml(item.label) +
               '</strong><br>' +
               point.year +
               ': ' +
@@ -455,7 +468,14 @@ var WasteAtlasDashboard = (function () {
     function load(panel, year) {
       var key = panel.theme + ':' + year;
       if (!recordCache[key]) {
-        recordCache[key] = _fetchJSON(chartDataUrl(panel, state, year));
+        // A failed request must not be remembered, or the chart could never
+        // recover from a temporary error without a page reload.
+        recordCache[key] = _fetchJSON(chartDataUrl(panel, state, year)).catch(
+          function (error) {
+            delete recordCache[key];
+            throw error;
+          }
+        );
       }
       return recordCache[key];
     }
@@ -571,6 +591,7 @@ var WasteAtlasDashboard = (function () {
     init: init,
     // Pure helpers, exposed for unit tests.
     chartDataUrl: chartDataUrl,
+    escapeHtml: escapeHtml,
     summarise: summarise,
     trendRows: trendRows,
     kpisFrom: kpisFrom

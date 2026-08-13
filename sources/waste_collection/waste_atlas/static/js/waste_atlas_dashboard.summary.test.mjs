@@ -22,7 +22,8 @@ const source = readFileSync(join(HERE, "waste_atlas_dashboard.js"), "utf8");
 const sandbox = { console };
 vm.createContext(sandbox);
 vm.runInContext(source, sandbox);
-const { chartDataUrl, summarise, trendRows, kpisFrom } = sandbox.WasteAtlasDashboard;
+const { chartDataUrl, escapeHtml, summarise, trendRows, kpisFrom } =
+  sandbox.WasteAtlasDashboard;
 
 const systemPanel = {
   theme: "collection_system",
@@ -114,6 +115,14 @@ test("trend rows are ordered by year and carry each year's shares", () => {
   );
   assert.strictEqual(rows[0].bars[1].share, 1);
   assert.strictEqual(rows[1].bars[0].share, 1);
+});
+
+test("configured labels are escaped before they reach a tooltip", () => {
+  assert.strictEqual(
+    escapeHtml('<img src=x onerror="alert(1)">'),
+    "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;",
+  );
+  assert.strictEqual(escapeHtml("Bring point & door to door"), "Bring point &amp; door to door");
 });
 
 test("headline figures count only charts that loaded data", () => {
