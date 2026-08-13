@@ -185,6 +185,68 @@ test("row flow gives every entry of a row the row's height so rows line up", () 
   );
 });
 
+// A realm with a canvas stub that reports bold text wider than regular text and
+// records every font it measured with, so wrapping can be observed without a DOM.
+function measuringRealm() {
+  const fonts = [];
+  const context = {
+    font: "",
+    measureText(text) {
+      fonts.push(this.font);
+      const perChar = String(this.font).indexOf("bold") === 0 ? 12 : 6;
+      return { width: String(text).length * perChar };
+    },
+  };
+  const realm = {
+    console,
+    document: { createElement: () => ({ getContext: () => context }) },
+  };
+  vm.createContext(realm);
+  vm.runInContext(source, realm);
+  realm.WasteAtlasChoropleth.setRenderDefaults(renderDefaults());
+  return { atlas: realm.WasteAtlasChoropleth, fonts };
+}
+
+test("text is measured with the face it is rendered in", () => {
+  const { atlas, fonts } = measuringRealm();
+  const title = "Annual collection count ratio - Biowaste : Residual waste";
+  const font = { family: atlas.legend.screenFontFamily, weight: "bold" };
+
+  const bold = atlas.layout.wrapTextToWidth(title, 240, 13, font);
+  const regular = atlas.layout.wrapTextToWidth(title, 240, 13, {
+    family: font.family,
+  });
+
+  // The legend title is drawn bold: measuring it regular underestimates its
+  // width and the title then overflows the legend box instead of wrapping.
+  assert.ok(bold.length > regular.length);
+  assert.ok(fonts.includes("bold 13px 'Nunito', sans-serif"));
+  assert.ok(fonts.includes("13px 'Nunito', sans-serif"));
+});
+
+test("the export legend title is measured in the bold face it is printed in", () => {
+  const { atlas, fonts } = measuringRealm();
+
+  const opts = atlas.layout.measureExportLegend(
+    {
+      legendTitle: "Annual collection count ratio - Biowaste : Residual waste",
+      categories: [{ value: "a", label: "A label", color: "#000000" }],
+    },
+    200,
+    1,
+    "column",
+  );
+
+  // Every title line must fit the box it was wrapped for when measured bold,
+  // the face the export draws it in; measuring it regular overflows the box.
+  const maxWidth = opts.width - opts.paddingX * 2;
+  assert.ok(opts.titleLines.length > 1);
+  opts.titleLines.forEach((line) => {
+    assert.ok(line.length * 12 <= maxWidth, line);
+  });
+  assert.ok(fonts.some((font) => font.indexOf("bold") === 0));
+});
+
 test("a row-flow column is measured on the slot heights, so columns stay aligned", () => {
   // The screen legend shares this measurement, so a wrapped (taller) entry may
   // not push its column out of step with its neighbour.
