@@ -211,20 +211,6 @@ class WasteAtlasMapConfigurationForm(forms.Form):
                 widget=forms.NumberInput(attrs={"class": "form-control", "step": 1}),
             )
 
-    @staticmethod
-    def _is_no_collection_category(category):
-        label = str(category.get("label", ""))
-        return any(
-            text in label
-            for text in (
-                "No separate biowaste collection",
-                "No separate door-to-door collection",
-                "No separate collection",
-                "No separate green waste collection",
-                "No door-to-door",
-            )
-        )
-
     def _entries(self):
         """Return ``(field prefix, legend value)`` for every orderable entry.
 
@@ -243,15 +229,9 @@ class WasteAtlasMapConfigurationForm(forms.Form):
 
     def _entry_order(self):
         """Return the field prefixes in the order the renderer would show them."""
-        normal = []
-        no_collection = []
-        for index, category in enumerate(self._categories):
-            target = (
-                no_collection if self._is_no_collection_category(category) else normal
-            )
-            target.append(f"category_{index}")
-        quartiles = [f"quartile_{entry['value']}" for entry in self._quartile_entries]
-        default_order = normal + quartiles + no_collection
+        default_order = [
+            f"category_{index}" for index in range(len(self._categories))
+        ] + [f"quartile_{entry['value']}" for entry in self._quartile_entries]
 
         values = dict(self._entries())
         ordered_values = order_legend_values(

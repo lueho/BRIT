@@ -443,9 +443,9 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
     def test_quartile_classes_default_to_the_order_the_renderer_uses(self):
         """The editor's initial order must match what the map renders.
 
-        Without a saved order the renderer shows the quartile classes first and
-        the "no separate collection" entry last, so that is where the form has
-        to place them.
+        Without a saved order the renderer keeps the configured category order
+        and appends the computed quartile classes, so the editor has to list
+        the entries the same way.
         """
         config = WasteAtlasMapConfiguration.objects.get(
             key="biowaste_collection_amount"
@@ -463,7 +463,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         rows = response.context["form"].category_rows
         self.assertEqual(
             [row["value"] for row in rows],
-            ["very_high", "high", "medium", "low", "q1", "q2", "q3", "q4", "no_bio"],
+            ["very_high", "high", "medium", "low", "no_bio", "q1", "q2", "q3", "q4"],
         )
         # Computed entries carry no editable text: their labels are the ranges
         # the renderer derives from the data.

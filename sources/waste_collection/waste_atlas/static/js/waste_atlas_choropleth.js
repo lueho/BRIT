@@ -1143,17 +1143,6 @@ var WasteAtlasChoropleth = (function () {
       .replace(/No separate bio collection/g, 'No separate biowaste collection');
   }
 
-  function _isNoCollectionCategory(item) {
-    var label = String(item.label || '');
-    return (
-      label.indexOf('No separate biowaste collection') !== -1 ||
-      label.indexOf('No separate door-to-door collection') !== -1 ||
-      label.indexOf('No separate collection') !== -1 ||
-      label.indexOf('No separate green waste collection') !== -1 ||
-      label.indexOf('No door-to-door') !== -1
-    );
-  }
-
   function _visibleLegendCategories(cfg) {
     return cfg.categories.filter(function (item) {
       if (_isNoDataCategory(item) && !cfg._hasNoDataCategory) return false;
