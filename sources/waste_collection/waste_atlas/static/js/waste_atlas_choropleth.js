@@ -1155,21 +1155,10 @@ var WasteAtlasChoropleth = (function () {
     });
   }
 
-  function _orderedLegendCategories(cfg) {
-    var visible = _visibleLegendCategories(cfg);
-    if (Array.isArray(cfg.legendCategoryOrder)) {
-      return visible.slice().sort(function (left, right) {
-        var leftIndex = cfg.legendCategoryOrder.indexOf(left.value);
-        var rightIndex = cfg.legendCategoryOrder.indexOf(right.value);
-        if (leftIndex === -1) leftIndex = cfg.legendCategoryOrder.length;
-        if (rightIndex === -1) rightIndex = cfg.legendCategoryOrder.length;
-        return leftIndex - rightIndex;
-      });
-    }
-
+  function _defaultLegendCategories(cfg) {
     var normal = [];
     var noCollection = [];
-    visible.forEach(function (item) {
+    _visibleLegendCategories(cfg).forEach(function (item) {
       if (_isNoCollectionCategory(item)) {
         noCollection.push(item);
       } else {
@@ -1177,6 +1166,39 @@ var WasteAtlasChoropleth = (function () {
       }
     });
     return normal.concat(noCollection);
+  }
+
+  /**
+   * Apply the saved legend order (``legendCategoryOrder``) to the categories the
+   * legend shows, on screen and in the export alike.
+   *
+   * An entry the saved order does not mention keeps its position relative to the
+   * mentioned ones: it stays directly behind the last mentioned entry preceding
+   * it in the default order, and in front of everything when none does. Quartile
+   * classification swaps the stored classes for data-derived ones, so a saved
+   * order predating that swap still places the entries it does know without
+   * scattering the rest.
+   */
+  function _orderedLegendCategories(cfg) {
+    var order = Array.isArray(cfg.legendCategoryOrder) ? cfg.legendCategoryOrder : [];
+    var keyed = [];
+    var rank = -1;
+    var offset = 0;
+    _defaultLegendCategories(cfg).forEach(function (item) {
+      var saved = order.indexOf(item.value);
+      if (saved === -1) {
+        offset += 1;
+      } else {
+        rank = saved;
+        offset = 0;
+      }
+      keyed.push({ rank: rank, offset: offset, item: item });
+    });
+    return keyed.sort(function (left, right) {
+      return left.rank - right.rank || left.offset - right.offset;
+    }).map(function (entry) {
+      return entry.item;
+    });
   }
 
   function _legendItems(cfg, exportMode) {
@@ -3551,6 +3573,10 @@ var WasteAtlasChoropleth = (function () {
     exportElementSVG: exportElementSVG,
     exportElementPNG: exportElementPNG,
     transforms: transforms,
+    // Legend entry order, shared by the screen legend and the export.
+    legend: {
+      orderedCategories: _orderedLegendCategories
+    },
     // Pure helpers for the export legend layout engine, exposed for tests and
     // for a future export preview that must share this exact layout path.
     layout: {
