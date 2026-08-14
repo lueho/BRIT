@@ -240,6 +240,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         preserved_updated = deepcopy(config.configuration)
         for value in (preserved_original, preserved_updated):
             value.pop("legendTitle", None)
+            value.pop("legendNote", None)
             value.pop("exportLegendTitle", None)
             value.pop("legendPlacement", None)
             value.pop("legendWidth", None)
@@ -262,6 +263,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         self.assertIn("no-store", map_response.headers["Cache-Control"])
         rendered_config = self._rendered_map_config(map_response)
         self.assertEqual(rendered_config["legendTitle"], "Edited online legend")
+        self.assertEqual(rendered_config["legendNote"], "An explanatory legend note")
         self.assertEqual(
             rendered_config["exportLegendTitle"],
             "Edited export legend",
