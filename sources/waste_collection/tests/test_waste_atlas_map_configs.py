@@ -238,6 +238,30 @@ class WasteAtlasMapConfigStructureTests(TestCase):
                     ):
                         self.assertNotIn(token, label)
 
+    def test_min_bin_size_maps_use_german_2024_standard_sizes(self):
+        expected_numeric_categories = [
+            ("under_40", "< 40"),
+            ("exactly_40", "40"),
+            ("between_40_and_60", "41 – 59"),
+            ("exactly_60", "60"),
+            ("between_60_and_80", "61 – 79"),
+            ("exactly_80", "80"),
+            ("between_80_and_120", "81 – 119"),
+            ("exactly_120", "120"),
+            ("over_120", "> 120"),
+        ]
+
+        for config_key in ("biowaste_min_bin_size", "residual_min_bin_size"):
+            config = MAP_CONFIGS[config_key]
+            numeric_categories = [
+                (entry["value"], entry["label"])
+                for entry in config["categories"]
+                if entry["value"] != "no_door_to_door"
+            ]
+            with self.subTest(config_key=config_key):
+                self.assertEqual(numeric_categories, expected_numeric_categories)
+                self.assertFalse(config["enableQuartiles"])
+
     def test_map_selection_context_includes_region_scope_per_map_set(self):
         """Each map-set entry must carry its full region scope."""
         from sources.waste_collection.waste_atlas.pages import MAP_SET_COUNTRIES

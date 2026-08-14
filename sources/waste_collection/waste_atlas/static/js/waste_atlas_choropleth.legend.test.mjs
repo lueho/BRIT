@@ -203,6 +203,52 @@ test("connection-rate quartiles include full connection in the calculation", () 
   assert.equal(quartileConfig.categories.at(-1).label, "40 – 100 (Q4)");
 });
 
+test("minimum bin sizes use the German 2024 standard-size classes", () => {
+  const records = [
+    { catchment_id: 1, min_bin_size: 39 },
+    { catchment_id: 2, min_bin_size: 40 },
+    { catchment_id: 3, min_bin_size: 41 },
+    { catchment_id: 4, min_bin_size: 59 },
+    { catchment_id: 5, min_bin_size: 60 },
+    { catchment_id: 6, min_bin_size: 61 },
+    { catchment_id: 7, min_bin_size: 79 },
+    { catchment_id: 8, min_bin_size: 80 },
+    { catchment_id: 9, min_bin_size: 81 },
+    { catchment_id: 10, min_bin_size: 119 },
+    { catchment_id: 11, min_bin_size: 120 },
+    { catchment_id: 12, min_bin_size: 121 },
+    { catchment_id: 13, min_bin_size: null },
+  ];
+  const expected = [
+    "under_40",
+    "exactly_40",
+    "between_40_and_60",
+    "between_40_and_60",
+    "exactly_60",
+    "between_60_and_80",
+    "between_60_and_80",
+    "exactly_80",
+    "between_80_and_120",
+    "between_80_and_120",
+    "exactly_120",
+    "over_120",
+    null,
+  ];
+
+  for (const transformName of ["biowasteMinBinSize", "residualMinBinSize"]) {
+    const classified = sandbox.WasteAtlasChoropleth.transforms[transformName](records);
+    assert.deepEqual(
+      classified.map((row) => row._classified),
+      expected,
+    );
+  }
+
+  const noDoorToDoor = sandbox.WasteAtlasChoropleth.transforms.biowasteMinBinSize([
+    { catchment_id: 14, min_bin_size: null, is_door_to_door: false },
+  ]);
+  assert.equal(noDoorToDoor[0]._classified, "no_door_to_door");
+});
+
 test("RLP collection counts below 13 use the matching outer class", () => {
   const { rpBiowasteCollectionCount, rpResidualCollectionCount } =
     sandbox.WasteAtlasChoropleth.transforms;

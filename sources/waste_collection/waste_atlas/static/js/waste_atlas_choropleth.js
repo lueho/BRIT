@@ -2112,14 +2112,24 @@ var WasteAtlasChoropleth = (function () {
           cls = 'no_door_to_door';
         } else if (r.min_bin_size === null) {
           cls = null;
-        } else if (r.min_bin_size <= 26.5) {
-          cls = 'xs';
-        } else if (r.min_bin_size <= 60) {
-          cls = 'small';
-        } else if (r.min_bin_size <= 120) {
-          cls = 'medium';
+        } else if (r.min_bin_size < 40) {
+          cls = 'under_40';
+        } else if (r.min_bin_size === 40) {
+          cls = 'exactly_40';
+        } else if (r.min_bin_size < 60) {
+          cls = 'between_40_and_60';
+        } else if (r.min_bin_size === 60) {
+          cls = 'exactly_60';
+        } else if (r.min_bin_size < 80) {
+          cls = 'between_60_and_80';
+        } else if (r.min_bin_size === 80) {
+          cls = 'exactly_80';
+        } else if (r.min_bin_size < 120) {
+          cls = 'between_80_and_120';
+        } else if (r.min_bin_size === 120) {
+          cls = 'exactly_120';
         } else {
-          cls = 'large';
+          cls = 'over_120';
         }
         return { catchment_id: r.catchment_id, _classified: cls };
       });
@@ -2491,14 +2501,24 @@ var WasteAtlasChoropleth = (function () {
         var cls;
         if (r.min_bin_size === null) {
           cls = null;
-        } else if (r.min_bin_size <= 30) {
-          cls = 'xs';
-        } else if (r.min_bin_size <= 60) {
-          cls = 'small';
-        } else if (r.min_bin_size <= 120) {
-          cls = 'medium';
+        } else if (r.min_bin_size < 40) {
+          cls = 'under_40';
+        } else if (r.min_bin_size === 40) {
+          cls = 'exactly_40';
+        } else if (r.min_bin_size < 60) {
+          cls = 'between_40_and_60';
+        } else if (r.min_bin_size === 60) {
+          cls = 'exactly_60';
+        } else if (r.min_bin_size < 80) {
+          cls = 'between_60_and_80';
+        } else if (r.min_bin_size === 80) {
+          cls = 'exactly_80';
+        } else if (r.min_bin_size < 120) {
+          cls = 'between_80_and_120';
+        } else if (r.min_bin_size === 120) {
+          cls = 'exactly_120';
         } else {
-          cls = 'large';
+          cls = 'over_120';
         }
         return { catchment_id: r.catchment_id, _classified: cls };
       });
