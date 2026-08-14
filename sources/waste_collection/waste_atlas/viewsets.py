@@ -1967,11 +1967,21 @@ class CollectionPointCountRatioViewSet(WasteAtlasViewSet):
         return Response(serializer.data)
 
 
-def _get_fee_system(country, year, waste_categories, nuts_prefixes=(), user=None):
+def _get_fee_system(
+    country,
+    year,
+    waste_categories,
+    nuts_prefixes=(),
+    user=None,
+    non_door_to_door_as_collection_system=False,
+):
     """Return per-catchment fee system for the given waste categories.
 
-    For biowaste, non-door-to-door catchments return the collection
-    system name instead of the fee system.
+    Biowaste maps combine the ``Biowaste`` and ``Food waste`` categories.
+    For door-to-door-specific biowaste maps, non-door-to-door catchments
+    return their actual collection-system name.  The renderer can then group
+    those systems under its distinct no-door-to-door legend category without
+    falsely describing a bring-point collection as no separate collection.
     """
     best = _select_primary_collections(
         country,
@@ -1986,7 +1996,12 @@ def _get_fee_system(country, year, waste_categories, nuts_prefixes=(), user=None
     for cid, row in best.items():
         system = row["collection_system"]
         fee = row["fee_system__name"]
-        if system == "No separate collection":
+        if non_door_to_door_as_collection_system and system not in {
+            "Door to door",
+            "Mixed door-to-door and bring point",
+        }:
+            val = system
+        elif system == "No separate collection":
             val = "No separate collection"
         elif fee:
             val = fee
@@ -2037,6 +2052,7 @@ class BiowasteFeeSystemViewSet(WasteAtlasViewSet):
             ["Biowaste", "Food waste"],
             nuts_prefixes,
             user=request.user,
+            non_door_to_door_as_collection_system=True,
         )
         serializer = CatchmentFeeSystemSerializer(data, many=True)
         return Response(serializer.data)
@@ -2064,6 +2080,7 @@ class CombinedFeeSystemViewSet(WasteAtlasViewSet):
                 ["Biowaste", "Food waste"],
                 nuts_prefixes,
                 user=request.user,
+                non_door_to_door_as_collection_system=True,
             )
         }
         res = {

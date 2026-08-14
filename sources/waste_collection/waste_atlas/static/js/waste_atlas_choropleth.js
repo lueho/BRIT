@@ -1950,6 +1950,18 @@ var WasteAtlasChoropleth = (function () {
     });
   }
 
+  var NON_DOOR_TO_DOOR_COLLECTION_SYSTEMS = [
+    'No separate collection',
+    'Bring point',
+    'Recycling centre',
+    'On demand kerbside collection',
+    'Home-composting'
+  ];
+
+  function _isNonDoorToDoorCollectionSystem(value) {
+    return NON_DOOR_TO_DOOR_COLLECTION_SYSTEMS.indexOf(value) !== -1;
+  }
+
   // ---- named transform registry -------------------------------------------
   var transforms = {
     biowasteCollectionAmount: function (records) {
@@ -1990,6 +2002,16 @@ var WasteAtlasChoropleth = (function () {
           cls = 'less_frequent';
         }
         return { catchment_id: r.catchment_id, _classified: cls };
+      });
+    },
+    biowasteFeeSystem: function (records) {
+      return records.map(function (r) {
+        return {
+          catchment_id: r.catchment_id,
+          _classified: _isNonDoorToDoorCollectionSystem(r.fee_system)
+            ? 'no_door_to_door'
+            : r.fee_system
+        };
       });
     },
     rpBiowasteCollectionCount: function (records) {
@@ -2065,10 +2087,8 @@ var WasteAtlasChoropleth = (function () {
       });
     },
     biowasteFrequency: function (records) {
-      var NO_BIO = ['No separate collection', 'Bring point', 'Recycling centre',
-        'On demand kerbside collection', 'Home-composting'];
       return records.map(function (r) {
-        var cls = NO_BIO.indexOf(r.frequency_type) !== -1
+        var cls = _isNonDoorToDoorCollectionSystem(r.frequency_type)
           ? 'no_bio_collection'
           : r.frequency_type;
         return { catchment_id: r.catchment_id, _classified: cls };
@@ -2270,8 +2290,7 @@ var WasteAtlasChoropleth = (function () {
     combinedFeeSystem: function (records) {
       return records.map(function (r) {
         var cls;
-        var noSep = ['No separate collection', 'Recycling centre', 'Bring point'];
-        if (noSep.indexOf(r.bio_fee) !== -1) {
+        if (_isNonDoorToDoorCollectionSystem(r.bio_fee)) {
           cls = 'no_bio';
         } else if (r.bio_fee === 'Flexible' && r.residual_fee === 'Flexible') {
           cls = 'flex_flex';
@@ -2299,11 +2318,9 @@ var WasteAtlasChoropleth = (function () {
         'Fixed-Flexible': 'flexible',
         'Fixed-Seasonal': 'seasonal'
       };
-      var NO_BIO = ['No separate collection', 'Bring point', 'Recycling centre',
-        'On demand kerbside collection', 'Home-composting'];
       return records.map(function (r) {
         var cls;
-        if (NO_BIO.indexOf(r.bio_frequency) !== -1) {
+        if (_isNonDoorToDoorCollectionSystem(r.bio_frequency)) {
           cls = 'no_bio_collection';
         } else {
           var b = TYPE_KEY[r.bio_frequency] || 'unknown';
