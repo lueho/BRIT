@@ -126,6 +126,15 @@ class WasteAtlasMapConfigStructureTests(TestCase):
                         set(entry),
                     )
 
+    def test_connection_rate_uses_fixed_percentage_bands(self):
+        config = MAP_CONFIGS["connection_rate"]
+
+        self.assertFalse(config["enableQuartiles"])
+        self.assertEqual(
+            [category["value"] for category in config["categories"][:4]],
+            ["75-100", "50-74", "25-49", "0-24"],
+        )
+
     def test_amount_maps_mark_aggregated_values(self):
         for config_key in (
             "biowaste_collection_amount",
