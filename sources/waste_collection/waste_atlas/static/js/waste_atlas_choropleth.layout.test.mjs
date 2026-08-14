@@ -153,6 +153,22 @@ test("resolveExportLegend inherits the atlas-wide item flow", () => {
   });
 });
 
+test("export legend labels change only through an explicit exportLabel", () => {
+  assert.equal(
+    layout.exportLegendLabel({
+      label: "No separate door-to-door biowaste collection",
+    }),
+    "No separate door-to-door biowaste collection",
+  );
+  assert.equal(
+    layout.exportLegendLabel({
+      label: "Biowaste more often, residual waste every two weeks",
+      exportLabel: "More / 2 weeks",
+    }),
+    "More / 2 weeks",
+  );
+});
+
 function flowItems(heights) {
   return heights.map((height, index) => ({ label: "item " + index, height: height }));
 }
