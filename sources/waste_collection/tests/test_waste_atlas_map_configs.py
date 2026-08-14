@@ -95,6 +95,29 @@ class WasteAtlasMapConfigStructureTests(TestCase):
                 "DtD: yes | BP: no",
             ],
         )
+        self.assertEqual(
+            config["legendCategoryOrder"],
+            [
+                "Bring point: yes",
+                "Bring point: no",
+                "Door-to-door: yes",
+                "Door-to-door: no",
+                "Bring point: yes | Door-to-door: yes",
+                "Bring point: no | Door-to-door: yes",
+                "Bring point: yes | Door-to-door: no",
+                "Bring point: no | Door-to-door: no",
+                "No separate biowaste collection",
+            ],
+        )
+        self.assertEqual(config["exportLegendColumns"], 3)
+        self.assertEqual(config["exportLegendItemFlow"], "column")
+        self.assertEqual(
+            config["legendColumnBreakBefore"],
+            [
+                "Bring point: yes | Door-to-door: yes",
+                "No separate biowaste collection",
+            ],
+        )
 
     def test_every_configuration_defines_the_keys_the_renderer_needs(self):
         for config_key, config in MAP_CONFIGS.items():

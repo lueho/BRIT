@@ -1273,19 +1273,27 @@ var WasteAtlasChoropleth = (function () {
         color: cfg.noDataColor || _defaults().noDataColor
       });
     }
-    return _markTrailingLegendStatuses(items);
+    return _markTrailingLegendStatuses(cfg, items);
   }
 
   // Computed value ranges have thresholds; preserved classes, conflict aids
   // and fallback no-data entries are statuses. When the statuses form one
-  // trailing group, expose that natural boundary to the column distributor so
-  // it can keep unlike entries together without a per-map break setting.
-  function _markTrailingLegendStatuses(items) {
+  // trailing group, expose that natural boundary to the column distributor.
+  // A map may instead declare explicit category-value boundaries when its
+  // semantic groups are not inferred from numeric ranges.
+  function _markTrailingLegendStatuses(cfg, items) {
+    var columnBreakBefore = Array.isArray(cfg.legendColumnBreakBefore)
+      ? cfg.legendColumnBreakBefore
+      : [];
     var lastValueRange = -1;
     items.forEach(function (item, index) {
       if (item.threshold != null) lastValueRange = index;
       delete item.breakBefore;
     });
+    items.forEach(function (item) {
+      if (columnBreakBefore.indexOf(item.value) !== -1) item.breakBefore = true;
+    });
+    if (columnBreakBefore.length) return items;
     if (lastValueRange < 0 || lastValueRange === items.length - 1) return items;
     var trailingItemsAreStatuses = items.slice(lastValueRange + 1).every(function (item) {
       return item.threshold == null;
