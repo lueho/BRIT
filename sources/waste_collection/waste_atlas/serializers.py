@@ -153,11 +153,6 @@ class CatchmentConnectionRateSerializer(serializers.Serializer):
     is_door_to_door = serializers.BooleanField()
     reporting_year = serializers.IntegerField(allow_null=True)
 
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        data["connection_rate"] = _round_one_decimal(data.get("connection_rate"))
-        return data
-
 
 class CatchmentParticipationPolicySerializer(serializers.Serializer):
     catchment_id = serializers.IntegerField()

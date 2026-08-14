@@ -1851,6 +1851,14 @@ var WasteAtlasChoropleth = (function () {
     return cfg.numericField && cfg.quartileColors && cfg.enableQuartiles !== false;
   }
 
+  function _matchesQuartileSpecialCase(record, specialCase) {
+    var value = record[specialCase.field];
+    if (Object.prototype.hasOwnProperty.call(specialCase, 'equals')) {
+      return value === specialCase.equals;
+    }
+    return Boolean(value);
+  }
+
   function _legacyRecordLookup(baseCfg, records) {
     var legacyRecords = records;
     if (typeof baseCfg.transformData === 'function') {
@@ -1881,7 +1889,9 @@ var WasteAtlasChoropleth = (function () {
     }
 
     function isSpecialCaseRecord(r) {
-      return specialCases.some(function (sc) { return Boolean(r[sc.field]); });
+      return specialCases.some(function (sc) {
+        return _matchesQuartileSpecialCase(r, sc);
+      });
     }
 
     var values = records
@@ -1914,7 +1924,7 @@ var WasteAtlasChoropleth = (function () {
           }
           for (var i = 0; i < specialCases.length; i++) {
             var sc = specialCases[i];
-            if (cls === null && r[sc.field]) {
+            if (cls === null && _matchesQuartileSpecialCase(r, sc)) {
               cls = sc.classValue;
               break;
             }
@@ -2317,8 +2327,10 @@ var WasteAtlasChoropleth = (function () {
           cls = 'no_d2d';
         } else if (r.connection_rate == null) {
           cls = null;
+        } else if (r.connection_rate === 1) {
+          cls = 'full_connection';
         } else if (r.connection_rate >= 0.75) {
-          cls = '75-100';
+          cls = '75-99';
         } else if (r.connection_rate >= 0.50) {
           cls = '50-74';
         } else if (r.connection_rate >= 0.25) {
@@ -3443,7 +3455,9 @@ var WasteAtlasChoropleth = (function () {
     var btnSVG = document.getElementById('btn-export-svg');
     var btnPNG = document.getElementById('btn-export-png');
     var fileBase = cfg.fileBase || _defaultFileBase();
-    var isQuartileMode = _isQuartileEnabled(cfg) && !cfg.changeMode;
+    var isQuartileMode = _isQuartileEnabled(cfg)
+      && cfg.quartileDefaultEnabled !== false
+      && !cfg.changeMode;
 
     function _exportFileBase() {
       if (cfg.changeMode && _lastLoadCfg) {
@@ -3550,7 +3564,7 @@ var WasteAtlasChoropleth = (function () {
 
       var toggleCheckbox = document.createElement('input');
       toggleCheckbox.type = 'checkbox';
-      toggleCheckbox.checked = true;
+      toggleCheckbox.checked = isQuartileMode;
       toggleCheckbox.addEventListener('change', function () {
         isQuartileMode = toggleCheckbox.checked;
         if (_lastData && _baseLoadCfg) {
@@ -3764,6 +3778,9 @@ var WasteAtlasChoropleth = (function () {
     exportElementSVG: exportElementSVG,
     exportElementPNG: exportElementPNG,
     transforms: transforms,
+    quartiles: {
+      apply: _applyQuartiles
+    },
     // Appearance of the aggregated-value markers, shared by the screen and the
     // export; exposed for tests and callers that draw their own legend swatch.
     acpv: {

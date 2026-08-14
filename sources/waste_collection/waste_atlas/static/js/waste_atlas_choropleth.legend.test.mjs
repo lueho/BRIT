@@ -19,10 +19,21 @@ import vm from "node:vm";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(join(HERE, "waste_atlas_choropleth.js"), "utf8");
 
-const sandbox = { console };
+const sandbox = {
+  console,
+  d3: {
+    quantile(values, probability) {
+      const position = (values.length - 1) * probability;
+      const lower = Math.floor(position);
+      const upper = Math.ceil(position);
+      const weight = position - lower;
+      return values[lower] * (1 - weight) + values[upper] * weight;
+    },
+  },
+};
 vm.createContext(sandbox);
 vm.runInContext(source, sandbox);
-const { legend } = sandbox.WasteAtlasChoropleth;
+const { legend, quartiles, transforms } = sandbox.WasteAtlasChoropleth;
 
 // The legend of a quartile map: the classification keeps the special case and
 // appends the four computed quartile classes.
@@ -141,6 +152,55 @@ test("biowaste fees distinguish non-door-to-door systems from missing data", () 
     classified.map((row) => row._classified),
     ["no_door_to_door", "no_door_to_door", "Flat fee", "no_data"],
   );
+});
+
+test("connection-rate fixed bands keep full connection separate", () => {
+  const classified = transforms.connectionRate([
+    { catchment_id: 1, connection_rate: 1, is_door_to_door: true },
+    { catchment_id: 2, connection_rate: 0.97, is_door_to_door: true },
+  ]);
+
+  assert.deepEqual(
+    classified.map((row) => row._classified),
+    ["full_connection", "75-99"],
+  );
+});
+
+test("connection-rate quartiles include full connection in the calculation", () => {
+  const config = {
+    numericField: "connection_rate",
+    dataField: "_classified",
+    transformName: "connectionRate",
+    categories: [
+      { value: "full_connection", label: "100% – full connection", color: "#003f5c" },
+      { value: "75-99", label: "75% – <100%", color: "#00608e" },
+      { value: "no_d2d", label: "No door to door", color: "#fff696" },
+    ],
+    quartileColors: ["#d1e7e6", "#7fcce9", "#0090cb", "#00608e"],
+    quartileDisplayMultiplier: 100,
+    quartilePreserveClasses: ["no_d2d"],
+  };
+  const records = [
+    { catchment_id: 1, connection_rate: 0.1, is_door_to_door: true },
+    { catchment_id: 2, connection_rate: 0.2, is_door_to_door: true },
+    { catchment_id: 3, connection_rate: 0.3, is_door_to_door: true },
+    { catchment_id: 4, connection_rate: 0.4, is_door_to_door: true },
+    { catchment_id: 5, connection_rate: 1, is_door_to_door: true },
+    { catchment_id: 6, connection_rate: null, is_door_to_door: false },
+  ];
+
+  const quartileConfig = quartiles.apply(config, records);
+  const classified = quartileConfig.transformData(records);
+
+  assert.deepEqual(
+    classified.map((row) => row._classified),
+    ["q1", "q1", "q2", "q3", "q4", "no_d2d"],
+  );
+  assert.deepEqual(
+    quartileConfig.categories.map((category) => category.value),
+    ["no_d2d", "q1", "q2", "q3", "q4"],
+  );
+  assert.equal(quartileConfig.categories.at(-1).label, "40 – 100 (Q4)");
 });
 
 test("RLP collection counts below 13 use the matching outer class", () => {
