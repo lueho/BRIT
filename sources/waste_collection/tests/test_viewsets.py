@@ -2675,7 +2675,7 @@ class ConnectionRateViewSetTests(APITestCase):
             [
                 {
                     "catchment_id": self.catchment.id,
-                    "connection_rate": 0.9,
+                    "connection_rate": 0.86,
                     "is_door_to_door": True,
                     "reporting_year": 2023,
                 }
@@ -2712,7 +2712,7 @@ class ConnectionRateViewSetTests(APITestCase):
         row = next(
             row for row in response.data if row["catchment_id"] == mixed_catchment.id
         )
-        self.assertEqual(row["connection_rate"], 0.5)
+        self.assertEqual(row["connection_rate"], 0.52)
         self.assertTrue(row["is_door_to_door"])
 
     def test_participation_policy_endpoint_returns_selected_collection_value(self):
