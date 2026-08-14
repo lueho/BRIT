@@ -135,15 +135,12 @@ class WasteAtlasMapConfigStructureTests(TestCase):
             [category["value"] for category in config["categories"][:5]],
             ["full_connection", "75-99", "50-74", "25-49", "0-24"],
         )
-        self.assertIn(
-            {
-                "field": "connection_rate",
-                "equals": 1,
-                "classValue": "full_connection",
-                "label": "100% – full connection",
-                "color": "#003f5c",
-            },
-            config["quartileSpecialCases"],
+        self.assertNotIn(
+            "full_connection",
+            [
+                special_case["classValue"]
+                for special_case in config.get("quartileSpecialCases", [])
+            ],
         )
 
     def test_amount_maps_mark_aggregated_values(self):

@@ -166,7 +166,7 @@ test("connection-rate fixed bands keep full connection separate", () => {
   );
 });
 
-test("connection-rate quartiles exclude full connection as a special class", () => {
+test("connection-rate quartiles include full connection in the calculation", () => {
   const config = {
     numericField: "connection_rate",
     dataField: "_classified",
@@ -179,15 +179,6 @@ test("connection-rate quartiles exclude full connection as a special class", () 
     quartileColors: ["#d1e7e6", "#7fcce9", "#0090cb", "#00608e"],
     quartileDisplayMultiplier: 100,
     quartilePreserveClasses: ["no_d2d"],
-    quartileSpecialCases: [
-      {
-        field: "connection_rate",
-        equals: 1,
-        classValue: "full_connection",
-        label: "100% – full connection",
-        color: "#003f5c",
-      },
-    ],
   };
   const records = [
     { catchment_id: 1, connection_rate: 0.1, is_door_to_door: true },
@@ -203,12 +194,13 @@ test("connection-rate quartiles exclude full connection as a special class", () 
 
   assert.deepEqual(
     classified.map((row) => row._classified),
-    ["q1", "q2", "q3", "q4", "full_connection", "no_d2d"],
+    ["q1", "q1", "q2", "q3", "q4", "no_d2d"],
   );
   assert.deepEqual(
     quartileConfig.categories.map((category) => category.value),
-    ["no_d2d", "full_connection", "q1", "q2", "q3", "q4"],
+    ["no_d2d", "q1", "q2", "q3", "q4"],
   );
+  assert.equal(quartileConfig.categories.at(-1).label, "40 – 100 (Q4)");
 });
 
 test("RLP collection counts below 13 use the matching outer class", () => {
