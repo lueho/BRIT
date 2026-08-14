@@ -3019,7 +3019,7 @@ var WasteAtlasChoropleth = (function () {
         kind: 'no-data'
       });
     }
-    _markTrailingLegendStatuses(screenItems);
+    _markTrailingLegendStatuses(cfg, screenItems);
 
     screenItems.forEach(function (item) {
       item.height = Math.max(swatchH, item.lines.length * lineHeight);

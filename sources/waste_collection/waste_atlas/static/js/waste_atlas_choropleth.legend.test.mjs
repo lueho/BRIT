@@ -51,6 +51,10 @@ function orderedValues(cfg) {
   return legend.orderedCategories(cfg).map((item) => item.value);
 }
 
+test("the screen legend passes its configuration when marking status entries", () => {
+  assert.match(source, /_markTrailingLegendStatuses\(cfg, screenItems\);/);
+});
+
 test("without a saved order the configured category order is preserved", () => {
   assert.deepEqual(orderedValues({ categories: quartileCategories() }), [
     "no_bio",
