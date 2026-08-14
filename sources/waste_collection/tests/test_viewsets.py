@@ -2682,6 +2682,39 @@ class ConnectionRateViewSetTests(APITestCase):
             ],
         )
 
+    def test_mixed_door_to_door_and_bring_point_is_door_to_door(self):
+        mixed_catchment = CollectionCatchment.objects.create(
+            name="Mixed connection rate catchment",
+            region=self.region,
+        )
+        mixed_system = CollectionSystem.objects.create(
+            name="Mixed door-to-door and bring point"
+        )
+        mixed_collection = Collection.objects.create(
+            name="Mixed connection rate collection",
+            catchment=mixed_catchment,
+            waste_category=self.bio_category,
+            collection_system=mixed_system,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+        CollectionPropertyValue.objects.create(
+            collection=mixed_collection,
+            property=self.prop,
+            unit=self.unit,
+            year=2024,
+            average=52,
+        )
+
+        response = self.client.get(self.endpoint, {"country": "DE", "year": 2024})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        row = next(
+            row for row in response.data if row["catchment_id"] == mixed_catchment.id
+        )
+        self.assertEqual(row["connection_rate"], 0.5)
+        self.assertTrue(row["is_door_to_door"])
+
     def test_participation_policy_endpoint_returns_selected_collection_value(self):
         response = self.client.get(
             "/waste_collection/api/waste-atlas/participation-policy/",

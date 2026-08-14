@@ -3490,7 +3490,10 @@ class ConnectionRateViewSet(WasteAtlasViewSet):
         for cid, row in best.items():
             col_id = row["collection_id"]
             system = row["collection_system"]
-            is_d2d = system == "Door to door"
+            is_d2d = system in {
+                "Door to door",
+                "Mixed door-to-door and bring point",
+            }
             rate = rate_lookup.get(col_id)
             avg = rate["average"] if rate is not None else None
             data.append(

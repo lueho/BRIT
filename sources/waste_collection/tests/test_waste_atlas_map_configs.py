@@ -383,8 +383,13 @@ class WasteAtlasMapConfigStructureTests(TestCase):
                 config = MAP_CONFIGS[f"rp_{theme}"]
                 self.assertEqual(config["transformName"], transform)
                 self.assertFalse(config["enableQuartiles"])
+                self.assertTrue(config["showOnlyPresentCategories"])
                 self.assertEqual(
-                    [entry["label"] for entry in config["categories"][:8]],
+                    [
+                        entry["label"]
+                        for entry in config["categories"]
+                        if entry["value"] != "no_door_to_door"
+                    ],
                     [
                         "< 13",
                         "13",
@@ -400,6 +405,13 @@ class WasteAtlasMapConfigStructureTests(TestCase):
         self.assertEqual(
             MAP_CONFIGS["rp_biowaste_collection_count"]["categories"][-1]["label"],
             "No separate door-to-door biowaste collection",
+        )
+        self.assertNotIn(
+            "no_door_to_door",
+            {
+                entry["value"]
+                for entry in MAP_CONFIGS["rp_residual_collection_count"]["categories"]
+            },
         )
 
     def test_rp_count_maps_keep_the_numeric_field_of_their_shared_theme(self):

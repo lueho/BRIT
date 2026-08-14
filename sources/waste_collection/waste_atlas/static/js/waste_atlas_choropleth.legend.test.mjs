@@ -93,6 +93,25 @@ test("a no-data category only shows when the data needs it", () => {
   ]);
 });
 
+test("RLP outer collection-count classes only show when present", () => {
+  const categories = [
+    { value: "under_13", label: "< 13" },
+    { value: "13", label: "13" },
+    { value: "over_52", label: "> 52" },
+  ];
+  const config = {
+    categories: categories,
+    showOnlyPresentCategories: true,
+    _presentCategoryValues: { 13: true },
+  };
+
+  assert.deepEqual(orderedValues(config), ["13"]);
+  config._presentCategoryValues.under_13 = true;
+  assert.deepEqual(orderedValues(config), ["under_13", "13"]);
+  config._presentCategoryValues.over_52 = true;
+  assert.deepEqual(orderedValues(config), ["under_13", "13", "over_52"]);
+});
+
 test("RLP ratio values of at least 2 use the 2:1 class", () => {
   assert.equal(
     sandbox.WasteAtlasChoropleth.transforms.rpCollectionCountRatio([
@@ -124,7 +143,7 @@ test("biowaste fees distinguish non-door-to-door systems from missing data", () 
   );
 });
 
-test("RLP collection counts below 13 are classified, not dropped as no data", () => {
+test("RLP collection counts below 13 use the matching outer class", () => {
   const { rpBiowasteCollectionCount, rpResidualCollectionCount } =
     sandbox.WasteAtlasChoropleth.transforms;
   assert.equal(
