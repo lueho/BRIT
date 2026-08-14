@@ -77,6 +77,25 @@ class WasteAtlasMapConfigStructureTests(TestCase):
     def test_configurations_are_seeded(self):
         self.assertTrue(len(MAP_CONFIGS))
 
+    def test_access_control_uses_compact_labels_and_a_legend_note(self):
+        config = MAP_CONFIGS["access_control"]
+
+        self.assertEqual(config["legendTitle"], "Collection mode + Access/use control")
+        self.assertEqual(config["legendNote"], "DtD = Door to door · BP = Bring point")
+        self.assertEqual(
+            [category["label"] for category in config["categories"][:8]],
+            [
+                "BP: yes",
+                "BP: no",
+                "DtD: yes",
+                "DtD: no",
+                "DtD: yes | BP: yes",
+                "DtD: no | BP: no",
+                "DtD: no | BP: yes",
+                "DtD: yes | BP: no",
+            ],
+        )
+
     def test_every_configuration_defines_the_keys_the_renderer_needs(self):
         for config_key, config in MAP_CONFIGS.items():
             with self.subTest(config_key=config_key):

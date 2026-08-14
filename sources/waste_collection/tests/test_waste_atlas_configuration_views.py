@@ -37,6 +37,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         stored_columns = configuration.get("exportLegendColumns", "auto")
         data = {
             "legend_title": configuration["legendTitle"],
+            "legend_note": configuration.get("legendNote", ""),
             "export_legend_title": configuration.get("exportLegendTitle", ""),
             "legend_placement": configuration.get("legendPlacement", "bottom-left"),
             "legend_width": configuration.get("legendWidth", 300),
@@ -170,6 +171,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
             self._form_data(
                 original,
                 legend_title="Edited online legend",
+                legend_note="An explanatory legend note",
                 export_legend_title="Edited export legend",
                 category_0_label="Edited online category",
                 category_0_export_label="Edited export category",
@@ -200,6 +202,10 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         self.assertEqual(
             config.configuration["legendTitle"],
             "Edited online legend",
+        )
+        self.assertEqual(
+            config.configuration["legendNote"],
+            "An explanatory legend note",
         )
         self.assertEqual(
             config.configuration["exportLegendTitle"],
