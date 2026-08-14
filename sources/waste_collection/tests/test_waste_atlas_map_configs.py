@@ -222,6 +222,24 @@ class WasteAtlasMapConfigStructureTests(TestCase):
                         continue
                     self.assertEqual(entry["color"], no_collection_color())
 
+    def test_organic_amount_distinguishes_no_collection_from_no_data(self):
+        config = MAP_CONFIGS["organic_collection_amount"]
+
+        category = next(
+            entry for entry in config["categories"] if entry["value"] == "no_collection"
+        )
+        special_case = next(
+            entry
+            for entry in config["quartileSpecialCases"]
+            if entry["field"] == "no_collection"
+        )
+
+        self.assertEqual(category["label"], "No separate collection")
+        self.assertEqual(category["color"], no_collection_color())
+        self.assertEqual(special_case["classValue"], "no_collection")
+        self.assertEqual(special_case["label"], "No separate collection")
+        self.assertEqual(special_case["color"], no_collection_color())
+
     @staticmethod
     def _all_entries(config):
         return [

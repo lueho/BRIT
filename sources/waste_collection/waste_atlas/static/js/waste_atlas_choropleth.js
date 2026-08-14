@@ -2428,7 +2428,9 @@ var WasteAtlasChoropleth = (function () {
     organicCollectionAmount: function (records) {
       return records.map(function (r) {
         var cls;
-        if (r.amount === null) {
+        if (r.no_collection) {
+          cls = 'no_collection';
+        } else if (r.amount === null) {
           cls = null;
         } else if (r.amount > 300) {
           cls = 'very_high';

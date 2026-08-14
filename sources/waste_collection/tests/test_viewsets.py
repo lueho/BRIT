@@ -3793,6 +3793,9 @@ class OrganicAmountViewSetTests(APITestCase):
         )
 
         cls.d2d, _ = CollectionSystem.objects.get_or_create(name="Door to door")
+        cls.no_collection, _ = CollectionSystem.objects.get_or_create(
+            name="No separate collection"
+        )
 
         cls.region = Region.objects.create(name="Region Organic DE", country="DE")
 
@@ -3807,6 +3810,9 @@ class OrganicAmountViewSetTests(APITestCase):
         )
         cls.catchment_residual_only = CollectionCatchment.objects.create(
             name="Organic Residual Only", region=cls.region
+        )
+        cls.catchment_no_collection = CollectionCatchment.objects.create(
+            name="Organic No Separate Collection", region=cls.region
         )
 
         bio_col_both = Collection.objects.create(
@@ -3907,6 +3913,16 @@ class OrganicAmountViewSetTests(APITestCase):
             average=150.0,
         )
 
+        for waste_category in (cls.bio_category, cls.green_category):
+            Collection.objects.create(
+                name=f"Organic no collection {waste_category.name}",
+                catchment=cls.catchment_no_collection,
+                waste_category=waste_category,
+                collection_system=cls.no_collection,
+                valid_from=date(2024, 1, 1),
+                publication_status="published",
+            )
+
     def setUp(self):
         clear_derived_value_config_cache()
 
@@ -3940,14 +3956,28 @@ class OrganicAmountViewSetTests(APITestCase):
             by_catchment[self.catchment_green_only.id]["amount"], 50.0
         )
 
-    def test_organic_amount_excludes_residual_only_catchment(self):
-        """Karte 27 does not include catchments with residual waste only."""
+    def test_organic_amount_marks_residual_only_as_no_collection(self):
+        """Karte 27 marks catchments without organic streams as no collection."""
         response = self.client.get(
             "/waste_collection/api/waste-atlas/organic-collection-amount/",
             {"country": "DE", "year": 2024},
         )
         by_catchment = {r["catchment_id"]: r for r in response.data}
-        self.assertNotIn(self.catchment_residual_only.id, by_catchment)
+        row = by_catchment[self.catchment_residual_only.id]
+        self.assertIsNone(row["amount"])
+        self.assertTrue(row["no_collection"])
+
+    def test_organic_amount_marks_no_separate_collection(self):
+        """Karte 27 distinguishes no organic collection from missing data."""
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/organic-collection-amount/",
+            {"country": "DE", "year": 2024},
+        )
+
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        row = by_catchment[self.catchment_no_collection.id]
+        self.assertIsNone(row["amount"])
+        self.assertTrue(row["no_collection"])
 
     def test_organic_ratio_computed_correctly(self):
         """Karte 28 computes organic / (organic + residual) for catchments with both."""
