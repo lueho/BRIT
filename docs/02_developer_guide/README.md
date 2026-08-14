@@ -26,6 +26,9 @@ This section contains developer-facing documentation for BRIT. Workflow instruct
 - **API details**
   Read [API Reference](api.md).
 
+- **Waste Atlas biowaste scope and collection-state terminology**
+  Read [Waste Atlas biowaste semantics](waste_atlas_semantics.md).
+
 - **Context retention and memory offloading**
   Read [Context Retention](context_retention.md) when moving durable agent memories into repository documentation.
 

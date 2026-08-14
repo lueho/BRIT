@@ -52,6 +52,21 @@ URL_CONFIG_KEYS = (
 
 
 class WasteAtlasMapConfigStructureTests(TestCase):
+    DOOR_TO_DOOR_BIOWASTE_THEMES = {
+        "biowaste_collection_count",
+        "biowaste_fee_system",
+        "biowaste_frequency",
+        "biowaste_min_bin_size",
+        "biowaste_required_bin_capacity",
+        "collection_count_ratio",
+        "combined_collection_count",
+        "combined_fee_system",
+        "combined_frequency",
+        "connection_rate",
+        "min_bin_size_ratio",
+        "rp_biowaste_collection_count",
+        "rp_collection_count_ratio",
+    }
     UNIT_LABEL_FORBIDDEN_TOKENS = {
         "kg/cap/a": ("kg/cap/a", " kg"),
         "%": ("%",),
@@ -77,6 +92,30 @@ class WasteAtlasMapConfigStructureTests(TestCase):
                     self.assertTrue("color" in entry or "colorRef" in entry)
                     self.assertTrue("value" in entry or "classValue" in entry)
 
+    def test_door_to_door_biowaste_maps_use_the_specific_absence_label(self):
+        expected = "No separate door-to-door biowaste collection"
+        for config_key in self.DOOR_TO_DOOR_BIOWASTE_THEMES:
+            config = MAP_CONFIGS[config_key]
+            matching = [
+                entry
+                for entry in config["categories"]
+                if (entry.get("value") or entry.get("classValue"))
+                in {"no_bio", "no_d2d", "no_door_to_door", "no_bio_collection"}
+            ]
+            with self.subTest(config_key=config_key):
+                self.assertEqual(len(matching), 1)
+                self.assertEqual(matching[0]["label"], expected)
+
+    def test_biowaste_fee_map_classifies_non_door_to_door_systems(self):
+        config = MAP_CONFIGS["biowaste_fee_system"]
+
+        self.assertEqual(config["transformName"], "biowasteFeeSystem")
+        self.assertEqual(config["dataField"], "_classified")
+        self.assertIn(
+            "no_door_to_door",
+            [entry["value"] for entry in config["categories"]],
+        )
+
     def test_every_quartile_special_case_defines_the_field_it_classifies(self):
         """Quartile special cases key off a feature field, not a category value."""
         for config_key, config in MAP_CONFIGS.items():
@@ -86,6 +125,23 @@ class WasteAtlasMapConfigStructureTests(TestCase):
                         {"field", "classValue", "label", "color"},
                         set(entry),
                     )
+
+    def test_connection_rate_uses_fixed_percentage_bands(self):
+        config = MAP_CONFIGS["connection_rate"]
+
+        self.assertTrue(config["enableQuartiles"])
+        self.assertFalse(config["quartileDefaultEnabled"])
+        self.assertEqual(
+            [category["value"] for category in config["categories"][:5]],
+            ["full_connection", "75-99", "50-74", "25-49", "0-24"],
+        )
+        self.assertNotIn(
+            "full_connection",
+            [
+                special_case["classValue"]
+                for special_case in config.get("quartileSpecialCases", [])
+            ],
+        )
 
     def test_amount_maps_mark_aggregated_values(self):
         for config_key in (

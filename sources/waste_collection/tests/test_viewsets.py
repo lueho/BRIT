@@ -2675,7 +2675,7 @@ class ConnectionRateViewSetTests(APITestCase):
             [
                 {
                     "catchment_id": self.catchment.id,
-                    "connection_rate": 0.9,
+                    "connection_rate": 0.86,
                     "is_door_to_door": True,
                     "reporting_year": 2023,
                 }
@@ -2712,7 +2712,7 @@ class ConnectionRateViewSetTests(APITestCase):
         row = next(
             row for row in response.data if row["catchment_id"] == mixed_catchment.id
         )
-        self.assertEqual(row["connection_rate"], 0.5)
+        self.assertEqual(row["connection_rate"], 0.52)
         self.assertTrue(row["is_door_to_door"])
 
     def test_participation_policy_endpoint_returns_selected_collection_value(self):
@@ -2932,6 +2932,78 @@ class TargetWasteCategoryViewSetTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, [])
+
+
+class BiowasteFeeSystemViewSetTests(APITestCase):
+    endpoint = "/waste_collection/api/waste-atlas/biowaste-fee-system/"
+
+    @classmethod
+    def setUpTestData(cls):
+        region = Region.objects.create(name="Fee System Region", country="DE")
+        cls.catchment = CollectionCatchment.objects.create(
+            name="Bring Point Catchment",
+            region=region,
+        )
+        bring_point = CollectionSystem.objects.create(name="Bring point")
+        no_separate_collection = CollectionSystem.objects.create(
+            name="No separate collection"
+        )
+        fee_system = FeeSystem.objects.create(name="Flat fee")
+
+        for waste_category_name in ("Biowaste", "Residual waste"):
+            Collection.objects.create(
+                name=f"Bring Point {waste_category_name}",
+                catchment=cls.catchment,
+                waste_category=WasteCategory.objects.create(name=waste_category_name),
+                collection_system=bring_point,
+                fee_system=fee_system,
+                valid_from=date(2024, 1, 1),
+                publication_status="published",
+            )
+
+        Collection.objects.create(
+            name="No separate Food waste collection",
+            catchment=cls.catchment,
+            waste_category=WasteCategory.objects.create(name="Food waste"),
+            collection_system=no_separate_collection,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+
+    def test_bring_point_wins_over_no_collection_in_combined_biowaste_scope(self):
+        response = self.client.get(
+            self.endpoint,
+            {"country": "DE", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data,
+            [
+                {
+                    "catchment_id": self.catchment.id,
+                    "fee_system": "Bring point",
+                }
+            ],
+        )
+
+    def test_combined_map_keeps_the_bring_point_residual_fee(self):
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/combined-fee-system/",
+            {"country": "DE", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data,
+            [
+                {
+                    "catchment_id": self.catchment.id,
+                    "bio_fee": "Bring point",
+                    "residual_fee": "Flat fee",
+                }
+            ],
+        )
 
 
 class BinConfigurationViewSetTests(APITestCase):
