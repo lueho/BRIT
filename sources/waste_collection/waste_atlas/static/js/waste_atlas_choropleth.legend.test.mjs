@@ -130,6 +130,19 @@ test("RLP ratios below one to one are classified, not dropped as no data", () =>
   assert.equal(classified[1]._classified, null);
 });
 
+test("biowaste fees distinguish non-door-to-door systems from missing data", () => {
+  const classified = sandbox.WasteAtlasChoropleth.transforms.biowasteFeeSystem([
+    { catchment_id: 1, fee_system: "Bring point" },
+    { catchment_id: 2, fee_system: "No separate collection" },
+    { catchment_id: 3, fee_system: "Flat fee" },
+    { catchment_id: 4, fee_system: "no_data" },
+  ]);
+  assert.deepEqual(
+    classified.map((row) => row._classified),
+    ["no_door_to_door", "no_door_to_door", "Flat fee", "no_data"],
+  );
+});
+
 test("RLP collection counts below 13 use the matching outer class", () => {
   const { rpBiowasteCollectionCount, rpResidualCollectionCount } =
     sandbox.WasteAtlasChoropleth.transforms;
