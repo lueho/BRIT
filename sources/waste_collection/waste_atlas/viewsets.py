@@ -2942,12 +2942,14 @@ class ResidualRequiredBinCapacityViewSet(WasteAtlasViewSet):
 _ORGANIC_CATEGORY_NAMES = ["Biowaste", "Food waste"] + _GREEN_WASTE_CATEGORY_NAMES
 
 
-def _get_organic_amounts(country, year, nuts_prefixes=(), user=None):
-    """Return per-catchment summed organic waste amount (kg/person/year).
+def _get_organic_amount_rows(country, year, nuts_prefixes=(), user=None):
+    """Return per-catchment organic amount and collection status.
 
     Sums bio/food waste from ``_get_collection_amount`` with green waste from
     ``_get_green_waste_collection_amount``.  Catchments present in either
-    source are included; amounts are summed where both are available.
+    source are included when at least one organic fraction is collected.
+    Catchments explicitly lacking both fractions are retained and marked as
+    having no separate collection.
     """
     bio_rows = _get_collection_amount(
         country, year, ["Biowaste", "Food waste"], nuts_prefixes, user=user
@@ -2956,27 +2958,38 @@ def _get_organic_amounts(country, year, nuts_prefixes=(), user=None):
         country, year, nuts_prefixes, user=user
     )
 
-    bio_map = {
-        r["catchment_id"]: r["amount"] for r in bio_rows if not r.get("no_collection")
-    }
-    green_map = {
-        r["catchment_id"]: r["amount"] for r in green_rows if not r.get("no_collection")
-    }
+    bio_map = {row["catchment_id"]: row for row in bio_rows}
+    green_map = {row["catchment_id"]: row for row in green_rows}
 
     all_ids = set(bio_map) | set(green_map)
-    result = {}
+    result = []
     for cid in all_ids:
-        b = bio_map.get(cid)
-        g = green_map.get(cid)
-        if b is not None and g is not None:
-            result[cid] = b + g
-        elif b is not None:
-            result[cid] = b
-        elif g is not None:
-            result[cid] = g
-        else:
-            result[cid] = None
+        bio = bio_map.get(cid)
+        green = green_map.get(cid)
+        source_rows = [row for row in (bio, green) if row is not None]
+        collected_rows = [row for row in source_rows if not row["no_collection"]]
+        no_collection = bool(source_rows) and not collected_rows
+
+        if not collected_rows and not no_collection:
+            continue
+
+        amounts = [row["amount"] for row in collected_rows if row["amount"] is not None]
+        result.append(
+            {
+                "catchment_id": cid,
+                "amount": sum(amounts) if amounts else None,
+                "no_collection": no_collection,
+            }
+        )
     return result
+
+
+def _get_organic_amounts(country, year, nuts_prefixes=(), user=None):
+    """Return per-catchment summed organic waste amount (kg/person/year)."""
+    return {
+        row["catchment_id"]: row["amount"]
+        for row in _get_organic_amount_rows(country, year, nuts_prefixes, user=user)
+    }
 
 
 class OrganicCollectionAmountViewSet(WasteAtlasViewSet):
@@ -2996,8 +3009,7 @@ class OrganicCollectionAmountViewSet(WasteAtlasViewSet):
         """Return a JSON array of {catchment_id, amount}."""
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
-        organic = _get_organic_amounts(country, year, nuts_prefixes, user=request.user)
-        data = [{"catchment_id": cid, "amount": amt} for cid, amt in organic.items()]
+        data = _get_organic_amount_rows(country, year, nuts_prefixes, user=request.user)
         serializer = CatchmentCollectionAmountSerializer(data, many=True)
         return Response(serializer.data)
 

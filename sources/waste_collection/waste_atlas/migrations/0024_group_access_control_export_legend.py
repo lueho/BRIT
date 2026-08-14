@@ -72,6 +72,6 @@ def restore_legend(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-    dependencies = [("waste_atlas", "0022_add_access_control_legend_note")]
+    dependencies = [("waste_atlas", "0023_add_organic_amount_no_collection")]
 
     operations = [migrations.RunPython(group_legend, restore_legend)]
