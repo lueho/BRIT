@@ -52,6 +52,12 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         label="Legend title",
         widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
     )
+    legend_note = forms.CharField(
+        label="Legend note (optional)",
+        required=False,
+        help_text="Shown below the legend on the map and in downloaded exports.",
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+    )
     export_legend_title = forms.CharField(
         label="Export legend title (optional)",
         required=False,
@@ -144,6 +150,7 @@ class WasteAtlasMapConfigurationForm(forms.Form):
 
         initial = kwargs.setdefault("initial", {})
         initial.setdefault("legend_title", self._configuration.get("legendTitle", ""))
+        initial.setdefault("legend_note", self._configuration.get("legendNote", ""))
         initial.setdefault(
             "export_legend_title",
             self._configuration.get("exportLegendTitle", ""),
@@ -312,6 +319,11 @@ class WasteAtlasMapConfigurationForm(forms.Form):
     def save(self):
         configuration = deepcopy(self._configuration)
         configuration["legendTitle"] = self.cleaned_data["legend_title"]
+        legend_note = self.cleaned_data["legend_note"]
+        if legend_note:
+            configuration["legendNote"] = legend_note
+        else:
+            configuration.pop("legendNote", None)
         configuration["legendPlacement"] = self.cleaned_data["legend_placement"]
         configuration["legendWidth"] = self.cleaned_data["legend_width"]
         configuration["legendFontSize"] = self.cleaned_data["legend_font_size"]

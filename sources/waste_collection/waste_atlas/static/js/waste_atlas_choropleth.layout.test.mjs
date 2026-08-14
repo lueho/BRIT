@@ -250,6 +250,22 @@ test("quartile legend measurement creates the value/status break automatically",
   );
 });
 
+test("a configured legend note is measured as a separated export footnote", () => {
+  const measured = layout.measureExportLegend(
+    {
+      legendTitle: "Access control",
+      legendNote: "DtD = Door to door · BP = Bring point",
+      categories: [{ value: "yes", label: "Yes", color: "#111111" }],
+    },
+    800,
+    1,
+    "column",
+  );
+
+  assert.deepEqual(measured.footnote.lines, ["DtD = Door to door · BP = Bring point"]);
+  assert.ok(measured.footnoteHeight > 0);
+});
+
 test("the screen legend resolves the same arrangement as the export", () => {
   assert.equal(layout.legendItemFlow({ exportLegend: { itemFlow: "row" } }), "row");
   assert.equal(layout.legendItemFlow({ exportLegendItemFlow: "row" }), "row");

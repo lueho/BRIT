@@ -1202,6 +1202,19 @@ var WasteAtlasChoropleth = (function () {
     return item.exportLabel || item.label;
   }
 
+  function _legendFootnoteLabel(cfg, exportMode) {
+    var labels = [];
+    if (cfg.legendNote) labels.push(cfg.legendNote);
+    if (cfg.overlayPatternField && cfg.overlayPatternLegendLabel && cfg._hasOverlayPattern) {
+      labels.push(
+        exportMode && cfg.exportOverlayPatternLegendLabel
+          ? cfg.exportOverlayPatternLegendLabel
+          : cfg.overlayPatternLegendLabel
+      );
+    }
+    return labels.join('\n');
+  }
+
   function _visibleLegendCategories(cfg) {
     return cfg.categories.filter(function (item) {
       if (_isNoDataCategory(item) && !cfg._hasNoDataCategory) return false;
@@ -1296,10 +1309,14 @@ var WasteAtlasChoropleth = (function () {
     var labelWidth = _legendItems(cfg, true).reduce(function (widest, item) {
       return Math.max(widest, _measureTextWidth(item.label, opts.fontSize));
     }, 0);
+    var footnoteWidth = _legendFootnoteLabel(cfg, true).split(/\r?\n/)
+      .reduce(function (widest, line) {
+        return Math.max(widest, _measureTextWidth(line, Math.round(opts.fontSize * 0.82)));
+      }, 0);
     var columnContent = opts.swatchW + opts.labelGap + labelWidth;
     var columnsWidth = opts.columnCount * columnContent
       + (opts.columnCount - 1) * opts.columnGap;
-    var contentWidth = Math.max(titleWidth, columnsWidth);
+    var contentWidth = Math.max(titleWidth, columnsWidth, footnoteWidth);
     return Math.min(maxWidth, Math.ceil(contentWidth + opts.paddingX * 2 + 2));
   }
 
@@ -1418,10 +1435,10 @@ var WasteAtlasChoropleth = (function () {
     opts.columnHeights = opts.columns.map(function (column) {
       return _legendColumnHeight(column, opts.rowGap);
     });
-    // Footnote for overlay pattern hint (rendered separately, not as a category)
+    // Configured legend notes and pattern hints are rendered below the categories.
     opts.footnote = null;
-    if (cfg.overlayPatternField && cfg.overlayPatternLegendLabel && cfg._hasOverlayPattern) {
-      var footnoteLabel = cfg.exportOverlayPatternLegendLabel || cfg.overlayPatternLegendLabel;
+    var footnoteLabel = _legendFootnoteLabel(cfg, true);
+    if (footnoteLabel) {
       var footnoteFontSize = Math.round(opts.fontSize * 0.82);
       opts.footnote = {
         lines: _wrapTextToWidth(footnoteLabel, width - opts.paddingX * 2, footnoteFontSize),
@@ -2892,7 +2909,7 @@ var WasteAtlasChoropleth = (function () {
   }
 
   function _drawLegend(width, height, cfg, layout) {
-    var hasOverlayLegend = cfg.overlayPatternField && cfg.overlayPatternLegendLabel && cfg._hasOverlayPattern;
+    var hasLegendFootnote = Boolean(_legendFootnoteLabel(cfg, false));
     var hasConflictLegend = !!(_conflictEnabled && cfg.conflictOverlayLabel
       && _conflictCatchments && _conflictCatchments.size);
 
@@ -2911,7 +2928,7 @@ var WasteAtlasChoropleth = (function () {
           y += _drawExportLegendItem(gExport, cat, x, y, opts) - opts.rowGap;
         });
       });
-      // Footnote: overlay pattern hint (separate from legend categories)
+      // Configured notes and pattern hints are separate from legend categories.
       if (opts.footnote) {
         var footnoteY = columnStartY + Math.max.apply(null, opts.columnHeights)
           + Math.round(opts.fontSize * 0.3);
@@ -3010,9 +3027,9 @@ var WasteAtlasChoropleth = (function () {
     var itemsHeight = Math.max.apply(null, screenColumns.map(function (column) {
       return _legendColumnHeight(column, gap);
     }));
-    var footnoteLines = hasOverlayLegend
+    var footnoteLines = hasLegendFootnote
       ? _wrapTextToWidth(
-        cfg.overlayPatternLegendLabel,
+        _legendFootnoteLabel(cfg, false),
         legendWidth - paddingX * 2,
         Math.max(8, fontSize - 2),
         SCREEN_LABEL_FONT
@@ -3090,7 +3107,7 @@ var WasteAtlasChoropleth = (function () {
     });
     currentY += itemsHeight;
 
-    if (hasOverlayLegend) {
+    if (hasLegendFootnote) {
       var footnoteLineY = currentY + gap;
       g.append('line')
         .attr('x1', paddingX).attr('y1', footnoteLineY)

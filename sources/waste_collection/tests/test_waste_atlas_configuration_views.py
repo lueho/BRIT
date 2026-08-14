@@ -37,6 +37,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         stored_columns = configuration.get("exportLegendColumns", "auto")
         data = {
             "legend_title": configuration["legendTitle"],
+            "legend_note": configuration.get("legendNote", ""),
             "export_legend_title": configuration.get("exportLegendTitle", ""),
             "legend_placement": configuration.get("legendPlacement", "bottom-left"),
             "legend_width": configuration.get("legendWidth", 300),
@@ -170,6 +171,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
             self._form_data(
                 original,
                 legend_title="Edited online legend",
+                legend_note="An explanatory legend note",
                 export_legend_title="Edited export legend",
                 category_0_label="Edited online category",
                 category_0_export_label="Edited export category",
@@ -200,6 +202,10 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         self.assertEqual(
             config.configuration["legendTitle"],
             "Edited online legend",
+        )
+        self.assertEqual(
+            config.configuration["legendNote"],
+            "An explanatory legend note",
         )
         self.assertEqual(
             config.configuration["exportLegendTitle"],
@@ -234,6 +240,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         preserved_updated = deepcopy(config.configuration)
         for value in (preserved_original, preserved_updated):
             value.pop("legendTitle", None)
+            value.pop("legendNote", None)
             value.pop("exportLegendTitle", None)
             value.pop("legendPlacement", None)
             value.pop("legendWidth", None)
@@ -256,6 +263,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         self.assertIn("no-store", map_response.headers["Cache-Control"])
         rendered_config = self._rendered_map_config(map_response)
         self.assertEqual(rendered_config["legendTitle"], "Edited online legend")
+        self.assertEqual(rendered_config["legendNote"], "An explanatory legend note")
         self.assertEqual(
             rendered_config["exportLegendTitle"],
             "Edited export legend",

@@ -57,6 +57,12 @@
           {{ form.export_legend_title }}
           {{ form.export_legend_title.errors }}
         </div>
+        <div class="col-12">
+          <label class="form-label" for="{{ form.legend_note.id_for_label }}">{{ form.legend_note.label }}</label>
+          {{ form.legend_note }}
+          <div class="form-text">{{ form.legend_note.help_text }}</div>
+          {{ form.legend_note.errors }}
+        </div>
       </div>
     </fieldset>
     <fieldset class="mb-4">
