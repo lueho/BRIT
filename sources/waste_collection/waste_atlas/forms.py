@@ -74,6 +74,16 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         max_value=24,
         widget=forms.NumberInput(attrs={"class": "form-control"}),
     )
+    show_only_present_categories = forms.BooleanField(
+        label="Hide categories not present on this map",
+        required=False,
+        help_text=(
+            "Applies to both the interactive map and downloaded exports. "
+            "The categories remain configured and reappear whenever the "
+            "selected region and year contain matching data."
+        ),
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
     export_legend_customize = forms.BooleanField(
         label="Customize the export legend for this map",
         required=False,
@@ -149,6 +159,10 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         initial.setdefault(
             "legend_font_size",
             self._configuration.get("legendFontSize", self._defaults.legend_font_size),
+        )
+        initial.setdefault(
+            "show_only_present_categories",
+            self._configuration.get("showOnlyPresentCategories", False),
         )
         has_custom_export_legend = any(
             key in self._configuration for key in EXPORT_LEGEND_OVERRIDE_KEYS
@@ -301,6 +315,10 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         configuration["legendPlacement"] = self.cleaned_data["legend_placement"]
         configuration["legendWidth"] = self.cleaned_data["legend_width"]
         configuration["legendFontSize"] = self.cleaned_data["legend_font_size"]
+        if self.cleaned_data.get("show_only_present_categories"):
+            configuration["showOnlyPresentCategories"] = True
+        else:
+            configuration.pop("showOnlyPresentCategories", None)
 
         export_title = self.cleaned_data["export_legend_title"]
         if export_title:

@@ -62,6 +62,8 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
             )
         ):
             data["export_legend_customize"] = "on"
+        if configuration.get("showOnlyPresentCategories"):
+            data["show_only_present_categories"] = "on"
         for index, category in enumerate(configuration["categories"]):
             data[f"category_{index}_label"] = category["label"]
             data[f"category_{index}_export_label"] = category.get("exportLabel", "")
@@ -73,6 +75,40 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
             )
         data.update(overrides)
         return data
+
+    def test_staff_can_hide_categories_that_are_absent_from_the_map(self):
+        config = self._configuration()
+        original = deepcopy(config.configuration)
+        self.client.force_login(self.staff)
+
+        response = self.client.post(
+            reverse("waste-atlas-map-configuration-update", args=[config.key]),
+            self._form_data(original, show_only_present_categories="on"),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        config.refresh_from_db()
+        self.assertTrue(config.configuration["showOnlyPresentCategories"])
+
+        edit_response = self.client.get(
+            reverse("waste-atlas-map-configuration-update", args=[config.key])
+        )
+        self.assertEqual(edit_response.status_code, 200)
+        self.assertTrue(
+            edit_response.context["form"]["show_only_present_categories"].value()
+        )
+        self.assertContains(edit_response, "Hide categories not present on this map")
+
+        disabled_data = self._form_data(config.configuration)
+        disabled_data.pop("show_only_present_categories")
+        response = self.client.post(
+            reverse("waste-atlas-map-configuration-update", args=[config.key]),
+            disabled_data,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        config.refresh_from_db()
+        self.assertNotIn("showOnlyPresentCategories", config.configuration)
 
     def _rendered_map_config(self, response):
         match = re.search(

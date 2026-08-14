@@ -261,6 +261,7 @@ class WasteAtlasMapConfigStructureTests(TestCase):
             with self.subTest(config_key=config_key):
                 self.assertEqual(numeric_categories, expected_numeric_categories)
                 self.assertFalse(config["enableQuartiles"])
+                self.assertTrue(config["showOnlyPresentCategories"])
 
     def test_map_selection_context_includes_region_scope_per_map_set(self):
         """Each map-set entry must carry its full region scope."""

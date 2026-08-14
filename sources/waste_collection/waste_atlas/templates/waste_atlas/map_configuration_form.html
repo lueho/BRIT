@@ -132,6 +132,14 @@
     </fieldset>
     <fieldset class="mb-4">
       <legend class="h5">Categories</legend>
+      <div class="form-check mb-3">
+        {{ form.show_only_present_categories }}
+        <label class="form-check-label"
+               for="{{ form.show_only_present_categories.id_for_label }}">
+          {{ form.show_only_present_categories.label }}
+        </label>
+        <div class="form-text">{{ form.show_only_present_categories.help_text }}</div>
+      </div>
       <div class="table-responsive">
         <table class="table align-middle">
           <thead>
