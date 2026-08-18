@@ -664,7 +664,9 @@ def _build_change_geometry(from_snapshots, to_snapshots):
         to_geom = to_snapshot["geom"]
         if not from_geom.intersects(to_geom):
             continue
-        intersection = from_geom.intersection(to_geom)
+        intersection = _polygonal_part(from_geom.intersection(to_geom))
+        if intersection is None:
+            continue
         if from_id != to_id:
             # Catchment boundaries come from different sources (NUTS districts,
             # LAU unions, drawn collector areas) and overlap each other within a
