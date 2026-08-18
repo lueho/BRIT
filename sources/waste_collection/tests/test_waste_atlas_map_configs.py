@@ -119,6 +119,25 @@ class WasteAtlasMapConfigStructureTests(TestCase):
             ],
         )
 
+    def test_system_access_control_uses_compact_labels_and_distinct_other_color(self):
+        config = MAP_CONFIGS["system_access_control"]
+
+        self.assertEqual(config["legendTitle"], "Collection mode + Access/use control")
+        self.assertEqual(config["legendNote"], "DtD = Door to door · BP = Bring point")
+        self.assertEqual(
+            [category["label"] for category in config["categories"]],
+            [
+                "BP + control",
+                "BP + no control",
+                "DtD + control",
+                "DtD + no control",
+                "Other combination",
+            ],
+        )
+        other_combination = config["categories"][-1]
+        self.assertNotEqual(other_combination["color"], no_data_color())
+        self.assertNotIn(other_combination["color"], {"#bdbdbd", "#e0e0e0"})
+
     def test_every_configuration_defines_the_keys_the_renderer_needs(self):
         for config_key, config in MAP_CONFIGS.items():
             with self.subTest(config_key=config_key):

@@ -1321,9 +1321,9 @@ class CataloniaSystemAccessControlViewSet(WasteAtlasViewSet):
                         value = "Bring point + no access control"
                 elif system == "Door to door":
                     if bio_row["access_control_pap"] is True:
-                        value = "PAP + use control"
+                        value = "Door to door + control"
                     elif bio_row["access_control_pap"] is False:
-                        value = "PAP + no use control"
+                        value = "Door to door + no control"
             data.append({"catchment_id": cid, "access_control": value})
         serializer = CatchmentAccessControlSerializer(data, many=True)
         return Response(serializer.data)

@@ -2515,7 +2515,7 @@ class CataloniaCollectionSystemViewSetTests(APITestCase):
         )
         self.assertEqual(
             by_catchment[self.catchment_same_pap.id],
-            "PAP + no use control",
+            "Door to door + no control",
         )
         self.assertEqual(
             by_catchment[self.catchment_other.id],
