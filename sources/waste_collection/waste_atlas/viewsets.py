@@ -4,7 +4,7 @@ from datetime import date
 
 from django.conf import settings
 from django.contrib.gis.db.models import MultiPolygonField
-from django.contrib.gis.geos import GeometryCollection
+from django.contrib.gis.geos import GeometryCollection, MultiPolygon, Polygon
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import (
     Case,
@@ -501,6 +501,76 @@ def _change_overlay_cache_key(from_ids, from_year, to_ids, to_year, user=None):
     return f"waste_atlas_change_overlay:{from_year}:{to_year}:{scope}:{digest}"
 
 
+def _polygonal_part(geom):
+    """The areal part of an overlay result, or ``None`` if it has none.
+
+    Intersecting two boundaries that only graze each other yields collections
+    holding points and lines next to polygons; those parts carry no area and
+    must not reach the client as change features.
+    """
+    if geom is None or geom.empty:
+        return None
+    if isinstance(geom, (Polygon, MultiPolygon)):
+        return geom if geom.area > 0 else None
+    if not isinstance(geom, GeometryCollection):
+        return None
+    polygons = [part for part in geom if isinstance(part, (Polygon, MultiPolygon))]
+    if not polygons:
+        return None
+    areal = GeometryCollection(polygons, srid=geom.srid).unary_union
+    return areal if areal.area > 0 else None
+
+
+def _is_drawable_ring(polygon, tolerance):
+    """Whether a ring encloses an area wider than the rendering resolution.
+
+    ``2 * area / perimeter`` is the mean width of the enclosed band, so a
+    hairline sliver falls below the tolerance no matter how long it is.
+    """
+    if polygon.area <= 0 or not polygon.length:
+        return False
+    return 2 * polygon.area / polygon.length >= tolerance
+
+
+def _drawable_change_geometry(geom, tolerance):
+    """The parts of an overlay fragment a map at ``tolerance`` resolution shows.
+
+    Neighbouring catchments carry boundaries from different sources, so
+    overlaying them cuts hairline slivers out of areas that never changed hands.
+    Such a sliver is digitisation noise rather than a reassignment, and its
+    near-degenerate rings make spherical renderers fill the whole world, so
+    every part and hole is kept only if it is drawable on its own.
+    """
+    areal = _polygonal_part(geom)
+    if areal is None:
+        return None
+    if not tolerance:
+        return areal
+    parts = list(areal) if isinstance(areal, MultiPolygon) else [areal]
+    drawable = []
+    for part in parts:
+        if not _is_drawable_ring(part, tolerance):
+            continue
+        rings = [part[0]] + [
+            ring
+            for ring in list(part)[1:]
+            if _is_drawable_ring(Polygon(ring, srid=part.srid), tolerance)
+        ]
+        simplified = Polygon(*rings, srid=part.srid).simplify(
+            tolerance, preserve_topology=True
+        )
+        if not simplified.valid:
+            simplified = simplified.buffer(0)
+        simplified = _polygonal_part(simplified)
+        if simplified is not None and _is_drawable_ring(simplified, tolerance):
+            drawable.append(simplified)
+    if not drawable:
+        return None
+    if len(drawable) == 1:
+        return drawable[0]
+    return GeometryCollection(drawable, srid=areal.srid).unary_union
+
+
 def _append_change_feature(
     features,
     geom,
@@ -514,12 +584,10 @@ def _append_change_feature(
     to_catchment_name=None,
     to_revision_id=None,
 ):
-    if geom is None or geom.empty or geom.area <= 0:
+    simplified = _drawable_change_geometry(geom, tolerance)
+    if simplified is None:
         return
     area = geom.area
-    simplified = geom.simplify(tolerance, preserve_topology=True)
-    if simplified.empty:
-        return
     feature_id = f"change-{len(features) + 1}"
     if from_catchment_name and to_catchment_name:
         catchment_name = (
@@ -597,6 +665,16 @@ def _build_change_geometry(from_snapshots, to_snapshots):
         if not from_geom.intersects(to_geom):
             continue
         intersection = from_geom.intersection(to_geom)
+        if from_id != to_id and from_id in to_snapshots:
+            # Catchment boundaries come from different sources and overlap each
+            # other within a single year.  Where both catchments stay active,
+            # area the receiving one already covered in the from year is such a
+            # source overlap and was never handed over.  A catchment that stops
+            # collecting does hand its area over, even to a neighbour whose
+            # boundary already covered it.
+            already_covered = from_snapshots.get(to_id)
+            if already_covered is not None:
+                intersection = intersection.difference(already_covered["geom"])
         _append_change_feature(
             features,
             intersection,

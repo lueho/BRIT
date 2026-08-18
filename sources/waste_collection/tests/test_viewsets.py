@@ -1,4 +1,6 @@
+import json
 import math
+from collections import Counter
 from datetime import date
 from unittest.mock import patch
 from uuid import uuid4
@@ -6,9 +8,10 @@ from uuid import uuid4
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache, caches
 from django.db import connection
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
@@ -5575,6 +5578,230 @@ class WasteAtlasChangeOverlayPrecisionTests(APITestCase):
 
         self.assertAlmostEqual(stable[self.west.pk], 1.0, places=3)
         self.assertAlmostEqual(stable[self.east.pk], 2.0, places=3)
+
+
+class WasteAtlasChangeOverlayBorderNoiseTests(APITestCase):
+    """Overlays only report fragments a map at atlas resolution can show.
+
+    Neighbouring catchments carry boundaries from different sources, so their
+    shared border overlaps by digitisation noise.  Intersecting them yields
+    hairline slivers and non-areal touch fragments that are not reassignments.
+    """
+
+    @staticmethod
+    def _multipolygon(ring):
+        closed = [*ring, ring[0]]
+        coordinates = ", ".join(f"{x:.8f} {y:.8f}" for x, y in closed)
+        return f"MULTIPOLYGON((({coordinates})))"
+
+    @classmethod
+    def _catchment(cls, name, ring):
+        region = Region.objects.create(
+            name=f"{name} region",
+            country="DE",
+            borders=GeoPolygon.objects.create(geom=cls._multipolygon(ring)),
+        )
+        catchment = CollectionCatchment.objects.create(name=name, region=region)
+        CatchmentRevision.objects.create(
+            catchment=catchment,
+            name=f"{name} boundary",
+            geom=cls._multipolygon(ring),
+            publication_status="published",
+        )
+        for year in (2022, 2024):
+            Collection.objects.create(
+                name=f"{name} collection {year}",
+                catchment=catchment,
+                valid_from=date(year, 1, 1),
+                publication_status="published",
+            )
+        return catchment
+
+    @classmethod
+    def setUpTestData(cls):
+        noise = 0.00002
+        # Neighbours meeting at x = 1, where the eastern boundary reaches a hair
+        # across the border and a spike touches the western one in a point.
+        cls.west = cls._catchment("Western neighbour", [(0, 0), (1, 0), (1, 1), (0, 1)])
+        cls.east = cls._catchment(
+            "Eastern neighbour",
+            [
+                (1 - noise, 0),
+                (3, 0),
+                (3, 1),
+                (1 - noise, 1),
+                (1 - noise, 0.75),
+                (1, 0.5),
+                (1 - noise, 0.25),
+            ],
+        )
+
+    def _features(self):
+        caches[getattr(settings, "GEOJSON_CACHE", "default")].clear()
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/catchment/collection-change-geojson/",
+            {"country": "DE", "from_year": 2022, "to_year": 2024},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return response.data["features"]
+
+    def test_border_noise_is_not_reported_as_a_reassignment(self):
+        changes = Counter(
+            feature["properties"]["spatial_change"] for feature in self._features()
+        )
+
+        self.assertEqual(changes["transferred"], 0)
+        self.assertEqual(changes["stable"], 2)
+
+    def test_every_served_fragment_is_a_drawable_polygon(self):
+        for feature in self._features():
+            with self.subTest(feature=feature["properties"]["change_feature_id"]):
+                geometry = GEOSGeometry(json.dumps(feature["geometry"]))
+
+                self.assertIn(geometry.geom_type, ("Polygon", "MultiPolygon"))
+                self.assertTrue(geometry.valid)
+                self.assertGreater(geometry.area, 0)
+
+
+class WasteAtlasChangeOverlappingCatchmentTests(APITestCase):
+    """Areas two catchments already shared did not change hands."""
+
+    @staticmethod
+    def _multipolygon(ring):
+        closed = [*ring, ring[0]]
+        coordinates = ", ".join(f"{x:.8f} {y:.8f}" for x, y in closed)
+        return f"MULTIPOLYGON((({coordinates})))"
+
+    @classmethod
+    def _catchment(cls, name, ring, years):
+        region = Region.objects.create(
+            name=f"{name} region",
+            country="DE",
+            borders=GeoPolygon.objects.create(geom=cls._multipolygon(ring)),
+        )
+        catchment = CollectionCatchment.objects.create(name=name, region=region)
+        CatchmentRevision.objects.create(
+            catchment=catchment,
+            name=f"{name} boundary",
+            geom=cls._multipolygon(ring),
+            publication_status="published",
+        )
+        for year in years:
+            Collection.objects.create(
+                name=f"{name} collection {year}",
+                catchment=catchment,
+                valid_from=date(year, 1, 1),
+                publication_status="published",
+            )
+        return catchment
+
+    @classmethod
+    def setUpTestData(cls):
+        # The county boundary reaches into the municipality, so both catchments
+        # claim the same strip in both years.
+        cls.county = cls._catchment(
+            "County", [(0, 0), (1.5, 0), (1.5, 1), (0, 1)], (2022, 2024)
+        )
+        cls.municipality = cls._catchment(
+            "Municipality", [(1, 0), (3, 0), (3, 1), (1, 1)], (2022, 2024)
+        )
+        # A joint association takes over a third municipality in 2024.
+        cls.joined = cls._catchment(
+            "Joined municipality", [(4, 0), (5, 0), (5, 1), (4, 1)], (2022,)
+        )
+        cls.association = cls._catchment(
+            "Association", [(4, 0), (5, 0), (5, 1), (4, 1)], (2024,)
+        )
+        # A county whose boundary always covered the municipality it absorbed.
+        cls.absorbed = cls._catchment(
+            "Absorbed municipality", [(6, 0), (7, 0), (7, 1), (6, 1)], (2022,)
+        )
+        cls.absorbing = cls._catchment(
+            "Absorbing county", [(6, 0), (8, 0), (8, 1), (6, 1)], (2022, 2024)
+        )
+
+    def _transferred(self):
+        caches[getattr(settings, "GEOJSON_CACHE", "default")].clear()
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/catchment/collection-change-geojson/",
+            {"country": "DE", "from_year": 2022, "to_year": 2024},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return [
+            feature["properties"]
+            for feature in response.data["features"]
+            if feature["properties"]["spatial_change"] == "transferred"
+        ]
+
+    def test_areas_shared_in_both_years_are_not_transferred(self):
+        pairs = {
+            (properties["from_catchment_id"], properties["to_catchment_id"])
+            for properties in self._transferred()
+        }
+
+        self.assertNotIn((self.county.pk, self.municipality.pk), pairs)
+        self.assertNotIn((self.municipality.pk, self.county.pk), pairs)
+
+    def test_a_real_takeover_stays_transferred(self):
+        transferred = {
+            (
+                properties["from_catchment_id"],
+                properties["to_catchment_id"],
+            ): properties["area"]
+            for properties in self._transferred()
+        }
+
+        self.assertAlmostEqual(
+            transferred[(self.joined.pk, self.association.pk)], 1.0, places=3
+        )
+
+    def test_a_dissolved_catchment_hands_its_area_over(self):
+        transferred = {
+            (
+                properties["from_catchment_id"],
+                properties["to_catchment_id"],
+            ): properties["area"]
+            for properties in self._transferred()
+        }
+
+        self.assertAlmostEqual(
+            transferred[(self.absorbed.pk, self.absorbing.pk)], 1.0, places=3
+        )
+
+
+class WasteAtlasDrawableChangeGeometryTests(SimpleTestCase):
+    """Only the parts of an overlay fragment a map can draw are kept."""
+
+    tolerance = 0.001
+
+    def _drawable(self, wkt):
+        return atlas_viewsets._drawable_change_geometry(
+            GEOSGeometry(wkt), self.tolerance
+        )
+
+    def test_hairline_slivers_beside_a_real_area_are_dropped(self):
+        drawable = self._drawable(
+            "MULTIPOLYGON("
+            "((0 0, 0.05 0, 0.05 0.05, 0 0.05, 0 0)),"
+            "((1 0, 1.00002 0, 1.00002 1, 1 1, 1 0))"
+            ")"
+        )
+
+        self.assertEqual(drawable.geom_type, "Polygon")
+        self.assertAlmostEqual(drawable.area, 0.0025, places=6)
+
+    def test_fragments_without_any_area_are_dropped(self):
+        self.assertIsNone(
+            self._drawable("GEOMETRYCOLLECTION(POINT(1 1), LINESTRING(1 1, 2 2))")
+        )
+
+    def test_holes_narrower_than_the_resolution_are_dropped(self):
+        drawable = self._drawable(
+            "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0),"
+            "(0.5 0.1, 0.50002 0.1, 0.50002 0.9, 0.5 0.9, 0.5 0.1))"
+        )
+
+        self.assertEqual(len(drawable.coords), 1)
 
 
 class WasteAtlasChangeYearParsingTests(APITestCase):
