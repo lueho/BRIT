@@ -5710,7 +5710,12 @@ class WasteAtlasChangeOverlappingCatchmentTests(APITestCase):
             "Joined municipality", [(4, 0), (5, 0), (5, 1), (4, 1)], (2022,)
         )
         cls.association = cls._catchment(
-            "Association", [(4, 0), (5, 0), (5, 1), (4, 1)], (2024,)
+            "Association", [(4, 0), (5.1, 0), (5.1, 1), (4, 1)], (2024,)
+        )
+        # The new association's boundary also reaches into a neighbour that
+        # keeps collecting on its own.
+        cls.neighbour = cls._catchment(
+            "Untouched neighbour", [(5, 0), (6, 0), (6, 1), (5, 1)], (2022, 2024)
         )
         # A county whose boundary always covered the municipality it absorbed.
         cls.absorbed = cls._catchment(
@@ -5754,6 +5759,14 @@ class WasteAtlasChangeOverlappingCatchmentTests(APITestCase):
         self.assertAlmostEqual(
             transferred[(self.joined.pk, self.association.pk)], 1.0, places=3
         )
+
+    def test_a_new_catchment_reaching_into_a_neighbour_takes_nothing(self):
+        pairs = {
+            (properties["from_catchment_id"], properties["to_catchment_id"])
+            for properties in self._transferred()
+        }
+
+        self.assertNotIn((self.neighbour.pk, self.association.pk), pairs)
 
     def test_a_dissolved_catchment_hands_its_area_over(self):
         transferred = {

@@ -665,16 +665,16 @@ def _build_change_geometry(from_snapshots, to_snapshots):
         if not from_geom.intersects(to_geom):
             continue
         intersection = from_geom.intersection(to_geom)
-        if from_id != to_id and from_id in to_snapshots:
-            # Catchment boundaries come from different sources and overlap each
-            # other within a single year.  Where both catchments stay active,
-            # area the receiving one already covered in the from year is such a
-            # source overlap and was never handed over.  A catchment that stops
-            # collecting does hand its area over, even to a neighbour whose
-            # boundary already covered it.
-            already_covered = from_snapshots.get(to_id)
-            if already_covered is not None:
-                intersection = intersection.difference(already_covered["geom"])
+        if from_id != to_id:
+            # Catchment boundaries come from different sources (NUTS districts,
+            # LAU unions, drawn collector areas) and overlap each other within a
+            # single year.  Area the giving catchment still covers in the to year
+            # never left it, so such an overlap is a source disagreement rather
+            # than a reassignment.  A catchment that stops collecting keeps no
+            # area, so its handovers stay.
+            still_covered = to_snapshots.get(from_id)
+            if still_covered is not None:
+                intersection = intersection.difference(still_covered["geom"])
         _append_change_feature(
             features,
             intersection,
