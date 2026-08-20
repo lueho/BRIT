@@ -64,7 +64,10 @@ SECURE_CSP_REPORT_ONLY = {
         "https://cdn.jsdelivr.net",
         "https://cdnjs.cloudflare.com",
         "https://www.googletagmanager.com",
+        "https://static.cloudflareinsights.com",
+        CSP.NONCE,
     ],
+    "connect-src": [CSP.SELF, "https://*.google-analytics.com"],
     "font-src": [
         CSP.SELF,
         AWS_S3_ORIGIN,

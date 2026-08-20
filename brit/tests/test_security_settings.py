@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 
+from django.template.loader import get_template
 from django.test import SimpleTestCase
 
 
@@ -25,8 +26,12 @@ from django.test import RequestFactory
 
 middleware_path = "django.middleware.csp.ContentSecurityPolicyMiddleware"
 assert middleware_path in h.MIDDLEWARE
+assert "django.template.context_processors.csp" in h.TEMPLATES[0]["OPTIONS"]["context_processors"]
 middleware = ContentSecurityPolicyMiddleware(lambda request: HttpResponse("ok"))
-response = middleware(RequestFactory().get("/"))
+request = RequestFactory().get("/")
+middleware.process_request(request)
+nonce = str(request._csp_nonce)
+response = middleware.process_response(request, HttpResponse("ok"))
 expected = (
     "default-src 'self'; "
     "style-src 'self' https://brit-test-assets.s3.amazonaws.com "
@@ -34,7 +39,9 @@ expected = (
     "https://fonts.googleapis.com; "
     "script-src 'self' https://brit-test-assets.s3.amazonaws.com "
     "https://cdn.jsdelivr.net https://cdnjs.cloudflare.com "
-    "https://www.googletagmanager.com; "
+    "https://www.googletagmanager.com https://static.cloudflareinsights.com "
+    f"'nonce-{nonce}'; "
+    "connect-src 'self' https://*.google-analytics.com; "
     "font-src 'self' https://brit-test-assets.s3.amazonaws.com "
     "https://cdnjs.cloudflare.com https://fonts.gstatic.com; "
     "img-src 'self' https://brit-test-assets.s3.amazonaws.com data:; "
@@ -53,3 +60,17 @@ assert "Content-Security-Policy" not in response.headers
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_first_party_inline_scripts_use_the_csp_nonce(self):
+        template_names = (
+            "partials/_analytics.html",
+            "partials/_cookie_bar.html",
+            "filtered_list.html",
+        )
+
+        for template_name in template_names:
+            with self.subTest(template_name=template_name):
+                self.assertIn(
+                    'nonce="{{ csp_nonce }}"',
+                    get_template(template_name).template.source,
+                )
