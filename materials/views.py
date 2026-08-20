@@ -120,7 +120,7 @@ class MaterialsExplorerView(TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["material_count"] = Material.objects.filter(
-            type="material", publication_status="published"
+            publication_status="published"
         ).count()
         context["category_count"] = MaterialCategory.objects.filter(
             publication_status="published"
@@ -211,21 +211,18 @@ class MaterialCategoryAutocompleteView(UserCreatedObjectAutocompleteView):
 
 class MaterialPublishedListView(PublishedObjectFilterView):
     model = Material
-    queryset = Material.objects.filter(type="material")
     filterset_class = MaterialListFilter
     dashboard_url = reverse_lazy("materials-explorer")
 
 
 class MaterialPrivateListView(PrivateObjectFilterView):
     model = Material
-    queryset = Material.objects.filter(type="material")
     filterset_class = MaterialListFilter
     dashboard_url = reverse_lazy("materials-explorer")
 
 
 class MaterialReviewListView(ReviewObjectFilterView):
     model = Material
-    queryset = Material.objects.filter(type="material")
     filterset_class = MaterialListFilter
     template_name = "materials/material_list.html"
     dashboard_url = reverse_lazy("materials-explorer")
@@ -279,10 +276,7 @@ class SampleSubstrateMaterialAutocompleteView(UserCreatedObjectAutocompleteView)
     def get_queryset(self):
         queryset = super().get_queryset()
         substrate_category, _ = get_or_create_sample_substrate_category()
-        return queryset.filter(
-            type="material",
-            categories=substrate_category,
-        ).distinct()
+        return queryset.filter(categories=substrate_category).distinct()
 
 
 class SampleSubstrateMaterialQuickCreateView(
@@ -308,7 +302,6 @@ class SampleSubstrateMaterialQuickCreateView(
         substrate_category, _ = get_or_create_sample_substrate_category()
         published_material = Material.objects.filter(
             name__iexact=name,
-            type="material",
             publication_status=Material.STATUS_PUBLISHED,
         ).first()
         if published_material is not None:
@@ -327,7 +320,6 @@ class SampleSubstrateMaterialQuickCreateView(
         material = Material.objects.filter(
             owner=request.user,
             name__iexact=name,
-            type="material",
         ).first()
         created = False
         if material is None:

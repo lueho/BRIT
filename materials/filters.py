@@ -65,7 +65,7 @@ class MaterialListFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilte
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         request = getattr(self, "request", None)
-        queryset = Material.objects.filter(type="material")
+        queryset = Material.objects.all()
         if request and hasattr(request, "user"):
             queryset = filter_queryset_for_user(queryset, request.user)
 
@@ -288,11 +288,7 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
     def filter_raw_parameter(self, queryset, name, value):
         canonical_component = value.canonical_component
         comparable_ids = MaterialComponent.objects.filter(
-            Q(type="component")
-            & (
-                Q(pk=canonical_component.pk)
-                | Q(comparable_component=canonical_component)
-            )
+            Q(pk=canonical_component.pk) | Q(comparable_component=canonical_component)
         ).values_list("pk", flat=True)
         return queryset.filter(
             component_measurements__component_id__in=comparable_ids
@@ -316,11 +312,10 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
 
         substrate_category, _ = get_or_create_sample_substrate_category()
         substrate_queryset = Material.objects.filter(
-            type="material",
-            categories=substrate_category,
+            categories=substrate_category
         ).distinct()
         parameter_queryset = MaterialProperty.objects.all()
-        raw_parameter_queryset = MaterialComponent.objects.filter(type="component")
+        raw_parameter_queryset = MaterialComponent.objects.all()
 
         if request and hasattr(request, "user"):
             parameter_queryset = filter_queryset_for_user(
@@ -390,7 +385,7 @@ class UserOwnedSampleFilter(SampleFilter):
 
 class SampleSeriesFilter(UserCreatedObjectScopedFilterSet):
     material = ModelChoiceFilter(
-        queryset=Material.objects.filter(type="material"),
+        queryset=Material.objects.all(),
         field_name="material__name",
         label="Material",
         empty_label="All",

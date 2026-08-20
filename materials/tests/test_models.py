@@ -72,6 +72,38 @@ class MaterialComponentTestCase(TestCase):
         self.assertEqual(alias.canonical_component, canonical)
 
 
+class BaseMaterialProxyTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.material = Material.objects.create(name="Proxy material")
+        cls.component = MaterialComponent.objects.create(name="Proxy component")
+
+    def test_material_manager_excludes_components(self):
+        self.assertIn(self.material, Material.objects.all())
+        self.assertNotIn(
+            self.component.pk, Material.objects.values_list("pk", flat=True)
+        )
+
+    def test_component_manager_excludes_materials(self):
+        self.assertIn(self.component, MaterialComponent.objects.all())
+        self.assertNotIn(
+            self.material.pk,
+            MaterialComponent.objects.values_list("pk", flat=True),
+        )
+
+    def test_proxy_models_enforce_their_type_when_saved(self):
+        material = Material(name="Forced material", type="component")
+        component = MaterialComponent(name="Forced component", type="material")
+
+        material.save()
+        component.save()
+        material.refresh_from_db()
+        component.refresh_from_db()
+
+        self.assertEqual(material.type, "material")
+        self.assertEqual(component.type, "component")
+
+
 class MaterialPropertyTestCase(TestCase):
     def test_canonical_property_defaults_to_self(self):
         property_obj = MaterialProperty.objects.create(name="Organic matter", unit="%")

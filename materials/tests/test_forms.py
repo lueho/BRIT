@@ -69,6 +69,15 @@ class ComponentModelFormTestCase(TestCase):
             TomSelectModelChoiceField,
         )
 
+    def test_comparable_component_choices_exclude_materials(self):
+        material = Material.objects.create(name="Not a component")
+        component = MaterialComponent.objects.create(name="Actual component")
+
+        queryset = ComponentModelForm().fields["comparable_component"].queryset
+
+        self.assertIn(component, queryset)
+        self.assertNotIn(material.pk, queryset.values_list("pk", flat=True))
+
 
 class MaterialPropertyModelFormTestCase(TestCase):
     def test_form_includes_comparable_property_field(self):
