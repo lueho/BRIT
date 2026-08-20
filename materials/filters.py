@@ -6,6 +6,7 @@ from django_filters import (
     ModelChoiceFilter,
 )
 from django_filters import rest_framework as rf_filters
+from django_filters.widgets import DateRangeWidget
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
 
@@ -226,10 +227,17 @@ class CompositionFilterSet(rf_filters.FilterSet):
 class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
     search_fields = ("name", "description", "material__name", "location")
 
+    q = CharFilter(
+        method="filter_q",
+        label="Search",
+        help_text="Search sample names, descriptions, substrate materials, or locations.",
+    )
+
     name = ModelChoiceFilter(
         queryset=Sample.objects.none(),
         field_name="name",
         label="Sample Name",
+        help_text="Select a specific sample by name.",
         empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -242,6 +250,7 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
         queryset=Material.objects.none(),
         field_name="material",
         label="Substrate material",
+        help_text="Show samples made from this substrate material.",
         empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -253,7 +262,8 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
     parameter = ModelChoiceFilter(
         queryset=MaterialProperty.objects.none(),
         method="filter_parameter",
-        label="Parameter",
+        label="Material property",
+        help_text="Filter by non-mass characteristics, such as pH or calorific value.",
         empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -265,7 +275,11 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
     raw_parameter = ModelChoiceFilter(
         queryset=MaterialComponent.objects.none(),
         method="filter_raw_parameter",
-        label="Raw parameter",
+        label="Composition component",
+        help_text=(
+            "Filter by a component mass fraction used in material-flow analysis, "
+            "such as nitrogen."
+        ),
         empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -274,7 +288,12 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             )
         ),
     )
-    created_at = DateFromToRangeFilter(field_name="created_at", label="Created")
+    sample_date = DateFromToRangeFilter(
+        field_name="datetime",
+        label="Sample date",
+        help_text="Show samples taken within this date range.",
+        widget=DateRangeWidget(attrs={"type": "date"}),
+    )
 
     def filter_parameter(self, queryset, name, value):
         canonical_property = value.canonical_property
@@ -351,7 +370,7 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             "substrate_material",
             "parameter",
             "raw_parameter",
-            "created_at",
+            "sample_date",
         )
 
 

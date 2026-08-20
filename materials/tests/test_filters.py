@@ -1,6 +1,8 @@
+from datetime import datetime
 from decimal import Decimal
 
 from django.test import TestCase
+from django.utils import timezone
 
 from utils.properties.models import Unit
 
@@ -118,7 +120,7 @@ class SampleFilterTestCase(TestCase):
         filtr = SampleFilter(queryset=Sample.objects.all())
         self.assertFalse(filtr.form.helper.form_tag)
 
-    def test_filter_form_contains_substrate_material_and_parameter_fields(self):
+    def test_filter_form_uses_semantic_measurement_labels_and_guidance(self):
         filtr = SampleFilter(queryset=Sample.objects.all())
 
         self.assertIn("substrate_material", filtr.form.fields)
@@ -128,8 +130,47 @@ class SampleFilterTestCase(TestCase):
             filtr.form.fields["substrate_material"].label,
             "Substrate material",
         )
-        self.assertEqual(filtr.form.fields["parameter"].label, "Parameter")
-        self.assertEqual(filtr.form.fields["raw_parameter"].label, "Raw parameter")
+        self.assertEqual(filtr.form.fields["parameter"].label, "Material property")
+        self.assertEqual(
+            filtr.form.fields["parameter"].help_text,
+            "Filter by non-mass characteristics, such as pH or calorific value.",
+        )
+        self.assertEqual(
+            filtr.form.fields["raw_parameter"].label,
+            "Composition component",
+        )
+        self.assertEqual(
+            filtr.form.fields["raw_parameter"].help_text,
+            "Filter by a component mass fraction used in material-flow analysis, such as nitrogen.",
+        )
+
+    def test_sample_date_filter_uses_sample_datetime_with_date_picker(self):
+        sample_taken_in_range = Sample.objects.create(
+            name="Sample taken in range",
+            material=self.substrate_material,
+            datetime=timezone.make_aware(datetime(2024, 5, 15, 10, 30)),
+        )
+        sample_taken_outside_range = Sample.objects.create(
+            name="Sample taken outside range",
+            material=self.substrate_material,
+            datetime=timezone.make_aware(datetime(2023, 5, 15, 10, 30)),
+        )
+
+        filtr = SampleFilter(
+            data={
+                "sample_date_after": "2024-05-01",
+                "sample_date_before": "2024-05-31",
+            },
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertEqual(filtr.form.fields["sample_date"].label, "Sample date")
+        self.assertEqual(
+            filtr.form.fields["sample_date"].widget.suffixes, ["after", "before"]
+        )
+        self.assertEqual(filtr.form.fields["sample_date"].widget.attrs["type"], "date")
+        self.assertEqual(list(filtr.qs), [sample_taken_in_range])
+        self.assertNotIn(sample_taken_outside_range, filtr.qs)
 
     def test_parameter_filter_matches_sample_owned_property_values(self):
         sample_owned = Sample.objects.create(

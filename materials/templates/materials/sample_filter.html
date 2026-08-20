@@ -45,7 +45,7 @@
                                    class="text-decoration-none">
                                     <strong class="d-block">{{ object.name }}</strong>
                                     <span class="text-muted small">{{ object.material.name }}
-                                        {% if object.created_at %}· {{ object.created_at|date:"Y-m-d" }}{% endif %}
+                                        {% if object.datetime %}· {{ object.datetime|date:"Y-m-d" }}{% endif %}
                                         {% if object.standalone %}· Standalone{% endif %}
                                     </span>
                                 </a>
