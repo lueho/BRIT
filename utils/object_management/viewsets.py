@@ -231,6 +231,13 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         # Enforce object-level permissions
         self.check_object_permissions(request, obj)
 
+        permission = UserCreatedObjectPermission()
+        if not permission.has_approve_permission(request, obj):
+            return Response(
+                {"error": "You do not have permission to approve this object."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         try:
             previous_status = getattr(obj, "publication_status", None)
             obj.approve(
@@ -266,6 +273,13 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         # Enforce object-level permissions
         self.check_object_permissions(request, obj)
 
+        permission = UserCreatedObjectPermission()
+        if not permission.has_reject_permission(request, obj):
+            return Response(
+                {"error": "You do not have permission to reject this object."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         try:
             previous_status = getattr(obj, "publication_status", None)
             obj.reject()
@@ -299,6 +313,13 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
 
         # Enforce object-level permissions
         self.check_object_permissions(request, obj)
+
+        permission = UserCreatedObjectPermission()
+        if not permission.has_archive_permission(request, obj):
+            return Response(
+                {"error": "You do not have permission to archive this object."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         try:
             obj.archive()
