@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 
+from django.conf import settings
 from django.template.loader import get_template
 from django.test import SimpleTestCase
 
@@ -41,7 +42,8 @@ expected = (
     "https://cdn.jsdelivr.net https://cdnjs.cloudflare.com "
     "https://www.googletagmanager.com https://static.cloudflareinsights.com "
     f"'nonce-{nonce}'; "
-    "connect-src 'self' https://*.google-analytics.com; "
+    "connect-src 'self' https://*.google-analytics.com "
+    "https://analytics.google.com https://stats.g.doubleclick.net; "
     "font-src 'self' https://brit-test-assets.s3.amazonaws.com "
     "https://cdnjs.cloudflare.com https://fonts.gstatic.com; "
     "img-src 'self' https://brit-test-assets.s3.amazonaws.com data:; "
@@ -61,10 +63,18 @@ assert "Content-Security-Policy" not in response.headers
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
 
+    def test_csp_context_processor_is_only_enabled_in_production(self):
+        self.assertNotIn(
+            "django.template.context_processors.csp",
+            settings.TEMPLATES[0]["OPTIONS"]["context_processors"],
+        )
+
     def test_first_party_inline_scripts_use_the_csp_nonce(self):
         template_names = (
             "partials/_analytics.html",
             "partials/_cookie_bar.html",
+            "partials/_hide_empty_learning_tab.html",
+            "detail_with_options.html",
             "filtered_list.html",
         )
 
