@@ -42,6 +42,9 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 
 MIDDLEWARE.insert(1, "django.middleware.csp.ContentSecurityPolicyMiddleware")
+TEMPLATES[0]["OPTIONS"]["context_processors"].append(
+    "django.template.context_processors.csp"
+)
 
 # Add middleware for emails with logs about unhandled exceptions
 # This middleware is added only in production because it triggers too many logging events during testing in development.
@@ -64,6 +67,14 @@ SECURE_CSP_REPORT_ONLY = {
         "https://cdn.jsdelivr.net",
         "https://cdnjs.cloudflare.com",
         "https://www.googletagmanager.com",
+        "https://static.cloudflareinsights.com",
+        CSP.NONCE,
+    ],
+    "connect-src": [
+        CSP.SELF,
+        "https://*.google-analytics.com",
+        "https://analytics.google.com",
+        "https://stats.g.doubleclick.net",
     ],
     "font-src": [
         CSP.SELF,

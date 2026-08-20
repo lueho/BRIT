@@ -38,7 +38,7 @@
 
 {% block javascript %}
     <script src="{% static 'js/formset.min.js' %}"></script>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         document.addEventListener('DOMContentLoaded', function() {
             const percentageInputs = document.querySelectorAll('.percentage-input');
             const managementFormTotalForms = document.getElementById('shares-TOTAL_FORMS');

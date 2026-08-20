@@ -30,7 +30,7 @@ Bulk access management form. Context:
     {% if all_owned %}Apply to all my items{% else %}Apply to selected{% endif %}
   </button>
   {% if not all_owned %}
-    <script>
+    <script nonce="{{ csp_nonce }}">
       // Templates with custom tables may not render selection checkboxes;
       // hide the toolbar there instead of offering a dead control.
       document.addEventListener('DOMContentLoaded', function () {

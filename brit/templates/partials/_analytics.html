@@ -1,7 +1,7 @@
 {% load cookie_consent_tags %}
 {% if GA_KEY and request|cookie_group_accepted:"analytics" %}
   <script async src="https://www.googletagmanager.com/gtag/js?id={{ GA_KEY }}"></script>
-  <script>
+  <script nonce="{{ csp_nonce }}">
         window.dataLayer = window.dataLayer || [];
 
         function gtag() {

@@ -46,7 +46,7 @@
     {{ block.super }}
     {{ task_list|json_script:"task_list" }}
 
-    <script>
+    <script nonce="{{ csp_nonce }}">
 
         async function getStatus(task_id) {
             let url = "{% url 'scenario-evaluation-status' task_id=0 %}".replace('0', task_id)

@@ -179,7 +179,7 @@
         {% endif %}
       {% endif %}
     </div>
-    <script>
+    <script nonce="{{ csp_nonce }}">
       (function(){
         window.copySharedMessage = function(form, textareaId) {
           try {

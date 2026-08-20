@@ -125,7 +125,7 @@
     <script src="{% static 'js/streaming-geojson.min.js' %}"></script>
 
     {{ map_config|json_script:"mapConfig" }}
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ csp_nonce }}">
     const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
     
     // Enable streaming with progress for large datasets

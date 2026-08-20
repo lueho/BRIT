@@ -18,7 +18,7 @@
     {{ block.super }}
     {{ parameters|json_script:"data" }}
 
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ csp_nonce }}">
         const form = document.getElementById("configForm");
         const initialParameters = JSON.parse(document.getElementById("data").textContent);
 

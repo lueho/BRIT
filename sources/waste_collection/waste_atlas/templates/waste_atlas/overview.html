@@ -111,5 +111,5 @@
       </section>
 {% endblock atlas_workspace %}
 {% block atlas_page_javascript %}
-   <script>WasteAtlasChoropleth.initOverviewDirectory();</script>
+   <script nonce="{{ csp_nonce }}">WasteAtlasChoropleth.initOverviewDirectory();</script>
 {% endblock atlas_page_javascript %}

@@ -3,7 +3,7 @@
 {% block atlas_config %}
   {% atlas_js_config map_config_key as atlas_cfg %}
   {{ atlas_cfg|json_script:"atlas-config" }}
-  <script>
+  <script nonce="{{ csp_nonce }}">
     document.addEventListener('DOMContentLoaded', function () {
       var cfg = JSON.parse(document.getElementById('atlas-config').textContent);
       WasteAtlasChoropleth.init(cfg);

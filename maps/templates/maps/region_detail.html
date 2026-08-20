@@ -55,7 +55,7 @@
                {% if show_composed_of %}checked{% endif %}>
         <label class="form-check-label" for="toggle-composed-of">Show composed-of borders</label>
     </div>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         (function () {
             const toggle = document.getElementById('toggle-composed-of');
             if (!toggle) {
