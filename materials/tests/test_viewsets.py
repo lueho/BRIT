@@ -616,6 +616,13 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
             owner=cls.owner,
             publication_status="published",
         )
+        cls.member_sample = Sample.objects.create(
+            material=cls.material,
+            name="Member Composition Sample",
+            owner=cls.member,
+            standalone=True,
+            publication_status="private",
+        )
         cls.group = MaterialComponentGroup.objects.create(name="Test Component Group")
         cls.published_composition = Composition.objects.create(
             name="Published Composition",
@@ -770,6 +777,20 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         self.assertIn(response.status_code, (401, 403))
 
+    def test_post_http_403_for_member_targeting_another_users_sample(self):
+        extra_group = MaterialComponentGroup.objects.create(
+            name="Unauthorized Composition Group"
+        )
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("api-composition-list"),
+            data=json.dumps({"sample": self.sample.pk, "group": extra_group.pk}),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 403)
+
     def test_post_http_201_for_member_with_add_permission(self):
         extra_group = MaterialComponentGroup.objects.create(
             name="Extra Group For Composition"
@@ -777,13 +798,13 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.post(
             reverse("api-composition-list"),
-            data=json.dumps({"sample": self.sample.pk, "group": extra_group.pk}),
+            data=json.dumps({"sample": self.member_sample.pk, "group": extra_group.pk}),
             content_type=JSON,
         )
         self.assertEqual(response.status_code, 201)
         self.assertTrue(
             Composition.objects.filter(
-                sample=self.sample, group=extra_group, owner=self.member
+                sample=self.member_sample, group=extra_group, owner=self.member
             ).exists()
         )
 
@@ -850,6 +871,13 @@ class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
             name="CM Test Sample",
             owner=cls.owner,
             publication_status="published",
+        )
+        cls.member_sample = Sample.objects.create(
+            material=cls.material,
+            name="Member Measurement Sample",
+            owner=cls.member,
+            standalone=True,
+            publication_status="private",
         )
         cls.group = MaterialComponentGroup.objects.create(name="CM Test Group")
         cls.component = MaterialComponent.objects.create(name="CM Test Component")
@@ -948,8 +976,9 @@ class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         self.assertIn(response.status_code, (401, 403))
 
-    def test_post_http_201_for_member_with_add_permission(self):
+    def test_post_http_403_for_member_targeting_another_users_sample(self):
         self.client.force_login(self.member)
+
         response = self.client.post(
             reverse("api-componentmeasurement-list"),
             data=json.dumps(
@@ -963,10 +992,28 @@ class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
             ),
             content_type=JSON,
         )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_201_for_member_with_add_permission(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("api-componentmeasurement-list"),
+            data=json.dumps(
+                {
+                    "sample": self.member_sample.pk,
+                    "group": self.group.pk,
+                    "component": self.component.pk,
+                    "unit": self.unit.pk,
+                    "average": "5.0",
+                }
+            ),
+            content_type=JSON,
+        )
         self.assertEqual(response.status_code, 201)
         self.assertTrue(
             ComponentMeasurement.objects.filter(
-                sample=self.sample,
+                sample=self.member_sample,
                 component=self.component,
                 average=Decimal("5.0"),
                 owner=self.member,
@@ -1055,6 +1102,13 @@ class MaterialPropertyValueViewSetTestCase(ViewSetWithPermissionsTestCase):
             owner=cls.owner,
             publication_status="published",
         )
+        cls.member_sample = Sample.objects.create(
+            material=cls.material,
+            name="Member Property Sample",
+            owner=cls.member,
+            standalone=True,
+            publication_status="private",
+        )
         cls.prop = MaterialProperty.objects.create(
             name="MPV Test Property", owner=cls.owner
         )
@@ -1130,8 +1184,9 @@ class MaterialPropertyValueViewSetTestCase(ViewSetWithPermissionsTestCase):
 
     # --- create ---
 
-    def test_post_http_201_for_member_with_add_permission(self):
+    def test_post_http_403_for_member_targeting_another_users_sample(self):
         self.client.force_login(self.member)
+
         response = self.client.post(
             reverse("api-materialpropertyvalue-list"),
             data=json.dumps(
@@ -1144,10 +1199,27 @@ class MaterialPropertyValueViewSetTestCase(ViewSetWithPermissionsTestCase):
             ),
             content_type=JSON,
         )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_201_for_member_with_add_permission(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("api-materialpropertyvalue-list"),
+            data=json.dumps(
+                {
+                    "sample": self.member_sample.pk,
+                    "property": self.prop.pk,
+                    "unit": self.unit.pk,
+                    "average": "50.0",
+                }
+            ),
+            content_type=JSON,
+        )
         self.assertEqual(response.status_code, 201)
         self.assertTrue(
             MaterialPropertyValue.objects.filter(
-                sample=self.sample,
+                sample=self.member_sample,
                 property=self.prop,
                 average=Decimal("50.0"),
                 owner=self.member,

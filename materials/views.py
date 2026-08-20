@@ -7,6 +7,7 @@ from django.contrib.auth.mixins import (
     PermissionRequiredMixin,
     UserPassesTestMixin,
 )
+from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from django.http import (
     Http404,
@@ -520,7 +521,9 @@ class MaterialPropertyAutocompleteView(UserCreatedObjectAutocompleteView):
 
 class SampleBoundCreateMixin(UserPassesTestMixin):
     sample = None
+    sample_policy_key = None
     sample_query_param = "sample"
+    sample_url_kwarg = None
 
     def dispatch(self, request, *args, **kwargs):
         self.sample = self.get_sample()
@@ -530,14 +533,26 @@ class SampleBoundCreateMixin(UserPassesTestMixin):
         if self.sample is not None:
             return self.sample
 
-        sample_pk = self.request.GET.get(
-            self.sample_query_param
-        ) or self.request.POST.get(self.sample_query_param)
+        sample_pk = None
+        if self.sample_url_kwarg:
+            sample_pk = self.kwargs.get(self.sample_url_kwarg)
+        if not sample_pk:
+            sample_pk = self.request.GET.get(
+                self.sample_query_param
+            ) or self.request.POST.get(self.sample_query_param)
         if not sample_pk:
             raise Http404("Sample query parameter is required.")
 
         self.sample = get_object_or_404(Sample, pk=sample_pk)
         return self.sample
+
+    def test_func(self):
+        policy = get_object_policy(self.request.user, self.sample, request=self.request)
+        return policy[self.sample_policy_key]
+
+    def form_valid(self, form):
+        form.instance.sample = self.sample
+        return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -554,14 +569,7 @@ class MaterialPropertyValueCreateView(
     model = MaterialPropertyValue
     form_class = MaterialPropertyValueModelForm
     permission_required = "materials.add_materialpropertyvalue"
-
-    def test_func(self):
-        policy = get_object_policy(self.request.user, self.sample, request=self.request)
-        return policy["can_add_property"]
-
-    def form_valid(self, form):
-        form.instance.sample = self.sample
-        return super().form_valid(form)
+    sample_policy_key = "can_add_property"
 
 
 class MaterialPropertyValueDetailView(
@@ -598,17 +606,7 @@ class ComponentMeasurementCreateView(
     model = ComponentMeasurement
     form_class = ComponentMeasurementModelForm
     permission_required = "materials.add_componentmeasurement"
-
-    def test_func(self):
-        policy = get_object_policy(self.request.user, self.sample, request=self.request)
-        return (
-            self.request.user.has_perm("materials.add_componentmeasurement")
-            and policy["can_manage_samples"]
-        )
-
-    def form_valid(self, form):
-        form.instance.sample = self.sample
-        return super().form_valid(form)
+    sample_policy_key = "can_manage_samples"
 
 
 class ComponentMeasurementDetailView(
@@ -1326,81 +1324,30 @@ class UserOwnedSampleAutoCompleteView(SampleAutocompleteView):
         return super().get_queryset().filter(owner=self.request.user)
 
 
-class SampleAddCompositionView(UserCreatedObjectCreateView):
-    sample = None
+class SampleAddCompositionView(SampleBoundCreateMixin, UserCreatedObjectCreateView):
     form_class = SampleAddCompositionForm
     permission_required = "materials.add_composition"
+    sample_policy_key = "can_manage_samples"
+    sample_url_kwarg = "pk"
 
     def get_initial(self):
-        self.sample = self.get_sample()
         return {"sample": self.sample}
 
-    def form_valid(self, form):
-        form.instance.owner = self.request.user
-        composition = form.save()
-        self.sample.compositions.add(composition)
-        return HttpResponseRedirect(self.get_success_url())
 
-    def get_sample(self):
-        if not self.sample:
-            self.sample = Sample.objects.get(pk=self.kwargs.get("pk"))
-        return self.sample
-
-    def get_success_url(self):
-        return reverse("sample-detail", kwargs={"pk": self.kwargs.get("pk")})
-
-    def get(self, request, *args, **kwargs):
-        self.sample = self.get_sample()
-        return super().get(request, *args, **kwargs)
-
-    def post(self, request, *args, **kwargs):
-        self.sample = self.get_sample()
-        return super().post(request, *args, **kwargs)
-
-
-class SampleAddPropertyView(UserPassesTestMixin, UserCreatedObjectCreateView):
+class SampleAddPropertyView(SampleBoundCreateMixin, UserCreatedObjectCreateView):
     form_class = MaterialPropertyValueModelForm
     permission_required = "materials.add_materialpropertyvalue"
-
-    def test_func(self):
-        try:
-            sample = Sample.objects.get(pk=self.kwargs.get("pk"))
-        except Sample.DoesNotExist:
-            return False
-        policy = get_object_policy(self.request.user, sample, request=self.request)
-        return policy["can_add_property"]
-
-    def form_valid(self, form):
-        sample = Sample.objects.get(pk=self.kwargs.get("pk"))
-        form.instance.sample = sample
-        form.save()
-        return HttpResponseRedirect(self.get_success_url())
-
-    def get_success_url(self):
-        return reverse("sample-detail", kwargs={"pk": self.kwargs.get("pk")})
+    sample_policy_key = "can_add_property"
+    sample_url_kwarg = "pk"
 
 
-class SampleModalAddPropertyView(UserPassesTestMixin, UserCreatedObjectModalCreateView):
+class SampleModalAddPropertyView(
+    SampleBoundCreateMixin, UserCreatedObjectModalCreateView
+):
     form_class = MaterialPropertyValueModalModelForm
     permission_required = "materials.add_materialpropertyvalue"
-
-    def form_valid(self, form):
-        sample = Sample.objects.get(pk=self.kwargs.get("pk"))
-        form.instance.owner = self.request.user
-        form.instance.sample = sample
-        form.save()
-        return HttpResponseRedirect(self.get_success_url())
-
-    def test_func(self):
-        try:
-            sample = Sample.objects.get(pk=self.kwargs.get("pk"))
-        except Sample.DoesNotExist:
-            return False
-        policy = get_object_policy(self.request.user, sample, request=self.request)
-        return policy["can_add_property"]
-
-    def get_success_url(self):
-        return reverse("sample-detail", kwargs={"pk": self.kwargs.get("pk")})
+    sample_policy_key = "can_add_property"
+    sample_url_kwarg = "pk"
 
 
 class SampleCreateDuplicateView(UserCreatedObjectUpdateView):
@@ -1435,14 +1382,31 @@ class SampleCreateDuplicateView(UserCreatedObjectUpdateView):
 # Not List view because compositions only make sense in the context of their materials
 
 
-class CompositionCreateView(UserCreatedObjectCreateView):
+class SampleRelationCreatePermissionMixin:
+    sample_policy_key = None
+
+    def form_valid(self, form):
+        sample = form.cleaned_data["sample"]
+        policy = get_object_policy(self.request.user, sample, request=self.request)
+        if not policy[self.sample_policy_key]:
+            raise PermissionDenied("You cannot add data to this sample.")
+        return super().form_valid(form)
+
+
+class CompositionCreateView(
+    SampleRelationCreatePermissionMixin, UserCreatedObjectCreateView
+):
     form_class = CompositionModelForm
     permission_required = "materials.add_composition"
+    sample_policy_key = "can_manage_samples"
 
 
-class CompositionModalCreateView(UserCreatedObjectModalCreateView):
+class CompositionModalCreateView(
+    SampleRelationCreatePermissionMixin, UserCreatedObjectModalCreateView
+):
     form_class = CompositionModalModelForm
     permission_required = "materials.add_composition"
+    sample_policy_key = "can_manage_samples"
 
 
 class CompositionDetailView(UserCreatedObjectDetailView):

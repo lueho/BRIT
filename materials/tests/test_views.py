@@ -2196,6 +2196,7 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         value = MaterialPropertyValue.objects.get(
             average=Decimal("123.321"), standard_deviation=Decimal("0.1337")
         )
+        self.assertEqual(value.owner, self.sample.owner)
         self.assertIn(value, self.sample.property_values.all())
 
     def test_post_persists_selected_unit(self):
@@ -2602,6 +2603,51 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
             "group": self.related_objects["group"].pk,
             "fractions_of": self.m2m_objects["components"]["component_1"].pk,
         }
+
+    def _assert_create_for_owned_sample(self, url):
+        sample = Sample.objects.create(
+            owner=self.user_with_add_perm,
+            name=f"Owned sample for {url}",
+            material=self.related_objects["unpublished_sample"].material,
+            standalone=True,
+        )
+        data = self.create_object_data.copy()
+        data.update(self.related_objects_post_data())
+        data["sample"] = sample.pk
+        initial_count = self.model.objects.count()
+        self.client.force_login(self.user_with_add_perm)
+
+        response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.model.objects.count(), initial_count + 1)
+        new_object = self.model.objects.latest("pk")
+        self.assertEqual(new_object.owner, self.user_with_add_perm)
+        self.assertEqual(new_object.sample, sample)
+
+    def test_create_view_post_as_authenticated_with_permission(self):
+        self._assert_create_for_owned_sample(self.get_create_url())
+
+    def test_modal_create_view_post_as_authenticated_with_permission(self):
+        self._assert_create_for_owned_sample(self.get_modal_create_url())
+
+    def test_create_view_rejects_sample_user_cannot_manage(self):
+        self.client.force_login(self.user_with_add_perm)
+        data = self.create_object_data.copy()
+        data.update(self.related_objects_post_data())
+
+        response = self.client.post(self.get_create_url(), data)
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_modal_create_view_rejects_sample_user_cannot_manage(self):
+        self.client.force_login(self.user_with_add_perm)
+        data = self.create_object_data.copy()
+        data.update(self.related_objects_post_data())
+
+        response = self.client.post(self.get_modal_create_url(), data)
+
+        self.assertEqual(response.status_code, 403)
 
     def get_update_success_url(self, pk=None):
         return reverse(
@@ -3059,6 +3105,12 @@ class SampleAddCompositionViewTestCase(ViewWithPermissionsTestCase):
         cls.sample = Sample.objects.create(
             owner=cls.member, series=series, material=material
         )
+        cls.other_users_sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Other user's sample",
+            standalone=True,
+            material=material,
+        )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("sample-add-composition", kwargs={"pk": self.sample.pk})
@@ -3100,6 +3152,40 @@ class SampleAddCompositionViewTestCase(ViewWithPermissionsTestCase):
             reverse("sample-add-composition", kwargs={"pk": self.sample.pk})
         )
         self.assertEqual(response.status_code, 403)
+
+    def test_get_forbidden_for_non_owner_with_add_permission(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse(
+                "sample-add-composition",
+                kwargs={"pk": self.other_users_sample.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_forbidden_for_non_owner_with_add_permission(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse(
+                "sample-add-composition",
+                kwargs={"pk": self.other_users_sample.pk},
+            ),
+            {
+                "sample": self.other_users_sample.pk,
+                "group": self.component_group.pk,
+                "fractions_of": MaterialComponent.objects.default().pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            Composition.objects.filter(
+                sample=self.other_users_sample,
+                group=self.component_group,
+            ).exists()
+        )
 
     def test_post_success_and_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
