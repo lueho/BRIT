@@ -10,6 +10,7 @@ class ProductionContentSecurityPolicyTests(SimpleTestCase):
         environment = os.environ.copy()
         environment["DJANGO_SETTINGS_MODULE"] = "brit.settings.heroku"
         environment["SECRET_KEY"] = "test-secret-key"
+        environment["AWS_STORAGE_BUCKET_NAME"] = "brit-test-assets"
         completed = subprocess.run(
             [
                 sys.executable,
@@ -28,7 +29,15 @@ middleware = ContentSecurityPolicyMiddleware(lambda request: HttpResponse("ok"))
 response = middleware(RequestFactory().get("/"))
 expected = (
     "default-src 'self'; "
-    "style-src 'self'; "
+    "style-src 'self' https://brit-test-assets.s3.amazonaws.com "
+    "https://cdn.jsdelivr.net https://cdnjs.cloudflare.com "
+    "https://fonts.googleapis.com; "
+    "script-src 'self' https://brit-test-assets.s3.amazonaws.com "
+    "https://cdn.jsdelivr.net https://cdnjs.cloudflare.com "
+    "https://www.googletagmanager.com; "
+    "font-src 'self' https://brit-test-assets.s3.amazonaws.com "
+    "https://cdnjs.cloudflare.com https://fonts.gstatic.com; "
+    "img-src 'self' https://brit-test-assets.s3.amazonaws.com data:; "
     "base-uri 'self'; "
     "frame-ancestors 'self'; "
     "object-src 'none'"
