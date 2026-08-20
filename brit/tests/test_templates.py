@@ -735,6 +735,15 @@ class BreadcrumbRailGlobalStylingAssetTests(SimpleTestCase):
             r"\.page-breadcrumb-rail\s*\{[^}]*margin-bottom",
         )
 
+    def test_brit_theme_css_aligns_rail_content_with_page_gutter(self):
+        css = self._read_asset("css/brit-theme.css")
+
+        self.assertRegex(
+            css,
+            r"\.page-breadcrumb-rail\s*\{[^}]*padding:\s*0\.5rem "
+            r"var\(--bs-gutter-x, 1\.5rem\)",
+        )
+
     def test_brit_theme_css_defines_shared_sticky_offset_variables(self):
         """The shared custom properties must move to the global theme."""
         css = self._read_asset("css/brit-theme.css")
@@ -754,6 +763,10 @@ class BreadcrumbRailGlobalStylingAssetTests(SimpleTestCase):
         self.assertRegex(
             minified,
             r"--brit-sticky-offset:\s*calc\(var\(--brit-topnav-height\)",
+        )
+        self.assertIn(
+            "padding:.5rem var(--bs-gutter-x, 1.5rem)",
+            minified,
         )
 
     def test_filtered_list_css_no_longer_redefines_shared_variables(self):
