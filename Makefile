@@ -13,7 +13,7 @@ ASSETS_RUN := $(COMPOSE) run --rm assets
 
 .DEFAULT_GOAL := help
 
-.PHONY: help assets assets-watch assets-check js-test
+.PHONY: help assets assets-test assets-watch assets-check js-test
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -22,8 +22,10 @@ help: ## Show this help
 assets: ## Build all static assets once (SCSS -> CSS -> min)
 	$(ASSETS_RUN) node scripts/build_assets.mjs
 
-js-test: ## Run dependency-free JS unit tests (node:test) in the asset toolchain
+assets-test: ## Run dependency-free JS unit tests (node:test) in the asset toolchain
 	$(ASSETS_RUN) node --test 'sources/**/*.test.mjs'
+
+js-test: assets-test ## Alias for assets-test
 
 assets-watch: ## Watch sources and rebuild changed assets (live dev feedback)
 	$(ASSETS_RUN) node scripts/build_assets.mjs --watch

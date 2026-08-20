@@ -10,16 +10,20 @@ on:
       - "**/*.scss"
       - "**/*.css"
       - "**/*.js"
+      - "**/*.mjs"
       - "docker/assets/**"
       - "scripts/build_assets.mjs"
+      - "Makefile"
       - ".github/workflows/assets.yml"
   pull_request:
     paths:
       - "**/*.scss"
       - "**/*.css"
       - "**/*.js"
+      - "**/*.mjs"
       - "docker/assets/**"
       - "scripts/build_assets.mjs"
+      - "Makefile"
       - ".github/workflows/assets.yml"
 
 jobs:
@@ -30,6 +34,9 @@ jobs:
 
       - name: Build asset toolchain image
         run: docker build -f docker/assets/Dockerfile -t brit-assets .
+
+      - name: Run JavaScript unit tests
+        run: docker run --rm -v "$PWD:/app" -w /app brit-assets node --test 'sources/**/*.test.mjs'
 
       - name: Rebuild all assets
         run: docker run --rm -v "$PWD:/app" -w /app brit-assets node scripts/build_assets.mjs
