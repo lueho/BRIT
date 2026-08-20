@@ -101,6 +101,21 @@ class MockUserCreatedObject:  # minimal, deterministic pk
             raise ValidationError("Only objects in review can be withdrawn")
         self.publication_status = "private"
 
+    def approve(self, user=None):
+        if self.publication_status != "review":
+            raise ValidationError("Only objects in review can be approved")
+        self.publication_status = "published"
+
+    def reject(self):
+        if self.publication_status != "review":
+            raise ValidationError("Only objects in review can be rejected")
+        self.publication_status = "declined"
+
+    def archive(self):
+        if self.publication_status != "published":
+            raise ValidationError("Only published objects can be archived")
+        self.publication_status = "archived"
+
 
 MockUserCreatedObject._meta.concrete_model = MockUserCreatedObject
 
@@ -321,6 +336,9 @@ class UserCreatedObjectWorkflowTests(BaseAPITestCase):
         self.review_obj = MockUserCreatedObject(
             pk=2, owner=self.regular_user, publication_status="review"
         )
+        self.published_obj = MockUserCreatedObject(
+            pk=3, owner=self.regular_user, publication_status="published"
+        )
 
     def _action(self, action: str, obj: MockUserCreatedObject, actor=None):
         actor = actor or self.regular_user
@@ -365,6 +383,47 @@ class UserCreatedObjectWorkflowTests(BaseAPITestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(self.review_obj.publication_status, "review")
+
+    def test_owner_cannot_approve_own_object(self):
+        resp = self._action("approve", self.review_obj)
+
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.review_obj.publication_status, "review")
+
+    def test_owner_cannot_reject_own_object(self):
+        resp = self._action("reject", self.review_obj)
+
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.review_obj.publication_status, "review")
+
+    def test_approve_allows_staff_moderator_for_another_users_object(self):
+        resp = self._action("approve", self.review_obj, actor=self.staff_user)
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(self.review_obj.publication_status, "published")
+
+    def test_reject_allows_staff_moderator_for_another_users_object(self):
+        resp = self._action("reject", self.review_obj, actor=self.staff_user)
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(self.review_obj.publication_status, "declined")
+
+    def test_archive_uses_dedicated_permission(self):
+        with patch.object(
+            UserCreatedObjectPermission,
+            "has_archive_permission",
+            return_value=False,
+        ):
+            resp = self._action("archive", self.published_obj)
+
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.published_obj.publication_status, "published")
+
+    def test_archive_allows_staff_moderator(self):
+        resp = self._action("archive", self.published_obj, actor=self.staff_user)
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(self.published_obj.publication_status, "archived")
 
 
 class UserCreatedObjectPermissionTests(BaseAPITestCase):
