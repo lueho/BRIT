@@ -50,6 +50,11 @@ class MaterialViewSetTestCase(ViewSetWithPermissionsTestCase):
         cls.private_material = Material.objects.create(
             name="Private Material", owner=cls.owner, publication_status="private"
         )
+        cls.published_component = MaterialComponent.objects.create(
+            name="Published Component",
+            owner=cls.owner,
+            publication_status="published",
+        )
 
     def _list_names(self, response):
         return [item["name"] for item in response.data]
@@ -65,6 +70,18 @@ class MaterialViewSetTestCase(ViewSetWithPermissionsTestCase):
         names = self._list_names(response)
         self.assertIn(self.published_material.name, names)
         self.assertNotIn(self.private_material.name, names)
+
+    def test_get_list_excludes_components(self):
+        response = self.client.get(reverse("api-material-list"))
+
+        self.assertNotIn(self.published_component.name, self._list_names(response))
+
+    def test_get_detail_returns_404_for_component(self):
+        response = self.client.get(
+            reverse("api-material-detail", kwargs={"pk": self.published_component.pk})
+        )
+
+        self.assertEqual(response.status_code, 404)
 
     def test_get_list_http_200_ok_for_authenticated_user(self):
         self.client.force_login(self.outsider)

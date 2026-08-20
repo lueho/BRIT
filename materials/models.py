@@ -150,17 +150,36 @@ class BaseMaterial(NamedUserCreatedObject):
         return super().approve(user=user)
 
 
+class BaseMaterialTypeManager(UserCreatedObjectManager):
+    material_type = None
+
+    def get_queryset(self):
+        return super().get_queryset().filter(type=self.material_type)
+
+
+class MaterialManager(BaseMaterialTypeManager):
+    material_type = "material"
+
+
 class Material(BaseMaterial):
     """
     Generic material class for many purposes. E.g. this is used as top level definition to link semantic definition of
     materials with analysis data.
     """
 
+    objects = MaterialManager()
+
     class Meta:
         proxy = True
 
+    def save(self, *args, **kwargs):
+        self.type = MaterialManager.material_type
+        super().save(*args, **kwargs)
 
-class MaterialComponentManager(UserCreatedObjectManager):
+
+class MaterialComponentManager(BaseMaterialTypeManager):
+    material_type = "component"
+
     def default(self):
         name = getattr(settings, "DEFAULT_MATERIALCOMPONENT_NAME", "Fresh Matter (FM)")
         return self.get_queryset().get(name=name, owner=get_default_owner())
@@ -185,6 +204,10 @@ class MaterialComponent(BaseMaterial):
         verbose_name = "component"
         ordering = ["name"]
 
+    def save(self, *args, **kwargs):
+        self.type = MaterialComponentManager.material_type
+        super().save(*args, **kwargs)
+
     @property
     def canonical_component(self):
         component = self
@@ -193,13 +216,6 @@ class MaterialComponent(BaseMaterial):
             visited_ids.add(component.pk)
             component = component.comparable_component
         return component
-
-
-@receiver(post_save, sender=MaterialComponent)
-def add_type_component(sender, instance, created, **kwargs):
-    if created:
-        instance.type = "component"
-        instance.save()
 
 
 class MaterialComponentGroupManager(UserCreatedObjectManager):

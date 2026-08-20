@@ -83,7 +83,7 @@ class MaterialModalModelForm(ModalModelFormMixin, MaterialModelForm):
 
 class ComponentModelForm(SimpleModelForm):
     comparable_component = TomSelectModelChoiceField(
-        queryset=MaterialComponent.objects.filter(type="component"),
+        queryset=MaterialComponent.objects.all(),
         required=False,
         config=TomSelectConfig(
             url="materialcomponent-autocomplete",
@@ -94,7 +94,7 @@ class ComponentModelForm(SimpleModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        queryset = MaterialComponent.objects.filter(type="component")
+        queryset = MaterialComponent.objects.all()
         if self.instance.pk:
             queryset = queryset.exclude(pk=self.instance.pk)
         self.fields["comparable_component"].queryset = queryset
@@ -253,7 +253,7 @@ class MaterialPropertyValueModelForm(
         label="Property",
     )
     basis_component = TomSelectModelChoiceField(
-        queryset=MaterialComponent.objects.filter(type="component"),
+        queryset=MaterialComponent.objects.all(),
         required=False,
         config=TomSelectConfig(
             url="materialcomponent-autocomplete",
@@ -433,10 +433,7 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         substrate_category, _ = get_or_create_sample_substrate_category()
-        material_queryset = Material.objects.filter(
-            type="material",
-            categories=substrate_category,
-        )
+        material_queryset = Material.objects.filter(categories=substrate_category)
         if self.instance.pk and self.instance.material_id:
             material_queryset = material_queryset | Material.objects.filter(
                 pk=self.instance.material_id

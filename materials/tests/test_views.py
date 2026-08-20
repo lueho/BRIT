@@ -54,6 +54,38 @@ class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(200, response.status_code)
 
 
+class BaseMaterialProxyAutocompleteViewTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.material = Material.objects.create(
+            name="Shared search material",
+            publication_status="published",
+        )
+        cls.component = MaterialComponent.objects.create(
+            name="Shared search component",
+            publication_status="published",
+        )
+
+    def test_material_autocomplete_excludes_components(self):
+        response = self.client.get(reverse("material-autocomplete"), {"q": "Shared"})
+
+        self.assertEqual(response.status_code, 200)
+        names = [item["name"] for item in response.json()["results"]]
+        self.assertIn(self.material.name, names)
+        self.assertNotIn(self.component.name, names)
+
+    def test_component_autocomplete_excludes_materials(self):
+        response = self.client.get(
+            reverse("materialcomponent-autocomplete"),
+            {"q": "Shared"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        names = [item["name"] for item in response.json()["results"]]
+        self.assertIn(self.component.name, names)
+        self.assertNotIn(self.material.name, names)
+
+
 class SampleSubstrateMaterialAutocompleteViewTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):

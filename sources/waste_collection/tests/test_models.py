@@ -8,7 +8,7 @@ from django.urls import reverse
 from factory.django import mute_signals
 
 from distributions.models import Period, TemporalDistribution, Timestep
-from materials.models import Material
+from materials.models import Material, MaterialCategory, MaterialComponent
 from utils.object_management.models import get_default_owner
 from utils.properties.models import Property, Unit
 
@@ -23,6 +23,7 @@ from ..models import (
     CollectionSeason,
     CollectionSystem,
     WasteCategory,
+    WasteComponent,
     WasteFlyer,
 )
 from ..utils import ensure_initial_data
@@ -59,6 +60,25 @@ class InitialDataTestCase(TestCase):
             )
         )
         self.assertTrue(expected_names.issubset(existing_names))
+
+
+class WasteComponentManagerTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        category = MaterialCategory.objects.create(name="Biowaste component")
+        cls.waste_component = WasteComponent.objects.create(name="Kitchen waste")
+        cls.material_component = MaterialComponent.objects.create(name="Carbon")
+        cls.material_component.categories.add(category)
+
+    def test_manager_excludes_material_components(self):
+        self.assertIn(self.waste_component, WasteComponent.objects.all())
+        self.assertNotIn(
+            self.material_component.pk,
+            WasteComponent.objects.values_list("pk", flat=True),
+        )
+
+    def test_created_waste_component_is_a_material(self):
+        self.assertEqual(self.waste_component.type, "material")
 
 
 class CollectionCatchmentTestCase(TestCase):

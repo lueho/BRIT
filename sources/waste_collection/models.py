@@ -15,7 +15,7 @@ from django.utils import timezone
 from bibliography.models import Source
 from distributions.models import Period, TemporalDistribution
 from maps.models import Catchment
-from materials.models import Material, MaterialCategory, Sample
+from materials.models import Material, MaterialCategory, MaterialManager, Sample
 from utils.object_management.models import (
     NamedUserCreatedObject,
     UserCreatedObject,
@@ -96,7 +96,7 @@ class WasteCategory(NamedUserCreatedObject):
         verbose_name_plural = "waste categories"
 
 
-class WasteComponentManager(UserCreatedObjectManager):
+class WasteComponentManager(MaterialManager):
     def get_queryset(self):
         return super().get_queryset().filter(categories__name="Biowaste component")
 
