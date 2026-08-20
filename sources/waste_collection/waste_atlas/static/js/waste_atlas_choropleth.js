@@ -818,6 +818,15 @@ var WasteAtlasChoropleth = (function () {
     };
   }
 
+  function _regionFromSelect(select) {
+    var selectedOption = select.options[select.selectedIndex];
+    return {
+      country: selectedOption ? selectedOption.getAttribute('data-country') || select.value : select.value,
+      nutsPrefix: selectedOption ? selectedOption.getAttribute('data-nuts-prefix') || '' : '',
+      nutsLevel: selectedOption ? selectedOption.getAttribute('data-nuts-level') || '' : ''
+    };
+  }
+
   function initSelectorControls(loadCurrent, options) {
     options = options || {};
     var disableNavigation = options.disableNavigation || false;
@@ -861,12 +870,7 @@ var WasteAtlasChoropleth = (function () {
     }
 
     function selectedRegion() {
-      var selectedOption = countrySelect.options[countrySelect.selectedIndex];
-      return {
-        country: selectedOption ? selectedOption.getAttribute('data-country') || countrySelect.value : countrySelect.value,
-        nutsPrefix: selectedOption ? selectedOption.getAttribute('data-nuts-prefix') || '' : '',
-        nutsLevel: selectedOption ? selectedOption.getAttribute('data-nuts-level') || '' : ''
-      };
+      return _regionFromSelect(countrySelect);
     }
 
     function selectedCountryCode() {
@@ -1853,7 +1857,9 @@ var WasteAtlasChoropleth = (function () {
 
     function fmt(v) {
       if (v == null) return '';
-      return Math.round(v * displayMultiplier).toString();
+      var scaled = v * displayMultiplier;
+      var epsilon = Number.EPSILON * Math.max(1, Math.abs(scaled));
+      return Math.round(scaled + epsilon).toString();
     }
 
     return [
@@ -3825,8 +3831,22 @@ var WasteAtlasChoropleth = (function () {
     exportElementSVG: exportElementSVG,
     exportElementPNG: exportElementPNG,
     transforms: transforms,
+    changes: {
+      numericRecords: _numericChangeRecords,
+      renderConfig: _changeRenderConfig
+    },
+    collections: {
+      detailUrl: _collectionDetailUrl,
+      openChoice: _openCollectionChoice
+    },
     quartiles: {
-      apply: _applyQuartiles
+      apply: _applyQuartiles,
+      categories: _computeQuartileCategories
+    },
+    selection: {
+      configForSelection: _configForSelection,
+      queryString: _selectorQueryString,
+      regionFromSelect: _regionFromSelect
     },
     // Appearance of the aggregated-value markers, shared by the screen and the
     // export; exposed for tests and callers that draw their own legend swatch.
@@ -3835,6 +3855,9 @@ var WasteAtlasChoropleth = (function () {
     },
     // Legend entry order, shared by the screen legend and the export.
     legend: {
+      annotateFeatures: _annotateFeatures,
+      footnote: _legendFootnoteLabel,
+      items: _legendItems,
       orderedCategories: _orderedLegendCategories,
       screenFontFamily: SCREEN_FONT_FAMILY
     },
@@ -3848,6 +3871,7 @@ var WasteAtlasChoropleth = (function () {
       columnCandidates: _exportLegendColumnCandidates,
       distributeLegendItems: _distributeLegendItems,
       wrapTextToWidth: _wrapTextToWidth,
+      fitExportLegendWidth: _fitExportLegendWidth,
       measureExportLegend: _measureExportLegend,
       legendColumnHeight: _legendColumnHeight,
       candidateViolations: _exportCandidateViolations,
