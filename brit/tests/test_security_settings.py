@@ -72,7 +72,11 @@ assert "Content-Security-Policy" not in response.headers
 
     def test_first_party_inline_scripts_use_the_csp_nonce(self):
         script_tags = re.compile(r"<script(?P<attributes>[^>]*)>", re.IGNORECASE)
-        template_paths = Path(settings.BASE_DIR).glob("**/templates/**/*.html")
+        template_paths = (
+            template_path
+            for template_path in Path(settings.BASE_DIR).glob("**/templates/**/*.html")
+            if ".venv" not in template_path.parts
+        )
 
         for template_path in template_paths:
             for script_tag in script_tags.finditer(template_path.read_text()):
