@@ -11,7 +11,7 @@
 {% block javascript %}
     {{ block.super }}
 
-    <script>
+    <script nonce="{{ csp_nonce }}">
         const form = document.getElementById("configForm");
 
         function renderParameterFields(parameters) {

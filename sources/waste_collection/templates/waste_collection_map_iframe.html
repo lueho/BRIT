@@ -62,7 +62,7 @@
   {{ block.super }}
   <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
   <script src="{% static 'js/waste_collection_map.min.js' %}"></script>
-  <script>
+  <script nonce="{{ csp_nonce }}">
       function resetFilterForm() {
         window.location.href = window.location.pathname;
       }

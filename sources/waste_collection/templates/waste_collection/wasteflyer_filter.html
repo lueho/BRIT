@@ -55,7 +55,7 @@
 {% endblock list_card_options_dropdown_additional_links %}
 {% block javascript %}
     {{ block.super }}
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ csp_nonce }}">
     async function monitor_task_progress(url, count = 0) {
         const response = await fetch(url);
         const data = await response.json();

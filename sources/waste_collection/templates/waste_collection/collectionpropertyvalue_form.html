@@ -2,7 +2,7 @@
 
 {% block javascript %}
     {{ block.super }}
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ csp_nonce }}">
         async function fetchUnitOptions(propertyId) {
             const select_unit = document.querySelector('#id_unit');
             if (propertyId === '') {

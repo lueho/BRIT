@@ -83,7 +83,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js"
             crossorigin="anonymous"></script>
     <script src="{% static "js/feedstock_summary_bar_chart.min.js" %}"></script>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         let charts = JSON.parse(document.getElementById("charts").textContent);
         for (const [id, chart] of Object.entries(charts)) {
             let ctx = document.getElementById(id);

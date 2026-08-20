@@ -26,7 +26,7 @@
 
 {% block javascript %}
     {{ block.super }}
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ csp_nonce }}">
         function clickedListLink() {
             const listLink = document.getElementById('link-regions-as-list');
             window.location.href = listLink.dataset.hrefTemplate + '?' + parseFilterParameters().toString();

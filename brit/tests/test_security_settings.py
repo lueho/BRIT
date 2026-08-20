@@ -1,9 +1,10 @@
 import os
+import re
 import subprocess
 import sys
+from pathlib import Path
 
 from django.conf import settings
-from django.template.loader import get_template
 from django.test import SimpleTestCase
 
 
@@ -70,17 +71,12 @@ assert "Content-Security-Policy" not in response.headers
         )
 
     def test_first_party_inline_scripts_use_the_csp_nonce(self):
-        template_names = (
-            "partials/_analytics.html",
-            "partials/_cookie_bar.html",
-            "partials/_hide_empty_learning_tab.html",
-            "detail_with_options.html",
-            "filtered_list.html",
-        )
+        script_tags = re.compile(r"<script(?P<attributes>[^>]*)>", re.IGNORECASE)
+        template_paths = Path(settings.BASE_DIR).glob("**/templates/**/*.html")
 
-        for template_name in template_names:
-            with self.subTest(template_name=template_name):
-                self.assertIn(
-                    'nonce="{{ csp_nonce }}"',
-                    get_template(template_name).template.source,
-                )
+        for template_path in template_paths:
+            for script_tag in script_tags.finditer(template_path.read_text()):
+                attributes = script_tag.group("attributes")
+                if not re.search(r"\bsrc\s*=", attributes, re.IGNORECASE):
+                    with self.subTest(template_path=template_path):
+                        self.assertIn('nonce="{{ csp_nonce }}"', attributes)

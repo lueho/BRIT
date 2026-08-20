@@ -33,7 +33,7 @@
   {% endblock atlas_vendor_javascript %}
   {% include "waste_atlas/includes/render_defaults.html" %}
   <script src="{% static 'js/waste_atlas_choropleth.min.js' %}?v=20260812-1"></script>
-  <script>WasteAtlasChoropleth.initShell();</script>
+  <script nonce="{{ csp_nonce }}">WasteAtlasChoropleth.initShell();</script>
   {% block atlas_page_javascript %}
   {% endblock atlas_page_javascript %}
 {% endblock javascript %}

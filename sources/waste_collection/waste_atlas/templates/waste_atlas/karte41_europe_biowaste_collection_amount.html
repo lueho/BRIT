@@ -61,7 +61,7 @@
   <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
   {% include "waste_atlas/includes/render_defaults.html" %}
   <script src="{% static 'js/waste_atlas_choropleth.min.js' %}?v=20260812-1"></script>
-  <script>
+  <script nonce="{{ csp_nonce }}">
     document.addEventListener('DOMContentLoaded', function () {
       var svgEl = document.getElementById('europe-biowaste-svg');
       var mapContainer = document.getElementById('map-container');

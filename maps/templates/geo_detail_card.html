@@ -16,7 +16,7 @@
     {{ block.super }}
     <script src="{% static 'js/maps.min.js' %}"></script>
     {{ map_config|json_script:"mapConfig" }}
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ csp_nonce }}">
         const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
         window.onload = () => loadMap(mapConfig);
     </script>

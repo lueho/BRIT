@@ -212,7 +212,7 @@
          href="{% url 'waste-atlas-map-configuration-list' %}">Cancel</a>
     </div>
   </form>
-  <script>
+  <script nonce="{{ csp_nonce }}">
     (function () {
       var toggle = document.querySelector('[data-atlas-toggle="export-legend-custom"]');
       var panel = document.querySelector('[data-atlas-target="export-legend-custom"]');
