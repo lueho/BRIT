@@ -2649,6 +2649,29 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 
         self.assertEqual(response.status_code, 403)
 
+    def test_update_view_rejects_new_sample_user_cannot_manage(self):
+        target_sample = Sample.objects.create(
+            owner=self.user_with_add_perm,
+            name="Unauthorized update target",
+            material=self.related_objects["unpublished_sample"].material,
+            standalone=True,
+        )
+        data = self.related_objects_post_data()
+        data["sample"] = target_sample.pk
+        self.client.force_login(self.owner_user)
+
+        response = self.client.post(
+            self.get_update_url(self.unpublished_object.pk),
+            data,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.unpublished_object.refresh_from_db()
+        self.assertEqual(
+            self.unpublished_object.sample,
+            self.related_objects["unpublished_sample"],
+        )
+
     def get_update_success_url(self, pk=None):
         return reverse(
             "sample-detail",

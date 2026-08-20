@@ -1,4 +1,4 @@
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import PermissionDenied
 
 from utils.object_management.permissions import get_object_policy
 from utils.object_management.viewsets import UserCreatedObjectViewSet
@@ -36,16 +36,26 @@ from .serializers import (
 class SampleBoundMutationViewSetMixin:
     sample_policy_key = None
 
-    def perform_create(self, serializer):
-        sample = serializer.validated_data.get("sample")
-        if sample is None:
-            raise ValidationError({"sample": "A target sample is required."})
+    def _validate_target_sample(self, serializer):
+        if "sample" not in serializer.validated_data:
+            return
+
+        sample = serializer.validated_data["sample"]
+        instance = serializer.instance
+        if sample is None or (instance is not None and instance.sample_id == sample.pk):
+            return
 
         policy = get_object_policy(self.request.user, sample, request=self.request)
         if not policy[self.sample_policy_key]:
             raise PermissionDenied("You cannot add data to this sample.")
 
+    def perform_create(self, serializer):
+        self._validate_target_sample(serializer)
         super().perform_create(serializer)
+
+    def perform_update(self, serializer):
+        self._validate_target_sample(serializer)
+        super().perform_update(serializer)
 
 
 class MaterialViewSet(UserCreatedObjectViewSet):

@@ -1382,19 +1382,28 @@ class SampleCreateDuplicateView(UserCreatedObjectUpdateView):
 # Not List view because compositions only make sense in the context of their materials
 
 
-class SampleRelationCreatePermissionMixin:
+class SampleRelationMutationPermissionMixin:
     sample_policy_key = None
 
     def form_valid(self, form):
         sample = form.cleaned_data["sample"]
-        policy = get_object_policy(self.request.user, sample, request=self.request)
-        if not policy[self.sample_policy_key]:
-            raise PermissionDenied("You cannot add data to this sample.")
+        instance = form.instance
+        original_sample_id = None
+        if instance.pk is not None:
+            original_sample_id = (
+                instance.__class__._base_manager.filter(pk=instance.pk)
+                .values_list("sample_id", flat=True)
+                .get()
+            )
+        if original_sample_id != sample.pk:
+            policy = get_object_policy(self.request.user, sample, request=self.request)
+            if not policy[self.sample_policy_key]:
+                raise PermissionDenied("You cannot add data to this sample.")
         return super().form_valid(form)
 
 
 class CompositionCreateView(
-    SampleRelationCreatePermissionMixin, UserCreatedObjectCreateView
+    SampleRelationMutationPermissionMixin, UserCreatedObjectCreateView
 ):
     form_class = CompositionModelForm
     permission_required = "materials.add_composition"
@@ -1402,7 +1411,7 @@ class CompositionCreateView(
 
 
 class CompositionModalCreateView(
-    SampleRelationCreatePermissionMixin, UserCreatedObjectModalCreateView
+    SampleRelationMutationPermissionMixin, UserCreatedObjectModalCreateView
 ):
     form_class = CompositionModalModelForm
     permission_required = "materials.add_composition"
@@ -1422,9 +1431,12 @@ class CompositionModalDetailView(UserCreatedObjectModalDetailView):
     model = Composition
 
 
-class CompositionUpdateView(UserCreatedObjectUpdateView):
+class CompositionUpdateView(
+    SampleRelationMutationPermissionMixin, UserCreatedObjectUpdateView
+):
     model = Composition
     form_class = CompositionModelForm
+    sample_policy_key = "can_manage_samples"
 
     def get_success_url(self):
         return reverse("sample-detail", kwargs={"pk": self.object.sample.pk})

@@ -810,6 +810,22 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
 
     # --- update ---
 
+    def test_patch_http_403_when_owner_targets_another_users_sample(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.patch(
+            reverse(
+                "api-composition-detail",
+                kwargs={"pk": self.private_composition.pk},
+            ),
+            data=json.dumps({"sample": self.member_sample.pk}),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.private_composition.refresh_from_db()
+        self.assertEqual(self.private_composition.sample, self.sample)
+
     def test_patch_http_403_for_outsider_on_private(self):
         self.client.force_login(self.outsider)
         response = self.client.patch(
@@ -1022,6 +1038,22 @@ class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
 
     # --- update ---
 
+    def test_patch_http_403_when_owner_targets_another_users_sample(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.patch(
+            reverse(
+                "api-componentmeasurement-detail",
+                kwargs={"pk": self.private_measurement.pk},
+            ),
+            data=json.dumps({"sample": self.member_sample.pk}),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.private_measurement.refresh_from_db()
+        self.assertEqual(self.private_measurement.sample, self.sample)
+
     def test_patch_http_403_for_outsider_on_private(self):
         self.client.force_login(self.outsider)
         response = self.client.patch(
@@ -1226,7 +1258,48 @@ class MaterialPropertyValueViewSetTestCase(ViewSetWithPermissionsTestCase):
             ).exists()
         )
 
+    def test_post_http_201_without_sample(self):
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("api-materialpropertyvalue-list"),
+            data=json.dumps(
+                {
+                    "property": self.prop.pk,
+                    "unit": self.unit.pk,
+                    "average": "75.0",
+                }
+            ),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(
+            MaterialPropertyValue.objects.filter(
+                sample__isnull=True,
+                property=self.prop,
+                average=Decimal("75.0"),
+                owner=self.member,
+            ).exists()
+        )
+
     # --- update ---
+
+    def test_patch_http_403_when_owner_targets_another_users_sample(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.patch(
+            reverse(
+                "api-materialpropertyvalue-detail",
+                kwargs={"pk": self.private_value.pk},
+            ),
+            data=json.dumps({"sample": self.member_sample.pk}),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.private_value.refresh_from_db()
+        self.assertEqual(self.private_value.sample, self.sample)
 
     def test_patch_http_200_for_owner_on_private(self):
         self.client.force_login(self.owner)
