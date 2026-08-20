@@ -326,6 +326,7 @@ const SelectionController = (function () {
         } catch (_) { }
         try { ButtonManager.reset(); } catch (_) { }
         try { showSummaryLoading(); } catch (_) { }
+        try { scrollToSummaries(); } catch (_) { }
         try { getFeatureDetails(fid); } catch (_) { }
         try { window.dispatchEvent(new CustomEvent('wc-selection-changed', { detail: { id: currentId } })); } catch (_) { }
     }
