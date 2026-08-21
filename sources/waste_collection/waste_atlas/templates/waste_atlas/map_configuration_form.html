@@ -113,6 +113,13 @@
           <div class="form-text">{{ form.export_legend_placement.help_text }}</div>
           {{ form.export_legend_placement.errors }}
         </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label"
+                 for="{{ form.export_legend_map_layout.id_for_label }}">{{ form.export_legend_map_layout.label }}</label>
+          {{ form.export_legend_map_layout }}
+          <div class="form-text">{{ form.export_legend_map_layout.help_text }}</div>
+          {{ form.export_legend_map_layout.errors }}
+        </div>
         <div class="col-6 col-md-4">
           <label class="form-label"
                  for="{{ form.export_legend_columns.id_for_label }}">{{ form.export_legend_columns.label }}</label>

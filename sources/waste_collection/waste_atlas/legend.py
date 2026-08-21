@@ -1,9 +1,12 @@
 """Single source of truth for export-legend configuration semantics.
 
-The Waste Atlas export legend has four *independent* settings:
+The Waste Atlas export legend has five *independent* settings:
 
 ``placement``
     ``auto`` (choose automatically) or one of the fixed placements.
+``mapLayout``
+    ``auto`` (preserve the compatible layout), ``fit`` (reserve map space), or
+    ``overlay`` (allow the legend over the map).
 ``columns``
     ``auto`` (choose automatically) or an exact count ``1``-``4``.
 ``itemFlow``
@@ -31,16 +34,31 @@ pages, that override must win over the shared theme configuration.
 AUTO = "auto"
 
 # Fixed placements a user (or override) may pin the legend to.
-FIXED_EXPORT_LEGEND_PLACEMENTS = (
-    "right",
-    "left",
-    "bottom",
-    "bottom-right",
-    "bottom-left",
-    "top-right",
-    "top-left",
+EXPORT_LEGEND_PLACEMENT_CHOICES = (
+    (AUTO, "Automatic"),
+    ("top-left", "Top left"),
+    ("top", "Top"),
+    ("top-right", "Top right"),
+    ("right", "Right"),
+    ("bottom-right", "Bottom right"),
+    ("bottom", "Bottom"),
+    ("bottom-left", "Bottom left"),
+    ("left", "Left"),
 )
-EXPORT_LEGEND_PLACEMENTS = (AUTO, *FIXED_EXPORT_LEGEND_PLACEMENTS)
+EXPORT_LEGEND_PLACEMENTS = tuple(
+    value for value, _label in EXPORT_LEGEND_PLACEMENT_CHOICES
+)
+FIXED_EXPORT_LEGEND_PLACEMENTS = EXPORT_LEGEND_PLACEMENTS[1:]
+FIT_MAP = "fit"
+OVERLAY_MAP = "overlay"
+EXPORT_LEGEND_MAP_LAYOUT_CHOICES = (
+    (AUTO, "Automatic"),
+    (FIT_MAP, "Fit map around legend"),
+    (OVERLAY_MAP, "Overlay legend on map"),
+)
+EXPORT_LEGEND_MAP_LAYOUTS = tuple(
+    value for value, _label in EXPORT_LEGEND_MAP_LAYOUT_CHOICES
+)
 FIXED_EXPORT_LEGEND_COLUMNS = (1, 2, 3, 4)
 # How legend entries are arranged across the columns.  These labelled choices
 # are the single source of truth: the model field, the form select and
@@ -59,13 +77,14 @@ EXPORT_LEGEND_ITEM_FLOWS = tuple(
 # Persisted flat keys that describe the export legend layout.
 EXPORT_LEGEND_OVERRIDE_KEYS = (
     "exportLegendPlacement",
+    "exportLegendMapLayout",
     "exportLegendColumns",
     "exportLegendItemFlow",
     "exportLegendWidth",
 )
-# Retired keys.  "Fit width to content" and "avoid map overlap" are now hard
-# layout invariants rather than options, and column counts are no longer coupled
-# to placement, so these must never linger and silently affect a layout.
+# Retired keys. Fitting width remains an invariant, map collision now uses the
+# independent layout setting, and column counts are no longer coupled to
+# placement, so these must never linger and silently affect a layout.
 LEGACY_EXPORT_LEGEND_KEYS = (
     "exportLegendFitContent",
     "exportLegendAvoidMapOverlap",
@@ -151,6 +170,16 @@ def normalize_placement(value):
     return None
 
 
+def normalize_map_layout(value):
+    """Return a canonical map layout, or ``None`` when it means inherit."""
+    if value is None:
+        return None
+    value = str(value).strip()
+    if value in EXPORT_LEGEND_MAP_LAYOUTS:
+        return value
+    return None
+
+
 def normalize_columns(value):
     """Return ``auto`` or an exact column count, or ``None`` (inherit)."""
     if value is None:
@@ -210,8 +239,8 @@ def resolve_export_legend(*, stored, page_overrides, defaults):
     """Resolve the one effective export-legend config the renderer consumes.
 
     ``defaults`` is the atlas-level fallback object
-    (``{"placement", "columns", "itemFlow", "maxWidthFraction"}``) and is always
-    fully populated, so the returned object never contains ``None``.
+    (``{"placement", "mapLayout", "columns", "itemFlow", "maxWidthFraction"}``)
+    and is always fully populated, so the returned object never contains ``None``.
     """
     layers = (page_overrides or {}, stored or {})
     return {
@@ -220,6 +249,12 @@ def resolve_export_legend(*, stored, page_overrides, defaults):
             normalize_placement,
             layers,
             defaults["placement"],
+        ),
+        "mapLayout": _resolve(
+            "exportLegendMapLayout",
+            normalize_map_layout,
+            layers,
+            defaults["mapLayout"],
         ),
         "columns": _resolve(
             "exportLegendColumns",

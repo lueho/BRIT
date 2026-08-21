@@ -24,7 +24,26 @@ function geoMercator() {
     return projection;
   };
   projection.scale = () => projection.extent[1][0] - projection.extent[0][0];
+  projection.stream = (stream) => stream;
   return projection;
+}
+
+function geoStream(geometry, stream) {
+  function visit(node) {
+    if (!node) return;
+    if (node.type === "FeatureCollection") return node.features.forEach(visit);
+    if (node.type === "Feature") return visit(node.geometry);
+    if (node.type === "Polygon") {
+      stream.polygonStart();
+      node.coordinates.forEach((ring) => {
+        stream.lineStart();
+        ring.forEach((point) => stream.point(point[0], point[1]));
+        stream.lineEnd();
+      });
+      stream.polygonEnd();
+    }
+  }
+  visit(geometry);
 }
 
 function geoPath() {
@@ -43,7 +62,7 @@ function geoPath() {
 const assignedUrls = [];
 const sandbox = {
   console,
-  d3: { geoMercator, geoPath, quantile },
+  d3: { geoMercator, geoPath, geoStream, quantile },
   window: {
     location: {
       assign(url) {
@@ -79,6 +98,7 @@ atlas.setRenderDefaults({
   exportLegend: {
     columns: "auto",
     itemFlow: "column",
+    mapLayout: "auto",
     maxWidthFraction: 0.52,
     placement: "auto",
   },
@@ -225,6 +245,43 @@ test("fixed export layout keeps the map outside a two-column right legend", () =
   assert.equal(exported.legendPlacement, "right");
   assert.equal(exported.legendColumns, 2);
   assert.ok(exported.mapExtent[1][0] < exported.legend.x);
+  assert.equal(exported.warning, null);
+});
+
+test("bottom-right fit anchors the legend and reserves non-overlapping map space", () => {
+  const config = {
+    categories: [{ value: "a", label: "Available data", color: "#111111" }],
+    dataField: "status",
+    exportLegend: {
+      columns: 1,
+      itemFlow: "column",
+      mapLayout: "fit",
+      maxWidthFraction: 0.52,
+      placement: "bottom-right",
+    },
+    legendTitle: "Status",
+  };
+  const data = {
+    catchments: {
+      features: [{ properties: { catchment_id: 1 } }],
+      type: "FeatureCollection",
+    },
+    countryBorder: {
+      features: [{ geometry: { coordinates: [], type: "Polygon" }, properties: {} }],
+      type: "FeatureCollection",
+    },
+    thematicData: [{ catchment_id: 1, status: "a" }],
+  };
+
+  const exported = layout.exportLayout(data, config);
+
+  assert.equal(exported.legendPlacement, "bottom-right");
+  assert.equal(exported.legend.x + exported.legend.width, exported.width - 46);
+  assert.equal(exported.legend.y + exported.legend.height, exported.height - 46);
+  assert.ok(
+    exported.mapExtent[1][0] < exported.legend.x
+      || exported.mapExtent[1][1] < exported.legend.y,
+  );
   assert.equal(exported.warning, null);
 });
 

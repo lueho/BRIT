@@ -44,6 +44,7 @@ function renderDefaults(exportLegend = {}) {
     exportLegend: Object.assign(
       {
         placement: "auto",
+        mapLayout: "auto",
         columns: "auto",
         itemFlow: "column",
         maxWidthFraction: 0.52,
@@ -99,6 +100,7 @@ test("resolveExportLegend returns explicit auto values verbatim", () => {
     }),
     {
       placement: "auto",
+      mapLayout: "auto",
       columns: "auto",
       itemFlow: "column",
       maxWidthFraction: 0.4,
@@ -110,19 +112,27 @@ test("resolveExportLegend keeps fixed values", () => {
   assert.deepEqual(
     layout.resolveExportLegend({
       exportLegend: {
-        placement: "left",
+        placement: "top",
+        mapLayout: "fit",
         columns: 2,
         itemFlow: "row",
         maxWidthFraction: 0.38,
       },
     }),
-    { placement: "left", columns: 2, itemFlow: "row", maxWidthFraction: 0.38 },
+    {
+      placement: "top",
+      mapLayout: "fit",
+      columns: 2,
+      itemFlow: "row",
+      maxWidthFraction: 0.38,
+    },
   );
 });
 
 test("resolveExportLegend falls back to atlas defaults when absent", () => {
   assert.deepEqual(layout.resolveExportLegend({}), {
     placement: "auto",
+    mapLayout: "auto",
     columns: "auto",
     itemFlow: "column",
     maxWidthFraction: 0.52,
@@ -248,6 +258,7 @@ test("quartile legend measurement creates the value/status break automatically",
     measured.columns.map((column) => column.map((item) => item.value || item.label)),
     [["q1", "q2", "q3", "q4"], ["no_bio", "No data"]],
   );
+  assert.equal(measured.columnGap, 20);
 });
 
 test("a configured legend note is measured as a separated export footnote", () => {
@@ -365,11 +376,60 @@ test("a row-flow column is measured on the slot heights, so columns stay aligned
   );
 });
 
-test("placement candidates: auto expands, fixed pins", () => {
-  const auto = layout.placementCandidates("auto");
-  assert.deepEqual(auto.slice(0, 3), ["right", "left", "bottom"]);
-  assert.equal(auto.length, 7);
+test("placement candidates: auto expands to eight positions and fixed pins", () => {
+  assert.deepEqual(layout.placementCandidates("auto"), [
+    "top-left",
+    "top",
+    "top-right",
+    "right",
+    "bottom-right",
+    "bottom",
+    "bottom-left",
+    "left",
+  ]);
   assert.deepEqual(layout.placementCandidates("left"), ["left"]);
+});
+
+test("fit and overlay are independent from a corner position", () => {
+  assert.deepEqual(layout.layoutCandidates("bottom-right", "fit"), [
+    { position: "bottom-right", mapLayout: "fit", fitSide: "shape-x" },
+    { position: "bottom-right", mapLayout: "fit", fitSide: "right" },
+    { position: "bottom-right", mapLayout: "fit", fitSide: "bottom" },
+  ]);
+  assert.deepEqual(layout.layoutCandidates("bottom-right", "overlay"), [
+    { position: "bottom-right", mapLayout: "overlay", fitSide: null },
+  ]);
+});
+
+test("corner fitting shifts only as far as the legend band requires", () => {
+  const legend = { x: 440, width: 400 };
+  assert.equal(
+    layout.horizontalCornerOffset(
+      "bottom-right",
+      { left: 120, right: 500 },
+      legend,
+      24,
+    ),
+    -84,
+  );
+  assert.equal(
+    layout.horizontalCornerOffset(
+      "bottom-right",
+      { left: 120, right: 400 },
+      legend,
+      24,
+    ),
+    0,
+  );
+  assert.equal(
+    layout.horizontalCornerOffset(
+      "bottom-left",
+      { left: 360, right: 800 },
+      { x: 46, width: 300 },
+      24,
+    ),
+    10,
+  );
 });
 
 test("column candidates: auto expands 1..4, fixed pins", () => {
@@ -410,9 +470,18 @@ test("more columns than items is rejected", () => {
   assert.ok(layout.candidateViolations(c).includes("columns"));
 });
 
-test("an overlay legend covering shapes is rejected", () => {
+test("an automatic overlay legend covering shapes is rejected", () => {
   const c = validCandidate({ overlay: true, overlapsShapes: true });
   assert.ok(layout.candidateViolations(c).includes("overlap"));
+});
+
+test("an explicit overlay layout permits covering shapes", () => {
+  const c = validCandidate({
+    overlay: true,
+    allowOverlap: true,
+    overlapsShapes: true,
+  });
+  assert.ok(!layout.candidateViolations(c).includes("overlap"));
 });
 
 test("scoring prefers the preferred page height", () => {

@@ -1,7 +1,7 @@
 """Export-legend configuration semantics: inherit / auto / fixed + precedence.
 
-The export legend has four independent settings (placement, columns, item flow,
-maximum width). Each is resolved with explicit *inherit* (missing), *auto*
+The export legend has five independent settings (placement, map layout, columns,
+item flow, maximum width). Each is resolved with explicit *inherit* (missing), *auto*
 (decide automatically) and *fixed* semantics, with precedence page/region
 override -> stored theme config -> atlas defaults. These tests pin that
 resolution down directly and through the form and template tag.
@@ -28,6 +28,7 @@ from sources.waste_collection.waste_atlas.templatetags.atlas_tags import (
 
 ATLAS_DEFAULTS = {
     "placement": "auto",
+    "mapLayout": "auto",
     "columns": "auto",
     "itemFlow": "column",
     "maxWidthFraction": 0.52,
@@ -57,6 +58,7 @@ class ResolveExportLegendTests(TestCase):
             resolved,
             {
                 "placement": "auto",
+                "mapLayout": "auto",
                 "columns": "auto",
                 "itemFlow": "column",
                 "maxWidthFraction": 0.4,
@@ -66,7 +68,8 @@ class ResolveExportLegendTests(TestCase):
     def test_fixed_values_are_honoured(self):
         resolved = self._resolve(
             stored={
-                "exportLegendPlacement": "left",
+                "exportLegendPlacement": "top",
+                "exportLegendMapLayout": "fit",
                 "exportLegendColumns": 1,
                 "exportLegendItemFlow": "row",
                 "exportLegendWidth": 0.52,
@@ -75,7 +78,8 @@ class ResolveExportLegendTests(TestCase):
         self.assertEqual(
             resolved,
             {
-                "placement": "left",
+                "placement": "top",
+                "mapLayout": "fit",
                 "columns": 1,
                 "itemFlow": "row",
                 "maxWidthFraction": 0.52,
@@ -91,15 +95,17 @@ class ResolveExportLegendTests(TestCase):
             },
             page_overrides={
                 "exportLegendPlacement": "right",
+                "exportLegendMapLayout": "overlay",
                 "exportLegendColumns": 1,
                 "exportLegendItemFlow": "row",
             },
         )
-        # Placement/columns/flow come from the page; width inherits the theme.
+        # Placement/layout/columns/flow come from the page; width inherits the theme.
         self.assertEqual(
             resolved,
             {
                 "placement": "right",
+                "mapLayout": "overlay",
                 "columns": 1,
                 "itemFlow": "row",
                 "maxWidthFraction": 0.4,
@@ -112,6 +118,7 @@ class ResolveExportLegendTests(TestCase):
             resolved,
             {
                 "placement": "auto",
+                "mapLayout": "auto",
                 "columns": "auto",
                 "itemFlow": "column",
                 "maxWidthFraction": 0.7,
@@ -138,11 +145,13 @@ class ResolveExportLegendTests(TestCase):
         resolved = self._resolve(
             stored={
                 "exportLegendPlacement": "nonsense",
+                "exportLegendMapLayout": "nonsense",
                 "exportLegendColumns": 9,
                 "exportLegendItemFlow": "diagonal",
             }
         )
         self.assertEqual(resolved["placement"], "auto")
+        self.assertEqual(resolved["mapLayout"], "auto")
         self.assertEqual(resolved["columns"], "auto")
         self.assertEqual(resolved["itemFlow"], "column")
 
@@ -164,6 +173,7 @@ class AtlasJsConfigExportLegendTests(TestCase):
         # Flat/legacy layout keys are never emitted to the renderer.
         for key in (
             "exportLegendPlacement",
+            "exportLegendMapLayout",
             "exportLegendColumns",
             "exportLegendItemFlow",
             "exportLegendWidth",
@@ -172,7 +182,8 @@ class AtlasJsConfigExportLegendTests(TestCase):
 
     def test_stored_fixed_values_reach_the_resolved_object(self):
         self._store(
-            exportLegendPlacement="right",
+            exportLegendPlacement="bottom-right",
+            exportLegendMapLayout="fit",
             exportLegendColumns=1,
             exportLegendItemFlow="row",
             exportLegendWidth=0.52,
@@ -180,7 +191,8 @@ class AtlasJsConfigExportLegendTests(TestCase):
         self.assertEqual(
             self._config()["exportLegend"],
             {
-                "placement": "right",
+                "placement": "bottom-right",
+                "mapLayout": "fit",
                 "columns": 1,
                 "itemFlow": "row",
                 "maxWidthFraction": 0.52,
@@ -212,6 +224,7 @@ class ExportLegendFormSemanticsTests(TestCase):
             "legend_width": 300,
             "legend_font_size": 12,
             "export_legend_placement": "auto",
+            "export_legend_map_layout": "",
             "export_legend_columns": "auto",
             "export_legend_item_flow": "column",
             "export_legend_width": 52,
@@ -245,6 +258,7 @@ class ExportLegendFormSemanticsTests(TestCase):
         configuration.refresh_from_db()
         for key in (
             "exportLegendPlacement",
+            "exportLegendMapLayout",
             "exportLegendColumns",
             "exportLegendItemFlow",
             "exportLegendWidth",
@@ -268,8 +282,43 @@ class ExportLegendFormSemanticsTests(TestCase):
 
         configuration.refresh_from_db()
         self.assertEqual(configuration.configuration["exportLegendPlacement"], "auto")
+        self.assertNotIn("exportLegendMapLayout", configuration.configuration)
         self.assertEqual(configuration.configuration["exportLegendColumns"], "auto")
         self.assertEqual(configuration.configuration["exportLegendWidth"], 0.52)
+
+    def test_bottom_right_can_fit_the_map_without_overlap(self):
+        configuration = self._configuration()
+        form = WasteAtlasMapConfigurationForm(
+            data=self._base_data(
+                configuration,
+                export_legend_customize="on",
+                export_legend_placement="bottom-right",
+                export_legend_map_layout="fit",
+            ),
+            instance=configuration,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(
+            [value for value, _label in form.fields["export_legend_placement"].choices],
+            [
+                "auto",
+                "top-left",
+                "top",
+                "top-right",
+                "right",
+                "bottom-right",
+                "bottom",
+                "bottom-left",
+                "left",
+            ],
+        )
+        form.save()
+
+        configuration.refresh_from_db()
+        self.assertEqual(
+            configuration.configuration["exportLegendPlacement"], "bottom-right"
+        )
+        self.assertEqual(configuration.configuration["exportLegendMapLayout"], "fit")
 
     def test_blank_maximum_width_preserves_inheritance(self):
         configuration = self._configuration()
@@ -338,6 +387,7 @@ class ExportLegendItemFlowFormTests(TestCase):
             "legend_font_size": 12,
             "export_legend_customize": "on",
             "export_legend_placement": "auto",
+            "export_legend_map_layout": "",
             "export_legend_columns": "2",
             "export_legend_item_flow": "row",
             "export_legend_width": 52,

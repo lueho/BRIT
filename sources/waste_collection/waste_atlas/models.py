@@ -353,12 +353,13 @@ class WasteAtlasRenderingSettings(models.Model):
     def export_legend_defaults(self):
         """Atlas-level fallback for the resolved export-legend config.
 
-        Placement and columns default to ``auto`` so, unless a theme or page
-        pins them, the layout engine chooses; the item flow and the width
-        fraction are the values stored on this row.
+        Placement, map layout and columns default to ``auto`` so, unless a
+        theme or page pins them, the layout engine chooses; the item flow and
+        the width fraction are the values stored on this row.
         """
         return {
             "placement": AUTO,
+            "mapLayout": AUTO,
             "columns": AUTO,
             "itemFlow": self.export_legend_item_flow,
             "maxWidthFraction": self.export_legend_width_fraction,

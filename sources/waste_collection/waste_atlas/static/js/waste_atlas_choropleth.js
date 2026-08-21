@@ -1405,7 +1405,7 @@ var WasteAtlasChoropleth = (function () {
       labelGap: 10,
       rowGap: 8,
       titleGap: 14,
-      columnGap: 34,
+      columnGap: 20,
       columnCount: columnCount || 1,
       itemFlow: itemFlow === 'row' ? 'row' : 'column',
       fontSize: _exportLegendFontSize(),
@@ -1472,8 +1472,19 @@ var WasteAtlasChoropleth = (function () {
     return x * y;
   }
 
-  function _mapBoundsForExtent(fitData, extent) {
-    var projection = d3.geoMercator().fitExtent(extent, fitData);
+  function _offsetProjection(projection, offsetX, offsetY) {
+    if (!offsetX && !offsetY) return projection;
+    var translation = projection.translate();
+    return projection.translate([
+      translation[0] + (offsetX || 0),
+      translation[1] + (offsetY || 0)
+    ]);
+  }
+
+  function _mapBoundsForExtent(fitData, extent, offsetX, offsetY) {
+    var projection = _offsetProjection(
+      d3.geoMercator().fitExtent(extent, fitData), offsetX, offsetY
+    );
     var bounds = d3.geoPath().projection(projection).bounds(fitData);
     return {
       x: bounds[0][0],
@@ -1486,8 +1497,12 @@ var WasteAtlasChoropleth = (function () {
 
   // Min/max projected x of the mapped geometry within a vertical band. Used to
   // tell whether a page corner is genuinely empty space beside the shapes.
-  function _projectedEdgesInBand(geometryData, fitData, extent, minY, maxY) {
-    var projection = d3.geoMercator().fitExtent(extent, fitData);
+  function _projectedEdgesInBand(
+    geometryData, fitData, extent, minY, maxY, offsetX, offsetY
+  ) {
+    var projection = _offsetProjection(
+      d3.geoMercator().fitExtent(extent, fitData), offsetX, offsetY
+    );
     var rightEdge = -Infinity;
     var leftEdge = Infinity;
     var previous = null;
@@ -1531,23 +1546,42 @@ var WasteAtlasChoropleth = (function () {
     return { left: leftEdge, right: rightEdge };
   }
 
+  function _horizontalCornerOffset(position, edges, legend, gap) {
+    if (position.indexOf('right') !== -1) {
+      if (edges.right === -Infinity) return 0;
+      return Math.min(0, legend.x - gap - edges.right);
+    }
+    if (edges.left === Infinity) return 0;
+    return Math.max(0, legend.x + legend.width + gap - edges.left);
+  }
+
   // ---- export legend layout (constraint-driven) ----------------------------
   // The renderer consumes one resolved config, ``cfg.exportLegend`` =
-  // { placement, columns, itemFlow, maxWidthFraction } with explicit auto/fixed
-  // values.
+  // { placement, mapLayout, columns, itemFlow, maxWidthFraction } with explicit
+  // auto/fixed values.
   // From it we generate candidate layouts, reject any that violate a hard
-  // invariant (clipping, empty map, unreadable text, or overlapping mapped
-  // geometry), then score the survivors deterministically.
+  // invariant (clipping, empty map, unreadable text, or disallowed overlap),
+  // then score the survivors deterministically.
 
   var EXPORT_LEGEND_MARGIN = 46;
   var EXPORT_LEGEND_TITLE_BLOCK = 46;
-  var EXPORT_LEGEND_GAP = 46;
-  // Placements that split the page so the map never sits under the legend.
-  var EXPORT_LEGEND_DEDICATED = ['right', 'left', 'bottom'];
-  // Page corners: valid only where there is genuinely empty space beside shapes.
-  var EXPORT_LEGEND_OVERLAY = [
-    'top-right', 'bottom-right', 'top-left', 'bottom-left'
+  var EXPORT_LEGEND_GAP = 24;
+  // The eight compass positions are independent from whether the map is fitted
+  // around the legend or the legend overlays the full map area.
+  var EXPORT_LEGEND_POSITIONS = [
+    'top-left', 'top', 'top-right', 'right',
+    'bottom-right', 'bottom', 'bottom-left', 'left'
   ];
+  var EXPORT_LEGEND_FIT_SIDES = {
+    'top-left': ['left', 'top'],
+    'top': ['top'],
+    'top-right': ['right', 'top'],
+    'right': ['right'],
+    'bottom-right': ['right', 'bottom'],
+    'bottom': ['bottom'],
+    'bottom-left': ['left', 'bottom'],
+    'left': ['left']
+  };
   // When no candidate is fully valid, the least-bad one is chosen by summed
   // violation cost first: clipping the legend or destroying the map area are
   // far worse than an over-wide column count or slightly tight text.
@@ -1591,18 +1625,22 @@ var WasteAtlasChoropleth = (function () {
       // Backward compatibility for any caller that still passes flat keys.
       resolved = {
         placement: cfg && cfg.exportLegendPlacement,
+        mapLayout: cfg && cfg.exportLegendMapLayout,
         columns: cfg && cfg.exportLegendColumns,
         itemFlow: cfg && cfg.exportLegendItemFlow,
         maxWidthFraction: cfg && cfg.exportLegendWidth
       };
     }
     var placement = resolved.placement || 'auto';
+    var mapLayout = resolved.mapLayout || atlasLegend.mapLayout || 'auto';
     var columns = resolved.columns == null ? 'auto' : resolved.columns;
     var maxWidthFraction = Number(resolved.maxWidthFraction) || fallbackWidth;
     var itemFlow = resolved.itemFlow;
+    if (mapLayout !== 'fit' && mapLayout !== 'overlay') mapLayout = 'auto';
     if (itemFlow !== 'row' && itemFlow !== 'column') itemFlow = fallbackItemFlow;
     return {
       placement: placement,
+      mapLayout: mapLayout,
       columns: columns,
       itemFlow: itemFlow,
       maxWidthFraction: maxWidthFraction
@@ -1618,8 +1656,28 @@ var WasteAtlasChoropleth = (function () {
 
   function _exportLegendPlacementCandidates(placement) {
     if (placement && placement !== 'auto') return [placement];
-    // Dedicated placements first: they never overlap and are preferred on ties.
-    return EXPORT_LEGEND_DEDICATED.concat(EXPORT_LEGEND_OVERLAY);
+    return EXPORT_LEGEND_POSITIONS.slice();
+  }
+
+  function _exportLegendLayoutCandidates(placement, mapLayout) {
+    var candidates = [];
+    _exportLegendPlacementCandidates(placement).forEach(function (position) {
+      if (mapLayout === 'fit') {
+        if (position.indexOf('-') !== -1) {
+          candidates.push({ position: position, mapLayout: 'fit', fitSide: 'shape-x' });
+        }
+        EXPORT_LEGEND_FIT_SIDES[position].forEach(function (fitSide) {
+          candidates.push({ position: position, mapLayout: 'fit', fitSide: fitSide });
+        });
+      } else if (mapLayout === 'overlay') {
+        candidates.push({ position: position, mapLayout: 'overlay', fitSide: null });
+      } else if (position.indexOf('-') === -1) {
+        candidates.push({ position: position, mapLayout: 'fit', fitSide: position });
+      } else {
+        candidates.push({ position: position, mapLayout: 'auto', fitSide: null });
+      }
+    });
+    return candidates;
   }
 
   function _exportLegendColumnCandidates(columns) {
@@ -1640,7 +1698,7 @@ var WasteAtlasChoropleth = (function () {
     ) {
       violations.push('clipped');
     }
-    if (candidate.mapWidth <= 0 || candidate.mapHeight <= 0) {
+    if (candidate.mapWidth <= 0 || candidate.mapHeight <= 0 || candidate.mapClipped) {
       violations.push('invalid-map');
     }
     if (candidate.textWidth < candidate.minTextWidth) {
@@ -1649,7 +1707,7 @@ var WasteAtlasChoropleth = (function () {
     if (candidate.columns > candidate.itemCount) {
       violations.push('columns');
     }
-    if (candidate.overlay && candidate.overlapsShapes) {
+    if (candidate.overlay && !candidate.allowOverlap && candidate.overlapsShapes) {
       violations.push('overlap');
     }
     return violations;
@@ -1666,18 +1724,50 @@ var WasteAtlasChoropleth = (function () {
       + usedAreaRatio * 500;
   }
 
+  function _positionExportLegend(position, legend, exportWidth, exportHeight) {
+    var left = EXPORT_LEGEND_MARGIN;
+    var right = exportWidth - EXPORT_LEGEND_MARGIN - legend.width;
+    var top = EXPORT_LEGEND_TITLE_BLOCK;
+    var bottom = exportHeight - EXPORT_LEGEND_MARGIN - legend.height;
+    var centerX = Math.round((exportWidth - legend.width) / 2);
+    var centerY = Math.round((top + exportHeight - EXPORT_LEGEND_MARGIN - legend.height) / 2);
+    return {
+      x: position.indexOf('left') !== -1 ? left
+        : (position.indexOf('right') !== -1 ? right : centerX),
+      y: position.indexOf('top') !== -1 ? top
+        : (position.indexOf('bottom') !== -1 ? bottom : centerY)
+    };
+  }
+
+  function _fitMapExtent(fitSide, legend, exportWidth, exportHeight) {
+    var extent = [
+      [EXPORT_LEGEND_MARGIN, EXPORT_LEGEND_TITLE_BLOCK],
+      [exportWidth - EXPORT_LEGEND_MARGIN, exportHeight - EXPORT_LEGEND_MARGIN]
+    ];
+    if (fitSide === 'right') {
+      extent[1][0] = legend.x - EXPORT_LEGEND_GAP;
+    } else if (fitSide === 'left') {
+      extent[0][0] = legend.x + legend.width + EXPORT_LEGEND_GAP;
+    } else if (fitSide === 'top') {
+      extent[0][1] = legend.y + legend.height + EXPORT_LEGEND_GAP;
+    } else if (fitSide === 'bottom') {
+      extent[1][1] = legend.y - EXPORT_LEGEND_GAP;
+    }
+    return extent;
+  }
+
   function _exportLayout(data, cfg) {
     // Ensure cfg._hasNoData is up to date before measuring the legend.
     _annotateFeatures(data, cfg);
-    var margin = EXPORT_LEGEND_MARGIN;
-    var titleBlock = EXPORT_LEGEND_TITLE_BLOCK;
     var gap = EXPORT_LEGEND_GAP;
     var exportWidth = _exportWidth();
     var preferredHeightMm = _exportDefaults().heightMm;
     // Country border for full maps, subdivisions for regional maps.
     var fitData = _fitGeometry(data, cfg);
     var resolved = _resolvedExportLegend(cfg);
-    var placements = _exportLegendPlacementCandidates(resolved.placement);
+    var layoutOptions = _exportLegendLayoutCandidates(
+      resolved.placement, resolved.mapLayout
+    );
     var columnOptions = _exportLegendColumnCandidates(resolved.columns);
     var maxLegendWidth = Math.round(exportWidth * resolved.maxWidthFraction);
     var minTextWidth = Math.max(40, Math.round(_exportLegendFontSize() * 2));
@@ -1700,12 +1790,13 @@ var WasteAtlasChoropleth = (function () {
     // A projected-edge scan is a full d3.geoStream pass; cache it by the exact
     // inputs that change the result (map extent and the vertical band).
     var edgesCache = {};
-    function projectedEdgesInBand(extent, minY, maxY) {
+    function projectedEdgesInBand(extent, minY, maxY, offsetX, offsetY) {
       var key = extent[0][0] + ',' + extent[0][1] + ','
-        + extent[1][0] + ',' + extent[1][1] + ':' + minY + ',' + maxY;
+        + extent[1][0] + ',' + extent[1][1] + ':' + minY + ',' + maxY
+        + ':' + (offsetX || 0) + ',' + (offsetY || 0);
       if (!(key in edgesCache)) {
         edgesCache[key] = _projectedEdgesInBand(
-          data.catchments, fitData, extent, minY, maxY
+          fitData, fitData, extent, minY, maxY, offsetX, offsetY
         );
       }
       return edgesCache[key];
@@ -1713,71 +1804,74 @@ var WasteAtlasChoropleth = (function () {
 
     _exportHeightCandidatesMm().forEach(function (heightMm) {
       var exportHeight = Math.round(heightMm / 25.4 * _exportDefaults().dpi);
-      placements.forEach(function (placement) {
-        var overlay = EXPORT_LEGEND_OVERLAY.indexOf(placement) !== -1;
+      layoutOptions.forEach(function (layoutOption) {
+        var overlay = layoutOption.fitSide === null;
+        var allowOverlap = layoutOption.mapLayout === 'overlay';
         columnOptions.forEach(function (columnCount) {
-          var legend = measureLegend(columnCount);
-          var x = margin;
-          var y = titleBlock;
-          var mapExtent = [[margin, titleBlock], [exportWidth - margin, exportHeight - margin]];
-          if (placement === 'right') {
-            x = exportWidth - margin - legend.width;
-            mapExtent = [[margin, titleBlock], [x - gap, exportHeight - margin]];
-          } else if (placement === 'left') {
-            x = margin;
-            mapExtent = [[x + legend.width + gap, titleBlock], [exportWidth - margin, exportHeight - margin]];
-          } else if (placement === 'bottom') {
-            x = Math.round((exportWidth - legend.width) / 2);
-            y = exportHeight - margin - legend.height;
-            mapExtent = [[margin, titleBlock], [exportWidth - margin, y - gap]];
-          } else if (placement === 'bottom-right') {
-            x = exportWidth - margin - legend.width;
-            y = exportHeight - margin - legend.height;
-          } else if (placement === 'bottom-left') {
-            x = margin;
-            y = exportHeight - margin - legend.height;
-          } else if (placement === 'top-right') {
-            x = exportWidth - margin - legend.width;
-            y = titleBlock;
-          } else if (placement === 'top-left') {
-            x = margin;
-            y = titleBlock;
-          }
-          legend = Object.assign({}, legend, { x: x, y: y });
-
+          var measuredLegend = measureLegend(columnCount);
+          var position = _positionExportLegend(
+            layoutOption.position, measuredLegend, exportWidth, exportHeight
+          );
+          var legend = Object.assign({}, measuredLegend, position);
+          var mapExtent = _fitMapExtent(
+            layoutOption.fitSide, legend, exportWidth, exportHeight
+          );
           var mapWidth = mapExtent[1][0] - mapExtent[0][0];
           var mapHeight = mapExtent[1][1] - mapExtent[0][1];
           var invalidMap = mapWidth <= 0 || mapHeight <= 0;
+          var mapOffsetX = 0;
+          var mapOffsetY = 0;
+          var shapeEdges = null;
+          if (layoutOption.fitSide === 'shape-x' && !invalidMap) {
+            shapeEdges = projectedEdgesInBand(
+              mapExtent, legend.y, legend.y + legend.height
+            );
+            mapOffsetX = _horizontalCornerOffset(
+              layoutOption.position, shapeEdges, legend, gap
+            );
+          }
           var mapBounds = invalidMap
             ? { x: 0, y: 0, width: 0, height: 0, scale: 0 }
-            : _mapBoundsForExtent(fitData, mapExtent);
+            : _mapBoundsForExtent(fitData, mapExtent, mapOffsetX, mapOffsetY);
+          var mapClipped = layoutOption.fitSide === 'shape-x' && (
+            !shapeEdges
+            || shapeEdges.left === Infinity
+            || shapeEdges.right === -Infinity
+            || mapBounds.x < EXPORT_LEGEND_MARGIN - 0.5
+            || mapBounds.x + mapBounds.width > exportWidth - EXPORT_LEGEND_MARGIN + 0.5
+            || mapBounds.y < EXPORT_LEGEND_TITLE_BLOCK - 0.5
+            || mapBounds.y + mapBounds.height > exportHeight - EXPORT_LEGEND_MARGIN + 0.5
+          );
 
-          // Overlay corners are only valid over genuinely empty space: the
-          // legend must clear the mapped geometry within its own vertical band.
+          // Automatic overlays remain valid only over genuinely empty space;
+          // an explicit overlay layout deliberately permits covering shapes.
           var overlapsShapes = false;
-          if (overlay && !invalidMap) {
-            var edges = projectedEdgesInBand(mapExtent, y, y + legend.height);
-            var isRight = placement.indexOf('right') !== -1;
-            if (isRight) {
-              overlapsShapes = edges.right !== -Infinity
-                && x < edges.right + gap;
-            } else {
-              overlapsShapes = edges.left !== Infinity
-                && x + legend.width > edges.left - gap;
-            }
+          if (overlay && !allowOverlap && !invalidMap) {
+            var edges = projectedEdgesInBand(
+              mapExtent, legend.y, legend.y + legend.height
+            );
+            overlapsShapes = edges.right !== -Infinity
+              && edges.left !== Infinity
+              && legend.x < edges.right + gap
+              && legend.x + legend.width > edges.left - gap;
           }
 
           candidates.push({
             order: order++,
-            name: placement,
+            name: layoutOption.position,
+            mapLayout: layoutOption.mapLayout,
             overlay: overlay,
+            allowOverlap: allowOverlap,
             columns: columnCount,
             heightMm: heightMm,
             height: exportHeight,
             legend: legend,
             mapExtent: mapExtent,
+            mapOffsetX: mapOffsetX,
+            mapOffsetY: mapOffsetY,
             mapWidth: mapWidth,
             mapHeight: mapHeight,
+            mapClipped: mapClipped,
             mapScale: mapBounds.scale,
             mapArea: mapBounds.width * mapBounds.height,
             legendArea: legend.width * legend.height,
@@ -1828,6 +1922,8 @@ var WasteAtlasChoropleth = (function () {
       widthMm: _exportDefaults().widthMm,
       heightMm: best.heightMm,
       mapExtent: best.mapExtent,
+      mapOffsetX: best.mapOffsetX,
+      mapOffsetY: best.mapOffsetY,
       showHeader: false,
       titleY: 50,
       subtitleY: 82,
@@ -2671,8 +2767,11 @@ var WasteAtlasChoropleth = (function () {
     var mapRoot = _svg.append('g').attr('class', 'layer-map-root');
     if (!layout.exportMode) _mapRoot = mapRoot;
 
-    var projection = d3.geoMercator()
-      .fitExtent(layout.mapExtent, fitData);
+    var projection = _offsetProjection(
+      d3.geoMercator().fitExtent(layout.mapExtent, fitData),
+      layout.mapOffsetX,
+      layout.mapOffsetY
+    );
     var path = d3.geoPath().projection(projection);
 
     // The ACPV markers are sized against the drawn map, not the canvas.
@@ -3868,6 +3967,8 @@ var WasteAtlasChoropleth = (function () {
       exportLegendLabel: _exportLegendLabel,
       legendItemFlow: _legendItemFlow,
       placementCandidates: _exportLegendPlacementCandidates,
+      layoutCandidates: _exportLegendLayoutCandidates,
+      horizontalCornerOffset: _horizontalCornerOffset,
       columnCandidates: _exportLegendColumnCandidates,
       distributeLegendItems: _distributeLegendItems,
       wrapTextToWidth: _wrapTextToWidth,

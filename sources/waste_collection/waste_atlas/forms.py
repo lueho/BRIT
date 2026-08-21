@@ -5,10 +5,13 @@ from django import forms
 from .legend import (
     AUTO,
     EXPORT_LEGEND_ITEM_FLOW_CHOICES,
+    EXPORT_LEGEND_MAP_LAYOUT_CHOICES,
     EXPORT_LEGEND_OVERRIDE_KEYS,
+    EXPORT_LEGEND_PLACEMENT_CHOICES,
     LEGACY_EXPORT_LEGEND_KEYS,
     normalize_columns,
     normalize_item_flow,
+    normalize_map_layout,
     normalize_placement,
     normalize_width_fraction,
     order_legend_values,
@@ -20,16 +23,6 @@ from .models import (
 )
 
 LEGEND_PLACEMENT_CHOICES = LEGEND_PLACEMENTS
-EXPORT_LEGEND_PLACEMENT_CHOICES = (
-    (AUTO, "Automatic"),
-    ("right", "Right of map"),
-    ("left", "Left of map"),
-    ("bottom", "Below map"),
-    ("bottom-right", "Page corner: bottom right"),
-    ("bottom-left", "Page corner: bottom left"),
-    ("top-right", "Page corner: top right"),
-    ("top-left", "Page corner: top left"),
-)
 EXPORT_LEGEND_COLUMN_CHOICES = (
     (AUTO, "Automatic"),
     ("1", "1"),
@@ -42,6 +35,10 @@ EXPORT_LEGEND_COLUMN_CHOICES = (
 EXPORT_LEGEND_ITEM_FLOW_FORM_CHOICES = (
     ("", "Atlas default"),
     *EXPORT_LEGEND_ITEM_FLOW_CHOICES,
+)
+EXPORT_LEGEND_MAP_LAYOUT_FORM_CHOICES = (
+    ("", "Automatic (atlas default)"),
+    *(choice for choice in EXPORT_LEGEND_MAP_LAYOUT_CHOICES if choice[0] != AUTO),
 )
 
 
@@ -95,8 +92,8 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         required=False,
         help_text=(
             "When off, every export of this map uses the atlas defaults. "
-            "Turn it on to set placement, columns, arrangement and maximum "
-            "width."
+            "Turn it on to set placement, map layout, columns, arrangement "
+            "and maximum width."
         ),
         widget=forms.CheckboxInput(
             attrs={
@@ -110,6 +107,16 @@ class WasteAtlasMapConfigurationForm(forms.Form):
         choices=EXPORT_LEGEND_PLACEMENT_CHOICES,
         required=False,
         help_text="Automatic lets the layout engine choose the best position.",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    export_legend_map_layout = forms.ChoiceField(
+        label="Map layout",
+        choices=EXPORT_LEGEND_MAP_LAYOUT_FORM_CHOICES,
+        required=False,
+        help_text=(
+            "Fit reserves space so the legend cannot overlap the map. Overlay "
+            "keeps the full map area and permits overlap."
+        ),
         widget=forms.Select(attrs={"class": "form-select"}),
     )
     export_legend_columns = forms.ChoiceField(
@@ -179,6 +186,13 @@ class WasteAtlasMapConfigurationForm(forms.Form):
             "export_legend_placement",
             normalize_placement(self._configuration.get("exportLegendPlacement"))
             or AUTO,
+        )
+        stored_map_layout = normalize_map_layout(
+            self._configuration.get("exportLegendMapLayout")
+        )
+        initial.setdefault(
+            "export_legend_map_layout",
+            "" if stored_map_layout in (None, AUTO) else stored_map_layout,
         )
         stored_columns = normalize_columns(
             self._configuration.get("exportLegendColumns")
@@ -345,6 +359,13 @@ class WasteAtlasMapConfigurationForm(forms.Form):
             configuration["exportLegendPlacement"] = (
                 self.cleaned_data.get("export_legend_placement") or AUTO
             )
+            map_layout = normalize_map_layout(
+                self.cleaned_data.get("export_legend_map_layout")
+            )
+            if map_layout in (None, AUTO):
+                configuration.pop("exportLegendMapLayout", None)
+            else:
+                configuration["exportLegendMapLayout"] = map_layout
             columns = self.cleaned_data.get("export_legend_columns") or AUTO
             configuration["exportLegendColumns"] = (
                 AUTO if columns == AUTO else int(columns)
