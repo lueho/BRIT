@@ -298,6 +298,7 @@ class CatchmentOrganicRatioSerializer(serializers.Serializer):
     organic_amount = serializers.FloatField(allow_null=True)
     residual_amount = serializers.FloatField(allow_null=True)
     ratio = serializers.FloatField(allow_null=True)
+    no_collection = serializers.BooleanField(default=False)
 
 
 class CatchmentMinBinSizeSerializer(serializers.Serializer):

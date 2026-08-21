@@ -261,6 +261,31 @@ test("quartile legend measurement creates the value/status break automatically",
   assert.equal(measured.columnGap, 20);
 });
 
+test("quartile statuses stay last and separate after configured range ordering", () => {
+  const measured = layout.measureExportLegend(
+    {
+      legendTitle: "Organic collection amount",
+      legendCategoryOrder: ["no_collection", "q4", "q3", "q2", "q1"],
+      categories: [
+        { value: "no_collection", label: "No separate collection" },
+        { value: "q1", label: "Q1", threshold: 1 },
+        { value: "q2", label: "Q2", threshold: 2 },
+        { value: "q3", label: "Q3", threshold: 3 },
+        { value: "q4", label: "Q4", threshold: Infinity },
+      ],
+    },
+    1000,
+    3,
+    "column",
+  );
+
+  assert.deepEqual(
+    measured.columns.map((column) => column.map((item) => item.value)),
+    [["q4", "q3"], ["q2", "q1"], ["no_collection"]],
+  );
+  assert.equal(measured.columns[2][0].breakBefore, true);
+});
+
 test("a configured legend note is measured as a separated export footnote", () => {
   const measured = layout.measureExportLegend(
     {

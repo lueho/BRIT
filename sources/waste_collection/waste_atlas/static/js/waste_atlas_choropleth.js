@@ -1281,28 +1281,28 @@ var WasteAtlasChoropleth = (function () {
   }
 
   // Computed value ranges have thresholds; preserved classes, conflict aids
-  // and fallback no-data entries are statuses. When the statuses form one
-  // trailing group, expose that natural boundary to the column distributor.
+  // and fallback no-data entries are statuses. Keep each configured order within
+  // its semantic group, then expose their boundary to the column distributor.
   // A map may instead declare explicit category-value boundaries when its
   // semantic groups are not inferred from numeric ranges.
   function _markTrailingLegendStatuses(cfg, items) {
     var columnBreakBefore = Array.isArray(cfg.legendColumnBreakBefore)
       ? cfg.legendColumnBreakBefore
       : [];
-    var lastValueRange = -1;
-    items.forEach(function (item, index) {
-      if (item.threshold != null) lastValueRange = index;
+    items.forEach(function (item) {
       delete item.breakBefore;
     });
-    items.forEach(function (item) {
-      if (columnBreakBefore.indexOf(item.value) !== -1) item.breakBefore = true;
-    });
-    if (columnBreakBefore.length) return items;
-    if (lastValueRange < 0 || lastValueRange === items.length - 1) return items;
-    var trailingItemsAreStatuses = items.slice(lastValueRange + 1).every(function (item) {
-      return item.threshold == null;
-    });
-    if (trailingItemsAreStatuses) items[lastValueRange + 1].breakBefore = true;
+    if (columnBreakBefore.length) {
+      items.forEach(function (item) {
+        if (columnBreakBefore.indexOf(item.value) !== -1) item.breakBefore = true;
+      });
+      return items;
+    }
+    var valueRanges = items.filter(function (item) { return item.threshold != null; });
+    var statuses = items.filter(function (item) { return item.threshold == null; });
+    if (!valueRanges.length || !statuses.length) return items;
+    items = valueRanges.concat(statuses);
+    items[valueRanges.length].breakBefore = true;
     return items;
   }
 
@@ -2090,8 +2090,17 @@ var WasteAtlasChoropleth = (function () {
     );
     if (!categories) return baseCfg;
 
+    var configuredCategories = {};
+    baseCfg.categories.forEach(function (category) {
+      configuredCategories[category.value] = category;
+    });
     var allCategories = preservedCategories.concat(specialCases.map(function (sc) {
-      return { value: sc.classValue, label: sc.label, color: sc.color };
+      var configured = configuredCategories[sc.classValue];
+      return Object.assign({}, configured || {}, {
+        value: sc.classValue,
+        label: configured && configured.label != null ? configured.label : sc.label,
+        color: configured && configured.color != null ? configured.color : sc.color
+      });
     })).filter(function (cat, index, items) {
       return items.findIndex(function (item) { return item.value === cat.value; }) === index;
     }).concat(categories);
@@ -2618,7 +2627,9 @@ var WasteAtlasChoropleth = (function () {
     organicWasteRatio: function (records) {
       return records.map(function (r) {
         var cls;
-        if (r.ratio === null) {
+        if (r.no_collection) {
+          cls = 'no_collection';
+        } else if (r.ratio === null) {
           cls = null;
         } else if (r.ratio > 0.66) {
           cls = 'very_high';
