@@ -7,6 +7,7 @@ override -> stored theme config -> atlas defaults. These tests pin that
 resolution down directly and through the form and template tag.
 """
 
+from django import forms
 from django.template import Context
 from django.test import TestCase
 
@@ -319,6 +320,47 @@ class ExportLegendFormSemanticsTests(TestCase):
             configuration.configuration["exportLegendPlacement"], "bottom-right"
         )
         self.assertEqual(configuration.configuration["exportLegendMapLayout"], "fit")
+
+    def test_legend_text_fields_preserve_manual_line_breaks(self):
+        configuration = self._configuration()
+        form = WasteAtlasMapConfigurationForm(
+            data=self._base_data(
+                configuration,
+                legend_title="Preview title line 1\nPreview title line 2",
+                export_legend_title="Export title line 1\nExport title line 2",
+                category_0_label="Preview label line 1\nPreview label line 2",
+                category_0_export_label="Export label line 1\nExport label line 2",
+            ),
+            instance=configuration,
+        )
+
+        self.assertIsInstance(form.fields["legend_title"].widget, forms.Textarea)
+        self.assertIsInstance(form.fields["export_legend_title"].widget, forms.Textarea)
+        self.assertIsInstance(form.fields["category_0_label"].widget, forms.Textarea)
+        self.assertIsInstance(
+            form.fields["category_0_export_label"].widget,
+            forms.Textarea,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+
+        configuration.refresh_from_db()
+        self.assertEqual(
+            configuration.configuration["legendTitle"],
+            "Preview title line 1\nPreview title line 2",
+        )
+        self.assertEqual(
+            configuration.configuration["exportLegendTitle"],
+            "Export title line 1\nExport title line 2",
+        )
+        self.assertEqual(
+            configuration.configuration["categories"][0]["label"],
+            "Preview label line 1\nPreview label line 2",
+        )
+        self.assertEqual(
+            configuration.configuration["categories"][0]["exportLabel"],
+            "Export label line 1\nExport label line 2",
+        )
 
     def test_blank_maximum_width_preserves_inheritance(self):
         configuration = self._configuration()

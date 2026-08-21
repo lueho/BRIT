@@ -286,6 +286,27 @@ test("quartile statuses stay last and separate after configured range ordering",
   assert.equal(measured.columns[2][0].breakBefore, true);
 });
 
+test("manual legend-label line breaks are preserved during wrapping", () => {
+  const measured = layout.measureExportLegend(
+    {
+      legendTitle: "Legend",
+      categories: [
+        {
+          value: "a",
+          label: "Preview line 1\nPreview line 2",
+          exportLabel: "Export line 1\nExport line 2",
+          color: "#111111",
+        },
+      ],
+    },
+    1000,
+    1,
+    "column",
+  );
+
+  assert.deepEqual(measured.items[0].lines, ["Export line 1", "Export line 2"]);
+});
+
 test("a configured legend note is measured as a separated export footnote", () => {
   const measured = layout.measureExportLegend(
     {
@@ -388,6 +409,20 @@ test("the export legend title is measured in the bold face it is printed in", ()
     assert.ok(line.length * 12 <= maxWidth, line);
   });
   assert.ok(fonts.some((font) => font.indexOf("bold") === 0));
+});
+
+test("fitted title width includes slash-spacing normalization", () => {
+  const opts = layout.measureExportLegend(
+    {
+      legendTitle: "Collected amount (kg/cap/a)",
+      categories: [{ value: "q1", label: "Q1", color: "#000000" }],
+    },
+    1000,
+    1,
+    "column",
+  );
+
+  assert.deepEqual(opts.titleLines, ["Collected amount (kg / cap / a)"]);
 });
 
 test("a row-flow column is measured on the slot heights, so columns stay aligned", () => {
