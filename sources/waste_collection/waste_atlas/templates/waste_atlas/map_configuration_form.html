@@ -49,12 +49,14 @@
         <div class="col-12 col-lg-6">
           <label class="form-label" for="{{ form.legend_title.id_for_label }}">{{ form.legend_title.label }}</label>
           {{ form.legend_title }}
+          <div class="form-text">{{ form.legend_title.help_text }}</div>
           {{ form.legend_title.errors }}
         </div>
         <div class="col-12 col-lg-6">
           <label class="form-label"
                  for="{{ form.export_legend_title.id_for_label }}">{{ form.export_legend_title.label }}</label>
           {{ form.export_legend_title }}
+          <div class="form-text">{{ form.export_legend_title.help_text }}</div>
           {{ form.export_legend_title.errors }}
         </div>
         <div class="col-12">
@@ -145,6 +147,9 @@
     </fieldset>
     <fieldset class="mb-4">
       <legend class="h5">Categories</legend>
+      <p class="text-muted small mb-3">
+        Press Enter in a preview or export name to force a legend line break.
+      </p>
       <div class="form-check mb-3">
         {{ form.show_only_present_categories }}
         <label class="form-check-label"

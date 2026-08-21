@@ -47,6 +47,7 @@ class WasteAtlasMapConfigurationForm(forms.Form):
 
     legend_title = forms.CharField(
         label="Legend title",
+        help_text="Press Enter to force a line break.",
         widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
     )
     legend_note = forms.CharField(
@@ -58,6 +59,7 @@ class WasteAtlasMapConfigurationForm(forms.Form):
     export_legend_title = forms.CharField(
         label="Export legend title (optional)",
         required=False,
+        help_text="Press Enter to force a line break.",
         widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
     )
     legend_placement = forms.ChoiceField(
@@ -229,13 +231,13 @@ class WasteAtlasMapConfigurationForm(forms.Form):
             self.fields[f"category_{index}_label"] = forms.CharField(
                 label="Preview name",
                 initial=category.get("label", ""),
-                widget=forms.TextInput(attrs={"class": "form-control"}),
+                widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
             )
             self.fields[f"category_{index}_export_label"] = forms.CharField(
                 label="Export name (optional)",
                 initial=category.get("exportLabel", ""),
                 required=False,
-                widget=forms.TextInput(attrs={"class": "form-control"}),
+                widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
             )
         entry_order = self._entry_order()
         for prefix, _value in self._entries():

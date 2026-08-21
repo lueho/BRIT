@@ -286,6 +286,27 @@ test("quartile statuses stay last and separate after configured range ordering",
   assert.equal(measured.columns[2][0].breakBefore, true);
 });
 
+test("manual legend-label line breaks are preserved during wrapping", () => {
+  const measured = layout.measureExportLegend(
+    {
+      legendTitle: "Legend",
+      categories: [
+        {
+          value: "a",
+          label: "Preview line 1\nPreview line 2",
+          exportLabel: "Export line 1\nExport line 2",
+          color: "#111111",
+        },
+      ],
+    },
+    1000,
+    1,
+    "column",
+  );
+
+  assert.deepEqual(measured.items[0].lines, ["Export line 1", "Export line 2"]);
+});
+
 test("a configured legend note is measured as a separated export footnote", () => {
   const measured = layout.measureExportLegend(
     {
