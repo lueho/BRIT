@@ -1495,40 +1495,46 @@ var WasteAtlasChoropleth = (function () {
     };
   }
 
-  // Min/max projected x of the mapped geometry within a vertical band. Used to
-  // tell whether a page corner is genuinely empty space beside the shapes.
-  function _projectedEdgesInBand(
-    geometryData, fitData, extent, minY, maxY, offsetX, offsetY
+  // Find the projected geometry range within a band on the other axis. Boundary
+  // crossings are interpolated so sparse polygon vertices do not hide overlap.
+  function _projectedRangeInBand(
+    geometryData, fitData, extent, bandAxis, minBand, maxBand, offsetX, offsetY
   ) {
     var projection = _offsetProjection(
       d3.geoMercator().fitExtent(extent, fitData), offsetX, offsetY
     );
-    var rightEdge = -Infinity;
-    var leftEdge = Infinity;
+    var minEdge = Infinity;
+    var maxEdge = -Infinity;
     var previous = null;
     var inLine = false;
-    function record(x, y) {
-      if (y >= minY && y <= maxY) {
-        rightEdge = Math.max(rightEdge, x);
-        leftEdge = Math.min(leftEdge, x);
+    function pointValues(x, y) {
+      return bandAxis === 'x'
+        ? { band: x, edge: y }
+        : { band: y, edge: x };
+    }
+    function record(point) {
+      if (point.band >= minBand && point.band <= maxBand) {
+        minEdge = Math.min(minEdge, point.edge);
+        maxEdge = Math.max(maxEdge, point.edge);
       }
     }
     var stream = {
       point: function (x, y) {
-        record(x, y);
-        if (inLine && previous && y !== previous[1]) {
-          [minY, maxY].forEach(function (boundaryY) {
-            var crossesBoundary = (previous[1] < boundaryY && y > boundaryY)
-              || (previous[1] > boundaryY && y < boundaryY);
+        var current = pointValues(x, y);
+        record(current);
+        if (inLine && previous && current.band !== previous.band) {
+          [minBand, maxBand].forEach(function (boundary) {
+            var crossesBoundary = (previous.band < boundary && current.band > boundary)
+              || (previous.band > boundary && current.band < boundary);
             if (crossesBoundary) {
-              var ratio = (boundaryY - previous[1]) / (y - previous[1]);
-              var crossingX = previous[0] + (x - previous[0]) * ratio;
-              rightEdge = Math.max(rightEdge, crossingX);
-              leftEdge = Math.min(leftEdge, crossingX);
+              var ratio = (boundary - previous.band) / (current.band - previous.band);
+              var crossing = previous.edge + (current.edge - previous.edge) * ratio;
+              minEdge = Math.min(minEdge, crossing);
+              maxEdge = Math.max(maxEdge, crossing);
             }
           });
         }
-        if (inLine) previous = [x, y];
+        if (inLine) previous = current;
       },
       lineStart: function () {
         inLine = true;
@@ -1543,7 +1549,25 @@ var WasteAtlasChoropleth = (function () {
       sphere: function () { }
     };
     d3.geoStream(geometryData, projection.stream(stream));
-    return { left: leftEdge, right: rightEdge };
+    return { min: minEdge, max: maxEdge };
+  }
+
+  function _projectedEdgesInBand(
+    geometryData, fitData, extent, minY, maxY, offsetX, offsetY
+  ) {
+    var range = _projectedRangeInBand(
+      geometryData, fitData, extent, 'y', minY, maxY, offsetX, offsetY
+    );
+    return { left: range.min, right: range.max };
+  }
+
+  function _projectedVerticalEdgesInBand(
+    geometryData, fitData, extent, minX, maxX, offsetX, offsetY
+  ) {
+    var range = _projectedRangeInBand(
+      geometryData, fitData, extent, 'x', minX, maxX, offsetX, offsetY
+    );
+    return { top: range.min, bottom: range.max };
   }
 
   function _horizontalCornerOffset(position, edges, legend, gap) {
@@ -1553,6 +1577,15 @@ var WasteAtlasChoropleth = (function () {
     }
     if (edges.left === Infinity) return 0;
     return Math.max(0, legend.x + legend.width + gap - edges.left);
+  }
+
+  function _verticalCornerOffset(position, edges, legend, gap) {
+    if (position.indexOf('bottom') !== -1) {
+      if (edges.bottom === -Infinity) return 0;
+      return Math.min(0, legend.y - gap - edges.bottom);
+    }
+    if (edges.top === Infinity) return 0;
+    return Math.max(0, legend.y + legend.height + gap - edges.top);
   }
 
   // ---- export legend layout (constraint-driven) ----------------------------
@@ -1665,6 +1698,7 @@ var WasteAtlasChoropleth = (function () {
       if (mapLayout === 'fit') {
         if (position.indexOf('-') !== -1) {
           candidates.push({ position: position, mapLayout: 'fit', fitSide: 'shape-x' });
+          candidates.push({ position: position, mapLayout: 'fit', fitSide: 'shape-y' });
         }
         EXPORT_LEGEND_FIT_SIDES[position].forEach(function (fitSide) {
           candidates.push({ position: position, mapLayout: 'fit', fitSide: fitSide });
@@ -1721,6 +1755,7 @@ var WasteAtlasChoropleth = (function () {
     return candidate.mapScale * 100000
       - (candidate.heightMm - preferredHeightMm) * 120000
       - candidate.wrappedLines * 4000
+      - (Math.abs(candidate.mapOffsetX || 0) + Math.abs(candidate.mapOffsetY || 0))
       + usedAreaRatio * 500;
   }
 
@@ -1788,15 +1823,26 @@ var WasteAtlasChoropleth = (function () {
       return measureCache[key];
     }
     // A projected-edge scan is a full d3.geoStream pass; cache it by the exact
-    // inputs that change the result (map extent and the vertical band).
+    // inputs that change the result (map extent, axis, band and offset).
     var edgesCache = {};
     function projectedEdgesInBand(extent, minY, maxY, offsetX, offsetY) {
-      var key = extent[0][0] + ',' + extent[0][1] + ','
+      var key = 'y:' + extent[0][0] + ',' + extent[0][1] + ','
         + extent[1][0] + ',' + extent[1][1] + ':' + minY + ',' + maxY
         + ':' + (offsetX || 0) + ',' + (offsetY || 0);
       if (!(key in edgesCache)) {
         edgesCache[key] = _projectedEdgesInBand(
           fitData, fitData, extent, minY, maxY, offsetX, offsetY
+        );
+      }
+      return edgesCache[key];
+    }
+    function projectedVerticalEdgesInBand(extent, minX, maxX, offsetX, offsetY) {
+      var key = 'x:' + extent[0][0] + ',' + extent[0][1] + ','
+        + extent[1][0] + ',' + extent[1][1] + ':' + minX + ',' + maxX
+        + ':' + (offsetX || 0) + ',' + (offsetY || 0);
+      if (!(key in edgesCache)) {
+        edgesCache[key] = _projectedVerticalEdgesInBand(
+          fitData, fitData, extent, minX, maxX, offsetX, offsetY
         );
       }
       return edgesCache[key];
@@ -1822,21 +1868,34 @@ var WasteAtlasChoropleth = (function () {
           var mapOffsetX = 0;
           var mapOffsetY = 0;
           var shapeEdges = null;
+          var shapeEdgesMissing = false;
           if (layoutOption.fitSide === 'shape-x' && !invalidMap) {
             shapeEdges = projectedEdgesInBand(
               mapExtent, legend.y, legend.y + legend.height
             );
+            shapeEdgesMissing = shapeEdges.left === Infinity
+              || shapeEdges.right === -Infinity;
             mapOffsetX = _horizontalCornerOffset(
+              layoutOption.position, shapeEdges, legend, gap
+            );
+          } else if (layoutOption.fitSide === 'shape-y' && !invalidMap) {
+            shapeEdges = projectedVerticalEdgesInBand(
+              mapExtent, legend.x, legend.x + legend.width
+            );
+            shapeEdgesMissing = shapeEdges.top === Infinity
+              || shapeEdges.bottom === -Infinity;
+            mapOffsetY = _verticalCornerOffset(
               layoutOption.position, shapeEdges, legend, gap
             );
           }
           var mapBounds = invalidMap
             ? { x: 0, y: 0, width: 0, height: 0, scale: 0 }
             : _mapBoundsForExtent(fitData, mapExtent, mapOffsetX, mapOffsetY);
-          var mapClipped = layoutOption.fitSide === 'shape-x' && (
+          var shapeFit = layoutOption.fitSide === 'shape-x'
+            || layoutOption.fitSide === 'shape-y';
+          var mapClipped = shapeFit && (
             !shapeEdges
-            || shapeEdges.left === Infinity
-            || shapeEdges.right === -Infinity
+            || shapeEdgesMissing
             || mapBounds.x < EXPORT_LEGEND_MARGIN - 0.5
             || mapBounds.x + mapBounds.width > exportWidth - EXPORT_LEGEND_MARGIN + 0.5
             || mapBounds.y < EXPORT_LEGEND_TITLE_BLOCK - 0.5
@@ -3969,6 +4028,7 @@ var WasteAtlasChoropleth = (function () {
       placementCandidates: _exportLegendPlacementCandidates,
       layoutCandidates: _exportLegendLayoutCandidates,
       horizontalCornerOffset: _horizontalCornerOffset,
+      verticalCornerOffset: _verticalCornerOffset,
       columnCandidates: _exportLegendColumnCandidates,
       distributeLegendItems: _distributeLegendItems,
       wrapTextToWidth: _wrapTextToWidth,

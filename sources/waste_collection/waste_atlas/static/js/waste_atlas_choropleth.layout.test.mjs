@@ -393,6 +393,7 @@ test("placement candidates: auto expands to eight positions and fixed pins", () 
 test("fit and overlay are independent from a corner position", () => {
   assert.deepEqual(layout.layoutCandidates("bottom-right", "fit"), [
     { position: "bottom-right", mapLayout: "fit", fitSide: "shape-x" },
+    { position: "bottom-right", mapLayout: "fit", fitSide: "shape-y" },
     { position: "bottom-right", mapLayout: "fit", fitSide: "right" },
     { position: "bottom-right", mapLayout: "fit", fitSide: "bottom" },
   ]);
@@ -426,6 +427,37 @@ test("corner fitting shifts only as far as the legend band requires", () => {
       "bottom-left",
       { left: 360, right: 800 },
       { x: 46, width: 300 },
+      24,
+    ),
+    10,
+  );
+});
+
+test("corner fitting can shift vertically instead of shrinking", () => {
+  const legend = { y: 900, height: 200 };
+  assert.equal(
+    layout.verticalCornerOffset(
+      "bottom-right",
+      { top: 300, bottom: 950 },
+      legend,
+      24,
+    ),
+    -74,
+  );
+  assert.equal(
+    layout.verticalCornerOffset(
+      "bottom-right",
+      { top: 300, bottom: 850 },
+      legend,
+      24,
+    ),
+    0,
+  );
+  assert.equal(
+    layout.verticalCornerOffset(
+      "top-left",
+      { top: 260, bottom: 800 },
+      { y: 46, height: 200 },
       24,
     ),
     10,
@@ -493,6 +525,18 @@ test("scoring prefers the preferred page height", () => {
 function scoredCandidate(violations, score) {
   return { violations, violationCost: layout.candidateViolationCost({ violations }), score };
 }
+
+test("scoring prefers the smaller shape-aware shift at equal scale", () => {
+  const horizontal = layout.scoreCandidate(
+    validCandidate({ mapOffsetX: -80, mapOffsetY: 0 }),
+    110,
+  );
+  const vertical = layout.scoreCandidate(
+    validCandidate({ mapOffsetX: 0, mapOffsetY: -20 }),
+    110,
+  );
+  assert.ok(vertical > horizontal);
+});
 
 test("violation cost sums per-violation weights", () => {
   assert.equal(layout.candidateViolationCost({ violations: [] }), 0);
