@@ -411,6 +411,20 @@ test("the export legend title is measured in the bold face it is printed in", ()
   assert.ok(fonts.some((font) => font.indexOf("bold") === 0));
 });
 
+test("fitted title width includes slash-spacing normalization", () => {
+  const opts = layout.measureExportLegend(
+    {
+      legendTitle: "Collected amount (kg/cap/a)",
+      categories: [{ value: "q1", label: "Q1", color: "#000000" }],
+    },
+    1000,
+    1,
+    "column",
+  );
+
+  assert.deepEqual(opts.titleLines, ["Collected amount (kg / cap / a)"]);
+});
+
 test("a row-flow column is measured on the slot heights, so columns stay aligned", () => {
   // The screen legend shares this measurement, so a wrapped (taller) entry may
   // not push its column out of step with its neighbour.

@@ -1166,14 +1166,29 @@ var WasteAtlasChoropleth = (function () {
     return _measureCtx.measureText(text).width;
   }
 
+  function _normalizeWrappedSegment(segment) {
+    return String(segment)
+      .replace(/\s*\/\s*/g, ' / ')
+      .replace(/\s*[–—]\s*/g, ' – ')
+      .split(/\s+/)
+      .filter(function (word) { return word.length > 0; })
+      .join(' ');
+  }
+
+  function _widestExplicitLineWidth(label, fontSize, font) {
+    return String(label).split(/\r?\n/).reduce(function (widest, segment) {
+      return Math.max(
+        widest,
+        _measureTextWidth(_normalizeWrappedSegment(segment), fontSize, font)
+      );
+    }, 0);
+  }
+
   function _wrapTextToWidth(label, maxWidth, fontSize, font) {
     var lines = [];
     String(label).split(/\r?\n/).forEach(function (segment) {
-      var words = segment
-        .replace(/\s*\/\s*/g, ' / ')
-        .replace(/\s*[–—]\s*/g, ' – ')
-        .split(/\s+/)
-        .filter(function (word) { return word.length > 0; });
+      var normalized = _normalizeWrappedSegment(segment);
+      var words = normalized ? normalized.split(' ') : [];
       var current = '';
       words.forEach(function (word) {
         var next = current ? current + ' ' + word : word;
@@ -1310,21 +1325,21 @@ var WasteAtlasChoropleth = (function () {
   // column count. Applied to every legend: the engine never uses more width
   // than the content needs, whether the legend has one column or several.
   function _fitExportLegendWidth(cfg, maxWidth, opts) {
-    var titleWidth = String(cfg.exportLegendTitle || cfg.legendTitle || '')
-      .split(/\r?\n/)
-      .reduce(function (widest, line) {
-        return Math.max(
-          widest,
-          _measureTextWidth(line, opts.titleFontSize, EXPORT_TITLE_FONT)
-        );
-      }, 0);
+    var titleWidth = _widestExplicitLineWidth(
+      cfg.exportLegendTitle || cfg.legendTitle || '',
+      opts.titleFontSize,
+      EXPORT_TITLE_FONT
+    );
     var labelWidth = _legendItems(cfg, true).reduce(function (widest, item) {
-      return Math.max(widest, _measureTextWidth(item.label, opts.fontSize));
+      return Math.max(
+        widest,
+        _widestExplicitLineWidth(item.label, opts.fontSize)
+      );
     }, 0);
-    var footnoteWidth = _legendFootnoteLabel(cfg, true).split(/\r?\n/)
-      .reduce(function (widest, line) {
-        return Math.max(widest, _measureTextWidth(line, Math.round(opts.fontSize * 0.82)));
-      }, 0);
+    var footnoteWidth = _widestExplicitLineWidth(
+      _legendFootnoteLabel(cfg, true),
+      Math.round(opts.fontSize * 0.82)
+    );
     var columnContent = opts.swatchW + opts.labelGap + labelWidth;
     var columnsWidth = opts.columnCount * columnContent
       + (opts.columnCount - 1) * opts.columnGap;
