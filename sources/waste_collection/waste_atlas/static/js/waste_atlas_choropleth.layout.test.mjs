@@ -44,6 +44,7 @@ function renderDefaults(exportLegend = {}) {
     exportLegend: Object.assign(
       {
         placement: "auto",
+        mapLayout: "auto",
         columns: "auto",
         itemFlow: "column",
         maxWidthFraction: 0.52,
@@ -99,6 +100,7 @@ test("resolveExportLegend returns explicit auto values verbatim", () => {
     }),
     {
       placement: "auto",
+      mapLayout: "auto",
       columns: "auto",
       itemFlow: "column",
       maxWidthFraction: 0.4,
@@ -110,19 +112,27 @@ test("resolveExportLegend keeps fixed values", () => {
   assert.deepEqual(
     layout.resolveExportLegend({
       exportLegend: {
-        placement: "left",
+        placement: "top",
+        mapLayout: "fit",
         columns: 2,
         itemFlow: "row",
         maxWidthFraction: 0.38,
       },
     }),
-    { placement: "left", columns: 2, itemFlow: "row", maxWidthFraction: 0.38 },
+    {
+      placement: "top",
+      mapLayout: "fit",
+      columns: 2,
+      itemFlow: "row",
+      maxWidthFraction: 0.38,
+    },
   );
 });
 
 test("resolveExportLegend falls back to atlas defaults when absent", () => {
   assert.deepEqual(layout.resolveExportLegend({}), {
     placement: "auto",
+    mapLayout: "auto",
     columns: "auto",
     itemFlow: "column",
     maxWidthFraction: 0.52,
@@ -248,6 +258,32 @@ test("quartile legend measurement creates the value/status break automatically",
     measured.columns.map((column) => column.map((item) => item.value || item.label)),
     [["q1", "q2", "q3", "q4"], ["no_bio", "No data"]],
   );
+  assert.equal(measured.columnGap, 20);
+});
+
+test("quartile statuses stay last and separate after configured range ordering", () => {
+  const measured = layout.measureExportLegend(
+    {
+      legendTitle: "Organic collection amount",
+      legendCategoryOrder: ["no_collection", "q4", "q3", "q2", "q1"],
+      categories: [
+        { value: "no_collection", label: "No separate collection" },
+        { value: "q1", label: "Q1", threshold: 1 },
+        { value: "q2", label: "Q2", threshold: 2 },
+        { value: "q3", label: "Q3", threshold: 3 },
+        { value: "q4", label: "Q4", threshold: Infinity },
+      ],
+    },
+    1000,
+    3,
+    "column",
+  );
+
+  assert.deepEqual(
+    measured.columns.map((column) => column.map((item) => item.value)),
+    [["q4", "q3"], ["q2", "q1"], ["no_collection"]],
+  );
+  assert.equal(measured.columns[2][0].breakBefore, true);
 });
 
 test("a configured legend note is measured as a separated export footnote", () => {
@@ -365,11 +401,92 @@ test("a row-flow column is measured on the slot heights, so columns stay aligned
   );
 });
 
-test("placement candidates: auto expands, fixed pins", () => {
-  const auto = layout.placementCandidates("auto");
-  assert.deepEqual(auto.slice(0, 3), ["right", "left", "bottom"]);
-  assert.equal(auto.length, 7);
+test("placement candidates: auto expands to eight positions and fixed pins", () => {
+  assert.deepEqual(layout.placementCandidates("auto"), [
+    "top-left",
+    "top",
+    "top-right",
+    "right",
+    "bottom-right",
+    "bottom",
+    "bottom-left",
+    "left",
+  ]);
   assert.deepEqual(layout.placementCandidates("left"), ["left"]);
+});
+
+test("fit and overlay are independent from a corner position", () => {
+  assert.deepEqual(layout.layoutCandidates("bottom-right", "fit"), [
+    { position: "bottom-right", mapLayout: "fit", fitSide: "shape-x" },
+    { position: "bottom-right", mapLayout: "fit", fitSide: "shape-y" },
+    { position: "bottom-right", mapLayout: "fit", fitSide: "right" },
+    { position: "bottom-right", mapLayout: "fit", fitSide: "bottom" },
+  ]);
+  assert.deepEqual(layout.layoutCandidates("bottom-right", "overlay"), [
+    { position: "bottom-right", mapLayout: "overlay", fitSide: null },
+  ]);
+});
+
+test("corner fitting shifts only as far as the legend band requires", () => {
+  const legend = { x: 440, width: 400 };
+  assert.equal(
+    layout.horizontalCornerOffset(
+      "bottom-right",
+      { left: 120, right: 500 },
+      legend,
+      24,
+    ),
+    -84,
+  );
+  assert.equal(
+    layout.horizontalCornerOffset(
+      "bottom-right",
+      { left: 120, right: 400 },
+      legend,
+      24,
+    ),
+    0,
+  );
+  assert.equal(
+    layout.horizontalCornerOffset(
+      "bottom-left",
+      { left: 360, right: 800 },
+      { x: 46, width: 300 },
+      24,
+    ),
+    10,
+  );
+});
+
+test("corner fitting can shift vertically instead of shrinking", () => {
+  const legend = { y: 900, height: 200 };
+  assert.equal(
+    layout.verticalCornerOffset(
+      "bottom-right",
+      { top: 300, bottom: 950 },
+      legend,
+      24,
+    ),
+    -74,
+  );
+  assert.equal(
+    layout.verticalCornerOffset(
+      "bottom-right",
+      { top: 300, bottom: 850 },
+      legend,
+      24,
+    ),
+    0,
+  );
+  assert.equal(
+    layout.verticalCornerOffset(
+      "top-left",
+      { top: 260, bottom: 800 },
+      { y: 46, height: 200 },
+      24,
+    ),
+    10,
+  );
 });
 
 test("column candidates: auto expands 1..4, fixed pins", () => {
@@ -410,9 +527,18 @@ test("more columns than items is rejected", () => {
   assert.ok(layout.candidateViolations(c).includes("columns"));
 });
 
-test("an overlay legend covering shapes is rejected", () => {
+test("an automatic overlay legend covering shapes is rejected", () => {
   const c = validCandidate({ overlay: true, overlapsShapes: true });
   assert.ok(layout.candidateViolations(c).includes("overlap"));
+});
+
+test("an explicit overlay layout permits covering shapes", () => {
+  const c = validCandidate({
+    overlay: true,
+    allowOverlap: true,
+    overlapsShapes: true,
+  });
+  assert.ok(!layout.candidateViolations(c).includes("overlap"));
 });
 
 test("scoring prefers the preferred page height", () => {
@@ -424,6 +550,18 @@ test("scoring prefers the preferred page height", () => {
 function scoredCandidate(violations, score) {
   return { violations, violationCost: layout.candidateViolationCost({ violations }), score };
 }
+
+test("scoring prefers the smaller shape-aware shift at equal scale", () => {
+  const horizontal = layout.scoreCandidate(
+    validCandidate({ mapOffsetX: -80, mapOffsetY: 0 }),
+    110,
+  );
+  const vertical = layout.scoreCandidate(
+    validCandidate({ mapOffsetX: 0, mapOffsetY: -20 }),
+    110,
+  );
+  assert.ok(vertical > horizontal);
+});
 
 test("violation cost sums per-violation weights", () => {
   assert.equal(layout.candidateViolationCost({ violations: [] }), 0);

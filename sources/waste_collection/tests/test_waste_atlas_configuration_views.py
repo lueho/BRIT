@@ -182,6 +182,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
                 legend_font_size=15,
                 export_legend_customize="on",
                 export_legend_placement="left",
+                export_legend_map_layout="fit",
                 export_legend_width=38,
                 export_legend_columns="2",
                 export_legend_item_flow="row",
@@ -223,6 +224,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         self.assertEqual(config.configuration["legendWidth"], 420)
         self.assertEqual(config.configuration["legendFontSize"], 15)
         self.assertEqual(config.configuration["exportLegendPlacement"], "left")
+        self.assertEqual(config.configuration["exportLegendMapLayout"], "fit")
         self.assertEqual(config.configuration["exportLegendWidth"], 0.38)
         self.assertEqual(config.configuration["exportLegendColumns"], 2)
         self.assertEqual(config.configuration["exportLegendItemFlow"], "row")
@@ -246,6 +248,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
             value.pop("legendWidth", None)
             value.pop("legendFontSize", None)
             value.pop("exportLegendPlacement", None)
+            value.pop("exportLegendMapLayout", None)
             value.pop("exportLegendWidth", None)
             value.pop("exportLegendColumns", None)
             value.pop("exportLegendItemFlow", None)
@@ -284,6 +287,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
             rendered_config["exportLegend"],
             {
                 "placement": "left",
+                "mapLayout": "fit",
                 "columns": 2,
                 "itemFlow": "row",
                 "maxWidthFraction": 0.38,
@@ -333,6 +337,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
             rendered_config["exportLegend"],
             {
                 "placement": "auto",
+                "mapLayout": "auto",
                 "columns": 1,
                 "itemFlow": "column",
                 "maxWidthFraction": 0.52,
@@ -551,6 +556,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
             rendered_config["exportLegend"],
             {
                 "placement": "top-left",
+                "mapLayout": "auto",
                 "columns": 2,
                 "itemFlow": "column",
                 "maxWidthFraction": 0.45,

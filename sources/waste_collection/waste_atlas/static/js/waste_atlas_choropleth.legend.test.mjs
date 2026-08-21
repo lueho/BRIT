@@ -158,6 +158,58 @@ test("biowaste fees distinguish non-door-to-door systems from missing data", () 
   );
 });
 
+test("organic waste ratios distinguish no collection from missing data", () => {
+  const classified = transforms.organicWasteRatio([
+    { catchment_id: 1, no_collection: true, ratio: null },
+    { catchment_id: 2, no_collection: false, ratio: null },
+  ]);
+
+  assert.deepEqual(
+    classified.map((row) => row._classified),
+    ["no_collection", null],
+  );
+});
+
+test("quartile special cases reuse editable category display metadata", () => {
+  const config = {
+    numericField: "ratio",
+    dataField: "_classified",
+    categories: [
+      {
+        value: "no_collection",
+        label: "No separate biowaste or green waste collection",
+        exportLabel: "No separate organic collection",
+        color: "#123456",
+      },
+    ],
+    quartileColors: ["#1", "#2", "#3", "#4"],
+    quartileSpecialCases: [
+      {
+        field: "no_collection",
+        classValue: "no_collection",
+        label: "Stale special-case label",
+        color: "#ffffff",
+      },
+    ],
+  };
+  const records = [
+    { catchment_id: 1, ratio: 0.1, no_collection: false },
+    { catchment_id: 2, ratio: 0.2, no_collection: false },
+    { catchment_id: 3, ratio: 0.3, no_collection: false },
+    { catchment_id: 4, ratio: 0.4, no_collection: false },
+    { catchment_id: 5, ratio: null, no_collection: true },
+  ];
+
+  const quartileConfig = quartiles.apply(config, records);
+  const category = quartileConfig.categories.find(
+    (entry) => entry.value === "no_collection",
+  );
+
+  assert.equal(category.label, "No separate biowaste or green waste collection");
+  assert.equal(category.exportLabel, "No separate organic collection");
+  assert.equal(category.color, "#123456");
+});
+
 test("connection-rate fixed bands keep full connection separate", () => {
   const classified = transforms.connectionRate([
     { catchment_id: 1, connection_rate: 1, is_door_to_door: true },

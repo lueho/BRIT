@@ -6,6 +6,9 @@ it is deliberately not asserted here.  These tests only cover the structure the
 renderer and the selector rely on.
 """
 
+from importlib import import_module
+
+from django.apps import apps
 from django.template import Context
 from django.test import TestCase
 from django.urls import Resolver404, resolve
@@ -281,6 +284,43 @@ class WasteAtlasMapConfigStructureTests(TestCase):
         self.assertEqual(special_case["classValue"], "no_collection")
         self.assertEqual(special_case["label"], "No separate collection")
         self.assertEqual(special_case["color"], no_collection_color())
+
+    def test_organic_ratio_distinguishes_no_collection_from_no_data(self):
+        stored = WasteAtlasMapConfiguration.objects.get(key="organic_waste_ratio")
+        configuration = dict(stored.configuration)
+        configuration["legendCategoryOrder"] = [
+            *[entry["value"] for entry in configuration["categories"]],
+            "no_collection",
+            "q1",
+            "q2",
+            "q3",
+            "q4",
+        ]
+        stored.configuration = configuration
+        stored.save(update_fields=["configuration"])
+
+        migration = import_module(
+            "sources.waste_collection.waste_atlas.migrations."
+            "0026_add_organic_ratio_no_collection"
+        )
+        migration.add_organic_ratio_no_collection(apps, None)
+        config = MAP_CONFIGS["organic_waste_ratio"]
+
+        category = next(
+            entry for entry in config["categories"] if entry["value"] == "no_collection"
+        )
+        special_case = next(
+            entry
+            for entry in config["quartileSpecialCases"]
+            if entry["field"] == "no_collection"
+        )
+
+        self.assertEqual(category["label"], "No separate collection")
+        self.assertEqual(category["color"], no_collection_color())
+        self.assertEqual(special_case["classValue"], "no_collection")
+        self.assertEqual(special_case["label"], "No separate collection")
+        self.assertEqual(special_case["color"], no_collection_color())
+        self.assertEqual(config["legendCategoryOrder"][-1], "no_collection")
 
     @staticmethod
     def _all_entries(config):

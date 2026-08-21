@@ -3982,6 +3982,17 @@ class OrganicAmountViewSetTests(APITestCase):
         self.assertIsNone(row["amount"])
         self.assertTrue(row["no_collection"])
 
+    def test_organic_ratio_marks_no_separate_collection(self):
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/organic-waste-ratio/",
+            {"country": "DE", "year": 2024},
+        )
+
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        row = by_catchment[self.catchment_no_collection.id]
+        self.assertIsNone(row["ratio"])
+        self.assertTrue(row["no_collection"])
+
     def test_organic_ratio_computed_correctly(self):
         """Karte 28 computes organic / (organic + residual) for catchments with both."""
         response = self.client.get(

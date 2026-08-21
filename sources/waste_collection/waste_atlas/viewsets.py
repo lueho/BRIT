@@ -3064,14 +3064,6 @@ def _get_organic_amount_rows(country, year, nuts_prefixes=(), user=None):
     return result
 
 
-def _get_organic_amounts(country, year, nuts_prefixes=(), user=None):
-    """Return per-catchment summed organic waste amount (kg/person/year)."""
-    return {
-        row["catchment_id"]: row["amount"]
-        for row in _get_organic_amount_rows(country, year, nuts_prefixes, user=user)
-    }
-
-
 class OrganicCollectionAmountViewSet(WasteAtlasViewSet):
     """Return aggregated organic waste amount per catchment (Karte 27).
 
@@ -3105,20 +3097,26 @@ class OrganicWasteRatioViewSet(WasteAtlasViewSet):
     permission_classes = [permissions.AllowAny]
 
     def list(self, request):
-        """Return a JSON array of {catchment_id, organic_amount, residual_amount, ratio}."""
+        """Return organic/residual amounts, ratio and collection status by catchment."""
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
-        organic = _get_organic_amounts(country, year, nuts_prefixes, user=request.user)
+        organic_map = {
+            row["catchment_id"]: row
+            for row in _get_organic_amount_rows(
+                country, year, nuts_prefixes, user=request.user
+            )
+        }
         res_map = {
             r["catchment_id"]: r["amount"]
             for r in _get_collection_amount(
                 country, year, ["Residual waste"], nuts_prefixes, user=request.user
             )
         }
-        all_ids = set(organic) | set(res_map)
+        all_ids = set(organic_map) | set(res_map)
         data = []
         for cid in all_ids:
-            o = organic.get(cid)
+            organic_row = organic_map.get(cid)
+            o = organic_row["amount"] if organic_row else None
             r = res_map.get(cid)
             if o is not None and r is not None and (o + r) > 0:
                 ratio = o / (o + r)
@@ -3130,6 +3128,7 @@ class OrganicWasteRatioViewSet(WasteAtlasViewSet):
                     "organic_amount": o,
                     "residual_amount": r,
                     "ratio": ratio,
+                    "no_collection": bool(organic_row and organic_row["no_collection"]),
                 }
             )
         serializer = CatchmentOrganicRatioSerializer(data, many=True)
