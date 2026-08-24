@@ -3454,6 +3454,27 @@ class GreenWasteCollectionAmountViewSetTests(APITestCase):
         agg.collections.set(collections)
         return agg
 
+    def test_zero_amounts_are_preserved_across_all_fallbacks(self):
+        CollectionPropertyValue.objects.filter(
+            collection__in=[self.specific_collection, self.total_collection]
+        ).update(average=0)
+        AggregatedCollectionPropertyValue.objects.filter(
+            collections__in=[self.agg_collection_a, self.agg_total_collection]
+        ).update(average=0)
+
+        response = self.client.get(self.endpoint, {"country": "DE", "year": 2024})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data_by_catchment = {row["catchment_id"]: row for row in response.data}
+        for catchment in (
+            self.catchment_agg,
+            self.catchment_specific,
+            self.catchment_total,
+            self.catchment_agg_total,
+        ):
+            with self.subTest(catchment=catchment.id):
+                self.assertEqual(data_by_catchment[catchment.id]["amount"], 0)
+
     def test_returns_green_waste_amount_with_aggregation_and_fallbacks(self):
         """It prefers aggregated specific values and falls back to specific/total."""
         response = self.client.get(self.endpoint, {"country": "DE", "year": 2024})
@@ -4587,19 +4608,30 @@ class BiowasteImpurityViewSetTests(APITestCase):
             valid_from=date(2024, 1, 1),
             publication_status="published",
         )
+        cls.collection_with_data_predecessor = Collection.objects.create(
+            name="Impurity With Data Bio Predecessor",
+            catchment=cls.catchment_with_data,
+            waste_category=cls.bio_category,
+            collection_system=cls.d2d,
+            valid_from=date(2020, 1, 1),
+            publication_status="archived",
+        )
+        cls.collection_with_data.predecessors.add(cls.collection_with_data_predecessor)
         CollectionPropertyValue.objects.create(
-            collection=cls.collection_with_data,
+            collection=cls.collection_with_data_predecessor,
             property=cls.impurity_property,
             unit=cls.pct_unit,
             year=2024,
             average=8.5,
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
-            collection=cls.collection_with_data,
+            collection=cls.collection_with_data_predecessor,
             property=cls.impurity_property,
             unit=cls.pct_unit,
             year=2020,
             average=12.5,
+            publication_status="published",
         )
 
         # Catchment B: DtD with no CPV → impurity_rate=null, no_collection=False
@@ -4637,7 +4669,7 @@ class BiowasteImpurityViewSetTests(APITestCase):
         response = self.client.get(self.endpoint, {"country": "ES", "year": 2024})
         self.assertEqual(response.status_code, 200)
 
-    def test_impurity_rate_returned_for_catchment_with_data(self):
+    def test_impurity_rate_returned_from_collection_version_chain(self):
         by_catchment = self._by_catchment()
         row = by_catchment[self.catchment_with_data.id]
         self.assertEqual(row["impurity_rate"], 8.5)

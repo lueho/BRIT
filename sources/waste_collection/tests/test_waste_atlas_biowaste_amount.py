@@ -316,6 +316,39 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
             data_by_catchment[self.catchment_no_collection.id]["acpv_group_key"]
         )
 
+    def test_returns_zero_cpv_and_includes_zero_acpv_in_average(self):
+        CollectionPropertyValue.objects.filter(
+            collection=self.cpv_source_collection,
+            property=self.specific_property,
+            year=2022,
+        ).update(average=0)
+        zero_acpv = self._create_agg_value(
+            collections=[self.acpv_group_b_source_collection],
+            property_obj=self.specific_property,
+            unit_obj=self.specific_unit,
+            year=2022,
+            average=0,
+        )
+
+        response = self.client.get(self.endpoint, {"country": "DE", "year": 2022})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data_by_catchment = {row["catchment_id"]: row for row in response.data}
+        cpv_row = data_by_catchment[self.catchment_cpv.id]
+        self.assertEqual(cpv_row["amount"], 0)
+        self.assertEqual(cpv_row["value_source"], "cpv")
+        acpv_row = data_by_catchment[self.catchment_acpv_group_b.id]
+        self.assertEqual(acpv_row["amount"], 47.5)
+        self.assertEqual(acpv_row["value_source"], "acpv")
+        self.assertEqual(
+            acpv_row["acpv_group_key"],
+            "acpv-"
+            + "-".join(
+                str(value_id)
+                for value_id in sorted([self.acpv_group_b.id, zero_acpv.id])
+            ),
+        )
+
     def test_returns_dissolved_outline_features_per_acpv_group(self):
         response = self.client.get(
             self.outline_endpoint,
