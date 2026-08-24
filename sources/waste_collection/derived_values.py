@@ -506,14 +506,10 @@ def backfill_derived_values(dry_run=False, owner=None, publication_status=None):
     """
     stats = {"created": 0, "updated": 0, "skipped": 0}
     cfg = get_derived_value_config()
-    source_qs = (
-        CollectionPropertyValue.objects.filter(
-            property_id__in=[cfg.specific_property_id, cfg.total_property_id],
-            is_derived=False,
-        )
-        .exclude(average=0)
-        .select_related("collection__catchment", "property", "unit")
-    )
+    source_qs = CollectionPropertyValue.objects.filter(
+        property_id__in=[cfg.specific_property_id, cfg.total_property_id],
+        is_derived=False,
+    ).select_related("collection__catchment", "property", "unit")
 
     total = source_qs.count()
     logger.info("Backfilling derived values for %d source CPV records...", total)

@@ -2305,15 +2305,11 @@ def _amounts_for_year(
     ``total waste collected`` and population.
     """
     cfg = get_derived_property_config()
-    cpv_qs = (
-        CollectionPropertyValue.objects.filter(
-            collection_id__in=all_collection_ids,
-            property_id=cfg.specific_property_id,
-            year=year,
-        )
-        .exclude(average=0)
-        .values_list("collection_id", "average")
-    )
+    cpv_qs = CollectionPropertyValue.objects.filter(
+        collection_id__in=all_collection_ids,
+        property_id=cfg.specific_property_id,
+        year=year,
+    ).values_list("collection_id", "average")
     result: dict[int, float] = {}
     value_sources: dict[int, str] = {}
     for col_id, avg in cpv_qs:
@@ -2329,15 +2325,11 @@ def _amounts_for_year(
         missing_cols = {
             col_id for col_id, cid in col_to_cid.items() if cid in missing_cid_set
         }
-        agg_qs = (
-            AggregatedCollectionPropertyValue.objects.filter(
-                collections__id__in=missing_cols,
-                property_id=cfg.specific_property_id,
-                year=year,
-            )
-            .exclude(average=0)
-            .values_list("collections__id", "average", "id")
-        )
+        agg_qs = AggregatedCollectionPropertyValue.objects.filter(
+            collections__id__in=missing_cols,
+            property_id=cfg.specific_property_id,
+            year=year,
+        ).values_list("collections__id", "average", "id")
         acpv_by_catchment: dict[int, list[float]] = {}
         acpv_ids_by_catchment: dict[int, set[int]] = {}
         for col_id, avg, acpv_id in agg_qs:
@@ -2362,15 +2354,11 @@ def _amounts_for_year(
     missing_cols = {
         col_id for col_id, cid in col_to_cid.items() if cid in missing_cid_set
     }
-    total_qs = (
-        CollectionPropertyValue.objects.filter(
-            collection_id__in=missing_cols,
-            property_id=cfg.total_property_id,
-            year=year,
-        )
-        .exclude(average=0)
-        .values_list("collection_id", "average")
-    )
+    total_qs = CollectionPropertyValue.objects.filter(
+        collection_id__in=missing_cols,
+        property_id=cfg.total_property_id,
+        year=year,
+    ).values_list("collection_id", "average")
     total_by_catchment: dict[int, float] = {}
     for col_id, avg in total_qs:
         cid = col_to_cid.get(col_id)
@@ -2527,15 +2515,11 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
 
     # 1) Aggregated specific waste amount per catchment.
     agg_specific_by_catchment: dict[int, list[float]] = {}
-    agg_specific_qs = (
-        AggregatedCollectionPropertyValue.objects.filter(
-            collections__id__in=all_collection_ids,
-            property_id=cfg.specific_property_id,
-            year=year,
-        )
-        .exclude(average=0)
-        .values_list("collections__id", "average")
-    )
+    agg_specific_qs = AggregatedCollectionPropertyValue.objects.filter(
+        collections__id__in=all_collection_ids,
+        property_id=cfg.specific_property_id,
+        year=year,
+    ).values_list("collections__id", "average")
     for col_id, avg in agg_specific_qs:
         cid = col_to_cid.get(col_id)
         if cid is not None:
@@ -2556,15 +2540,11 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
             col_id for col_id, cid in col_to_cid.items() if cid in missing_cid_set
         }
         cpv_specific_by_catchment: dict[int, list[float]] = {}
-        cpv_specific_qs = (
-            CollectionPropertyValue.objects.filter(
-                collection_id__in=missing_cols,
-                property_id=cfg.specific_property_id,
-                year=year,
-            )
-            .exclude(average=0)
-            .values_list("collection_id", "average")
-        )
+        cpv_specific_qs = CollectionPropertyValue.objects.filter(
+            collection_id__in=missing_cols,
+            property_id=cfg.specific_property_id,
+            year=year,
+        ).values_list("collection_id", "average")
         for col_id, avg in cpv_specific_qs:
             cid = col_to_cid.get(col_id)
             if cid is not None:
@@ -2584,15 +2564,11 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
         }
 
         total_by_catchment: dict[int, float] = {}
-        total_qs = (
-            CollectionPropertyValue.objects.filter(
-                collection_id__in=missing_cols,
-                property_id=cfg.total_property_id,
-                year=year,
-            )
-            .exclude(average=0)
-            .values_list("collection_id", "average")
-        )
+        total_qs = CollectionPropertyValue.objects.filter(
+            collection_id__in=missing_cols,
+            property_id=cfg.total_property_id,
+            year=year,
+        ).values_list("collection_id", "average")
         for col_id, avg in total_qs:
             cid = col_to_cid.get(col_id)
             if cid is not None:
@@ -2609,15 +2585,11 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
                 if cid in still_missing_cid_set
             }
             agg_total_by_catchment: dict[int, list[float]] = {}
-            agg_total_qs = (
-                AggregatedCollectionPropertyValue.objects.filter(
-                    collections__id__in=still_missing_cols,
-                    property_id=cfg.total_property_id,
-                    year=year,
-                )
-                .exclude(average=0)
-                .values_list("collections__id", "average")
-            )
+            agg_total_qs = AggregatedCollectionPropertyValue.objects.filter(
+                collections__id__in=still_missing_cols,
+                property_id=cfg.total_property_id,
+                year=year,
+            ).values_list("collections__id", "average")
             for col_id, avg in agg_total_qs:
                 cid = col_to_cid.get(col_id)
                 if cid is not None:
@@ -3733,17 +3705,17 @@ class BiowasteImpurityViewSet(WasteAtlasViewSet):
         )
 
         collection_ids = [row["collection_id"] for row in best.values()]
-        cpv_qs = (
-            CollectionPropertyValue.objects.filter(
-                collection_id__in=collection_ids,
-                property__name=BIOWASTE_IMPURITY_RATE_PROPERTY_NAME,
-                year=year,
-            )
-            .order_by("collection_id", "-year")
-            .distinct("collection_id")
-            .values_list("collection_id", "average")
+        rate_values = _latest_property_values(
+            collection_ids,
+            property_name=BIOWASTE_IMPURITY_RATE_PROPERTY_NAME,
+            unit_name=PERCENTAGE_UNIT_NAME,
+            year=year,
+            user=request.user,
         )
-        rate_lookup = dict(cpv_qs)
+        rate_lookup = {
+            collection_id: value["average"]
+            for collection_id, value in rate_values.items()
+        }
 
         data = []
         for cid, row in best.items():

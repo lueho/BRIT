@@ -163,7 +163,9 @@ DIRECTORY_SECTION_LABELS = {
     "schedule": "Schedule",
     "counts": "Collection counts",
     "fees": "Fees",
-    "amounts": "Collected amounts & ratios",
+    "amounts": (
+        "Waste-related quantities, ratios and compositions (Key Performance Indicators)"
+    ),
 }
 
 DIRECTORY_THEME_GROUP_SECTIONS = {
@@ -180,7 +182,7 @@ DIRECTORY_THEME_GROUP_SECTIONS = {
     "collection_support": "systems",
     "access_control": "systems",
     "system_access_control": "systems",
-    "impurity": "systems",
+    "impurity": "amounts",
     "weekly_bp_access_days": "systems",
     "bin_configuration": "bins",
     "min_bin_size": "bins",

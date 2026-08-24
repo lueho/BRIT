@@ -4529,6 +4529,29 @@ class WasteAtlasMapViewsTestCase(TestCase):
             f"{reverse('waste-atlas-biowaste-frequency-map')}?country=SE", se_urls
         )
 
+    def test_overview_groups_biowaste_impurity_with_kpis(self):
+        ctx = build_overview_directory_context(reverse)
+        catalonia = next(
+            group
+            for group in ctx["directory_region_groups"]
+            if group["id"] == "catalonia"
+        )
+        region = next(
+            region for region in catalonia["regions"] if region["value"] == "ES-CT"
+        )
+        section = next(
+            section
+            for section in region["sections"]
+            if any(entry["theme"] == "biowaste_impurity" for entry in section["maps"])
+        )
+
+        self.assertEqual(section["key"], "amounts")
+        self.assertEqual(
+            section["label"],
+            "Waste-related quantities, ratios and compositions "
+            "(Key Performance Indicators)",
+        )
+
     def test_overview_preselects_region_and_filters_from_query_params(self):
         response = self.client.get(
             reverse("waste-atlas-overview"),
@@ -6323,6 +6346,30 @@ class DerivedValuesTestCase(TestCase):
         write_stats = backfill_derived_values(dry_run=False)
         self.assertEqual(write_stats, {"created": 1, "updated": 1, "skipped": 3})
 
+    def test_backfill_derives_counterpart_for_zero_value(self):
+        collection, _ = self._create_collection("zero-backfill", population=1000)
+        self._bulk_create_cpv(
+            name="zero-source",
+            collection=collection,
+            property=self.property_specific,
+            unit=self.unit_specific,
+            year=2024,
+            average=0,
+            publication_status="published",
+            is_derived=False,
+        )
+
+        stats = backfill_derived_values()
+
+        self.assertEqual(stats, {"created": 1, "updated": 0, "skipped": 0})
+        derived = CollectionPropertyValue.objects.get(
+            collection=collection,
+            property=self.property_total,
+            year=2024,
+            is_derived=True,
+        )
+        self.assertEqual(derived.average, 0)
+
     def test_amounts_for_2024_falls_back_to_total_and_population(self):
         collection, catchment = self._create_collection(
             "atlas-fallback", population=2500
@@ -6346,6 +6393,30 @@ class DerivedValuesTestCase(TestCase):
             catchment_ids=[catchment.pk],
         )
         self.assertEqual(amounts[catchment.pk], 2.6)
+
+    def test_amounts_for_2024_converts_zero_total_to_zero_specific(self):
+        collection, catchment = self._create_collection(
+            "atlas-zero-fallback", population=2500
+        )
+        self._bulk_create_cpv(
+            name="zero-total-only",
+            collection=collection,
+            property=self.property_total,
+            unit=self.unit_total,
+            year=2024,
+            average=0,
+            publication_status="published",
+            is_derived=False,
+        )
+
+        amounts = _amounts_for_2024(
+            year=2024,
+            all_collection_ids={collection.pk},
+            col_to_cid={collection.pk: catchment.pk},
+            catchment_ids=[catchment.pk],
+        )
+
+        self.assertEqual(amounts[catchment.pk], 0)
 
     def test_amounts_fallback_does_not_use_population_from_another_year(self):
         collection, catchment = self._create_collection(

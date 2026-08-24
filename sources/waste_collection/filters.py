@@ -399,8 +399,7 @@ class NullableCollectionPropertyValueRangeFilter(NullableRangeFilter):
                 "avg_value": Avg(
                     "collectionpropertyvalue__average",
                     filter=Q(
-                        collectionpropertyvalue__property__name=self.property_name,
-                        collectionpropertyvalue__average__gt=0.0,
+                        collectionpropertyvalue__property__name=self.property_name
                     ),
                 )
             }

@@ -173,6 +173,7 @@ class ConnectionRateFilterTestCase(TestCase):
         cls.collection2 = Collection.objects.create(name="Collection 2")
         cls.collection3 = Collection.objects.create(name="Collection 3")
         cls.collection4 = Collection.objects.create(name="Collection 4")
+        cls.collection5 = Collection.objects.create(name="Collection 5")
 
         # Add connection rate properties to collections
         prop = Property.objects.create(name="Connection rate")
@@ -185,6 +186,9 @@ class ConnectionRateFilterTestCase(TestCase):
         CollectionPropertyValue.objects.create(
             collection=cls.collection3, property=prop, year=2022, average=25
         )
+        CollectionPropertyValue.objects.create(
+            collection=cls.collection4, property=prop, year=2022, average=0
+        )
 
     def test_filter_by_connection_rate(self):
         filter_ = ConnectionRateFilter()
@@ -192,6 +196,12 @@ class ConnectionRateFilterTestCase(TestCase):
         expected = Collection.objects.filter(
             pk__in=[self.collection1.pk, self.collection2.pk]
         )
+        self.assertQuerySetEqual(qs, expected, ordered=False)
+
+    def test_filter_treats_zero_as_a_value(self):
+        filter_ = ConnectionRateFilter()
+        qs = filter_.filter(Collection.objects.all(), (slice(0, 0), False))
+        expected = Collection.objects.filter(pk=self.collection4.pk)
         self.assertQuerySetEqual(qs, expected, ordered=False)
 
     def test_filter_with_without_value(self):
@@ -204,7 +214,7 @@ class ConnectionRateFilterTestCase(TestCase):
         filter_ = ConnectionRateFilter()
         qs = filter_.filter(Collection.objects.all(), (slice(50, 75), True))
         expected = Collection.objects.filter(
-            pk__in=[self.collection1.pk, self.collection2.pk, self.collection4.pk]
+            pk__in=[self.collection1.pk, self.collection2.pk, self.collection5.pk]
         )
         self.assertQuerySetEqual(qs, expected, ordered=False)
 
