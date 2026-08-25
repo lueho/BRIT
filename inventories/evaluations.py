@@ -141,23 +141,6 @@ class ScenarioResult:
 
         return charts
 
-    # TODO: Delete when ready
-    # def total_production_per_material_component(self):
-    #     # This should not depend on the material definition but should be fetched directly from layer. Calculation
-    #     # should happen directly in the model algorithm.
-    #     total_production_per_feedstock = self.total_production_per_feedstock()
-    #     components = {}
-    #     for feedstock in self.feedstocks:
-    #         for group, content in feedstock.composition().items():
-    #             if group not in components:
-    #                 components[group] = {}
-    #             for share in content['averages']:
-    #                 if share.component.name not in components[group]:
-    #                     components[group][share.component.name] = 0
-    #                 components[group][share.component.name] += share.average * total_production_per_feedstock[
-    #                     feedstock]
-    #     return components
-
     def seasonal_production_per_component(self):
         datasets = []
         for layer in self.layers:
