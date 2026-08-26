@@ -554,6 +554,35 @@ class ScenarioTestCase(TestCase):
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
         self.assertFalse(RunningTask.objects.filter(id=running_task.id).exists())
 
+    def test_create_default_configuration_handles_m2m_parameter_algorithms(self):
+        """#219: create_default_configuration() must create one entry per
+        parameter even though InventoryAlgorithmParameter.inventory_algorithm
+        is a ManyToManyField."""
+        algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
+        algorithm.default = True
+        algorithm.save()
+
+        parameter = InventoryAlgorithmParameter.objects.create(
+            short_name="test_param",
+            is_required=True,
+        )
+        parameter.inventory_algorithm.add(algorithm)
+        default_value = InventoryAlgorithmParameterValue.objects.create(
+            name="default",
+            parameter=parameter,
+            value=1.0,
+            default=True,
+        )
+
+        self.scenario.create_default_configuration()
+
+        entry = ScenarioInventoryConfiguration.objects.get(
+            scenario=self.scenario, inventory_parameter=parameter
+        )
+        self.assertEqual(entry.inventory_algorithm, algorithm)
+        self.assertEqual(entry.geodataset, algorithm.geodataset)
+        self.assertEqual(entry.inventory_value, default_value)
+
 
 class ScenarioResultHomogenizeTimestepsTestCase(TestCase):
     """#211: homogenize_timesteps must collect timesteps from all layers."""

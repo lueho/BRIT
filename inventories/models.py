@@ -569,17 +569,15 @@ class Scenario(NamedUserCreatedObject):
         step.
         :return:
         """
-        for parameter in InventoryAlgorithmParameter.objects.filter(
-            inventory_algorithm__in=self.default_inventory_algorithms()
-        ):
-            config_entry = ScenarioInventoryConfiguration()
-            config_entry.scenario = self
-            config_entry.feedstock = parameter.inventory_algorithm.feedstock
-            config_entry.inventory_algorithm = parameter.inventory_algorithm
-            config_entry.geodataset = parameter.inventory_algorithm.geodataset
-            config_entry.inventory_parameter = parameter
-            config_entry.inventory_value = parameter.default_value()
-            config_entry.save()
+        for algorithm in self.default_inventory_algorithms():
+            for parameter in algorithm.inventoryalgorithmparameter_set.all():
+                config_entry = ScenarioInventoryConfiguration()
+                config_entry.scenario = self
+                config_entry.geodataset = algorithm.geodataset
+                config_entry.inventory_algorithm = algorithm
+                config_entry.inventory_parameter = parameter
+                config_entry.inventory_value = parameter.default_value()
+                config_entry.save()
 
     def configuration(self):
         return ScenarioInventoryConfiguration.objects.filter(scenario=self)
