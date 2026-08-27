@@ -162,6 +162,18 @@
         {% endif %}
     {% endblock url_check_action %}
 {% endblock options_primary_actions %}
+{% block detail_footer_left %}
+    {% with back_url=request.GET.back %}
+    {% if back_url %}
+        <a class="btn btn-sm btn-outline-secondary"
+           href="{{ back_url }}"
+           title="Back to results">
+            <i class="fas fa-arrow-left"></i>
+            <span class="d-none d-md-inline">Back to results</span>
+        </a>
+    {% endif %}
+    {% endwith %}
+{% endblock detail_footer_left %}
 {% block javascript %}
     {{ block.super }}
     <script src="{% static 'js/sources.min.js' %}"></script>
