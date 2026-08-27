@@ -22,6 +22,7 @@ from materials.models import (
     SampleSeries,
 )
 from utils.properties.models import Unit
+from utils.tests.test_utils import CanonicalRelationTestMixin
 
 
 class InitialDataTestCase(TestCase):
@@ -56,19 +57,13 @@ class MaterialComponentTestCase(TestCase):
         self.assertIsInstance(default, MaterialComponent)
         self.assertEqual(default.name, "Other")
 
-    def test_canonical_component_defaults_to_self(self):
-        component = MaterialComponent.objects.create(name="Organic matter")
 
-        self.assertEqual(component.canonical_component, component)
+class MaterialComponentCanonicalTestCase(CanonicalRelationTestMixin, TestCase):
+    def test_canonical_component_defaults_to_self(self):
+        self._test_canonical_defaults_to_self(MaterialComponent)
 
     def test_canonical_component_follows_comparable_component(self):
-        canonical = MaterialComponent.objects.create(name="Organic matter")
-        alias = MaterialComponent.objects.create(
-            name="Volatile solids",
-            comparable_component=canonical,
-        )
-
-        self.assertEqual(alias.canonical_component, canonical)
+        self._test_canonical_follows_comparable(MaterialComponent)
 
 
 class BaseMaterialProxyTestCase(TestCase):
@@ -104,20 +99,18 @@ class BaseMaterialProxyTestCase(TestCase):
 
 
 class MaterialPropertyTestCase(TestCase):
-    def test_canonical_property_defaults_to_self(self):
-        property_obj = MaterialProperty.objects.create(name="Organic matter", unit="%")
+    pass
 
-        self.assertEqual(property_obj.canonical_property, property_obj)
+
+class MaterialPropertyCanonicalTestCase(CanonicalRelationTestMixin, TestCase):
+    canonical_attr = "canonical_property"
+    comparable_attr = "comparable_property"
+
+    def test_canonical_property_defaults_to_self(self):
+        self._test_canonical_defaults_to_self(MaterialProperty, unit="%")
 
     def test_canonical_property_follows_comparable_property(self):
-        canonical = MaterialProperty.objects.create(name="Organic matter", unit="%")
-        alias = MaterialProperty.objects.create(
-            name="Volatile solids",
-            unit="%",
-            comparable_property=canonical,
-        )
-
-        self.assertEqual(alias.canonical_property, canonical)
+        self._test_canonical_follows_comparable(MaterialProperty, unit="%")
 
 
 class MaterialTestCase(TestCase):
