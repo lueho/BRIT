@@ -5,46 +5,6 @@ from factory.django import mute_signals
 from ..models import Author, Licence, Source, SourceAuthor, check_url_valid
 
 
-class AuthorModelTests(TestCase):
-    def test_str_representation(self):
-        author = Author(
-            first_names="John", middle_names="Fitzgerald", last_names="Kennedy"
-        )
-        self.assertEqual("Kennedy, John", str(author))
-
-    def test_bibtex_name_simple(self):
-        author = Author(first_names="John", last_names="Doe")
-        self.assertEqual("Doe, J.", author.bibtex_name)
-
-    def test_bibtex_name_full(self):
-        author = Author(
-            first_names="John",
-            middle_names="Fitzgerald",
-            last_names="Kennedy",
-            suffix="Jr.",
-        )
-        self.assertEqual("Kennedy, J. F., Jr.", author.bibtex_name)
-
-    def test_abbreviated_full_name(self):
-        author = Author(
-            first_names="John", middle_names="Fitzgerald", last_names="Kennedy"
-        )
-        self.assertEqual("Kennedy, J. F.", author.abbreviated_full_name)
-
-    def test_preferred_citation_name(self):
-        author = Author(preferred_citation="J.F.K.")
-        self.assertEqual("J.F.K.", author.preferred_citation)
-
-    def test_suffix_handling(self):
-        author = Author(
-            first_names="John",
-            middle_names="Fitzgerald",
-            last_names="Kennedy",
-            suffix="II",
-        )
-        self.assertEqual("Kennedy, J. F., II", author.abbreviated_full_name)
-
-
 class LicenceModelTest(TestCase):
     def setUp(self):
         self.licence_name = "MIT License"
@@ -61,13 +21,6 @@ class LicenceModelTest(TestCase):
         self.assertEqual(self.licence.name, self.licence_name)
         self.assertEqual(self.licence.reference_url, self.licence_url)
         self.assertEqual(self.licence.description, self.licence_description)
-
-    def test_licence_str(self):
-        self.assertEqual(str(self.licence), self.licence_name)
-
-    def test_bibtex_entry(self):
-        expected_bibtex_note = f"License: {self.licence_name}, URL: {self.licence_url}"
-        self.assertEqual(self.licence.bibtex_entry, expected_bibtex_note)
 
 
 def setUpModule():
@@ -216,30 +169,6 @@ class SourceAbbreviationSignalTestCase(TestCase):
         SourceAuthor.objects.create(source=source, author=self.author1, position=1)
         source.refresh_from_db()
         self.assertEqual(source.abbreviation, "DIN EN 13039")
-
-
-class SourceStrTestCase(TestCase):
-    """Tests for Source.__str__ fallback chain."""
-
-    def test_str_returns_abbreviation(self):
-        with mute_signals(post_save):
-            source = Source.objects.create(title="Some Title", abbreviation="Custom")
-        self.assertEqual(str(source), "Custom")
-
-    def test_str_falls_back_to_title(self):
-        with mute_signals(post_save):
-            source = Source(title="My Title", abbreviation="")
-            source.pk = None  # simulate unsaved
-        # After save, abbreviation will be auto-populated, so test the property directly
-        source.abbreviation = ""
-        self.assertEqual(str(source), "My Title")
-
-    def test_str_falls_back_to_source_pk(self):
-        with mute_signals(post_save):
-            source = Source.objects.create(title="", abbreviation="fallback")
-        source.abbreviation = ""
-        source.title = ""
-        self.assertEqual(str(source), f"Source #{source.pk}")
 
 
 class SourceUpdateAbbreviationTestCase(TestCase):

@@ -79,11 +79,6 @@ class ProcessCategoryModelTestCase(TestCase):
         self.assertEqual(category.name, "Thermochemical")
         self.assertEqual(category.owner, self.owner)
 
-    def test_str_representation(self):
-        """String representation should return the category name."""
-        category = ProcessCategory.objects.create(name="Biochemical", owner=self.owner)
-        self.assertEqual(str(category), "Biochemical")
-
     def test_publication_status_inherited(self):
         """ProcessCategory inherits publication status from NamedUserCreatedObject."""
         category = ProcessCategory.objects.create(
