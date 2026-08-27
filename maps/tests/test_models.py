@@ -1,3 +1,4 @@
+import contextlib
 import logging
 
 from django.contrib.gis.geos import GEOSGeometry
@@ -22,6 +23,27 @@ from ..models import (
     RegionAttributeValue,
     RegionProperty,
 )
+
+
+@contextlib.contextmanager
+def assert_no_warning(logger_name, msg_contains):
+    """Assert that no warning containing msg_contains is logged."""
+    logger = logging.getLogger(logger_name)
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.WARNING)
+    records = []
+    handler.handle = lambda record: records.append(record)
+    logger.addHandler(handler)
+    logger.setLevel(logging.WARNING)
+    try:
+        yield
+    finally:
+        logger.removeHandler(handler)
+        for record in records:
+            if msg_contains in record.getMessage():
+                raise AssertionError(
+                    f"Unexpected warning logged: {record.getMessage()}"
+                )
 
 
 class RegionTestCase(TestCase):
@@ -400,17 +422,13 @@ class CustomCatchmentParentMismatchSignalTestCase(TestCase):
                 )
             ),
         )
-        with self.assertLogs("maps.signals", level="WARNING") as cm:
+        with assert_no_warning("maps.signals", "spatial overlap with"):
             Catchment.objects.create(
                 name="Inside Custom",
                 type="custom",
                 parent=self.parent_catchment,
                 region=inside_region,
             )
-            # assertLogs requires at least one log record; emit a dummy one
-            # so the assertion doesn't fail when no warning is produced.
-            logging.getLogger("maps.signals").warning("dummy")
-        self.assertNotIn("spatial overlap with", "\n".join(cm.output))
 
     def test_no_warning_for_non_custom_catchment(self):
         admin_region = Region.objects.create(
@@ -423,15 +441,13 @@ class CustomCatchmentParentMismatchSignalTestCase(TestCase):
                 )
             ),
         )
-        with self.assertLogs("maps.signals", level="WARNING") as cm:
+        with assert_no_warning("maps.signals", "spatial overlap with"):
             Catchment.objects.create(
                 name="Admin Child",
                 type="administrative",
                 parent=self.parent_catchment,
                 region=admin_region,
             )
-            logging.getLogger("maps.signals").warning("dummy")
-        self.assertNotIn("spatial overlap with", "\n".join(cm.output))
 
 
 class NutsRegionTestCase(TestCase):

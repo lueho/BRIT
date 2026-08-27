@@ -2,7 +2,7 @@ from django.db.models.signals import post_save
 from django.test import TestCase
 from factory.django import mute_signals
 
-from ..models import Author, Licence, Source, SourceAuthor, check_url_valid
+from ..models import Author, Licence, Source, SourceAuthor
 
 
 class LicenceModelTest(TestCase):
@@ -21,14 +21,6 @@ class LicenceModelTest(TestCase):
         self.assertEqual(self.licence.name, self.licence_name)
         self.assertEqual(self.licence.reference_url, self.licence_url)
         self.assertEqual(self.licence.description, self.licence_description)
-
-
-def setUpModule():
-    post_save.disconnect(check_url_valid, sender=Source)
-
-
-def tearDownModule():
-    post_save.connect(check_url_valid, sender=Source)
 
 
 class SourceAbbreviationGenerationTestCase(TestCase):
