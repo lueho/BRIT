@@ -66,6 +66,9 @@
                                     This dataset is large. Loading it completely can take a while. Please choose filter
                                     parameters first.
                                 </p>
+                                <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="dismiss-overlay" aria-label="Dismiss warning">
+                                    <i class="fas fa-times"></i> Dismiss
+                                </button>
                             </div>
                         </div>
                         {% leaflet_map "main" %}
@@ -217,6 +220,16 @@
         window.fetchFeatureGeometries = fetchFeatureGeometriesWithProgress;
     }
     
+    // Dismiss map overlay
+    document.addEventListener('DOMContentLoaded', () => {
+        const dismissBtn = document.getElementById('dismiss-overlay');
+        if (dismissBtn) {
+            dismissBtn.addEventListener('click', () => {
+                hideMapOverlay();
+            });
+        }
+    });
+
     window.onload = () => {
         loadMap(mapConfig);
     };

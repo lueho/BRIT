@@ -7,8 +7,41 @@ function parseFilterParameters() {
         return new URLSearchParams();
     }
     const formData = new FormData(form);
-    return new URLSearchParams(formData);
+    const params = new URLSearchParams(formData);
+    
+    // Remove CSRF token (not needed for GET requests)
+    params.delete('csrfmiddlewaretoken');
+    
+    // Remove empty parameters
+    for (const [key, value] of params.entries()) {
+        if (value.trim() === '') {
+            params.delete(key);
+        }
+    }
+    
+    return params;
 }
+
+function cleanAndSubmitForm(form) {
+    const params = parseFilterParameters();
+    const action = form.action || window.location.pathname;
+    const cleanUrl = action + (params.toString() ? '?' + params.toString() : '');
+    window.location.href = cleanUrl;
+    return false;
+}
+
+function initFilterFormCleanup() {
+    const form = document.querySelector('form[method="get"]');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            cleanAndSubmitForm(this);
+        });
+    }
+}
+
+// Initialize on DOM ready
+document.addEventListener('DOMContentLoaded', initFilterFormCleanup);
 
 function lockFilter() {
     const submitButtons = document.querySelectorAll('.submit-filter');
