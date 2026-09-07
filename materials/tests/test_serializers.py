@@ -22,12 +22,47 @@ from ..models import (
     SampleSeries,
 )
 from ..serializers import (
+    ComponentMeasurementWriteSerializer,
     CompositionDoughnutChartSerializer,
     CompositionModelSerializer,
     MaterialPropertyValueModelSerializer,
     SampleModelSerializer,
     SampleSeriesModelSerializer,
 )
+
+
+class ComponentMeasurementWriteSerializerTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.sample = Sample.objects.create(
+            name="Sample", material=Material.objects.create(name="Material")
+        )
+        cls.group = MaterialComponentGroup.objects.create(name="Group")
+        cls.component = MaterialComponent.objects.create(name="Carbon")
+
+    def _data(self, unit):
+        return {
+            "sample": self.sample.pk,
+            "group": self.group.pk,
+            "component": self.component.pk,
+            "unit": unit.pk,
+            "average": "12.0",
+        }
+
+    def test_rejects_units_that_are_not_weight_fractions(self):
+        serializer = ComponentMeasurementWriteSerializer(
+            data=self._data(Unit.objects.create(name="mg/L", symbol="mg/L"))
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("unit", serializer.errors)
+
+    def test_accepts_weight_fraction_units(self):
+        serializer = ComponentMeasurementWriteSerializer(
+            data=self._data(Unit.objects.create(name="g/kg", symbol="g/kg"))
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
 
 
 class MaterialPropertySerializerTestCase(TestCase):

@@ -122,7 +122,7 @@ class SampleCompositionNormalizationTestCase(TestCase):
         )
         return sample, group
 
-    def _measure(self, sample, group, component, average):
+    def _measure(self, sample, group, component, average, unit=None, basis=None):
         if isinstance(component, str):
             component = MaterialComponent.objects.create(
                 name=component,
@@ -133,9 +133,50 @@ class SampleCompositionNormalizationTestCase(TestCase):
             sample=sample,
             group=group,
             component=component,
-            unit=self.percent_unit,
+            basis_component=basis,
+            unit=unit or self.percent_unit,
             average=Decimal(average),
             owner=self.owner,
+        )
+
+    def test_converts_weight_fraction_units_to_percent_before_normalizing(self):
+        sample, group = self._sample_with_group("Mixed Units")
+        g_per_kg = Unit.objects.create(name="g/kg", symbol="g/kg", owner=self.owner)
+        self._measure(sample, group, "Carbon", "300", unit=g_per_kg)
+        self._measure(sample, group, "Nitrogen", "20")
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(
+            [(s["component_name"], s["percent"]) for s in composition["shares"]],
+            [("Carbon", 30.0), ("Nitrogen", 20.0), ("Other", 50.0)],
+        )
+        self.assertEqual(composition["warnings"], [])
+
+    def test_converts_mg_per_kg_to_percent(self):
+        sample, group = self._sample_with_group("Trace")
+        mg_per_kg = Unit.objects.create(name="mg/kg", symbol="mg/kg", owner=self.owner)
+        self._measure(sample, group, "Zinc", "5000", unit=mg_per_kg)
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(
+            [(s["component_name"], s["percent"]) for s in composition["shares"]],
+            [("Zinc", 0.5), ("Other", 99.5)],
+        )
+
+    def test_converts_units_on_dry_matter_basis_too(self):
+        sample, group = self._sample_with_group("DM Units")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        g_per_kg = Unit.objects.create(name="g/kg", symbol="g/kg", owner=self.owner)
+        self._measure(sample, group, "Carbon", "400", unit=g_per_kg, basis=dm)
+        self._measure(sample, group, "Nitrogen", "10", basis=dm)
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(
+            [s["as_percentage"] for s in composition["shares"]],
+            ["40.0% of DM", "10.0% of DM", "50.0% of DM"],
         )
 
     def test_scales_shares_down_when_raw_sum_exceeds_100(self):
