@@ -4,97 +4,7 @@
   const root = document.querySelector(".sdv2");
   if (!root) return;
 
-  /* ---------- Command palette ---------- */
-  const palette = document.getElementById("sdv2Palette");
-  const paletteInput = document.getElementById("sdv2PaletteInput");
-  const paletteItems = palette
-    ? Array.from(palette.querySelectorAll("[data-sdv2-palette-item]"))
-    : [];
-  let paletteActiveIdx = -1;
-
-  function openPalette() {
-    if (!palette) return;
-    if (typeof palette.showModal === "function") {
-      if (!palette.open) palette.showModal();
-    } else {
-      palette.setAttribute("open", "open");
-    }
-    paletteInput.value = "";
-    filterPalette("");
-    setTimeout(() => paletteInput.focus(), 30);
-  }
-
-  function closePalette() {
-    if (!palette) return;
-    if (palette.open) palette.close();
-    else palette.removeAttribute("open");
-  }
-
-  function filterPalette(query) {
-    const q = query.trim().toLowerCase();
-    let firstVisibleIdx = -1;
-    paletteItems.forEach((item, idx) => {
-      const match = !q || item.textContent.toLowerCase().includes(q);
-      item.parentElement.classList.toggle("d-none", !match);
-      item.classList.remove("is-active");
-      if (match && firstVisibleIdx === -1) firstVisibleIdx = idx;
-    });
-    paletteActiveIdx = firstVisibleIdx;
-    if (paletteActiveIdx >= 0) {
-      paletteItems[paletteActiveIdx].classList.add("is-active");
-    }
-  }
-
-  function movePaletteActive(delta) {
-    if (!paletteItems.length) return;
-    const visible = paletteItems.filter(
-      (item) => !item.parentElement.classList.contains("d-none")
-    );
-    if (!visible.length) return;
-    let currentVisibleIdx = visible.findIndex((item) =>
-      item.classList.contains("is-active")
-    );
-    currentVisibleIdx = Math.max(0, currentVisibleIdx);
-    const nextVisibleIdx =
-      (currentVisibleIdx + delta + visible.length) % visible.length;
-    visible.forEach((item) => item.classList.remove("is-active"));
-    visible[nextVisibleIdx].classList.add("is-active");
-    visible[nextVisibleIdx].scrollIntoView({ block: "nearest" });
-  }
-
-  function activatePaletteItem() {
-    const active = paletteItems.find((item) =>
-      item.classList.contains("is-active")
-    );
-    if (active) {
-      closePalette();
-      active.click();
-    }
-  }
-
-  document
-    .querySelectorAll("[data-sdv2-palette-open]")
-    .forEach((btn) => btn.addEventListener("click", openPalette));
-
-  if (paletteInput) {
-    paletteInput.addEventListener("input", (e) => filterPalette(e.target.value));
-    paletteInput.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        movePaletteActive(1);
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        movePaletteActive(-1);
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        activatePaletteItem();
-      } else if (e.key === "Escape") {
-        closePalette();
-      }
-    });
-  }
-
-  /* ---------- Global keyboard shortcuts ---------- */
+  /* ---------- Keyboard navigation (invisible power-user affordances) ---------- */
   const groupCards = Array.from(document.querySelectorAll(".sdv2-group-card"));
   let groupCursor = -1;
 
@@ -121,19 +31,8 @@
 
   document.addEventListener("keydown", (e) => {
     if (isEditableTarget(e.target)) return;
-    if (palette && palette.open) return;
-    if (e.metaKey || e.ctrlKey) {
-      if (e.key === "k" || e.key === "K") {
-        e.preventDefault();
-        openPalette();
-      }
-      return;
-    }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
     switch (e.key) {
-      case ".":
-        e.preventDefault();
-        openPalette();
-        break;
       case "j":
         e.preventDefault();
         focusGroup(groupCursor + 1);
@@ -147,7 +46,7 @@
         const editingNow = root.dataset.editEnabled === "1";
         if (!canEdit) return;
         const url = new URL(window.location.href);
-        url.searchParams.set("experience", "v2");
+        url.searchParams.delete("experience");
         if (editingNow) url.searchParams.delete("mode");
         else url.searchParams.set("mode", "edit");
         window.location.href = url.toString();
@@ -156,6 +55,16 @@
       default:
         break;
     }
+  });
+
+  /* ---------- Raw-measurement disclosure controls ---------- */
+  document.querySelectorAll("[data-sdv2-raws-toggle]").forEach((trigger) => {
+    trigger.addEventListener("click", () => {
+      const shouldOpen = trigger.dataset.sdv2RawsToggle === "expand";
+      document.querySelectorAll("details.sdv2-raws").forEach((details) => {
+        details.open = shouldOpen;
+      });
+    });
   });
 
   /* ---------- Export affordances ---------- */
@@ -329,11 +238,7 @@
   document.querySelectorAll("[data-sdv2-export-sample]").forEach((el) => {
     el.addEventListener("click", (e) => {
       e.preventDefault();
-      // Prefer the rail trigger as the visual target so the palette entry
-      // still shows progress somewhere visible after the palette closes.
-      const target =
-        document.querySelector(".sdv2-export-trigger[data-sdv2-export-sample]") || el;
-      startSampleExport(target);
+      startSampleExport(el);
     });
   });
 
