@@ -335,12 +335,11 @@
               <div class="sdv2-section-heading">
                 <h2 class="sdv2-section-title">Composition</h2>
                 <span class="sdv2-section-hint">
-                  {% if composition_mode == 'mixed' %}
-                    Raw measurements are authoritative where present; saved compositions remain as fallback for other groups.
-                  {% elif composition_mode == 'derived' %}
-                    Derived from raw measurements; each group normalized to 100%.
-                  {% else %}
+                  {% if composition_mode == 'saved' %}
                     Stored composition records for this sample.
+                  {% else %}
+                    Charts show the normalized composition; the raw measurements behind it are listed below each chart.
+                    <a href="#composition-methodology" class="sdv2-methodology-link">How is the composition normalized?</a>
                   {% endif %}
                 </span>
               </div>
@@ -383,15 +382,9 @@
                       <a href="{% url 'materialcomponentgroup-detail-modal' group_pk %}"
                          class="modal-link sdv2-group-name">{{ composition.group_name }}</a>
                       <span class="sdv2-group-badges">
-                        <span class="sdv2-badge sdv2-badge-sum"
-                              title="Total percentage across components">Σ {{ composition.share_total_percent|floatformat:1 }}%</span>
-                        <span class="sdv2-badge sdv2-badge-{% if composition.is_derived %}derived{% else %}saved{% endif %}">
-                          {% if composition.is_derived %}
-                            Derived
-                          {% else %}
-                            Saved
-                          {% endif %}
-                        </span>
+                        {% if not composition.is_derived and composition_mode == 'mixed' %}
+                          <span class="sdv2-badge sdv2-badge-saved">Saved composition</span>
+                        {% endif %}
                         <span class="sdv2-group-fractions">% of {{ composition.fractions_of_name }}</span>
                       </span>
                     </div>
@@ -484,7 +477,7 @@
                           <tr>
                             <th scope="col" aria-label="Color"></th>
                             <th scope="col">Component</th>
-                            <th scope="col" class="sdv2-num">Share</th>
+                            <th scope="col" class="sdv2-num">{% if composition.is_derived %}Normalized share{% else %}Share{% endif %}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -623,6 +616,23 @@
                 </article>
               {% endwith %}
             {% endfor %}
+            {% if composition_mode != 'saved' %}
+              <details class="sdv2-methodology" id="composition-methodology">
+                <summary>Methodology: how normalized compositions are derived</summary>
+                <div class="sdv2-methodology-body">
+                  <p>
+                    Each chart is derived from the raw component measurements of its group and always sums to 100%.
+                    The raw values themselves are shown unchanged in the <em>Raw measurements</em> table of each group.
+                  </p>
+                  <ul>
+                    <li>If the raw shares sum to more than 100%, all shares are scaled down proportionally.</li>
+                    <li>If they sum to less than 100%, the gap is shown as <em>Other</em>.</li>
+                    <li>Measurements recorded directly as <em>Other</em> are not used; the remainder is always computed from the measured components.</li>
+                    <li>Measurements not expressed in weight percent are omitted from the normalized composition.</li>
+                  </ul>
+                </div>
+              </details>
+            {% endif %}
           </section>
         {% elif edit_mode_enabled or not data.compositions %}
           <section class="sdv2-groups sdv2-groups-empty sdv2-section-panel">

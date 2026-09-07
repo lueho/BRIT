@@ -714,18 +714,6 @@
   color: var(--sdv2-text-muted);
 }
 
-.sdv2-badge-sum {
-  background: var(--sdv2-accent-derived-soft);
-  color: var(--sdv2-accent-derived);
-  border-color: #cbdace;
-}
-
-.sdv2-badge-derived {
-  background: var(--sdv2-accent-derived-soft);
-  color: var(--sdv2-accent-derived);
-  border-color: #cbdace;
-}
-
 .sdv2-badge-saved {
   background: var(--sdv2-accent-raw-soft);
   color: var(--sdv2-accent-raw);
@@ -926,6 +914,40 @@ tr.sdv2-has-swatch:hover .sdv2-swatch {
 .sdv2-raws {
   border-top: 1px solid var(--sdv2-border);
   background: var(--sdv2-surface-alt);
+}
+
+.sdv2-methodology-link {
+  margin-left: 0.35rem;
+  white-space: nowrap;
+}
+
+.sdv2-methodology {
+  margin-top: 0.75rem;
+  scroll-margin-top: var(--sdv2-anchor-offset);
+  padding: 0.6rem 1.1rem;
+  font-size: 13px;
+  color: var(--sdv2-text-muted);
+  border: 1px dashed var(--sdv2-border-strong);
+  border-radius: var(--sdv2-radius);
+}
+
+.sdv2-methodology summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--sdv2-accent-derived);
+}
+
+.sdv2-methodology-body {
+  padding-top: 0.5rem;
+}
+
+.sdv2-methodology-body p,
+.sdv2-methodology-body ul {
+  margin-bottom: 0.4rem;
+}
+
+.sdv2-methodology-body ul {
+  padding-left: 1.2rem;
 }
 
 .sdv2-raws summary {

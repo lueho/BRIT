@@ -4567,7 +4567,8 @@ class EmptyStateViewsTestCase(TestCase):
             {share["as_percentage"] for share in composition["shares"]},
             {"30.0%", "70.0%"},
         )
-        self.assertContains(response, "Derived")
+        self.assertContains(response, "Normalized share")
+        self.assertContains(response, "composition-methodology")
         self.assertNotContains(response, "30.0 ± 0.0%")
         self.assertNotContains(response, "No compositions available")
 
@@ -4689,10 +4690,10 @@ class EmptyStateViewsTestCase(TestCase):
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Σ 100.0%")
+        self.assertNotContains(response, "Σ ")
         self.assertContains(response, "57.1%")
         self.assertContains(response, "42.9%")
-        self.assertContains(response, "scaled down to 100%")
+        self.assertNotContains(response, "alert-warning")
 
         composition = response.context["display_compositions"][0]
         self.assertEqual(composition["share_total_percent"], 100.0)

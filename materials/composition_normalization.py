@@ -170,9 +170,6 @@ def _build_raw_derived_group_composition(
         )
         warning_codes.append(WARNING_MULTIPLE_BASIS_COMPONENTS)
     if legacy_other_count:
-        warnings.append(
-            "Legacy 'Other' measurements were ignored; the remainder is derived from the other components."
-        )
         warning_codes.append(WARNING_LEGACY_OTHER_IGNORED)
 
     shares = []
@@ -226,9 +223,6 @@ def _build_raw_derived_group_composition(
             )
             share["average"] = float(scaled_percent / Decimal("100"))
             share["as_percentage"] = f"{round(scaled_percent, 1)}{display_unit}"
-        warnings.append(
-            f"Raw measurements summed to {round(total_percent, 1)}%; shares were scaled down to 100%."
-        )
         warning_codes.append(WARNING_SHARES_SCALED_TO_100)
     elif total_percent < Decimal("100"):
         other_gap = Decimal("100") - total_percent
@@ -240,9 +234,6 @@ def _build_raw_derived_group_composition(
                 "standard_deviation": None,
                 "as_percentage": f"{round(other_gap, 1)}{display_unit}",
             }
-        )
-        warnings.append(
-            "Raw measurements did not sum to 100%; the remaining fraction was assigned to Other."
         )
         warning_codes.append(WARNING_REMAINING_FRACTION_ASSIGNED_TO_OTHER)
 
