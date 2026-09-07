@@ -21,20 +21,25 @@
     {# contract populated by UserCreatedObjectDetailView. Anonymous      #}
     {# visitors get a minimalist reading layout with no rail at all.     #}
     {% if user.is_authenticated %}
-    <nav class="sdv2-rail" aria-label="Sample actions">
+    <nav class="sdv2-rail{% if edit_mode_enabled %} sdv2-rail-editing{% endif %}" aria-label="Sample actions">
       <div class="sdv2-rail-actions">
         <span class="sdv2-status-pill sdv2-status-{{ object.publication_status|default:'private' }}"
-              title="Publication status">{{ object.get_publication_status_display }}</span>
+              title="Publication status">
+          <i class="fas fa-circle sdv2-status-dot" aria-hidden="true"></i>
+          {{ object.get_publication_status_display }}
+        </span>
         {% if sample_policy.can_edit or sample_policy.can_manage_samples or sample_policy.can_add_property %}
           {% if edit_mode_enabled %}
-            <span class="sdv2-editing-state">
-              <i class="fas fa-pen-to-square" aria-hidden="true"></i>
-              Editing
+            <span class="sdv2-mode-group" role="group" aria-label="Edit mode">
+              <span class="sdv2-editing-state">
+                <i class="fas fa-pen-to-square" aria-hidden="true"></i>
+                Editing
+              </span>
+              <a class="sdv2-mode-action" href="{% url 'sample-detail' object.pk %}">
+                <i class="fas fa-check" aria-hidden="true"></i>
+                Done
+              </a>
             </span>
-            <a class="sdv2-mode-action" href="{% url 'sample-detail' object.pk %}">
-              <i class="fas fa-check" aria-hidden="true"></i>
-              Done
-            </a>
           {% else %}
             <a class="sdv2-mode-action" href="?mode=edit">
               <i class="fas fa-pen-to-square" aria-hidden="true"></i>
@@ -47,7 +52,7 @@
                 action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
                 class="sdv2-rail-submit">
             {% csrf_token %}
-            <button type="submit" class="sdv2-btn sdv2-btn-primary">
+            <button type="submit" class="sdv2-btn">
               <i class="fas fa-paper-plane" aria-hidden="true"></i> Submit for review
             </button>
           </form>
@@ -124,7 +129,7 @@
              href="{% url 'sample-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}"
              title="Delete this sample">
             <i class="fas fa-trash" aria-hidden="true"></i>
-            <span class="visually-hidden">Delete sample</span>
+            Delete
           </a>
         {% endif %}
       </div>
@@ -339,34 +344,35 @@
                   <a href="#composition-methodology" class="sdv2-methodology-link">How is the composition normalized?</a>
                 </span>
               </div>
-              {% if edit_mode_enabled and sample_policy.can_manage_samples %}
-                <div class="sdv2-section-actions sdv2-composition-actions"
-                     aria-label="Add composition data">
-                  {% if perms.materials.add_componentmeasurement %}
-                    <a class="sdv2-btn sdv2-btn-primary"
-                       href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
-                      <i class="fas fa-plus"></i> Add measurement
-                    </a>
-                  {% endif %}
-                  {% if perms.materials.add_composition %}
-                    <a class="sdv2-btn"
-                       href="{% url 'sample-add-composition' object.id %}?next={{ request.get_full_path|urlencode }}">
-                      <i class="fas fa-plus"></i> Add composition
-                    </a>
-                  {% endif %}
-                </div>
-              {% endif %}
-            </div>
-            {% if component_measurements %}
-              <div class="sdv2-raws-controls" role="group" aria-label="Raw measurement visibility">
-                <button type="button" class="sdv2-affordance sdv2-affordance-ghost" data-sdv2-raws-toggle="expand">
-                  <i class="fas fa-expand-alt" aria-hidden="true"></i> Expand raw data
-                </button>
-                <button type="button" class="sdv2-affordance sdv2-affordance-ghost" data-sdv2-raws-toggle="collapse">
-                  <i class="fas fa-compress-alt" aria-hidden="true"></i> Collapse raw data
-                </button>
+              <div class="sdv2-section-actions">
+                {% if component_measurements %}
+                  <div class="sdv2-raws-controls" role="group" aria-label="Raw measurement visibility">
+                    <button type="button" class="sdv2-affordance sdv2-affordance-ghost" data-sdv2-raws-toggle="expand">
+                      <i class="fas fa-expand-alt" aria-hidden="true"></i> Expand raw data
+                    </button>
+                    <button type="button" class="sdv2-affordance sdv2-affordance-ghost" data-sdv2-raws-toggle="collapse">
+                      <i class="fas fa-compress-alt" aria-hidden="true"></i> Collapse raw data
+                    </button>
+                  </div>
+                {% endif %}
+                {% if edit_mode_enabled and sample_policy.can_manage_samples %}
+                  <div class="sdv2-composition-actions" role="group" aria-label="Add composition data">
+                    {% if perms.materials.add_componentmeasurement %}
+                      <a class="sdv2-btn sdv2-btn-primary"
+                         href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
+                        <i class="fas fa-plus"></i> Add measurement
+                      </a>
+                    {% endif %}
+                    {% if perms.materials.add_composition %}
+                      <a class="sdv2-btn"
+                         href="{% url 'sample-add-composition' object.id %}?next={{ request.get_full_path|urlencode }}">
+                        <i class="fas fa-plus"></i> Add composition
+                      </a>
+                    {% endif %}
+                  </div>
+                {% endif %}
               </div>
-            {% endif %}
+            </div>
             {% for composition in display_compositions %}
               {% with group_pk=composition.group raws=grouped_measurements|get_item:composition.group %}
                 <article class="sdv2-group-card sdv2-surface sdv2-anchor-target"
@@ -630,6 +636,7 @@
               <h2 class="sdv2-section-title">Composition</h2>
               {% if edit_mode_enabled and sample_policy.can_manage_samples %}
                 <div class="sdv2-section-actions sdv2-composition-actions"
+                     role="group"
                      aria-label="Add composition data">
                   {% if perms.materials.add_componentmeasurement %}
                     <a class="sdv2-btn sdv2-btn-primary"
@@ -717,19 +724,24 @@
                     {% if edit_mode_enabled %}
                       <td class="sdv2-num">
                         {% object_policy prop as pp %}
-                        {% if pp.can_edit %}
-                          <a href="{% url 'materialpropertyvalue-update' prop.id %}"
-                             title="Edit property value">
-                            <i class="fas fa-pen-to-square"></i>
-                          </a>
-                        {% endif %}
-                        {% if pp.can_delete %}
-                          <a class="modal-link sdv2-delete-link"
-                             href="{% url 'materialpropertyvalue-delete-modal' prop.id %}?next={{ request.get_full_path|urlencode }}"
-                             title="Delete property value">
-                            <i class="fas fa-trash"></i>
-                          </a>
-                        {% endif %}
+                        <span class="sdv2-row-tools">
+                          {% if pp.can_edit %}
+                            <a class="sdv2-affordance sdv2-affordance-sm sdv2-affordance-edit"
+                               href="{% url 'materialpropertyvalue-update' prop.id %}"
+                               title="Edit property value">
+                              <i class="fas fa-pen-to-square" aria-hidden="true"></i>
+                              <span class="visually-hidden">Edit</span>
+                            </a>
+                          {% endif %}
+                          {% if pp.can_delete %}
+                            <a class="sdv2-affordance sdv2-affordance-sm sdv2-affordance-danger modal-link sdv2-delete-link"
+                               href="{% url 'materialpropertyvalue-delete-modal' prop.id %}?next={{ request.get_full_path|urlencode }}"
+                               title="Delete property value">
+                              <i class="fas fa-trash" aria-hidden="true"></i>
+                              <span class="visually-hidden">Delete</span>
+                            </a>
+                          {% endif %}
+                        </span>
                       </td>
                     {% endif %}
                   </tr>
