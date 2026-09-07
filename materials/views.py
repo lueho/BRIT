@@ -829,13 +829,16 @@ def build_sample_card_data(samples):
     """
     samples = list(samples)
     ids = [sample.pk for sample in samples]
-    empty = {
-        "measurement_count": 0,
-        "property_value_count": 0,
-        "component_preview": [],
-        "component_preview_overflow": 0,
-    }
-    cards = {sample.pk: dict(empty) for sample in samples}
+
+    def empty_card():
+        return {
+            "measurement_count": 0,
+            "property_value_count": 0,
+            "component_preview": [],
+            "component_preview_overflow": 0,
+        }
+
+    cards = {sample.pk: empty_card() for sample in samples}
     if not ids:
         return cards
 
@@ -880,7 +883,7 @@ def build_sample_card_data(samples):
         else:
             card["component_preview_overflow"] += 1
     for sample in samples:
-        sample.card_data = cards.get(sample.pk, dict(empty))
+        sample.card_data = cards[sample.pk]
     return cards
 
 

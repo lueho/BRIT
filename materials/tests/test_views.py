@@ -2010,6 +2010,21 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(card["component_preview"], ["Carbon", "Oxygen", "Hydrogen"])
         self.assertEqual(card["component_preview_overflow"], 1)
 
+    def test_sample_card_preview_does_not_leak_into_empty_samples(self):
+        self._add_sample_data()
+        empty = Sample.objects.create(
+            owner=self.owner,
+            name="Empty sample",
+            material=self.sample.material,
+            publication_status="published",
+        )
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        cards = response.context["sample_cards"]
+        self.assertEqual(cards[self.sample.pk]["component_preview"], ["Wood", "Ash"])
+        self.assertEqual(cards[empty.pk]["component_preview"], [])
+        self.assertEqual(cards[empty.pk]["measurement_count"], 0)
+
     def test_gallery_renders_card_data_signals(self):
         self._add_sample_data()
         response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
