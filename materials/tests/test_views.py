@@ -4658,7 +4658,7 @@ class EmptyStateViewsTestCase(TestCase):
             content.index(f'id="group-{chemical_group.pk}"'),
         )
 
-    def test_sample_detail_group_sum_badge_reports_actual_total(self):
+    def test_sample_detail_scales_over_100_raw_totals_to_100(self):
         sample = Sample.objects.create(
             name="Sample Over 100",
             material=Material.objects.create(name="Test Material", type="material"),
@@ -4689,8 +4689,10 @@ class EmptyStateViewsTestCase(TestCase):
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Σ 105.0%")
-        self.assertNotContains(response, "Σ 100.0%")
+        self.assertContains(response, "Σ 100.0%")
+        self.assertContains(response, "57.1%")
+        self.assertContains(response, "42.9%")
+        self.assertContains(response, "scaled down to 100%")
 
     def test_sample_detail_v2_places_normalized_view_before_raw_drilldown(self):
         sample = Sample.objects.create(
