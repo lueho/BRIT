@@ -4658,6 +4658,40 @@ class EmptyStateViewsTestCase(TestCase):
             content.index(f'id="group-{chemical_group.pk}"'),
         )
 
+    def test_sample_detail_group_sum_badge_reports_actual_total(self):
+        sample = Sample.objects.create(
+            name="Sample Over 100",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        sample.compositions.all().delete()
+        unit_percent = Unit.objects.filter(name="%").first() or Unit.objects.create(
+            name="%", symbol="percent", owner=self.staff_user
+        )
+        group = MaterialComponentGroup.objects.create(
+            name="Chemical Elements",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        for name, average in (("Carbon", "60"), ("Nitrogen", "45")):
+            ComponentMeasurement.objects.create(
+                owner=self.staff_user,
+                sample=sample,
+                group=group,
+                component=MaterialComponent.objects.create(
+                    name=name, owner=self.staff_user, publication_status="published"
+                ),
+                unit=unit_percent,
+                average=Decimal(average),
+            )
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Σ 105.0%")
+        self.assertNotContains(response, "Σ 100.0%")
+
     def test_sample_detail_v2_places_normalized_view_before_raw_drilldown(self):
         sample = Sample.objects.create(
             name="Sample Layout Order",

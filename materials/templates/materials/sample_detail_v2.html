@@ -384,7 +384,7 @@
                          class="modal-link sdv2-group-name">{{ composition.group_name }}</a>
                       <span class="sdv2-group-badges">
                         <span class="sdv2-badge sdv2-badge-sum"
-                              title="Total percentage across components">Σ 100.0%</span>
+                              title="Total percentage across components">Σ {{ composition.share_total_percent|floatformat:1 }}%</span>
                         <span class="sdv2-badge sdv2-badge-{% if composition.is_derived %}derived{% else %}saved{% endif %}">
                           {% if composition.is_derived %}
                             Derived

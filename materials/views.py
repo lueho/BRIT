@@ -1234,6 +1234,15 @@ class SampleDetailView(UserCreatedObjectDetailView):
             for composition in compositions
             if composition["group"] != default_group_id
         ]
+        for composition in display_compositions:
+            composition["share_total_percent"] = round(
+                sum(
+                    float(share.get("average") or 0)
+                    for share in composition.get("shares", [])
+                )
+                * 100,
+                1,
+            )
         group_anchors = self._build_group_anchors(display_compositions)
         grouped_measurements = self._group_measurements_by_group_id(
             component_measurements
