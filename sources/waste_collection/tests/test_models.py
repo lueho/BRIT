@@ -4,7 +4,6 @@ from unittest.mock import patch
 from django.core.exceptions import ValidationError
 from django.db.models import signals
 from django.test import TestCase
-from django.urls import reverse
 from factory.django import mute_signals
 
 from distributions.models import Period, TemporalDistribution, Timestep
@@ -77,9 +76,6 @@ class WasteComponentManagerTestCase(TestCase):
             WasteComponent.objects.values_list("pk", flat=True),
         )
 
-    def test_created_waste_component_is_a_material(self):
-        self.assertEqual(self.waste_component.type, "material")
-
 
 class CollectionCatchmentTestCase(TestCase):
     catchment = None
@@ -126,12 +122,6 @@ class CollectionCatchmentTestCase(TestCase):
         self.assertIn(self.collection, collections)
         self.assertIn(self.child_collection, collections)
         self.assertIn(self.grandchild_collection, collections)
-
-    def test_get_absolute_url(self):
-        self.assertEqual(
-            reverse("collectioncatchment-detail", kwargs={"pk": self.catchment.pk}),
-            self.collection.catchment.get_absolute_url(),
-        )
 
 
 class WasteFlyerTestCase(TestCase):

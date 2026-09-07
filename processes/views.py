@@ -57,17 +57,6 @@ from .models import (
 )
 from .querysets import with_process_count, with_published_process_count
 
-# Temporary mock data for backward compatibility with closecycle module
-# TODO: Remove when closecycle is updated to use real Process model
-MOCK_PROCESS_TYPES = [
-    {"id": 1, "name": "Anaerobic Digestion", "category": "Biochemical"},
-    {"id": 2, "name": "Gasification", "category": "Thermochemical"},
-    {"id": 3, "name": "Pyrolysis", "category": "Thermochemical"},
-    {"id": 4, "name": "Composting", "category": "Biochemical"},
-    {"id": 5, "name": "Hydrothermal Processing", "category": "Thermochemical"},
-    {"id": 12, "name": "Pulping", "category": "Physicochemical"},
-]
-
 # ==============================================================================
 # Helper Views
 # ==============================================================================

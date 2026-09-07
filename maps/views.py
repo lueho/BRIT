@@ -706,9 +706,6 @@ class FilteredMapMixin(MapMixin):
         else:
             return MapConfiguration.objects.get(name="Default Map Configuration")
 
-    # def get_dataset(self):
-    #     return GeoDataset.objects.get(pk=self.kwargs.get('pk')) # TODO: Implement this functionality
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         # Ensure a fast COUNT() is used rather than evaluating the queryset

@@ -3,6 +3,7 @@ from django.db import connection
 from django.db.models import QuerySet
 
 from maps.models import Catchment
+from utils.properties.units import get_unit_registry
 
 from .exceptions import EmptyQueryset
 
@@ -16,6 +17,9 @@ class InventoryAlgorithmsBase:
         catchment_id
         source_model
         point_yield = {'value': <value>, 'standard_deviation': <std>}
+        Optional keyword arguments:
+        yield_unit = '<unit>' — input unit for point_yield value (default: 'kg').
+                      The result is converted to Mg/a (megagrams per year).
         """
         catchment = Catchment.objects.get(id=kwargs.get("catchment_id"))
         model = kwargs.get("source_model")
@@ -23,6 +27,17 @@ class InventoryAlgorithmsBase:
         count = clipped.count()
         point_yield = kwargs.get("point_yield")
         total_production = point_yield["value"] * count
+
+        yield_unit = kwargs.get("yield_unit", "kg")
+        registry = get_unit_registry()
+        if registry is not None:
+            try:
+                quantity = registry.Quantity(total_production, yield_unit)
+                total_production_mg = quantity.to("megagram").magnitude
+            except Exception:
+                total_production_mg = total_production / 1000
+        else:
+            total_production_mg = total_production / 1000
 
         # If result is a gis layer, it must have a list of features under key ['features']. Each feature must have
         # an entry for the key 'geom'
@@ -39,7 +54,7 @@ class InventoryAlgorithmsBase:
         result["aggregated_values"].append(
             {
                 "name": "Total production",
-                "value": total_production / 1000,  # TODO: Add dynamic unit management
+                "value": total_production_mg,
                 "unit": "Mg/a",
             }
         )

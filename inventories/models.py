@@ -521,10 +521,6 @@ class Scenario(NamedUserCreatedObject):
         ):
             config_entry.delete()
 
-    # def delete(self, **kwargs):
-    #     self.delete_configuration()  # TODO: Does this happen automatically through cascading?
-    #     super().delete()
-
     def delete_result_layers(self):
         for layer in self.layer_set.all():
             layer.delete()

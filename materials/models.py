@@ -290,15 +290,6 @@ class AnalyticalMethod(NamedUserCreatedObject):
             return f"{self.name} (Ont: {self.ontology_uri})"
         return self.name
 
-    @property
-    def external_metadata(self):
-        """
-        Placeholder for a method to retrieve external metadata from the linked ontology.
-        In a later workflow, implement an API call (e.g., via OLS or BioPortal) to fetch
-        metadata based on self.ontology_uri. You might cache the results locally.
-        """
-        return {}  # TODO: Implement external metadata retrieval
-
     def cascade_review_action(self, action_name, actor=None, previous_status=None):
         """Cascade review actions to linked sources.
 

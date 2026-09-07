@@ -17,6 +17,8 @@ data/processed/
 
 compose.override.yml
 compose.local.yml
+# Generated per isolated worktree by the private ops tooling.
+compose.worktree.yml
 
 # Public contributor scripts are allowlisted. Data/ops helpers belong in the
 # private data or operations repository.

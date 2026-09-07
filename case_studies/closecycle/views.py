@@ -1,7 +1,7 @@
 from django.conf import settings
 
 from maps.views import GeoDataSetPublishedFilteredMapView, MapMixin
-from processes.views import MOCK_PROCESS_TYPES
+from processes.models import Process
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -55,24 +55,20 @@ class ShowcaseDetailView(MapMixin, UserCreatedObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Only inject mock data in dev/test
+        # Only inject data in dev/test
         if getattr(settings, "ENVIRONMENT", "dev") != "prod":
             showcase_name = getattr(self.object, "name", None)
             involved_processes = []
             if showcase_name in SHOWCASE_PROCESS_MAP:
                 process_names = SHOWCASE_PROCESS_MAP[showcase_name]
-                # Find process dicts from MOCK_PROCESS_TYPES
-                for pname in process_names:
-                    proc = next(
-                        (p for p in MOCK_PROCESS_TYPES if p["name"] == pname), None
+                processes = Process.objects.filter(name__in=process_names)
+                for proc in processes:
+                    involved_processes.append(
+                        {
+                            "name": proc.name,
+                            "id": proc.pk,
+                        }
                     )
-                    if proc:
-                        involved_processes.append(
-                            {
-                                "name": proc["name"],
-                                "id": proc["id"],
-                            }
-                        )
             context["involved_processes"] = involved_processes
         return context
 
