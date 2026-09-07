@@ -70,6 +70,9 @@
             </a>
           {% endif %}
         {% endif %}
+        <div class="sdv2-rail-nav">
+          {% include "materials/includes/sample_context_nav.html" %}
+        </div>
         <div class="dropdown sdv2-actions-menu">
           <button class="sdv2-btn sdv2-actions-trigger"
                   type="button"
@@ -134,25 +137,9 @@
         {% include "object_management/review_panel.html" with object=object %}
       </section>
     {% endif %}
-    <nav class="sdv2-context-nav" aria-label="Sample navigation">
-      {% if request.GET.back %}
-        <a href="{{ request.GET.back }}">
-          <i class="fas fa-arrow-left" aria-hidden="true"></i> Back to results
-        </a>
-      {% endif %}
-      <span class="sdv2-view-toggle" role="group" aria-label="View toggle">
-        <a href="{{ public_url }}?scope=published"
-           role="button"
-           aria-pressed="false"
-           title="View as list"><i class="fas fa-list" aria-hidden="true"></i> All samples</a>
-        <a href="{{ public_gallery_url }}?scope=published"
-           role="button"
-           aria-pressed="false"
-           title="View as featured gallery"><i class="fas fa-image" aria-hidden="true"></i> Featured</a>
-      </span>
-      <a href="{% url 'materials-explorer' %}"
-         title="Open Explorer (dashboard)"><i class="fas fa-table-cells-large" aria-hidden="true"></i> Explorer</a>
-    </nav>
+    {% if not user.is_authenticated %}
+      {% include "materials/includes/sample_context_nav.html" %}
+    {% endif %}
     {# ─── Hero ─── #}
     <header class="sdv2-hero sdv2-surface {% if object.display_image %}sdv2-hero-with-media{% else %}sdv2-hero-no-media{% endif %}">
       <div class="sdv2-hero-identity">
