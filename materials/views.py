@@ -9,7 +9,7 @@ from django.contrib.auth.mixins import (
 )
 from django.core.exceptions import PermissionDenied
 from django.db.models import F, Q, Window
-from django.db.models.aggregates import Count
+from django.db.models.aggregates import Count, Max
 from django.db.models.functions import RowNumber
 from django.http import (
     Http404,
@@ -861,31 +861,24 @@ def build_sample_card_data(samples):
 
     ranked_components = (
         ComponentMeasurement.objects.filter(sample_id__in=ids)
+        .values("sample_id", "component__name")
+        .annotate(peak=Max("average"))
         .annotate(
             rank=Window(
                 RowNumber(),
                 partition_by=F("sample_id"),
-                order_by=F("average").desc(),
+                order_by=[F("peak").desc(), F("component__name").asc()],
             )
         )
-        .filter(rank__lte=CARD_COMPONENT_PREVIEW_LIMIT * 4)
         .order_by("sample_id", "rank")
-        .values_list("sample_id", "component__name")
+        .values_list("sample_id", "component__name", "rank")
     )
-    previews = defaultdict(list)
-    overflows = defaultdict(int)
-    seen = defaultdict(set)
-    for sample_id, component_name in ranked_components:
-        if len(previews[sample_id]) < CARD_COMPONENT_PREVIEW_LIMIT:
-            if component_name not in seen[sample_id]:
-                seen[sample_id].add(component_name)
-                previews[sample_id].append(component_name)
-        elif component_name not in seen[sample_id]:
-            seen[sample_id].add(component_name)
-            overflows[sample_id] += 1
-    for sample_id, preview in previews.items():
-        cards[sample_id]["component_preview"] = preview
-        cards[sample_id]["component_preview_overflow"] = overflows[sample_id]
+    for sample_id, component_name, rank in ranked_components:
+        card = cards[sample_id]
+        if rank <= CARD_COMPONENT_PREVIEW_LIMIT:
+            card["component_preview"].append(component_name)
+        else:
+            card["component_preview_overflow"] += 1
     for sample in samples:
         sample.card_data = cards.get(sample.pk, dict(empty))
     return cards

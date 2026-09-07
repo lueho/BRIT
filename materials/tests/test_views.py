@@ -1975,6 +1975,41 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(card["component_preview"], ["Oxygen", "Nitrogen", "Hydrogen"])
         self.assertEqual(card["component_preview_overflow"], 1)
 
+    def test_sample_card_component_preview_survives_repeated_measurements(self):
+        group = MaterialComponentGroup.objects.create(
+            owner=self.owner,
+            name="Chemical elements",
+            publication_status="published",
+        )
+        carbon = MaterialComponent.objects.create(
+            owner=self.owner, name="Carbon", publication_status="published"
+        )
+        for _ in range(15):
+            ComponentMeasurement.objects.create(
+                owner=self.owner,
+                sample=self.sample,
+                group=group,
+                component=carbon,
+                average=Decimal("50.0"),
+            )
+        for name, average in (("Hydrogen", "6"), ("Oxygen", "40"), ("Ash", "4")):
+            component = MaterialComponent.objects.create(
+                owner=self.owner, name=name, publication_status="published"
+            )
+            ComponentMeasurement.objects.create(
+                owner=self.owner,
+                sample=self.sample,
+                group=group,
+                component=component,
+                average=Decimal(average),
+            )
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        card = self._card_for(response)
+        self.assertEqual(card["measurement_count"], 18)
+        self.assertEqual(card["component_preview"], ["Carbon", "Oxygen", "Hydrogen"])
+        self.assertEqual(card["component_preview_overflow"], 1)
+
     def test_gallery_renders_card_data_signals(self):
         self._add_sample_data()
         response = self.client.get(reverse("sample-gallery"), {"scope": "published"})

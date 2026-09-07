@@ -100,13 +100,13 @@
               </li>
             {% endif %}
             <li>
-              <a class="dropdown-item"
-                 href="#"
-                 data-sdv2-export-sample
-                 data-export-url="{% url 'sample-export' object.pk %}"
-                 data-progress-template="{% url 'file-export-progress' 'TASK_ID' %}">
+              <button type="button"
+                      class="dropdown-item"
+                      data-sdv2-export-sample
+                      data-export-url="{% url 'sample-export' object.pk %}"
+                      data-progress-template="{% url 'file-export-progress' 'TASK_ID' %}">
                 <i class="fas fa-fw fa-file-excel me-2" aria-hidden="true"></i>Export sample to Excel
-              </a>
+              </button>
             </li>
             {% if sample_policy.can_delete %}
               <li><hr class="dropdown-divider"></li>
@@ -871,15 +871,24 @@
       // Build a tooltip label callback that reports percentages instead of
       // the raw dataset values (shares can be fractions 0..1 or already %,
       // so we always normalize against the dataset total).
-      function tooltipLabel(ctx) {
-        const ds = ctx.dataset || (ctx.chart && ctx.chart.data.datasets[ctx.datasetIndex]) || {};
+      // Chart.js 2.x calls label(tooltipItem, data); 3.x+ calls label(ctx).
+      function tooltipLabel(item, data) {
+        const chartData = data || (item.chart && item.chart.data) || {};
+        const datasets = chartData.datasets || [];
+        const dataIndex = item.dataIndex !== undefined ? item.dataIndex : item.index;
+        const ds = item.dataset || datasets[item.datasetIndex] || {};
         const values = ds.data || [];
         const total = values.reduce((sum, v) => sum + (Number(v) || 0), 0);
-        const raw = ctx.parsed !== undefined && ctx.parsed !== null
-          ? (typeof ctx.parsed === "object" ? ctx.parsed.y || ctx.parsed.value || 0 : ctx.parsed)
-          : (ctx.raw !== undefined ? ctx.raw : values[ctx.dataIndex]);
+        let raw;
+        if (item.parsed !== undefined && item.parsed !== null) {
+          raw = typeof item.parsed === "object" ? item.parsed.y || item.parsed.value || 0 : item.parsed;
+        } else if (item.raw !== undefined) {
+          raw = item.raw;
+        } else {
+          raw = values[dataIndex];
+        }
         const pct = total > 0 ? (Number(raw) / total) * 100 : 0;
-        const label = ctx.label || (ctx.chart && ctx.chart.data.labels && ctx.chart.data.labels[ctx.dataIndex]) || "";
+        const label = (chartData.labels && chartData.labels[dataIndex]) || item.label || "";
         return label + ": " + pct.toFixed(1) + " %";
       }
 
@@ -901,6 +910,7 @@
         config.options.maintainAspectRatio = true;
         config.options.aspectRatio = 1;
         config.options.cutout = "62%";
+        config.options.cutoutPercentage = 62;
         config.options.layout = {padding: 4};
         // Disable legend under both Chart.js v2 (top-level) and v3+ (plugins).
         config.options.legend = {display: false};

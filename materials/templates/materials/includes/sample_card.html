@@ -78,7 +78,7 @@ Expects `object` (Sample with .card_data) and optionally:
       {% endif %}
     </div>
     {% if list_type == "private" and object.update_url %}
-      <div class="mt-2">
+      <div class="mt-2 sample-card-actions">
         <a class="btn btn-sm btn-outline-secondary" href="{{ object.update_url }}">Edit metadata</a>
       </div>
     {% endif %}
