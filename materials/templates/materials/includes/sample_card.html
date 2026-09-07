@@ -71,7 +71,7 @@ Expects `object` (Sample with .card_data) and optionally:
         <div class="small text-muted fst-italic">No data yet</div>
       {% endif %}
       {% if object.card_data.component_preview %}
-        <div class="small text-truncate text-muted" title="Dominant components: {{ object.card_data.component_preview|join:', ' }}">
+        <div class="small text-truncate text-muted" title="Largest measured components (by weight share): {{ object.card_data.component_preview|join:', ' }}">
           {{ object.card_data.component_preview|join:" · " }}{% if object.card_data.component_preview_overflow %}
             +{{ object.card_data.component_preview_overflow }} more{% endif %}
         </div>

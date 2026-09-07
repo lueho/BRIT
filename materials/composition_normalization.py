@@ -172,7 +172,7 @@ def _build_raw_derived_group_composition(
         component_percent = Decimal("0.0")
         for measurement in component_measurements:
             try:
-                component_percent += _to_weight_percent(
+                component_percent += to_weight_percent(
                     Decimal(measurement.average), measurement.unit
                 )
             except UnitConversionError:
@@ -267,7 +267,7 @@ def _is_dry_matter_basis(measurement):
     return basis_name in {"dm", "drymatter"}
 
 
-def _to_weight_percent(value, unit):
+def to_weight_percent(value, unit):
     """Express a weight-fraction measurement in percent, whatever its unit."""
     for token in (getattr(unit, "symbol", ""), getattr(unit, "name", "")):
         try:

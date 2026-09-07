@@ -575,9 +575,8 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         is_published and not is_archived and (is_owner or is_staff or is_moderator)
     )
 
-    # Object-specific management helpers. Owners work on unpublished records;
-    # staff retain their editorial override for published records so they can
-    # manage a sample's composition data as well as its metadata.
+    # Sample-related management (sample data, series distributions, collection
+    # samples) mirrors can_edit: owners on unpublished records, staff always.
     can_manage_samples = (
         is_staff or (is_owner and not is_published)
     ) and not is_archived

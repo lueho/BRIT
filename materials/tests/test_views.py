@@ -1826,6 +1826,9 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
             material=cls.material,
             standalone=True,
         )
+        cls.percent, _ = Unit.objects.get_or_create(
+            owner=cls.owner, name="%", defaults={"symbol": "%"}
+        )
 
     def test_public_list_includes_gallery_switch(self):
         response = self.client.get(reverse("sample-list"), {"scope": "published"})
@@ -1904,6 +1907,7 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
             sample=self.sample,
             group=group,
             component=wood,
+            unit=self.percent,
             average=Decimal("60.0"),
         )
         ComponentMeasurement.objects.create(
@@ -1911,6 +1915,7 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
             sample=self.sample,
             group=group,
             component=ash,
+            unit=self.percent,
             average=Decimal("10.0"),
         )
         moisture = MaterialProperty.objects.create(
@@ -1967,6 +1972,7 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
                 sample=self.sample,
                 group=group,
                 component=component,
+                unit=self.percent,
                 average=Decimal(index + 1),
             )
         response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
@@ -1990,6 +1996,7 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
                 sample=self.sample,
                 group=group,
                 component=carbon,
+                unit=self.percent,
                 average=Decimal("50.0"),
             )
         for name, average in (("Hydrogen", "6"), ("Oxygen", "40"), ("Ash", "4")):
@@ -2001,6 +2008,7 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
                 sample=self.sample,
                 group=group,
                 component=component,
+                unit=self.percent,
                 average=Decimal(average),
             )
         response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
@@ -2009,6 +2017,31 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(card["measurement_count"], 18)
         self.assertEqual(card["component_preview"], ["Carbon", "Oxygen", "Hydrogen"])
         self.assertEqual(card["component_preview_overflow"], 1)
+
+    def test_sample_card_component_preview_ranks_by_converted_weight_share(self):
+        group = MaterialComponentGroup.objects.create(
+            owner=self.owner, name="Chemical elements", publication_status="published"
+        )
+        g_per_kg = Unit.objects.create(owner=self.owner, name="g/kg", symbol="g/kg")
+        for name, average, unit in (
+            ("Nitrogen", "40", self.percent),
+            ("Carbon", "300", g_per_kg),
+            ("Zinc", "50", g_per_kg),
+        ):
+            component = MaterialComponent.objects.create(
+                owner=self.owner, name=name, publication_status="published"
+            )
+            ComponentMeasurement.objects.create(
+                owner=self.owner,
+                sample=self.sample,
+                group=group,
+                component=component,
+                average=Decimal(average),
+                unit=unit,
+            )
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        card = self._card_for(response)
+        self.assertEqual(card["component_preview"], ["Nitrogen", "Carbon", "Zinc"])
 
     def test_sample_card_preview_does_not_leak_into_empty_samples(self):
         self._add_sample_data()

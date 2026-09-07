@@ -335,12 +335,8 @@
               <div class="sdv2-section-heading">
                 <h2 class="sdv2-section-title">Composition</h2>
                 <span class="sdv2-section-hint">
-                  {% if composition_mode == 'saved' %}
-                    Stored composition records for this sample.
-                  {% else %}
-                    Charts show the normalized composition; the raw measurements behind it are listed below each chart.
-                    <a href="#composition-methodology" class="sdv2-methodology-link">How is the composition normalized?</a>
-                  {% endif %}
+                  Charts show the normalized composition; the raw measurements behind it are listed below each chart.
+                  <a href="#composition-methodology" class="sdv2-methodology-link">How is the composition normalized?</a>
                 </span>
               </div>
               {% if edit_mode_enabled and sample_policy.can_manage_samples %}
@@ -375,16 +371,12 @@
               {% with group_pk=composition.group raws=grouped_measurements|get_item:composition.group %}
                 <article class="sdv2-group-card sdv2-surface sdv2-anchor-target"
                          id="group-{{ group_pk }}"
-                         data-group-id="{{ group_pk }}"
-                         data-derived="{% if composition.is_derived %}1{% else %}0{% endif %}">
+                         data-group-id="{{ group_pk }}">
                   <header class="sdv2-group-header">
                     <div class="sdv2-group-title">
                       <a href="{% url 'materialcomponentgroup-detail-modal' group_pk %}"
                          class="modal-link sdv2-group-name">{{ composition.group_name }}</a>
                       <span class="sdv2-group-badges">
-                        {% if not composition.is_derived and composition_mode == 'mixed' %}
-                          <span class="sdv2-badge sdv2-badge-saved">Saved composition</span>
-                        {% endif %}
                         <span class="sdv2-group-fractions">% of {{ composition.fractions_of_name }}</span>
                       </span>
                     </div>
@@ -477,7 +469,7 @@
                           <tr>
                             <th scope="col" aria-label="Color"></th>
                             <th scope="col">Component</th>
-                            <th scope="col" class="sdv2-num">{% if composition.is_derived %}Normalized share{% else %}Share{% endif %}</th>
+                            <th scope="col" class="sdv2-num">Normalized share</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -616,7 +608,6 @@
                 </article>
               {% endwith %}
             {% endfor %}
-            {% if composition_mode != 'saved' %}
               <details class="sdv2-methodology" id="composition-methodology">
                 <summary>Methodology: how normalized compositions are derived</summary>
                 <div class="sdv2-methodology-body">
@@ -632,7 +623,6 @@
                   </ul>
                 </div>
               </details>
-            {% endif %}
           </section>
         {% elif edit_mode_enabled or not data.compositions %}
           <section class="sdv2-groups sdv2-groups-empty sdv2-section-panel">

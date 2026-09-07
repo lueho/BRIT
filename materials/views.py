@@ -1,6 +1,7 @@
 import json
 import logging
 from collections import defaultdict
+from decimal import Decimal
 
 from django.contrib.auth.mixins import (
     LoginRequiredMixin,
@@ -8,9 +9,8 @@ from django.contrib.auth.mixins import (
     UserPassesTestMixin,
 )
 from django.core.exceptions import PermissionDenied
-from django.db.models import F, Q, Window
-from django.db.models.aggregates import Count, Max
-from django.db.models.functions import RowNumber
+from django.db.models import Q
+from django.db.models.aggregates import Count
 from django.http import (
     Http404,
     HttpResponseRedirect,
@@ -50,12 +50,15 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateView,
     UserOwnsObjectMixin,
 )
+from utils.properties.models import Unit
+from utils.properties.units import UnitConversionError
 from utils.views import NextOrSuccessUrlMixin
 
 from .composition_normalization import (
     get_sample_composition_settings_by_group,
     get_sample_normalized_compositions,
     get_sorted_component_measurements,
+    to_weight_percent,
 )
 from .filters import (
     AnalyticalMethodListFilter,
@@ -862,26 +865,31 @@ def build_sample_card_data(samples):
     for stats in property_counts:
         cards[stats["sample_id"]]["property_value_count"] = stats["total"]
 
-    ranked_components = (
+    peak_percent_by_component = defaultdict(dict)
+    for sample_id, component_name, average, unit_symbol, unit_name in (
         ComponentMeasurement.objects.filter(sample_id__in=ids)
-        .values("sample_id", "component__name")
-        .annotate(peak=Max("average"))
-        .annotate(
-            rank=Window(
-                RowNumber(),
-                partition_by=F("sample_id"),
-                order_by=[F("peak").desc(), F("component__name").asc()],
-            )
+        .select_related("unit", "component")
+        .values_list(
+            "sample_id", "component__name", "average", "unit__symbol", "unit__name"
         )
-        .order_by("sample_id", "rank")
-        .values_list("sample_id", "component__name", "rank")
-    )
-    for sample_id, component_name, rank in ranked_components:
+    ):
+        try:
+            percent = to_weight_percent(
+                Decimal(average), Unit(symbol=unit_symbol, name=unit_name)
+            )
+        except UnitConversionError:
+            continue
+        peaks = peak_percent_by_component[sample_id]
+        peaks[component_name] = max(peaks.get(component_name, percent), percent)
+    for sample_id, peaks in peak_percent_by_component.items():
         card = cards[sample_id]
-        if rank <= CARD_COMPONENT_PREVIEW_LIMIT:
-            card["component_preview"].append(component_name)
-        else:
-            card["component_preview_overflow"] += 1
+        ranked = sorted(peaks.items(), key=lambda item: (-item[1], item[0]))
+        card["component_preview"] = [
+            name for name, _ in ranked[:CARD_COMPONENT_PREVIEW_LIMIT]
+        ]
+        card["component_preview_overflow"] = max(
+            len(ranked) - CARD_COMPONENT_PREVIEW_LIMIT, 0
+        )
     for sample in samples:
         sample.card_data = cards[sample.pk]
     return cards
@@ -1092,15 +1100,6 @@ class SampleDetailView(UserCreatedObjectDetailView):
             charts[f"composition-chart-{composition['id']}"] = chart_dict
         return charts
 
-    @staticmethod
-    def _get_composition_mode(compositions):
-        composition_origins = {composition["origin"] for composition in compositions}
-        if len(composition_origins) > 1:
-            return "mixed"
-        if composition_origins == {"raw_derived"}:
-            return "derived"
-        return "saved"
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         data = SampleModelSerializer(
@@ -1144,7 +1143,6 @@ class SampleDetailView(UserCreatedObjectDetailView):
             composition_settings_by_group=composition_settings_by_group,
         )
         charts = self._build_composition_charts(compositions)
-        composition_mode = self._get_composition_mode(compositions)
 
         sample_summary = {
             "component_measurement_count": len(component_measurements),
@@ -1188,7 +1186,6 @@ class SampleDetailView(UserCreatedObjectDetailView):
             {
                 "data": data,
                 "charts": charts,
-                "composition_mode": composition_mode,
                 "property_values": property_values,
                 "component_measurements": component_measurements,
                 "sample_summary": sample_summary,
@@ -1261,7 +1258,6 @@ class SampleDetailView(UserCreatedObjectDetailView):
             "group_anchors": group_anchors,
             "grouped_measurements": grouped_measurements,
             "charts": self._build_composition_charts(display_compositions),
-            "composition_mode": self._get_composition_mode(display_compositions),
             "primary_source": primary_source,
             "sample_policy": sample_policy,
             "review_timeline": review_timeline,
