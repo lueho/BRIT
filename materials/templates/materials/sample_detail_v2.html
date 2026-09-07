@@ -30,18 +30,18 @@
         </span>
         {% if sample_policy.can_edit or sample_policy.can_manage_samples or sample_policy.can_add_property %}
           {% if edit_mode_enabled %}
-            <span class="sdv2-mode-group" role="group" aria-label="Edit mode">
-              <span class="sdv2-editing-state">
+            <span class="sdv2-btn-group" role="group" aria-label="Edit mode">
+              <span class="sdv2-btn sdv2-btn-edit sdv2-editing-state">
                 <i class="fas fa-pen-to-square" aria-hidden="true"></i>
                 Editing
               </span>
-              <a class="sdv2-mode-action" href="{% url 'sample-detail' object.pk %}">
+              <a class="sdv2-btn sdv2-btn-primary sdv2-mode-action" href="{% url 'sample-detail' object.pk %}">
                 <i class="fas fa-check" aria-hidden="true"></i>
                 Done
               </a>
             </span>
           {% else %}
-            <a class="sdv2-mode-action" href="?mode=edit">
+            <a class="sdv2-btn sdv2-btn-primary sdv2-mode-action" href="?mode=edit">
               <i class="fas fa-pen-to-square" aria-hidden="true"></i>
               Edit
             </a>
@@ -71,7 +71,7 @@
           {% endif %}
         {% endif %}
         <div class="dropdown sdv2-actions-menu">
-          <button class="sdv2-actions-trigger"
+          <button class="sdv2-btn sdv2-actions-trigger"
                   type="button"
                   data-bs-toggle="dropdown"
                   aria-expanded="false"
@@ -124,14 +124,6 @@
             {% endif %}
           </ul>
         </div>
-        {% if edit_mode_enabled and sample_policy.can_delete %}
-          <a class="sdv2-rail-delete sdv2-affordance sdv2-affordance-edit modal-link"
-             href="{% url 'sample-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}"
-             title="Delete this sample">
-            <i class="fas fa-trash" aria-hidden="true"></i>
-            Delete
-          </a>
-        {% endif %}
       </div>
     </nav>
     {% endif %}
@@ -347,10 +339,10 @@
               <div class="sdv2-section-actions">
                 {% if component_measurements %}
                   <div class="sdv2-raws-controls" role="group" aria-label="Raw measurement visibility">
-                    <button type="button" class="sdv2-affordance sdv2-affordance-ghost" data-sdv2-raws-toggle="expand">
+                    <button type="button" class="sdv2-btn sdv2-btn-ghost sdv2-btn-sm" data-sdv2-raws-toggle="expand">
                       <i class="fas fa-expand-alt" aria-hidden="true"></i> Expand raw data
                     </button>
-                    <button type="button" class="sdv2-affordance sdv2-affordance-ghost" data-sdv2-raws-toggle="collapse">
+                    <button type="button" class="sdv2-btn sdv2-btn-ghost sdv2-btn-sm" data-sdv2-raws-toggle="collapse">
                       <i class="fas fa-compress-alt" aria-hidden="true"></i> Collapse raw data
                     </button>
                   </div>
@@ -387,13 +379,13 @@
                       </span>
                     </div>
                     <div class="sdv2-group-tools" role="group" aria-label="Group actions">
-                      <a class="sdv2-affordance"
+                      <a class="sdv2-btn sdv2-btn-ghost sdv2-btn-icon"
                          href="#group-{{ group_pk }}"
                          title="Permalink to this group"
                          aria-label="Permalink">
                         <i class="fas fa-link"></i>
                       </a>
-                      <button class="sdv2-affordance"
+                      <button class="sdv2-btn sdv2-btn-ghost sdv2-btn-icon"
                               type="button"
                               data-sdv2-cite="{{ object.name }} · {{ composition.group_name }}"
                               title="Copy citation snippet">
@@ -401,7 +393,7 @@
                       </button>
                       {% if edit_mode_enabled and sample_policy.can_manage_samples %}
                         <div class="dropdown sdv2-group-actions-menu">
-                          <button class="sdv2-affordance sdv2-affordance-edit"
+                          <button class="sdv2-btn sdv2-btn-edit sdv2-btn-icon"
                                   type="button"
                                   data-bs-toggle="dropdown"
                                   aria-expanded="false"
@@ -585,7 +577,7 @@
                           </tbody>
                         </table>
                         {% if edit_mode_enabled and sample_policy.can_manage_samples %}
-                          <a class="sdv2-raws-add"
+                          <a class="sdv2-btn sdv2-btn-ghost sdv2-btn-sm sdv2-raws-add"
                              href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}&amp;group={{ group_pk }}">
                             <i class="fas fa-plus"></i> Add measurement row
                           </a>
@@ -596,14 +588,14 @@
                   <footer class="sdv2-group-footer">
                     <div class="sdv2-affordances" role="group" aria-label="Export actions">
                       <button type="button"
-                              class="sdv2-affordance sdv2-affordance-ghost"
+                              class="sdv2-btn sdv2-btn-ghost sdv2-btn-sm"
                               data-sdv2-export="json"
                               data-sdv2-group="{{ group_pk }}"
                               title="Copy this group as JSON">
                         <i class="fas fa-code"></i> JSON
                       </button>
                       <button type="button"
-                              class="sdv2-affordance sdv2-affordance-ghost"
+                              class="sdv2-btn sdv2-btn-ghost sdv2-btn-sm"
                               data-sdv2-export="csv"
                               data-sdv2-group="{{ group_pk }}"
                               title="Copy this group as CSV">
@@ -726,7 +718,7 @@
                         {% object_policy prop as pp %}
                         <span class="sdv2-row-tools">
                           {% if pp.can_edit %}
-                            <a class="sdv2-affordance sdv2-affordance-sm sdv2-affordance-edit"
+                            <a class="sdv2-btn sdv2-btn-edit sdv2-btn-icon sdv2-btn-sm"
                                href="{% url 'materialpropertyvalue-update' prop.id %}"
                                title="Edit property value">
                               <i class="fas fa-pen-to-square" aria-hidden="true"></i>
@@ -734,7 +726,7 @@
                             </a>
                           {% endif %}
                           {% if pp.can_delete %}
-                            <a class="sdv2-affordance sdv2-affordance-sm sdv2-affordance-danger modal-link sdv2-delete-link"
+                            <a class="sdv2-btn sdv2-btn-danger sdv2-btn-icon sdv2-btn-sm modal-link"
                                href="{% url 'materialpropertyvalue-delete-modal' prop.id %}?next={{ request.get_full_path|urlencode }}"
                                title="Delete property value">
                               <i class="fas fa-trash" aria-hidden="true"></i>
@@ -749,7 +741,7 @@
               </tbody>
             </table>
             {% if edit_mode_enabled and sample_policy.can_add_property %}
-              <a class="sdv2-btn sdv2-btn-ghost"
+              <a class="sdv2-btn"
                  href="{% url 'sample-add-property' object.id %}">
                 <i class="fas fa-plus"></i> Add property
               </a>

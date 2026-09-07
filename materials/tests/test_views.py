@@ -3665,7 +3665,7 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Review feedback")
 
-    def test_v2_edit_mode_shows_delete_outside_palette(self):
+    def test_v2_edit_mode_offers_delete_in_actions_menu(self):
         sample, owner = self._create_v2_owner_sample("V2 Delete", "private")
         self.client.force_login(owner)
         response = self.client.get(
@@ -3673,9 +3673,7 @@ class EmptyStateViewsTestCase(TestCase):
             + "?experience=v2&mode=edit"
         )
         self.assertEqual(response.status_code, 200)
-        # Delete must be reachable as a visible rail affordance in edit mode,
-        # not only through the command palette.
-        self.assertContains(response, "sdv2-rail-delete")
+        self.assertNotContains(response, "sdv2-rail-delete")
         self.assertContains(response, "delete/modal")
 
     def test_v2_does_not_render_disabled_compare_stub(self):
@@ -3865,7 +3863,7 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(edit_response, "sdv2-editing-state")
         self.assertContains(
             edit_response,
-            f'class="sdv2-mode-action" href="{reverse("sample-detail", kwargs={"pk": sample.pk})}"',
+            f'sdv2-mode-action" href="{reverse("sample-detail", kwargs={"pk": sample.pk})}"',
         )
         self.assertContains(edit_response, "Done")
 
@@ -4032,11 +4030,6 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(
             response,
             'class="dropdown-item text-danger modal-link"',
-            html=False,
-        )
-        self.assertContains(
-            response,
-            'class="sdv2-rail-delete sdv2-affordance sdv2-affordance-edit modal-link"',
             html=False,
         )
 
