@@ -197,6 +197,18 @@ class SampleCompositionNormalizationTestCase(TestCase):
         )
         self.assertIn(WARNING_LEGACY_OTHER_IGNORED, composition["warning_codes"])
 
+    def test_share_total_is_not_a_sum_of_rounded_shares(self):
+        sample, group = self._sample_with_group("Thirds")
+        for name in ("Carbon", "Nitrogen", "Oxygen"):
+            self._measure(sample, group, name, "50")
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(
+            [share["percent"] for share in composition["shares"]], [33.3, 33.3, 33.3]
+        )
+        self.assertEqual(composition["share_total_percent"], 100.0)
+
     def test_other_only_group_yields_no_derived_composition(self):
         sample, group = self._sample_with_group("Only Other")
         self._measure(sample, group, MaterialComponent.objects.other(), "100")

@@ -255,7 +255,7 @@ def _build_raw_derived_group_composition(
     )
     for share in shares:
         share["percent"] = round(share["average"] * 100, 1)
-    share_total_percent = round(sum(share["percent"] for share in shares), 1)
+    share_total_percent = round(sum(share["average"] * 100 for share in shares), 1)
 
     return {
         "id": f"derived-{group.pk}",
