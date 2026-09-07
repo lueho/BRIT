@@ -4694,6 +4694,14 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "42.9%")
         self.assertContains(response, "scaled down to 100%")
 
+        composition = response.context["display_compositions"][0]
+        self.assertEqual(composition["share_total_percent"], 100.0)
+        chart = response.context["charts"][f"composition-chart-{composition['id']}"]
+        self.assertEqual(chart["data"]["datasets"][0]["data"], [57.1, 42.9])
+        self.assertEqual(
+            chart["data"]["tooltip_labels"], ["Carbon: 57.1 %", "Nitrogen: 42.9 %"]
+        )
+
     def test_sample_detail_v2_places_normalized_view_before_raw_drilldown(self):
         sample = Sample.objects.create(
             name="Sample Layout Order",

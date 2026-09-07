@@ -868,28 +868,13 @@
       if (!raw) return;
       const charts = JSON.parse(raw.textContent);
 
-      // Build a tooltip label callback that reports percentages instead of
-      // the raw dataset values (shares can be fractions 0..1 or already %,
-      // so we always normalize against the dataset total).
+      // Tooltip text is precomputed server-side (data.tooltip_labels).
       // Chart.js 2.x calls label(tooltipItem, data); 3.x+ calls label(ctx).
       function tooltipLabel(item, data) {
         const chartData = data || (item.chart && item.chart.data) || {};
-        const datasets = chartData.datasets || [];
         const dataIndex = item.dataIndex !== undefined ? item.dataIndex : item.index;
-        const ds = item.dataset || datasets[item.datasetIndex] || {};
-        const values = ds.data || [];
-        const total = values.reduce((sum, v) => sum + (Number(v) || 0), 0);
-        let raw;
-        if (item.parsed !== undefined && item.parsed !== null) {
-          raw = typeof item.parsed === "object" ? item.parsed.y || item.parsed.value || 0 : item.parsed;
-        } else if (item.raw !== undefined) {
-          raw = item.raw;
-        } else {
-          raw = values[dataIndex];
-        }
-        const pct = total > 0 ? (Number(raw) / total) * 100 : 0;
-        const label = (chartData.labels && chartData.labels[dataIndex]) || item.label || "";
-        return label + ": " + pct.toFixed(1) + " %";
+        const labels = chartData.tooltip_labels || [];
+        return labels[dataIndex] || item.label || "";
       }
 
       Object.keys(charts).forEach(key => {

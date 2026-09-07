@@ -1076,7 +1076,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
         charts = {}
         for composition in compositions:
             labels = [share["component_name"] for share in composition["shares"]]
-            values = [share["average"] for share in composition["shares"]]
+            values = [share["percent"] for share in composition["shares"]]
             chart = DoughnutChart(
                 id=f"materialCompositionChart-{composition['id']}",
                 title="Composition",
@@ -1084,7 +1084,12 @@ class SampleDetailView(UserCreatedObjectDetailView):
                 labels=labels,
                 data=[{"label": "Fraction", "unit": "%", "data": values}],
             )
-            charts[f"composition-chart-{composition['id']}"] = chart.as_dict()
+            chart_dict = chart.as_dict()
+            chart_dict["data"]["tooltip_labels"] = [
+                f"{label}: {value:.1f} %"
+                for label, value in zip(labels, values, strict=True)
+            ]
+            charts[f"composition-chart-{composition['id']}"] = chart_dict
         return charts
 
     @staticmethod
@@ -1234,15 +1239,6 @@ class SampleDetailView(UserCreatedObjectDetailView):
             for composition in compositions
             if composition["group"] != default_group_id
         ]
-        for composition in display_compositions:
-            composition["share_total_percent"] = round(
-                sum(
-                    float(share.get("average") or 0)
-                    for share in composition.get("shares", [])
-                )
-                * 100,
-                1,
-            )
         group_anchors = self._build_group_anchors(display_compositions)
         grouped_measurements = self._group_measurements_by_group_id(
             component_measurements

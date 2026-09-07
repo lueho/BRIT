@@ -268,9 +268,9 @@ class CompositionSerializerTestCase(TestCase):
         ComponentMeasurement.objects.create(
             sample=sample,
             group=group,
-            component=MaterialComponent.objects.other(),
+            component=MaterialComponent.objects.create(name="Test Component"),
             unit=unit,
-            average=Decimal("50"),
+            average=Decimal("40"),
         )
 
     def test_serializer_construction(self):
@@ -288,7 +288,7 @@ class CompositionSerializerTestCase(TestCase):
         self.assertEqual(
             data["shares"][-1]["component"], MaterialComponent.objects.other().pk
         )
-        self.assertEqual(data["shares"][-1]["as_percentage"], "100.0%")
+        self.assertEqual(data["shares"][-1]["as_percentage"], "60.0%")
 
 
 class CompositionDoughnutChartSerializerTestCase(TestCase):

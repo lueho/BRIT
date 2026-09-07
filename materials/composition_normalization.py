@@ -128,17 +128,17 @@ def _build_raw_derived_group_composition(
         average = Decimal(measurement.average)
         if average <= 0:
             continue
-        if not _is_percent_of_dm_measurement(measurement):
-            is_dm_basis = False
         if measurement.component_id == other_component.pk:
             legacy_other_count += 1
             continue
+        if not _is_percent_of_dm_measurement(measurement):
+            is_dm_basis = False
         positive_measurements.append(measurement)
         if measurement.basis_component is not None:
             basis_components.append(measurement.basis_component)
         grouped_components[measurement.component].append(measurement)
 
-    if not positive_measurements and not legacy_other_count:
+    if not positive_measurements:
         return None
 
     percent_unit = Unit.objects.filter(name="%").first() or Unit(
@@ -206,7 +206,7 @@ def _build_raw_derived_group_composition(
             }
         )
 
-    if not shares and not legacy_other_count:
+    if not shares:
         return None
 
     if skipped_measurement_count:
@@ -253,6 +253,9 @@ def _build_raw_derived_group_composition(
             share["component_name"].lower(),
         )
     )
+    for share in shares:
+        share["percent"] = round(share["average"] * 100, 1)
+    share_total_percent = round(sum(share["percent"] for share in shares), 1)
 
     return {
         "id": f"derived-{group.pk}",
@@ -262,6 +265,7 @@ def _build_raw_derived_group_composition(
         "fractions_of": reference_component.pk,
         "fractions_of_name": reference_component.name,
         "shares": shares,
+        "share_total_percent": share_total_percent,
         "is_derived": True,
         "origin": "raw_derived",
         "warnings": warnings,

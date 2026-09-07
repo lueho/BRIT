@@ -153,6 +153,10 @@ class SampleCompositionNormalizationTestCase(TestCase):
             sum(share["average"] for share in composition["shares"]), 1.0
         )
         self.assertIn(WARNING_SHARES_SCALED_TO_100, composition["warning_codes"])
+        self.assertEqual(composition["share_total_percent"], 100.0)
+        self.assertEqual(
+            [share["percent"] for share in composition["shares"]], [50.0, 50.0]
+        )
         self.assertNotIn(
             MaterialComponent.objects.other().pk,
             [share["component"] for share in composition["shares"]],
@@ -192,6 +196,12 @@ class SampleCompositionNormalizationTestCase(TestCase):
             [("Carbon", "40.0%"), (other.name, "60.0%")],
         )
         self.assertIn(WARNING_LEGACY_OTHER_IGNORED, composition["warning_codes"])
+
+    def test_other_only_group_yields_no_derived_composition(self):
+        sample, group = self._sample_with_group("Only Other")
+        self._measure(sample, group, MaterialComponent.objects.other(), "100")
+
+        self.assertEqual(get_sample_normalized_compositions(sample), [])
 
     def test_resolves_raw_groups_with_settings_order(self):
         sample = Sample.objects.create(
