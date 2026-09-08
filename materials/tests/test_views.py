@@ -4780,6 +4780,10 @@ class EmptyStateViewsTestCase(TestCase):
 
         content = response.content.decode()
         self.assertLess(
+            content.index(f'href="#group-{organic_group.pk}"'),
+            content.index(f'href="#group-{chemical_group.pk}"'),
+        )
+        self.assertLess(
             content.index(f'id="group-{organic_group.pk}"'),
             content.index(f'id="group-{chemical_group.pk}"'),
         )

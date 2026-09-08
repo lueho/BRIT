@@ -1277,14 +1277,13 @@ class SampleDetailView(UserCreatedObjectDetailView):
     @staticmethod
     def _build_group_anchors(compositions):
         """Return label-only navigation targets for visible composition groups."""
-        anchors = [
+        return [
             {
                 "group_id": composition["group"],
                 "name": composition["group_name"],
             }
             for composition in compositions
         ]
-        return sorted(anchors, key=lambda anchor: anchor["name"].lower())
 
     def _build_review_timeline(self):
         try:
