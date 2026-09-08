@@ -1,6 +1,9 @@
+from datetime import datetime
+
 from django.contrib.auth.models import Permission, User
 from django.http import QueryDict
 from django.test import RequestFactory, TestCase
+from django.utils import timezone
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.forms import TomSelectModelChoiceField
 
@@ -245,6 +248,30 @@ class SampleModelFormTestCase(TestCase):
         request = self.factory.get("/")
         request.user = user
         return request
+
+    def test_distinguishes_sampling_and_analysis_time(self):
+        form = SampleModelForm(request=self._build_request(self.owner))
+
+        self.assertEqual(form.fields["datetime"].label, "Sampling date/time")
+        self.assertIn("analysis_date", form.fields)
+        self.assertEqual(form.fields["analysis_date"].label, "Analysis date/time")
+        self.assertEqual(
+            form.fields["analysis_date"].widget.input_type, "datetime-local"
+        )
+        self.assertIn("analysis_laboratory", form.fields)
+
+    def test_datetime_local_widgets_render_existing_values_in_iso_format(self):
+        sample = Sample.objects.create(
+            name="Timed sample",
+            material=self.substrate_material,
+            owner=self.owner,
+            datetime=timezone.make_aware(datetime(2024, 3, 5, 9, 30)),
+            analysis_date=timezone.make_aware(datetime(2024, 4, 12, 14, 0)),
+        )
+        form = SampleModelForm(instance=sample, request=self._build_request(self.owner))
+
+        self.assertIn('value="2024-03-05T09:30"', str(form["datetime"]))
+        self.assertIn('value="2024-04-12T14:00"', str(form["analysis_date"]))
 
     def test_material_field_uses_substrate_autocomplete(self):
         form = SampleModelForm(request=self._build_request(self.owner))

@@ -173,8 +173,14 @@
           {% endif %}
           {% if object.datetime %}
             <li>
-              <span class="sdv2-meta-label">When</span>
+              <span class="sdv2-meta-label">Sampled</span>
               <time datetime="{{ object.datetime|date:'c' }}">{{ object.datetime|date:'Y-m-d H:i' }}</time>
+            </li>
+          {% endif %}
+          {% if object.analysis_date %}
+            <li>
+              <span class="sdv2-meta-label">Analysed</span>
+              <time datetime="{{ object.analysis_date|date:'c' }}">{{ object.analysis_date|date:'Y-m-d H:i' }}</time>
             </li>
           {% endif %}
           {% if object.location %}
@@ -769,7 +775,7 @@
                 <span class="sdv2-timeline-dot"></span>
                 <div class="sdv2-timeline-content">
                   <div class="sdv2-timeline-title">Analysed</div>
-                  <div class="sdv2-timeline-date">{{ object.analysis_date|date:'Y-m-d' }}</div>
+                  <div class="sdv2-timeline-date">{{ object.analysis_date|date:'Y-m-d H:i' }}</div>
                   {% if object.analysis_laboratory %}
                     <div class="sdv2-timeline-meta">at {{ object.analysis_laboratory }}</div>
                   {% endif %}
@@ -919,20 +925,32 @@
         });
 
         const ctx = canvas.getContext("2d");
+        let chart;
         try {
-          new Chart(ctx, config);
+          chart = new Chart(ctx, config);
         } catch (err) {
           console.warn("sdv2 chart render failed", key, err);
           return;
         }
 
-        // Paint the neighbouring composition table rows with the same colors
-        // Chart.js uses for slices, so the table doubles as the legend.
+        // Paint the neighbouring composition table rows with the exact colors
+        // Chart.js resolved for each slice, so the table doubles as the legend.
         const body = container.closest(".sdv2-group-body");
         if (body) {
+          const dataset = ((chart.data || {}).datasets || [])[0] || {};
+          const pick = (value, idx) => {
+            if (Array.isArray(value)) return value.length ? value[idx % value.length] : null;
+            return value || null;
+          };
           const rows = body.querySelectorAll(".sdv2-group-table tbody tr");
           rows.forEach((row, idx) => {
-            row.classList.add("sdv2-has-swatch", `sdv2-swatch-${idx % 8}`);
+            row.classList.add("sdv2-has-swatch");
+            const swatch = row.querySelector(".sdv2-swatch");
+            if (!swatch) return;
+            const fill = pick(dataset.backgroundColor, idx);
+            const border = pick(dataset.borderColor, idx) || fill;
+            if (fill) swatch.style.setProperty("--sdv2-swatch-fill", fill);
+            if (border) swatch.style.setProperty("--sdv2-swatch-border", border);
           });
         }
       });
