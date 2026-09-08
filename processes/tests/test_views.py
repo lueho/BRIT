@@ -408,6 +408,32 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.assertContains(response, "Information Resources")
         self.assertContains(response, "Process flow chart")
 
+    def test_detail_view_uses_sdv2_layout(self):
+        """Process detail renders the sdv2 detail-page layout like samples."""
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": self.published_object.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('class="sdv2"', content)
+        self.assertIn("sdv2-hero", content)
+        self.assertIn("sdv2-hero-title", content)
+        self.assertIn("sdv2-rail", content)
+        self.assertIn("sample_detail_v2.min.css", content)
+        self.assertNotIn("detail-layout-card", content)
+
+    def test_detail_view_hides_action_rail_for_anonymous(self):
+        """Anonymous readers get the minimalist layout without the action rail."""
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": self.published_object.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "sdv2-rail")
+
     def test_detail_view_section_headings_are_emphasized(self):
         self.published_object.description = "Visible description"
         self.published_object.process_technology = "Visible process technology"
@@ -422,7 +448,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         content = response.content.decode()
         for heading in ("Description", "Process Technology"):
             self.assertIn(
-                f'<h6 class="detail-section-heading">{heading}</h6>',
+                f'<h2 class="sdv2-section-title">{heading}</h2>',
                 content,
             )
 
@@ -486,7 +512,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Bibliography")
         self.assertNotContains(response, "<ol>")
-        self.assertContains(response, '<ul class="list-unstyled">')
+        self.assertContains(response, "list-unstyled")
         self.assertLess(
             response.content.decode().index("Alpha"),
             response.content.decode().index("Zebra"),

@@ -1,203 +1,437 @@
-{% extends "detail_with_options.html" %}
-{% block title %}BRIT | Process: {{ object.name }}{% endblock %}
-{% block detail_body %}
-    <section class="mb-4">
-        <h5 class="text-uppercase mb-2">{{ object.name }}</h5>
-        {% if object.image %}
-            <img src="{{ object.image.url }}"
-                 class="detail-uploaded-image mb-3"
-                 alt="{{ object.image_alt_text|default_if_none:''|default:object.name }}">
-            {% if object.image_caption or object.image_rights_notice %}
-                <div class="small text-muted mb-3">
-                    {% if object.image_caption %}<div>{{ object.image_caption }}</div>{% endif %}
-                    {% if object.image_rights_notice %}<div>{{ object.image_rights_notice }}</div>{% endif %}
-                </div>
-            {% endif %}
-        {% endif %}
-        {% if process_authors %}
-            <div class="text-muted mb-3">
-                {% for process_author in process_authors %}
-                    {% with author=process_author.author %}
-                        <div>
-                            {{ author }}
-                            {% if author.institution %}<span>({{ author.institution }})</span>{% endif %}
-                            {% if author.contact_email %}<a href="mailto:{{ author.contact_email }}">{{ author.contact_email }}</a>{% endif %}
-                        </div>
-                    {% endwith %}
-                {% endfor %}
-            </div>
-        {% endif %}
-        <p class="lead mb-3">{{ object.short_description|default:"No short description" }}</p>
-        <dl class="row mb-0">
-            {% if object.parent %}
-                <dt class="col-sm-3">Parent Process</dt>
-                <dd class="col-sm-9">
-                    <a href="{% url 'processes:process-detail' object.parent.pk %}">{{ object.parent.name }}</a>
-                </dd>
-            {% endif %}
-            <dt class="col-sm-3">Categories</dt>
-            <dd class="col-sm-9">
-                {% for category in object.categories.all %}
-                    <a href="{% url 'processes:processcategory-detail' category.pk %}"
-                       class="badge bg-secondary">{{ category.name }}</a>
-                {% empty %}
-                    <span class="text-muted">No categories</span>
-                {% endfor %}
-            </dd>
-        </dl>
-    </section>
-    {% if object.supplementary_document %}
-        <section class="mb-4">
-            <a href="{{ object.supplementary_document.url }}"
-               class="btn btn-outline-secondary"
-               download>
-                <i class="fas fa-file-pdf me-1"></i> Download PDF version
+{% extends "base.html" %}
+{% load static %}
+{% load custom_tags %}
+{% load moderation_tags %}
+{% object_policy object as process_policy %}
+{% block title %}
+  BRIT · {{ object.name }}
+{% endblock title %}
+{% block style_sheets %}
+  <link href="{% static 'css/sample_detail_v2.min.css' %}" rel="stylesheet">
+{% endblock style_sheets %}
+{% block content %}
+  <div class="sdv2"
+       data-has-action-rail="{% if user.is_authenticated %}1{% else %}0{% endif %}">
+    {# ─── Sticky rail: process-specific actions (authenticated only) ── #}
+    {# The BRIT > Processes > <Process> path is rendered by the shared   #}
+    {# breadcrumb rail in base.html through the breadcrumb_* contract   #}
+    {# populated by UserCreatedObjectDetailView. Anonymous visitors get #}
+    {# a minimalist reading layout with no rail at all.                 #}
+    {% if user.is_authenticated %}
+    <section class="sdv2-rail" aria-label="Process toolbar">
+      <div class="sdv2-rail-nav">
+        {% include "processes/includes/process_context_nav.html" %}
+      </div>
+      <div class="sdv2-rail-workspace">
+        <div class="sdv2-rail-status" role="group" aria-label="Process status">
+          <span class="sdv2-status-pill sdv2-status-{{ object.publication_status|default:'private' }}"
+                title="Publication status">
+            <i class="fas fa-circle sdv2-status-dot" aria-hidden="true"></i>
+            {{ object.get_publication_status_display }}
+          </span>
+        </div>
+        <div class="sdv2-rail-actions" role="group" aria-label="Process actions">
+          {% if object.publication_status == 'private' and process_policy.can_submit_review %}
+            <form method="post"
+                  action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                  class="sdv2-rail-submit">
+              {% csrf_token %}
+              <button type="submit" class="sdv2-btn">
+                <i class="fas fa-paper-plane" aria-hidden="true"></i> Submit for review
+              </button>
+            </form>
+          {% elif process_policy.can_view_review_feedback %}
+            <a class="sdv2-btn sdv2-btn-ghost"
+               href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+              <i class="fas fa-clipboard-check" aria-hidden="true"></i>
+              {{ process_policy.review_feedback_label }}
             </a>
-        </section>
-    {% endif %}
-    <section class="mb-4">
-        <dl class="row mb-0">
-            {% if object.mechanism %}
-                <dt class="col-sm-3 text-uppercase">Mechanism</dt>
-                <dd class="col-sm-9">
-                    {{ object.mechanism }}
-                </dd>
+          {% elif process_policy.is_in_review and not review_mode %}
+            {% if process_policy.is_owner or process_policy.is_staff or process_policy.is_moderator %}
+              <a class="sdv2-btn sdv2-btn-ghost"
+                 href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+                <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view
+              </a>
             {% endif %}
-            {% if operating_parameters %}
-                <dt class="col-sm-3 text-uppercase">Operating parameters</dt>
-                <dd class="col-sm-9">
-                    <ul class="list-unstyled mb-0">
-                        {% for param in operating_parameters %}
-                            <li>
-                                <strong>{{ param.name|default:param.get_parameter_display }}:</strong>
-                                {% if param.nominal_value %}
-                                    {{ param.get_nominal_value_display }}
-                                {% elif param.value_min or param.value_max %}
-                                    {{ param.get_value_min_display|default:"-" }} – {{ param.get_value_max_display|default:"-" }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                                {% if param.unit %}{{ param.unit.name }}{% endif %}
-                                {% if param.basis %}<span class="text-muted">({{ param.basis }})</span>{% endif %}
-                            </li>
-                        {% endfor %}
-                    </ul>
-                </dd>
-            {% endif %}
-            {% if input_materials %}
-                <dt class="col-sm-3 text-uppercase">Input</dt>
-                <dd class="col-sm-9">
-                    <ul class="list-unstyled mb-0">
-                        {% for pm in input_materials %}
-                            <li class="mb-2">
-                                <strong>
-                                    <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
-                                </strong>
-                                {% if pm.quantity_value %}
-                                    <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
-                                {% endif %}
-                                {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes }}</p>{% endif %}
-                            </li>
-                        {% endfor %}
-                    </ul>
-                </dd>
-            {% endif %}
-            {% if output_materials %}
-                <dt class="col-sm-3 text-uppercase">Output</dt>
-                <dd class="col-sm-9">
-                    <ul class="list-unstyled mb-0">
-                        {% for pm in output_materials %}
-                            <li class="mb-2">
-                                <strong>
-                                    <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
-                                </strong>
-                                {% if pm.quantity_value %}
-                                    <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
-                                {% endif %}
-                                {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes }}</p>{% endif %}
-                            </li>
-                        {% endfor %}
-                    </ul>
-                </dd>
-            {% endif %}
-            {% if parameters_by_type.Yield %}
-                <dt class="col-sm-3 text-uppercase">Yield</dt>
-                <dd class="col-sm-9">
-                    <ul class="list-unstyled mb-0">
-                        {% for param in parameters_by_type.Yield %}
-                            <li>
-                                {% if param.nominal_value %}
-                                    {{ param.get_nominal_value_display }}
-                                {% elif param.value_min or param.value_max %}
-                                    {{ param.get_value_min_display|default:"-" }} – {{ param.get_value_max_display|default:"-" }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                                {% if param.unit %}{{ param.unit.name }}{% endif %}
-                            </li>
-                        {% endfor %}
-                    </ul>
-                </dd>
-            {% endif %}
-        </dl>
-    </section>
-    {% if object.description %}
-        <h6 class="detail-section-heading">Description</h6>
-        <div>{{ object.description|linebreaks }}</div>
-    {% endif %}
-    {% if object.process_technology %}
-        <h6 class="detail-section-heading">Process Technology</h6>
-        <div>{{ object.process_technology|linebreaks }}</div>
-    {% endif %}
-    <!-- Links and Resources -->
-    {% if process_links %}
-        <h6 class="detail-section-heading">Links</h6>
-        <ul class="list-group mb-3">
-            {% for link in process_links %}
-                <li class="list-group-item">
-                    <a href="{{ link.url }}"
-                       {% if link.open_in_new_tab %}target="_blank"{% endif %}>
-                        {{ link.label }}
-                        {% if link.open_in_new_tab %}<i class="bi bi-box-arrow-up-right"></i>{% endif %}
+          {% endif %}
+          {% if process_policy.can_manage_editors or process_policy.can_delete %}
+            <div class="dropdown sdv2-actions-menu">
+              <button class="sdv2-btn sdv2-actions-trigger"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      aria-label="More process actions">
+                <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
+                <span>More actions</span>
+                <i class="fas fa-chevron-down sdv2-actions-chevron" aria-hidden="true"></i>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                {% if process_policy.can_manage_editors %}
+                  <li>
+                    <a class="dropdown-item modal-link"
+                       href="{% url 'object_management:manage_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                      <i class="fas fa-fw fa-user-group me-2" aria-hidden="true"></i>Manage access
                     </a>
-                </li>
-            {% endfor %}
-        </ul>
+                  </li>
+                {% endif %}
+                {% if process_policy.can_delete %}
+                  <li><hr class="dropdown-divider"></li>
+                  <li>
+                    <a class="dropdown-item text-danger modal-link"
+                       href="{% url 'processes:process-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">
+                      <i class="fas fa-fw fa-trash me-2" aria-hidden="true"></i>Delete process
+                    </a>
+                  </li>
+                {% endif %}
+              </ul>
+            </div>
+          {% endif %}
+          {% if process_policy.can_edit %}
+            <a class="sdv2-btn sdv2-btn-primary sdv2-mode-action"
+               href="{{ object.update_url }}?next={{ request.get_full_path|urlencode }}">
+              <i class="fas fa-pen-to-square" aria-hidden="true"></i>
+              Edit process
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </section>
     {% endif %}
-    {% if process_info_resources %}
-        <h6 class="detail-section-heading">Information Resources</h6>
-        <ul class="list-group">
-            {% for resource in process_info_resources %}
-                <li class="list-group-item">
-                    <strong>{{ resource.title }}</strong> ({{ resource.get_resource_type_display }})
-                    {% if resource.description %}<p class="mb-0">{{ resource.description }}</p>{% endif %}
-                    <a href="{{ resource.target_url }}">View Resource</a>
-                </li>
-            {% endfor %}
-        </ul>
+    <div class="sdv2-canvas sdv2-canvas-fluid">
+    {% if show_review_panel %}
+      <section class="sdv2-review-panel sdv2-section-panel"
+               aria-label="Review workspace">
+        {% include "object_management/review_panel.html" with object=object %}
+      </section>
     {% endif %}
-    <!-- Variants (Child Processes) -->
-    {% if process_variants %}
-        <h6 class="detail-section-heading">Process Variants</h6>
-        <ul class="list-group">
-            {% for variant in process_variants %}
-                <li class="list-group-item">
-                    <a href="{% url 'processes:process-detail' variant.pk %}">{{ variant.name }}</a>
-                </li>
-            {% endfor %}
-        </ul>
+    {% if not user.is_authenticated %}
+      {% include "processes/includes/process_context_nav.html" %}
     {% endif %}
-    <!-- Bibliography -->
-    {% if bibliography_sources %}
-        <h6 class="detail-section-heading">Bibliography</h6>
-        <ul class="list-unstyled">
-            {% for source in bibliography_sources %}
+    {# ─── Hero ─── #}
+    <header class="sdv2-hero sdv2-surface {% if object.image %}sdv2-hero-with-media{% else %}sdv2-hero-no-media{% endif %}">
+      <div class="sdv2-hero-identity">
+        <div class="sdv2-hero-kicker">Process</div>
+        <h1 class="sdv2-hero-title">{{ object.name }}</h1>
+        <div class="sdv2-hero-material">
+          {% if object.short_description %}
+            {{ object.short_description }}
+          {% else %}
+            <span class="text-muted">No short description</span>
+          {% endif %}
+        </div>
+        <ul class="sdv2-hero-meta" aria-label="Process metadata">
+          {% if object.mechanism %}
+            <li>
+              <span class="sdv2-meta-label">Mechanism</span>
+              {{ object.mechanism }}
+            </li>
+          {% endif %}
+          {% if object.parent %}
+            <li>
+              <span class="sdv2-meta-label">Parent</span>
+              <a href="{% url 'processes:process-detail' object.parent.pk %}">{{ object.parent.name }}</a>
+            </li>
+          {% endif %}
+          {% if object.categories.all %}
+            <li>
+              <span class="sdv2-meta-label">Categories</span>
+              {% for category in object.categories.all %}
+                <a href="{% url 'processes:processcategory-detail' category.pk %}">{{ category.name }}</a>{% if not forloop.last %},{% endif %}
+              {% endfor %}
+            </li>
+          {% endif %}
+        </ul>
+      </div>
+      {% if object.image %}
+        <figure class="sdv2-hero-media">
+          <img src="{{ object.image.url }}"
+               alt="{{ object.image_alt_text|default_if_none:''|default:object.name }}"
+               decoding="async"
+               fetchpriority="high">
+          {% if object.image_caption or object.image_rights_notice %}
+            <figcaption class="sdv2-hero-media-caption">
+              {% if object.image_caption %}
+                <span>{{ object.image_caption }}</span>
+              {% endif %}
+              {% if object.image_rights_notice %}
+                <span class="sdv2-hero-media-rights">{{ object.image_rights_notice }}</span>
+              {% endif %}
+            </figcaption>
+          {% endif %}
+        </figure>
+      {% endif %}
+      {% if process_authors or bibliography_sources %}
+        <div class="sdv2-hero-provenance">
+          {% if process_authors %}
+            <span class="sdv2-prov-label">Authors</span>
+            <span class="sdv2-prov-sources">
+              {% for process_author in process_authors %}
+                {% with author=process_author.author %}
+                  <span>{{ author }}{% if author.institution %} ({{ author.institution }}){% endif %}{% if author.contact_email %} <a href="mailto:{{ author.contact_email }}">{{ author.contact_email }}</a>{% endif %}</span>
+                {% endwith %}
+              {% endfor %}
+            </span>
+          {% endif %}
+          {% if bibliography_sources %}
+            <span class="sdv2-prov-label">Sources</span>
+            <span class="sdv2-prov-sources">
+              {% for source in bibliography_sources %}
+                <a href="{% url 'source-detail-modal' source.pk %}"
+                   class="modal-link sdv2-source-chip"
+                   title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:source.title }}</a>
+              {% endfor %}
+            </span>
+          {% endif %}
+        </div>
+      {% endif %}
+    </header>
+    {# ─── Anchor navigation: only when there is more than one target ─── #}
+    {% if section_anchors|length >= 2 %}
+      <nav class="sdv2-anchor-nav" aria-label="Jump to section">
+        {% for anchor in section_anchors %}
+          <a class="sdv2-anchor-chip" href="#{{ anchor.id }}">{{ anchor.name }}</a>
+        {% endfor %}
+      </nav>
+    {% endif %}
+    {# ─── Review banner (only when review-relevant) ─── #}
+    {% if object.publication_status == 'review' or object.publication_status == 'declined' %}
+      <div class="sdv2-review-banner sdv2-review-banner-{{ object.publication_status }}"
+           role="status">
+        <div class="sdv2-review-banner-icon" aria-hidden="true">
+          <i class="fas fa-{% if object.publication_status == 'review' %}hourglass-half{% else %}triangle-exclamation{% endif %}"></i>
+        </div>
+        <div class="sdv2-review-banner-body">
+          <div class="sdv2-review-banner-title">
+            {% if object.publication_status == 'review' %}
+              In review
+            {% else %}
+              Review declined
+            {% endif %}
+          </div>
+          <div class="sdv2-review-banner-text">
+            {% if review_timeline %}
+              Last action <strong>{{ review_timeline|last|get_item:'label'|default:'—' }}</strong>
+              by {{ review_timeline|last|get_item:'user'|default:'someone' }}
+              on {{ review_timeline|last|get_item:'created_at'|date:'Y-m-d' }}.
+            {% else %}
+              Awaiting moderator action.
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+    {# ─── Main column + related aside ─── #}
+    <div class="sdv2-layout{% if not has_related_processes %} sdv2-layout-full{% endif %}">
+      <main class="sdv2-main">
+        {% if object.description %}
+          <section class="sdv2-section-panel sdv2-anchor-target sdv2-about"
+                   id="description"
+                   aria-label="Description">
+            <h2 class="sdv2-section-title">Description</h2>
+            <div class="sdv2-about-body">{{ object.description|linebreaks }}</div>
+          </section>
+        {% endif %}
+        {% if object.process_technology %}
+          <section class="sdv2-section-panel sdv2-anchor-target sdv2-about"
+                   id="technology"
+                   aria-label="Process technology">
+            <h2 class="sdv2-section-title">Process Technology</h2>
+            <div class="sdv2-about-body">{{ object.process_technology|linebreaks }}</div>
+          </section>
+        {% endif %}
+        {% if operating_parameters %}
+          <section class="sdv2-section-panel sdv2-anchor-target"
+                   id="parameters"
+                   aria-label="Operating parameters">
+            <h2 class="sdv2-section-title">Operating parameters</h2>
+            <ul class="list-unstyled mb-0 mt-3">
+              {% for param in operating_parameters %}
                 <li>
-                    <a href="{% url 'source-detail-modal' source.pk %}"
-                       class="modal-link"
-                       title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:source.title|default:"Source" }}</a>
+                  <strong>{{ param.name|default:param.get_parameter_display }}:</strong>
+                  {% if param.nominal_value %}
+                    {{ param.get_nominal_value_display }}
+                  {% elif param.value_min or param.value_max %}
+                    {{ param.get_value_min_display|default:"-" }} – {{ param.get_value_max_display|default:"-" }}
+                  {% else %}
+                    -
+                  {% endif %}
+                  {% if param.unit %}{{ param.unit.name }}{% endif %}
+                  {% if param.basis %}<span class="text-muted">({{ param.basis }})</span>{% endif %}
                 </li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-{% endblock %}
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+        {% if input_materials or output_materials or parameters_by_type.Yield %}
+          <section class="sdv2-section-panel sdv2-anchor-target"
+                   id="materials"
+                   aria-label="Materials and yield">
+            <h2 class="sdv2-section-title">Materials</h2>
+            <dl class="sdv2-context-details">
+              {% if input_materials %}
+                <div>
+                  <dt>Input</dt>
+                  <dd>
+                    <ul class="list-unstyled mb-0">
+                      {% for pm in input_materials %}
+                        <li class="mb-2">
+                          <strong>
+                            <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
+                          </strong>
+                          {% if pm.quantity_value %}
+                            <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
+                          {% endif %}
+                          {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes }}</p>{% endif %}
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </dd>
+                </div>
+              {% endif %}
+              {% if output_materials %}
+                <div>
+                  <dt>Output</dt>
+                  <dd>
+                    <ul class="list-unstyled mb-0">
+                      {% for pm in output_materials %}
+                        <li class="mb-2">
+                          <strong>
+                            <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
+                          </strong>
+                          {% if pm.quantity_value %}
+                            <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
+                          {% endif %}
+                          {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes }}</p>{% endif %}
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </dd>
+                </div>
+              {% endif %}
+              {% if parameters_by_type.Yield %}
+                <div>
+                  <dt>Yield</dt>
+                  <dd>
+                    <ul class="list-unstyled mb-0">
+                      {% for param in parameters_by_type.Yield %}
+                        <li>
+                          {% if param.nominal_value %}
+                            {{ param.get_nominal_value_display }}
+                          {% elif param.value_min or param.value_max %}
+                            {{ param.get_value_min_display|default:"-" }} – {{ param.get_value_max_display|default:"-" }}
+                          {% else %}
+                            -
+                          {% endif %}
+                          {% if param.unit %}{{ param.unit.name }}{% endif %}
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </dd>
+                </div>
+              {% endif %}
+            </dl>
+          </section>
+        {% endif %}
+        {% if object.supplementary_document %}
+          <section class="sdv2-section-panel sdv2-anchor-target"
+                   id="document"
+                   aria-label="Supplementary document">
+            <h2 class="sdv2-section-title">Supplementary document</h2>
+            <a href="{{ object.supplementary_document.url }}"
+               class="sdv2-btn mt-3"
+               download>
+              <i class="fas fa-file-pdf" aria-hidden="true"></i> Download PDF version
+            </a>
+          </section>
+        {% endif %}
+        {% if process_links %}
+          <section class="sdv2-section-panel sdv2-anchor-target"
+                   id="links"
+                   aria-label="Links">
+            <h2 class="sdv2-section-title">Links</h2>
+            <ul class="list-unstyled mb-0 mt-3">
+              {% for link in process_links %}
+                <li class="mb-1">
+                  <a href="{{ link.url }}"
+                     {% if link.open_in_new_tab %}target="_blank" rel="noopener"{% endif %}>
+                    {{ link.label }}
+                    {% if link.open_in_new_tab %}<i class="bi bi-box-arrow-up-right"></i>{% endif %}
+                  </a>
+                </li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+        {% if process_info_resources %}
+          <section class="sdv2-section-panel sdv2-anchor-target"
+                   id="resources"
+                   aria-label="Information resources">
+            <h2 class="sdv2-section-title">Information Resources</h2>
+            <ul class="list-unstyled mb-0 mt-3">
+              {% for resource in process_info_resources %}
+                <li class="mb-3">
+                  <strong>{{ resource.title }}</strong> ({{ resource.get_resource_type_display }})
+                  {% if resource.description %}<p class="mb-0 text-muted">{{ resource.description }}</p>{% endif %}
+                  <a href="{{ resource.target_url }}">View Resource</a>
+                </li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+        {% if bibliography_sources %}
+          <section class="sdv2-section-panel sdv2-anchor-target"
+                   id="bibliography"
+                   aria-label="Bibliography">
+            <h2 class="sdv2-section-title">Bibliography</h2>
+            <ul class="list-unstyled mb-0 mt-3">
+              {% for source in bibliography_sources %}
+                <li>
+                  <a href="{% url 'source-detail-modal' source.pk %}"
+                     class="modal-link"
+                     title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:source.title|default:"Source" }}</a>
+                </li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+      </main>
+      {# ─── Related processes aside ─── #}
+      {% if has_related_processes %}
+      <aside class="sdv2-related" aria-label="Related processes">
+        {% if object.parent %}
+          <section class="sdv2-related-section sdv2-surface">
+            <h3 class="sdv2-related-title">Parent process</h3>
+            <ul class="sdv2-related-list">
+              <li>
+                <a href="{% url 'processes:process-detail' object.parent.pk %}"
+                   class="sdv2-related-link">
+                  <span class="sdv2-related-name">{{ object.parent.name }}</span>
+                </a>
+              </li>
+            </ul>
+          </section>
+        {% endif %}
+        {% if process_variants %}
+          <section class="sdv2-related-section sdv2-surface">
+            <h3 class="sdv2-related-title">Process variants</h3>
+            <ul class="sdv2-related-list">
+              {% for variant in process_variants %}
+                <li>
+                  <a href="{% url 'processes:process-detail' variant.pk %}"
+                     class="sdv2-related-link">
+                    <span class="sdv2-related-name">{{ variant.name }}</span>
+                  </a>
+                </li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+      </aside>
+      {% endif %}
+    </div>
+    </div>
+  </div>
+{% endblock content %}
+{% block javascript %}
+  <script src="{% static 'js/sample_detail_v2.min.js' %}"></script>
+{% endblock javascript %}
