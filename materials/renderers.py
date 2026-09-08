@@ -65,6 +65,7 @@ class SampleCSVRenderer(BaseCSVRenderer):
         "series": "Series",
         "timestep": "Timestep",
         "datetime": "Sampling date/time",
+        "datetime_precision": "Sampling date precision",
         "standalone": "Standalone",
         "publication_status": "Publication status",
         "owner": "Owner",
@@ -172,9 +173,7 @@ class SampleMeasurementsXLSXRenderer:
             "Sample campaign (e.g. season, project)": sample.series.name
             if sample.series
             else "",
-            "Sample date": sample.datetime.strftime("%Y-%m-%d")
-            if sample.datetime
-            else "",
+            "Sample date": sample.sampling_date_input,
             "Analysis date": sample.analysis_date.strftime("%Y-%m-%d")
             if sample.analysis_date
             else "",

@@ -3658,6 +3658,83 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, 'class="sdv2"')
         self.assertNotContains(response, "Classic view")
 
+    def test_sampled_metadata_omits_unknown_time_for_legacy_dates(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        sample.datetime = timezone.make_aware(
+            datetime(2024, 8, 27), timezone.get_default_timezone()
+        )
+        sample.save()
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertContains(response, '<span class="sdv2-meta-label">Sampled</span>')
+        self.assertContains(
+            response, '<time datetime="2024-08-27">27 Aug 2024</time>', html=True
+        )
+        self.assertNotContains(response, '<span class="sdv2-meta-label">When</span>')
+
+    def test_sampled_metadata_matches_explicit_precision(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        for precision, value, markup in (
+            ("year", datetime(2024, 1, 1), "<span>2024</span>"),
+            (
+                "date",
+                datetime(2024, 8, 27),
+                '<time datetime="2024-08-27">27 Aug 2024</time>',
+            ),
+            (
+                "time",
+                datetime(2024, 8, 27, 14, 30),
+                '<time datetime="2024-08-27 14:30">27 Aug 2024, 14:30</time>',
+            ),
+            (
+                "time",
+                datetime(2024, 8, 27),
+                '<time datetime="2024-08-27 00:00">27 Aug 2024, 00:00</time>',
+            ),
+        ):
+            with self.subTest(precision=precision, value=value):
+                sample.datetime = timezone.make_aware(
+                    value, timezone.get_default_timezone()
+                )
+                sample.datetime_precision = precision
+                sample.save()
+                response = self.client.get(
+                    reverse("sample-detail", kwargs={"pk": sample.pk})
+                )
+                self.assertContains(response, markup, html=True)
+                self.assertContains(
+                    response, '<span class="sdv2-meta-label">Sampled</span>'
+                )
+                if precision == "year":
+                    self.assertNotContains(response, 'datetime="2024-01-01')
+
+    def test_unknown_sampling_date_omits_sampled_metadata(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+        self.assertNotContains(response, '<span class="sdv2-meta-label">Sampled</span>')
+
+    def test_sampling_precision_is_displayed_in_list_and_gallery(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        sample.image = "materials_sample/dated-sample.jpg"
+        for precision, value, display in (
+            ("year", datetime(2024, 1, 1), "2024"),
+            ("date", datetime(2024, 8, 27), "27 Aug 2024"),
+            ("time", datetime(2024, 8, 27, 14, 30), "27 Aug 2024, 14:30"),
+        ):
+            sample.datetime = timezone.make_aware(
+                value, timezone.get_default_timezone()
+            )
+            sample.datetime_precision = precision
+            sample.save()
+            for route in ("sample-list", "sample-gallery"):
+                with self.subTest(route=route, precision=precision):
+                    response = self.client.get(reverse(route), {"scope": "published"})
+                    self.assertContains(response, sample.name)
+                    self.assertContains(response, display)
+                    if precision == "year":
+                        self.assertNotContains(response, "2024-01-01")
+
     def _create_v2_owner_sample(self, name, status):
         owner = User.objects.create_user(username=f"{name}-owner", password="test123")
         return Sample.objects.create(
@@ -3675,9 +3752,9 @@ class EmptyStateViewsTestCase(TestCase):
         self.client.force_login(owner)
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Sampled")
-        self.assertContains(response, "2024-03-05 09:30")
-        self.assertContains(response, "Analysed")
+        self.assertContains(response, '<span class="sdv2-meta-label">Sampled</span>')
+        self.assertContains(response, "5 Mar 2024, 09:30")
+        self.assertContains(response, '<span class="sdv2-meta-label">Analysed</span>')
         self.assertContains(response, "2024-04-12 14:00")
         self.assertNotContains(response, '<span class="sdv2-meta-label">When</span>')
 
