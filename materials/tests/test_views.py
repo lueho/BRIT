@@ -2193,6 +2193,29 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         )
         return unpublished_sample
 
+    def test_review_detail_view_does_not_link_back_to_itself(self):
+        """On the review page the rail must not offer a link back to itself."""
+        declined_sample = self.model.objects.create(
+            name="Declined test sample",
+            owner=self.owner_user,
+            publication_status="declined",
+            **self.related_objects,
+        )
+        self.client.force_login(self.owner_user)
+        review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(self.model).id,
+                "object_id": declined_sample.pk,
+            },
+        )
+
+        response = self.client.get(review_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Review feedback")
+        self.assertNotContains(response, f'href="{review_url}')
+
     def test_update_view_prefills_material_autocomplete_with_material_name(self):
         substrate_category, _ = MaterialCategory.objects.get_or_create(
             name=get_sample_substrate_category_name()
