@@ -1,4 +1,4 @@
-from crispy_forms.layout import HTML, Div, Field, Layout
+from crispy_forms.layout import HTML, Div, Field, Fieldset, Layout
 from django.core.exceptions import ValidationError
 from django.forms import (
     DateTimeInput,
@@ -464,6 +464,13 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             "series",
             "timestep",
             "sources",
+            Fieldset(
+                "Analysis",
+                "analysis_date",
+                "analysis_laboratory",
+                "lab_accreditation",
+                "analysis_objective",
+            ),
         )
 
     def clean(self):
@@ -494,12 +501,18 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             "series",
             "timestep",
             "sources",
+            "analysis_date",
+            "analysis_laboratory",
+            "lab_accreditation",
+            "analysis_objective",
         )
         widgets = {
             "datetime": DateTimeInput(attrs={"type": "datetime-local"}),
+            "analysis_date": DateTimeInput(attrs={"type": "datetime-local"}),
         }
         labels = {
-            "datetime": "Date/Time",
+            "datetime": "Sampling date/time",
+            "analysis_date": "Analysis date/time",
             "image": "Image",
             "image_alt_text": "Image alt text",
             "image_caption": "Image caption",

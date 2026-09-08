@@ -44,7 +44,10 @@ Expects `object` (Sample with .card_data) and optionally:
     <div class="small text-muted mb-2">{{ object.material.name }}</div>
     <ul class="list-unstyled small text-muted mb-2 sample-card-meta">
       {% if object.datetime %}
-        <li><i class="fas fa-calendar me-1"></i>{{ object.datetime|date:"Y-m-d" }}</li>
+        <li title="Sampling date"><i class="fas fa-calendar me-1"></i>Sampled {{ object.datetime|date:"Y-m-d" }}</li>
+      {% endif %}
+      {% if object.analysis_date %}
+        <li title="Analysis date"><i class="fas fa-flask me-1"></i>Analysed {{ object.analysis_date|date:"Y-m-d" }}</li>
       {% endif %}
       {% if object.location %}
         <li><i class="fas fa-location-dot me-1"></i>{{ object.location }}</li>

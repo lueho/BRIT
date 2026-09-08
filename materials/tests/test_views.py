@@ -3644,6 +3644,20 @@ class EmptyStateViewsTestCase(TestCase):
             publication_status=status,
         ), owner
 
+    def test_v2_hero_distinguishes_sampling_and_analysis_time(self):
+        sample, owner = self._create_v2_owner_sample("V2 Times", "private")
+        sample.datetime = timezone.make_aware(datetime(2024, 3, 5, 9, 30))
+        sample.analysis_date = timezone.make_aware(datetime(2024, 4, 12, 14, 0))
+        sample.save()
+        self.client.force_login(owner)
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sampled")
+        self.assertContains(response, "2024-03-05 09:30")
+        self.assertContains(response, "Analysed")
+        self.assertContains(response, "2024-04-12 14:00")
+        self.assertNotContains(response, '<span class="sdv2-meta-label">When</span>')
+
     def test_v2_private_sample_edit_mode_shows_submit_for_review(self):
         sample, owner = self._create_v2_owner_sample("V2 Private", "private")
         self.client.force_login(owner)

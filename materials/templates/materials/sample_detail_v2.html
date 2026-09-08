@@ -173,8 +173,14 @@
           {% endif %}
           {% if object.datetime %}
             <li>
-              <span class="sdv2-meta-label">When</span>
+              <span class="sdv2-meta-label">Sampled</span>
               <time datetime="{{ object.datetime|date:'c' }}">{{ object.datetime|date:'Y-m-d H:i' }}</time>
+            </li>
+          {% endif %}
+          {% if object.analysis_date %}
+            <li>
+              <span class="sdv2-meta-label">Analysed</span>
+              <time datetime="{{ object.analysis_date|date:'c' }}">{{ object.analysis_date|date:'Y-m-d H:i' }}</time>
             </li>
           {% endif %}
           {% if object.location %}
@@ -769,7 +775,7 @@
                 <span class="sdv2-timeline-dot"></span>
                 <div class="sdv2-timeline-content">
                   <div class="sdv2-timeline-title">Analysed</div>
-                  <div class="sdv2-timeline-date">{{ object.analysis_date|date:'Y-m-d' }}</div>
+                  <div class="sdv2-timeline-date">{{ object.analysis_date|date:'Y-m-d H:i' }}</div>
                   {% if object.analysis_laboratory %}
                     <div class="sdv2-timeline-meta">at {{ object.analysis_laboratory }}</div>
                   {% endif %}

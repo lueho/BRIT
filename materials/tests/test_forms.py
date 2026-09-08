@@ -246,6 +246,17 @@ class SampleModelFormTestCase(TestCase):
         request.user = user
         return request
 
+    def test_distinguishes_sampling_and_analysis_time(self):
+        form = SampleModelForm(request=self._build_request(self.owner))
+
+        self.assertEqual(form.fields["datetime"].label, "Sampling date/time")
+        self.assertIn("analysis_date", form.fields)
+        self.assertEqual(form.fields["analysis_date"].label, "Analysis date/time")
+        self.assertEqual(
+            form.fields["analysis_date"].widget.input_type, "datetime-local"
+        )
+        self.assertIn("analysis_laboratory", form.fields)
+
     def test_material_field_uses_substrate_autocomplete(self):
         form = SampleModelForm(request=self._build_request(self.owner))
 
