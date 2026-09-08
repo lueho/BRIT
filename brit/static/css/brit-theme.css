@@ -7576,6 +7576,16 @@ p {
   color: rgba(52, 58, 64, 0.7) !important;
 }
 
+.detail-section-heading {
+  font-size: 1.15rem;
+  font-weight: 650;
+  color: rgb(56.25, 84.75, 64.5);
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid rgba(75, 113, 86, 0.25);
+}
+
 a:not(.btn):not(.nav-link) {
   color: #376046;
 }

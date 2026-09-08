@@ -142,16 +142,16 @@
         </dl>
     </section>
     {% if object.description %}
-        <h6 class="mt-4">Description</h6>
+        <h6 class="detail-section-heading">Description</h6>
         <div>{{ object.description|linebreaks }}</div>
     {% endif %}
     {% if object.process_technology %}
-        <h6 class="mt-4">Process Technology</h6>
+        <h6 class="detail-section-heading">Process Technology</h6>
         <div>{{ object.process_technology|linebreaks }}</div>
     {% endif %}
     <!-- Links and Resources -->
     {% if process_links %}
-        <h6 class="mb-3 mt-4">Links</h6>
+        <h6 class="detail-section-heading">Links</h6>
         <ul class="list-group mb-3">
             {% for link in process_links %}
                 <li class="list-group-item">
@@ -165,7 +165,7 @@
         </ul>
     {% endif %}
     {% if process_info_resources %}
-        <h6 class="mb-3 mt-4">Information Resources</h6>
+        <h6 class="detail-section-heading">Information Resources</h6>
         <ul class="list-group">
             {% for resource in process_info_resources %}
                 <li class="list-group-item">
@@ -178,7 +178,7 @@
     {% endif %}
     <!-- Variants (Child Processes) -->
     {% if process_variants %}
-        <h6 class="mb-3 mt-4">Process Variants</h6>
+        <h6 class="detail-section-heading">Process Variants</h6>
         <ul class="list-group">
             {% for variant in process_variants %}
                 <li class="list-group-item">
@@ -189,7 +189,7 @@
     {% endif %}
     <!-- Bibliography -->
     {% if bibliography_sources %}
-        <h6 class="mb-3 mt-4">Bibliography</h6>
+        <h6 class="detail-section-heading">Bibliography</h6>
         <ul class="list-unstyled">
             {% for source in bibliography_sources %}
                 <li>
