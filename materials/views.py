@@ -18,6 +18,7 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404
 from django.urls import NoReverseMatch, reverse, reverse_lazy
+from django.utils.translation import gettext
 from django.views.generic import RedirectView, TemplateView, View
 from django.views.generic.detail import SingleObjectMixin
 
@@ -1699,6 +1700,10 @@ class RemoveSeasonalVariationView(UserCreatedObjectDetailView):
             {
                 "form_title": "Remove seasonal variation",
                 "submit_button_text": "Remove",
+                "confirmation_message": gettext(
+                    "Remove “%(distribution)s” from this composition?"
+                )
+                % {"distribution": self.get_distribution()},
             }
         )
         return context

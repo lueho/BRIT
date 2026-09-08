@@ -11,7 +11,7 @@
             aria-label="{% trans 'Close' %}"></button>
   </div>
   <div class="modal-body">
-    <p class="mb-2 text-break">{% blocktrans with object_name=object %}Delete “{{ object_name }}”?{% endblocktrans %}</p>
+    <p class="mb-2 text-break">{% if confirmation_message %}{{ confirmation_message }}{% else %}{% blocktrans with object_name=object %}Delete “{{ object_name }}”?{% endblocktrans %}{% endif %}</p>
     <p class="mb-0">{% trans "This cannot be undone." %}</p>
   </div>
   <div class="modal-footer">
