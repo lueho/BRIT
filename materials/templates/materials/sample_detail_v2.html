@@ -49,7 +49,7 @@
                 <i class="fas fa-paper-plane" aria-hidden="true"></i> Submit for review
               </button>
             </form>
-          {% elif sample_policy.can_view_review_feedback %}
+          {% elif sample_policy.can_view_review_feedback and not review_mode %}
             <a class="sdv2-btn sdv2-btn-ghost"
                href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
               <i class="fas fa-clipboard-check" aria-hidden="true"></i>
