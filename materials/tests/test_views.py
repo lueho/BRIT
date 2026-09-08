@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from decimal import Decimal
 from urllib.parse import quote
 from uuid import uuid4
@@ -6,9 +7,11 @@ from uuid import uuid4
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models.signals import post_save, pre_save
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
+from django.utils import timezone
 from factory.django import mute_signals
 
 from bibliography.models import Source
@@ -999,11 +1002,14 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
             publication_status="private",
         )
 
-    def test_sample_detail_shows_property_edit_link_for_owner(self):
+    def test_sample_detail_shows_property_edit_link_for_private_sample_owner(self):
+        self.sample.publication_status = "private"
+        self.sample.save(update_fields=["publication_status"])
         self.client.force_login(self.owner)
 
         response = self.client.get(
-            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+            {"mode": "edit"},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -1062,7 +1068,7 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Volatile solids")
-        self.assertContains(response, "Comparable as Organic matter")
+        self.assertContains(response, "Canonical: Organic matter")
 
     def test_sample_detail_shows_value_level_basis_for_properties(self):
         self.client.force_login(self.owner)
@@ -1275,11 +1281,14 @@ class ComponentMeasurementUpdateViewTestCase(ViewWithPermissionsTestCase):
             publication_status="private",
         )
 
-    def test_sample_detail_shows_measurement_edit_link_for_owner(self):
+    def test_sample_detail_shows_measurement_edit_link_for_private_sample_owner(self):
+        self.sample.publication_status = "private"
+        self.sample.save(update_fields=["publication_status"])
         self.client.force_login(self.owner)
 
         response = self.client.get(
-            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+            {"mode": "edit"},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -1419,7 +1428,8 @@ class ComponentMeasurementCreateAndDetailViewTestCase(ViewWithPermissionsTestCas
         self.client.force_login(self.member)
 
         response = self.client.get(
-            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+            {"mode": "edit"},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -1816,6 +1826,9 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
             material=cls.material,
             standalone=True,
         )
+        cls.percent, _ = Unit.objects.get_or_create(
+            owner=cls.owner, name="%", defaults={"symbol": "%"}
+        )
 
     def test_public_list_includes_gallery_switch(self):
         response = self.client.get(reverse("sample-list"), {"scope": "published"})
@@ -1834,7 +1847,8 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("sample-list"))
-        self.assertContains(response, "Open sample")
+        # The whole card links to the detail page; no redundant CTA button.
+        self.assertNotContains(response, ">Open sample</a>")
         self.assertContains(response, self.material.name)
 
     def test_private_gallery_renders_for_owner(self):
@@ -1869,8 +1883,194 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, 'decoding="async"')
         self.assertContains(response, 'width="800"')
         self.assertContains(response, 'height="450"')
-        self.assertContains(response, "Using series image")
         self.assertContains(response, sample.name)
+
+    def _add_sample_data(self):
+        """Attach two measurements in one group plus one property value."""
+        group = MaterialComponentGroup.objects.create(
+            owner=self.owner,
+            name="Chemical elements",
+            publication_status="published",
+        )
+        wood = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Wood",
+            publication_status="published",
+        )
+        ash = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Ash",
+            publication_status="published",
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.owner,
+            sample=self.sample,
+            group=group,
+            component=wood,
+            unit=self.percent,
+            average=Decimal("60.0"),
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.owner,
+            sample=self.sample,
+            group=group,
+            component=ash,
+            unit=self.percent,
+            average=Decimal("10.0"),
+        )
+        moisture = MaterialProperty.objects.create(
+            owner=self.owner,
+            name="Moisture",
+            publication_status="published",
+        )
+        MaterialPropertyValue.objects.create(
+            owner=self.owner,
+            sample=self.sample,
+            property=moisture,
+            average=Decimal("5.0"),
+            publication_status="published",
+        )
+
+    def _card_for(self, response):
+        return response.context["sample_cards"][self.sample.pk]
+
+    def test_public_list_provides_sample_card_data(self):
+        self._add_sample_data()
+        response = self.client.get(reverse("sample-list"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        card = self._card_for(response)
+        self.assertEqual(card["measurement_count"], 2)
+        self.assertEqual(card["property_value_count"], 1)
+        self.assertEqual(card["component_preview"], ["Wood", "Ash"])
+        self.assertEqual(card["component_preview_overflow"], 0)
+
+    def test_public_gallery_provides_sample_card_data(self):
+        self._add_sample_data()
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        card = self._card_for(response)
+        self.assertEqual(card["measurement_count"], 2)
+        self.assertEqual(card["property_value_count"], 1)
+        self.assertEqual(card["component_preview"], ["Wood", "Ash"])
+
+    def test_sample_card_component_preview_limits_to_three_with_overflow(self):
+        group = MaterialComponentGroup.objects.create(
+            owner=self.owner,
+            name="Chemical elements",
+            publication_status="published",
+        )
+        names = ["Carbon", "Hydrogen", "Nitrogen", "Oxygen"]
+        components = [
+            MaterialComponent.objects.create(
+                owner=self.owner, name=name, publication_status="published"
+            )
+            for name in names
+        ]
+        for index, component in enumerate(components):
+            ComponentMeasurement.objects.create(
+                owner=self.owner,
+                sample=self.sample,
+                group=group,
+                component=component,
+                unit=self.percent,
+                average=Decimal(index + 1),
+            )
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        card = self._card_for(response)
+        self.assertEqual(card["component_preview"], ["Oxygen", "Nitrogen", "Hydrogen"])
+        self.assertEqual(card["component_preview_overflow"], 1)
+
+    def test_sample_card_component_preview_survives_repeated_measurements(self):
+        group = MaterialComponentGroup.objects.create(
+            owner=self.owner,
+            name="Chemical elements",
+            publication_status="published",
+        )
+        carbon = MaterialComponent.objects.create(
+            owner=self.owner, name="Carbon", publication_status="published"
+        )
+        for _ in range(15):
+            ComponentMeasurement.objects.create(
+                owner=self.owner,
+                sample=self.sample,
+                group=group,
+                component=carbon,
+                unit=self.percent,
+                average=Decimal("50.0"),
+            )
+        for name, average in (("Hydrogen", "6"), ("Oxygen", "40"), ("Ash", "4")):
+            component = MaterialComponent.objects.create(
+                owner=self.owner, name=name, publication_status="published"
+            )
+            ComponentMeasurement.objects.create(
+                owner=self.owner,
+                sample=self.sample,
+                group=group,
+                component=component,
+                unit=self.percent,
+                average=Decimal(average),
+            )
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        card = self._card_for(response)
+        self.assertEqual(card["measurement_count"], 18)
+        self.assertEqual(card["component_preview"], ["Carbon", "Oxygen", "Hydrogen"])
+        self.assertEqual(card["component_preview_overflow"], 1)
+
+    def test_sample_card_component_preview_ranks_by_converted_weight_share(self):
+        group = MaterialComponentGroup.objects.create(
+            owner=self.owner, name="Chemical elements", publication_status="published"
+        )
+        g_per_kg = Unit.objects.create(owner=self.owner, name="g/kg", symbol="g/kg")
+        for name, average, unit in (
+            ("Nitrogen", "40", self.percent),
+            ("Carbon", "300", g_per_kg),
+            ("Zinc", "50", g_per_kg),
+        ):
+            component = MaterialComponent.objects.create(
+                owner=self.owner, name=name, publication_status="published"
+            )
+            ComponentMeasurement.objects.create(
+                owner=self.owner,
+                sample=self.sample,
+                group=group,
+                component=component,
+                average=Decimal(average),
+                unit=unit,
+            )
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        card = self._card_for(response)
+        self.assertEqual(card["component_preview"], ["Nitrogen", "Carbon", "Zinc"])
+
+    def test_sample_card_preview_does_not_leak_into_empty_samples(self):
+        self._add_sample_data()
+        empty = Sample.objects.create(
+            owner=self.owner,
+            name="Empty sample",
+            material=self.sample.material,
+            publication_status="published",
+        )
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        cards = response.context["sample_cards"]
+        self.assertEqual(cards[self.sample.pk]["component_preview"], ["Wood", "Ash"])
+        self.assertEqual(cards[empty.pk]["component_preview"], [])
+        self.assertEqual(cards[empty.pk]["measurement_count"], 0)
+
+    def test_gallery_renders_card_data_signals(self):
+        self._add_sample_data()
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        self.assertContains(response, "data-sample-card-signals")
+        self.assertContains(response, "Wood")
+
+    def test_empty_sample_card_has_zeroed_signals(self):
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        card = self._card_for(response)
+        self.assertEqual(card["measurement_count"], 0)
+        self.assertEqual(card["property_value_count"], 0)
+        self.assertEqual(card["component_preview"], [])
+        self.assertEqual(card["component_preview_overflow"], 0)
 
     def test_detail_view_uses_series_image_when_sample_image_missing(self):
         series = SampleSeries.objects.create(
@@ -1918,7 +2118,7 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
         # The same peer-view switcher appears on the detail header.
-        self.assertContains(response, 'aria-label="View toggle"')
+        self.assertContains(response, 'aria-label="Sample navigation"')
         self.assertContains(response, reverse("sample-list"))
         self.assertContains(response, reverse("sample-gallery"))
         # Detail is not a list representation, so no segment is marked active.
@@ -1932,7 +2132,7 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         # Explorer remains reachable as a distinct, secondary affordance and is
         # not folded into the representation switcher.
         self.assertContains(response, reverse("materials-explorer"))
-        self.assertContains(response, "Open Explorer (dashboard)")
+        self.assertContains(response, "Materials explorer")
 
 
 class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
@@ -1992,6 +2192,29 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             publication_status=unpublished_sample.publication_status,
         )
         return unpublished_sample
+
+    def test_review_detail_view_does_not_link_back_to_itself(self):
+        """On the review page the rail must not offer a link back to itself."""
+        declined_sample = self.model.objects.create(
+            name="Declined test sample",
+            owner=self.owner_user,
+            publication_status="declined",
+            **self.related_objects,
+        )
+        self.client.force_login(self.owner_user)
+        review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(self.model).id,
+                "object_id": declined_sample.pk,
+            },
+        )
+
+        response = self.client.get(review_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Review feedback")
+        self.assertNotContains(response, f'href="{review_url}')
 
     def test_update_view_prefills_material_autocomplete_with_material_name(self):
         substrate_category, _ = MaterialCategory.objects.get_or_create(
@@ -2981,7 +3204,8 @@ class DerivedCompositionOrderViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
 
         response = self.client.get(
-            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+            {"mode": "edit"},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -3008,8 +3232,8 @@ class DerivedCompositionOrderViewTestCase(ViewWithPermissionsTestCase):
         )
         initial_content = initial_response.content.decode()
         self.assertLess(
-            initial_content.index("Chemical Elements"),
-            initial_content.index("Organic/Inorganic"),
+            initial_content.index(f'id="group-{self.chemical_group.pk}"'),
+            initial_content.index(f'id="group-{self.organic_group.pk}"'),
         )
 
         response = self.client.get(
@@ -3027,8 +3251,8 @@ class DerivedCompositionOrderViewTestCase(ViewWithPermissionsTestCase):
         )
         reordered_content = reordered_response.content.decode()
         self.assertLess(
-            reordered_content.index("Organic/Inorganic"),
-            reordered_content.index("Chemical Elements"),
+            reordered_content.index(f'id="group-{self.organic_group.pk}"'),
+            reordered_content.index(f'id="group-{self.chemical_group.pk}"'),
         )
 
 
@@ -3343,13 +3567,13 @@ class EmptyStateViewsTestCase(TestCase):
         )
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No other sample properties yet")
-        self.assertContains(response, "Other Sample Properties")
+        self.assertContains(response, "No properties yet")
+        self.assertContains(response, "Properties")
         self.assertContains(
             response,
             "Add measurements such as moisture, density, pH, or other sample properties",
         )
-        self.assertNotContains(response, "Add the first other sample property")
+        self.assertNotContains(response, "Add the first property")
 
     def test_sample_detail_empty_properties_owner_sees_actionable_message(self):
         sample = Sample.objects.create(
@@ -3368,9 +3592,8 @@ class EmptyStateViewsTestCase(TestCase):
         self.client.force_login(self.regular_user)
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No other sample properties yet")
-        self.assertContains(response, "Add the first other sample property")
-        self.assertContains(response, "Add other sample property")
+        self.assertContains(response, "No properties yet")
+        self.assertContains(response, "Add the first property")
 
     def test_sample_detail_shows_sample_identity_block_and_summary(self):
         sample = Sample.objects.create(
@@ -3382,20 +3605,13 @@ class EmptyStateViewsTestCase(TestCase):
         )
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response,
-            '<div class="small text-muted text-uppercase fw-semibold mb-1">Context</div>',
-            html=True,
-        )
+        self.assertContains(response, 'class="sdv2-hero')
         self.assertContains(response, "Spruce Sample")
         self.assertContains(response, "Wood chips")
         self.assertContains(response, "Hamburg")
-        self.assertContains(response, "About this sample")
-        self.assertContains(response, "At a glance")
-        self.assertContains(response, "Composition data")
-        self.assertContains(response, "Other sample properties")
-        self.assertContains(response, "Raw data groups")
-        self.assertContains(response, "Completeness")
+        self.assertContains(response, "Composition")
+        self.assertContains(response, "Properties")
+        self.assertNotContains(response, "sdv2-hero-stats")
 
     def test_sample_detail_v2_flag_renders_prototype_template(self):
         sample = Sample.objects.create(
@@ -3412,7 +3628,20 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertTemplateUsed(response, "materials/sample_detail_v2.html")
         self.assertContains(response, 'class="sdv2"')
 
-    def test_sample_detail_default_flag_still_uses_classic_template(self):
+    def test_sample_detail_uses_v2_by_default(self):
+        sample = Sample.objects.create(
+            name="Default Sample",
+            material=Material.objects.create(name="Default Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "materials/sample_detail_v2.html")
+        self.assertContains(response, 'class="sdv2"')
+
+    def test_sample_detail_classic_flag_falls_forward_to_v2_after_retirement(self):
         sample = Sample.objects.create(
             name="Classic Sample",
             material=Material.objects.create(name="Classic Material", type="material"),
@@ -3420,10 +3649,577 @@ class EmptyStateViewsTestCase(TestCase):
             publication_status="published",
         )
 
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=classic"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "materials/sample_detail_v2.html")
+        self.assertTemplateNotUsed(response, "materials/sample_detail.html")
+        self.assertContains(response, 'class="sdv2"')
+        self.assertNotContains(response, "Classic view")
+
+    def _create_v2_owner_sample(self, name, status):
+        owner = User.objects.create_user(username=f"{name}-owner", password="test123")
+        return Sample.objects.create(
+            name=name,
+            material=Material.objects.create(name=f"{name} Material", type="material"),
+            owner=owner,
+            publication_status=status,
+        ), owner
+
+    def test_v2_hero_distinguishes_sampling_and_analysis_time(self):
+        sample, owner = self._create_v2_owner_sample("V2 Times", "private")
+        sample.datetime = timezone.make_aware(datetime(2024, 3, 5, 9, 30))
+        sample.analysis_date = timezone.make_aware(datetime(2024, 4, 12, 14, 0))
+        sample.save()
+        self.client.force_login(owner)
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "materials/sample_detail.html")
-        self.assertNotContains(response, 'class="sdv2"')
+        self.assertContains(response, "Sampled")
+        self.assertContains(response, "2024-03-05 09:30")
+        self.assertContains(response, "Analysed")
+        self.assertContains(response, "2024-04-12 14:00")
+        self.assertNotContains(response, '<span class="sdv2-meta-label">When</span>')
+
+    def test_v2_private_sample_edit_mode_shows_submit_for_review(self):
+        sample, owner = self._create_v2_owner_sample("V2 Private", "private")
+        self.client.force_login(owner)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk})
+            + "?experience=v2&mode=edit"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "materials/sample_detail_v2.html")
+        self.assertContains(response, "Submit for review")
+        self.assertContains(response, "submit-for-review")
+
+    def test_v2_declined_sample_shows_review_feedback_entry(self):
+        sample, owner = self._create_v2_owner_sample("V2 Declined", "declined")
+        self.client.force_login(owner)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Review feedback")
+
+    def test_v2_edit_mode_offers_delete_in_actions_menu(self):
+        sample, owner = self._create_v2_owner_sample("V2 Delete", "private")
+        self.client.force_login(owner)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk})
+            + "?experience=v2&mode=edit"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "sdv2-rail-delete")
+        self.assertContains(response, "delete/modal")
+
+    def test_v2_does_not_render_disabled_compare_stub(self):
+        sample = Sample.objects.create(
+            name="No Stub Sample",
+            material=Material.objects.create(name="Stub Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Compare mode (coming soon)")
+
+    def _create_v2_public_sample_with_metadata(self):
+        return Sample.objects.create(
+            name="Minimal Sample",
+            material=Material.objects.create(name="Minimal Material", type="material"),
+            owner=self.staff_user,
+            location="Hamburg",
+            description="A publicly visible sample record.",
+            analysis_laboratory="TUHH Lab",
+            publication_status="published",
+        )
+
+    def test_v2_anonymous_gets_minimal_layout_without_editorial_chrome(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "materials/sample_detail_v2.html")
+        # Editorial chrome: action rail, hero stats, completeness strip,
+        # provenance timeline, and command palette are owner/editor tools.
+        self.assertNotContains(response, "sdv2-rail")
+        self.assertNotContains(response, "sdv2-hero-stats")
+        self.assertNotContains(response, "sdv2-completeness")
+        self.assertNotContains(response, "sdv2-timeline")
+        self.assertNotContains(response, "sdv2-palette")
+        self.assertNotContains(response, "Quick actions")
+
+    def test_v2_anonymous_still_sees_data_and_metadata(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+        self.assertEqual(response.status_code, 200)
+        # Identity + metadata.
+        self.assertContains(response, "Minimal Sample")
+        self.assertContains(response, "Minimal Material")
+        self.assertContains(response, "Hamburg")
+        self.assertContains(response, "TUHH Lab")
+        # The actual data sections remain.
+        self.assertContains(response, "sdv2-properties")
+        self.assertContains(response, "Composition")
+        # An empty related-samples rail does not take space from the data.
+        self.assertNotContains(response, "sdv2-related")
+        self.assertContains(response, "sdv2-layout-full")
+
+    def test_v2_uses_one_visual_canvas_and_consistent_section_surfaces(self):
+        sample, _group = self._create_sample_with_composition_and_property()
+        sample.description = "A sample with a complete reading surface."
+        sample.save(update_fields=["description"])
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="sdv2-canvas sdv2-canvas-fluid"')
+        self.assertContains(response, "sdv2-hero sdv2-surface")
+        self.assertContains(response, "sdv2-about sdv2-section-panel")
+        self.assertContains(response, "sdv2-group-card sdv2-surface")
+        self.assertContains(response, "sdv2-properties sdv2-section-panel")
+        self.assertContains(
+            response,
+            'class="sdv2-raw-component"',
+            count=sample.component_measurements.count(),
+        )
+
+    def test_v2_keeps_related_rail_when_related_samples_exist(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        related_sample = Sample.objects.create(
+            name="Related material sample",
+            material=sample.material,
+            owner=self.staff_user,
+            publication_status="published",
+        )
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="sdv2-related"')
+        self.assertNotContains(response, "sdv2-layout-full")
+        self.assertContains(response, related_sample.name)
+
+    def test_v2_renders_uploaded_sample_image_in_hero(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        sample.image = SimpleUploadedFile(
+            "sample-photo.jpg",
+            b"sample image content",
+            content_type="image/jpeg",
+        )
+        sample.image_alt_text = "Close-up of roadside pruning wood"
+        sample.image_caption = "Sample after size reduction"
+        sample.image_rights_notice = "CC BY 4.0"
+        sample.save()
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "sdv2-hero-with-media")
+        self.assertContains(response, "sdv2-hero-media")
+        self.assertContains(response, sample.display_image.url)
+        self.assertContains(response, sample.display_image_alt_text)
+        self.assertContains(response, sample.display_image_caption)
+        self.assertContains(response, sample.display_image_rights_notice)
+
+    def test_v2_hero_collapses_when_sample_has_no_display_image(self):
+        sample = self._create_v2_public_sample_with_metadata()
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "sdv2-hero-no-media")
+        self.assertNotContains(response, "sdv2-hero-media")
+
+    def test_v2_uses_series_image_as_hero_fallback(self):
+        material = Material.objects.create(
+            name="Series image material",
+            type="material",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        series = SampleSeries.objects.create(
+            name="Series with image",
+            material=material,
+            owner=self.staff_user,
+            publication_status="published",
+            image=SimpleUploadedFile(
+                "series-photo.jpg",
+                b"series image content",
+                content_type="image/jpeg",
+            ),
+            image_alt_text="Representative image for the sample series",
+        )
+        sample = self._create_v2_public_sample_with_metadata()
+        sample.series = series
+        sample.save(update_fields=["series"])
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, series.image.url)
+        self.assertContains(response, series.image_alt_text)
+        self.assertContains(response, "Showing the image from the linked sample series")
+        self.assertContains(
+            response,
+            f'<a href="{reverse("sampleseries-detail", kwargs={"pk": series.pk})}">'
+            f"{series.name}</a>",
+            html=True,
+        )
+
+    def test_v2_uses_single_contextual_edit_mode_action(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        self.client.force_login(self.staff_user)
+
+        explore_response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+        edit_response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk})
+            + "?experience=v2&mode=edit"
+        )
+
+        self.assertNotContains(explore_response, "sdv2-mode-toggle")
+        self.assertContains(explore_response, "sdv2-mode-action")
+        self.assertContains(explore_response, "?mode=edit")
+        self.assertContains(explore_response, "Edit")
+        self.assertContains(edit_response, "sdv2-editing-state")
+        self.assertContains(
+            edit_response,
+            f'sdv2-mode-action" href="{reverse("sample-detail", kwargs={"pk": sample.pk})}"',
+        )
+        self.assertContains(edit_response, "Done")
+
+    def test_sample_toolbar_separates_navigation_status_and_actions(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        self.client.force_login(self.staff_user)
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertContains(response, 'aria-label="Sample toolbar"')
+        self.assertContains(response, 'aria-label="Sample status"')
+        self.assertContains(response, 'aria-label="Sample actions"')
+        self.assertContains(response, "Edit sample")
+        self.assertContains(response, "More actions")
+        content = response.content.decode()
+        self.assertLess(
+            content.index('aria-label="Sample navigation"'),
+            content.index('aria-label="Sample status"'),
+        )
+        self.assertLess(
+            content.index("sdv2-actions-trigger"), content.index("sdv2-mode-action")
+        )
+
+    def test_sample_toolbar_edit_state_is_not_styled_as_a_button(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        self.client.force_login(self.staff_user)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}), {"mode": "edit"}
+        )
+
+        self.assertContains(
+            response,
+            '<span class="sdv2-editing-state">'
+            '<i class="fas fa-pen-to-square" aria-hidden="true"></i>'
+            "Editing sample</span>",
+            html=True,
+        )
+        self.assertContains(response, "Done editing")
+        self.assertNotContains(response, 'aria-label="Edit mode"')
+
+    def test_sample_navigation_uses_links_not_toggle_buttons(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        url = reverse("sample-detail", kwargs={"pk": sample.pk})
+        for authenticated in (False, True):
+            with self.subTest(authenticated=authenticated):
+                if authenticated:
+                    self.client.force_login(self.staff_user)
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                navigation = (
+                    response.content.decode()
+                    .split('aria-label="Sample navigation">', 1)[1]
+                    .split("</nav>", 1)[0]
+                )
+                self.assertNotIn('role="button"', navigation)
+                self.assertNotIn("aria-pressed", navigation)
+                for route, label in (
+                    ("sample-list", "All samples"),
+                    ("sample-gallery", "Featured samples"),
+                    ("materials-explorer", "Materials explorer"),
+                ):
+                    self.assertIn(reverse(route), navigation)
+                    self.assertIn(label, navigation)
+
+    def test_v2_explore_mode_is_decluttered_for_authenticated_users(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        self.client.force_login(self.staff_user)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+        self.assertEqual(response.status_code, 200)
+        # Reading layout: stats, sparkband, completeness, and timeline are
+        # noise on top of data that is already visible as cards and tables.
+        self.assertNotContains(response, "sdv2-hero-stats")
+        self.assertNotContains(response, "sdv2-sparkband")
+        self.assertNotContains(response, "sdv2-completeness")
+        self.assertNotContains(response, "sdv2-timeline")
+        # Data and metadata still dominate.
+        self.assertContains(response, "TUHH Lab")
+        self.assertContains(response, "sdv2-properties")
+
+    def test_v2_edit_mode_exposes_editorial_sections(self):
+        owner = User.objects.create_user(username="editorial-owner", password="test123")
+        change_perm, _ = Permission.objects.get_or_create(
+            codename="change_sample",
+            content_type=ContentType.objects.get_for_model(Sample),
+            defaults={"name": "Can change sample"},
+        )
+        owner.user_permissions.add(change_perm)
+        sample = Sample.objects.create(
+            name="Editorial Sample",
+            material=Material.objects.create(
+                name="Editorial Material", type="material"
+            ),
+            owner=owner,
+            publication_status="private",
+        )
+        self.client.force_login(owner)
+        explore_response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+        self.assertNotContains(explore_response, "sdv2-completeness")
+        self.assertNotContains(explore_response, "sdv2-timeline")
+
+        edit_response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk})
+            + "?experience=v2&mode=edit"
+        )
+        self.assertEqual(edit_response.status_code, 200)
+        self.assertContains(edit_response, "sdv2-completeness")
+        self.assertContains(edit_response, "sdv2-timeline")
+
+    def test_v2_edit_mode_exposes_composition_creation_actions(self):
+        sample, _group = self._create_sample_with_composition_and_property()
+        for model, codename in (
+            (ComponentMeasurement, "add_componentmeasurement"),
+            (Composition, "add_composition"),
+        ):
+            permission, _ = Permission.objects.get_or_create(
+                codename=codename,
+                content_type=ContentType.objects.get_for_model(model),
+                defaults={"name": f"Can {codename.replace('_', ' ')}"},
+            )
+            self.staff_user.user_permissions.add(permission)
+        self.client.force_login(self.staff_user)
+        base_url = reverse("sample-detail", kwargs={"pk": sample.pk})
+
+        explore_response = self.client.get(base_url + "?experience=v2")
+        edit_response = self.client.get(base_url + "?experience=v2&mode=edit")
+
+        self.assertNotContains(explore_response, "sdv2-composition-actions")
+        self.assertContains(edit_response, "sdv2-composition-actions")
+        self.assertContains(edit_response, "Add measurement")
+        self.assertContains(edit_response, "Add composition")
+        self.assertContains(
+            edit_response,
+            f"{reverse('componentmeasurement-create')}?sample={sample.pk}",
+        )
+        self.assertContains(
+            edit_response,
+            reverse("sample-add-composition", kwargs={"pk": sample.pk}),
+        )
+        self.assertEqual(
+            self.client.get(
+                reverse("componentmeasurement-create") + f"?sample={sample.pk}"
+            ).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.get(
+                reverse("sample-add-composition", kwargs={"pk": sample.pk})
+            ).status_code,
+            200,
+        )
+
+    def test_v2_superuser_can_add_data_to_published_sample(self):
+        sample, _group = self._create_sample_with_composition_and_property()
+        superuser = User.objects.create_superuser(
+            username="sample-superuser", password="test123"
+        )
+        self.client.force_login(superuser)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk})
+            + "?experience=v2&mode=edit"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "sdv2-composition-actions")
+        self.assertContains(response, "Add measurement")
+        self.assertContains(response, "Add composition")
+
+    def test_v2_edit_mode_exposes_all_sample_data_management_actions(self):
+        sample, group = self._create_sample_with_composition_and_property()
+        setting = Composition.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            fractions_of=MaterialComponent.objects.default(),
+        )
+        prop = sample.property_values.get()
+        self.client.force_login(self.staff_user)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse(
+                "derived-composition-order-down",
+                kwargs={"sample_pk": sample.pk, "group_pk": group.pk},
+            ),
+        )
+        self.assertContains(
+            response,
+            reverse(
+                "derived-composition-order-up",
+                kwargs={"sample_pk": sample.pk, "group_pk": group.pk},
+            ),
+        )
+        self.assertContains(
+            response, reverse("composition-update", kwargs={"pk": setting.pk})
+        )
+        self.assertContains(
+            response,
+            reverse("composition-delete-modal", kwargs={"pk": setting.pk}),
+        )
+        self.assertContains(
+            response,
+            reverse("materialpropertyvalue-delete-modal", kwargs={"pk": prop.pk}),
+        )
+        self.assertContains(response, "Manage access")
+        self.assertContains(response, "object_management/modal/manage-access")
+
+    def test_v2_modal_actions_are_wired_as_modal_links(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        self.client.force_login(self.staff_user)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
+        )
+
+        self.assertContains(
+            response,
+            'class="dropdown-item text-danger modal-link"',
+            html=False,
+        )
+
+    def test_v2_in_review_sample_links_to_review_workspace(self):
+        sample, owner = self._create_v2_owner_sample("V2 Review", "review")
+        self.client.force_login(owner)
+        review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(Sample).pk,
+                "object_id": sample.pk,
+            },
+        )
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertContains(response, "Review view")
+        self.assertContains(response, review_url)
+
+    def test_v2_review_query_renders_embedded_review_panel(self):
+        sample, owner = self._create_v2_owner_sample("V2 Panel", "review")
+        self.client.force_login(owner)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?review=1"
+        )
+
+        self.assertContains(response, 'id="review-panel"')
+
+    def test_v2_preserves_full_provenance_and_measurement_context(self):
+        sample, _group = self._create_sample_with_composition_and_property()
+        sample.datetime = timezone.make_aware(datetime(2026, 8, 27, 14, 35))
+        sample.lab_accreditation = "ISO/IEC 17025"
+        sample.analysis_objective = "Determine suitability for fibre recovery."
+        sample.save()
+        sources = [
+            Source.objects.create(
+                abbreviation=f"SRC-{index}",
+                title=f"Source {index}",
+                owner=self.staff_user,
+                publication_status="published",
+            )
+            for index in (1, 2)
+        ]
+        sample.sources.set(sources)
+        measurement = sample.component_measurements.order_by("pk").first()
+        measurement.component.abbreviation = "CELL"
+        measurement.component.save(update_fields=["abbreviation"])
+        measurement.comment = "Measured after conditioning."
+        measurement.save(update_fields=["comment"])
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertContains(response, "14:35")
+        self.assertContains(response, "ISO/IEC 17025")
+        self.assertContains(response, "Determine suitability for fibre recovery.")
+        self.assertContains(response, "CELL")
+        self.assertContains(response, "Measured after conditioning.")
+        for source in sources:
+            self.assertContains(
+                response, reverse("source-detail-modal", kwargs={"pk": source.pk})
+            )
+
+    def test_v2_preserves_navigation_and_raw_group_controls(self):
+        sample, _group = self._create_sample_with_composition_and_property()
+        back_url = reverse("sample-list") + "?scope=published"
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}),
+            {"back": back_url},
+        )
+
+        self.assertContains(response, back_url.replace("&", "&amp;"))
+        self.assertContains(response, reverse("sample-list"))
+        self.assertContains(response, reverse("sample-gallery"))
+        self.assertContains(response, reverse("materials-explorer"))
+        self.assertContains(response, 'data-sdv2-raws-toggle="expand"')
+        self.assertContains(response, 'data-sdv2-raws-toggle="collapse"')
+
+    def test_v2_export_lives_in_actions_dropdown_not_rail_button(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        self.client.force_login(self.staff_user)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "sdv2-export-trigger")
+        self.assertContains(response, "Export sample to Excel")
+        self.assertContains(
+            response, reverse("sample-export", kwargs={"pk": sample.pk})
+        )
 
     def test_sample_detail_shows_section_intro_and_quick_nav(self):
         sample = Sample.objects.create(
@@ -3438,14 +4234,256 @@ class EmptyStateViewsTestCase(TestCase):
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Measurement workspace")
+        self.assertContains(response, "sdv2-context-nav")
+        self.assertContains(response, "All samples")
+        self.assertContains(response, "Featured")
+        self.assertContains(response, "Materials explorer")
 
+        # The command palette and classic fallback are retired; secondary
+        # actions live in the conventional Bootstrap dropdown in the rail.
+        self.client.force_login(self.staff_user)
         v2_response = self.client.get(
-            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+            reverse("sample-detail", kwargs={"pk": sample.pk})
         )
         self.assertEqual(v2_response.status_code, 200)
-        self.assertContains(v2_response, "Quick actions")
-        self.assertContains(v2_response, "Classic view")
+        self.assertNotContains(v2_response, "Quick actions")
+        self.assertNotContains(v2_response, "sdv2Palette")
+        self.assertNotContains(v2_response, "Classic view")
+
+    def test_v2_rail_actions_dropdown_carries_secondary_editorial_actions(self):
+        owner = User.objects.create_user(username="dropdown-owner", password="test123")
+        sample = Sample.objects.create(
+            name="Dropdown Sample",
+            material=Material.objects.create(name="Dropdown Material", type="material"),
+            owner=owner,
+            publication_status="private",
+        )
+        add_perm, _ = Permission.objects.get_or_create(
+            codename="add_sample",
+            content_type=ContentType.objects.get_for_model(Sample),
+            defaults={"name": "Can add sample"},
+        )
+        change_perm, _ = Permission.objects.get_or_create(
+            codename="change_sample",
+            content_type=ContentType.objects.get_for_model(Sample),
+            defaults={"name": "Can change sample"},
+        )
+        owner.user_permissions.add(add_perm, change_perm)
+        self.client.force_login(owner)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "sdv2-actions-menu")
+        self.assertContains(
+            response, reverse("sample-duplicate", kwargs={"pk": sample.pk})
+        )
+        self.assertContains(response, "Edit sample metadata")
+
+    def test_v2_anonymous_gets_no_actions_dropdown(self):
+        sample = Sample.objects.create(
+            name="Anon Dropdown Sample",
+            material=Material.objects.create(
+                name="Anon Dropdown Material", type="material"
+            ),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "sdv2-actions-menu")
+
+    def _create_sample_with_composition_and_property(self):
+        sample = Sample.objects.create(
+            name="Anchor Sample",
+            material=Material.objects.create(name="Anchor Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        group = MaterialComponentGroup.objects.create(
+            owner=self.staff_user,
+            name="Wood chemistry",
+            publication_status="published",
+        )
+        cellulose = MaterialComponent.objects.create(
+            owner=self.staff_user,
+            name="Cellulose",
+            publication_status="published",
+        )
+        lignin = MaterialComponent.objects.create(
+            owner=self.staff_user,
+            name="Lignin",
+            publication_status="published",
+        )
+        unit_percent = Unit.objects.filter(name="%").first()
+        if unit_percent is None:
+            unit_percent = Unit.objects.create(
+                name="%", symbol="percent", owner=self.staff_user
+            )
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=cellulose,
+            unit=unit_percent,
+            average=Decimal("60.0"),
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=lignin,
+            unit=unit_percent,
+            average=Decimal("30.0"),
+        )
+        moisture = MaterialProperty.objects.create(
+            owner=self.staff_user,
+            name="Moisture",
+            publication_status="published",
+        )
+        MaterialPropertyValue.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            property=moisture,
+            average=Decimal("12.0"),
+            publication_status="published",
+        )
+        return sample, group
+
+    def test_v2_anchor_nav_links_sections_for_all_users(self):
+        sample, group = self._create_sample_with_composition_and_property()
+        url = reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        anonymous_response = self.client.get(url)
+        self.assertEqual(anonymous_response.status_code, 200)
+        self.assertContains(anonymous_response, "sdv2-anchor-nav")
+        self.assertContains(anonymous_response, f"#group-{group.pk}")
+        self.assertContains(anonymous_response, "#properties")
+        self.assertNotContains(anonymous_response, "sdv2-anchor-share")
+        self.assertContains(anonymous_response, 'data-has-action-rail="0"')
+        self.assertContains(anonymous_response, "sdv2-anchor-target", count=2)
+        self.assertEqual(
+            anonymous_response.context["group_anchors"],
+            [{"group_id": group.pk, "name": "Wood chemistry"}],
+        )
+
+        self.client.force_login(self.staff_user)
+        authenticated_response = self.client.get(url)
+        self.assertEqual(authenticated_response.status_code, 200)
+        self.assertContains(authenticated_response, 'data-has-action-rail="1"')
+
+    def test_v2_anchor_nav_omitted_when_single_section(self):
+        sample = Sample.objects.create(
+            name="Single Section Sample",
+            material=Material.objects.create(
+                name="Single Section Material", type="material"
+            ),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "sdv2-anchor-nav")
+
+    def test_v2_hides_total_material_composition_without_removing_data(self):
+        sample = Sample.objects.create(
+            name="Hierarchy Sample",
+            material=Material.objects.create(
+                name="Hierarchy Material", type="material"
+            ),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        default_group = MaterialComponentGroup.objects.default()
+        default_component = MaterialComponent.objects.default()
+        visible_group = MaterialComponentGroup.objects.create(
+            owner=self.staff_user,
+            name="Wood chemistry",
+            publication_status="published",
+        )
+        cellulose = MaterialComponent.objects.create(
+            owner=self.staff_user,
+            name="Cellulose for hierarchy test",
+            publication_status="published",
+        )
+        unit_percent = Unit.objects.filter(name="%").first()
+        if unit_percent is None:
+            unit_percent = Unit.objects.create(
+                name="%", symbol="percent", owner=self.staff_user
+            )
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=default_group,
+            component=default_component,
+            unit=unit_percent,
+            average=Decimal("100.0"),
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=visible_group,
+            component=cellulose,
+            unit=unit_percent,
+            average=Decimal("100.0"),
+        )
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        all_compositions = response.context["data"]["compositions"]
+        self.assertEqual(
+            {composition["group"] for composition in all_compositions},
+            {default_group.pk, visible_group.pk},
+        )
+        self.assertEqual(
+            [
+                composition["group"]
+                for composition in response.context["display_compositions"]
+            ],
+            [visible_group.pk],
+        )
+        self.assertNotContains(response, f'id="group-{default_group.pk}"')
+        self.assertNotContains(response, f'href="#group-{default_group.pk}"')
+        self.assertContains(response, f'id="group-{visible_group.pk}"')
+        self.assertNotIn(
+            f"composition-chart-derived-{sample.pk}-{default_group.pk}",
+            response.context["charts"],
+        )
+
+    def test_v2_omits_composition_section_when_only_total_material_exists(self):
+        sample = Sample.objects.create(
+            name="Root-only Sample",
+            material=Material.objects.create(
+                name="Root-only Material", type="material"
+            ),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        default_group = MaterialComponentGroup.objects.default()
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=default_group,
+            component=MaterialComponent.objects.default(),
+            unit=Unit.objects.filter(name="%").first(),
+            average=Decimal("100.0"),
+        )
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["data"]["compositions"])
+        self.assertEqual(response.context["display_compositions"], [])
+        self.assertNotContains(response, 'aria-label="Composition groups"')
+        self.assertNotContains(response, "No composition data yet")
 
     def test_sample_detail_shows_sample_sources_as_badge_links(self):
         sample = Sample.objects.create(
@@ -3470,7 +4508,7 @@ class EmptyStateViewsTestCase(TestCase):
             reverse("source-detail-modal", kwargs={"pk": source.pk}),
         )
         self.assertContains(response, "SRC-1")
-        self.assertContains(response, "badge bg-light text-dark text-decoration-none")
+        self.assertContains(response, "sdv2-source-chip")
 
     def test_sample_detail_private_owner_sees_workspace_panels(self):
         sample = Sample.objects.create(
@@ -3481,16 +4519,16 @@ class EmptyStateViewsTestCase(TestCase):
         )
 
         self.client.force_login(self.regular_user)
-        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
+        )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Workspace")
-        self.assertContains(response, "Editorial status")
-        self.assertContains(response, "Completeness")
-        self.assertContains(response, "Create")
-        self.assertContains(response, "Edit")
-        self.assertContains(response, "Review")
-        self.assertContains(response, "Danger zone")
+        self.assertContains(response, "Editing")
+        self.assertContains(response, "sdv2-completeness")
+        self.assertContains(response, "sdv2-timeline")
+        self.assertContains(response, "Submit for review")
+        self.assertContains(response, "Manage access")
         self.assertContains(response, "Description present")
 
     def test_sample_detail_empty_mass_measurements_anonymous(self):
@@ -3508,9 +4546,12 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "No composition data yet")
         self.assertContains(
             response,
-            "Add component measurements such as ash, protein, carbon, or other mass-related fractions",
+            "Composition groups appear here once component measurements can be normalized",
         )
-        self.assertNotContains(response, "Add the first composition data entry")
+        self.assertNotContains(
+            response,
+            f"{reverse('componentmeasurement-create')}?sample={sample.pk}",
+        )
 
     def test_sample_detail_empty_mass_measurements_owner_sees_cta_with_permission(self):
         sample = Sample.objects.create(
@@ -3529,10 +4570,12 @@ class EmptyStateViewsTestCase(TestCase):
         sample.compositions.all().delete()
 
         self.client.force_login(self.regular_user)
-        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
+        )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Add the first composition data entry")
+        self.assertContains(response, "Add measurement")
 
     def test_sample_detail_empty_compositions_owner_sees_manual_and_measurement_actions(
         self,
@@ -3550,19 +4593,27 @@ class EmptyStateViewsTestCase(TestCase):
             defaults={"name": "Can add component measurement"},
         )
         self.regular_user.user_permissions.add(permission)
+        composition_permission, _ = Permission.objects.get_or_create(
+            codename="add_composition",
+            content_type=ContentType.objects.get_for_model(Composition),
+            defaults={"name": "Can add composition"},
+        )
+        self.regular_user.user_permissions.add(composition_permission)
         sample.compositions.all().delete()
 
         self.client.force_login(self.regular_user)
-        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
+        )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No normalized compositions yet")
+        self.assertContains(response, "No composition data yet")
         self.assertContains(
             response,
-            "Composition groups appear here once mass-related measurements can be normalized to 100%",
+            "Composition groups appear here once component measurements can be normalized",
         )
-        self.assertContains(response, "Add composition manually")
-        self.assertContains(response, "Add composition data")
+        self.assertContains(response, "Add composition")
+        self.assertContains(response, "Add measurement")
 
     def test_sample_detail_shows_default_composition(self):
         sample = Sample.objects.create(
@@ -3641,7 +4692,8 @@ class EmptyStateViewsTestCase(TestCase):
             {share["as_percentage"] for share in composition["shares"]},
             {"30.0%", "70.0%"},
         )
-        self.assertContains(response, "Derived")
+        self.assertContains(response, "Normalized share")
+        self.assertContains(response, "composition-methodology")
         self.assertNotContains(response, "30.0 ± 0.0%")
         self.assertNotContains(response, "No compositions available")
 
@@ -3728,13 +4780,55 @@ class EmptyStateViewsTestCase(TestCase):
 
         content = response.content.decode()
         self.assertLess(
-            content.index("Organic/Inorganic"),
-            content.index("Chemical Elements"),
+            content.index(f'id="group-{organic_group.pk}"'),
+            content.index(f'id="group-{chemical_group.pk}"'),
         )
 
-    def test_sample_detail_classic_places_normalized_composition_after_measurement_workspace(
-        self,
-    ):
+    def test_sample_detail_scales_over_100_raw_totals_to_100(self):
+        sample = Sample.objects.create(
+            name="Sample Over 100",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        sample.compositions.all().delete()
+        unit_percent = Unit.objects.filter(name="%").first() or Unit.objects.create(
+            name="%", symbol="percent", owner=self.staff_user
+        )
+        group = MaterialComponentGroup.objects.create(
+            name="Chemical Elements",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        for name, average in (("Carbon", "60"), ("Nitrogen", "45")):
+            ComponentMeasurement.objects.create(
+                owner=self.staff_user,
+                sample=sample,
+                group=group,
+                component=MaterialComponent.objects.create(
+                    name=name, owner=self.staff_user, publication_status="published"
+                ),
+                unit=unit_percent,
+                average=Decimal(average),
+            )
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Σ ")
+        self.assertContains(response, "57.1%")
+        self.assertContains(response, "42.9%")
+        self.assertNotContains(response, "alert-warning")
+
+        composition = response.context["display_compositions"][0]
+        self.assertEqual(composition["share_total_percent"], 100.0)
+        chart = response.context["charts"][f"composition-chart-{composition['id']}"]
+        self.assertEqual(chart["data"]["datasets"][0]["data"], [57.1, 42.9])
+        self.assertEqual(
+            chart["data"]["tooltip_labels"], ["Carbon: 57.1 %", "Nitrogen: 42.9 %"]
+        )
+
+    def test_sample_detail_v2_places_normalized_view_before_raw_drilldown(self):
         sample = Sample.objects.create(
             name="Sample Layout Order",
             material=Material.objects.create(name="Test Material", type="material"),
@@ -3783,8 +4877,8 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
         self.assertLess(
-            content.index("Measurement workspace"),
-            content.index("Mass-related Measurements"),
+            content.index("sdv2-group-body"),
+            content.index("Raw measurements"),
         )
 
     def test_sample_detail_keeps_dm_percent_values_for_dm_measurements(self):
@@ -4025,7 +5119,8 @@ class EmptyStateViewsTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Volatile solids")
-        self.assertContains(response, "Comparable as Organic matter")
+        self.assertContains(response, "Canonical: Organic matter")
+        self.assertContains(response, "↔ Organic matter")
 
     def test_analytical_method_list_empty_anonymous(self):
         response = self.client.get(
@@ -4471,6 +5566,18 @@ class MaterialsReviewDetailAccessTests(TestCase):
         response = self.client.get(self._review_detail_url(self.review_sample))
         self.assertEqual(response.status_code, 200)
 
+    def test_sample_review_detail_uses_v2_with_full_sample_context(self):
+        self.client.force_login(self.moderator)
+
+        response = self.client.get(self._review_detail_url(self.review_sample))
+
+        self.assertTemplateUsed(response, "materials/sample_detail_v2.html")
+        self.assertContains(response, 'class="sdv2"')
+        self.assertContains(response, 'id="review-panel"')
+        self.assertContains(response, self.review_sample.name)
+        self.assertIn("display_compositions", response.context)
+        self.assertIn("property_values", response.context)
+
     def test_non_owner_non_moderator_cannot_access_review_detail(self):
         self.client.force_login(self.other_user)
         response = self.client.get(self._review_detail_url(self.review_sample))
@@ -4578,13 +5685,14 @@ class SampleDetailTemplateReviewUITests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Submit for Review")
 
-    def test_sample_detail_extends_detail_with_options(self):
+    def test_sample_detail_uses_retired_v2_surface_directly(self):
         self.client.force_login(self.owner)
         url = reverse("sample-detail", kwargs={"pk": self.private_sample.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         template_names = [t.name for t in response.templates]
-        self.assertIn("detail_with_options.html", template_names)
+        self.assertIn("materials/sample_detail_v2.html", template_names)
+        self.assertNotIn("detail_with_options.html", template_names)
 
     def test_sample_detail_uses_series_image_when_sample_image_missing(self):
         with mute_signals(post_save, pre_save):

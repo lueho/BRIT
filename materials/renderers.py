@@ -64,7 +64,7 @@ class SampleCSVRenderer(BaseCSVRenderer):
         "material": "Material",
         "series": "Series",
         "timestep": "Timestep",
-        "datetime": "Date/time",
+        "datetime": "Sampling date/time",
         "standalone": "Standalone",
         "publication_status": "Publication status",
         "owner": "Owner",

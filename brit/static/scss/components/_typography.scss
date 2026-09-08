@@ -15,3 +15,15 @@ p {
 .text-muted {
   color: rgba($gray-800, 0.7) !important;
 }
+
+// Section headings inside detail pages. Plain headings inherit the theme green,
+// which reads lighter than the body text next to it at body font size.
+.detail-section-heading {
+  font-size: 1.15rem;
+  font-weight: 650;
+  color: shade-color($primary, 25%);
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid rgba($primary, 0.25);
+}

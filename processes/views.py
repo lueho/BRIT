@@ -11,12 +11,15 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, TemplateView
 from extra_views import CreateWithInlinesView
 
+from utils.object_management.models import ReviewAction
+from utils.object_management.permissions import get_object_policy
 from utils.object_management.views import (
     OwnedObjectModelSelectOptionsView,
     PrivateObjectFilterView,
     PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
+    ReviewItemDetailView,
     ReviewObjectFilterView,
     ReviewObjectListMixin,
     UserCreatedObjectAutocompleteView,
@@ -427,8 +430,88 @@ class ProcessDetailView(UserCreatedObjectDetailView):
             self.object.sources_ordered(),
             key=lambda source: (source.abbreviation or source.title or "").casefold(),
         )
+        context["process_policy"] = get_object_policy(
+            self.request.user, self.object, request=self.request
+        )
+        context["review_timeline"] = self._build_review_timeline()
+        context["section_anchors"] = self._build_section_anchors(context)
+        context["has_related_processes"] = bool(
+            context["process_variants"] or self.object.parent_id
+        )
 
         return context
+
+    def _build_review_timeline(self):
+        try:
+            actions = (
+                ReviewAction.for_object(self.object)
+                .select_related("user")
+                .order_by("created_at", "id")
+            )
+        except Exception:
+            return []
+        timeline = []
+        for action in actions:
+            timeline.append(
+                {
+                    "action": action.action,
+                    "label": action.get_action_display()
+                    if hasattr(action, "get_action_display")
+                    else action.action,
+                    "user": getattr(action.user, "username", None),
+                    "created_at": action.created_at,
+                    "comment": getattr(action, "comment", "") or "",
+                }
+            )
+        return timeline
+
+    def _build_section_anchors(self, context):
+        """Return label/id pairs for the sections rendered on the page."""
+        anchors = []
+        if (
+            self.object.mechanism
+            or context["operating_parameters"]
+            or context["input_materials"]
+            or context["output_materials"]
+            or context["parameters_by_type"].get(
+                ProcessOperatingParameter.Parameter.YIELD.label
+            )
+        ):
+            anchors.append({"id": "facts", "name": "At a glance"})
+        if self.object.description:
+            anchors.append({"id": "description", "name": "Description"})
+        if self.object.process_technology:
+            anchors.append({"id": "technology", "name": "Process technology"})
+        if context["process_links"]:
+            anchors.append({"id": "links", "name": "Links"})
+        if context["process_info_resources"]:
+            anchors.append({"id": "resources", "name": "Information resources"})
+        if context["bibliography_sources"]:
+            anchors.append({"id": "bibliography", "name": "Bibliography"})
+        return anchors
+
+
+class ProcessReviewItemDetailView(ReviewItemDetailView):
+    """Render process moderation with the complete process detail context."""
+
+    model = Process
+
+    def _resolve_base_template(self):
+        return "processes/process_detail.html"
+
+    def get_review_specific_context(self, context):
+        detail_view = ProcessDetailView()
+        detail_view.request = self.request
+        detail_view.args = self.args
+        detail_view.kwargs = self.kwargs
+        detail_view.object = self.object
+        process_context = detail_view.get_context_data(object=self.object)
+        for review_key in ("review_logs", "review_mode", "show_review_panel"):
+            process_context.pop(review_key, None)
+        return process_context
+
+
+ProcessReviewItemDetailView.register_for_model(Process)
 
 
 class ProcessModalDetailView(UserCreatedObjectModalDetailView):

@@ -1,4 +1,4 @@
-from crispy_forms.layout import HTML, Div, Field, Layout
+from crispy_forms.layout import HTML, Div, Field, Fieldset, Layout
 from django.core.exceptions import ValidationError
 from django.forms import (
     DateTimeInput,
@@ -202,12 +202,13 @@ class ComponentMeasurementModelForm(
         label="Analytical method",
     )
     unit = TomSelectModelChoiceField(
-        queryset=Unit.objects.all(),
+        queryset=Unit.objects.filter(Unit.weight_fraction_q()),
         config=TomSelectConfig(
-            url="unit-autocomplete",
+            url="unit-autocomplete-weight-fraction",
             label_field="name",
         ),
         label="Unit",
+        help_text="Weight-fraction units only (e.g. %, g/kg, mg/kg).",
     )
 
     class Meta:
@@ -463,6 +464,13 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             "series",
             "timestep",
             "sources",
+            Fieldset(
+                "Analysis",
+                "analysis_date",
+                "analysis_laboratory",
+                "lab_accreditation",
+                "analysis_objective",
+            ),
         )
 
     def clean(self):
@@ -493,12 +501,22 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             "series",
             "timestep",
             "sources",
+            "analysis_date",
+            "analysis_laboratory",
+            "lab_accreditation",
+            "analysis_objective",
         )
         widgets = {
-            "datetime": DateTimeInput(attrs={"type": "datetime-local"}),
+            "datetime": DateTimeInput(
+                format="%Y-%m-%dT%H:%M", attrs={"type": "datetime-local"}
+            ),
+            "analysis_date": DateTimeInput(
+                format="%Y-%m-%dT%H:%M", attrs={"type": "datetime-local"}
+            ),
         }
         labels = {
-            "datetime": "Date/Time",
+            "datetime": "Sampling date/time",
+            "analysis_date": "Analysis date/time",
             "image": "Image",
             "image_alt_text": "Image alt text",
             "image_caption": "Image caption",

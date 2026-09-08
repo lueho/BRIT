@@ -719,7 +719,10 @@ class Sample(NamedUserCreatedObject):
         help_text='If no option fits, please choose "Other" and specify the material in the description.',
     )
     datetime = models.DateTimeField(
-        blank=True, null=True, help_text="Choose 00:00 if time is unknown."
+        blank=True,
+        null=True,
+        verbose_name="sampling date/time",
+        help_text="When the sample was taken. Choose 00:00 if the time is unknown.",
     )
     location = models.CharField(
         max_length=511,
@@ -730,7 +733,8 @@ class Sample(NamedUserCreatedObject):
     analysis_date = models.DateTimeField(
         blank=True,
         null=True,
-        help_text="Date when the analysis was performed.",
+        verbose_name="analysis date/time",
+        help_text="When the laboratory analysis was performed. Choose 00:00 if the time is unknown.",
     )
     analysis_laboratory = models.CharField(
         max_length=255,
@@ -1096,6 +1100,16 @@ class ComponentMeasurement(NumericMeasurementMixin, UserCreatedObject):
 
     class Meta:
         ordering = ["component__name", "id"]
+
+    def clean(self):
+        super().clean()
+        if self.unit_id and not self.unit.is_weight_fraction:
+            raise ValidationError(
+                {
+                    "unit": "Component measurements must use a weight-fraction unit "
+                    "(e.g. %, g/kg, mg/kg)."
+                }
+            )
 
     def duplicate(self, creator, sample=None):
         duplicate = ComponentMeasurement.objects.create(
