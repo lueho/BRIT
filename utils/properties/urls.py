@@ -17,6 +17,7 @@ from .views import (
     UnitPrivateListView,
     UnitPublishedListView,
     UnitUpdateView,
+    WeightFractionUnitAutocompleteView,
 )
 
 urlpatterns = [
@@ -50,6 +51,11 @@ urlpatterns = [
         "units/autocomplete/",
         UnitAutocompleteView.as_view(),
         name="unit-autocomplete",
+    ),
+    path(
+        "units/autocomplete/weight-fraction/",
+        WeightFractionUnitAutocompleteView.as_view(),
+        name="unit-autocomplete-weight-fraction",
     ),
     path("units/create/", UnitCreateView.as_view(), name="unit-create"),
     path("units/<int:pk>/", UnitDetailView.as_view(), name="unit-detail"),

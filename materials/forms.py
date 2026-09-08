@@ -202,12 +202,13 @@ class ComponentMeasurementModelForm(
         label="Analytical method",
     )
     unit = TomSelectModelChoiceField(
-        queryset=Unit.objects.all(),
+        queryset=Unit.objects.filter(Unit.weight_fraction_q()),
         config=TomSelectConfig(
-            url="unit-autocomplete",
+            url="unit-autocomplete-weight-fraction",
             label_field="name",
         ),
         label="Unit",
+        help_text="Weight-fraction units only (e.g. %, g/kg, mg/kg).",
     )
 
     class Meta:

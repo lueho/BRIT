@@ -5,7 +5,12 @@ from django.test import TestCase
 
 from utils.properties.models import Unit
 
-from ..composition_normalization import get_sample_normalized_compositions
+from ..composition_normalization import (
+    WARNING_LEGACY_OTHER_IGNORED,
+    WARNING_REMAINING_FRACTION_ASSIGNED_TO_OTHER,
+    WARNING_SHARES_SCALED_TO_100,
+    get_sample_normalized_compositions,
+)
 from ..models import (
     ComponentMeasurement,
     Composition,
@@ -100,6 +105,156 @@ class SampleCompositionNormalizationTestCase(TestCase):
         )
         self.assertEqual(composition["settings_pk"], persisted.pk)
         self.assertEqual(composition["warning_count"], 0)
+
+    def _sample_with_group(self, name):
+        sample = Sample.objects.create(
+            name=name,
+            material=self.material,
+            series=self.series,
+            publication_status="published",
+            owner=self.owner,
+        )
+        sample.compositions.all().delete()
+        group = MaterialComponentGroup.objects.create(
+            name=f"{name} Group",
+            publication_status="published",
+            owner=self.owner,
+        )
+        return sample, group
+
+    def _measure(self, sample, group, component, average, unit=None, basis=None):
+        if isinstance(component, str):
+            component = MaterialComponent.objects.create(
+                name=component,
+                publication_status="published",
+                owner=self.owner,
+            )
+        ComponentMeasurement.objects.create(
+            sample=sample,
+            group=group,
+            component=component,
+            basis_component=basis,
+            unit=unit or self.percent_unit,
+            average=Decimal(average),
+            owner=self.owner,
+        )
+
+    def test_converts_weight_fraction_units_to_percent_before_normalizing(self):
+        sample, group = self._sample_with_group("Mixed Units")
+        g_per_kg = Unit.objects.create(name="g/kg", symbol="g/kg", owner=self.owner)
+        self._measure(sample, group, "Carbon", "300", unit=g_per_kg)
+        self._measure(sample, group, "Nitrogen", "20")
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(
+            [(s["component_name"], s["percent"]) for s in composition["shares"]],
+            [("Carbon", 30.0), ("Nitrogen", 20.0), ("Other", 50.0)],
+        )
+        self.assertEqual(composition["warnings"], [])
+
+    def test_converts_mg_per_kg_to_percent(self):
+        sample, group = self._sample_with_group("Trace")
+        mg_per_kg = Unit.objects.create(name="mg/kg", symbol="mg/kg", owner=self.owner)
+        self._measure(sample, group, "Zinc", "5000", unit=mg_per_kg)
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(
+            [(s["component_name"], s["percent"]) for s in composition["shares"]],
+            [("Zinc", 0.5), ("Other", 99.5)],
+        )
+
+    def test_converts_units_on_dry_matter_basis_too(self):
+        sample, group = self._sample_with_group("DM Units")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        g_per_kg = Unit.objects.create(name="g/kg", symbol="g/kg", owner=self.owner)
+        self._measure(sample, group, "Carbon", "400", unit=g_per_kg, basis=dm)
+        self._measure(sample, group, "Nitrogen", "10", basis=dm)
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(
+            [s["as_percentage"] for s in composition["shares"]],
+            ["40.0% of DM", "10.0% of DM", "50.0% of DM"],
+        )
+
+    def test_scales_shares_down_when_raw_sum_exceeds_100(self):
+        sample, group = self._sample_with_group("Over 100")
+        self._measure(sample, group, "Carbon", "60")
+        self._measure(sample, group, "Nitrogen", "60")
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(
+            [share["as_percentage"] for share in composition["shares"]],
+            ["50.0%", "50.0%"],
+        )
+        self.assertAlmostEqual(
+            sum(share["average"] for share in composition["shares"]), 1.0
+        )
+        self.assertIn(WARNING_SHARES_SCALED_TO_100, composition["warning_codes"])
+        self.assertEqual(composition["share_total_percent"], 100.0)
+        self.assertEqual(
+            [share["percent"] for share in composition["shares"]], [50.0, 50.0]
+        )
+        self.assertNotIn(
+            MaterialComponent.objects.other().pk,
+            [share["component"] for share in composition["shares"]],
+        )
+
+    def test_fills_gap_below_100_with_other(self):
+        sample, group = self._sample_with_group("Under 100")
+        self._measure(sample, group, "Carbon", "40")
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        other = MaterialComponent.objects.other()
+        self.assertEqual(
+            [
+                (share["component"], share["as_percentage"])
+                for share in composition["shares"]
+            ][-1],
+            (other.pk, "60.0%"),
+        )
+        self.assertIn(
+            WARNING_REMAINING_FRACTION_ASSIGNED_TO_OTHER, composition["warning_codes"]
+        )
+
+    def test_legacy_other_measurements_are_ignored(self):
+        sample, group = self._sample_with_group("Legacy Other")
+        other = MaterialComponent.objects.other()
+        self._measure(sample, group, "Carbon", "40")
+        self._measure(sample, group, other, "70")
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(
+            [
+                (share["component_name"], share["as_percentage"])
+                for share in composition["shares"]
+            ],
+            [("Carbon", "40.0%"), (other.name, "60.0%")],
+        )
+        self.assertIn(WARNING_LEGACY_OTHER_IGNORED, composition["warning_codes"])
+
+    def test_share_total_is_not_a_sum_of_rounded_shares(self):
+        sample, group = self._sample_with_group("Thirds")
+        for name in ("Carbon", "Nitrogen", "Oxygen"):
+            self._measure(sample, group, name, "50")
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(
+            [share["percent"] for share in composition["shares"]], [33.3, 33.3, 33.3]
+        )
+        self.assertEqual(composition["share_total_percent"], 100.0)
+
+    def test_other_only_group_yields_no_derived_composition(self):
+        sample, group = self._sample_with_group("Only Other")
+        self._measure(sample, group, MaterialComponent.objects.other(), "100")
+
+        self.assertEqual(get_sample_normalized_compositions(sample), [])
 
     def test_resolves_raw_groups_with_settings_order(self):
         sample = Sample.objects.create(

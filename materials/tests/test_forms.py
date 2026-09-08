@@ -205,6 +205,19 @@ class ComponentMeasurementModelFormTestCase(TestCase):
             str(form["standard_deviation"]),
         )
 
+    def test_unit_choices_are_limited_to_weight_fraction_units(self):
+        percent, _ = Unit.objects.get_or_create(
+            name="%", defaults={"symbol": "percent"}
+        )
+        g_per_kg = Unit.objects.create(name="g/kg", symbol="g/kg")
+        mg_per_l = Unit.objects.create(name="mg/L", symbol="mg/L")
+
+        queryset = ComponentMeasurementModelForm().fields["unit"].queryset
+
+        self.assertIn(percent, queryset)
+        self.assertIn(g_per_kg, queryset)
+        self.assertNotIn(mg_per_l, queryset)
+
 
 class SampleModelFormTestCase(TestCase):
     @classmethod

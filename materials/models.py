@@ -1097,6 +1097,16 @@ class ComponentMeasurement(NumericMeasurementMixin, UserCreatedObject):
     class Meta:
         ordering = ["component__name", "id"]
 
+    def clean(self):
+        super().clean()
+        if self.unit_id and not self.unit.is_weight_fraction:
+            raise ValidationError(
+                {
+                    "unit": "Component measurements must use a weight-fraction unit "
+                    "(e.g. %, g/kg, mg/kg)."
+                }
+            )
+
     def duplicate(self, creator, sample=None):
         duplicate = ComponentMeasurement.objects.create(
             owner=creator,

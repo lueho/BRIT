@@ -5,6 +5,7 @@ from rest_framework.serializers import (
     ReadOnlyField,
     SerializerMethodField,
     StringRelatedField,
+    ValidationError,
 )
 
 from bibliography.models import Source
@@ -428,6 +429,14 @@ class ComponentMeasurementWriteSerializer(ModelSerializer):
             "sample_size",
             "comment",
         )
+
+    def validate_unit(self, unit):
+        if not unit.is_weight_fraction:
+            raise ValidationError(
+                "Component measurements must use a weight-fraction unit "
+                "(e.g. %, g/kg, mg/kg)."
+            )
+        return unit
 
 
 class MaterialPropertyValueReadSerializer(ModelSerializer):

@@ -1,6 +1,7 @@
 import json
 import logging
 from collections import defaultdict
+from decimal import Decimal
 
 from django.contrib.auth.mixins import (
     LoginRequiredMixin,
@@ -9,6 +10,7 @@ from django.contrib.auth.mixins import (
 )
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
+from django.db.models.aggregates import Count
 from django.http import (
     Http404,
     HttpResponseRedirect,
@@ -34,6 +36,7 @@ from utils.object_management.permissions import (
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
+    ReviewItemDetailView,
     ReviewObjectFilterView,
     ReviewObjectListView,
     UserCreatedObjectAutocompleteView,
@@ -47,12 +50,15 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateView,
     UserOwnsObjectMixin,
 )
+from utils.properties.models import Unit
+from utils.properties.units import UnitConversionError
 from utils.views import NextOrSuccessUrlMixin
 
 from .composition_normalization import (
     get_sample_composition_settings_by_group,
     get_sample_normalized_compositions,
     get_sorted_component_measurements,
+    to_weight_percent,
 )
 from .filters import (
     AnalyticalMethodListFilter,
@@ -813,6 +819,82 @@ def get_sample_representation_urls():
     }
 
 
+CARD_COMPONENT_PREVIEW_LIMIT = 3
+
+
+def build_sample_card_data(samples):
+    """Cheap per-sample data signals for list and gallery representations.
+
+    Returns a mapping ``sample_pk -> card dict`` with measurement counts,
+    property counts, and a small dominant-component preview. Everything is
+    computed in three aggregate queries for the whole page, so cards stay
+    affordable even at full pagination size.
+    """
+    samples = list(samples)
+    ids = [sample.pk for sample in samples]
+
+    def empty_card():
+        return {
+            "measurement_count": 0,
+            "property_value_count": 0,
+            "component_preview": [],
+            "component_preview_overflow": 0,
+        }
+
+    cards = {sample.pk: empty_card() for sample in samples}
+    if not ids:
+        return cards
+
+    measurement_stats = (
+        ComponentMeasurement.objects.filter(sample_id__in=ids)
+        .values("sample_id")
+        .annotate(
+            total=Count("id"),
+            groups=Count("group", distinct=True),
+        )
+    )
+    for stats in measurement_stats:
+        cards[stats["sample_id"]]["measurement_count"] = stats["total"]
+        cards[stats["sample_id"]]["groups"] = stats["groups"]
+
+    property_counts = (
+        MaterialPropertyValue.objects.filter(sample_id__in=ids)
+        .values("sample_id")
+        .annotate(total=Count("id"))
+    )
+    for stats in property_counts:
+        cards[stats["sample_id"]]["property_value_count"] = stats["total"]
+
+    peak_percent_by_component = defaultdict(dict)
+    for sample_id, component_name, average, unit_symbol, unit_name in (
+        ComponentMeasurement.objects.filter(sample_id__in=ids)
+        .select_related("unit", "component")
+        .values_list(
+            "sample_id", "component__name", "average", "unit__symbol", "unit__name"
+        )
+    ):
+        try:
+            percent = to_weight_percent(
+                Decimal(average), Unit(symbol=unit_symbol, name=unit_name)
+            )
+        except UnitConversionError:
+            continue
+        peaks = peak_percent_by_component[sample_id]
+        peaks[component_name] = max(peaks.get(component_name, percent), percent)
+    for sample_id, peaks in peak_percent_by_component.items():
+        card = cards[sample_id]
+        ranked = sorted(peaks.items(), key=lambda item: (-item[1], item[0]))
+        card["component_preview"] = [
+            name for name, _ in ranked[:CARD_COMPONENT_PREVIEW_LIMIT]
+        ]
+        card["component_preview_overflow"] = max(
+            len(ranked) - CARD_COMPONENT_PREVIEW_LIMIT, 0
+        )
+    for sample in samples:
+        sample.card_data = cards[sample.pk]
+    return cards
+
+
 class SampleRepresentationMixin:
     model = Sample
     filterset_class = SampleFilter
@@ -838,6 +920,12 @@ class SampleRepresentationMixin:
         context = super().get_context_data(**kwargs)
         gallery_urls = self.get_gallery_context_urls()
         context.update(gallery_urls)
+        page_objects = (
+            context.get("page_obj").object_list
+            if context.get("page_obj")
+            else context.get("object_list")
+        )
+        context["sample_cards"] = build_sample_card_data(page_objects or [])
         if getattr(self, "representation_mode", "list") == "gallery":
             context.update(
                 {
@@ -914,16 +1002,7 @@ class SampleModalCreateView(UserCreatedObjectModalCreateView):
 
 class SampleDetailView(UserCreatedObjectDetailView):
     model = Sample
-
-    V2_FLAG_VALUES = {"v2", "new", "experimental"}
-
-    def _is_v2_experience(self):
-        return self.request.GET.get("experience", "").lower() in self.V2_FLAG_VALUES
-
-    def get_template_names(self):
-        if self._is_v2_experience():
-            return ["materials/sample_detail_v2.html"]
-        return super().get_template_names()
+    template_name = "materials/sample_detail_v2.html"
 
     @staticmethod
     def _build_completeness_checks(
@@ -1005,7 +1084,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
         charts = {}
         for composition in compositions:
             labels = [share["component_name"] for share in composition["shares"]]
-            values = [share["average"] for share in composition["shares"]]
+            values = [share["percent"] for share in composition["shares"]]
             chart = DoughnutChart(
                 id=f"materialCompositionChart-{composition['id']}",
                 title="Composition",
@@ -1013,7 +1092,12 @@ class SampleDetailView(UserCreatedObjectDetailView):
                 labels=labels,
                 data=[{"label": "Fraction", "unit": "%", "data": values}],
             )
-            charts[f"composition-chart-{composition['id']}"] = chart.as_dict()
+            chart_dict = chart.as_dict()
+            chart_dict["data"]["tooltip_labels"] = [
+                f"{label}: {value:.1f} %"
+                for label, value in zip(labels, values, strict=True)
+            ]
+            charts[f"composition-chart-{composition['id']}"] = chart_dict
         return charts
 
     def get_context_data(self, **kwargs):
@@ -1059,13 +1143,6 @@ class SampleDetailView(UserCreatedObjectDetailView):
             composition_settings_by_group=composition_settings_by_group,
         )
         charts = self._build_composition_charts(compositions)
-        composition_origins = {composition["origin"] for composition in compositions}
-        if len(composition_origins) > 1:
-            composition_mode = "mixed"
-        elif composition_origins == {"raw_derived"}:
-            composition_mode = "derived"
-        else:
-            composition_mode = "saved"
 
         sample_summary = {
             "component_measurement_count": len(component_measurements),
@@ -1109,7 +1186,6 @@ class SampleDetailView(UserCreatedObjectDetailView):
             {
                 "data": data,
                 "charts": charts,
-                "composition_mode": composition_mode,
                 "property_values": property_values,
                 "component_measurements": component_measurements,
                 "sample_summary": sample_summary,
@@ -1135,15 +1211,14 @@ class SampleDetailView(UserCreatedObjectDetailView):
             }
         )
 
-        if self._is_v2_experience():
-            context.update(
-                self._build_v2_context(
-                    compositions=compositions,
-                    component_measurements=component_measurements,
-                    property_values=property_values,
-                    sample_policy=sample_policy,
-                )
+        context.update(
+            self._build_v2_context(
+                compositions=compositions,
+                component_measurements=component_measurements,
+                property_values=property_values,
+                sample_policy=sample_policy,
             )
+        )
 
         return context
 
@@ -1155,9 +1230,13 @@ class SampleDetailView(UserCreatedObjectDetailView):
         sample_policy,
     ):
         """Extra context exclusively for the v2 prototype layout."""
-        group_sparklines = self._build_group_sparklines(
-            compositions, component_measurements
-        )
+        default_group_id = MaterialComponentGroup.objects.default().pk
+        display_compositions = [
+            composition
+            for composition in compositions
+            if composition["group"] != default_group_id
+        ]
+        group_anchors = self._build_group_anchors(display_compositions)
         grouped_measurements = self._group_measurements_by_group_id(
             component_measurements
         )
@@ -1175,12 +1254,15 @@ class SampleDetailView(UserCreatedObjectDetailView):
             )
         )
         return {
-            "group_sparklines": group_sparklines,
+            "display_compositions": display_compositions,
+            "group_anchors": group_anchors,
             "grouped_measurements": grouped_measurements,
+            "charts": self._build_composition_charts(display_compositions),
             "primary_source": primary_source,
             "sample_policy": sample_policy,
             "review_timeline": review_timeline,
             "related_samples": related,
+            "has_related_samples": bool(related["series"] or related["material"]),
             "edit_mode_enabled": edit_mode_enabled,
             "edit_mode_requested": edit_requested,
         }
@@ -1193,57 +1275,16 @@ class SampleDetailView(UserCreatedObjectDetailView):
         return dict(grouped)
 
     @staticmethod
-    def _build_group_sparklines(compositions, component_measurements):
-        """Tiny per-group bars for the hero composition band.
-
-        Alongside the stacked bar we expose the dominant component so the
-        sparkline carries a readable signal even at hero sizes where
-        segment shading alone is too subtle.
-        """
-        by_group = {}
-        for composition in compositions:
-            group_id = composition.get("group")
-            segments = [
-                {
-                    "label": share["component_name"],
-                    "value": float(share.get("average", 0) or 0),
-                }
-                for share in composition.get("shares", [])
-            ]
-            dominant = max(segments, key=lambda seg: seg["value"]) if segments else None
-            total_value = sum(seg["value"] for seg in segments)
-            by_group[group_id] = {
-                "group_id": group_id,
-                "name": composition.get("group_name", ""),
-                "anchor": f"group-{group_id}",
-                "segments": segments,
-                "is_derived": composition.get("is_derived", False),
-                "measurement_count": 0,
-                "component_count": len(segments),
-                "dominant_label": dominant["label"] if dominant else "",
-                "dominant_share": (
-                    (dominant["value"] / total_value * 100.0)
-                    if dominant and total_value
-                    else 0.0
-                ),
+    def _build_group_anchors(compositions):
+        """Return label-only navigation targets for visible composition groups."""
+        anchors = [
+            {
+                "group_id": composition["group"],
+                "name": composition["group_name"],
             }
-        for measurement in component_measurements:
-            entry = by_group.setdefault(
-                measurement.group_id,
-                {
-                    "group_id": measurement.group_id,
-                    "name": measurement.group.name,
-                    "anchor": f"group-{measurement.group_id}",
-                    "segments": [],
-                    "is_derived": True,
-                    "measurement_count": 0,
-                    "component_count": 0,
-                    "dominant_label": "",
-                    "dominant_share": 0.0,
-                },
-            )
-            entry["measurement_count"] += 1
-        return sorted(by_group.values(), key=lambda entry: entry["name"].lower())
+            for composition in compositions
+        ]
+        return sorted(anchors, key=lambda anchor: anchor["name"].lower())
 
     def _build_review_timeline(self):
         try:
@@ -1290,6 +1331,29 @@ class SampleDetailView(UserCreatedObjectDetailView):
             )
             related["material"] = list(material_qs)
         return related
+
+
+class SampleReviewItemDetailView(ReviewItemDetailView):
+    """Render sample moderation with the complete v2 sample context."""
+
+    model = Sample
+
+    def _resolve_base_template(self):
+        return "materials/sample_detail_v2.html"
+
+    def get_review_specific_context(self, context):
+        detail_view = SampleDetailView()
+        detail_view.request = self.request
+        detail_view.args = self.args
+        detail_view.kwargs = self.kwargs
+        detail_view.object = self.object
+        sample_context = detail_view.get_context_data(object=self.object)
+        for review_key in ("review_logs", "review_mode", "show_review_panel"):
+            sample_context.pop(review_key, None)
+        return sample_context
+
+
+SampleReviewItemDetailView.register_for_model(Sample)
 
 
 class SampleUpdateView(UserCreatedObjectUpdateView):
