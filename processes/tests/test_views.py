@@ -408,6 +408,24 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.assertContains(response, "Information Resources")
         self.assertContains(response, "Process flow chart")
 
+    def test_detail_view_section_headings_are_emphasized(self):
+        self.published_object.description = "Visible description"
+        self.published_object.process_technology = "Visible process technology"
+        self.published_object.save()
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": self.published_object.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        for heading in ("Description", "Process Technology"):
+            self.assertIn(
+                f'<h6 class="detail-section-heading">{heading}</h6>',
+                content,
+            )
+
     def test_detail_view_links_bibliography_references_to_modal(self):
         source = Source.objects.create(
             title="Reference Title",
