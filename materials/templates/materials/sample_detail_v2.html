@@ -2,8 +2,9 @@
 {% load static %}
 {% load custom_tags %}
 {% load moderation_tags %}
+{% object_policy object as sample_policy %}
 {% block title %}
-  BRIT · {{ object.name }} · v2 preview
+  BRIT · {{ object.name }}
 {% endblock title %}
 {% block style_sheets %}
   <link href="{% static 'css/sample_detail_v2.min.css' %}" rel="stylesheet">
@@ -12,52 +13,140 @@
   <div class="sdv2"
        data-sample-id="{{ object.id }}"
        data-edit-enabled="{% if edit_mode_enabled %}1{% else %}0{% endif %}"
-       data-can-edit="{% if sample_policy.can_edit or sample_policy.can_manage_samples or sample_policy.can_add_property %}1{% else %}0{% endif %}">
-    {# ─── Sticky rail: sample-specific actions ─────────────────────── #}
+       data-can-edit="{% if sample_policy.can_edit or sample_policy.can_manage_samples or sample_policy.can_add_property %}1{% else %}0{% endif %}"
+       data-has-action-rail="{% if user.is_authenticated %}1{% else %}0{% endif %}">
+    {# ─── Sticky rail: sample-specific actions (authenticated only) ── #}
     {# The BRIT > Materials > Samples > <Sample> path is rendered by the #}
     {# shared breadcrumb rail in base.html through the breadcrumb_*      #}
-    {# contract populated by UserCreatedObjectDetailView. This rail      #}
-    {# keeps only sample-specific actions (status pill, mode toggle,    #}
-    {# quick-actions palette, export, classic-view link).                #}
-    <nav class="sdv2-rail" aria-label="Sample actions">
-      <div class="sdv2-rail-actions">
-        <span class="sdv2-status-pill sdv2-status-{{ object.publication_status|default:'private' }}"
-              title="Publication status">{{ object.get_publication_status_display }}</span>
-        <div class="sdv2-mode-toggle" role="group" aria-label="View mode">
-          <a class="sdv2-mode {% if not edit_mode_enabled %}is-active{% endif %}"
-             href="?experience=v2">Explore</a>
-          <button class="sdv2-mode"
-                  type="button"
-                  data-sdv2-compare
-                  disabled
-                  title="Compare mode (coming soon)">Compare</button>
-          {% if sample_policy.can_edit or sample_policy.can_manage_samples or sample_policy.can_add_property %}
-            <a class="sdv2-mode {% if edit_mode_enabled %}is-active{% endif %}"
-               href="?experience=v2&amp;mode=edit">Edit</a>
+    {# contract populated by UserCreatedObjectDetailView. Anonymous      #}
+    {# visitors get a minimalist reading layout with no rail at all.     #}
+    {% if user.is_authenticated %}
+    <section class="sdv2-rail{% if edit_mode_enabled %} sdv2-rail-editing{% endif %}" aria-label="Sample toolbar">
+      <div class="sdv2-rail-nav">
+        {% include "materials/includes/sample_context_nav.html" %}
+      </div>
+      <div class="sdv2-rail-workspace">
+        <div class="sdv2-rail-status" role="group" aria-label="Sample status">
+          <span class="sdv2-status-pill sdv2-status-{{ object.publication_status|default:'private' }}"
+                title="Publication status">
+            <i class="fas fa-circle sdv2-status-dot" aria-hidden="true"></i>
+            {{ object.get_publication_status_display }}
+          </span>
+          {% if edit_mode_enabled %}
+            <span class="sdv2-editing-state">
+              <i class="fas fa-pen-to-square" aria-hidden="true"></i>
+              Editing sample
+            </span>
           {% endif %}
         </div>
-        <button class="sdv2-palette-trigger" type="button" data-sdv2-palette-open>
-          <span class="sdv2-kbd">Ctrl</span><span class="sdv2-kbd-plus">+</span><span class="sdv2-kbd">K</span>
-          <span class="sdv2-palette-hint">Quick actions</span>
-        </button>
-        {% if request.user.is_authenticated %}
-          <button type="button"
-                  class="sdv2-export-trigger"
-                  data-sdv2-export-sample
-                  data-export-url="{% url 'sample-export' object.pk %}"
-                  data-progress-template="{% url 'file-export-progress' 'TASK_ID' %}"
-                  title="Download the complete sample as an Excel workbook">
-            <i class="fas fa-file-excel" aria-hidden="true"></i>
-            <span class="sdv2-export-trigger-label">Excel</span>
-          </button>
-        {% endif %}
-        <a class="sdv2-classic-link"
-           href="{% url 'sample-detail' object.pk %}"
-           title="Switch back to the classic detail view">Classic view</a>
+        <div class="sdv2-rail-actions" role="group" aria-label="Sample actions">
+          {% if object.publication_status == 'private' and sample_policy.can_submit_review %}
+            <form method="post"
+                  action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                  class="sdv2-rail-submit">
+              {% csrf_token %}
+              <button type="submit" class="sdv2-btn">
+                <i class="fas fa-paper-plane" aria-hidden="true"></i> Submit for review
+              </button>
+            </form>
+          {% elif sample_policy.can_view_review_feedback %}
+            <a class="sdv2-btn sdv2-btn-ghost"
+               href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+              <i class="fas fa-clipboard-check" aria-hidden="true"></i>
+              {{ sample_policy.review_feedback_label }}
+            </a>
+          {% elif sample_policy.is_in_review and not review_mode %}
+            {% if sample_policy.is_owner or sample_policy.is_staff or sample_policy.is_moderator %}
+              <a class="sdv2-btn sdv2-btn-ghost"
+                 href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+                <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view
+              </a>
+            {% endif %}
+          {% endif %}
+          <div class="dropdown sdv2-actions-menu">
+            <button class="sdv2-btn sdv2-actions-trigger"
+                    type="button"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    aria-label="More sample actions">
+              <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
+              <span>More actions</span>
+              <i class="fas fa-chevron-down sdv2-actions-chevron" aria-hidden="true"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              {% if sample_policy.can_edit %}
+                <li>
+                  <a class="dropdown-item"
+                     href="{% url 'sample-update' object.id %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="fas fa-fw fa-pen-to-square me-2" aria-hidden="true"></i>Edit sample metadata
+                  </a>
+                </li>
+              {% endif %}
+              {% if sample_policy.can_duplicate %}
+                <li>
+                  <a class="dropdown-item"
+                     href="{% url 'sample-duplicate' object.id %}">
+                    <i class="fas fa-fw fa-copy me-2" aria-hidden="true"></i>Duplicate sample
+                  </a>
+                </li>
+              {% endif %}
+              {% if sample_policy.can_manage_editors %}
+                <li>
+                  <a class="dropdown-item modal-link"
+                     href="{% url 'object_management:manage_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="fas fa-fw fa-user-group me-2" aria-hidden="true"></i>Manage access
+                  </a>
+                </li>
+              {% endif %}
+              <li>
+                <button type="button"
+                        class="dropdown-item"
+                        data-sdv2-export-sample
+                        data-export-url="{% url 'sample-export' object.pk %}"
+                        data-progress-template="{% url 'file-export-progress' 'TASK_ID' %}">
+                  <i class="fas fa-fw fa-file-excel me-2" aria-hidden="true"></i>Export sample to Excel
+                </button>
+              </li>
+              {% if sample_policy.can_delete %}
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <a class="dropdown-item text-danger modal-link"
+                     href="{% url 'sample-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="fas fa-fw fa-trash me-2" aria-hidden="true"></i>Delete sample
+                  </a>
+                </li>
+              {% endif %}
+            </ul>
+          </div>
+          {% if sample_policy.can_edit or sample_policy.can_manage_samples or sample_policy.can_add_property %}
+            {% if edit_mode_enabled %}
+              <a class="sdv2-btn sdv2-btn-primary sdv2-mode-action" href="{% url 'sample-detail' object.pk %}">
+                <i class="fas fa-check" aria-hidden="true"></i>
+                Done editing
+              </a>
+            {% else %}
+              <a class="sdv2-btn sdv2-btn-primary sdv2-mode-action" href="?mode=edit">
+                <i class="fas fa-pen-to-square" aria-hidden="true"></i>
+                Edit sample
+              </a>
+            {% endif %}
+          {% endif %}
+        </div>
       </div>
-    </nav>
+    </section>
+    {% endif %}
+    <div class="sdv2-canvas sdv2-canvas-fluid">
+    {% if show_review_panel %}
+      <section class="sdv2-review-panel sdv2-section-panel"
+               aria-label="Review workspace">
+        {% include "object_management/review_panel.html" with object=object %}
+      </section>
+    {% endif %}
+    {% if not user.is_authenticated %}
+      {% include "materials/includes/sample_context_nav.html" %}
+    {% endif %}
     {# ─── Hero ─── #}
-    <header class="sdv2-hero">
+    <header class="sdv2-hero sdv2-surface {% if object.display_image %}sdv2-hero-with-media{% else %}sdv2-hero-no-media{% endif %}">
       <div class="sdv2-hero-identity">
         <div class="sdv2-hero-kicker">Sample</div>
         <h1 class="sdv2-hero-title">{{ object.name }}</h1>
@@ -73,8 +162,7 @@
           {% if object.series %}
             <li>
               <span class="sdv2-meta-label">Series</span>
-              <a href="{% url 'sampleseries-detail' object.series.pk %}"
-                 class="modal-link">{{ object.series.name }}</a>
+              <a href="{% url 'sampleseries-detail' object.series.pk %}">{{ object.series.name }}</a>
             </li>
           {% endif %}
           {% if object.timestep %}
@@ -86,7 +174,7 @@
           {% if object.datetime %}
             <li>
               <span class="sdv2-meta-label">When</span>
-              <time datetime="{{ object.datetime|date:'c' }}">{{ object.datetime|date:'Y-m-d' }}</time>
+              <time datetime="{{ object.datetime|date:'c' }}">{{ object.datetime|date:'Y-m-d H:i' }}</time>
             </li>
           {% endif %}
           {% if object.location %}
@@ -102,76 +190,56 @@
             </li>
           {% endif %}
         </ul>
-        <div class="sdv2-hero-stats" role="list" aria-label="Sample statistics">
-          <div class="sdv2-stat" role="listitem">
-            <span class="sdv2-stat-value">{{ sample_summary.component_measurement_count }}</span>
-            <span class="sdv2-stat-label">measurements</span>
-          </div>
-          <div class="sdv2-stat" role="listitem">
-            <span class="sdv2-stat-value">{{ sample_summary.component_measurement_group_count }}</span>
-            <span class="sdv2-stat-label">groups</span>
-          </div>
-          <div class="sdv2-stat" role="listitem">
-            <span class="sdv2-stat-value">{{ sample_summary.property_value_count }}</span>
-            <span class="sdv2-stat-label">properties</span>
-          </div>
-          <div class="sdv2-stat" role="listitem">
-            <span class="sdv2-stat-value">{{ sample_summary.sample_source_count }}</span>
-            <span class="sdv2-stat-label">sources</span>
-          </div>
-        </div>
       </div>
-      <div class="sdv2-sparkband" aria-label="Composition groups at a glance">
-        {% if group_sparklines %}
-          {% for group in group_sparklines %}
-            <a class="sdv2-spark {% if group.is_derived %}sdv2-spark-derived{% else %}sdv2-spark-saved{% endif %}"
-               href="#group-{{ group.group_id }}"
-               title="Jump to {{ group.name }}">
-              <div class="sdv2-spark-head">
-                <span class="sdv2-spark-name">{{ group.name }}</span>
-                <span class="sdv2-spark-count">{{ group.component_count }} comp · {{ group.measurement_count }} raw</span>
-              </div>
-              <span class="sdv2-spark-bar"
-                    role="img"
-                    aria-label="{{ group.name }} composition">
-                {% if group.segments %}
-                  {% for segment in group.segments %}
-                    <span class="sdv2-spark-seg sdv2-spark-seg-{{ forloop.counter0|modulo:8 }}"
-                          data-flex="{{ segment.value }}"
-                          title="{{ segment.label }}"></span>
-                  {% endfor %}
-                {% else %}
-                  <span class="sdv2-spark-empty"></span>
-                {% endif %}
-              </span>
-              {% if group.dominant_label %}
-                <div class="sdv2-spark-dominant">
-                  <span class="sdv2-spark-dominant-label">{{ group.dominant_label }}</span>
-                  <span class="sdv2-spark-dominant-share">{{ group.dominant_share|floatformat:0 }}%</span>
-                </div>
-              {% else %}
-                <div class="sdv2-spark-dominant sdv2-spark-dominant-empty">no derived composition</div>
+      {% if object.display_image %}
+        <figure class="sdv2-hero-media">
+          <img src="{{ object.display_image.url }}"
+               alt="{{ object.display_image_alt_text }}"
+               decoding="async"
+               fetchpriority="high">
+          {% if object.display_image_source == 'series' or object.display_image_caption or object.display_image_rights_notice %}
+            <figcaption class="sdv2-hero-media-caption">
+              {% if object.display_image_source == 'series' %}
+                <span><i class="fas fa-image" aria-hidden="true"></i> Showing the image from the linked sample series.</span>
               {% endif %}
-            </a>
-          {% endfor %}
-        {% else %}
-          <div class="sdv2-spark-placeholder">No composition data yet.</div>
-        {% endif %}
-      </div>
+              {% if object.display_image_caption %}
+                <span>{{ object.display_image_caption }}</span>
+              {% endif %}
+              {% if object.display_image_rights_notice %}
+                <span class="sdv2-hero-media-rights">{{ object.display_image_rights_notice }}</span>
+              {% endif %}
+            </figcaption>
+          {% endif %}
+        </figure>
+      {% endif %}
       <div class="sdv2-hero-provenance">
         {% if primary_source %}
-          <span class="sdv2-prov-label">Primary source</span>
-          <a href="{% url 'source-detail-modal' primary_source.pk %}"
-             class="modal-link sdv2-prov-link">{{ primary_source.title|default:primary_source.abbreviation }}</a>
-          {% if sample_summary.sample_source_count > 1 %}
-            <span class="sdv2-prov-more">+{{ sample_summary.sample_source_count|add:'-1' }} more</span>
-          {% endif %}
+          <span class="sdv2-prov-label">Sources</span>
+          <span class="sdv2-prov-sources">
+            {% for source in object.sources.all %}
+              <a href="{% url 'source-detail-modal' source.pk %}"
+                 class="modal-link sdv2-source-chip"
+                 title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:source.title }}</a>
+            {% endfor %}
+          </span>
         {% else %}
           <span class="text-muted">No source linked.</span>
         {% endif %}
       </div>
     </header>
-    {# ─── Completeness strip ─── #}
+    {# ─── Anchor navigation: only when there is more than one target ─── #}
+    {% with anchor_count=group_anchors|length %}
+      {% if anchor_count >= 2 or anchor_count == 1 and property_values %}
+        <nav class="sdv2-anchor-nav" aria-label="Jump to section">
+          {% for group in group_anchors %}
+            <a class="sdv2-anchor-chip" href="#group-{{ group.group_id }}">{{ group.name }}</a>
+          {% endfor %}
+          <a class="sdv2-anchor-chip" href="#properties">Properties</a>
+        </nav>
+      {% endif %}
+    {% endwith %}
+    {# ─── Completeness strip (editorial layer, edit mode only) ─── #}
+    {% if edit_mode_enabled %}
     <div class="sdv2-completeness" role="group" aria-label="Data completeness">
       <div class="sdv2-completeness-score">
         <span class="sdv2-completeness-value">{{ sample_completeness.score }}%</span>
@@ -195,6 +263,7 @@
         {% endfor %}
       </ul>
     </div>
+    {% endif %}
     {# ─── Review banner (only when review-relevant) ─── #}
     {% if object.publication_status == 'review' or object.publication_status == 'declined' %}
       <div class="sdv2-review-banner sdv2-review-banner-{{ object.publication_status }}"
@@ -223,71 +292,145 @@
       </div>
     {% endif %}
     {# ─── Main column + related aside ─── #}
-    <div class="sdv2-layout">
+    <div class="sdv2-layout{% if not has_related_samples %} sdv2-layout-full{% endif %}">
       <main class="sdv2-main">
-        {% if object.description %}
-          <section class="sdv2-about" aria-label="About this sample">
+        {% if object.description or object.lab_accreditation or object.analysis_objective %}
+          <section class="sdv2-about sdv2-section-panel"
+                   aria-label="About this sample">
             <h2 class="sdv2-section-title">About</h2>
-            <div class="sdv2-about-body">{{ object.description|linebreaksbr }}</div>
+            {% if object.description %}<div class="sdv2-about-body">{{ object.description|linebreaksbr }}</div>{% endif %}
+            {% if object.lab_accreditation or object.analysis_objective %}
+              <dl class="sdv2-context-details">
+                {% if object.lab_accreditation %}
+                  <div>
+                    <dt>Laboratory accreditation</dt>
+                    <dd>{{ object.lab_accreditation }}</dd>
+                  </div>
+                {% endif %}
+                {% if object.analysis_objective %}
+                  <div>
+                    <dt>Analysis objective</dt>
+                    <dd>{{ object.analysis_objective|linebreaksbr }}</dd>
+                  </div>
+                {% endif %}
+              </dl>
+            {% endif %}
           </section>
         {% endif %}
         {# ─── Composition group cards ─── #}
-        {% if data.compositions %}
+        {% if display_compositions %}
           <section class="sdv2-groups" aria-label="Composition groups">
             <div class="sdv2-section-header">
-              <h2 class="sdv2-section-title">Composition</h2>
-              <span class="sdv2-section-hint">
-                {% if composition_mode == 'mixed' %}
-                  Raw measurements are authoritative where present; saved compositions remain as fallback for other groups.
-                {% elif composition_mode == 'derived' %}
-                  Derived from raw measurements; each group normalized to 100%.
-                {% else %}
-                  Stored composition records for this sample.
+              <div class="sdv2-section-heading">
+                <h2 class="sdv2-section-title">Composition</h2>
+                <span class="sdv2-section-hint">
+                  Charts show the normalized composition; the raw measurements behind it are listed below each chart.
+                  <a href="#composition-methodology" class="sdv2-methodology-link">How is the composition normalized?</a>
+                </span>
+              </div>
+              <div class="sdv2-section-actions">
+                {% if component_measurements %}
+                  <div class="sdv2-raws-controls" role="group" aria-label="Raw measurement visibility">
+                    <button type="button" class="sdv2-btn sdv2-btn-ghost sdv2-btn-sm" data-sdv2-raws-toggle="expand">
+                      <i class="fas fa-expand-alt" aria-hidden="true"></i> Expand raw data
+                    </button>
+                    <button type="button" class="sdv2-btn sdv2-btn-ghost sdv2-btn-sm" data-sdv2-raws-toggle="collapse">
+                      <i class="fas fa-compress-alt" aria-hidden="true"></i> Collapse raw data
+                    </button>
+                  </div>
                 {% endif %}
-              </span>
+                {% if edit_mode_enabled and sample_policy.can_manage_samples %}
+                  <div class="sdv2-composition-actions" role="group" aria-label="Add composition data">
+                    {% if perms.materials.add_componentmeasurement %}
+                      <a class="sdv2-btn sdv2-btn-primary"
+                         href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
+                        <i class="fas fa-plus"></i> Add measurement
+                      </a>
+                    {% endif %}
+                    {% if perms.materials.add_composition %}
+                      <a class="sdv2-btn"
+                         href="{% url 'sample-add-composition' object.id %}?next={{ request.get_full_path|urlencode }}">
+                        <i class="fas fa-plus"></i> Add composition
+                      </a>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              </div>
             </div>
-            {% for composition in data.compositions %}
+            {% for composition in display_compositions %}
               {% with group_pk=composition.group raws=grouped_measurements|get_item:composition.group %}
-                <article class="sdv2-group-card"
+                <article class="sdv2-group-card sdv2-surface sdv2-anchor-target"
                          id="group-{{ group_pk }}"
-                         data-group-id="{{ group_pk }}"
-                         data-derived="{% if composition.is_derived %}1{% else %}0{% endif %}">
+                         data-group-id="{{ group_pk }}">
                   <header class="sdv2-group-header">
                     <div class="sdv2-group-title">
                       <a href="{% url 'materialcomponentgroup-detail-modal' group_pk %}"
                          class="modal-link sdv2-group-name">{{ composition.group_name }}</a>
                       <span class="sdv2-group-badges">
-                        <span class="sdv2-badge sdv2-badge-sum"
-                              title="Total percentage across components">Σ 100.0%</span>
-                        <span class="sdv2-badge sdv2-badge-{% if composition.is_derived %}derived{% else %}saved{% endif %}">
-                          {% if composition.is_derived %}
-                            Derived
-                          {% else %}
-                            Saved
-                          {% endif %}
-                        </span>
                         <span class="sdv2-group-fractions">% of {{ composition.fractions_of_name }}</span>
                       </span>
                     </div>
                     <div class="sdv2-group-tools" role="group" aria-label="Group actions">
-                      <a class="sdv2-affordance"
+                      <a class="sdv2-btn sdv2-btn-ghost sdv2-btn-icon"
                          href="#group-{{ group_pk }}"
                          title="Permalink to this group"
                          aria-label="Permalink">
                         <i class="fas fa-link"></i>
                       </a>
-                      <button class="sdv2-affordance"
+                      <button class="sdv2-btn sdv2-btn-ghost sdv2-btn-icon"
                               type="button"
                               data-sdv2-cite="{{ object.name }} · {{ composition.group_name }}"
                               title="Copy citation snippet">
                         <i class="fas fa-quote-right"></i>
                       </button>
                       {% if edit_mode_enabled and sample_policy.can_manage_samples %}
-                        <a class="sdv2-affordance sdv2-affordance-edit"
-                           href="{% if composition.is_derived %}{% url 'componentmeasurement-create' %}?sample={{ object.id }}&amp;group={{ group_pk }}{% else %}{% url 'composition-update' composition.id %}?next={{ request.get_full_path|urlencode }}{% endif %}"
-                           title="Edit this group">
-                          <i class="fas fa-pen-to-square"></i>
-                        </a>
+                        <div class="dropdown sdv2-group-actions-menu">
+                          <button class="sdv2-btn sdv2-btn-edit sdv2-btn-icon"
+                                  type="button"
+                                  data-bs-toggle="dropdown"
+                                  aria-expanded="false"
+                                  aria-label="Edit {{ composition.group_name }}">
+                            <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
+                          </button>
+                          <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                              <a class="dropdown-item"
+                                 href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}&amp;group={{ group_pk }}">
+                                <i class="fas fa-fw fa-plus me-2" aria-hidden="true"></i>Add measurement
+                              </a>
+                            </li>
+                            {% if composition.settings_pk %}
+                              <li>
+                                <a class="dropdown-item"
+                                   href="{% url 'composition-update' composition.settings_pk %}?next={{ request.get_full_path|urlencode }}">
+                                  <i class="fas fa-fw fa-pen-to-square me-2" aria-hidden="true"></i>Edit group settings
+                                </a>
+                              </li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                              <a class="dropdown-item"
+                                 href="{% url 'derived-composition-order-down' sample_pk=object.pk group_pk=group_pk %}?next={{ request.get_full_path|urlencode }}">
+                                <i class="fas fa-fw fa-arrow-up me-2" aria-hidden="true"></i>Move earlier
+                              </a>
+                            </li>
+                            <li>
+                              <a class="dropdown-item"
+                                 href="{% url 'derived-composition-order-up' sample_pk=object.pk group_pk=group_pk %}?next={{ request.get_full_path|urlencode }}">
+                                <i class="fas fa-fw fa-arrow-down me-2" aria-hidden="true"></i>Move later
+                              </a>
+                            </li>
+                            {% if composition.settings_pk %}
+                              <li><hr class="dropdown-divider"></li>
+                              <li>
+                                <a class="dropdown-item text-danger modal-link"
+                                   href="{% url 'composition-delete-modal' composition.settings_pk %}?next={{ request.get_full_path|urlencode }}">
+                                  <i class="fas fa-fw fa-trash me-2" aria-hidden="true"></i>Delete group settings
+                                </a>
+                              </li>
+                            {% endif %}
+                          </ul>
+                        </div>
                       {% endif %}
                     </div>
                   </header>
@@ -316,7 +459,7 @@
                           <tr>
                             <th scope="col" aria-label="Color"></th>
                             <th scope="col">Component</th>
-                            <th scope="col" class="sdv2-num">Share</th>
+                            <th scope="col" class="sdv2-num">Normalized share</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -346,21 +489,25 @@
                         <table class="sdv2-raws-table">
                           <colgroup>
                             <col class="sdv2-col-component">
+                            <col class="sdv2-col-abbreviation">
                             <col class="sdv2-col-basis">
                             <col class="sdv2-col-value">
                             <col class="sdv2-col-n">
                             <col class="sdv2-col-method">
                             <col class="sdv2-col-sources">
+                            <col class="sdv2-col-comment">
                             {% if edit_mode_enabled %}<col class="sdv2-col-edit">{% endif %}
                           </colgroup>
                           <thead>
                             <tr>
                               <th scope="col">Component</th>
+                              <th scope="col">Abbr.</th>
                               <th scope="col">Basis</th>
                               <th scope="col" class="sdv2-num">Value</th>
                               <th scope="col" class="sdv2-num">n</th>
                               <th scope="col">Method</th>
                               <th scope="col">Sources</th>
+                              <th scope="col">Comments</th>
                               {% if edit_mode_enabled %}<th scope="col" class="sdv2-num">Edit</th>{% endif %}
                             </tr>
                           </thead>
@@ -376,6 +523,7 @@
                                     </span>
                                   {% endif %}
                                 </td>
+                                <td>{{ measurement.component.abbreviation|default:"—" }}</td>
                                 <td>{{ measurement.basis_component.name|default:"—" }}</td>
                                 <td class="sdv2-num">
                                   <strong>{{ measurement.average|trim_decimal:4 }}</strong>
@@ -404,6 +552,7 @@
                                     <span class="text-muted">—</span>
                                   {% endfor %}
                                 </td>
+                                <td>{{ measurement.comment|default:"—" }}</td>
                                 {% if edit_mode_enabled %}
                                   <td class="sdv2-num">
                                     {% object_policy measurement as mp %}
@@ -420,7 +569,7 @@
                           </tbody>
                         </table>
                         {% if edit_mode_enabled and sample_policy.can_manage_samples %}
-                          <a class="sdv2-raws-add"
+                          <a class="sdv2-btn sdv2-btn-ghost sdv2-btn-sm sdv2-raws-add"
                              href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}&amp;group={{ group_pk }}">
                             <i class="fas fa-plus"></i> Add measurement row
                           </a>
@@ -431,14 +580,14 @@
                   <footer class="sdv2-group-footer">
                     <div class="sdv2-affordances" role="group" aria-label="Export actions">
                       <button type="button"
-                              class="sdv2-affordance sdv2-affordance-ghost"
+                              class="sdv2-btn sdv2-btn-ghost sdv2-btn-sm"
                               data-sdv2-export="json"
                               data-sdv2-group="{{ group_pk }}"
                               title="Copy this group as JSON">
                         <i class="fas fa-code"></i> JSON
                       </button>
                       <button type="button"
-                              class="sdv2-affordance sdv2-affordance-ghost"
+                              class="sdv2-btn sdv2-btn-ghost sdv2-btn-sm"
                               data-sdv2-export="csv"
                               data-sdv2-group="{{ group_pk }}"
                               title="Copy this group as CSV">
@@ -449,33 +598,55 @@
                 </article>
               {% endwith %}
             {% endfor %}
+              <details class="sdv2-methodology" id="composition-methodology">
+                <summary>Methodology: how normalized compositions are derived</summary>
+                <div class="sdv2-methodology-body">
+                  <p>
+                    Each chart is derived from the raw component measurements of its group and always sums to 100%.
+                    The raw values themselves are shown unchanged in the <em>Raw measurements</em> table of each group.
+                  </p>
+                  <ul>
+                    <li>All measurements are first converted to weight percent (e.g. g/kg → %, mg/kg → %); component measurements only accept weight-fraction units.</li>
+                    <li>If the raw shares sum to more than 100%, all shares are scaled down proportionally.</li>
+                    <li>If they sum to less than 100%, the gap is shown as <em>Other</em>.</li>
+                    <li>Measurements recorded directly as <em>Other</em> are not used; the remainder is always computed from the measured components.</li>
+                  </ul>
+                </div>
+              </details>
           </section>
-        {% else %}
-          <section class="sdv2-groups sdv2-groups-empty">
+        {% elif edit_mode_enabled or not data.compositions %}
+          <section class="sdv2-groups sdv2-groups-empty sdv2-section-panel">
+            <div class="sdv2-section-header">
+              <h2 class="sdv2-section-title">Composition</h2>
+              {% if edit_mode_enabled and sample_policy.can_manage_samples %}
+                <div class="sdv2-section-actions sdv2-composition-actions"
+                     role="group"
+                     aria-label="Add composition data">
+                  {% if perms.materials.add_componentmeasurement %}
+                    <a class="sdv2-btn sdv2-btn-primary"
+                       href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
+                      <i class="fas fa-plus"></i> Add measurement
+                    </a>
+                  {% endif %}
+                  {% if perms.materials.add_composition %}
+                    <a class="sdv2-btn"
+                       href="{% url 'sample-add-composition' object.id %}?next={{ request.get_full_path|urlencode }}">
+                      <i class="fas fa-plus"></i> Add composition
+                    </a>
+                  {% endif %}
+                </div>
+              {% endif %}
+            </div>
             <div class="sdv2-empty">
               <div class="sdv2-empty-title">No composition data yet</div>
               <div class="sdv2-empty-body">
                 Composition groups appear here once component measurements can be normalized, or when a composition is added manually.
               </div>
-              {% if sample_policy.can_manage_samples %}
-                <div class="sdv2-empty-actions">
-                  {% if perms.materials.add_componentmeasurement %}
-                    <a class="sdv2-btn sdv2-btn-primary"
-                       href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">
-                      <i class="fas fa-plus"></i> Add composition data
-                    </a>
-                  {% endif %}
-                  <a class="sdv2-btn"
-                     href="{% url 'sample-add-composition' object.id %}?next={{ request.get_full_path|urlencode }}">
-                    <i class="fas fa-plus"></i> Add composition manually
-                  </a>
-                </div>
-              {% endif %}
             </div>
           </section>
         {% endif %}
         {# ─── Properties band ─── #}
-        <section class="sdv2-properties"
+        <section class="sdv2-properties sdv2-section-panel sdv2-anchor-target"
                  id="properties"
                  aria-label="Sample properties">
           <div class="sdv2-section-header">
@@ -537,12 +708,24 @@
                     {% if edit_mode_enabled %}
                       <td class="sdv2-num">
                         {% object_policy prop as pp %}
-                        {% if pp.can_edit %}
-                          <a href="{% url 'materialpropertyvalue-update' prop.id %}"
-                             title="Edit property value">
-                            <i class="fas fa-pen-to-square"></i>
-                          </a>
-                        {% endif %}
+                        <span class="sdv2-row-tools">
+                          {% if pp.can_edit %}
+                            <a class="sdv2-btn sdv2-btn-edit sdv2-btn-icon sdv2-btn-sm"
+                               href="{% url 'materialpropertyvalue-update' prop.id %}"
+                               title="Edit property value">
+                              <i class="fas fa-pen-to-square" aria-hidden="true"></i>
+                              <span class="visually-hidden">Edit</span>
+                            </a>
+                          {% endif %}
+                          {% if pp.can_delete %}
+                            <a class="sdv2-btn sdv2-btn-danger sdv2-btn-icon sdv2-btn-sm modal-link"
+                               href="{% url 'materialpropertyvalue-delete-modal' prop.id %}?next={{ request.get_full_path|urlencode }}"
+                               title="Delete property value">
+                              <i class="fas fa-trash" aria-hidden="true"></i>
+                              <span class="visually-hidden">Delete</span>
+                            </a>
+                          {% endif %}
+                        </span>
                       </td>
                     {% endif %}
                   </tr>
@@ -550,7 +733,7 @@
               </tbody>
             </table>
             {% if edit_mode_enabled and sample_policy.can_add_property %}
-              <a class="sdv2-btn sdv2-btn-ghost"
+              <a class="sdv2-btn"
                  href="{% url 'sample-add-property' object.id %}">
                 <i class="fas fa-plus"></i> Add property
               </a>
@@ -572,8 +755,10 @@
             </div>
           {% endif %}
         </section>
-        {# ─── Provenance timeline ─── #}
-        <section class="sdv2-timeline" aria-label="Provenance timeline">
+        {# ─── Provenance timeline (editorial layer, edit mode only) ─── #}
+        {% if edit_mode_enabled %}
+        <section class="sdv2-timeline sdv2-section-panel"
+                 aria-label="Provenance timeline">
           <div class="sdv2-section-header">
             <h2 class="sdv2-section-title">Provenance</h2>
             <span class="sdv2-section-hint">Key events in this sample's lifecycle.</span>
@@ -619,11 +804,13 @@
             </li>
           </ol>
         </section>
+        {% endif %}
       </main>
       {# ─── Related samples aside ─── #}
+      {% if has_related_samples %}
       <aside class="sdv2-related" aria-label="Related samples">
         {% if related_samples.series %}
-          <section class="sdv2-related-section">
+          <section class="sdv2-related-section sdv2-surface">
             <h3 class="sdv2-related-title">
               Same series
               <a href="{% url 'sampleseries-detail' object.series.pk %}"
@@ -632,7 +819,7 @@
             <ul class="sdv2-related-list">
               {% for s in related_samples.series %}
                 <li>
-                  <a href="{% url 'sample-detail' s.pk %}?experience=v2"
+                  <a href="{% url 'sample-detail' s.pk %}"
                      class="sdv2-related-link">
                     <span class="sdv2-related-name">{{ s.name }}</span>
                     {% if s.timestep %}<span class="sdv2-related-meta">{{ s.timestep }}</span>{% endif %}
@@ -643,12 +830,12 @@
           </section>
         {% endif %}
         {% if related_samples.material %}
-          <section class="sdv2-related-section">
+          <section class="sdv2-related-section sdv2-surface">
             <h3 class="sdv2-related-title">Same material</h3>
             <ul class="sdv2-related-list">
               {% for s in related_samples.material %}
                 <li>
-                  <a href="{% url 'sample-detail' s.pk %}?experience=v2"
+                  <a href="{% url 'sample-detail' s.pk %}"
                      class="sdv2-related-link">
                     <span class="sdv2-related-name">{{ s.name }}</span>
                     {% if s.series %}<span class="sdv2-related-meta">{{ s.series.name }}</span>{% endif %}
@@ -658,82 +845,12 @@
             </ul>
           </section>
         {% endif %}
-        {% if not related_samples.series and not related_samples.material %}
-          <section class="sdv2-related-section">
-            <h3 class="sdv2-related-title">Related samples</h3>
-            <p class="sdv2-related-empty">No related samples visible yet.</p>
-          </section>
-        {% endif %}
       </aside>
+      {% endif %}
     </div>
-    {# ─── Command palette (very lightweight) ─── #}
-    <dialog class="sdv2-palette" id="sdv2Palette" aria-label="Quick actions">
-      <form method="dialog" class="sdv2-palette-form">
-        <label class="sdv2-palette-label" for="sdv2PaletteInput">Jump to…</label>
-        <input type="text"
-               id="sdv2PaletteInput"
-               class="sdv2-palette-input"
-               autocomplete="off"
-               placeholder="Type to filter actions and sections">
-        <ul class="sdv2-palette-list" role="listbox">
-          {% for group in group_sparklines %}
-            <li>
-              <a data-sdv2-palette-item href="#group-{{ group.group_id }}">Jump to {{ group.name }}</a>
-            </li>
-          {% endfor %}
-          <li>
-            <a data-sdv2-palette-item href="#properties">Jump to Properties</a>
-          </li>
-          {% if sample_policy.can_manage_samples and perms.materials.add_componentmeasurement %}
-            <li>
-              <a data-sdv2-palette-item
-                 href="{% url 'componentmeasurement-create' %}?sample={{ object.id }}">Add composition data</a>
-            </li>
-          {% endif %}
-          {% if sample_policy.can_add_property %}
-            <li>
-              <a data-sdv2-palette-item
-                 href="{% url 'sample-add-property' object.id %}">Add property</a>
-            </li>
-          {% endif %}
-          {% if sample_policy.can_edit %}
-            <li>
-              <a data-sdv2-palette-item
-                 href="{% url 'sample-update' object.id %}?next={{ request.get_full_path|urlencode }}">Edit sample metadata</a>
-            </li>
-          {% endif %}
-          {% if sample_policy.can_duplicate %}
-            <li>
-              <a data-sdv2-palette-item href="{% url 'sample-duplicate' object.id %}">Duplicate sample</a>
-            </li>
-          {% endif %}
-          {% if request.user.is_authenticated %}
-            <li>
-              <a data-sdv2-palette-item
-                 href="#"
-                 data-sdv2-export-sample
-                 data-export-url="{% url 'sample-export' object.pk %}"
-                 data-progress-template="{% url 'file-export-progress' 'TASK_ID' %}">Export sample to Excel</a>
-            </li>
-          {% endif %}
-          <li>
-            <a data-sdv2-palette-item href="{% url 'sample-detail' object.pk %}">Open classic view</a>
-          </li>
-          {% if sample_policy.can_delete %}
-            <li>
-              <a data-sdv2-palette-item
-                 class="sdv2-palette-danger"
-                 href="{% url 'sample-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">Delete sample</a>
-            </li>
-          {% endif %}
-        </ul>
-        <div class="sdv2-palette-footer">
-          <span><span class="sdv2-kbd">↑</span><span class="sdv2-kbd">↓</span> navigate</span>
-          <span><span class="sdv2-kbd">↵</span> open</span>
-          <span><span class="sdv2-kbd">Esc</span> close</span>
-        </div>
-      </form>
-    </dialog>
+    </div>
+    {# The former command palette was retired: its navigation job moved to #}
+    {# the sdv2-anchor-nav and its action job to the rail Actions menu.   #}
     {{ data.compositions|json_script:"sdv2-export-data" }}
   </div>
 {% endblock content %}
@@ -747,19 +864,13 @@
       if (!raw) return;
       const charts = JSON.parse(raw.textContent);
 
-      // Build a tooltip label callback that reports percentages instead of
-      // the raw dataset values (shares can be fractions 0..1 or already %,
-      // so we always normalize against the dataset total).
-      function tooltipLabel(ctx) {
-        const ds = ctx.dataset || (ctx.chart && ctx.chart.data.datasets[ctx.datasetIndex]) || {};
-        const values = ds.data || [];
-        const total = values.reduce((sum, v) => sum + (Number(v) || 0), 0);
-        const raw = ctx.parsed !== undefined && ctx.parsed !== null
-          ? (typeof ctx.parsed === "object" ? ctx.parsed.y || ctx.parsed.value || 0 : ctx.parsed)
-          : (ctx.raw !== undefined ? ctx.raw : values[ctx.dataIndex]);
-        const pct = total > 0 ? (Number(raw) / total) * 100 : 0;
-        const label = ctx.label || (ctx.chart && ctx.chart.data.labels && ctx.chart.data.labels[ctx.dataIndex]) || "";
-        return label + ": " + pct.toFixed(1) + " %";
+      // Tooltip text is precomputed server-side (data.tooltip_labels).
+      // Chart.js 2.x calls label(tooltipItem, data); 3.x+ calls label(ctx).
+      function tooltipLabel(item, data) {
+        const chartData = data || (item.chart && item.chart.data) || {};
+        const dataIndex = item.dataIndex !== undefined ? item.dataIndex : item.index;
+        const labels = chartData.tooltip_labels || [];
+        return labels[dataIndex] || item.label || "";
       }
 
       Object.keys(charts).forEach(key => {
@@ -780,6 +891,7 @@
         config.options.maintainAspectRatio = true;
         config.options.aspectRatio = 1;
         config.options.cutout = "62%";
+        config.options.cutoutPercentage = 62;
         config.options.layout = {padding: 4};
         // Disable legend under both Chart.js v2 (top-level) and v3+ (plugins).
         config.options.legend = {display: false};

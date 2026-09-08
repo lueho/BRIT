@@ -47,6 +47,12 @@ body {
     max-width: 18rem;
 }
 
+// Keep card controls clickable above the title's stretched-link overlay.
+.sample-card-actions {
+    position: relative;
+    z-index: 2;
+}
+
 .diagram-container {
     background: #fff;
     border: 1px solid var(--bs-border-color);

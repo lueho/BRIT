@@ -7387,6 +7387,11 @@ body {
   max-width: 18rem;
 }
 
+.sample-card-actions {
+  position: relative;
+  z-index: 2;
+}
+
 .diagram-container {
   background: #fff;
   border: 1px solid var(--bs-border-color);
