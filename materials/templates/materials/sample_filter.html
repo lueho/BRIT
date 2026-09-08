@@ -46,7 +46,7 @@
                                    class="text-decoration-none">
                                     <strong class="d-block">{{ object.name }}</strong>
                                     <span class="text-muted small">{{ object.material.name }}
-                                        {% if object.datetime %}· Sampled {{ object.datetime|date:"Y-m-d" }}{% endif %}
+                                        {% if object.datetime %}· Sampled {{ object.sampling_date_display }}{% endif %}
                                         {% if object.analysis_date %}· Analysed {{ object.analysis_date|date:"Y-m-d" }}{% endif %}
                                         {% if object.location %}· {{ object.location }}{% endif %}
                                     </span>

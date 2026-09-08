@@ -1,10 +1,16 @@
+import re
+
 from crispy_forms.layout import HTML, Div, Field, Fieldset, Layout
 from django.core.exceptions import ValidationError
 from django.forms import (
+    CharField,
+    DateTimeField,
     DateTimeInput,
     ModelChoiceField,
+    TextInput,
 )
 from django.urls import reverse
+from django.utils import timezone
 from django_tomselect.forms import (
     TomSelectConfig,
     TomSelectModelChoiceField,
@@ -410,6 +416,11 @@ class SampleSeriesAddTemporalDistributionModalModelForm(ModalModelForm):
 
 
 class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm):
+    datetime = CharField(
+        required=False,
+        label="Sampling date/time",
+        widget=TextInput(attrs={"placeholder": "e.g. 2024 or 2024-08-27"}),
+    )
     material = CreateEnabledTomSelectModelChoiceField(
         config=TomSelectConfig(
             url="sample-substrate-material-autocomplete",
@@ -433,6 +444,13 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if "datetime" not in (kwargs.get("initial") or {}):
+            self.initial["datetime"] = self.instance.sampling_date_input
+        self.fields["datetime"].help_text = (
+            "Enter only what is known: year (2024), date (2024-08-27), "
+            "or date and time (2024-08-27 14:30). "
+            f"Times use {timezone.get_default_timezone()}. Leave blank if unknown."
+        )
         substrate_category, _ = get_or_create_sample_substrate_category()
         material_queryset = Material.objects.filter(categories=substrate_category)
         if self.instance.pk and self.instance.material_id:
@@ -473,6 +491,34 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             ),
         )
 
+    def clean_datetime(self):
+        value = self.cleaned_data["datetime"]
+        if not value:
+            self.instance.datetime_precision = ""
+            return None
+        if self.instance.datetime and value == self.instance.sampling_date_input:
+            return self.instance.datetime
+        if re.fullmatch(r"[0-9]{4}", value):
+            precision = "year"
+            value += "-01-01"
+        elif re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+            precision = "date"
+        elif re.fullmatch(
+            r"[0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9]{2}:[0-9]{2}"
+            r"(?::[0-9]{2}(?:\.[0-9]{1,6})?)?",
+            value,
+        ):
+            precision = "time"
+        else:
+            raise ValidationError(
+                "Enter a year (2024), date (2024-08-27), "
+                "or date and time (2024-08-27 14:30)."
+            )
+        with timezone.override(timezone.get_default_timezone()):
+            parsed = DateTimeField().clean(value)
+        self.instance.datetime_precision = precision
+        return parsed
+
     def clean(self):
         cleaned_data = super().clean()
         standalone = cleaned_data.get("standalone", False)
@@ -507,9 +553,6 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             "analysis_objective",
         )
         widgets = {
-            "datetime": DateTimeInput(
-                format="%Y-%m-%dT%H:%M", attrs={"type": "datetime-local"}
-            ),
             "analysis_date": DateTimeInput(
                 format="%Y-%m-%dT%H:%M", attrs={"type": "datetime-local"}
             ),

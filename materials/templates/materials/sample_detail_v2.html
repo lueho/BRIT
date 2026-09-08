@@ -174,7 +174,11 @@
           {% if object.datetime %}
             <li>
               <span class="sdv2-meta-label">Sampled</span>
-              <time datetime="{{ object.datetime|date:'c' }}">{{ object.datetime|date:'Y-m-d H:i' }}</time>
+              {% if object.sampling_date_precision == 'year' %}
+                <span>{{ object.sampling_date_display }}</span>
+              {% else %}
+                <time datetime="{{ object.sampling_date_input }}">{{ object.sampling_date_display }}</time>
+              {% endif %}
             </li>
           {% endif %}
           {% if object.analysis_date %}
