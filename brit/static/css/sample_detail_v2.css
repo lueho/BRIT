@@ -910,14 +910,6 @@ tr.sdv2-has-swatch:hover .sdv2-swatch {
   transform: scale(1.15);
 }
 
-.sdv2-swatch-0 .sdv2-swatch { background: #3f6fb5; border-color: #3f6fb5; }
-.sdv2-swatch-1 .sdv2-swatch { background: #66a4c4; border-color: #66a4c4; }
-.sdv2-swatch-2 .sdv2-swatch { background: #7ea267; border-color: #7ea267; }
-.sdv2-swatch-3 .sdv2-swatch { background: #c29a4a; border-color: #c29a4a; }
-.sdv2-swatch-4 .sdv2-swatch { background: #9d6b9b; border-color: #9d6b9b; }
-.sdv2-swatch-5 .sdv2-swatch { background: #b86c5e; border-color: #b86c5e; }
-.sdv2-swatch-6 .sdv2-swatch { background: #5a8e8b; border-color: #5a8e8b; }
-.sdv2-swatch-7 .sdv2-swatch { background: #7d7c83; border-color: #7d7c83; }
 
 .sdv2-group-table th {
   font-size: 12px;
