@@ -1,3 +1,4 @@
+{% load i18n %}
 <form method="post" action="">
   {% csrf_token %}
   {# Preserve the original 'next' redirect target across POST #}
@@ -7,12 +8,14 @@
     <button type="button"
             class="btn-close"
             data-bs-dismiss="modal"
-            aria-label="Close"></button>
+            aria-label="{% trans 'Close' %}"></button>
   </div>
   <div class="modal-body">
-    <p>Are you sure?</p>
+    <p class="mb-2 text-break">{% blocktrans with object_name=object %}Delete “{{ object_name }}”?{% endblocktrans %}</p>
+    <p class="mb-0">{% trans "This cannot be undone." %}</p>
   </div>
   <div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
     <button type="submit" class="btn btn-danger">{{ submit_button_text }}</button>
   </div>
 </form>

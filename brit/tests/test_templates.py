@@ -9,6 +9,21 @@ from django.urls import reverse
 from brit.sitemap_items import SITEMAP_ITEMS
 
 
+class DeleteConfirmationTemplateTests(SimpleTestCase):
+    def test_confirmation_uses_object_display_without_requiring_name_field(self):
+        html = render_to_string(
+            "modal_delete.html",
+            {
+                "object": "Winter count option <2>",
+                "form_title": "Delete count option",
+                "submit_button_text": "Delete",
+            },
+        )
+
+        self.assertIn("Delete “Winter count option &lt;2&gt;”?", html)
+        self.assertNotIn("<2>", html)
+
+
 class SitemapItemsTestCase(SimpleTestCase):
     def test_sources_explorer_is_canonical_sitemap_entry(self):
         self.assertIn("/sources/explorer/", SITEMAP_ITEMS)

@@ -367,6 +367,31 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.assertContains(response, "2.5 kg")
         self.assertContains(response, "Visible input note")
 
+    def test_delete_confirmation_identifies_process_and_offers_cancel(self):
+        process = self.unpublished_object
+        process.name = 'BioCH4 & <pilot> "A"'
+        process.save()
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(
+            reverse(self.view_delete_name, kwargs={"pk": process.pk})
+        )
+
+        self.assertContains(response, f"Delete “{escape(process.name)}”?")
+        self.assertContains(response, "This cannot be undone.")
+        self.assertContains(
+            response,
+            '<button type="button" class="btn btn-secondary" '
+            'data-bs-dismiss="modal">Cancel</button>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            '<button type="submit" class="btn btn-danger">Delete</button>',
+            html=True,
+        )
+        self.assertTrue(Process.objects.filter(pk=process.pk).exists())
+
     def test_detail_title_preserves_entered_casing_as_page_heading(self):
         self.published_object.name = "BioCH4: aerobic Composting & <pilot>"
         self.published_object.save()
