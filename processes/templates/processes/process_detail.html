@@ -2,7 +2,7 @@
 {% block title %}BRIT | Process: {{ object.name }}{% endblock %}
 {% block detail_body %}
     <section class="mb-4">
-        <h5 class="text-uppercase mb-2">{{ object.name }}</h5>
+        <h1 class="h3 mb-2 text-break">{{ object.name }}</h1>
         {% if object.image %}
             <img src="{{ object.image.url }}"
                  class="detail-uploaded-image mb-3"

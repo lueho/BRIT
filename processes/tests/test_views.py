@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
+from django.utils.html import escape
 
 from bibliography.models import Source
 from materials.models import Material
@@ -363,6 +364,28 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.assertContains(response, "Display Feedstock")
         self.assertContains(response, "2.5 kg")
         self.assertContains(response, "Visible input note")
+
+    def test_detail_title_preserves_entered_casing_as_page_heading(self):
+        self.published_object.name = "BioCH4: aerobic Composting & <pilot>"
+        self.published_object.save()
+
+        for user in (None, self.owner_user):
+            with self.subTest(user=user):
+                if user:
+                    self.client.force_login(user)
+                response = self.client.get(
+                    reverse(
+                        self.view_detail_name, kwargs={"pk": self.published_object.pk}
+                    )
+                )
+
+                self.assertContains(
+                    response,
+                    '<h1 class="h3 mb-2 text-break">'
+                    f"{escape(self.published_object.name)}</h1>",
+                    count=1,
+                    html=True,
+                )
 
     def test_detail_view_hides_additional_resources_without_links(self):
         self.client.force_login(self.owner_user)
