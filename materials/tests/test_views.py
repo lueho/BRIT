@@ -2118,7 +2118,7 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
         # The same peer-view switcher appears on the detail header.
-        self.assertContains(response, 'aria-label="View toggle"')
+        self.assertContains(response, 'aria-label="Sample navigation"')
         self.assertContains(response, reverse("sample-list"))
         self.assertContains(response, reverse("sample-gallery"))
         # Detail is not a list representation, so no segment is marked active.
@@ -2132,7 +2132,7 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         # Explorer remains reachable as a distinct, secondary affordance and is
         # not folded into the representation switcher.
         self.assertContains(response, reverse("materials-explorer"))
-        self.assertContains(response, "Open Explorer (dashboard)")
+        self.assertContains(response, "Materials explorer")
 
 
 class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
@@ -3867,6 +3867,68 @@ class EmptyStateViewsTestCase(TestCase):
         )
         self.assertContains(edit_response, "Done")
 
+    def test_sample_toolbar_separates_navigation_status_and_actions(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        self.client.force_login(self.staff_user)
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertContains(response, 'aria-label="Sample toolbar"')
+        self.assertContains(response, 'aria-label="Sample status"')
+        self.assertContains(response, 'aria-label="Sample actions"')
+        self.assertContains(response, "Edit sample")
+        self.assertContains(response, "More actions")
+        content = response.content.decode()
+        self.assertLess(
+            content.index('aria-label="Sample navigation"'),
+            content.index('aria-label="Sample status"'),
+        )
+        self.assertLess(
+            content.index("sdv2-actions-trigger"), content.index("sdv2-mode-action")
+        )
+
+    def test_sample_toolbar_edit_state_is_not_styled_as_a_button(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        self.client.force_login(self.staff_user)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}), {"mode": "edit"}
+        )
+
+        self.assertContains(
+            response,
+            '<span class="sdv2-editing-state">'
+            '<i class="fas fa-pen-to-square" aria-hidden="true"></i>'
+            "Editing sample</span>",
+            html=True,
+        )
+        self.assertContains(response, "Done editing")
+        self.assertNotContains(response, 'aria-label="Edit mode"')
+
+    def test_sample_navigation_uses_links_not_toggle_buttons(self):
+        sample = self._create_v2_public_sample_with_metadata()
+        url = reverse("sample-detail", kwargs={"pk": sample.pk})
+        for authenticated in (False, True):
+            with self.subTest(authenticated=authenticated):
+                if authenticated:
+                    self.client.force_login(self.staff_user)
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                navigation = (
+                    response.content.decode()
+                    .split('aria-label="Sample navigation">', 1)[1]
+                    .split("</nav>", 1)[0]
+                )
+                self.assertNotIn('role="button"', navigation)
+                self.assertNotIn("aria-pressed", navigation)
+                for route, label in (
+                    ("sample-list", "All samples"),
+                    ("sample-gallery", "Featured samples"),
+                    ("materials-explorer", "Materials explorer"),
+                ):
+                    self.assertIn(reverse(route), navigation)
+                    self.assertIn(label, navigation)
+
     def test_v2_explore_mode_is_decluttered_for_authenticated_users(self):
         sample = self._create_v2_public_sample_with_metadata()
         self.client.force_login(self.staff_user)
@@ -4138,7 +4200,7 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "sdv2-context-nav")
         self.assertContains(response, "All samples")
         self.assertContains(response, "Featured")
-        self.assertContains(response, "Explorer")
+        self.assertContains(response, "Materials explorer")
 
         # The command palette and classic fallback are retired; secondary
         # actions live in the conventional Bootstrap dropdown in the rail.

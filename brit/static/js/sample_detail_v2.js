@@ -4,6 +4,13 @@
   const root = document.querySelector(".sdv2");
   if (!root) return;
 
+  const actionRail = root.querySelector(".sdv2-rail");
+  if (actionRail && "ResizeObserver" in window) {
+    new ResizeObserver(() => {
+      root.style.setProperty("--sdv2-rail-height", `${actionRail.offsetHeight}px`);
+    }).observe(actionRail);
+  }
+
   /* ---------- Keyboard navigation (invisible power-user affordances) ---------- */
   const groupCards = Array.from(document.querySelectorAll(".sdv2-group-card"));
   let groupCursor = -1;

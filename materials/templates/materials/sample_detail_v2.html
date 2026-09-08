@@ -21,114 +21,119 @@
     {# contract populated by UserCreatedObjectDetailView. Anonymous      #}
     {# visitors get a minimalist reading layout with no rail at all.     #}
     {% if user.is_authenticated %}
-    <nav class="sdv2-rail{% if edit_mode_enabled %} sdv2-rail-editing{% endif %}" aria-label="Sample actions">
-      <div class="sdv2-rail-actions">
-        <span class="sdv2-status-pill sdv2-status-{{ object.publication_status|default:'private' }}"
-              title="Publication status">
-          <i class="fas fa-circle sdv2-status-dot" aria-hidden="true"></i>
-          {{ object.get_publication_status_display }}
-        </span>
-        {% if sample_policy.can_edit or sample_policy.can_manage_samples or sample_policy.can_add_property %}
+    <section class="sdv2-rail{% if edit_mode_enabled %} sdv2-rail-editing{% endif %}" aria-label="Sample toolbar">
+      <div class="sdv2-rail-nav">
+        {% include "materials/includes/sample_context_nav.html" %}
+      </div>
+      <div class="sdv2-rail-workspace">
+        <div class="sdv2-rail-status" role="group" aria-label="Sample status">
+          <span class="sdv2-status-pill sdv2-status-{{ object.publication_status|default:'private' }}"
+                title="Publication status">
+            <i class="fas fa-circle sdv2-status-dot" aria-hidden="true"></i>
+            {{ object.get_publication_status_display }}
+          </span>
           {% if edit_mode_enabled %}
-            <span class="sdv2-btn-group" role="group" aria-label="Edit mode">
-              <span class="sdv2-btn sdv2-btn-edit sdv2-editing-state">
-                <i class="fas fa-pen-to-square" aria-hidden="true"></i>
-                Editing
-              </span>
-              <a class="sdv2-btn sdv2-btn-primary sdv2-mode-action" href="{% url 'sample-detail' object.pk %}">
-                <i class="fas fa-check" aria-hidden="true"></i>
-                Done
-              </a>
-            </span>
-          {% else %}
-            <a class="sdv2-btn sdv2-btn-primary sdv2-mode-action" href="?mode=edit">
+            <span class="sdv2-editing-state">
               <i class="fas fa-pen-to-square" aria-hidden="true"></i>
-              Edit
-            </a>
+              Editing sample
+            </span>
           {% endif %}
-        {% endif %}
-        {% if object.publication_status == 'private' and sample_policy.can_submit_review %}
-          <form method="post"
-                action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
-                class="sdv2-rail-submit">
-            {% csrf_token %}
-            <button type="submit" class="sdv2-btn">
-              <i class="fas fa-paper-plane" aria-hidden="true"></i> Submit for review
-            </button>
-          </form>
-        {% elif sample_policy.can_view_review_feedback %}
-          <a class="sdv2-btn sdv2-btn-ghost"
-             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
-            <i class="fas fa-clipboard-check" aria-hidden="true"></i>
-            {{ sample_policy.review_feedback_label }}
-          </a>
-        {% elif sample_policy.is_in_review and not review_mode %}
-          {% if sample_policy.is_owner or sample_policy.is_staff or sample_policy.is_moderator %}
+        </div>
+        <div class="sdv2-rail-actions" role="group" aria-label="Sample actions">
+          {% if object.publication_status == 'private' and sample_policy.can_submit_review %}
+            <form method="post"
+                  action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                  class="sdv2-rail-submit">
+              {% csrf_token %}
+              <button type="submit" class="sdv2-btn">
+                <i class="fas fa-paper-plane" aria-hidden="true"></i> Submit for review
+              </button>
+            </form>
+          {% elif sample_policy.can_view_review_feedback %}
             <a class="sdv2-btn sdv2-btn-ghost"
                href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
-              <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view
+              <i class="fas fa-clipboard-check" aria-hidden="true"></i>
+              {{ sample_policy.review_feedback_label }}
             </a>
+          {% elif sample_policy.is_in_review and not review_mode %}
+            {% if sample_policy.is_owner or sample_policy.is_staff or sample_policy.is_moderator %}
+              <a class="sdv2-btn sdv2-btn-ghost"
+                 href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+                <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view
+              </a>
+            {% endif %}
           {% endif %}
-        {% endif %}
-        <div class="sdv2-rail-nav">
-          {% include "materials/includes/sample_context_nav.html" %}
-        </div>
-        <div class="dropdown sdv2-actions-menu">
-          <button class="sdv2-btn sdv2-actions-trigger"
-                  type="button"
-                  data-bs-toggle="dropdown"
-                  aria-expanded="false"
-                  aria-label="More sample actions">
-            <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
-            <span>Actions</span>
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end">
-            {% if sample_policy.can_edit %}
+          <div class="dropdown sdv2-actions-menu">
+            <button class="sdv2-btn sdv2-actions-trigger"
+                    type="button"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    aria-label="More sample actions">
+              <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
+              <span>More actions</span>
+              <i class="fas fa-chevron-down sdv2-actions-chevron" aria-hidden="true"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              {% if sample_policy.can_edit %}
+                <li>
+                  <a class="dropdown-item"
+                     href="{% url 'sample-update' object.id %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="fas fa-fw fa-pen-to-square me-2" aria-hidden="true"></i>Edit sample metadata
+                  </a>
+                </li>
+              {% endif %}
+              {% if sample_policy.can_duplicate %}
+                <li>
+                  <a class="dropdown-item"
+                     href="{% url 'sample-duplicate' object.id %}">
+                    <i class="fas fa-fw fa-copy me-2" aria-hidden="true"></i>Duplicate sample
+                  </a>
+                </li>
+              {% endif %}
+              {% if sample_policy.can_manage_editors %}
+                <li>
+                  <a class="dropdown-item modal-link"
+                     href="{% url 'object_management:manage_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="fas fa-fw fa-user-group me-2" aria-hidden="true"></i>Manage access
+                  </a>
+                </li>
+              {% endif %}
               <li>
-                <a class="dropdown-item"
-                   href="{% url 'sample-update' object.id %}?next={{ request.get_full_path|urlencode }}">
-                  <i class="fas fa-fw fa-pen-to-square me-2" aria-hidden="true"></i>Edit sample metadata
-                </a>
+                <button type="button"
+                        class="dropdown-item"
+                        data-sdv2-export-sample
+                        data-export-url="{% url 'sample-export' object.pk %}"
+                        data-progress-template="{% url 'file-export-progress' 'TASK_ID' %}">
+                  <i class="fas fa-fw fa-file-excel me-2" aria-hidden="true"></i>Export sample to Excel
+                </button>
               </li>
+              {% if sample_policy.can_delete %}
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <a class="dropdown-item text-danger modal-link"
+                     href="{% url 'sample-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="fas fa-fw fa-trash me-2" aria-hidden="true"></i>Delete sample
+                  </a>
+                </li>
+              {% endif %}
+            </ul>
+          </div>
+          {% if sample_policy.can_edit or sample_policy.can_manage_samples or sample_policy.can_add_property %}
+            {% if edit_mode_enabled %}
+              <a class="sdv2-btn sdv2-btn-primary sdv2-mode-action" href="{% url 'sample-detail' object.pk %}">
+                <i class="fas fa-check" aria-hidden="true"></i>
+                Done editing
+              </a>
+            {% else %}
+              <a class="sdv2-btn sdv2-btn-primary sdv2-mode-action" href="?mode=edit">
+                <i class="fas fa-pen-to-square" aria-hidden="true"></i>
+                Edit sample
+              </a>
             {% endif %}
-            {% if sample_policy.can_duplicate %}
-              <li>
-                <a class="dropdown-item"
-                   href="{% url 'sample-duplicate' object.id %}">
-                  <i class="fas fa-fw fa-copy me-2" aria-hidden="true"></i>Duplicate sample
-                </a>
-              </li>
-            {% endif %}
-            {% if sample_policy.can_manage_editors %}
-              <li>
-                <a class="dropdown-item modal-link"
-                   href="{% url 'object_management:manage_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
-                  <i class="fas fa-fw fa-user-group me-2" aria-hidden="true"></i>Manage access
-                </a>
-              </li>
-            {% endif %}
-            <li>
-              <button type="button"
-                      class="dropdown-item"
-                      data-sdv2-export-sample
-                      data-export-url="{% url 'sample-export' object.pk %}"
-                      data-progress-template="{% url 'file-export-progress' 'TASK_ID' %}">
-                <i class="fas fa-fw fa-file-excel me-2" aria-hidden="true"></i>Export sample to Excel
-              </button>
-            </li>
-            {% if sample_policy.can_delete %}
-              <li><hr class="dropdown-divider"></li>
-              <li>
-                <a class="dropdown-item text-danger modal-link"
-                   href="{% url 'sample-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">
-                  <i class="fas fa-fw fa-trash me-2" aria-hidden="true"></i>Delete sample
-                </a>
-              </li>
-            {% endif %}
-          </ul>
+          {% endif %}
         </div>
       </div>
-    </nav>
+    </section>
     {% endif %}
     <div class="sdv2-canvas sdv2-canvas-fluid">
     {% if show_review_panel %}

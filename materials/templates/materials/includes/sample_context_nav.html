@@ -4,16 +4,13 @@
       <i class="fas fa-arrow-left" aria-hidden="true"></i> Back to results
     </a>
   {% endif %}
-  <span class="sdv2-view-toggle sdv2-btn-group" role="group" aria-label="View toggle">
-    <a class="sdv2-btn sdv2-btn-ghost" href="{{ public_url }}?scope=published"
-       role="button"
-       aria-pressed="false"
-       title="View as list"><i class="fas fa-list" aria-hidden="true"></i> All samples</a>
-    <a class="sdv2-btn sdv2-btn-ghost" href="{{ public_gallery_url }}?scope=published"
-       role="button"
-       aria-pressed="false"
-       title="View as featured gallery"><i class="fas fa-image" aria-hidden="true"></i> Featured</a>
-  </span>
-  <a class="sdv2-btn sdv2-btn-ghost" href="{% url 'materials-explorer' %}"
-     title="Open Explorer (dashboard)"><i class="fas fa-table-cells-large" aria-hidden="true"></i> Explorer</a>
+  <a class="sdv2-btn sdv2-btn-ghost" href="{{ public_url }}?scope=published">
+    <i class="fas fa-list" aria-hidden="true"></i> All samples
+  </a>
+  <a class="sdv2-btn sdv2-btn-ghost" href="{{ public_gallery_url }}?scope=published">
+    <i class="fas fa-image" aria-hidden="true"></i> Featured samples
+  </a>
+  <a class="sdv2-btn sdv2-btn-ghost" href="{% url 'materials-explorer' %}">
+    <i class="fas fa-table-cells-large" aria-hidden="true"></i> Materials explorer
+  </a>
 </nav>
