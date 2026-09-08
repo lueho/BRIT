@@ -9,7 +9,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 
-from bibliography.models import Source
+from bibliography.models import Author, Source
 from materials.models import Material
 from utils.properties.models import Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
@@ -19,6 +19,7 @@ from ..models import (
     ProcessCategory,
     ProcessInfoResource,
     ProcessMaterial,
+    ProcessOperatingParameter,
     ProcessSource,
 )
 
@@ -364,6 +365,135 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.assertContains(response, "Display Feedstock")
         self.assertContains(response, "2.5 kg")
         self.assertContains(response, "Visible input note")
+
+    def test_detail_view_follows_pdf_information_order(self):
+        process = self.published_object
+        process.description = "Detailed process background"
+        process.process_technology = "Technology and equipment explanation"
+        process.image = "processes/process_images/equipment.png"
+        process.image_alt_text = "Extraction equipment"
+        process.image_caption = "Equipment caption"
+        process.image_rights_notice = "Equipment attribution"
+        process.save()
+        process.authors.add(
+            Author.objects.create(
+                last_names="Process contributor",
+                institution="Research institute",
+                contact_email="author@example.com",
+                owner=self.owner_user,
+            )
+        )
+        for role in (ProcessMaterial.Role.INPUT, ProcessMaterial.Role.OUTPUT):
+            ProcessMaterial.objects.create(
+                process=process,
+                material=Material.objects.create(
+                    name=f"PDF {role} material", owner=self.owner_user
+                ),
+                role=role,
+                quantity_value=Decimal("0"),
+            )
+        ProcessOperatingParameter.objects.create(
+            process=process,
+            parameter=ProcessOperatingParameter.Parameter.TEMPERATURE,
+            nominal_value=Decimal("0"),
+            notes="Operating conditions note",
+        )
+        ProcessOperatingParameter.objects.create(
+            process=process,
+            parameter=ProcessOperatingParameter.Parameter.YIELD,
+            value_min=Decimal("0"),
+            value_max=Decimal("39"),
+            basis="dry basis",
+            notes="Depending on feedstock type",
+        )
+        process.sources.add(
+            Source.objects.create(title="PDF bibliography", owner=self.owner_user)
+        )
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": process.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        ordered_content = [
+            '<h1 class="sdv2-hero-title">',
+            "Process contributor",
+            process.short_description,
+            'alt="Extraction equipment"',
+            "Equipment caption",
+            "Equipment attribution",
+            process.mechanism,
+            "Temperature",
+            "Operating conditions note",
+            ">Yield</dt>",
+            "0 – 39",
+            "dry basis",
+            "Depending on feedstock type",
+            "PDF input material",
+            "PDF output material",
+            "Detailed process background",
+            ">Process Technology</h2>",
+            "Technology and equipment explanation",
+            ">Bibliography</h2>",
+            "PDF bibliography",
+        ]
+        for text in ordered_content:
+            self.assertContains(response, text)
+        positions = [content.index(text) for text in ordered_content]
+        self.assertEqual(positions, sorted(positions))
+        hero = content.split('<header class="sdv2-hero ', 1)[1].split("</header>", 1)[0]
+        self.assertIn("sdv2-hero-with-media", hero)
+        self.assertIn('alt="Extraction equipment"', hero)
+        self.assertIn("Equipment caption", hero)
+        self.assertIn("Equipment attribution", hero)
+        self.assertIn('fetchpriority="high"', hero)
+        self.assertNotIn('loading="lazy"', hero)
+        self.assertContains(response, 'alt="Extraction equipment"', count=1)
+        self.assertContains(response, "Research institute")
+        self.assertContains(response, 'href="mailto:author@example.com"')
+        self.assertRegex(content, r"Temperature:</span>\s+0\s")
+        self.assertContains(response, '<span class="text-muted ms-1">0</span>', count=2)
+        self.assertEqual(
+            [anchor["id"] for anchor in response.context["section_anchors"]],
+            ["facts", "description", "technology", "bibliography"],
+        )
+        for anchor in response.context["section_anchors"]:
+            self.assertContains(response, f'href="#{anchor["id"]}"')
+            self.assertContains(response, f'id="{anchor["id"]}"')
+
+    def test_detail_view_shows_image_without_technology_text(self):
+        self.published_object.image = "processes/process_images/equipment.png"
+        self.published_object.save()
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": self.published_object.pk})
+        )
+
+        self.assertNotContains(response, ">Process Technology</h2>")
+        self.assertNotContains(response, 'href="#technology"')
+        self.assertContains(response, "sdv2-hero-with-media")
+        self.assertContains(response, 'class="sdv2-hero-media"', count=1)
+        self.assertContains(response, "equipment.png")
+        self.assertContains(response, f'alt="{self.published_object.name}"')
+
+    def test_detail_view_omits_empty_sections(self):
+        self.published_object.mechanism = ""
+        self.published_object.save()
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": self.published_object.pk})
+        )
+
+        self.assertContains(response, "sdv2-hero-no-media")
+        self.assertNotContains(response, 'class="sdv2-hero-media"')
+        self.assertEqual(response.context["section_anchors"], [])
+        for section in ("facts", "description", "technology", "bibliography"):
+            self.assertNotContains(response, f'id="{section}"')
+        self.assertNotContains(response, "Download PDF version")
 
     def test_detail_view_hides_additional_resources_without_links(self):
         self.client.force_login(self.owner_user)

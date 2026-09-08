@@ -112,6 +112,19 @@
       <div class="sdv2-hero-identity">
         <div class="sdv2-hero-kicker">Process</div>
         <h1 class="sdv2-hero-title">{{ object.name }}</h1>
+        {% if process_authors %}
+          <div class="small text-muted my-3">
+            {% for process_author in process_authors %}
+              {% with author=process_author.author %}
+                <div class="mb-1">
+                  <span class="fw-semibold">{{ author }}</span>
+                  {% if author.institution %}<span>({{ author.institution }})</span>{% endif %}
+                  {% if author.contact_email %}<a class="text-break" href="mailto:{{ author.contact_email }}">{{ author.contact_email }}</a>{% endif %}
+                </div>
+              {% endwith %}
+            {% endfor %}
+          </div>
+        {% endif %}
         <div class="sdv2-hero-material">
           {% if object.short_description %}
             {{ object.short_description }}
@@ -120,12 +133,6 @@
           {% endif %}
         </div>
         <ul class="sdv2-hero-meta" aria-label="Process metadata">
-          {% if object.mechanism %}
-            <li>
-              <span class="sdv2-meta-label">Mechanism</span>
-              {{ object.mechanism }}
-            </li>
-          {% endif %}
           {% if object.parent %}
             <li>
               <span class="sdv2-meta-label">Parent</span>
@@ -160,28 +167,11 @@
           {% endif %}
         </figure>
       {% endif %}
-      {% if process_authors or bibliography_sources %}
+      {% if object.supplementary_document %}
         <div class="sdv2-hero-provenance">
-          {% if process_authors %}
-            <span class="sdv2-prov-label">Authors</span>
-            <span class="sdv2-prov-sources">
-              {% for process_author in process_authors %}
-                {% with author=process_author.author %}
-                  <span>{{ author }}{% if author.institution %} ({{ author.institution }}){% endif %}{% if author.contact_email %} <a href="mailto:{{ author.contact_email }}">{{ author.contact_email }}</a>{% endif %}</span>
-                {% endwith %}
-              {% endfor %}
-            </span>
-          {% endif %}
-          {% if bibliography_sources %}
-            <span class="sdv2-prov-label">Sources</span>
-            <span class="sdv2-prov-sources">
-              {% for source in bibliography_sources %}
-                <a href="{% url 'source-detail-modal' source.pk %}"
-                   class="modal-link sdv2-source-chip"
-                   title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:source.title }}</a>
-              {% endfor %}
-            </span>
-          {% endif %}
+          <a href="{{ object.supplementary_document.url }}" class="sdv2-btn" download>
+            <i class="fas fa-file-pdf" aria-hidden="true"></i> Download PDF version
+          </a>
         </div>
       {% endif %}
     </header>
@@ -223,6 +213,109 @@
     {# ─── Main column + related aside ─── #}
     <div class="sdv2-layout{% if not has_related_processes %} sdv2-layout-full{% endif %}">
       <main class="sdv2-main">
+        {% if object.mechanism or operating_parameters or parameters_by_type.Yield or input_materials or output_materials %}
+          <section class="sdv2-section-panel sdv2-anchor-target"
+                   id="facts"
+                   aria-label="Process at a glance">
+            <h2 class="sdv2-section-title">Process at a glance</h2>
+            <dl class="sdv2-context-details mb-3">
+              {% if object.mechanism %}
+                <div>
+                  <dt>Mechanism</dt>
+                  <dd>{{ object.mechanism }}</dd>
+                </div>
+              {% endif %}
+              {% if operating_parameters %}
+                <div>
+                  <dt>Operating parameters</dt>
+                  <dd>
+                    <ul class="list-unstyled mb-0">
+                      {% for param in operating_parameters %}
+                        <li class="mb-1">
+                          <span class="fw-semibold">{{ param.name|default:param.get_parameter_display }}:</span>
+                          {% if param.nominal_value is not None %}
+                            {{ param.get_nominal_value_display }}
+                          {% elif param.value_min is not None or param.value_max is not None %}
+                            {{ param.get_value_min_display|default:"-" }} – {{ param.get_value_max_display|default:"-" }}
+                          {% else %}
+                            -
+                          {% endif %}
+                          {% if param.unit %}{{ param.unit.name }}{% endif %}
+                          {% if param.basis %}<span class="text-muted">({{ param.basis }})</span>{% endif %}
+                          {% if param.notes %}<div class="small text-muted">{{ param.notes|linebreaksbr }}</div>{% endif %}
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </dd>
+                </div>
+              {% endif %}
+              {% if parameters_by_type.Yield %}
+                <div>
+                  <dt>Yield</dt>
+                  <dd>
+                    <ul class="list-unstyled mb-0">
+                      {% for param in parameters_by_type.Yield %}
+                        <li class="mb-1">
+                          {% if param.name %}<span class="fw-semibold">{{ param.name }}:</span>{% endif %}
+                          {% if param.nominal_value is not None %}
+                            {{ param.get_nominal_value_display }}
+                          {% elif param.value_min is not None or param.value_max is not None %}
+                            {{ param.get_value_min_display|default:"-" }} – {{ param.get_value_max_display|default:"-" }}
+                          {% else %}
+                            -
+                          {% endif %}
+                          {% if param.unit %}{{ param.unit.name }}{% endif %}
+                          {% if param.basis %}<span class="text-muted">({{ param.basis }})</span>{% endif %}
+                          {% if param.notes %}<div class="small text-muted">{{ param.notes|linebreaksbr }}</div>{% endif %}
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </dd>
+                </div>
+              {% endif %}
+            </dl>
+            {% if input_materials or output_materials %}
+              <div class="row g-3">
+                {% if input_materials %}
+                  <div class="col-md">
+                    <section class="sdv2-surface p-3 h-100" aria-label="Input">
+                      <h3 class="sdv2-section-title mb-3">Input</h3>
+                      <ul class="list-unstyled mb-0">
+                        {% for pm in input_materials %}
+                          <li class="mb-2">
+                            <a class="fw-semibold" href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
+                            {% if pm.quantity_value is not None %}
+                              <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
+                            {% endif %}
+                            {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes|linebreaksbr }}</p>{% endif %}
+                          </li>
+                        {% endfor %}
+                      </ul>
+                    </section>
+                  </div>
+                {% endif %}
+                {% if output_materials %}
+                  <div class="col-md">
+                    <section class="sdv2-surface p-3 h-100" aria-label="Output">
+                      <h3 class="sdv2-section-title mb-3">Output</h3>
+                      <ul class="list-unstyled mb-0">
+                        {% for pm in output_materials %}
+                          <li class="mb-2">
+                            <a class="fw-semibold" href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
+                            {% if pm.quantity_value is not None %}
+                              <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
+                            {% endif %}
+                            {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes|linebreaksbr }}</p>{% endif %}
+                          </li>
+                        {% endfor %}
+                      </ul>
+                    </section>
+                  </div>
+                {% endif %}
+              </div>
+            {% endif %}
+          </section>
+        {% endif %}
         {% if object.description %}
           <section class="sdv2-section-panel sdv2-anchor-target sdv2-about"
                    id="description"
@@ -237,111 +330,6 @@
                    aria-label="Process technology">
             <h2 class="sdv2-section-title">Process Technology</h2>
             <div class="sdv2-about-body">{{ object.process_technology|linebreaks }}</div>
-          </section>
-        {% endif %}
-        {% if operating_parameters %}
-          <section class="sdv2-section-panel sdv2-anchor-target"
-                   id="parameters"
-                   aria-label="Operating parameters">
-            <h2 class="sdv2-section-title">Operating parameters</h2>
-            <ul class="list-unstyled mb-0 mt-3">
-              {% for param in operating_parameters %}
-                <li>
-                  <strong>{{ param.name|default:param.get_parameter_display }}:</strong>
-                  {% if param.nominal_value %}
-                    {{ param.get_nominal_value_display }}
-                  {% elif param.value_min or param.value_max %}
-                    {{ param.get_value_min_display|default:"-" }} – {{ param.get_value_max_display|default:"-" }}
-                  {% else %}
-                    -
-                  {% endif %}
-                  {% if param.unit %}{{ param.unit.name }}{% endif %}
-                  {% if param.basis %}<span class="text-muted">({{ param.basis }})</span>{% endif %}
-                </li>
-              {% endfor %}
-            </ul>
-          </section>
-        {% endif %}
-        {% if input_materials or output_materials or parameters_by_type.Yield %}
-          <section class="sdv2-section-panel sdv2-anchor-target"
-                   id="materials"
-                   aria-label="Materials and yield">
-            <h2 class="sdv2-section-title">Materials</h2>
-            <dl class="sdv2-context-details">
-              {% if input_materials %}
-                <div>
-                  <dt>Input</dt>
-                  <dd>
-                    <ul class="list-unstyled mb-0">
-                      {% for pm in input_materials %}
-                        <li class="mb-2">
-                          <strong>
-                            <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
-                          </strong>
-                          {% if pm.quantity_value %}
-                            <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
-                          {% endif %}
-                          {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes }}</p>{% endif %}
-                        </li>
-                      {% endfor %}
-                    </ul>
-                  </dd>
-                </div>
-              {% endif %}
-              {% if output_materials %}
-                <div>
-                  <dt>Output</dt>
-                  <dd>
-                    <ul class="list-unstyled mb-0">
-                      {% for pm in output_materials %}
-                        <li class="mb-2">
-                          <strong>
-                            <a href="{{ pm.material.get_absolute_url }}">{{ pm.material.name }}</a>
-                          </strong>
-                          {% if pm.quantity_value %}
-                            <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
-                          {% endif %}
-                          {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes }}</p>{% endif %}
-                        </li>
-                      {% endfor %}
-                    </ul>
-                  </dd>
-                </div>
-              {% endif %}
-              {% if parameters_by_type.Yield %}
-                <div>
-                  <dt>Yield</dt>
-                  <dd>
-                    <ul class="list-unstyled mb-0">
-                      {% for param in parameters_by_type.Yield %}
-                        <li>
-                          {% if param.nominal_value %}
-                            {{ param.get_nominal_value_display }}
-                          {% elif param.value_min or param.value_max %}
-                            {{ param.get_value_min_display|default:"-" }} – {{ param.get_value_max_display|default:"-" }}
-                          {% else %}
-                            -
-                          {% endif %}
-                          {% if param.unit %}{{ param.unit.name }}{% endif %}
-                        </li>
-                      {% endfor %}
-                    </ul>
-                  </dd>
-                </div>
-              {% endif %}
-            </dl>
-          </section>
-        {% endif %}
-        {% if object.supplementary_document %}
-          <section class="sdv2-section-panel sdv2-anchor-target"
-                   id="document"
-                   aria-label="Supplementary document">
-            <h2 class="sdv2-section-title">Supplementary document</h2>
-            <a href="{{ object.supplementary_document.url }}"
-               class="sdv2-btn mt-3"
-               download>
-              <i class="fas fa-file-pdf" aria-hidden="true"></i> Download PDF version
-            </a>
           </section>
         {% endif %}
         {% if process_links %}

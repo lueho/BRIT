@@ -468,22 +468,20 @@ class ProcessDetailView(UserCreatedObjectDetailView):
     def _build_section_anchors(self, context):
         """Return label/id pairs for the sections rendered on the page."""
         anchors = []
-        if self.object.description:
-            anchors.append({"id": "description", "name": "Description"})
-        if self.object.process_technology:
-            anchors.append({"id": "technology", "name": "Process technology"})
-        if context["operating_parameters"]:
-            anchors.append({"id": "parameters", "name": "Operating parameters"})
         if (
-            context["input_materials"]
+            self.object.mechanism
+            or context["operating_parameters"]
+            or context["input_materials"]
             or context["output_materials"]
             or context["parameters_by_type"].get(
                 ProcessOperatingParameter.Parameter.YIELD.label
             )
         ):
-            anchors.append({"id": "materials", "name": "Materials"})
-        if self.object.supplementary_document:
-            anchors.append({"id": "document", "name": "Document"})
+            anchors.append({"id": "facts", "name": "At a glance"})
+        if self.object.description:
+            anchors.append({"id": "description", "name": "Description"})
+        if self.object.process_technology:
+            anchors.append({"id": "technology", "name": "Process technology"})
         if context["process_links"]:
             anchors.append({"id": "links", "name": "Links"})
         if context["process_info_resources"]:
