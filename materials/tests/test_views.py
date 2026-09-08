@@ -3032,6 +3032,36 @@ class RemoveSeasonalVariationViewTestCase(ViewWithPermissionsTestCase):
             html=True,
         )
 
+    def test_get_http_404_for_unknown_distribution(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse(
+                "remove_seasonal_variation",
+                kwargs={"pk": self.composition.pk, "distribution_pk": 9999},
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_get_http_404_for_distribution_not_used_by_the_composition(self):
+        unrelated = TemporalDistribution.objects.create(
+            owner=self.member, name="Unrelated distribution"
+        )
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse(
+                "remove_seasonal_variation",
+                kwargs={
+                    "pk": self.composition.pk,
+                    "distribution_pk": unrelated.pk,
+                },
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+
     def test_post_removes_only_the_selected_distribution(self):
         self.client.force_login(self.member)
 

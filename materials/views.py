@@ -1692,7 +1692,10 @@ class RemoveSeasonalVariationView(UserCreatedObjectDetailView):
     model = Composition
 
     def get_distribution(self):
-        return TemporalDistribution.objects.get(id=self.kwargs.get("distribution_pk"))
+        return get_object_or_404(
+            self.get_object().sample.series.temporal_distributions,
+            id=self.kwargs.get("distribution_pk"),
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
