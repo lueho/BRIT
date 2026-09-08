@@ -12,6 +12,7 @@ from django.db.models.signals import post_save, pre_save
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import escape
 from factory.django import mute_signals
 
 from bibliography.models import Source
@@ -2969,6 +2970,109 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 
 # ----------- Composition utilities ------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
+
+
+class RemoveSeasonalVariationViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = "change_composition"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        material = Material.objects.create(owner=cls.member, name="Test Material")
+        group = MaterialComponentGroup.objects.create(
+            owner=cls.member, name="Test Group"
+        )
+        series = SampleSeries.objects.create(
+            owner=cls.member, name="Test Series", material=material
+        )
+        sample = Sample.objects.get(series=series, timestep=Timestep.objects.default())
+        cls.composition = Composition.objects.create(
+            owner=cls.member,
+            sample=sample,
+            group=group,
+            fractions_of=MaterialComponent.objects.default(),
+        )
+        cls.distribution = TemporalDistribution.objects.create(
+            owner=cls.member, name="Seasons & <months>"
+        )
+        Timestep.objects.create(
+            owner=cls.member, name="Winter", distribution=cls.distribution
+        )
+        cls.composition.add_temporal_distribution(cls.distribution)
+
+    def get_url(self):
+        return reverse(
+            "remove_seasonal_variation",
+            kwargs={
+                "pk": self.composition.pk,
+                "distribution_pk": self.distribution.pk,
+            },
+        )
+
+    def test_confirmation_identifies_distribution_and_offers_cancel(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(self.get_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f"Remove “{escape(self.distribution.name)}” from this composition?",
+        )
+        self.assertNotContains(response, f"Delete “{escape(str(self.composition))}”?")
+        self.assertContains(
+            response,
+            '<button type="submit" class="btn btn-danger">Remove</button>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            '<button type="button" class="btn btn-secondary" '
+            'data-bs-dismiss="modal">Cancel</button>',
+            html=True,
+        )
+
+    def test_get_http_404_for_unknown_distribution(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse(
+                "remove_seasonal_variation",
+                kwargs={"pk": self.composition.pk, "distribution_pk": 9999},
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_get_http_404_for_distribution_not_used_by_the_composition(self):
+        unrelated = TemporalDistribution.objects.create(
+            owner=self.member, name="Unrelated distribution"
+        )
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse(
+                "remove_seasonal_variation",
+                kwargs={
+                    "pk": self.composition.pk,
+                    "distribution_pk": unrelated.pk,
+                },
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_post_removes_only_the_selected_distribution(self):
+        self.client.force_login(self.member)
+
+        response = self.client.post(self.get_url())
+
+        self.assertRedirects(response, self.composition.get_absolute_url())
+        self.assertNotIn(
+            self.distribution,
+            self.composition.sample.series.temporal_distributions.all(),
+        )
+        self.assertTrue(Composition.objects.filter(pk=self.composition.pk).exists())
 
 
 class ComponentOrderUpViewTestCase(ViewWithPermissionsTestCase):
