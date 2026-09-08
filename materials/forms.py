@@ -507,8 +507,12 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             "analysis_objective",
         )
         widgets = {
-            "datetime": DateTimeInput(attrs={"type": "datetime-local"}),
-            "analysis_date": DateTimeInput(attrs={"type": "datetime-local"}),
+            "datetime": DateTimeInput(
+                format="%Y-%m-%dT%H:%M", attrs={"type": "datetime-local"}
+            ),
+            "analysis_date": DateTimeInput(
+                format="%Y-%m-%dT%H:%M", attrs={"type": "datetime-local"}
+            ),
         }
         labels = {
             "datetime": "Sampling date/time",
