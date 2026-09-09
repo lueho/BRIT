@@ -36,7 +36,7 @@ jobs:
         run: docker build -f docker/assets/Dockerfile -t brit-assets .
 
       - name: Run JavaScript unit tests
-        run: docker run --rm -v "$PWD:/app" -w /app brit-assets node --test 'sources/**/*.test.mjs'
+        run: docker run --rm -v "$PWD:/app" -w /app brit-assets node --test 'sources/**/*.test.mjs' 'processes/**/*.test.mjs'
 
       - name: Rebuild all assets
         run: docker run --rm -v "$PWD:/app" -w /app brit-assets node scripts/build_assets.mjs

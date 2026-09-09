@@ -5,8 +5,13 @@ Comprehensive tests for all CRUD views following BRIT testing patterns.
 
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
+from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.html import escape
 
@@ -23,6 +28,461 @@ from ..models import (
     ProcessOperatingParameter,
     ProcessSource,
 )
+
+
+class ProcessMaintenanceViewsTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create_user(username="process-maintainer")
+        cls.other = get_user_model().objects.create_user(username="other-maintainer")
+        permissions = Permission.objects.filter(
+            content_type__app_label="processes",
+            codename__in=["add_process", "change_process"],
+        )
+        cls.owner.user_permissions.add(*permissions)
+        cls.other.user_permissions.add(*permissions)
+        cls.process = Process.objects.create(
+            owner=cls.owner,
+            name="Pilot",
+            description="Keep this description",
+            mechanism="Keep this mechanism",
+        )
+        cls.material = Material.objects.create(
+            name="Workshop substrate", owner=cls.owner, publication_status="published"
+        )
+        cls.input = ProcessMaterial.objects.create(
+            process=cls.process, material=cls.material, role="input"
+        )
+        cls.output = ProcessMaterial.objects.create(
+            process=cls.process, material=cls.material, role="output"
+        )
+        cls.parameter = ProcessOperatingParameter.objects.create(
+            process=cls.process, parameter="temperature", nominal_value=40
+        )
+
+    def setUp(self):
+        self.client.force_login(self.owner)
+
+    def section_url(self, section="overview", process=None):
+        return f"{reverse('processes:process-update', kwargs={'pk': (process or self.process).pk})}?section={section}"
+
+    def material_data(self, link=None):
+        link = link or self.input
+        return {
+            "process_materials-TOTAL_FORMS": "1",
+            "process_materials-INITIAL_FORMS": "1",
+            "process_materials-0-id": str(link.pk),
+            "process_materials-0-material": str(self.material.pk),
+            "process_materials-0-notes": "Updated input only",
+        }
+
+    def test_create_shows_only_three_fields_without_formsets(self):
+        response = self.client.get(reverse("processes:process-create"))
+        self.assertEqual(
+            set(response.context["form"].fields),
+            {"name", "categories", "short_description"},
+        )
+        self.assertNotContains(response, "TOTAL_FORMS")
+        self.assertContains(response, "Save private draft")
+
+    def test_create_with_name_only_saves_private_owned_draft(self):
+        response = self.client.post(
+            reverse("processes:process-create"), {"name": "New workshop process"}
+        )
+        self.assertEqual(response.status_code, 302)
+        process = Process.objects.get(name="New workshop process")
+        self.assertEqual(process.owner, self.owner)
+        self.assertEqual(process.publication_status, "private")
+        self.assertRedirects(
+            response,
+            f"{process.get_absolute_url()}?mode=edit",
+            fetch_redirect_response=False,
+        )
+
+    def test_edit_workspace_has_empty_section_actions_but_no_loaded_forms(self):
+        response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
+        self.assertContains(response, "data-process-workspace")
+        self.assertContains(response, "Inputs")
+        self.assertContains(response, "References and contributors")
+        self.assertNotContains(response, "TOTAL_FORMS")
+        self.assertNotContains(response, 'name="parent"')
+
+    def test_title_has_a_direct_edit_action_and_clear_field_label(self):
+        response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
+        self.assertContains(response, "Edit title")
+        self.assertContains(response, 'data-process-focus="name"')
+        response = self.client.get(self.section_url())
+        self.assertEqual(response.context["form"].fields["name"].label, "Title")
+
+    def test_title_change_is_persisted_and_returned_for_the_heading(self):
+        response = self.client.post(
+            self.section_url(),
+            {"name": "Renamed process"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        self.assertEqual(response.json()["title"], "Renamed process")
+        self.process.refresh_from_db()
+        self.assertEqual(self.process.name, "Renamed process")
+
+    def test_image_editor_is_near_the_title_and_separate_from_other_sections(self):
+        response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
+        content = response.content.decode()
+        self.assertIn('data-process-section="image"', content)
+        self.assertLess(
+            content.index('data-process-section="image"'),
+            content.index('data-process-section="technology"'),
+        )
+        response = self.client.get(self.section_url("image"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            set(response.context["form"].fields),
+            {
+                "image",
+                "image_alt_text",
+                "image_caption",
+                "image_rights_notice",
+            },
+        )
+        self.assertFalse(response.context["inlines"])
+        response = self.client.get(self.section_url("resources"))
+        self.assertEqual(
+            set(response.context["form"].fields), {"supplementary_document"}
+        )
+        self.assertNotContains(response, 'name="image"')
+        self.assertNotContains(response, 'name="process_sources-TOTAL_FORMS"')
+
+    def test_image_metadata_can_be_saved_without_submitting_other_sections(self):
+        response = self.client.post(
+            self.section_url("image"),
+            {
+                "image_alt_text": "Process reactor",
+                "image_caption": "Pilot plant",
+                "image_rights_notice": "Contributor",
+                "name": "Must not change the title",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.process.refresh_from_db()
+        self.assertEqual(self.process.image_caption, "Pilot plant")
+        self.assertEqual(self.process.name, "Pilot")
+        self.assertEqual(self.process.process_materials.count(), 2)
+
+    def test_bibliography_uses_abbreviations_in_both_modes(self):
+        source = Source.objects.create(
+            owner=self.owner,
+            title="Full descriptive publication title",
+            abbreviation="Example2020",
+            publication_status="published",
+        )
+        self.process.sources.add(source)
+        for suffix in ("", "?mode=edit"):
+            with self.subTest(mode=suffix):
+                response = self.client.get(self.process.get_absolute_url() + suffix)
+                self.assertContains(response, ">Example2020</a>")
+        response = self.client.get(self.section_url("references"))
+        self.assertContains(response, ">Example2020</option>")
+        self.assertContains(response, "label=abbreviation")
+        response = self.client.get(
+            reverse("source-autocomplete"),
+            {"q": "Example2020", "label": "abbreviation"},
+        )
+        result = next(
+            item for item in response.json()["results"] if item["id"] == source.pk
+        )
+        self.assertEqual(result["label"], "Example2020")
+
+    def test_supporting_files_link_through_brit_in_details_and_editors(self):
+        self.process.supplementary_document = (
+            "processes/supplementary_documents/report.pdf"
+        )
+        self.process.save()
+        resource = ProcessInfoResource.objects.create(
+            process=self.process,
+            title="Supporting report",
+            resource_type="document",
+            document="processes/info_resources/report.pdf",
+        )
+        document_url = reverse(
+            "processes:process-supplementary-document", kwargs={"pk": self.process.pk}
+        )
+        resource_url = reverse(
+            "processes:process-info-resource-document",
+            kwargs={"pk": self.process.pk, "resource_pk": resource.pk},
+        )
+        for url in (
+            self.process.get_absolute_url(),
+            f"{self.process.get_absolute_url()}?mode=edit",
+            self.section_url("resources"),
+        ):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertContains(response, f'href="{document_url}"')
+                self.assertContains(response, f'href="{resource_url}"')
+                self.assertNotContains(response, 'href="/media/processes/')
+
+    def test_overview_save_does_not_change_other_sections_or_publication(self):
+        response = self.client.post(
+            self.section_url(),
+            {
+                "name": "Updated pilot",
+                "short_description": "Short summary",
+                "publication_status": "published",
+                "description": "Must not be accepted",
+                "operating_parameters-TOTAL_FORMS": "0",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.process.refresh_from_db()
+        self.assertEqual(self.process.name, "Updated pilot")
+        self.assertEqual(self.process.description, "Keep this description")
+        self.assertEqual(self.process.mechanism, "Keep this mechanism")
+        self.assertEqual(self.process.publication_status, "private")
+        self.assertTrue(
+            ProcessOperatingParameter.objects.filter(pk=self.parameter.pk).exists()
+        )
+        self.assertEqual(self.process.process_materials.count(), 2)
+
+    def test_input_editor_does_not_render_outputs_or_parameters(self):
+        response = self.client.get(self.section_url("inputs"))
+        self.assertContains(response, "Workshop substrate")
+        self.assertNotContains(response, "operating_parameters-TOTAL_FORMS")
+        self.assertNotContains(response, 'name="name"')
+        self.assertEqual(len(response.context["inlines"][0].initial_forms), 1)
+        self.assertNotIn("role", response.context["inlines"][0].forms[0].fields)
+        self.assertNotIn("order", response.context["inlines"][0].forms[0].fields)
+
+    def test_input_save_preserves_outputs_and_ignores_forged_role(self):
+        data = self.material_data()
+        data["process_materials-0-role"] = "output"
+        response = self.client.post(self.section_url("inputs"), data)
+        self.assertEqual(response.status_code, 302)
+        self.input.refresh_from_db()
+        self.output.refresh_from_db()
+        self.assertEqual(self.input.notes, "Updated input only")
+        self.assertEqual(self.input.role, "input")
+        self.assertEqual(self.output.notes, "")
+
+    def test_input_row_id_must_belong_to_current_section(self):
+        response = self.client.post(
+            self.section_url("inputs"), self.material_data(self.output)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            response.context["inlines"][0].errors
+            or response.context["inlines"][0].non_form_errors()
+        )
+        self.output.refresh_from_db()
+        self.assertEqual(self.output.notes, "")
+
+    def test_input_row_id_must_belong_to_current_process(self):
+        other_process = Process.objects.create(owner=self.other, name="Other process")
+        other_link = ProcessMaterial.objects.create(
+            process=other_process, material=self.material, role="input"
+        )
+        response = self.client.post(
+            self.section_url("inputs"), self.material_data(other_link)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            response.context["inlines"][0].errors
+            or response.context["inlines"][0].non_form_errors()
+        )
+        other_link.refresh_from_db()
+        self.assertEqual(other_link.notes, "")
+
+    def test_invalid_quantity_retains_input_and_does_not_save(self):
+        data = self.material_data()
+        data["process_materials-0-quantity_value"] = "12.5"
+        response = self.client.post(self.section_url("inputs"), data)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Select a unit")
+        self.assertContains(response, "Updated input only")
+        self.input.refresh_from_db()
+        self.assertEqual(self.input.notes, "")
+
+    def test_private_material_reference_is_rejected(self):
+        material = Material.objects.create(
+            name="Inaccessible material", owner=self.other
+        )
+        data = self.material_data()
+        data["process_materials-0-material"] = material.pk
+        response = self.client.post(self.section_url("inputs"), data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["inlines"][0].errors)
+        self.input.refresh_from_db()
+        self.assertEqual(self.input.material, self.material)
+
+    def test_unknown_section_is_not_a_full_edit_fallback(self):
+        self.assertEqual(self.client.get(self.section_url("unknown")).status_code, 404)
+        self.assertEqual(
+            self.client.post(self.section_url("unknown"), {"name": "Bad"}).status_code,
+            404,
+        )
+
+    def test_non_owner_cannot_read_or_save_section(self):
+        self.client.force_login(self.other)
+        for section in (
+            "overview",
+            "technology",
+            "inputs",
+            "outputs",
+            "parameters",
+            "references",
+            "resources",
+        ):
+            with self.subTest(section=section):
+                self.assertEqual(
+                    self.client.get(self.section_url(section)).status_code, 403
+                )
+                self.assertEqual(
+                    self.client.post(self.section_url(section), {}).status_code, 403
+                )
+
+    def test_owner_cannot_edit_published_process(self):
+        self.process.publication_status = "published"
+        self.process.save()
+        self.assertEqual(
+            self.client.post(
+                self.section_url("inputs"), self.material_data()
+            ).status_code,
+            403,
+        )
+        response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
+        self.assertNotContains(response, "data-process-workspace")
+
+    def test_fragment_get_and_save_return_only_requested_section(self):
+        headers = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
+        response = self.client.get(self.section_url(), **headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["section"], "overview")
+        self.assertIn('name="name"', response.json()["html"])
+        self.assertNotIn("<html", response.json()["html"])
+        response = self.client.post(
+            self.section_url(), {"name": "Saved inline"}, **headers
+        )
+        self.assertTrue(response.json()["saved"])
+        self.assertIn("Saved inline", response.json()["html"])
+        self.assertNotIn('name="name"', response.json()["html"])
+
+    def test_fragment_validation_error_returns_bound_form(self):
+        response = self.client.post(
+            self.section_url(),
+            {"name": "", "short_description": "Keep typed text"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertFalse(response.json()["saved"])
+        self.assertIn("Keep typed text", response.json()["html"])
+        self.assertIn("This field is required", response.json()["html"])
+
+    def test_reference_widgets_load_only_selected_options(self):
+        Material.objects.create(
+            name="Unselected published material",
+            owner=self.owner,
+            publication_status="published",
+        )
+        response = self.client.get(self.section_url("inputs"))
+        self.assertContains(response, "Workshop substrate")
+        self.assertNotContains(response, "Unselected published material")
+        self.assertContains(
+            response, f'data-autocomplete-url="{reverse("material-autocomplete")}"'
+        )
+
+    def test_workspace_query_count_does_not_grow_per_material_row(self):
+        url = f"{self.process.get_absolute_url()}?mode=edit"
+        self.client.get(url)
+        with CaptureQueriesContext(connection) as baseline:
+            self.client.get(url)
+        ProcessMaterial.objects.bulk_create(
+            [
+                ProcessMaterial(
+                    process=self.process,
+                    material=self.material,
+                    role="input",
+                    stream_label=f"Stream {index}",
+                )
+                for index in range(30)
+            ]
+        )
+        with CaptureQueriesContext(connection) as populated:
+            response = self.client.get(url)
+        self.assertLessEqual(len(populated), len(baseline) + 1)
+        self.assertNotContains(response, "TOTAL_FORMS")
+
+    def test_overview_editor_does_not_query_inline_tables(self):
+        with CaptureQueriesContext(connection) as queries:
+            self.client.get(self.section_url())
+        for table in (
+            "processes_processmaterial",
+            "processes_processoperatingparameter",
+            "processes_processsource",
+            "processes_processauthor",
+        ):
+            self.assertFalse(
+                any(f'FROM "{table}"' in query["sql"] for query in queries), table
+            )
+
+    def test_inaccessible_category_and_parent_are_rejected(self):
+        category = ProcessCategory.objects.create(
+            name="Private category", owner=self.other
+        )
+        parent = Process.objects.create(name="Private parent", owner=self.other)
+        for data in (
+            {"categories": [category.pk]},
+            {"categories": [999999]},
+            {"parent": parent.pk},
+        ):
+            with self.subTest(data=data):
+                response = self.client.post(
+                    self.section_url(), {"name": "Must not save", **data}
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertTrue(response.context["form"].errors)
+                self.process.refresh_from_db()
+                self.assertEqual(self.process.name, "Pilot")
+
+    def test_invalid_reference_rolls_back_other_reference_changes(self):
+        author = Author.objects.create(first_names="Ada", last_names="Example")
+        source = Source.objects.create(title="Not accessible", owner=self.other)
+        response = self.client.post(
+            self.section_url("references"),
+            {
+                "process_authors-TOTAL_FORMS": "1",
+                "process_authors-INITIAL_FORMS": "0",
+                "process_authors-0-author": author.pk,
+                "process_sources-TOTAL_FORMS": "1",
+                "process_sources-INITIAL_FORMS": "0",
+                "process_sources-0-source": source.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(self.process.process_authors.exists())
+        self.assertFalse(self.process.process_sources.exists())
+
+    def test_missing_management_form_does_not_clear_existing_rows(self):
+        response = self.client.post(self.section_url("inputs"), {})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["inlines"][0].non_form_errors())
+        self.assertTrue(
+            self.process.process_materials.filter(pk=self.input.pk).exists()
+        )
+
+    def test_new_input_defaults_role_and_order_without_requesting_them(self):
+        response = self.client.post(
+            self.section_url("inputs"),
+            {
+                "process_materials-TOTAL_FORMS": "1",
+                "process_materials-INITIAL_FORMS": "0",
+                "process_materials-0-material": self.material.pk,
+                "process_materials-0-notes": "New input",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        row = self.process.process_materials.get(notes="New input")
+        self.assertEqual(row.role, "input")
+        self.assertGreater(row.order, 0)
 
 
 class ProcessDashboardViewTestCase(ViewWithPermissionsTestCase):
@@ -119,7 +579,9 @@ class ProcessCategoryCRUDViewsTestCase(
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Download combined process information")
-        self.assertContains(response, "category-summary")
+        self.assertContains(
+            response, self.published_object.supplementary_document_download_url
+        )
 
     def test_detail_shows_process_gallery_with_images(self):
         """Detail page should display category processes as image cards."""
@@ -567,8 +1029,12 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Download PDF version")
-        self.assertContains(response, "process-details")
-        self.assertContains(response, "download")
+        self.assertContains(
+            response, self.published_object.supplementary_document_download_url
+        )
+        self.assertNotContains(
+            response, f'href="{self.published_object.supplementary_document.url}"'
+        )
 
     def test_detail_view_does_not_show_additional_resources_for_info_resource(self):
         ProcessInfoResource.objects.create(
@@ -742,6 +1208,18 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         )
         self.assertFalse(Process.objects.filter(pk=process.pk).exists())
 
+    def get_update_success_url(self, pk):
+        return f"{reverse(self.view_detail_name, kwargs={'pk': pk})}?mode=edit"
+
+    def test_detail_view_unpublished_as_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(self.unpublished_object.pk))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, self.get_update_success_url(self.unpublished_object.pk)
+        )
+        self.assertContains(response, self.get_delete_url(self.unpublished_object.pk))
+
     def test_update_view_prefills_inline_select_values(self):
         material = Material.objects.create(
             name="Existing Material",
@@ -756,16 +1234,15 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.client.force_login(self.owner_user)
 
         response = self.client.get(
-            reverse(self.view_update_name, kwargs={"pk": self.unpublished_object.pk})
+            f"{reverse(self.view_update_name, kwargs={'pk': self.unpublished_object.pk})}?section=inputs"
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="process-form"')
+        self.assertContains(response, 'id="process-section-inputs-form"')
         self.assertContains(response, 'name="process_materials-TOTAL_FORMS"')
-        self.assertContains(response, 'form="process-form"')
-        self.assertContains(response, 'src="/static/js/formset.min.js"')
         self.assertContains(response, 'name="process_materials-0-material"')
         self.assertContains(response, "Existing Material")
+        self.assertNotContains(response, 'name="operating_parameters-TOTAL_FORMS"')
 
     def test_update_view_posts_inline_management_forms(self):
         material = Material.objects.create(
@@ -781,7 +1258,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.client.force_login(self.owner_user)
 
         response = self.client.post(
-            reverse(self.view_update_name, kwargs={"pk": self.unpublished_object.pk}),
+            f"{reverse(self.view_update_name, kwargs={'pk': self.unpublished_object.pk})}?section=inputs",
             {
                 "name": self.unpublished_object.name,
                 "short_description": self.unpublished_object.short_description,
@@ -795,7 +1272,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
                 "process_materials-0-material": material.pk,
                 "process_materials-0-role": ProcessMaterial.Role.OUTPUT,
                 "process_materials-0-order": "0",
-                "process_materials-0-stage": "",
+                "process_materials-0-stage": "Updated stage",
                 "process_materials-0-stream_label": "",
                 "process_materials-0-quantity_value": "",
                 "process_materials-0-quantity_unit": "",
@@ -827,12 +1304,12 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
         self.assertRedirects(
             response,
-            reverse(self.view_detail_name, kwargs={"pk": self.unpublished_object.pk}),
+            self.get_update_success_url(self.unpublished_object.pk),
         )
         self.unpublished_object.refresh_from_db()
         self.assertEqual(
-            self.unpublished_object.process_materials.get().role,
-            ProcessMaterial.Role.OUTPUT,
+            self.unpublished_object.process_materials.get().stage,
+            "Updated stage",
         )
 
     def test_update_with_private_source_inline_succeeds(self):
@@ -852,7 +1329,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.client.force_login(self.owner_user)
 
         response = self.client.post(
-            reverse(self.view_update_name, kwargs={"pk": self.unpublished_object.pk}),
+            f"{reverse(self.view_update_name, kwargs={'pk': self.unpublished_object.pk})}?section=references",
             {
                 "name": self.unpublished_object.name,
                 "short_description": self.unpublished_object.short_description,
@@ -892,7 +1369,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
         self.assertRedirects(
             response,
-            reverse(self.view_detail_name, kwargs={"pk": self.unpublished_object.pk}),
+            self.get_update_success_url(self.unpublished_object.pk),
         )
         self.assertTrue(
             ProcessSource.objects.filter(

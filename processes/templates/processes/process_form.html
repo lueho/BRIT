@@ -1,151 +1,25 @@
 {% extends "base.html" %}
 {% load static %}
-{% load crispy_forms_tags %}
 {% block title %}
-    {% if object %}
-        Edit
-    {% else %}
-        Create
-    {% endif %}
-    Process
+  {% if section %}Edit {{ section.label }} · {{ object.name }}{% else %}{{ form_title|default:'New process' }}{% endif %}
 {% endblock title %}
 {% block breadcrumbs %}
-    <li class="breadcrumb-item">
-        <a href="{% url 'home' %}">BRIT</a>
-    </li>
-    <li class="breadcrumb-item">
-        <a href="{% url 'processes:dashboard' %}">Processes</a>
-    </li>
-    <li class="breadcrumb-item">
-        <a href="{% url 'processes:process-list' %}">Processes</a>
-    </li>
-    <li class="breadcrumb-item active" aria-current="page">
-        {% if object %}
-            Edit
-        {% else %}
-            Create
-        {% endif %}
-    </li>
+  <li class="breadcrumb-item"><a href="{% url 'home' %}">BRIT</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'processes:dashboard' %}">Processes</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'processes:process-list' %}">Processes</a></li>
+  {% if object %}<li class="breadcrumb-item"><a href="{{ object.get_absolute_url }}?mode=edit">{{ object.name }}</a></li>{% endif %}
+  <li class="breadcrumb-item active" aria-current="page">{% if section %}{{ section.label }}{% else %}New process{% endif %}</li>
 {% endblock breadcrumbs %}
 {% block content %}
-    <div class="container-fluid">
-        <div class="row mb-4">
-            <div class="col-12">
-                <h1>
-                    {% if object %}
-                        Edit
-                    {% else %}
-                        Create
-                    {% endif %}
-                    Process
-                </h1>
-            </div>
-        </div>
-        <form id="process-form" method="post" enctype="multipart/form-data">
-            {% csrf_token %}
-            <!-- Main Process Information -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>Basic Information</h5>
-                        </div>
-                        <div class="card-body">{% crispy form %}</div>
-                    </div>
-                </div>
-            </div>
-            <!-- Materials -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>Materials (Inputs & Outputs)</h5>
-                        </div>
-                        <div class="card-body">
-                            {% include "bootstrap5/formset_base.html" with formset=inlines.0 layout="div" form_id="materials" owner_form_id="process-form" %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- Operating Parameters -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>Operating Parameters</h5>
-                        </div>
-                        <div class="card-body">
-                            {% include "bootstrap5/formset_base.html" with formset=inlines.1 layout="div" form_id="parameters" owner_form_id="process-form" %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- Authors -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>Authors</h5>
-                        </div>
-                        <div class="card-body">
-                            {% include "bootstrap5/formset_base.html" with formset=inlines.2 layout="div" form_id="process-authors" owner_form_id="process-form" %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- Bibliography -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>Bibliography</h5>
-                        </div>
-                        <div class="card-body">
-                            {% include "bootstrap5/formset_base.html" with formset=inlines.3 layout="div" form_id="process-sources" owner_form_id="process-form" %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- Links -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>Links</h5>
-                        </div>
-                        <div class="card-body">
-                            {% include "bootstrap5/formset_base.html" with formset=inlines.4 layout="div" form_id="links" owner_form_id="process-form" %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- Info Resources -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>Information Resources</h5>
-                        </div>
-                        <div class="card-body">
-                            {% include "bootstrap5/formset_base.html" with formset=inlines.5 layout="div" form_id="resources" owner_form_id="process-form" %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- Form Actions -->
-            <div class="row">
-                <div class="col-12">
-                    <button type="submit" class="btn btn-primary btn-lg">
-                        <i class="bi bi-check-circle"></i> Save Process
-                    </button>
-                    <a href="{% if object %}{% url 'processes:process-detail' object.pk %}{% else %}{% url 'processes:process-list' %}{% endif %}"
-                       class="btn btn-secondary btn-lg">Cancel</a>
-                </div>
-            </div>
-        </form>
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-9 col-xl-8" data-process-standalone data-static-url="{% get_static_prefix %}">
+      <h1 class="h3 mb-4">{% if section %}{{ section.label }}{% else %}{{ form_title|default:'New process' }}{% endif %}</h1>
+      <p data-process-status role="status" aria-live="polite" aria-atomic="true"></p>
+      <div class="card"><div class="card-body">{% include "processes/includes/process_section_form.html" %}</div></div>
     </div>
+  </div>
 {% endblock content %}
 {% block javascript %}
-    {{ block.super }}
-    <script src="{% static 'js/formset.min.js' %}"></script>
+  {{ block.super }}
+  <script src="{% static 'processes/js/process_workspace.js' %}" defer></script>
 {% endblock javascript %}

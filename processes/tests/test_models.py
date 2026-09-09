@@ -502,7 +502,7 @@ class ProcessModelTestCase(TestCase):
             resource_type=ProcessInfoResource.ResourceType.DOCUMENT,
             document=SimpleUploadedFile(filename, b"content"),
         )
-        self.assertIn(filename, resource.target_url)
+        self.assertEqual(resource.target_url, resource.document_download_url)
 
     def test_process_info_resource_target_url_for_url_types(self):
         """Test that target_url returns url field for INTERNAL and EXTERNAL types."""
