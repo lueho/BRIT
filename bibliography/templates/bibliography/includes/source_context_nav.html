@@ -1,0 +1,14 @@
+{% load i18n %}
+<nav class="d-flex flex-wrap gap-2 my-3" aria-label="{% trans 'Source navigation' %}">
+    {% if back_url %}
+        <a class="btn btn-sm btn-outline-secondary" href="{{ back_url }}">
+            <i class="fas fa-arrow-left" aria-hidden="true"></i> {% trans "Back to results" %}
+        </a>
+    {% endif %}
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'source-list' %}?scope=published">
+        <i class="fas fa-list" aria-hidden="true"></i> {% trans "All sources" %}
+    </a>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'bibliography-explorer' %}">
+        <i class="fas fa-table-cells-large" aria-hidden="true"></i> {% trans "Bibliography explorer" %}
+    </a>
+</nav>

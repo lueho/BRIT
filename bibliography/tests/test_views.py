@@ -4,6 +4,7 @@ from unittest.mock import patch
 from django.contrib.auth.models import Permission
 from django.db.models.signals import post_save
 from django.urls import reverse
+from django.utils.html import escape
 from factory.django import mute_signals
 
 from utils.object_management.models import User
@@ -238,6 +239,50 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         "type": "website",
         "url": "https://example.org",
     }
+
+    def test_detail_context_navigation_preserves_safe_results_url(self):
+        results_url = reverse("source-list") + "?scope=published&title=compost&page=2"
+        for user in (None, self.owner_user):
+            for back in (results_url, "https://testserver" + results_url):
+                with self.subTest(user=user, back=back):
+                    self.client.logout()
+                    if user:
+                        self.client.force_login(user)
+                    response = self.client.get(
+                        self.published_object.get_absolute_url(),
+                        {"back": back},
+                        secure=True,
+                    )
+                    self.assertEqual(response.context["back_url"], back)
+                    self.assertContains(response, f'href="{escape(back)}"')
+                    self.assertContains(response, "Back to results", count=1)
+                    self.assertTemplateUsed(
+                        response, "bibliography/includes/source_context_nav.html"
+                    )
+
+    def test_detail_context_navigation_omits_unsafe_or_missing_results_url(self):
+        for back in (
+            None,
+            "",
+            "https://external.example/",
+            "//external.example/",
+            "javascript:alert(1)",
+            "data:text/html,test",
+            "http://testserver/bibliography/sources/",
+            "/\\external.example/",
+        ):
+            with self.subTest(back=back):
+                self.client.logout()
+                response = self.client.get(
+                    self.published_object.get_absolute_url(),
+                    {"back": back} if back is not None else {},
+                    secure=True,
+                )
+                self.assertEqual(response.context["back_url"], "")
+                self.assertNotContains(response, "Back to results")
+                self.assertContains(response, 'aria-label="Source navigation"')
+                self.assertContains(response, "All sources")
+                self.assertContains(response, "Bibliography explorer")
 
     @classmethod
     def setUpTestData(cls):

@@ -5,6 +5,10 @@
 {% block style_sheets %}
     <link rel="stylesheet" href="{% static 'css/sources.min.css' %}">
 {% endblock style_sheets %}
+{% block content %}
+    {% include "bibliography/includes/source_context_nav.html" with back_url=back_url only %}
+    {{ block.super }}
+{% endblock content %}
 {% block detail_body %}
     {% if object.citation_key %}
         <p class="card-text">

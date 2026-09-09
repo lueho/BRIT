@@ -7,6 +7,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import FormView, TemplateView
 from rest_framework import status
@@ -287,6 +288,20 @@ class SourceBibtexArticleImportView(PermissionRequiredMixin, FormView):
 
 class SourceDetailView(UserCreatedObjectDetailView):
     model = Source
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        back_url = self.request.GET.get("back", "").strip()
+        context["back_url"] = (
+            back_url
+            if url_has_allowed_host_and_scheme(
+                back_url,
+                allowed_hosts={self.request.get_host()},
+                require_https=self.request.is_secure(),
+            )
+            else ""
+        )
+        return context
 
 
 class SourceModalDetailView(UserCreatedObjectModalDetailView):
