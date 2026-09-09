@@ -655,8 +655,9 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
     def test_detail_view_links_bibliography_references_to_modal(self):
         source = Source.objects.create(
-            title="Reference Title",
-            abbreviation="Ref01",
+            title="Reference <Title> & methods",
+            citation_key="Ref01",
+            year=2024,
             owner=self.owner_user,
             publication_status="published",
         )
@@ -670,10 +671,52 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            reverse("source-detail-modal", kwargs={"pk": source.pk}),
+            f'<a href="{reverse("source-detail-modal", kwargs={"pk": source.pk})}" '
+            'class="modal-link text-break">'
+            f'<strong class="d-block">{escape(source.title)}</strong>'
+            '<span class="small text-muted">Ref01 · 2024</span></a>',
+            html=True,
         )
-        self.assertContains(response, "modal-link")
-        self.assertContains(response, "Ref01")
+
+    def test_bibliography_citations_handle_missing_metadata(self):
+        self.client.force_login(self.owner_user)
+        for title, year, expected_body in (
+            (
+                "Undated reference",
+                None,
+                '<strong class="d-block">Undated reference</strong>'
+                '<span class="small text-muted">LegacyRef</span>',
+            ),
+            (
+                "",
+                2020,
+                '<strong class="d-block">LegacyRef</strong>'
+                '<span class="small text-muted">2020</span>',
+            ),
+            ("", None, '<strong class="d-block">LegacyRef</strong>'),
+        ):
+            with self.subTest(title=title, year=year):
+                source = Source.objects.create(
+                    title=title,
+                    year=year,
+                    citation_key="LegacyRef",
+                    owner=self.owner_user,
+                    publication_status="published",
+                )
+                self.published_object.sources.set([source])
+
+                response = self.client.get(
+                    reverse(
+                        self.view_detail_name, kwargs={"pk": self.published_object.pk}
+                    )
+                )
+
+                self.assertContains(
+                    response,
+                    f'<a href="{reverse("source-detail-modal", kwargs={"pk": source.pk})}" '
+                    f'class="modal-link text-break">{expected_body}</a>',
+                    html=True,
+                )
 
     def test_detail_view_private_process_as_superuser_without_staff_flag(self):
         superuser = self.owner_user.__class__.objects.create_user(
