@@ -1,0 +1,25 @@
+{% extends "detail_with_options.html" %}
+{% load i18n %}
+{% block detail_header %}
+    {% trans "Collection count options" %}
+{% endblock detail_header %}
+{% block detail_body %}
+    {% trans "Not specified" as not_specified %}
+    <p class="text-muted">{% trans "Number of collections during the selected season." %}</p>
+    <dl class="row mb-0">
+        <dt class="col-sm-3">{% trans "Frequency" %}</dt>
+        <dd class="col-sm-9">{{ object.frequency }}</dd>
+        <dt class="col-sm-3">{% trans "Season" %}</dt>
+        <dd class="col-sm-9">{{ object.season }}</dd>
+        <dt class="col-sm-3">{% trans "Standard" %}</dt>
+        <dd class="col-sm-9">{{ object.standard|default_if_none:not_specified }}</dd>
+        <dt class="col-sm-3">{% trans "Option 1" %}</dt>
+        <dd class="col-sm-9">{{ object.option_1|default_if_none:not_specified }}</dd>
+        <dt class="col-sm-3">{% trans "Option 2" %}</dt>
+        <dd class="col-sm-9">{{ object.option_2|default_if_none:not_specified }}</dd>
+        <dt class="col-sm-3">{% trans "Option 3" %}</dt>
+        <dd class="col-sm-9">{{ object.option_3|default_if_none:not_specified }}</dd>
+        <dt class="col-sm-3">{% trans "Owner" %}</dt>
+        <dd class="col-sm-9">{{ object.owner }}</dd>
+    </dl>
+{% endblock detail_body %}
