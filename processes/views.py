@@ -4,9 +4,13 @@ Provides complete CRUD operations for all process-related models following
 BRIT conventions and patterns from utils.object_management.views.
 """
 
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction
 from django.db.models import Prefetch
+from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404
+from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, TemplateView
 from extra_views import CreateWithInlinesView
@@ -24,31 +28,26 @@ from utils.object_management.views import (
     ReviewObjectListMixin,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
-    UserCreatedObjectCreateWithInlinesView,
     UserCreatedObjectDetailView,
     UserCreatedObjectModalCreateView,
     UserCreatedObjectModalDeleteView,
     UserCreatedObjectModalDetailView,
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectUpdateView,
-    UserCreatedObjectUpdateWithInlinesView,
 )
 from utils.views import BreadcrumbContextMixin, NextOrSuccessUrlMixin
 
 from .filters import ProcessFilter
 from .forms import (
+    PROCESS_SECTIONS,
     ProcessAddMaterialForm,
     ProcessAddParameterForm,
-    ProcessAuthorInline,
     ProcessCategoryModalModelForm,
     ProcessCategoryModelForm,
-    ProcessInfoResourceInline,
-    ProcessLinkInline,
-    ProcessMaterialInline,
+    ProcessMaintenanceForm,
     ProcessModalModelForm,
-    ProcessModelForm,
-    ProcessOperatingParameterInline,
-    ProcessSourceInline,
+    ProcessQuickCreateForm,
+    process_section_formsets,
 )
 from .models import (
     Process,
@@ -275,24 +274,26 @@ class ProcessCategoryOptions(OwnedObjectModelSelectOptionsView):
 # ==============================================================================
 
 
-class ProcessCreateView(UserCreatedObjectCreateWithInlinesView):
+class ProcessCreateView(UserCreatedObjectCreateView):
     """Create a new Process with related objects."""
 
     model = Process
-    form_class = ProcessModelForm
+    form_class = ProcessQuickCreateForm
     template_name = "processes/process_form.html"
     permission_required = "processes.add_process"
-    inlines = [
-        ProcessMaterialInline,
-        ProcessOperatingParameterInline,
-        ProcessAuthorInline,
-        ProcessSourceInline,
-        ProcessLinkInline,
-        ProcessInfoResourceInline,
-    ]
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "request": self.request}
+
+    def get_context_data(self, **kwargs):
+        return {
+            **super().get_context_data(**kwargs),
+            "form_title": "New process",
+            "submit_button_text": "Save private draft",
+        }
 
     def get_success_url(self):
-        return reverse("processes:process-detail", kwargs={"pk": self.object.pk})
+        return f"{self.object.get_absolute_url()}?mode=edit"
 
 
 class ProcessModalCreateView(UserCreatedObjectModalCreateView):
@@ -401,6 +402,27 @@ class ProcessDetailView(UserCreatedObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
+        policy = get_object_policy(self.request.user, self.object, request=self.request)
+        context["edit_mode_enabled"] = (
+            self.request.GET.get("mode") == "edit" and policy["can_edit"]
+        )
+        if context["edit_mode_enabled"]:
+            context["process_policy"] = policy
+            context["maintenance_sections"] = [
+                {
+                    "key": key,
+                    "label": section["label"],
+                    "url": f"{self.object.update_url}?section={key}",
+                    "material_links": self.object._material_links_for_role(
+                        section["role"]
+                    )
+                    if "role" in section
+                    else [],
+                }
+                for key, section in PROCESS_SECTIONS.items()
+            ]
+            return context
+
         # Organize materials by role
         context["input_materials"] = self.object._material_links_for_role(
             ProcessMaterial.Role.INPUT
@@ -430,9 +452,7 @@ class ProcessDetailView(UserCreatedObjectDetailView):
             self.object.sources_ordered(),
             key=lambda source: (source.abbreviation or source.title or "").casefold(),
         )
-        context["process_policy"] = get_object_policy(
-            self.request.user, self.object, request=self.request
-        )
+        context["process_policy"] = policy
         context["review_timeline"] = self._build_review_timeline()
         context["section_anchors"] = self._build_section_anchors(context)
         context["has_related_processes"] = bool(
@@ -520,23 +540,108 @@ class ProcessModalDetailView(UserCreatedObjectModalDetailView):
     model = Process
 
 
-class ProcessUpdateView(UserCreatedObjectUpdateWithInlinesView):
+class ProcessUpdateView(UserCreatedObjectUpdateView):
     """Update a Process with related objects."""
 
     model = Process
-    form_class = ProcessModelForm
+    form_class = ProcessMaintenanceForm
     template_name = "processes/process_form.html"
-    inlines = [
-        ProcessMaterialInline,
-        ProcessOperatingParameterInline,
-        ProcessAuthorInline,
-        ProcessSourceInline,
-        ProcessLinkInline,
-        ProcessInfoResourceInline,
-    ]
+
+    def dispatch(self, request, *args, **kwargs):
+        key = request.GET.get("section", "overview")
+        if key not in PROCESS_SECTIONS:
+            raise Http404("Unknown process section.")
+        self.section = {**PROCESS_SECTIONS[key], "key": key}
+        self.inlines = None
+        with transaction.atomic():
+            return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return (
+            queryset.select_for_update() if self.request.method == "POST" else queryset
+        )
+
+    def get_form_kwargs(self):
+        return {
+            **super().get_form_kwargs(),
+            "request": self.request,
+            "fields": self.section.get("fields", ()),
+        }
+
+    def get_inlines(self):
+        if self.inlines is None:
+            self.inlines = process_section_formsets(
+                self.object, self.section, self.request
+            )
+        return self.inlines
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "section": self.section,
+                "section_url": f"{self.object.update_url}?section={self.section['key']}",
+                "workspace_url": self.get_success_url(),
+                "form_title": self.section["label"],
+                "submit_button_text": "Save section",
+                "inlines": self.get_inlines(),
+            }
+        )
+        return context
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse(
+                {
+                    "section": self.section["key"],
+                    "saved": False,
+                    "html": render_to_string(
+                        "processes/includes/process_section_form.html",
+                        context,
+                        request=self.request,
+                    ),
+                },
+                status=422 if self.request.method == "POST" else 200,
+            )
+        return super().render_to_response(context, **response_kwargs)
+
+    def form_valid(self, form):
+        validity = [inline.is_valid() for inline in self.get_inlines()]
+        if not all(validity):
+            return self.form_invalid(form)
+        self.object = form.save()
+        for inline in self.get_inlines():
+            inline.save()
+        if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            context = {"object": self.object, "section": self.section}
+            if "role" in self.section:
+                context["material_links"] = self.object._material_links_for_role(
+                    self.section["role"]
+                )
+            return JsonResponse(
+                {
+                    "section": self.section["key"],
+                    "saved": True,
+                    "title": self.object.name,
+                    "message": "Saved privately."
+                    if self.object.is_private
+                    else "Changes saved.",
+                    "html": render_to_string(
+                        "processes/includes/process_section_summary.html",
+                        context,
+                        request=self.request,
+                    ),
+                }
+            )
+        messages.success(
+            self.request,
+            "Saved privately." if self.object.is_private else "Changes saved.",
+        )
+        return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
-        return reverse("processes:process-detail", kwargs={"pk": self.object.pk})
+        return f"{self.object.get_absolute_url()}?mode=edit"
 
 
 class ProcessModalDeleteView(UserCreatedObjectModalDeleteView):

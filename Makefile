@@ -23,7 +23,7 @@ assets: ## Build all static assets once (SCSS -> CSS -> min)
 	$(ASSETS_RUN) node scripts/build_assets.mjs
 
 assets-test: ## Run dependency-free JS unit tests (node:test) in the asset toolchain
-	$(ASSETS_RUN) node --test 'sources/**/*.test.mjs'
+	$(ASSETS_RUN) node --test 'sources/**/*.test.mjs' 'processes/**/*.test.mjs'
 
 js-test: assets-test ## Alias for assets-test
 

@@ -29,6 +29,7 @@ from urllib.parse import urlparse
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
 from django.db import models
+from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from bibliography.models import Author, Source
@@ -92,6 +93,12 @@ class ProcessCategory(NamedUserCreatedObject):
         permissions = [
             ("can_moderate_processcategory", "Can moderate process categories"),
         ]
+
+    @property
+    def supplementary_document_download_url(self):
+        return reverse(
+            "processes:processcategory-supplementary-document", kwargs={"pk": self.pk}
+        )
 
 
 class Process(NamedUserCreatedObject):
@@ -183,6 +190,12 @@ class Process(NamedUserCreatedObject):
             ("can_moderate_process", "Can moderate processes"),
         ]
         verbose_name_plural = "Processes"
+
+    @property
+    def supplementary_document_download_url(self):
+        return reverse(
+            "processes:process-supplementary-document", kwargs={"pk": self.pk}
+        )
 
     def _material_links_for_role(self, role: ProcessMaterial.Role):
         """Return prefetched material links for ``role`` if available."""
@@ -585,11 +598,18 @@ class ProcessInfoResource(models.Model):
             raise ValidationError(errors)
 
     @property
+    def document_download_url(self):
+        return reverse(
+            "processes:process-info-resource-document",
+            kwargs={"pk": self.process_id, "resource_pk": self.pk},
+        )
+
+    @property
     def target_url(self):
         """Return the URL that should be used in templates."""
 
-        if self.resource_type == self.ResourceType.DOCUMENT and self.document:
-            return self.document.url
+        if self.resource_type == self.ResourceType.DOCUMENT:
+            return self.document_download_url
         return self.url
 
     def __str__(self):

@@ -632,6 +632,14 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
     def hook_prepare_results(self, results):
         from bibliography.models import SourceAuthor
 
+        if self.request.GET.get("label") == "abbreviation":
+            for result in results:
+                label = result.get("citation_key") or f"Source #{result['id']}"
+                result.update(
+                    text=label, selected_text=label, abbreviation=label, label=label
+                )
+            return results
+
         source_ids = [r["id"] for r in results]
         authors_by_source = {}
         author_qs = (

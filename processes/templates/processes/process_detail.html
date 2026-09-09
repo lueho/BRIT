@@ -88,9 +88,9 @@
           {% endif %}
           {% if process_policy.can_edit %}
             <a class="sdv2-btn sdv2-btn-primary sdv2-mode-action"
-               href="{{ object.update_url }}?next={{ request.get_full_path|urlencode }}">
+               href="{{ object.get_absolute_url }}{% if not edit_mode_enabled %}?mode=edit{% endif %}">
               <i class="fas fa-pen-to-square" aria-hidden="true"></i>
-              Edit process
+              {% if edit_mode_enabled %}Done editing{% else %}Edit process{% endif %}
             </a>
           {% endif %}
         </div>
@@ -107,6 +107,9 @@
     {% if not user.is_authenticated %}
       {% include "processes/includes/process_context_nav.html" %}
     {% endif %}
+    {% if edit_mode_enabled %}
+      {% include "processes/includes/process_workspace.html" %}
+    {% else %}
     {# ─── Hero ─── #}
     <header class="sdv2-hero sdv2-surface {% if object.image %}sdv2-hero-with-media{% else %}sdv2-hero-no-media{% endif %}">
       <div class="sdv2-hero-identity">
@@ -169,7 +172,7 @@
       {% endif %}
       {% if object.supplementary_document %}
         <div class="sdv2-hero-provenance">
-          <a href="{{ object.supplementary_document.url }}" class="sdv2-btn" download>
+          <a href="{{ object.supplementary_document_download_url }}" class="sdv2-btn">
             <i class="fas fa-file-pdf" aria-hidden="true"></i> Download PDF version
           </a>
         </div>
@@ -360,7 +363,7 @@
                 <li class="mb-3">
                   <strong>{{ resource.title }}</strong> ({{ resource.get_resource_type_display }})
                   {% if resource.description %}<p class="mb-0 text-muted">{{ resource.description }}</p>{% endif %}
-                  <a href="{{ resource.target_url }}">View Resource</a>
+                  <a href="{{ resource.target_url }}">{% if resource.resource_type == 'document' %}Download file{% else %}View Resource{% endif %}</a>
                 </li>
               {% endfor %}
             </ul>
@@ -376,7 +379,7 @@
                 <li>
                   <a href="{% url 'source-detail-modal' source.pk %}"
                      class="modal-link"
-                     title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:source.title|default:"Source" }}</a>
+                     title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:"Source" }}</a>
                 </li>
               {% endfor %}
             </ul>
@@ -417,9 +420,11 @@
       </aside>
       {% endif %}
     </div>
+    {% endif %}
     </div>
   </div>
 {% endblock content %}
 {% block javascript %}
   <script src="{% static 'js/sample_detail_v2.min.js' %}"></script>
+  {% if edit_mode_enabled %}<script src="{% static 'processes/js/process_workspace.js' %}" defer></script>{% endif %}
 {% endblock javascript %}

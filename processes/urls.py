@@ -5,7 +5,7 @@ Provides comprehensive URL routing for all CRUD operations following BRIT patter
 
 from django.urls import include, path
 
-from . import views
+from . import download_views, views
 from .router import router
 
 app_name = "processes"
@@ -48,6 +48,11 @@ urlpatterns = [
         "categories/<int:pk>/",
         views.ProcessCategoryDetailView.as_view(),
         name="processcategory-detail",
+    ),
+    path(
+        "categories/<int:pk>/supplementary-document/",
+        download_views.ProcessCategorySupplementaryDocumentDownloadView.as_view(),
+        name="processcategory-supplementary-document",
     ),
     path(
         "categories/<int:pk>/modal/",
@@ -114,6 +119,16 @@ urlpatterns = [
         "<int:pk>/",
         views.ProcessDetailView.as_view(),
         name="process-detail",
+    ),
+    path(
+        "<int:pk>/supplementary-document/",
+        download_views.ProcessSupplementaryDocumentDownloadView.as_view(),
+        name="process-supplementary-document",
+    ),
+    path(
+        "<int:pk>/resources/<int:resource_pk>/document/",
+        download_views.ProcessInfoResourceDocumentDownloadView.as_view(),
+        name="process-info-resource-document",
     ),
     path(
         "types/<int:pk>/",
