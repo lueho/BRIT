@@ -373,10 +373,19 @@
             <h2 class="sdv2-section-title">Bibliography</h2>
             <ul class="list-unstyled mb-0 mt-3">
               {% for source in bibliography_sources %}
-                <li>
+                <li class="mb-3">
                   <a href="{% url 'source-detail-modal' source.pk %}"
-                     class="modal-link"
-                     title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:source.title|default:"Source" }}</a>
+                     class="modal-link text-break">
+                    <strong class="d-block">{{ source.title|default:source.citation_key|default:"Source" }}</strong>
+                    {% if source.title and source.citation_key or source.year %}
+                      <span class="small text-muted">
+                        {% if source.title and source.citation_key %}
+                          {{ source.citation_key }}{% if source.year %} · {% endif %}
+                        {% endif %}
+                        {% if source.year %}{{ source.year }}{% endif %}
+                      </span>
+                    {% endif %}
+                  </a>
                 </li>
               {% endfor %}
             </ul>
