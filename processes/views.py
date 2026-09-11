@@ -5,15 +5,12 @@ BRIT conventions and patterns from utils.object_management.views.
 """
 
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.db.models import Prefetch
 from django.http import Http404, HttpResponseRedirect, JsonResponse
-from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, TemplateView
-from extra_views import CreateWithInlinesView
 
 from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import get_object_policy
@@ -35,13 +32,11 @@ from utils.object_management.views import (
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectUpdateView,
 )
-from utils.views import BreadcrumbContextMixin, NextOrSuccessUrlMixin
+from utils.views import BreadcrumbContextMixin
 
 from .filters import ProcessFilter
 from .forms import (
     PROCESS_SECTIONS,
-    ProcessAddMaterialForm,
-    ProcessAddParameterForm,
     ProcessCategoryModalModelForm,
     ProcessCategoryModelForm,
     ProcessMaintenanceForm,
@@ -662,52 +657,3 @@ class ProcessAutocompleteView(UserCreatedObjectAutocompleteView):
 
     model = Process
     search_lookups = ["name__icontains", "mechanism__icontains"]
-
-
-# ==============================================================================
-# Utility Views
-# ==============================================================================
-
-
-class ProcessAddMaterialView(
-    LoginRequiredMixin, NextOrSuccessUrlMixin, CreateWithInlinesView
-):
-    """Add a material to an existing process."""
-
-    model = ProcessMaterial
-    form_class = ProcessAddMaterialForm
-    template_name = "processes/process_add_material.html"
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["process"] = get_object_or_404(Process, pk=self.kwargs["pk"])
-        return context
-
-    def form_valid(self, form):
-        form.instance.process = get_object_or_404(Process, pk=self.kwargs["pk"])
-        return super().form_valid(form)
-
-    def get_success_url(self):
-        return reverse("processes:process-detail", kwargs={"pk": self.kwargs["pk"]})
-
-
-class ProcessAddParameterView(
-    LoginRequiredMixin, NextOrSuccessUrlMixin, CreateWithInlinesView
-):
-    """Add an operating parameter to an existing process."""
-
-    model = ProcessOperatingParameter
-    form_class = ProcessAddParameterForm
-    template_name = "processes/process_add_parameter.html"
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["process"] = get_object_or_404(Process, pk=self.kwargs["pk"])
-        return context
-
-    def form_valid(self, form):
-        form.instance.process = get_object_or_404(Process, pk=self.kwargs["pk"])
-        return super().form_valid(form)
-
-    def get_success_url(self):
-        return reverse("processes:process-detail", kwargs={"pk": self.kwargs["pk"]})
