@@ -48,3 +48,11 @@ node_modules/
 
 AGENTS.md
 /.devin/
+
+# Agent harness bootstrap files (generated per worktree by BRIT-ops)
+/.agents/
+/.claude/
+/.codex/
+/.mcp.json
+CLAUDE.md
+opencode.jsonc
