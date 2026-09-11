@@ -126,9 +126,8 @@ function clearFeedback(feedbackElement) {
  *  - If the input contains a comma: everything before the first comma is
  *    last_names, everything after is first_names.  This is the standard
  *    bibliographic "Last, First" format.
- *  - If there is NO comma: the entire string is treated as last_names with
- *    an empty first_names.  This correctly handles organisation names like
- *    "European Environment Agency" or "Federal Statistical Office".
+ *  - If there is NO comma: the entire string is treated as an organization
+ *    name.  The backend creates an author_type="organization" record.
  */
 function parseAuthorInput(rawInput) {
     const trimmedInput = (rawInput || '').trim();
@@ -146,7 +145,7 @@ function parseAuthorInput(rawInput) {
         return { first_names: firstNames, last_names: lastNames };
     }
 
-    return { first_names: '', last_names: trimmedInput };
+    return { author_type: 'organization', organization_name: trimmedInput };
 }
 
 /**
@@ -154,10 +153,17 @@ function parseAuthorInput(rawInput) {
  */
 async function createAuthorFromInput(authorInput, quickCreateUrl, feedbackElement) {
     const parsedName = parseAuthorInput(authorInput);
-    if (!parsedName || !parsedName.last_names) {
+    if (!parsedName) {
         showFeedback(
             feedbackElement,
-            'Author needs at least a last name. Use "Last, First" or "First Last".'
+            'Author needs at least a name. Use "Last, First" for persons or type a name for organizations.'
+        );
+        return null;
+    }
+    if (!parsedName.last_names && !parsedName.organization_name) {
+        showFeedback(
+            feedbackElement,
+            'Author needs at least a name. Use "Last, First" for persons or type a name for organizations.'
         );
         return null;
     }
@@ -258,6 +264,8 @@ function initAuthorTomSelect(authorInput, feedbackElement) {
                     id: String(createdAuthor.id),
                     first_names: createdAuthor.first_names || '',
                     last_names: createdAuthor.last_names || '',
+                    author_type: createdAuthor.author_type || '',
+                    organization_name: createdAuthor.organization_name || '',
                     label: createdAuthor.label || createdAuthor.text || userInput,
                     text: createdAuthor.text || createdAuthor.label || userInput
                 });
@@ -401,11 +409,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (!option) {
                         return null;
                     }
-                    return {
+                    const metadata = {
                         id: String(authorId),
                         first_names: option.first_names || '',
                         last_names: option.last_names || ''
                     };
+                    if (option.author_type === 'organization') {
+                        metadata.author_type = 'organization';
+                        metadata.organization_name = option.organization_name || option.label || '';
+                    }
+                    return metadata;
                 })
                 .filter(Boolean);
         };

@@ -52,6 +52,8 @@ class ProcessAdmin(admin.ModelAdmin):
         "name",
         "authors__first_names",
         "authors__last_names",
+        "authors__organization_name",
+        "authors__organization_abbreviation",
         "authors__institution",
         "authors__contact_email",
         "short_description",
