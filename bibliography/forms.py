@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.forms import BaseInlineFormSet, CharField, DateInput, Textarea
+from django.utils import timezone
 from django_tomselect.forms import TomSelectConfig, TomSelectModelChoiceField
 
 from utils.forms import (
@@ -80,6 +81,18 @@ class SourceModelForm(SimpleModelForm):
             "last_accessed": DateInput(attrs={"type": "date"}),
         }
         help_texts = {"abstract": MARKDOWN_HELP_TEXT}
+
+    def save(self, commit=True):
+        url = self.cleaned_data.get("url") or ""
+        last_accessed = self.cleaned_data.get("last_accessed")
+        if url:
+            if self.instance.pk:
+                url_changed = url != (Source.objects.get(pk=self.instance.pk).url or "")
+            else:
+                url_changed = False
+            if url_changed or not last_accessed:
+                self.instance.last_accessed = timezone.now().date()
+        return super().save(commit=commit)
 
 
 class SourceModalModelForm(ModalModelFormMixin, SourceModelForm):
