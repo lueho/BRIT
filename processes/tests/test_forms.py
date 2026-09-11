@@ -9,8 +9,6 @@ from materials.models import Material
 from utils.properties.models import Unit
 
 from ..forms import (
-    ProcessAddMaterialForm,
-    ProcessAddParameterForm,
     ProcessAuthorFormSet,
     ProcessAuthorInlineForm,
     ProcessCategoryModalModelForm,
@@ -289,44 +287,3 @@ class ProcessOperatingParameterFormSetTestCase(TestCase):
         )
 
         self.assertTrue(formset.is_valid(), formset.errors)
-
-
-class ProcessAddMaterialFormTestCase(TestCase):
-    """Test ProcessAddMaterialForm."""
-
-    def setUp(self):
-        self.owner = get_user_model().objects.create(username="test_user")
-        self.material = Material.objects.create(
-            name="Test Material", owner=self.owner, publication_status="published"
-        )
-
-    def test_valid_form(self):
-        """Valid data should create a valid form."""
-        form = ProcessAddMaterialForm(
-            data={
-                "material": self.material.pk,
-                "role": ProcessMaterial.Role.INPUT,
-            }
-        )
-        self.assertTrue(form.is_valid())
-
-
-class ProcessAddParameterFormTestCase(TestCase):
-    """Test ProcessAddParameterForm."""
-
-    def setUp(self):
-        self.owner = get_user_model().objects.create(username="test_user")
-        self.unit = Unit.objects.create(
-            name="°C", owner=self.owner, publication_status="published"
-        )
-
-    def test_valid_form(self):
-        """Valid data should create a valid form."""
-        form = ProcessAddParameterForm(
-            data={
-                "parameter": ProcessOperatingParameter.Parameter.TEMPERATURE,
-                "nominal_value": "150",
-                "unit": self.unit.pk,
-            }
-        )
-        self.assertTrue(form.is_valid())

@@ -151,16 +151,6 @@ urlpatterns = [
         name="process-delete-modal",
     ),
     path(
-        "<int:pk>/add-material/",
-        views.ProcessAddMaterialView.as_view(),
-        name="process-add-material",
-    ),
-    path(
-        "<int:pk>/add-parameter/",
-        views.ProcessAddParameterView.as_view(),
-        name="process-add-parameter",
-    ),
-    path(
         "autocomplete/",
         views.ProcessAutocompleteView.as_view(),
         name="process-autocomplete",
