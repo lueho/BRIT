@@ -568,18 +568,21 @@ class ComponentMeasurementTestCase(TestCase):
         sample = Sample.objects.create(name="Sample", material=material)
         group = MaterialComponentGroup.objects.create(name="Chemical elements")
         component = MaterialComponent.objects.create(name="Carbon")
-        mg_per_l = Unit.objects.create(name="mg/L", symbol="mg/L")
-        measurement = ComponentMeasurement(
-            sample=sample,
-            group=group,
-            component=component,
-            unit=mg_per_l,
-            average=Decimal("42.0"),
-        )
-
-        with self.assertRaises(ValidationError) as ctx:
-            measurement.full_clean()
-        self.assertIn("unit", ctx.exception.message_dict)
+        for name, symbol in (("mg/L", "mg/L"), ("vol.-%", "volume_percent")):
+            with self.subTest(unit=name):
+                unit, _ = Unit.objects.update_or_create(
+                    name=name, defaults={"symbol": symbol}
+                )
+                measurement = ComponentMeasurement(
+                    sample=sample,
+                    group=group,
+                    component=component,
+                    unit=unit,
+                    average=Decimal("42.0"),
+                )
+                with self.assertRaises(ValidationError) as ctx:
+                    measurement.full_clean()
+                self.assertIn("unit", ctx.exception.message_dict)
 
     def test_clean_accepts_weight_fraction_units(self):
         material = Material.objects.create(name="Digestate")

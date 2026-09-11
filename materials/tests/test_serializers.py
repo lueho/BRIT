@@ -62,6 +62,14 @@ class ComponentMeasurementWriteSerializerTestCase(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("unit", serializer.errors)
 
+    def test_rejects_volume_percent(self):
+        unit, _ = Unit.objects.update_or_create(
+            name="vol.-%", defaults={"symbol": "volume_percent"}
+        )
+        serializer = ComponentMeasurementWriteSerializer(data=self._data(unit))
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("unit", serializer.errors)
+
     def test_accepts_weight_fraction_units(self):
         serializer = ComponentMeasurementWriteSerializer(
             data=self._data(Unit.objects.create(name="g/kg", symbol="g/kg"))
