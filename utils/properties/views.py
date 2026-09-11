@@ -55,7 +55,7 @@ class UnitAutocompleteView(UserCreatedObjectAutocompleteView):
     """Autocomplete view for Unit selection."""
 
     model = Unit
-    search_lookups = ["name__icontains", "abbreviation__icontains"]
+    search_lookups = ["name__icontains", "symbol__icontains"]
 
 
 class WeightFractionUnitAutocompleteView(UnitAutocompleteView):
