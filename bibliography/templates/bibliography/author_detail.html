@@ -1,39 +1,54 @@
 {% extends "detail_with_options.html" %}
 {% block detail_body %}
-    {% if object.last_names %}
+    {% if object.author_type == "organization" %}
         <p class="card-text">
-            <strong>Last names:</strong>
+            <strong>Organization:</strong>
             <br>
-            {{ object.last_names }}
+            {{ object.organization_name }}
         </p>
-    {% endif %}
-    {% if object.first_names %}
-        <p class="card-text">
-            <strong>First names:</strong>
-            <br>
-            {{ object.first_names }}
-        </p>
-    {% endif %}
-    {% if object.middle_names %}
-        <p class="card-text">
-            <strong>Middle names:</strong>
-            <br>
-            {{ object.middle_names }}
-        </p>
-    {% endif %}
-    {% if object.suffixes %}
-        <p class="card-text">
-            <strong>Suffixes:</strong>
-            <br>
-            {{ object.suffixes }}
-        </p>
-    {% endif %}
-    {% if object.preferred_citation %}
-        <p class="card-text">
-            <strong>Preferred citation:</strong>
-            <br>
-            {{ object.preferred_citation }}
-        </p>
+        {% if object.organization_abbreviation %}
+            <p class="card-text">
+                <strong>Abbreviation:</strong>
+                <br>
+                {{ object.organization_abbreviation }}
+            </p>
+        {% endif %}
+    {% else %}
+        {% if object.last_names %}
+            <p class="card-text">
+                <strong>Last names:</strong>
+                <br>
+                {{ object.last_names }}
+            </p>
+        {% endif %}
+        {% if object.first_names %}
+            <p class="card-text">
+                <strong>First names:</strong>
+                <br>
+                {{ object.first_names }}
+            </p>
+        {% endif %}
+        {% if object.middle_names %}
+            <p class="card-text">
+                <strong>Middle names:</strong>
+                <br>
+                {{ object.middle_names }}
+            </p>
+        {% endif %}
+        {% if object.suffix %}
+            <p class="card-text">
+                <strong>Suffix:</strong>
+                <br>
+                {{ object.suffix }}
+            </p>
+        {% endif %}
+        {% if object.preferred_citation %}
+            <p class="card-text">
+                <strong>Preferred citation:</strong>
+                <br>
+                {{ object.preferred_citation }}
+            </p>
+        {% endif %}
     {% endif %}
     {% if object.institution %}
         <p class="card-text">
