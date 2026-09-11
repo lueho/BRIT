@@ -1198,6 +1198,16 @@ class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
         context = super().get_context_data(**kwargs)
         # Pass through 'next' if provided in the opener link; templates will append it to the form action
         context["next_url"] = self.request.GET.get("next")
+        # If the object supports cascade review actions, expose the affected
+        # author count so the modal can show a notice.
+        obj = context.get("object")
+        if obj is not None and hasattr(obj, "affected_author_count"):
+            action = getattr(self, "action_attr_name", None)
+            if action:
+                try:
+                    context["cascade_author_count"] = obj.affected_author_count(action)
+                except Exception:
+                    context["cascade_author_count"] = 0
         return context
 
     def post(self, request, *args, **kwargs):  # type: ignore[override]
