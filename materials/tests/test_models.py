@@ -14,6 +14,7 @@ from factory.django import mute_signals
 
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import (
+    BaseMaterial,
     ComponentMeasurement,
     Composition,
     Material,
@@ -99,6 +100,32 @@ class BaseMaterialProxyTestCase(TestCase):
 
         self.assertEqual(material.type, "material")
         self.assertEqual(component.type, "component")
+
+
+class ComponentKindRemovalTestCase(TestCase):
+    """The orphaned component_kind field, MaterialComponentKind enum, filter,
+    admin column, and template label have all been removed."""
+
+    def test_basematerial_has_no_component_kind_field(self):
+        field_names = {f.name for f in BaseMaterial._meta.get_fields()}
+        self.assertNotIn("component_kind", field_names)
+
+    def test_materialcomponentkind_enum_removed(self):
+        import materials.models as models_module
+
+        self.assertFalse(hasattr(models_module, "MaterialComponentKind"))
+
+    def test_component_list_filter_has_no_component_kind(self):
+        from materials.filters import MaterialComponentListFilter
+
+        self.assertNotIn("component_kind", MaterialComponentListFilter.declared_filters)
+        self.assertNotIn("component_kind", MaterialComponentListFilter.Meta.fields)
+
+    def test_component_admin_has_no_component_kind(self):
+        from materials.admin import MaterialComponentAdmin
+
+        self.assertNotIn("component_kind", MaterialComponentAdmin.list_display)
+        self.assertNotIn("component_kind", MaterialComponentAdmin.list_filter)
 
 
 class MaterialPropertyTestCase(TestCase):
