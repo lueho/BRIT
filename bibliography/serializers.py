@@ -15,15 +15,39 @@ from .models import Author, Licence, Source, SourceAuthor
 
 
 class AuthorModelSerializer(ModelSerializer):
+    def validate(self, attrs):
+        author_type = attrs.get(
+            "author_type", getattr(self.instance, "author_type", "person")
+        )
+        if author_type == "organization":
+            organization_name = attrs.get(
+                "organization_name",
+                getattr(self.instance, "organization_name", ""),
+            )
+            if not str(organization_name or "").strip():
+                raise ValidationError(
+                    {"organization_name": "Organizations need a name."}
+                )
+        else:
+            last_names = attrs.get(
+                "last_names", getattr(self.instance, "last_names", "")
+            )
+            if not str(last_names or "").strip():
+                raise ValidationError({"last_names": "People need a surname."})
+        return attrs
+
     class Meta:
         model = Author
         fields = [
             "id",
+            "author_type",
             "first_names",
             "middle_names",
             "last_names",
             "suffix",
             "preferred_citation",
+            "organization_name",
+            "organization_abbreviation",
             "bibtex_name",
             "abbreviated_full_name",
         ]
@@ -41,13 +65,38 @@ class SourceCreateAuthorSerializer(ModelSerializer):
     id = IntegerField(required=False)
     first_names = CharField(required=False, allow_blank=True)
     last_names = CharField(required=False, allow_blank=True)
+    author_type = ChoiceField(
+        choices=[("person", "Person"), ("organization", "Organization")], required=False
+    )
+    organization_name = CharField(required=False, allow_blank=True)
+    organization_abbreviation = CharField(required=False, allow_blank=True)
 
     class Meta:
         model = Author
-        fields = ["id", "first_names", "last_names"]
+        fields = [
+            "id",
+            "author_type",
+            "first_names",
+            "last_names",
+            "organization_name",
+            "organization_abbreviation",
+        ]
 
     def validate(self, attrs):
-        if attrs.get("id") in (None, "") and not attrs.get("last_names", "").strip():
+        author_type = attrs.get("author_type", "person")
+        if (
+            attrs.get("id") in (None, "")
+            and author_type == "organization"
+            and not attrs.get("organization_name", "").strip()
+        ):
+            raise ValidationError(
+                {"organization_name": "This field is required for organizations."}
+            )
+        if (
+            attrs.get("id") in (None, "")
+            and author_type == "person"
+            and not attrs.get("last_names", "").strip()
+        ):
             raise ValidationError(
                 {"last_names": "This field is required when id is not provided."}
             )
@@ -103,9 +152,18 @@ class SourceCreateSerializer(ModelSerializer):
                     str(author_data.get("first_names") or "").split()
                 )
                 last_names = " ".join(str(author_data.get("last_names") or "").split())
+                author_type = author_data.get("author_type", "person")
+                organization_name = " ".join(
+                    str(author_data.get("organization_name") or "").split()
+                )
+                organization_abbreviation = " ".join(
+                    str(author_data.get("organization_abbreviation") or "").split()
+                )
                 author = Author.objects.filter(
+                    author_type=author_type,
                     first_names__iexact=first_names,
                     last_names__iexact=last_names,
+                    organization_name__iexact=organization_name,
                 ).first()
                 if author is None:
                     if not owner.has_perm("bibliography.add_author"):
@@ -116,6 +174,9 @@ class SourceCreateSerializer(ModelSerializer):
                         owner=owner,
                         first_names=first_names,
                         last_names=last_names,
+                        author_type=author_type,
+                        organization_name=organization_name,
+                        organization_abbreviation=organization_abbreviation,
                     )
 
             if author.pk not in author_ids:
@@ -220,7 +281,7 @@ class HyperlinkedAuthorSerializer(HyperlinkedModelSerializer):
 
     @staticmethod
     def get_name(instance):
-        return f"{instance.last_names}, {instance.first_names}"
+        return str(instance)
 
 
 class HyperlinkedSourceSerializer(HyperlinkedModelSerializer):

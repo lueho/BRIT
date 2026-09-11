@@ -1,6 +1,7 @@
 import string
 
 import celery
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
@@ -11,22 +12,41 @@ from utils.object_management.models import (
     UserCreatedObjectManager,
 )
 
+AUTHOR_TYPES = (("person", "Person"), ("organization", "Organization"))
+
 
 class Author(UserCreatedObject):
+    author_type = models.CharField(
+        max_length=20, choices=AUTHOR_TYPES, default="person"
+    )
     first_names = models.CharField(max_length=1023, null=True, blank=True)
     middle_names = models.CharField(max_length=1023, null=True, blank=True)
     last_names = models.CharField(max_length=1023, null=True, blank=True)
     suffix = models.CharField(max_length=100, null=True, blank=True)
     preferred_citation = models.CharField(max_length=2046, null=True, blank=True)
     institution = models.CharField(max_length=255, blank=True)
+    organization_name = models.CharField(max_length=1023, blank=True)
+    organization_abbreviation = models.CharField(max_length=255, blank=True)
     contact_email = models.EmailField(blank=True)
 
     class Meta:
         ordering = ["last_names", "first_names"]
 
+    def clean(self):
+        super().clean()
+        if (
+            self.author_type == "organization"
+            and not (self.organization_name or "").strip()
+        ):
+            raise ValidationError({"organization_name": "Organizations need a name."})
+        if self.author_type == "person" and not (self.last_names or "").strip():
+            raise ValidationError({"last_names": "People need a surname."})
+
     def __str__(self):
+        if self.author_type == "organization":
+            return (self.organization_name or "").strip()
         parts = [
-            " ".join(self.last_names.split()),
+            " ".join((self.last_names or "").split()),
         ]
         if self.first_names:
             parts.append(" ".join(self.first_names.split()))
@@ -37,6 +57,8 @@ class Author(UserCreatedObject):
     @property
     def bibtex_name(self):
         """Formats the author's name according to BibTeX conventions."""
+        if self.author_type == "organization":
+            return "{" + (self.organization_name or "").strip() + "}"
         initials = " ".join(
             [
                 f"{name.strip()[0].upper()}."
@@ -44,16 +66,25 @@ class Author(UserCreatedObject):
                 + (self.middle_names or "").split()
             ]
         )
-        bibtex = (
-            f"{' '.join(self.last_names.split())}{', ' + initials if initials else ''}"
-        )
+        bibtex = f"{' '.join((self.last_names or '').split())}{', ' + initials if initials else ''}"
         if self.suffix:
             bibtex += f", {self.suffix.strip()}"
         return bibtex
 
     @property
+    def citation_name(self):
+        """Name used when an author contributes to a source citation key."""
+        if self.author_type == "organization":
+            return (
+                self.organization_abbreviation or self.organization_name or ""
+            ).strip()
+        return (self.last_names or "").strip()
+
+    @property
     def abbreviated_full_name(self):
         """Returns the abbreviated full name with initials."""
+        if self.author_type == "organization":
+            return (self.organization_name or "").strip()
         initials = " ".join(
             [
                 f"{name[0].upper()}."
@@ -62,9 +93,7 @@ class Author(UserCreatedObject):
                 if name
             ]
         )
-        abbreviated = (
-            f"{' '.join(self.last_names.split())}{', ' + initials if initials else ''}"
-        )
+        abbreviated = f"{' '.join((self.last_names or '').split())}{', ' + initials if initials else ''}"
         if self.suffix:
             abbreviated += f", {self.suffix.strip()}"
         return abbreviated
@@ -279,11 +308,7 @@ class Source(UserCreatedObject):
         - No authors: first word of title + year
         Returns the base key without disambiguation suffix.
         """
-        authors = list(
-            self.sourceauthors.order_by("position")
-            .select_related("author")
-            .values_list("author__last_names", flat=True)
-        )
+        authors = [sa.author.citation_name for sa in self.ordered_authors()]
         year_part = f" {self.year}" if self.year else ""
 
         if len(authors) == 1:

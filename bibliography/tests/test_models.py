@@ -5,6 +5,35 @@ from factory.django import mute_signals
 from ..models import Author, Licence, Source, SourceAuthor
 
 
+class OrganizationAuthorTestCase(TestCase):
+    def test_organization_author_has_distinct_identity_and_citation_name(self):
+        author = Author.objects.create(
+            author_type="organization",
+            organization_name="European Environment Agency",
+            organization_abbreviation="EEA",
+        )
+
+        self.assertEqual(str(author), "European Environment Agency")
+        self.assertEqual(author.bibtex_name, "{European Environment Agency}")
+        self.assertEqual(author.abbreviated_full_name, "European Environment Agency")
+
+    def test_person_author_keeps_existing_name_format(self):
+        author = Author.objects.create(
+            first_names="Ada", last_names="Lovelace", author_type="person"
+        )
+        self.assertEqual(str(author), "Lovelace, Ada")
+
+    def test_source_abbreviation_uses_organization_abbreviation(self):
+        author = Author.objects.create(
+            author_type="organization",
+            organization_name="European Environment Agency",
+            organization_abbreviation="EEA",
+        )
+        source = Source.objects.create(title="Report", year=2024, abbreviation="tmp")
+        SourceAuthor.objects.create(source=source, author=author, position=1)
+        self.assertEqual(source.generate_abbreviation(), "EEA 2024")
+
+
 class LicenceModelTest(TestCase):
     def setUp(self):
         self.licence_name = "MIT License"
