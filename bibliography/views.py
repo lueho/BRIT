@@ -136,15 +136,29 @@ class AuthorAutocompleteView(UserCreatedObjectAutocompleteView):
     search_lookups = [
         "last_names__icontains",
         "first_names__icontains",
+        "organization_name__icontains",
     ]
     ordering = "last_names"
     page_size = 10
-    value_fields = ["id", "last_names", "first_names"]
+    value_fields = [
+        "id",
+        "last_names",
+        "first_names",
+        "author_type",
+        "organization_name",
+    ]
     virtual_fields = ["label"]
 
     def hook_prepare_results(self, results):
         for result in results:
-            result["label"] = f"{result['last_names']}, {result['first_names']}"
+            result["label"] = (
+                result["organization_name"]
+                if result.get("author_type") == "organization"
+                else f"{result['last_names']}, {result['first_names']}"
+            )
+            if result.get("author_type") != "organization":
+                result.pop("author_type", None)
+                result.pop("organization_name", None)
         return results
 
 

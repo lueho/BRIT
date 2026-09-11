@@ -114,11 +114,14 @@ class AuthorModelSerializerTestCase(TestCase):
             set(data.keys()),
             {
                 "id",
+                "author_type",
                 "first_names",
                 "middle_names",
                 "last_names",
                 "suffix",
                 "preferred_citation",
+                "organization_name",
+                "organization_abbreviation",
                 "bibtex_name",
                 "abbreviated_full_name",
             },
@@ -151,6 +154,30 @@ class AuthorModelSerializerTestCase(TestCase):
         for field in self.serializer_data:
             if self.serializer_data[field]:
                 self.assertEqual(self.serializer_data[field], getattr(author, field))
+
+    def test_organization_fields_are_serialized(self):
+        author = Author.objects.create(
+            author_type="organization",
+            organization_name="European Environment Agency",
+            organization_abbreviation="EEA",
+        )
+        data = AuthorModelSerializer(author).data
+        self.assertEqual(data["author_type"], "organization")
+        self.assertEqual(data["organization_name"], "European Environment Agency")
+
+    def test_organization_requires_name(self):
+        serializer = AuthorModelSerializer(
+            data={"author_type": "organization", "organization_name": ""}
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("organization_name", serializer.errors)
+
+    def test_person_requires_last_name(self):
+        serializer = AuthorModelSerializer(
+            data={"author_type": "person", "first_names": "Ada", "last_names": ""}
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("last_names", serializer.errors)
 
 
 class HyperlinkedLicenceSerializerTestCase(TestCase):

@@ -18,9 +18,23 @@ from .models import Author, Licence, Source, SourceAuthor
 
 
 class AuthorModelForm(SimpleModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["author_type"].required = False
+        if not self.instance.pk:
+            self.fields["author_type"].initial = "person"
+
     class Meta:
         model = Author
-        fields = ("first_names", "last_names", "institution", "contact_email")
+        fields = (
+            "author_type",
+            "first_names",
+            "last_names",
+            "organization_name",
+            "organization_abbreviation",
+            "institution",
+            "contact_email",
+        )
 
 
 class AuthorModalModelForm(ModalModelFormMixin, AuthorModelForm):
@@ -144,16 +158,33 @@ class SourceBibtexArticleImportForm(SimpleForm):
         author_ids = set()
 
         for parsed_author in parsed_authors:
+            author_type = parsed_author.get("author_type", "person")
             first_names = " ".join(str(parsed_author.get("first_names") or "").split())
             last_names = " ".join(str(parsed_author.get("last_names") or "").split())
+            organization_name = " ".join(
+                str(parsed_author.get("organization_name") or "").split()
+            )
             suffix = " ".join(str(parsed_author.get("suffix") or "").split())
-            if not last_names:
+            if author_type == "organization":
+                if not organization_name:
+                    continue
+                first_names = ""
+                last_names = ""
+                suffix = ""
+            elif not last_names:
                 continue
 
-            author_queryset = Author.objects.filter(
-                first_names__iexact=first_names,
-                last_names__iexact=last_names,
-            )
+            if author_type == "organization":
+                author_queryset = Author.objects.filter(
+                    author_type=author_type,
+                    organization_name__iexact=organization_name,
+                )
+            else:
+                author_queryset = Author.objects.filter(
+                    author_type=author_type,
+                    first_names__iexact=first_names,
+                    last_names__iexact=last_names,
+                )
             if suffix:
                 author_queryset = author_queryset.filter(suffix__iexact=suffix)
 
@@ -165,8 +196,10 @@ class SourceBibtexArticleImportForm(SimpleForm):
                     )
                 author = Author.objects.create(
                     owner=owner,
+                    author_type=author_type,
                     first_names=first_names,
                     last_names=last_names,
+                    organization_name=organization_name,
                     suffix=suffix,
                 )
 
