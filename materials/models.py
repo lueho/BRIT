@@ -26,11 +26,6 @@ from utils.properties.models import (
 )
 
 
-class MaterialComponentKind(models.TextChoices):
-    SINGLE = "single", "Single component"
-    AGGREGATE = "aggregate", "Aggregate component"
-
-
 class MaterialPropertyAggregationKind(models.TextChoices):
     MASS_RELATED = "mass_related", "Mass-related"
     NON_MASS_RELATED = "non_mass_related", "Non mass-related"
@@ -69,13 +64,6 @@ class BaseMaterial(NamedUserCreatedObject):
         help_text="Short abbreviation or acronym for this material/component.",
     )
     categories = models.ManyToManyField(MaterialCategory, blank=True)
-    component_kind = models.CharField(
-        max_length=20,
-        choices=MaterialComponentKind.choices,
-        default=MaterialComponentKind.SINGLE,
-        blank=True,
-        help_text="Only used for material components: single components versus aggregate groups.",
-    )
     basis_component = models.ForeignKey(
         "self",
         on_delete=models.PROTECT,
