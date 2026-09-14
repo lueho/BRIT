@@ -6471,6 +6471,33 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, private_basis.name)
         self.assertContains(response, private_canonical.name)
 
+    def test_component_moderator_sees_private_classification_references(self):
+        private_basis = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Moderator Private Basis Component",
+            publication_status="private",
+        )
+        private_canonical = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Moderator Private Canonical Component",
+            publication_status="private",
+        )
+        component = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Moderator Published Component With Private References",
+            publication_status="published",
+            basis_component=private_basis,
+            comparable_component=private_canonical,
+        )
+        permission = Permission.objects.get(codename="can_moderate_materialcomponent")
+        self.member.user_permissions.add(permission)
+        self.client.force_login(self.member)
+
+        response = self.get_detail("materialcomponent-detail", component)
+
+        self.assertContains(response, private_basis.name)
+        self.assertContains(response, private_canonical.name)
+
     def test_component_detail_shows_groups_measured_in(self):
         response = self.get_detail("materialcomponent-detail", self.component)
         self.assertContains(response, self.group.name)

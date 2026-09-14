@@ -29,10 +29,11 @@ from utils.file_export.views import (
     SingleObjectFileExportView,
 )
 from utils.modal import BSModalFormView, BSModalUpdateView
-from utils.object_management.models import ReviewAction
+from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,
+    user_is_moderator_for_model,
 )
 from utils.object_management.views import (
     PrivateObjectFilterView,
@@ -137,10 +138,18 @@ def _capped_related(queryset):
     return queryset[:DETAIL_RELATED_LIMIT], total, max(total - DETAIL_RELATED_LIMIT, 0)
 
 
-def _visible_or_none(obj, user):
+def _visible_or_none(model, obj, user):
     if obj is None:
         return None
-    return filter_queryset_for_user(type(obj).objects.filter(pk=obj.pk), user).first()
+    queryset = model.objects.filter(pk=obj.pk)
+    visible = filter_queryset_for_user(queryset, user).first()
+    if (
+        visible is None
+        and obj.publication_status == UserCreatedObject.STATUS_PRIVATE
+        and user_is_moderator_for_model(user, model)
+    ):
+        return queryset.first()
+    return visible
 
 
 class MaterialsExplorerView(TemplateView):
@@ -482,9 +491,13 @@ class ComponentDetailView(UserCreatedObjectDetailView):
             Q(pk=canonical.pk) | Q(comparable_component=canonical)
         ).values_list("pk", flat=True)
         context["canonical_component"] = (
-            _visible_or_none(canonical, user) if canonical.pk != obj.pk else None
+            _visible_or_none(MaterialComponent, canonical, user)
+            if canonical.pk != obj.pk
+            else None
         )
-        context["basis_component"] = _visible_or_none(obj.basis_component, user)
+        context["basis_component"] = _visible_or_none(
+            MaterialComponent, obj.basis_component, user
+        )
         (
             context["derived_components"],
             context["derived_components_total"],
@@ -708,9 +721,13 @@ class MaterialPropertyDetailView(UserCreatedObjectDetailView):
             Q(pk=canonical.pk) | Q(comparable_property=canonical)
         ).values_list("pk", flat=True)
         context["canonical_property"] = (
-            _visible_or_none(canonical, user) if canonical.pk != obj.pk else None
+            _visible_or_none(MaterialProperty, canonical, user)
+            if canonical.pk != obj.pk
+            else None
         )
-        context["basis_component"] = _visible_or_none(obj.default_basis_component, user)
+        context["basis_component"] = _visible_or_none(
+            MaterialComponent, obj.default_basis_component, user
+        )
         (
             context["comparable_variants"],
             context["comparable_variants_total"],
