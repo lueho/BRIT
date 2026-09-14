@@ -7,6 +7,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import FormView, TemplateView
 from rest_framework import status
@@ -136,15 +137,29 @@ class AuthorAutocompleteView(UserCreatedObjectAutocompleteView):
     search_lookups = [
         "last_names__icontains",
         "first_names__icontains",
+        "organization_name__icontains",
     ]
     ordering = "last_names"
     page_size = 10
-    value_fields = ["id", "last_names", "first_names"]
+    value_fields = [
+        "id",
+        "last_names",
+        "first_names",
+        "author_type",
+        "organization_name",
+    ]
     virtual_fields = ["label"]
 
     def hook_prepare_results(self, results):
         for result in results:
-            result["label"] = f"{result['last_names']}, {result['first_names']}"
+            result["label"] = (
+                result["organization_name"]
+                if result.get("author_type") == "organization"
+                else f"{result['last_names']}, {result['first_names']}"
+            )
+            if result.get("author_type") != "organization":
+                result.pop("author_type", None)
+                result.pop("organization_name", None)
         return results
 
 
@@ -288,6 +303,20 @@ class SourceBibtexArticleImportView(PermissionRequiredMixin, FormView):
 class SourceDetailView(UserCreatedObjectDetailView):
     model = Source
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        back_url = self.request.GET.get("back", "").strip()
+        context["back_url"] = (
+            back_url
+            if url_has_allowed_host_and_scheme(
+                back_url,
+                allowed_hosts={self.request.get_host()},
+                require_https=self.request.is_secure(),
+            )
+            else ""
+        )
+        return context
+
 
 class SourceModalDetailView(UserCreatedObjectModalDetailView):
     template_name = "source_detail_modal.html"
@@ -334,6 +363,48 @@ class AuthorQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
             payload = json.loads(request.body.decode("utf-8") or "{}")
         except (json.JSONDecodeError, UnicodeDecodeError):
             payload = {}
+
+        author_type = payload.get("author_type", "person")
+
+        if author_type == "organization":
+            organization_name = " ".join(
+                str(payload.get("organization_name", "")).split()
+            )
+            organization_abbreviation = " ".join(
+                str(payload.get("organization_abbreviation", "")).split()
+            )
+            if not organization_name:
+                return JsonResponse(
+                    {"error": "Organizations need a name."},
+                    status=400,
+                )
+
+            author = Author.objects.filter(
+                author_type="organization",
+                organization_name__iexact=organization_name,
+            ).first()
+
+            created = False
+            if author is None:
+                author = Author.objects.create(
+                    owner=request.user,
+                    author_type="organization",
+                    organization_name=organization_name,
+                    organization_abbreviation=organization_abbreviation,
+                )
+                created = True
+
+            label = author.organization_name
+            return JsonResponse(
+                {
+                    "id": author.pk,
+                    "author_type": "organization",
+                    "organization_name": author.organization_name,
+                    "label": label,
+                    "text": label,
+                },
+                status=201 if created else 200,
+            )
 
         first_names = " ".join(str(payload.get("first_names", "")).split())
         last_names = " ".join(str(payload.get("last_names", "")).split())
@@ -407,33 +478,66 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 except (Author.DoesNotExist, TypeError, ValueError):
                     author = None
             else:
-                first_names = self._normalize_name_part(raw_author.get("first_names"))
-                last_names = self._normalize_name_part(raw_author.get("last_names"))
-                if not last_names:
-                    continue
-
-                author = Author.objects.filter(
-                    first_names__iexact=first_names,
-                    last_names__iexact=last_names,
-                ).first()
-
-                if author is None:
-                    if not request.user.has_perm("bibliography.add_author"):
-                        return [], JsonResponse(
-                            {
-                                "error": (
-                                    "You need permission to create authors "
-                                    "for inline source creation."
-                                )
-                            },
-                            status=403,
-                        )
-
-                    author = Author.objects.create(
-                        owner=request.user,
-                        first_names=first_names,
-                        last_names=last_names,
+                author_type = raw_author.get("author_type", "person")
+                if author_type == "organization":
+                    organization_name = self._normalize_name_part(
+                        raw_author.get("organization_name")
                     )
+                    if not organization_name:
+                        continue
+
+                    author = Author.objects.filter(
+                        author_type="organization",
+                        organization_name__iexact=organization_name,
+                    ).first()
+
+                    if author is None:
+                        if not request.user.has_perm("bibliography.add_author"):
+                            return [], JsonResponse(
+                                {
+                                    "error": (
+                                        "You need permission to create authors "
+                                        "for inline source creation."
+                                    )
+                                },
+                                status=403,
+                            )
+
+                        author = Author.objects.create(
+                            owner=request.user,
+                            author_type="organization",
+                            organization_name=organization_name,
+                        )
+                else:
+                    first_names = self._normalize_name_part(
+                        raw_author.get("first_names")
+                    )
+                    last_names = self._normalize_name_part(raw_author.get("last_names"))
+                    if not last_names:
+                        continue
+
+                    author = Author.objects.filter(
+                        first_names__iexact=first_names,
+                        last_names__iexact=last_names,
+                    ).first()
+
+                    if author is None:
+                        if not request.user.has_perm("bibliography.add_author"):
+                            return [], JsonResponse(
+                                {
+                                    "error": (
+                                        "You need permission to create authors "
+                                        "for inline source creation."
+                                    )
+                                },
+                                status=403,
+                            )
+
+                        author = Author.objects.create(
+                            owner=request.user,
+                            first_names=first_names,
+                            last_names=last_names,
+                        )
 
             if author and author.pk not in resolved_ids:
                 resolved_authors.append(author)
@@ -631,6 +735,14 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
 
     def hook_prepare_results(self, results):
         from bibliography.models import SourceAuthor
+
+        if self.request.GET.get("label") == "abbreviation":
+            for result in results:
+                label = result.get("citation_key") or f"Source #{result['id']}"
+                result.update(
+                    text=label, selected_text=label, abbreviation=label, label=label
+                )
+            return results
 
         source_ids = [r["id"] for r in results]
         authors_by_source = {}

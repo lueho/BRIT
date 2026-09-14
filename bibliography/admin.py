@@ -15,8 +15,10 @@ class SourceAuthorInline(admin.TabularInline):
 @admin.register(Author)
 class AuthorAdmin(admin.ModelAdmin):
     list_display = (
+        "author_type",
         "last_names",
         "first_names",
+        "organization_name",
         "institution",
         "contact_email",
         "owner",
@@ -26,6 +28,8 @@ class AuthorAdmin(admin.ModelAdmin):
         "last_names",
         "first_names",
         "middle_names",
+        "organization_name",
+        "organization_abbreviation",
         "institution",
         "contact_email",
     )

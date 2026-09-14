@@ -8,6 +8,7 @@ from django.db.models import Max, Q
 from django.db.models.functions import Lower
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+from django.utils import dateformat, timezone
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
@@ -23,11 +24,6 @@ from utils.properties.models import (
     Unit,
     get_default_unit_pk,
 )
-
-
-class MaterialComponentKind(models.TextChoices):
-    SINGLE = "single", "Single component"
-    AGGREGATE = "aggregate", "Aggregate component"
 
 
 class MaterialPropertyAggregationKind(models.TextChoices):
@@ -77,13 +73,6 @@ class BaseMaterial(NamedUserCreatedObject):
         help_text="Short abbreviation or acronym for this material/component.",
     )
     categories = models.ManyToManyField(MaterialCategory, blank=True)
-    component_kind = models.CharField(
-        max_length=20,
-        choices=MaterialComponentKind.choices,
-        default=MaterialComponentKind.SINGLE,
-        blank=True,
-        help_text="Only used for material components: single components versus aggregate groups.",
-    )
     basis_component = models.ForeignKey(
         "self",
         on_delete=models.PROTECT,
@@ -776,7 +765,20 @@ class Sample(NamedUserCreatedObject):
         help_text='If no option fits, please choose "Other" and specify the material in the description.',
     )
     datetime = models.DateTimeField(
-        blank=True, null=True, help_text="Choose 00:00 if time is unknown."
+        blank=True,
+        null=True,
+        verbose_name="sampling date/time",
+        help_text="When the sample was taken, with its known precision recorded separately.",
+    )
+    datetime_precision = models.CharField(
+        max_length=8,
+        choices=[("year", "Year"), ("date", "Date"), ("time", "Date and time")],
+        blank=True,
+        default="",
+        help_text=(
+            "Known sampling date precision, interpreted in the default timezone. "
+            "Blank preserves legacy behavior: midnight is displayed as a date."
+        ),
     )
     location = models.CharField(
         max_length=511,
@@ -787,7 +789,8 @@ class Sample(NamedUserCreatedObject):
     analysis_date = models.DateTimeField(
         blank=True,
         null=True,
-        help_text="Date when the analysis was performed.",
+        verbose_name="analysis date/time",
+        help_text="When the laboratory analysis was performed. Choose 00:00 if the time is unknown.",
     )
     analysis_laboratory = models.CharField(
         max_length=255,
@@ -824,6 +827,51 @@ class Sample(NamedUserCreatedObject):
         help_text="If the sample represents a specific time step in a series, select it here.",
     )
     sources = models.ManyToManyField(Source)
+
+    @property
+    def _sampling_datetime(self):
+        if self.datetime is not None and timezone.is_aware(self.datetime):
+            return timezone.localtime(self.datetime, timezone.get_default_timezone())
+        return self.datetime
+
+    @property
+    def sampling_date_precision(self):
+        value = self._sampling_datetime
+        if value is None:
+            return ""
+        if self.datetime_precision:
+            return self.datetime_precision
+        return (
+            "time"
+            if any((value.hour, value.minute, value.second, value.microsecond))
+            else "date"
+        )
+
+    @property
+    def sampling_date_input(self):
+        value = self._sampling_datetime
+        precision = self.sampling_date_precision
+        if value is None:
+            return ""
+        if precision == "year":
+            return f"{value.year:04d}"
+        if precision == "date":
+            return value.date().isoformat()
+        timespec = "auto" if value.second or value.microsecond else "minutes"
+        return value.replace(tzinfo=None).isoformat(sep=" ", timespec=timespec)
+
+    @property
+    def sampling_date_display(self):
+        value = self._sampling_datetime
+        precision = self.sampling_date_precision
+        if value is None:
+            return ""
+        if precision == "year":
+            return self.sampling_date_input
+        display = dateformat.format(value, "j M Y")
+        if precision == "time":
+            return f"{display}, {self.sampling_date_input.split(' ', 1)[1]}"
+        return display
 
     def get_property_values_queryset(self):
         return self.property_values.all()
@@ -936,6 +984,11 @@ class Sample(NamedUserCreatedObject):
                     series=kwargs.get("series", self.series),
                     timestep=kwargs.get("timestep", self.timestep),
                     datetime=kwargs.get("datetime", self.datetime),
+                    datetime_precision=(
+                        kwargs.get("datetime_precision", self.datetime_precision)
+                        if kwargs.get("datetime", self.datetime) is not None
+                        else ""
+                    ),
                     location=kwargs.get("location", self.location),
                     analysis_date=kwargs.get("analysis_date", self.analysis_date),
                     analysis_laboratory=kwargs.get(
@@ -1193,6 +1246,16 @@ class ComponentMeasurement(
 
     class Meta:
         ordering = ["component__name", "id"]
+
+    def clean(self):
+        super().clean()
+        if self.unit_id and not self.unit.is_weight_fraction:
+            raise ValidationError(
+                {
+                    "unit": "Component measurements must use a weight-fraction unit "
+                    "(e.g. %, g/kg, mg/kg)."
+                }
+            )
 
     def duplicate(self, creator, sample=None):
         duplicate = ComponentMeasurement.objects.create(

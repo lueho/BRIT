@@ -2,7 +2,7 @@
 
 import types
 
-from crispy_forms.layout import HTML, Div, Field, Layout
+from crispy_forms.layout import Layout
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -19,9 +19,15 @@ from materials.models import Material
 from utils.forms import (
     DynamicTableInlineFormSetHelper,
     ModalModelFormMixin,
+    QuerysetTomSelectModelChoiceField,
+    QuerysetTomSelectModelMultipleChoiceField,
     SimpleModelForm,
+    WorkspaceReferenceScopeMixin,
+    WorkspaceSectionFormSet,
+    image_metadata_section,
 )
 from utils.properties.models import Unit
+from utils.widgets import WorkspaceDocumentInput
 
 from .models import (
     Process,
@@ -33,27 +39,6 @@ from .models import (
     ProcessOperatingParameter,
     ProcessSource,
 )
-
-
-def image_metadata_section():
-    return Div(
-        HTML(
-            '<div class="card-header bg-body-tertiary">'
-            '<h6 class="mb-0">Image details</h6>'
-            '<div class="form-text mb-0">'
-            "Alt text, caption, and rights notice belong to the uploaded image."
-            "</div>"
-            "</div>"
-        ),
-        Div(
-            Field("image"),
-            Field("image_alt_text"),
-            Field("image_caption"),
-            Field("image_rights_notice"),
-            css_class="card-body",
-        ),
-        css_class="card border mb-3",
-    )
 
 
 def queryset_valid_value(self, value):
@@ -69,26 +54,6 @@ def queryset_check_values(self, value):
         pks = [v for v in value if v]
         return list(self.queryset.filter(pk__in=pks))
     return []
-
-
-class QuerysetTomSelectModelChoiceField(TomSelectModelChoiceField):
-    """TomSelect field that validates submitted pks against its queryset."""
-
-    def clean(self, value):
-        if value in self.empty_values:
-            if self.required:
-                raise ValidationError(self.error_messages["required"], code="required")
-            return None
-
-        try:
-            key = self.to_field_name or "pk"
-            return self.queryset.get(**{key: value})
-        except (TypeError, ValueError, self.queryset.model.DoesNotExist) as exc:
-            raise ValidationError(
-                self.error_messages["invalid_choice"],
-                code="invalid_choice",
-                params={"value": value},
-            ) from exc
 
 
 # ==============================================================================
@@ -451,61 +416,219 @@ class ProcessInfoResourceInline(InlineFormSetFactory):
 # ==============================================================================
 
 
-class ProcessAddMaterialForm(SimpleModelForm):
-    material = TomSelectModelChoiceField(
-        queryset=Material.objects.filter(publication_status="published"),
-        config=TomSelectConfig(
-            url="material-autocomplete",
-            label_field="name",
-        ),
+class ProcessMaintenanceForm(WorkspaceReferenceScopeMixin, SimpleModelForm):
+    parent = QuerysetTomSelectModelChoiceField(
+        queryset=Process.objects.all(),
+        required=False,
+        config=TomSelectConfig(url="processes:process-autocomplete"),
+        label="Parent process",
+    )
+    categories = QuerysetTomSelectModelMultipleChoiceField(
+        queryset=ProcessCategory.objects.all(),
+        required=False,
+        config=TomSelectConfig(url="processes:processcategory-autocomplete"),
+        label="Categories",
+    )
+
+    class Meta(ProcessModelForm.Meta):
+        labels = {"name": "Title"}
+        widgets = {
+            **ProcessModelForm.Meta.widgets,
+            "supplementary_document": WorkspaceDocumentInput,
+        }
+
+    def __init__(self, *args, fields=None, **kwargs):
+        selected = fields if fields is not None else self.Meta.fields
+        super().__init__(*args, field_names=selected, **kwargs)
+        if self.instance.pk and "parent" in self.fields:
+            self.fields["parent"].queryset = self.fields["parent"].queryset.exclude(
+                pk=self.instance.pk
+            )
+        if self.instance.pk and "supplementary_document" in self.fields:
+            self.fields[
+                "supplementary_document"
+            ].widget.download_url = self.instance.supplementary_document_download_url
+        self.helper.layout = Layout(*self.fields)
+
+
+class ProcessQuickCreateForm(ProcessMaintenanceForm):
+    class Meta(ProcessMaintenanceForm.Meta):
+        fields = ("name", "short_description", "categories")
+
+
+class ProcessMaterialSectionForm(
+    WorkspaceReferenceScopeMixin, ProcessMaterialInlineForm
+):
+    material = QuerysetTomSelectModelChoiceField(
+        queryset=Material.objects.all(),
+        config=TomSelectConfig(url="material-autocomplete"),
         label="Material",
     )
-    quantity_unit = TomSelectModelChoiceField(
-        queryset=Unit.objects.filter(publication_status="published"),
+    quantity_unit = QuerysetTomSelectModelChoiceField(
+        queryset=Unit.objects.all(),
         required=False,
-        config=TomSelectConfig(
-            url="unit-autocomplete",
-            label_field="name",
-        ),
-        label="Quantity Unit",
-    )
-
-    class Meta:
-        model = ProcessMaterial
-        fields = (
-            "material",
-            "role",
-            "stage",
-            "stream_label",
-            "quantity_value",
-            "quantity_unit",
-            "notes",
-            "optional",
-        )
-        widgets = {"notes": forms.Textarea(attrs={"rows": 3})}
-
-
-class ProcessAddParameterForm(SimpleModelForm):
-    unit = TomSelectModelChoiceField(
-        queryset=Unit.objects.filter(publication_status="published"),
-        required=False,
-        config=TomSelectConfig(
-            url="unit-autocomplete",
-            label_field="name",
-        ),
+        config=TomSelectConfig(url="unit-autocomplete"),
         label="Unit",
     )
 
-    class Meta:
-        model = ProcessOperatingParameter
+    class Meta(ProcessMaterialInlineForm.Meta):
+        fields = (
+            "material",
+            "quantity_value",
+            "quantity_unit",
+            "stage",
+            "stream_label",
+            "notes",
+            "optional",
+        )
+
+
+class ProcessParameterSectionForm(
+    WorkspaceReferenceScopeMixin, ProcessOperatingParameterInlineForm
+):
+    unit = QuerysetTomSelectModelChoiceField(
+        queryset=Unit.objects.all(),
+        required=False,
+        config=TomSelectConfig(url="unit-autocomplete"),
+        label="Unit",
+    )
+
+    class Meta(ProcessOperatingParameterInlineForm.Meta):
         fields = (
             "parameter",
-            "name",
+            "nominal_value",
             "unit",
             "value_min",
             "value_max",
-            "nominal_value",
             "basis",
+            "name",
             "notes",
         )
-        widgets = {"notes": forms.Textarea(attrs={"rows": 3})}
+
+
+class ProcessSourceChoiceField(QuerysetTomSelectModelChoiceField):
+    def label_from_instance(self, obj):
+        return obj.abbreviation or f"Source #{obj.pk}"
+
+
+class ProcessSourceSectionForm(WorkspaceReferenceScopeMixin, ProcessSourceInlineForm):
+    source = ProcessSourceChoiceField(
+        queryset=Source.objects.all(),
+        config=TomSelectConfig(url="source-autocomplete", label_field="label"),
+        label="Source",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["source"].workspace_autocomplete_url += "?label=abbreviation"
+
+
+class ProcessAuthorSectionForm(WorkspaceReferenceScopeMixin, ProcessAuthorInlineForm):
+    pass
+
+
+class ProcessLinkSectionForm(WorkspaceReferenceScopeMixin, forms.ModelForm):
+    class Meta:
+        model = ProcessLink
+        fields = ("label", "url", "open_in_new_tab")
+
+
+class ProcessResourceSectionForm(
+    WorkspaceReferenceScopeMixin, ProcessInfoResourceInlineForm
+):
+    class Meta(ProcessInfoResourceInlineForm.Meta):
+        fields = ("title", "resource_type", "description", "url", "document")
+        widgets = {
+            **ProcessInfoResourceInlineForm.Meta.widgets,
+            "document": WorkspaceDocumentInput,
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields[
+                "document"
+            ].widget.download_url = self.instance.document_download_url
+
+
+class ProcessSectionFormSet(WorkspaceSectionFormSet):
+    reference_fields = {ProcessAuthor: "author", ProcessSource: "source"}
+    position_fields = {ProcessAuthor: "position"}
+
+
+PROCESS_SECTIONS = {
+    "overview": {
+        "label": "Overview",
+        "fields": ("name", "short_description", "categories", "parent"),
+    },
+    "image": {
+        "label": "Image",
+        "fields": ("image", "image_alt_text", "image_caption", "image_rights_notice"),
+    },
+    "technology": {
+        "label": "Description and technology",
+        "fields": ("mechanism", "description", "process_technology"),
+    },
+    "inputs": {
+        "label": "Inputs",
+        "forms": (
+            (
+                ProcessMaterialSectionForm,
+                {
+                    "add_label": "Add input",
+                    "row_template": "processes/includes/process_material_row.html",
+                },
+            ),
+        ),
+        "role": "input",
+    },
+    "outputs": {
+        "label": "Outputs",
+        "forms": (
+            (
+                ProcessMaterialSectionForm,
+                {
+                    "add_label": "Add output",
+                    "row_template": "processes/includes/process_material_row.html",
+                },
+            ),
+        ),
+        "role": "output",
+    },
+    "parameters": {
+        "label": "Conditions and performance",
+        "forms": (
+            (
+                ProcessParameterSectionForm,
+                {"heading": "Operating parameters", "add_label": "Add parameter"},
+            ),
+        ),
+    },
+    "references": {
+        "label": "References and contributors",
+        "forms": (
+            (
+                ProcessAuthorSectionForm,
+                {"heading": "Contributors", "add_label": "Add contributor"},
+            ),
+            (
+                ProcessSourceSectionForm,
+                {"heading": "Bibliography", "add_label": "Add reference"},
+            ),
+        ),
+    },
+    "resources": {
+        "label": "Supporting files and links",
+        "fields": ("supplementary_document",),
+        "forms": (
+            (ProcessLinkSectionForm, {"heading": "Links", "add_label": "Add link"}),
+            (
+                ProcessResourceSectionForm,
+                {
+                    "heading": "Information resources",
+                    "add_label": "Add information resource",
+                },
+            ),
+        ),
+    },
+}

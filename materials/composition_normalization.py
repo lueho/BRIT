@@ -1,14 +1,15 @@
 from collections import Counter, defaultdict
 from decimal import Decimal
 
-from utils.properties.models import Unit
-from utils.properties.units import UnitConversionError
+from utils.properties.units import UnitConversionError, convert_weight_fraction_value
 
 from .models import MaterialComponent
 
 WARNING_MULTIPLE_BASIS_COMPONENTS = "multiple_basis_components"
-WARNING_RAW_MEASUREMENTS_OMITTED = "raw_measurements_omitted"
+WARNING_INVALID_UNITS = "invalid_units"
 WARNING_REMAINING_FRACTION_ASSIGNED_TO_OTHER = "remaining_fraction_assigned_to_other"
+WARNING_SHARES_SCALED_TO_100 = "shares_scaled_to_100"
+WARNING_LEGACY_OTHER_IGNORED = "legacy_other_measurements_ignored"
 
 
 def get_sample_composition_settings_by_group(sample):
@@ -118,26 +119,26 @@ def _build_raw_derived_group_composition(
     basis_components = []
     is_dm_basis = True
     grouped_components = defaultdict(list)
-    skipped_measurement_count = 0
+    invalid_unit_names = set()
+    other_component = MaterialComponent.objects.other()
+    legacy_other_count = 0
 
     for measurement in measurements:
         average = Decimal(measurement.average)
         if average <= 0:
             continue
-        positive_measurements.append(measurement)
-        if not _is_percent_of_dm_measurement(measurement):
+        if measurement.component_id == other_component.pk:
+            legacy_other_count += 1
+            continue
+        if not _is_dry_matter_basis(measurement):
             is_dm_basis = False
+        positive_measurements.append(measurement)
         if measurement.basis_component is not None:
             basis_components.append(measurement.basis_component)
         grouped_components[measurement.component].append(measurement)
 
     if not positive_measurements:
         return None
-
-    other_component = MaterialComponent.objects.other()
-    percent_unit = Unit.objects.filter(name="%").first() or Unit(
-        name="%", symbol="percent"
-    )
 
     if composition_setting is not None and composition_setting.fractions_of_id:
         reference_component = composition_setting.fractions_of
@@ -163,24 +164,19 @@ def _build_raw_derived_group_composition(
             "Multiple basis components were present; using the most common reference component."
         )
         warning_codes.append(WARNING_MULTIPLE_BASIS_COMPONENTS)
+    if legacy_other_count:
+        warning_codes.append(WARNING_LEGACY_OTHER_IGNORED)
 
     shares = []
     for component, component_measurements in grouped_components.items():
         component_percent = Decimal("0.0")
         for measurement in component_measurements:
-            measurement_value = Decimal(measurement.average)
-            if is_dm_basis:
-                component_percent += measurement_value
-                continue
-            converted = _to_weight_percent(
-                measurement_value,
-                measurement.unit,
-                percent_unit,
-            )
-            if converted is None:
-                skipped_measurement_count += 1
-                continue
-            component_percent += converted
+            try:
+                component_percent += to_weight_percent(
+                    Decimal(measurement.average), measurement.unit
+                )
+            except UnitConversionError:
+                invalid_unit_names.add(str(measurement.unit))
 
         if component_percent <= 0:
             continue
@@ -198,39 +194,36 @@ def _build_raw_derived_group_composition(
     if not shares:
         return None
 
-    if skipped_measurement_count:
+    if invalid_unit_names:
         warnings.append(
-            "Some raw measurements could not be converted to weight percent and were omitted from normalization."
+            "Measurements with non weight-fraction units could not be normalized: "
+            + ", ".join(sorted(invalid_unit_names))
+            + ". Correct their unit to include them."
         )
-        warning_codes.append(WARNING_RAW_MEASUREMENTS_OMITTED)
+        warning_codes.append(WARNING_INVALID_UNITS)
 
     total_percent = sum(
         (Decimal(str(share["average"])) * Decimal("100") for share in shares),
         Decimal("0.0"),
     )
-    if total_percent < Decimal("100"):
-        other_gap = Decimal("100") - total_percent
-        other_share = next(
-            (share for share in shares if share["component"] == other_component.pk),
-            None,
-        )
-        if other_share is not None:
-            existing_percent = Decimal(str(other_share["average"])) * Decimal("100")
-            updated_percent = existing_percent + other_gap
-            other_share["average"] = float(updated_percent / Decimal("100"))
-            other_share["as_percentage"] = f"{round(updated_percent, 1)}{display_unit}"
-        else:
-            shares.append(
-                {
-                    "component": other_component.pk,
-                    "component_name": other_component.name,
-                    "average": float(other_gap / Decimal("100")),
-                    "standard_deviation": None,
-                    "as_percentage": f"{round(other_gap, 1)}{display_unit}",
-                }
+    if total_percent > Decimal("100"):
+        for share in shares:
+            scaled_percent = (
+                Decimal(str(share["average"])) * Decimal("100") / total_percent * 100
             )
-        warnings.append(
-            "Raw measurements did not sum to 100%; the remaining fraction was assigned to Other."
+            share["average"] = float(scaled_percent / Decimal("100"))
+            share["as_percentage"] = f"{round(scaled_percent, 1)}{display_unit}"
+        warning_codes.append(WARNING_SHARES_SCALED_TO_100)
+    elif total_percent < Decimal("100"):
+        other_gap = Decimal("100") - total_percent
+        shares.append(
+            {
+                "component": other_component.pk,
+                "component_name": other_component.name,
+                "average": float(other_gap / Decimal("100")),
+                "standard_deviation": None,
+                "as_percentage": f"{round(other_gap, 1)}{display_unit}",
+            }
         )
         warning_codes.append(WARNING_REMAINING_FRACTION_ASSIGNED_TO_OTHER)
 
@@ -241,6 +234,9 @@ def _build_raw_derived_group_composition(
             share["component_name"].lower(),
         )
     )
+    for share in shares:
+        share["percent"] = round(share["average"] * 100, 1)
+    share_total_percent = round(sum(share["average"] * 100 for share in shares), 1)
 
     return {
         "id": f"derived-{group.pk}",
@@ -250,6 +246,7 @@ def _build_raw_derived_group_composition(
         "fractions_of": reference_component.pk,
         "fractions_of_name": reference_component.name,
         "shares": shares,
+        "share_total_percent": share_total_percent,
         "is_derived": True,
         "origin": "raw_derived",
         "warnings": warnings,
@@ -261,25 +258,20 @@ def _build_raw_derived_group_composition(
     }
 
 
-def _normalize_unit_name(unit):
-    return (getattr(unit, "name", "") or "").strip().lower().replace(" ", "")
-
-
 def _normalize_component_name(component):
     return (getattr(component, "name", "") or "").strip().lower().replace(" ", "")
 
 
-def _is_percent_of_dm_measurement(measurement):
-    unit_name = _normalize_unit_name(measurement.unit)
+def _is_dry_matter_basis(measurement):
     basis_name = _normalize_component_name(measurement.basis_component)
-    return unit_name in {"%", "percent"} and basis_name in {"dm", "drymatter"}
+    return basis_name in {"dm", "drymatter"}
 
 
-def _to_weight_percent(value, unit, percent_unit):
-    if percent_unit is None:
-        return None
-    try:
-        converted_value = unit.convert(value, percent_unit)
-    except UnitConversionError:
-        return None
-    return Decimal(str(converted_value))
+def to_weight_percent(value, unit):
+    """Express a weight-fraction measurement in percent, whatever its unit."""
+    for token in (getattr(unit, "symbol", ""), getattr(unit, "name", "")):
+        try:
+            return convert_weight_fraction_value(value, token, "%")
+        except UnitConversionError:
+            continue
+    raise UnitConversionError(f"'{unit}' is not a weight-fraction unit.")

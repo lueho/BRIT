@@ -55,7 +55,7 @@ class InputMaterialManagerTestCase(TestCase):
                 group=composition.group,
                 component=component,
                 unit=percent_unit,
-                average=Decimal("70"),
+                average=Decimal("10"),
             )
 
     def test_filter_returns_only_suitable_samples(self):
@@ -97,7 +97,7 @@ class InputMaterialTestCase(TestCase):
                 group=composition.group,
                 component=component,
                 unit=percent_unit,
-                average=Decimal("70"),
+                average=Decimal("10"),
             )
 
     def setUp(self):
@@ -116,7 +116,7 @@ class InputMaterialTestCase(TestCase):
         self.assertEqual(self.input.composition.group.name, "Biochemical Composition")
 
     def test_property_carbohydrates_returns_valid_value(self):
-        self.assertEqual(self.input.carbohydrates, Decimal("0.7000000000"))
+        self.assertEqual(self.input.carbohydrates, Decimal("0.1"))
 
     def test_property_carbohydrates_uses_raw_derived_share_with_updated_measurements(
         self,
@@ -148,25 +148,25 @@ class InputMaterialTestCase(TestCase):
         self.assertEqual(self.input.carbohydrates, Decimal("0.4"))
 
     def test_property_amino_acids_returns_valid_value(self):
-        self.assertEqual(self.input.amino_acids, Decimal("0.7000000000"))
+        self.assertEqual(self.input.amino_acids, Decimal("0.1"))
 
     def test_property_starch_returns_valid_value(self):
-        self.assertEqual(self.input.starch, Decimal("0.7000000000"))
+        self.assertEqual(self.input.starch, Decimal("0.1"))
 
     def test_property_hemicellulose_returns_valid_value(self):
-        self.assertEqual(self.input.hemicellulose, Decimal("0.7000000000"))
+        self.assertEqual(self.input.hemicellulose, Decimal("0.1"))
 
     def test_property_fats_returns_valid_value(self):
-        self.assertEqual(self.input.fats, Decimal("0.7000000000"))
+        self.assertEqual(self.input.fats, Decimal("0.1"))
 
     def test_property_waxs_returns_valid_value(self):
-        self.assertEqual(self.input.waxs, Decimal("0.7000000000"))
+        self.assertEqual(self.input.waxs, Decimal("0.1"))
 
     def test_property_proteins_returns_valid_value(self):
-        self.assertEqual(self.input.proteins, Decimal("0.7000000000"))
+        self.assertEqual(self.input.proteins, Decimal("0.1"))
 
     def test_property_cellulose_returns_valid_value(self):
-        self.assertEqual(self.input.cellulose, Decimal("0.7000000000"))
+        self.assertEqual(self.input.cellulose, Decimal("0.1"))
 
     def test_property_lignin_returns_valid_value(self):
-        self.assertEqual(self.input.lignin, Decimal("0.7000000000"))
+        self.assertEqual(self.input.lignin, Decimal("0.1"))

@@ -1,6 +1,9 @@
+from datetime import datetime
+
 from django.contrib.auth.models import Permission, User
 from django.http import QueryDict
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
+from django.utils import timezone
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.forms import TomSelectModelChoiceField
 
@@ -205,6 +208,23 @@ class ComponentMeasurementModelFormTestCase(TestCase):
             str(form["standard_deviation"]),
         )
 
+    def test_unit_choices_are_limited_to_weight_fraction_units(self):
+        percent, _ = Unit.objects.get_or_create(
+            name="%", defaults={"symbol": "percent"}
+        )
+        g_per_kg = Unit.objects.create(name="g/kg", symbol="g/kg")
+        mg_per_l = Unit.objects.create(name="mg/L", symbol="mg/L")
+        volume_percent, _ = Unit.objects.update_or_create(
+            name="vol.-%", defaults={"symbol": "volume_percent"}
+        )
+
+        queryset = ComponentMeasurementModelForm().fields["unit"].queryset
+
+        self.assertIn(percent, queryset)
+        self.assertIn(g_per_kg, queryset)
+        self.assertNotIn(mg_per_l, queryset)
+        self.assertNotIn(volume_percent, queryset)
+
 
 class SampleModelFormTestCase(TestCase):
     @classmethod
@@ -219,7 +239,9 @@ class SampleModelFormTestCase(TestCase):
             name="Simple component"
         )
 
-        cls.substrate_material = Material.objects.create(name="Food waste mix")
+        cls.substrate_material = Material.objects.create(
+            name="Food waste mix", owner=cls.owner, publication_status="published"
+        )
         cls.substrate_material.categories.add(cls.substrate_category)
 
         cls.non_substrate_material = Material.objects.create(name="Amino Acids")
@@ -232,6 +254,127 @@ class SampleModelFormTestCase(TestCase):
         request = self.factory.get("/")
         request.user = user
         return request
+
+    def _sampling_form(self, value, instance=None):
+        data = QueryDict(mutable=True)
+        data.update(
+            {
+                "name": "Dated sample",
+                "material": str(self.substrate_material.pk),
+                "standalone": "on",
+                "datetime": value,
+            }
+        )
+        return SampleModelForm(
+            data=data,
+            instance=instance or Sample(owner=self.owner),
+            request=self._build_request(self.owner),
+        )
+
+    @override_settings(TIME_ZONE="Europe/Berlin", USE_TZ=True)
+    def test_sampling_date_input_preserves_supplied_precision_in_default_timezone(self):
+        cases = (
+            ("2024", "year", datetime(2024, 1, 1)),
+            ("2024-08-27", "date", datetime(2024, 8, 27)),
+            ("2024-08-27 14:30", "time", datetime(2024, 8, 27, 14, 30)),
+            ("2024-08-27T00:00", "time", datetime(2024, 8, 27)),
+            ("2024-08-27 14:30:15", "time", datetime(2024, 8, 27, 14, 30, 15)),
+        )
+        with timezone.override("America/Los_Angeles"):
+            for value, precision, expected in cases:
+                with self.subTest(value=value):
+                    form = self._sampling_form(value)
+                    self.assertTrue(form.is_valid(), form.errors)
+                    sample = form.save()
+                    sample.refresh_from_db()
+                    self.assertEqual(sample.datetime_precision, precision)
+                    self.assertEqual(
+                        sample.datetime,
+                        timezone.make_aware(expected, timezone.get_default_timezone()),
+                    )
+                    edit_form = SampleModelForm(instance=sample)
+                    round_trip = self._sampling_form(
+                        edit_form.initial["datetime"], sample
+                    )
+                    self.assertTrue(round_trip.is_valid(), round_trip.errors)
+                    self.assertEqual(round_trip.save().datetime_precision, precision)
+
+    def test_sampling_date_rejects_invalid_or_ambiguous_input(self):
+        for value in ("2024-08", "27/08/2024", "2024-02-30", "0000", "unknown"):
+            with self.subTest(value=value):
+                form = self._sampling_form(value)
+                self.assertFalse(form.is_valid())
+                self.assertIn("datetime", form.errors)
+
+    def test_unchanged_sampling_date_preserves_legacy_timestamp(self):
+        for value in (datetime(2024, 8, 27), datetime(2024, 8, 27, 14, 30, 12, 123456)):
+            with self.subTest(value=value):
+                sample = Sample.objects.create(
+                    owner=self.owner,
+                    material=self.substrate_material,
+                    datetime=timezone.make_aware(
+                        value, timezone.get_default_timezone()
+                    ),
+                )
+                original_datetime = sample.datetime
+                form = self._sampling_form(
+                    SampleModelForm(instance=sample).initial["datetime"], sample
+                )
+                self.assertTrue(form.is_valid(), form.errors)
+                saved = form.save()
+                saved.refresh_from_db()
+                self.assertEqual(saved.datetime, original_datetime)
+                self.assertEqual(saved.datetime_precision, "")
+
+    def test_sampling_date_can_be_cleared(self):
+        sample = Sample.objects.create(
+            owner=self.owner,
+            material=self.substrate_material,
+            datetime=timezone.make_aware(datetime(2024, 1, 1)),
+            datetime_precision="year",
+        )
+        form = self._sampling_form("", sample)
+        self.assertTrue(form.is_valid(), form.errors)
+        saved = form.save()
+        saved.refresh_from_db()
+        self.assertIsNone(saved.datetime)
+        self.assertEqual(saved.datetime_precision, "")
+
+    def test_supplied_initial_sampling_datetime_is_not_overridden(self):
+        sample = Sample(
+            owner=self.owner,
+            material=self.substrate_material,
+            datetime=timezone.make_aware(datetime(2024, 1, 1)),
+            datetime_precision="year",
+        )
+        for value in ("2025-08-27", "", datetime(2025, 8, 27, 14, 30)):
+            with self.subTest(value=value):
+                form = SampleModelForm(instance=sample, initial={"datetime": value})
+                self.assertEqual(form.initial["datetime"], value)
+
+    def test_distinguishes_sampling_and_analysis_time(self):
+        form = SampleModelForm(request=self._build_request(self.owner))
+
+        self.assertEqual(form.fields["datetime"].label, "Sampling date/time")
+        self.assertIn("analysis_date", form.fields)
+        self.assertEqual(form.fields["analysis_date"].label, "Analysis date/time")
+        self.assertEqual(
+            form.fields["analysis_date"].widget.input_type, "datetime-local"
+        )
+        self.assertIn("analysis_laboratory", form.fields)
+
+    def test_sampling_and_analysis_widgets_render_existing_values_in_iso_format(self):
+        sample = Sample.objects.create(
+            name="Timed sample",
+            material=self.substrate_material,
+            owner=self.owner,
+            datetime=timezone.make_aware(datetime(2024, 3, 5, 9, 30)),
+            analysis_date=timezone.make_aware(datetime(2024, 4, 12, 14, 0)),
+        )
+        form = SampleModelForm(instance=sample, request=self._build_request(self.owner))
+
+        self.assertIn('value="2024-03-05 09:30"', str(form["datetime"]))
+        self.assertIn('value="2024-04-12T14:00"', str(form["analysis_date"]))
 
     def test_material_field_uses_substrate_autocomplete(self):
         form = SampleModelForm(request=self._build_request(self.owner))

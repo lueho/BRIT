@@ -1,0 +1,16 @@
+<nav class="sdv2-context-nav" aria-label="Process navigation">
+  {% if request.GET.back %}
+    <a class="sdv2-btn sdv2-btn-ghost" href="{{ request.GET.back }}">
+      <i class="fas fa-arrow-left" aria-hidden="true"></i> Back to results
+    </a>
+  {% endif %}
+  <a class="sdv2-btn sdv2-btn-ghost" href="{% url 'processes:process-list' %}?scope=published">
+    <i class="fas fa-list" aria-hidden="true"></i> All processes
+  </a>
+  <a class="sdv2-btn sdv2-btn-ghost" href="{% url 'processes:processcategory-list' %}?scope=published">
+    <i class="fas fa-tags" aria-hidden="true"></i> Process categories
+  </a>
+  <a class="sdv2-btn sdv2-btn-ghost" href="{% url 'processes:processes-explorer' %}">
+    <i class="fas fa-table-cells-large" aria-hidden="true"></i> Processes explorer
+  </a>
+</nav>

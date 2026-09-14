@@ -575,9 +575,11 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         is_published and not is_archived and (is_owner or is_staff or is_moderator)
     )
 
-    # Object-specific management helpers
-    # If published objects shouldn't mutate, gate with not is_published
-    can_manage_samples = (is_owner or is_staff) and not is_archived and not is_published
+    # Sample-related management (sample data, series distributions, collection
+    # samples) mirrors can_edit: owners on unpublished records, staff always.
+    can_manage_samples = (
+        is_staff or (is_owner and not is_published)
+    ) and not is_archived
     property_add_permission = _get_property_add_permission_codename(obj)
     if property_add_permission is None:
         can_add_property = (is_owner or is_staff) and not is_archived

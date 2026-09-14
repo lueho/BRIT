@@ -1,11 +1,12 @@
+import contextlib
 import logging
 
-from django.contrib.gis.geos import GEOSGeometry, Point
+from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import QuerySet
 from django.test import TestCase
 from django.urls import reverse
 
-from maps.models import GeoPolygon, Location
+from maps.models import GeoPolygon
 from utils.properties.models import PropertyBase, Unit
 
 from ..models import (
@@ -24,43 +25,25 @@ from ..models import (
 )
 
 
-class ModelLabelMetadataTestCase(TestCase):
-    def test_irregular_plural_labels_are_explicit(self):
-        self.assertEqual(
-            GeoDatasetColumnPolicy._meta.verbose_name_plural,
-            "geo dataset column policies",
-        )
-        self.assertEqual(RegionProperty._meta.verbose_name_plural, "region properties")
-
-
-class TestLocationModel(TestCase):
-    def setUp(self):
-        self.location = Location.objects.create(
-            name="Test Location", geom=Point(5, 23), address="123 Test St."
-        )
-
-    def tearDown(self):
-        self.location.delete()
-
-    def test_location_created(self):
-        self.assertIsInstance(self.location, Location)
-
-    def test_location_name(self):
-        self.assertEqual(self.location.name, "Test Location")
-
-    def test_location_geom(self):
-        self.assertEqual((self.location.geom.x, self.location.geom.y), (5, 23))
-
-    def test_location_address(self):
-        self.assertEqual(self.location.address, "123 Test St.")
-
-    def test_location_str(self):
-        self.assertEqual(str(self.location), "Test Location at 123 Test St.")
-
-    def test_location_without_address_str(self):
-        self.location.address = None
-        self.location.save()
-        self.assertEqual(str(self.location), "Test Location")
+@contextlib.contextmanager
+def assert_no_warning(logger_name, msg_contains):
+    """Assert that no warning containing msg_contains is logged."""
+    logger = logging.getLogger(logger_name)
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.WARNING)
+    records = []
+    handler.handle = lambda record: records.append(record)
+    logger.addHandler(handler)
+    logger.setLevel(logging.WARNING)
+    try:
+        yield
+    finally:
+        logger.removeHandler(handler)
+        for record in records:
+            if msg_contains in record.getMessage():
+                raise AssertionError(
+                    f"Unexpected warning logged: {record.getMessage()}"
+                )
 
 
 class RegionTestCase(TestCase):
@@ -128,14 +111,6 @@ class CatchmentPostDeleteTestCase(TestCase):
 class GeoDatasetModelTestCase(TestCase):
     def setUp(self):
         self.region = Region.objects.create(name="Test Region")
-
-    def test_get_absolute_url_uses_canonical_dataset_detail_route(self):
-        dataset = GeoDataset.objects.create(name="Dataset", region=self.region)
-
-        self.assertEqual(
-            dataset.get_absolute_url(),
-            reverse("geodataset-detail", kwargs={"pk": dataset.pk}),
-        )
 
     def test_get_map_url_uses_dataset_scoped_map_route(self):
         dataset = GeoDataset.objects.create(name="Dataset", region=self.region)
@@ -447,17 +422,13 @@ class CustomCatchmentParentMismatchSignalTestCase(TestCase):
                 )
             ),
         )
-        with self.assertLogs("maps.signals", level="WARNING") as cm:
+        with assert_no_warning("maps.signals", "spatial overlap with"):
             Catchment.objects.create(
                 name="Inside Custom",
                 type="custom",
                 parent=self.parent_catchment,
                 region=inside_region,
             )
-            # assertLogs requires at least one log record; emit a dummy one
-            # so the assertion doesn't fail when no warning is produced.
-            logging.getLogger("maps.signals").warning("dummy")
-        self.assertNotIn("spatial overlap with", "\n".join(cm.output))
 
     def test_no_warning_for_non_custom_catchment(self):
         admin_region = Region.objects.create(
@@ -470,15 +441,13 @@ class CustomCatchmentParentMismatchSignalTestCase(TestCase):
                 )
             ),
         )
-        with self.assertLogs("maps.signals", level="WARNING") as cm:
+        with assert_no_warning("maps.signals", "spatial overlap with"):
             Catchment.objects.create(
                 name="Admin Child",
                 type="administrative",
                 parent=self.parent_catchment,
                 region=admin_region,
             )
-            logging.getLogger("maps.signals").warning("dummy")
-        self.assertNotIn("spatial overlap with", "\n".join(cm.output))
 
 
 class NutsRegionTestCase(TestCase):

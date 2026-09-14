@@ -9,6 +9,21 @@ from django.urls import reverse
 from brit.sitemap_items import SITEMAP_ITEMS
 
 
+class DeleteConfirmationTemplateTests(SimpleTestCase):
+    def test_confirmation_uses_object_display_without_requiring_name_field(self):
+        html = render_to_string(
+            "modal_delete.html",
+            {
+                "object": "Winter count option <2>",
+                "form_title": "Delete count option",
+                "submit_button_text": "Delete",
+            },
+        )
+
+        self.assertIn("Delete “Winter count option &lt;2&gt;”?", html)
+        self.assertNotIn("<2>", html)
+
+
 class SitemapItemsTestCase(SimpleTestCase):
     def test_sources_explorer_is_canonical_sitemap_entry(self):
         self.assertIn("/sources/explorer/", SITEMAP_ITEMS)
@@ -405,7 +420,9 @@ class SampleDetailV2BreadcrumbHarmonizationTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         from materials.models import Material, Sample
+        from utils.object_management.models import User
 
+        cls.owner = User.objects.create(username="phase3_owner", is_staff=True)
         cls.material = Material.objects.create(
             name="Phase 3 Close Out Material",
             publication_status="published",
@@ -413,6 +430,7 @@ class SampleDetailV2BreadcrumbHarmonizationTests(TestCase):
         cls.sample = Sample.objects.create(
             name="Phase 3 Close Out Sample",
             material=cls.material,
+            owner=cls.owner,
             publication_status="published",
         )
 
@@ -454,8 +472,9 @@ class SampleDetailV2BreadcrumbHarmonizationTests(TestCase):
         self.assertNotContains(response, "sdv2-crumb-current")
 
     def test_v2_preserves_sample_action_rail(self):
-        """The sample-specific action rail (status pill, mode toggle,
-        palette, classic-view link) must remain intact."""
+        """The sample-specific action rail (status pill, edit mode action,
+        context navigation, actions menu) must remain intact."""
+        self.client.force_login(self.owner)
         response = self.client.get(
             reverse("sample-detail", kwargs={"pk": self.sample.pk}) + "?experience=v2"
         )
@@ -464,8 +483,9 @@ class SampleDetailV2BreadcrumbHarmonizationTests(TestCase):
         self.assertContains(response, 'class="sdv2-rail"')
         self.assertContains(response, "sdv2-rail-actions")
         self.assertContains(response, "sdv2-status-pill")
-        self.assertContains(response, "sdv2-mode-toggle")
-        self.assertContains(response, "sdv2-classic-link")
+        self.assertContains(response, "sdv2-mode-action")
+        self.assertContains(response, "sdv2-rail-nav")
+        self.assertContains(response, "sdv2-actions-menu")
 
 
 class BreadcrumbContractFallbackPrecedenceTests(SimpleTestCase):

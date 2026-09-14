@@ -897,7 +897,7 @@ class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         cls.group = MaterialComponentGroup.objects.create(name="CM Test Group")
         cls.component = MaterialComponent.objects.create(name="CM Test Component")
-        cls.unit = Unit.objects.create(name="CM Test Unit", symbol="cmu")
+        cls.unit = Unit.objects.create(name="g/kg", symbol="g/kg")
         cls.published_measurement = ComponentMeasurement.objects.create(
             sample=cls.sample,
             group=cls.group,

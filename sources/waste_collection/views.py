@@ -1111,6 +1111,8 @@ class CollectionCatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
 class CollectionListMixin:
     """Mixin providing optimized queryset for Collection list views."""
 
+    ordering = ("name", "id")
+
     def get_queryset(self):
         """Optimize queries by prefetching related sources and flyers."""
         return (

@@ -1,0 +1,25 @@
+{% load static %}
+<div data-workspace data-static-url="{% get_static_prefix %}">
+  <header class="sdv2-hero sdv2-surface sdv2-hero-no-media mb-3">
+    <div class="sdv2-hero-identity">
+      <div class="sdv2-hero-kicker">Process maintenance</div>
+      <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+        <h1 class="sdv2-hero-title mb-0" data-workspace-title>{{ object.name }}</h1>
+        <a class="btn btn-outline-primary btn-sm"
+           href="{{ object.update_url }}?section=overview"
+           data-workspace-edit="overview"
+           data-workspace-focus="name"
+           aria-controls="workspace-editor-overview"
+           aria-expanded="false">Edit title</a>
+      </div>
+      <p class="mb-0">Edit one section at a time. Each save updates only that section.</p>
+      {% if object.publication_status == 'published' %}
+        <p class="text-warning-emphasis mt-2 mb-0">This process is published. Saved changes are immediately public.</p>
+      {% else %}
+        <p class="text-muted mt-2 mb-0">Saving does not publish this process or submit it for review.</p>
+      {% endif %}
+    </div>
+  </header>
+  <p class="small text-muted mb-3" data-workspace-status role="status" aria-live="polite" aria-atomic="true">Choose a section to edit.</p>
+  {% include "utils/includes/workspace_sections.html" %}
+</div>

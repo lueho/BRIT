@@ -7387,6 +7387,11 @@ body {
   max-width: 18rem;
 }
 
+.sample-card-actions {
+  position: relative;
+  z-index: 2;
+}
+
 .diagram-container {
   background: #fff;
   border: 1px solid var(--bs-border-color);
@@ -7574,6 +7579,16 @@ p {
 
 .text-muted {
   color: rgba(52, 58, 64, 0.7) !important;
+}
+
+.detail-section-heading {
+  font-size: 1.15rem;
+  font-weight: 650;
+  color: rgb(56.25, 84.75, 64.5);
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid rgba(75, 113, 86, 0.25);
 }
 
 a:not(.btn):not(.nav-link) {

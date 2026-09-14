@@ -7,9 +7,11 @@ from django.db.models import Q
 
 from utils.object_management.models import NamedUserCreatedObject, get_default_owner
 from utils.properties.units import (
+    WEIGHT_FRACTION_UNIT_TOKENS,
     UnitConversionError,
     convert_weight_fraction_value,
     get_unit_registry,
+    is_weight_fraction_unit_token,
 )
 
 
@@ -132,6 +134,20 @@ class Unit(NamedUserCreatedObject):
                 return unit
 
         return cls.objects.filter(filters).first()
+
+    @classmethod
+    def weight_fraction_q(cls):
+        """Q filter selecting units expressing a mass fraction (%, g/kg, ...)."""
+        filters = Q(pk__in=[])
+        for token in WEIGHT_FRACTION_UNIT_TOKENS:
+            filters |= Q(name__iexact=token) | Q(symbol__iexact=token)
+        return filters
+
+    @builtin_property
+    def is_weight_fraction(self):
+        return is_weight_fraction_unit_token(
+            self.symbol
+        ) or is_weight_fraction_unit_token(self.name)
 
     @cached_property
     def pint_unit(self):

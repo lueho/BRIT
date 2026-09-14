@@ -1,21 +1,24 @@
+from datetime import datetime
 from decimal import Decimal
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.db.models import signals
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
+from django.utils import timezone
 from factory.django import mute_signals
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import (
+    BaseMaterial,
     ComponentMeasurement,
     Composition,
     Material,
-    MaterialCategory,
     MaterialComponent,
     MaterialComponentGroup,
     MaterialProperty,
@@ -25,6 +28,7 @@ from materials.models import (
     SampleSeries,
 )
 from utils.properties.models import Unit
+from utils.tests.test_utils import CanonicalRelationTestMixin
 
 
 class InitialDataTestCase(TestCase):
@@ -116,19 +120,13 @@ class MaterialComponentTestCase(TestCase):
         self.assertIsInstance(default, MaterialComponent)
         self.assertEqual(default.name, "Other")
 
-    def test_canonical_component_defaults_to_self(self):
-        component = MaterialComponent.objects.create(name="Organic matter")
 
-        self.assertEqual(component.canonical_component, component)
+class MaterialComponentCanonicalTestCase(CanonicalRelationTestMixin, TestCase):
+    def test_canonical_component_defaults_to_self(self):
+        self._test_canonical_defaults_to_self(MaterialComponent)
 
     def test_canonical_component_follows_comparable_component(self):
-        canonical = MaterialComponent.objects.create(name="Organic matter")
-        alias = MaterialComponent.objects.create(
-            name="Volatile solids",
-            comparable_component=canonical,
-        )
-
-        self.assertEqual(alias.canonical_component, canonical)
+        self._test_canonical_follows_comparable(MaterialComponent)
 
 
 class BaseMaterialProxyTestCase(TestCase):
@@ -163,34 +161,45 @@ class BaseMaterialProxyTestCase(TestCase):
         self.assertEqual(component.type, "component")
 
 
-class MaterialPropertyTestCase(TestCase):
-    def test_canonical_property_defaults_to_self(self):
-        property_obj = MaterialProperty.objects.create(name="Organic matter", unit="%")
+class ComponentKindRemovalTestCase(TestCase):
+    """The orphaned component_kind field, MaterialComponentKind enum, filter,
+    admin column, and template label have all been removed."""
 
-        self.assertEqual(property_obj.canonical_property, property_obj)
+    def test_basematerial_has_no_component_kind_field(self):
+        field_names = {f.name for f in BaseMaterial._meta.get_fields()}
+        self.assertNotIn("component_kind", field_names)
+
+    def test_materialcomponentkind_enum_removed(self):
+        import materials.models as models_module
+
+        self.assertFalse(hasattr(models_module, "MaterialComponentKind"))
+
+    def test_component_list_filter_has_no_component_kind(self):
+        from materials.filters import MaterialComponentListFilter
+
+        self.assertNotIn("component_kind", MaterialComponentListFilter.declared_filters)
+        self.assertNotIn("component_kind", MaterialComponentListFilter.Meta.fields)
+
+    def test_component_admin_has_no_component_kind(self):
+        from materials.admin import MaterialComponentAdmin
+
+        self.assertNotIn("component_kind", MaterialComponentAdmin.list_display)
+        self.assertNotIn("component_kind", MaterialComponentAdmin.list_filter)
+
+
+class MaterialPropertyTestCase(TestCase):
+    pass
+
+
+class MaterialPropertyCanonicalTestCase(CanonicalRelationTestMixin, TestCase):
+    canonical_attr = "canonical_property"
+    comparable_attr = "comparable_property"
+
+    def test_canonical_property_defaults_to_self(self):
+        self._test_canonical_defaults_to_self(MaterialProperty, unit="%")
 
     def test_canonical_property_follows_comparable_property(self):
-        canonical = MaterialProperty.objects.create(name="Organic matter", unit="%")
-        alias = MaterialProperty.objects.create(
-            name="Volatile solids",
-            unit="%",
-            comparable_property=canonical,
-        )
-
-        self.assertEqual(alias.canonical_property, canonical)
-
-
-class ModelLabelMetadataTestCase(TestCase):
-    def test_irregular_plural_labels_are_explicit(self):
-        self.assertEqual(
-            MaterialCategory._meta.verbose_name_plural,
-            "material categories",
-        )
-        self.assertEqual(
-            MaterialProperty._meta.verbose_name_plural,
-            "material properties",
-        )
-        self.assertEqual(SampleSeries._meta.verbose_name_plural, "sample series")
+        self._test_canonical_follows_comparable(MaterialProperty, unit="%")
 
 
 class MaterialTestCase(TestCase):
@@ -640,6 +649,133 @@ class ComponentMeasurementTestCase(TestCase):
 
         self.assertIsNone(measurement.display_standard_deviation)
 
+    def test_clean_rejects_units_that_are_not_weight_fractions(self):
+        material = Material.objects.create(name="Digestate")
+        sample = Sample.objects.create(name="Sample", material=material)
+        group = MaterialComponentGroup.objects.create(name="Chemical elements")
+        component = MaterialComponent.objects.create(name="Carbon")
+        for name, symbol in (("mg/L", "mg/L"), ("vol.-%", "volume_percent")):
+            with self.subTest(unit=name):
+                unit, _ = Unit.objects.update_or_create(
+                    name=name, defaults={"symbol": symbol}
+                )
+                measurement = ComponentMeasurement(
+                    sample=sample,
+                    group=group,
+                    component=component,
+                    unit=unit,
+                    average=Decimal("42.0"),
+                )
+                with self.assertRaises(ValidationError) as ctx:
+                    measurement.full_clean()
+                self.assertIn("unit", ctx.exception.message_dict)
+
+    def test_clean_accepts_weight_fraction_units(self):
+        material = Material.objects.create(name="Digestate")
+        sample = Sample.objects.create(name="Sample", material=material)
+        group = MaterialComponentGroup.objects.create(name="Chemical elements")
+        component = MaterialComponent.objects.create(name="Carbon")
+        for name in ("%", "g/kg", "mg/kg", "‰"):
+            unit, _ = Unit.objects.get_or_create(name=name, defaults={"symbol": name})
+            ComponentMeasurement(
+                sample=sample,
+                group=group,
+                component=component,
+                unit=unit,
+                average=Decimal("1"),
+            ).full_clean()
+
+
+@override_settings(TIME_ZONE="Europe/Berlin", USE_TZ=True)
+class SampleSamplingDateTestCase(SimpleTestCase):
+    def test_missing_datetime_has_empty_presentation(self):
+        for precision in ("", "year", "date", "time"):
+            with self.subTest(precision=precision):
+                sample = Sample(owner_id=1, datetime_precision=precision)
+                self.assertEqual(sample.sampling_date_display, "")
+                self.assertEqual(sample.sampling_date_input, "")
+                self.assertEqual(sample.sampling_date_precision, "")
+
+    def test_explicit_and_legacy_precision_presentation(self):
+        cases = (
+            ("2024-01-01 00:00", "year", "year", "2024", "2024"),
+            ("2024-08-27 00:00", "date", "date", "27 Aug 2024", "2024-08-27"),
+            (
+                "2024-08-27 14:30",
+                "time",
+                "time",
+                "27 Aug 2024, 14:30",
+                "2024-08-27 14:30",
+            ),
+            (
+                "2024-08-27 00:00",
+                "time",
+                "time",
+                "27 Aug 2024, 00:00",
+                "2024-08-27 00:00",
+            ),
+            ("2024-01-01 00:00", "", "date", "1 Jan 2024", "2024-01-01"),
+            ("2024-08-27 00:00", "", "date", "27 Aug 2024", "2024-08-27"),
+            ("2024-08-27 14:30", "", "time", "27 Aug 2024, 14:30", "2024-08-27 14:30"),
+            (
+                "2024-08-27 14:30:12",
+                "time",
+                "time",
+                "27 Aug 2024, 14:30:12",
+                "2024-08-27 14:30:12",
+            ),
+            (
+                "2024-08-27 00:00:00.123456",
+                "",
+                "time",
+                "27 Aug 2024, 00:00:00.123456",
+                "2024-08-27 00:00:00.123456",
+            ),
+        )
+        for value, precision, resolved, display, input_value in cases:
+            with self.subTest(value=value, precision=precision):
+                local_datetime = datetime.fromisoformat(value).replace(
+                    tzinfo=ZoneInfo("Europe/Berlin")
+                )
+                stored_datetime = local_datetime.astimezone(ZoneInfo("UTC"))
+                sample = Sample(
+                    owner_id=1,
+                    datetime=stored_datetime,
+                    datetime_precision=precision,
+                )
+                with timezone.override("America/Los_Angeles"):
+                    self.assertEqual(sample.sampling_date_precision, resolved)
+                    self.assertEqual(sample.sampling_date_display, display)
+                    self.assertEqual(sample.sampling_date_input, input_value)
+                self.assertEqual(sample.datetime, stored_datetime)
+                self.assertEqual(sample.datetime_precision, precision)
+
+    @override_settings(TIME_ZONE="UTC")
+    def test_year_uses_server_calendar_without_rewriting_offset_instant(self):
+        original = datetime.fromisoformat("2024-01-01T00:00:00+02:00")
+        sample = Sample(owner_id=1, datetime=original, datetime_precision="year")
+        with timezone.override("Asia/Tokyo"):
+            self.assertEqual(sample.sampling_date_precision, "year")
+            self.assertEqual(sample.sampling_date_display, "2023")
+            self.assertEqual(sample.sampling_date_input, "2023")
+        self.assertIs(sample.datetime, original)
+        self.assertEqual(sample.datetime_precision, "year")
+
+    @override_settings(USE_TZ=False)
+    def test_naive_datetime_is_already_in_default_timezone(self):
+        sample = Sample(owner_id=1, datetime=datetime(2024, 8, 27, 14, 30))
+        self.assertEqual(sample.sampling_date_precision, "time")
+        self.assertEqual(sample.sampling_date_display, "27 Aug 2024, 14:30")
+        self.assertEqual(sample.sampling_date_input, "2024-08-27 14:30")
+
+    def test_precision_field_choices_and_legacy_default(self):
+        field = Sample._meta.get_field("datetime_precision")
+        self.assertEqual(
+            {value for value, _label in field.choices}, {"year", "date", "time"}
+        )
+        self.assertTrue(field.blank)
+        self.assertEqual(Sample(owner_id=1).datetime_precision, "")
+
 
 class SampleTestCase(TestCase):
     @classmethod
@@ -713,6 +849,31 @@ class SampleTestCase(TestCase):
                 average=prop.average,
                 standard_deviation=prop.standard_deviation,
             )
+
+    def test_duplicate_preserves_sampling_datetime_precision(self):
+        creator = User.objects.create(username="precision-creator")
+        self.sample.datetime = datetime(2024, 1, 1, tzinfo=ZoneInfo("Europe/Berlin"))
+        for precision in ("", "year", "date", "time"):
+            with self.subTest(precision=precision):
+                self.sample.datetime_precision = precision
+                self.sample.save(update_fields=["datetime", "datetime_precision"])
+                duplicate = self.sample.duplicate(creator)
+                duplicate.refresh_from_db()
+                self.assertEqual(duplicate.datetime, self.sample.datetime)
+                self.assertEqual(duplicate.datetime_precision, precision)
+
+    def test_duplicate_without_datetime_clears_sampling_precision(self):
+        creator = User.objects.create(username="undated-duplicate-creator")
+        self.sample.datetime = datetime(2024, 1, 1, tzinfo=ZoneInfo("Europe/Berlin"))
+        self.sample.datetime_precision = "year"
+        self.sample.save(update_fields=["datetime", "datetime_precision"])
+        duplicate = self.sample.duplicate(creator, datetime=None)
+        duplicate.refresh_from_db()
+        self.assertIsNone(duplicate.datetime)
+        self.assertEqual(duplicate.datetime_precision, "")
+        self.sample.refresh_from_db()
+        self.assertIsNotNone(self.sample.datetime)
+        self.assertEqual(self.sample.datetime_precision, "year")
 
     def test_components_include_raw_component_measurements(self):
         raw_component = MaterialComponent.objects.create(name="Raw Sample Component")

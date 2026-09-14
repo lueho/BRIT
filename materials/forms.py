@@ -1,25 +1,36 @@
-from crispy_forms.layout import HTML, Div, Field, Layout
+import re
+
+from crispy_forms.layout import Fieldset, Layout
 from django.core.exceptions import ValidationError
 from django.forms import (
+    CharField,
+    DateTimeField,
     DateTimeInput,
     ModelChoiceField,
+    TextInput,
 )
 from django.urls import reverse
+from django.utils import timezone
 from django_tomselect.forms import (
     TomSelectConfig,
     TomSelectModelChoiceField,
 )
 
+from bibliography.models import Source
 from distributions.models import TemporalDistribution
 from utils.forms import (
     CreateEnabledTomSelectModelChoiceField,
     ModalForm,
     ModalModelForm,
     ModalModelFormMixin,
+    QuerysetTomSelectModelChoiceField,
+    QuerysetTomSelectModelMultipleChoiceField,
     SimpleModelForm,
     SourcesFieldMixin,
     UserCreatedObjectFormMixin,
+    WorkspaceReferenceScopeMixin,
     configure_tomselect_inline_create,
+    image_metadata_section,
 )
 from utils.properties.forms import NumericMeasurementFieldsFormMixin
 from utils.properties.models import Unit, get_default_unit_pk
@@ -38,27 +49,6 @@ from .models import (
     SampleSeries,
     get_or_create_sample_substrate_category,
 )
-
-
-def image_metadata_section():
-    return Div(
-        HTML(
-            '<div class="card-header bg-body-tertiary">'
-            '<h6 class="mb-0">Image details</h6>'
-            '<div class="form-text mb-0">'
-            "Alt text, caption, and rights notice belong to the uploaded image."
-            "</div>"
-            "</div>"
-        ),
-        Div(
-            Field("image"),
-            Field("image_alt_text"),
-            Field("image_caption"),
-            Field("image_rights_notice"),
-            css_class="card-body",
-        ),
-        css_class="card border mb-3",
-    )
 
 
 class MaterialCategoryModelForm(SimpleModelForm):
@@ -202,12 +192,13 @@ class ComponentMeasurementModelForm(
         label="Analytical method",
     )
     unit = TomSelectModelChoiceField(
-        queryset=Unit.objects.all(),
+        queryset=Unit.objects.filter(Unit.weight_fraction_q()),
         config=TomSelectConfig(
-            url="unit-autocomplete",
+            url="unit-autocomplete-weight-fraction",
             label_field="name",
         ),
         label="Unit",
+        help_text="Weight-fraction units only (e.g. %, g/kg, mg/kg).",
     )
 
     class Meta:
@@ -409,6 +400,11 @@ class SampleSeriesAddTemporalDistributionModalModelForm(ModalModelForm):
 
 
 class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm):
+    datetime = CharField(
+        required=False,
+        label="Sampling date/time",
+        widget=TextInput(attrs={"placeholder": "e.g. 2024 or 2024-08-27"}),
+    )
     material = CreateEnabledTomSelectModelChoiceField(
         config=TomSelectConfig(
             url="sample-substrate-material-autocomplete",
@@ -432,6 +428,13 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if "datetime" not in (kwargs.get("initial") or {}):
+            self.initial["datetime"] = self.instance.sampling_date_input
+        self.fields["datetime"].help_text = (
+            "Enter only what is known: year (2024), date (2024-08-27), "
+            "or date and time (2024-08-27 14:30). "
+            f"Times use {timezone.get_default_timezone()}. Leave blank if unknown."
+        )
         substrate_category, _ = get_or_create_sample_substrate_category()
         material_queryset = Material.objects.filter(categories=substrate_category)
         if self.instance.pk and self.instance.material_id:
@@ -463,10 +466,47 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             "series",
             "timestep",
             "sources",
+            Fieldset(
+                "Analysis",
+                "analysis_date",
+                "analysis_laboratory",
+                "lab_accreditation",
+                "analysis_objective",
+            ),
         )
+
+    def clean_datetime(self):
+        value = self.cleaned_data["datetime"]
+        if not value:
+            self.instance.datetime_precision = ""
+            return None
+        if self.instance.datetime and value == self.instance.sampling_date_input:
+            return self.instance.datetime
+        if re.fullmatch(r"[0-9]{4}", value):
+            precision = "year"
+            value += "-01-01"
+        elif re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+            precision = "date"
+        elif re.fullmatch(
+            r"[0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9]{2}:[0-9]{2}"
+            r"(?::[0-9]{2}(?:\.[0-9]{1,6})?)?",
+            value,
+        ):
+            precision = "time"
+        else:
+            raise ValidationError(
+                "Enter a year (2024), date (2024-08-27), "
+                "or date and time (2024-08-27 14:30)."
+            )
+        with timezone.override(timezone.get_default_timezone()):
+            parsed = DateTimeField().clean(value)
+        self.instance.datetime_precision = precision
+        return parsed
 
     def clean(self):
         cleaned_data = super().clean()
+        if "standalone" not in self.fields and "series" not in self.fields:
+            return cleaned_data
         standalone = cleaned_data.get("standalone", False)
         series = cleaned_data.get("series")
         if not standalone and series is None:
@@ -493,12 +533,19 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             "series",
             "timestep",
             "sources",
+            "analysis_date",
+            "analysis_laboratory",
+            "lab_accreditation",
+            "analysis_objective",
         )
         widgets = {
-            "datetime": DateTimeInput(attrs={"type": "datetime-local"}),
+            "analysis_date": DateTimeInput(
+                format="%Y-%m-%dT%H:%M", attrs={"type": "datetime-local"}
+            ),
         }
         labels = {
-            "datetime": "Date/Time",
+            "datetime": "Sampling date/time",
+            "analysis_date": "Analysis date/time",
             "image": "Image",
             "image_alt_text": "Image alt text",
             "image_caption": "Image caption",
@@ -508,6 +555,101 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
 
 class SampleModalModelForm(ModalModelFormMixin, SampleModelForm):
     pass
+
+
+class SampleMaintenanceForm(WorkspaceReferenceScopeMixin, SampleModelForm):
+    """Section-scoped Sample form for the maintenance workspace."""
+
+    material = QuerysetTomSelectModelChoiceField(
+        queryset=Material.objects.all(),
+        config=TomSelectConfig(
+            url="sample-substrate-material-autocomplete",
+            label_field="name",
+            value_field="id",
+        ),
+        required=True,
+        label="Substrate",
+    )
+    series = QuerysetTomSelectModelChoiceField(
+        queryset=SampleSeries.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="sampleseries-autocomplete",
+            label_field="name",
+            value_field="id",
+        ),
+        label="Series",
+    )
+    sources = QuerysetTomSelectModelMultipleChoiceField(
+        queryset=Source.objects.all(),
+        required=False,
+        config=TomSelectConfig(url="source-autocomplete", label_field="label"),
+        label="Sources",
+    )
+
+    class Meta(SampleModelForm.Meta):
+        pass
+
+    def __init__(self, *args, fields=None, **kwargs):
+        selected = fields if fields is not None else self.Meta.fields
+        super().__init__(*args, field_names=selected, **kwargs)
+        if "sources" in self.fields:
+            self.fields["sources"].workspace_autocomplete_url += "?label=abbreviation"
+        self.helper.layout = Layout(*self.fields)
+
+    def _update_errors(self, errors):
+        # Sample.clean() reports the standalone/series invariant against
+        # "series"; sections that edit neither field cannot fix or display it.
+        if (
+            "standalone" not in self.fields
+            and "series" not in self.fields
+            and hasattr(errors, "error_dict")
+        ):
+            errors.error_dict.pop("series", None)
+            if not errors.error_dict:
+                return
+        super()._update_errors(errors)
+
+
+class SampleQuickCreateForm(SampleMaintenanceForm):
+    """Minimal fields needed to start a private Sample draft."""
+
+    class Meta(SampleMaintenanceForm.Meta):
+        fields = ("name", "material", "datetime", "standalone", "series")
+
+
+SAMPLE_SECTIONS = {
+    "overview": {
+        "label": "Overview",
+        "fields": ("name", "material", "description"),
+    },
+    "sampling": {
+        "label": "Sampling",
+        "fields": ("datetime", "location", "standalone", "series", "timestep"),
+    },
+    "analysis": {
+        "label": "Analysis",
+        "fields": (
+            "analysis_date",
+            "analysis_laboratory",
+            "lab_accreditation",
+            "analysis_objective",
+        ),
+    },
+    "image": {
+        "label": "Image",
+        "fields": (
+            "image",
+            "image_alt_text",
+            "image_caption",
+            "image_rights_notice",
+        ),
+    },
+    "sources": {
+        "label": "Sources",
+        "fields": ("sources",),
+    },
+}
 
 
 class CompositionModelForm(SimpleModelForm):

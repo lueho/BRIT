@@ -5,7 +5,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("bibliography", "0010_author_contact_details"),
-        ("materials", "0020_sample_image_metadata"),
+        ("materials", "0023_remove_component_kind"),
     ]
 
     operations = [

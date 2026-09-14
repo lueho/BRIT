@@ -1,9 +1,12 @@
+from datetime import datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
 from django.db.models.signals import post_save
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from factory.django import mute_signals
 
 from bibliography.models import Source
@@ -22,12 +25,57 @@ from ..models import (
     SampleSeries,
 )
 from ..serializers import (
+    ComponentMeasurementWriteSerializer,
     CompositionDoughnutChartSerializer,
     CompositionModelSerializer,
     MaterialPropertyValueModelSerializer,
+    SampleFlatSerializer,
     SampleModelSerializer,
     SampleSeriesModelSerializer,
+    SampleWriteSerializer,
 )
+
+
+class ComponentMeasurementWriteSerializerTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.sample = Sample.objects.create(
+            name="Sample", material=Material.objects.create(name="Material")
+        )
+        cls.group = MaterialComponentGroup.objects.create(name="Group")
+        cls.component = MaterialComponent.objects.create(name="Carbon")
+
+    def _data(self, unit):
+        return {
+            "sample": self.sample.pk,
+            "group": self.group.pk,
+            "component": self.component.pk,
+            "unit": unit.pk,
+            "average": "12.0",
+        }
+
+    def test_rejects_units_that_are_not_weight_fractions(self):
+        serializer = ComponentMeasurementWriteSerializer(
+            data=self._data(Unit.objects.create(name="mg/L", symbol="mg/L"))
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("unit", serializer.errors)
+
+    def test_rejects_volume_percent(self):
+        unit, _ = Unit.objects.update_or_create(
+            name="vol.-%", defaults={"symbol": "volume_percent"}
+        )
+        serializer = ComponentMeasurementWriteSerializer(data=self._data(unit))
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("unit", serializer.errors)
+
+    def test_accepts_weight_fraction_units(self):
+        serializer = ComponentMeasurementWriteSerializer(
+            data=self._data(Unit.objects.create(name="g/kg", symbol="g/kg"))
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
 
 
 class MaterialPropertySerializerTestCase(TestCase):
@@ -80,6 +128,157 @@ class SampleSeriesModelSerializerTestCase(TestCase):
         self.assertIn("id", data)
         self.assertIn("name", data)
         self.assertIn("distributions", data)
+
+
+class SampleDatetimePrecisionSerializerTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.material = Material.objects.create(name="Precision material")
+        cls.sample = Sample.objects.create(
+            name="Precision sample",
+            material=cls.material,
+            datetime=datetime(2024, 8, 27, tzinfo=ZoneInfo("Europe/Berlin")),
+        )
+
+    def test_read_serializers_expose_stored_precision_including_legacy_blank(self):
+        request = RequestFactory().get(reverse("home"))
+        for precision in ("", "year", "date", "time"):
+            self.sample.datetime_precision = precision
+            for serializer_class in (
+                SampleModelSerializer,
+                SampleFlatSerializer,
+                SampleWriteSerializer,
+            ):
+                with self.subTest(precision=precision, serializer=serializer_class):
+                    data = serializer_class(
+                        self.sample, context={"request": request}
+                    ).data
+                    self.assertEqual(data["datetime_precision"], precision)
+                    self.assertIsNotNone(data["datetime"])
+
+    def test_create_preserves_explicit_precision_and_timestamp(self):
+        for precision in ("year", "date", "time"):
+            with self.subTest(precision=precision):
+                serializer = SampleWriteSerializer(
+                    data={
+                        "name": "New sample",
+                        "material": self.material.pk,
+                        "datetime": "2024-08-27T00:00:00+02:00",
+                        "datetime_precision": precision,
+                    }
+                )
+                self.assertTrue(serializer.is_valid(), serializer.errors)
+                sample = serializer.save()
+                sample.refresh_from_db()
+                self.assertEqual(sample.datetime_precision, precision)
+                self.assertEqual(sample.datetime, self.sample.datetime)
+
+    @override_settings(TIME_ZONE="UTC", USE_TZ=True)
+    def test_offset_year_boundary_preserves_instant_and_uses_server_calendar(self):
+        original = "2024-01-01T00:00:00+02:00"
+        with timezone.override("Asia/Tokyo"):
+            serializer = SampleWriteSerializer(
+                data={
+                    "name": "Year boundary",
+                    "material": self.material.pk,
+                    "datetime": original,
+                    "datetime_precision": "year",
+                }
+            )
+            self.assertTrue(serializer.is_valid(), serializer.errors)
+            sample = serializer.save()
+            sample.refresh_from_db()
+            self.assertEqual(sample.datetime, datetime.fromisoformat(original))
+            self.assertEqual(sample.datetime_precision, "year")
+            self.assertEqual(sample.sampling_date_input, "2023")
+            self.assertEqual(sample.sampling_date_display, "2023")
+
+    def test_create_without_precision_remains_legacy(self):
+        for value in (None, "2024-08-27T00:00:00+02:00", "2024-08-27T14:30:00+02:00"):
+            with self.subTest(value=value):
+                serializer = SampleWriteSerializer(
+                    data={
+                        "name": "Legacy",
+                        "material": self.material.pk,
+                        "datetime": value,
+                    }
+                )
+                self.assertTrue(serializer.is_valid(), serializer.errors)
+                sample = serializer.save()
+                sample.refresh_from_db()
+                self.assertEqual(sample.datetime_precision, "")
+
+    def test_create_rejects_precision_without_datetime(self):
+        for precision in ("year", "date", "time"):
+            for datetime_data in ({}, {"datetime": None}):
+                with self.subTest(precision=precision, datetime_data=datetime_data):
+                    serializer = SampleWriteSerializer(
+                        data={
+                            "name": "Invalid",
+                            "material": self.material.pk,
+                            "datetime_precision": precision,
+                            **datetime_data,
+                        }
+                    )
+                    self.assertFalse(serializer.is_valid())
+                    self.assertIn("datetime_precision", serializer.errors)
+
+    def test_invalid_precision_is_rejected(self):
+        serializer = SampleWriteSerializer(
+            self.sample, data={"datetime_precision": "month"}, partial=True
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("datetime_precision", serializer.errors)
+
+    def test_partial_precision_update_uses_existing_datetime(self):
+        original_datetime = self.sample.datetime
+        serializer = SampleWriteSerializer(
+            self.sample, data={"datetime_precision": "time"}, partial=True
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        sample = serializer.save()
+        sample.refresh_from_db()
+        self.assertEqual(sample.datetime_precision, "time")
+        self.assertEqual(sample.datetime, original_datetime)
+
+    def test_partial_precision_update_rejects_missing_existing_datetime(self):
+        self.sample.datetime = None
+        serializer = SampleWriteSerializer(
+            self.sample, data={"datetime_precision": "year"}, partial=True
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("datetime_precision", serializer.errors)
+
+    def test_partial_update_preserves_omitted_precision(self):
+        for precision in ("", "year", "date", "time"):
+            with self.subTest(precision=precision):
+                self.sample.datetime_precision = precision
+                serializer = SampleWriteSerializer(
+                    self.sample,
+                    data={"datetime": "2024-08-27T14:30:12.123456+02:00"},
+                    partial=True,
+                )
+                self.assertTrue(serializer.is_valid(), serializer.errors)
+                sample = serializer.save()
+                sample.refresh_from_db()
+                self.assertEqual(sample.datetime_precision, precision)
+                self.assertEqual(sample.datetime.microsecond, 123456)
+
+    def test_clearing_datetime_requires_clearing_explicit_precision(self):
+        self.sample.datetime_precision = "date"
+        serializer = SampleWriteSerializer(
+            self.sample, data={"datetime": None}, partial=True
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("datetime_precision", serializer.errors)
+        serializer = SampleWriteSerializer(
+            self.sample, data={"datetime": None, "datetime_precision": ""}, partial=True
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        sample = serializer.save()
+        sample.refresh_from_db()
+        self.assertIsNone(sample.datetime)
+        self.assertEqual(sample.datetime_precision, "")
 
 
 class SampleSerializerTestCase(TestCase):
@@ -268,9 +467,9 @@ class CompositionSerializerTestCase(TestCase):
         ComponentMeasurement.objects.create(
             sample=sample,
             group=group,
-            component=MaterialComponent.objects.other(),
+            component=MaterialComponent.objects.create(name="Test Component"),
             unit=unit,
-            average=Decimal("50"),
+            average=Decimal("40"),
         )
 
     def test_serializer_construction(self):
@@ -288,7 +487,7 @@ class CompositionSerializerTestCase(TestCase):
         self.assertEqual(
             data["shares"][-1]["component"], MaterialComponent.objects.other().pk
         )
-        self.assertEqual(data["shares"][-1]["as_percentage"], "100.0%")
+        self.assertEqual(data["shares"][-1]["as_percentage"], "60.0%")
 
 
 class CompositionDoughnutChartSerializerTestCase(TestCase):

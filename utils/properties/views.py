@@ -55,7 +55,14 @@ class UnitAutocompleteView(UserCreatedObjectAutocompleteView):
     """Autocomplete view for Unit selection."""
 
     model = Unit
-    search_lookups = ["name__icontains", "abbreviation__icontains"]
+    search_lookups = ["name__icontains", "symbol__icontains"]
+
+
+class WeightFractionUnitAutocompleteView(UnitAutocompleteView):
+    """Autocomplete restricted to mass-fraction units (%, g/kg, ...)."""
+
+    def hook_queryset(self, queryset):
+        return super().hook_queryset(queryset).filter(Unit.weight_fraction_q())
 
 
 # ----------- Property CRUD --------------------------------------------------------------------------------------------

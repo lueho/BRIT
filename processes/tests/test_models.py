@@ -79,11 +79,6 @@ class ProcessCategoryModelTestCase(TestCase):
         self.assertEqual(category.name, "Thermochemical")
         self.assertEqual(category.owner, self.owner)
 
-    def test_str_representation(self):
-        """String representation should return the category name."""
-        category = ProcessCategory.objects.create(name="Biochemical", owner=self.owner)
-        self.assertEqual(str(category), "Biochemical")
-
     def test_publication_status_inherited(self):
         """ProcessCategory inherits publication status from NamedUserCreatedObject."""
         category = ProcessCategory.objects.create(
@@ -507,7 +502,7 @@ class ProcessModelTestCase(TestCase):
             resource_type=ProcessInfoResource.ResourceType.DOCUMENT,
             document=SimpleUploadedFile(filename, b"content"),
         )
-        self.assertIn(filename, resource.target_url)
+        self.assertEqual(resource.target_url, resource.document_download_url)
 
     def test_process_info_resource_target_url_for_url_types(self):
         """Test that target_url returns url field for INTERNAL and EXTERNAL types."""

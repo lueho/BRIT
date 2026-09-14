@@ -12,6 +12,12 @@
     {% csrf_token %}
     {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
     <p class="mb-3">Are you sure you want to submit this for review?</p>
+    {% if cascade_author_count %}
+      <div class="alert alert-info mb-3">
+        <i class="fas fa-info-circle"></i>
+        {{ cascade_author_count }} linked author{{ cascade_author_count|pluralize }} will also be submitted for review.
+      </div>
+    {% endif %}
     <div class="mb-3">
       <label for="submit-comment-textarea-{{ object.id }}" class="form-label">Review comment (optional)</label>
       <textarea class="form-control"

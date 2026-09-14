@@ -60,7 +60,7 @@ README*
 # Docker
 Dockerfile*
 docker-compose*
-compose.yml
+compose*.yml
 
 # Other
 .env*

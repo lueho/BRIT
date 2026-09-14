@@ -1,6 +1,4 @@
-from django.db import models
 from django.test import TestCase
-from django.test.utils import isolate_apps
 from rest_framework.fields import CharField, IntegerField
 from rest_framework.serializers import ModelSerializer, Serializer
 
@@ -10,7 +8,7 @@ from utils.serializers import FieldLabelMixin
 
 class FieldLabelMixinTestCase(TestCase):
     @classmethod
-    def setUp(cls):
+    def setUpTestData(cls):
         class TestSerializer(FieldLabelMixin, Serializer):
             char = CharField(label="Text")
             integer = IntegerField(label="Number")
@@ -18,20 +16,12 @@ class FieldLabelMixinTestCase(TestCase):
         cls.data = {"char": "abc", "integer": 123}
         cls.serializer = TestSerializer
 
-        with isolate_apps("sources.waste_collection"):
-
-            class TestModel(models.Model):
-                char = models.CharField(verbose_name="Text")
-                integer = models.IntegerField(verbose_name="Number")
-
         class TestModelSerializer(ModelSerializer):
             class Meta:
                 model = Collector
                 fields = ("name", "website")
 
         cls.model_serializer = TestModelSerializer
-        cls.model = TestModel
-        # self.object = TestModel.objects.create(**self.data)
         cls.tdata = {"name": "Test collector", "website": "https://www.flyer.org"}
         cls.object = Collector.objects.create(**cls.tdata)
 
@@ -62,16 +52,5 @@ class FieldLabelMixinTestCase(TestCase):
         self.assertDictEqual(serializer.data, expected)
 
     def test_model_serializer_to_representation_uses_field_names_by_default(self):
-        # obj = self.model(**self.data)
-        # obj = self.object
-        obj = Collector.objects.all()
-        # self.assertEqual(obj.char, self.data['char'])
-        # self.assertEqual(obj.integer, self.data['integer'])
-        # self.assertIsInstance(obj, self.model)
-        # self.assertEqual(obj.name, self.tdata['name'])
-        # self.assertEqual(obj.website, self.tdata['website'])
-        # self.assertIsInstance(obj, Collector)
-        serializer = self.model_serializer(obj, many=True)
-        # self.assertTrue(serializer.is_valid())
-        # self.assertDictEqual(serializer.validated_data, self.data)
-        self.assertDictEqual(serializer.data[0], self.tdata)
+        serializer = self.model_serializer(self.object)
+        self.assertDictEqual(serializer.data, self.tdata)
