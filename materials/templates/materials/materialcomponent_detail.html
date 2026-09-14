@@ -18,15 +18,15 @@
 {% endblock hero_meta_items %}
 
 {% block detail_sections %}
-    {% if object.basis_component or canonical_component or derived_components or comparable_variants %}
+    {% if basis_component or canonical_component or derived_components or comparable_variants %}
         <section class="sdv2-section-panel" aria-label="Component classification">
             <h2 class="sdv2-section-title">Classification</h2>
             <dl class="sdv2-context-details">
-                {% if object.basis_component %}
+                {% if basis_component %}
                     <div>
                         <dt>Basis component</dt>
                         <dd>
-                            <a href="{% url 'materialcomponent-detail' object.basis_component.pk %}">{{ object.basis_component.name }}</a>
+                            <a href="{% url 'materialcomponent-detail' basis_component.pk %}">{{ basis_component.name }}</a>
                         </dd>
                     </div>
                 {% endif %}

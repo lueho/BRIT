@@ -137,6 +137,12 @@ def _capped_related(queryset):
     return queryset[:DETAIL_RELATED_LIMIT], total, max(total - DETAIL_RELATED_LIMIT, 0)
 
 
+def _visible_or_none(obj, user):
+    if obj is None:
+        return None
+    return filter_queryset_for_user(type(obj).objects.filter(pk=obj.pk), user).first()
+
+
 class MaterialsExplorerView(TemplateView):
     template_name = "materials_dashboard.html"
 
@@ -475,7 +481,10 @@ class ComponentDetailView(UserCreatedObjectDetailView):
         comparable_ids = MaterialComponent.objects.filter(
             Q(pk=canonical.pk) | Q(comparable_component=canonical)
         ).values_list("pk", flat=True)
-        context["canonical_component"] = canonical if canonical.pk != obj.pk else None
+        context["canonical_component"] = (
+            _visible_or_none(canonical, user) if canonical.pk != obj.pk else None
+        )
+        context["basis_component"] = _visible_or_none(obj.basis_component, user)
         (
             context["derived_components"],
             context["derived_components_total"],
@@ -698,7 +707,10 @@ class MaterialPropertyDetailView(UserCreatedObjectDetailView):
         comparable_ids = MaterialProperty.objects.filter(
             Q(pk=canonical.pk) | Q(comparable_property=canonical)
         ).values_list("pk", flat=True)
-        context["canonical_property"] = canonical if canonical.pk != obj.pk else None
+        context["canonical_property"] = (
+            _visible_or_none(canonical, user) if canonical.pk != obj.pk else None
+        )
+        context["basis_component"] = _visible_or_none(obj.default_basis_component, user)
         (
             context["comparable_variants"],
             context["comparable_variants_total"],

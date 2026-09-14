@@ -19,11 +19,11 @@
     <section class="sdv2-section-panel" aria-label="Property definition">
         <h2 class="sdv2-section-title">Definition</h2>
         <dl class="sdv2-context-details">
-            {% if object.default_basis_component %}
+            {% if basis_component %}
                 <div>
                     <dt>Basis component</dt>
                     <dd>
-                        <a href="{% url 'materialcomponent-detail' object.default_basis_component.pk %}">{{ object.default_basis_component.name }}</a>
+                        <a href="{% url 'materialcomponent-detail' basis_component.pk %}">{{ basis_component.name }}</a>
                     </dd>
                 </div>
             {% endif %}
