@@ -1640,6 +1640,30 @@ class UserCreatedObjectListMixin:
     breadcrumb_page_title = None
     breadcrumb_section_label = None
     model = None
+    sortable_fields = {}
+    sort_param = "ordering"
+
+    def get_sortable_fields(self):
+        """Whitelisted sort keys mapping to ORM field paths.
+
+        ``sortable_fields`` may be set on the view or, more commonly, on the
+        view's ``filterset_class`` so all scope variants share one definition.
+        """
+        filterset_class = getattr(self, "filterset_class", None)
+        return getattr(filterset_class, "sortable_fields", None) or self.sortable_fields
+
+    def get_current_sort(self):
+        """Return the active sort key (e.g. ``name`` or ``-name``) or None.
+
+        Only whitelisted keys from ``get_sortable_fields`` are honoured;
+        anything else is ignored safely.
+        """
+        get_params = getattr(getattr(self, "request", None), "GET", {})
+        raw = (get_params.get(self.sort_param) or "").strip()
+        key = raw.lstrip("-")
+        if key and key in self.get_sortable_fields():
+            return ("-" if raw.startswith("-") else "") + key
+        return None
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -1672,6 +1696,14 @@ class UserCreatedObjectListMixin:
             queryset = apply_scope_filter(queryset, self.list_type, user=user)
         else:
             queryset = filter_queryset_for_user(queryset, user)
+
+        # An explicitly requested, whitelisted sort takes precedence over the
+        # default ordering.
+        current_sort = self.get_current_sort()
+        if current_sort:
+            key = current_sort.lstrip("-")
+            prefix = "-" if current_sort.startswith("-") else ""
+            return queryset.order_by(f"{prefix}{self.get_sortable_fields()[key]}", "pk")
 
         # If an OrderingFilter already set an explicit order, do not override it
         try:
@@ -1740,6 +1772,8 @@ class UserCreatedObjectListMixin:
                 "list_type": self.get_list_type(),
                 "private_list_owner": self.get_private_list_owner(),
                 "dashboard_url": self.get_dashboard_url(),
+                "sortable_fields": self.get_sortable_fields(),
+                "current_sort": self.get_current_sort() or "",
             }
         )
         context.update(

@@ -45,6 +45,7 @@ class MaterialFilterSet(rf_filters.FilterSet):
 
 
 class MaterialListFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name"}
     search_fields = ("name", "abbreviation", "description")
 
     name = ModelChoiceFilter(
@@ -100,6 +101,7 @@ class MaterialListFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilte
 
 
 class MaterialCategoryListFilter(UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name"}
     name = CharFilter(
         field_name="name",
         lookup_expr="icontains",
@@ -112,6 +114,7 @@ class MaterialCategoryListFilter(UserCreatedObjectScopedFilterSet):
 
 
 class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name"}
     name = ModelChoiceFilter(
         queryset=MaterialComponent.objects.none(),
         field_name="name",
@@ -157,6 +160,7 @@ class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
 
 
 class MaterialComponentGroupListFilter(UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name"}
     name = CharFilter(
         field_name="name",
         lookup_expr="icontains",
@@ -169,6 +173,7 @@ class MaterialComponentGroupListFilter(UserCreatedObjectScopedFilterSet):
 
 
 class MaterialPropertyListFilter(UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name"}
     name = CharFilter(
         field_name="name",
         lookup_expr="icontains",
@@ -191,6 +196,7 @@ class MaterialPropertyListFilter(UserCreatedObjectScopedFilterSet):
 
 
 class AnalyticalMethodListFilter(UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name", "technique": "technique"}
     name = CharFilter(
         field_name="name",
         lookup_expr="icontains",
@@ -221,6 +227,7 @@ class CompositionFilterSet(rf_filters.FilterSet):
 
 
 class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name", "datetime": "datetime"}
     search_fields = ("name", "description", "material__name", "location")
 
     q = CharFilter(
@@ -430,6 +437,7 @@ class UserOwnedSampleFilter(SampleFilter):
 
 
 class SampleSeriesFilter(UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name"}
     material = ModelChoiceFilter(
         queryset=Material.objects.all(),
         field_name="material__name",

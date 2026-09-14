@@ -263,18 +263,23 @@ class MaterialCategoryAutocompleteView(UserCreatedObjectAutocompleteView):
 class MaterialPublishedListView(PublishedObjectFilterView):
     model = Material
     filterset_class = MaterialListFilter
+    queryset = Material.objects.prefetch_related("categories")
+    template_name = "materials/material_list.html"
     dashboard_url = reverse_lazy("materials-explorer")
 
 
 class MaterialPrivateListView(PrivateObjectFilterView):
     model = Material
     filterset_class = MaterialListFilter
+    queryset = Material.objects.prefetch_related("categories")
+    template_name = "materials/material_list.html"
     dashboard_url = reverse_lazy("materials-explorer")
 
 
 class MaterialReviewListView(ReviewObjectFilterView):
     model = Material
     filterset_class = MaterialListFilter
+    queryset = Material.objects.prefetch_related("categories")
     template_name = "materials/material_list.html"
     dashboard_url = reverse_lazy("materials-explorer")
 

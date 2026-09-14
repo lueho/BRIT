@@ -6691,3 +6691,173 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(len(entry["samples"]), DETAIL_RELATED_LIMIT)
         self.assertEqual(entry["more"], 6)
         self.assertNotContains(response, "Hidden Private Sample")
+
+
+class MaterialsListEnhancementsTestCase(ViewWithPermissionsTestCase):
+    """Active filter chips and whitelisted sortable columns on list views."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.category = MaterialCategory.objects.create(
+            owner=cls.owner,
+            name="Published Category",
+            publication_status="published",
+        )
+        cls.alpha = Material.objects.create(
+            owner=cls.owner, name="Alpha Material", publication_status="published"
+        )
+        cls.alpha.categories.add(cls.category)
+        cls.beta = Material.objects.create(
+            owner=cls.owner, name="Beta Material", publication_status="published"
+        )
+        cls.gamma = Material.objects.create(
+            owner=cls.owner, name="Gamma Material", publication_status="published"
+        )
+        cls.old_sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Old Sample",
+            material=cls.alpha,
+            publication_status="published",
+            datetime=timezone.make_aware(datetime(2023, 1, 15)),
+        )
+        cls.new_sample = Sample.objects.create(
+            owner=cls.owner,
+            name="New Sample",
+            material=cls.alpha,
+            publication_status="published",
+            datetime=timezone.make_aware(datetime(2024, 6, 15)),
+        )
+
+    def material_list(self, params=""):
+        return self.client.get(f"{reverse('material-list')}?scope=published{params}")
+
+    def sample_list(self, params=""):
+        return self.client.get(f"{reverse('sample-list')}?scope=published{params}")
+
+    # --- Active filter chips -------------------------------------------------
+
+    def test_active_filter_chip_shown(self):
+        response = self.material_list(f"&category={self.category.pk}")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "active-filters")
+        self.assertContains(response, "filter-chip")
+        self.assertContains(response, "Category")
+        self.assertContains(response, self.category.name)
+
+    def test_no_chips_without_active_filters(self):
+        response = self.material_list()
+        self.assertNotContains(response, "active-filters")
+
+    def test_scope_is_not_rendered_as_chip(self):
+        response = self.material_list()
+        self.assertNotContains(response, "filter-chip")
+
+    def test_chip_remove_url_drops_filter_but_keeps_scope(self):
+        response = self.material_list(f"&category={self.category.pk}")
+        expected = f'href="{reverse("material-list")}?scope=published"'
+        self.assertContains(response, expected)
+
+    def test_chip_remove_url_preserves_other_filters(self):
+        response = self.material_list(
+            f"&category={self.category.pk}&name={self.alpha.pk}"
+        )
+        # The name chip's remove URL must keep the category filter.
+        self.assertContains(response, f"category={self.category.pk}")
+        # And the category chip's remove URL must keep the name filter.
+        self.assertContains(response, f"name={self.alpha.pk}")
+
+    def test_model_choice_chip_shows_object_name(self):
+        response = self.material_list(f"&name={self.alpha.pk}")
+        self.assertContains(response, "Alpha Material")
+
+    def test_search_chip_shows_query(self):
+        response = self.sample_list("&q=Old")
+        self.assertContains(response, "filter-chip")
+        self.assertContains(response, "Old")
+
+    def test_date_range_renders_single_chip(self):
+        response = self.sample_list(
+            "&sample_date_after=2023-01-01&sample_date_before=2023-12-31"
+        )
+        self.assertContains(response, "filter-chip")
+        self.assertContains(response, "Sample date")
+
+    def test_date_range_chip_removes_both_bounds(self):
+        response = self.sample_list(
+            "&sample_date_after=2023-01-01&sample_date_before=2023-12-31&page=1"
+        )
+        body = response.content.decode()
+        chip_start = body.index("filter-chip")
+        chip_end = body.index("</a>", chip_start)
+        chip_html = body[chip_start:chip_end]
+        self.assertNotIn("sample_date_after", chip_html)
+        self.assertNotIn("sample_date_before", chip_html)
+        self.assertIn("scope=published", chip_html)
+
+    # --- Sortable columns ----------------------------------------------------
+
+    def material_names(self, response):
+        return [obj.name for obj in response.context["object_list"]]
+
+    def test_material_list_sorts_descending(self):
+        response = self.material_list("&ordering=-name")
+        self.assertEqual(
+            self.material_names(response),
+            ["Gamma Material", "Beta Material", "Alpha Material"],
+        )
+
+    def test_material_list_sorts_ascending(self):
+        response = self.material_list("&ordering=name")
+        self.assertEqual(
+            self.material_names(response),
+            ["Alpha Material", "Beta Material", "Gamma Material"],
+        )
+
+    def test_invalid_ordering_is_ignored(self):
+        response = self.material_list("&ordering=bogus;DROP")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.material_names(response),
+            ["Alpha Material", "Beta Material", "Gamma Material"],
+        )
+
+    def test_sortable_header_renders_toggle_link(self):
+        response = self.material_list()
+        self.assertContains(response, "ordering=name")
+
+    def test_sort_link_preserves_active_filters(self):
+        response = self.material_list(f"&category={self.category.pk}&ordering=name")
+        body = response.content.decode()
+        self.assertIn(f"category={self.category.pk}", body)
+        self.assertIn("ordering=-name", body)
+
+    def test_sort_direction_indicator(self):
+        response = self.material_list("&ordering=name")
+        self.assertContains(response, 'aria-sort="ascending"')
+        response = self.material_list("&ordering=-name")
+        self.assertContains(response, 'aria-sort="descending"')
+
+    def test_sample_list_sorts_by_date(self):
+        response = self.sample_list("&ordering=-datetime")
+        names = [obj.name for obj in response.context["object_list"]]
+        self.assertLess(names.index("New Sample"), names.index("Old Sample"))
+        response = self.sample_list("&ordering=datetime")
+        names = [obj.name for obj in response.context["object_list"]]
+        self.assertLess(names.index("Old Sample"), names.index("New Sample"))
+
+    def test_non_sortable_column_has_no_ordering_link(self):
+        response = self.sample_list()
+        self.assertNotContains(response, "ordering=data")
+
+    def test_private_list_also_sorts(self):
+        self.client.force_login(self.owner)
+        Material.objects.create(
+            owner=self.owner, name="Aardvark Private", publication_status="private"
+        )
+        response = self.client.get(
+            f"{reverse('material-list-owned')}?scope=private&ordering=-name"
+        )
+        names = [obj.name for obj in response.context["object_list"]]
+        self.assertIn("Aardvark Private", names)
+        self.assertEqual(names, sorted(names, reverse=True))
