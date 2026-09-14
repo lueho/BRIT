@@ -2723,6 +2723,19 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_properties_section_open_to_owner_of_published_sample(self):
+        Sample.objects.filter(pk=self.sample.pk).update(publication_status="published")
+        response = self.client.get(
+            self.section_url("properties"), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("property_values-TOTAL_FORMS", response.json()["html"])
+        for section in ("overview", "measurements"):
+            response = self.client.get(
+                self.section_url(section), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+            )
+            self.assertEqual(response.status_code, 403, section)
+
     def test_measurements_post_creates_rows_owned_by_requesting_user(self):
         response = self.client.post(
             self.section_url("measurements"),
