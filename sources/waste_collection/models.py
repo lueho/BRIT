@@ -508,6 +508,9 @@ class Collection(NamedUserCreatedObject):
 
     objects = CollectionQuerySet.as_manager()
 
+    class Meta(NamedUserCreatedObject.Meta):
+        indexes = [models.Index(fields=["name", "id"], name="collection_name_id_idx")]
+
     VERSION_REVIEW_FIELD_NAMES = (
         "catchment",
         "collector",
