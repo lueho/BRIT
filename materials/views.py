@@ -121,6 +121,7 @@ from .models import (
     SampleSeries,
     get_or_create_sample_substrate_category,
 )
+from .permissions import can_add_data_to_sample
 from .serializers import (
     SampleModelSerializer,
     SampleSeriesModelSerializer,
@@ -1594,10 +1595,14 @@ class SampleRelationMutationPermissionMixin:
                 .values_list("sample_id", flat=True)
                 .get()
             )
-        if original_sample_id != sample.pk:
-            policy = get_object_policy(self.request.user, sample, request=self.request)
-            if not policy[self.sample_policy_key]:
-                raise PermissionDenied("You cannot add data to this sample.")
+        if not can_add_data_to_sample(
+            self.request.user,
+            sample,
+            original_sample_id,
+            self.sample_policy_key,
+            request=self.request,
+        ):
+            raise PermissionDenied("You cannot add data to this sample.")
         return super().form_valid(form)
 
 
