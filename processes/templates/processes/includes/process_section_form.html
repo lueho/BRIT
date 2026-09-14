@@ -1,0 +1,140 @@
+{% if workspace_field %}
+  {% with field=workspace_field %}
+    <div class="mb-3" data-process-field>
+      {% if field.is_hidden %}
+        {{ field }}
+      {% else %}
+        {% if field.field.widget.input_type != 'checkbox' %}
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span aria-hidden="true">*</span><span class="visually-hidden"> (required)</span>{% endif %}</label>
+        {% endif %}
+        {% if field.field.widget.url %}
+          <select name="{{ field.html_name }}"
+                  id="{{ field.id_for_label }}"
+                  class="form-select"
+                  data-process-select
+                  data-autocomplete-url="{{ field.field.workspace_autocomplete_url }}"
+                  data-label-field="{{ field.field.workspace_label_field }}"
+                  data-value-field="{{ field.field.workspace_value_field }}"
+                  aria-describedby="{{ field.auto_id }}_helptext {{ field.auto_id }}_errors"
+                  {% if field.field.widget.allow_multiple_selected %}multiple{% endif %}
+                  {% if field.field.required %}required{% endif %}
+                  {% if field.field.disabled %}disabled{% endif %}
+                  {% if field.errors %}aria-invalid="true"{% endif %}>
+            {% if not field.field.widget.allow_multiple_selected %}<option value="">---------</option>{% endif %}
+            {% for option in field.field.workspace_options %}<option value="{{ option.value }}" selected>{{ option.label }}</option>{% endfor %}
+          </select>
+        {% else %}
+          {{ field }}
+        {% endif %}
+        {% if field.field.widget.input_type == 'checkbox' %}<label class="form-check-label" for="{{ field.id_for_label }}">{% if field.name == 'DELETE' %}Remove this row when saving{% else %}{{ field.label }}{% endif %}</label>{% endif %}
+        <div id="{{ field.auto_id }}_helptext" class="form-text">{{ field.help_text }}{% if field.field.widget.url %} Type to search. Up to 15 matches are shown; refine your search to find more.{% endif %}</div>
+      {% endif %}
+      <div id="{{ field.auto_id }}_errors" class="text-danger" tabindex="-1" data-process-errors="{{ field.html_name }}">{{ field.errors }}</div>
+    </div>
+  {% endwith %}
+{% elif workspace_row %}
+  {% with row=workspace_row %}
+    <fieldset class="border rounded p-3 mb-3" data-process-row>
+      <legend class="float-none w-auto px-2 fs-6">{{ row_label|default:'Entry' }}</legend>
+      <div class="text-danger" tabindex="-1" data-process-errors="{{ row.prefix }}-__all__">{{ row.non_field_errors }}</div>
+      {% for field in row.hidden_fields %}
+        {% include "processes/includes/process_section_form.html" with workspace_field=field only %}
+      {% endfor %}
+      {% if section.key == 'inputs' or section.key == 'outputs' %}
+        {% include "processes/includes/process_section_form.html" with workspace_field=row.material only %}
+        <div class="row">
+          <div class="col-md-6">{% include "processes/includes/process_section_form.html" with workspace_field=row.quantity_value only %}</div>
+          <div class="col-md-6">{% include "processes/includes/process_section_form.html" with workspace_field=row.quantity_unit only %}</div>
+        </div>
+        <details class="mb-3" {% if row.stage.errors or row.stream_label.errors or row.notes.errors or row.optional.errors %}open{% endif %}>
+          <summary class="mb-3">Optional material details</summary>
+          {% include "processes/includes/process_section_form.html" with workspace_field=row.stage only %}
+          {% include "processes/includes/process_section_form.html" with workspace_field=row.stream_label only %}
+          {% include "processes/includes/process_section_form.html" with workspace_field=row.notes only %}
+          {% include "processes/includes/process_section_form.html" with workspace_field=row.optional only %}
+        </details>
+        {% include "processes/includes/process_section_form.html" with workspace_field=row.DELETE only %}
+      {% else %}
+        {% for field in row.visible_fields %}
+          {% include "processes/includes/process_section_form.html" with workspace_field=field only %}
+        {% endfor %}
+      {% endif %}
+    </fieldset>
+  {% endwith %}
+{% else %}
+  <form id="process-section-{{ section.key|default:'create' }}-form"
+        method="post"
+        action="{{ section_url|default:request.path }}"
+        enctype="multipart/form-data"
+        data-process-section-form
+        novalidate>
+    {% csrf_token %}
+    <noscript><p class="alert alert-warning">JavaScript is required to search for entries and add new rows. Only existing selections are shown. You can still edit and save other fields.</p></noscript>
+    <fieldset data-process-fields>
+      <legend class="fs-5" tabindex="-1" data-process-form-title>{% if section %}Edit {{ section.label }}{% else %}Start with the essentials{% endif %}</legend>
+      {% if object.publication_status == 'published' %}
+        <p class="alert alert-warning">This process is published. Saving updates the published process immediately; it does not create a private draft.</p>
+      {% elif object %}
+        <p class="small text-muted">Save this section without changing publication status. Review and publication are separate actions.</p>
+      {% else %}
+        <p class="small text-muted">Only a title is required. Save a private draft, then add details one section at a time.</p>
+      {% endif %}
+      <!-- Main Process Information -->
+      <div class="text-danger" tabindex="-1" data-process-errors="process-__all__">{{ form.non_field_errors }}</div>
+      {% for field in form %}
+        {% include "processes/includes/process_section_form.html" with workspace_field=field only %}
+      {% endfor %}
+      {% for inline in inlines %}
+        <section class="mb-4" data-process-formset="{{ inline.prefix }}" aria-labelledby="{{ inline.prefix }}-heading">
+          {% if inline.prefix == 'process_materials' %}
+            <!-- Materials -->
+            <h3 class="h6" id="{{ inline.prefix }}-heading">{{ section.label }}</h3>
+          {% elif inline.prefix == 'operating_parameters' %}
+            <!-- Operating Parameters -->
+            <h3 class="h6" id="{{ inline.prefix }}-heading">Operating parameters</h3>
+          {% elif inline.prefix == 'process_authors' %}
+            <!-- Authors -->
+            <h3 class="h6" id="{{ inline.prefix }}-heading">Contributors</h3>
+          {% elif inline.prefix == 'process_sources' %}
+            <!-- Bibliography -->
+            <h3 class="h6" id="{{ inline.prefix }}-heading">Bibliography</h3>
+          {% elif inline.prefix == 'links' %}
+            <!-- Links -->
+            <h3 class="h6" id="{{ inline.prefix }}-heading">Links</h3>
+          {% elif inline.prefix == 'info_resources' %}
+            <!-- Info Resources -->
+            <h3 class="h6" id="{{ inline.prefix }}-heading">Information resources</h3>
+          {% endif %}
+          {{ inline.management_form }}
+          <div class="text-danger" tabindex="-1" data-process-errors="{{ inline.prefix }}-management">{{ inline.management_form.errors }}</div>
+          <div class="text-danger" tabindex="-1" data-process-errors="{{ inline.prefix }}-__all__">{{ inline.non_form_errors }}</div>
+          <div data-process-rows>
+            {% for row in inline %}
+              {% include "processes/includes/process_section_form.html" with workspace_row=row row_label='Entry' section=section only %}
+            {% endfor %}
+          </div>
+          <template data-process-empty>
+            {% include "processes/includes/process_section_form.html" with workspace_row=inline.empty_form row_label='New entry' section=section only %}
+          </template>
+          <button type="button" class="btn btn-outline-primary btn-sm" data-process-add>
+            {% if inline.prefix == 'process_materials' %}Add {% if section.key == 'inputs' %}input{% else %}output{% endif %}{% elif inline.prefix == 'operating_parameters' %}Add parameter{% elif inline.prefix == 'process_authors' %}Add contributor{% elif inline.prefix == 'process_sources' %}Add reference{% elif inline.prefix == 'links' %}Add link{% else %}Add information resource{% endif %}
+          </button>
+        </section>
+      {% endfor %}
+      <!-- Form Actions -->
+      <p data-process-local-status></p>
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button type="submit" class="btn btn-primary">
+          {% if not object %}{{ submit_button_text|default:'Save private draft' }}{% elif object.publication_status == 'published' %}Save published changes{% elif object.publication_status == 'private' %}Save privately{% else %}Save changes (keep {{ object.get_publication_status_display|lower }} status){% endif %}
+        </button>
+        <a class="btn btn-outline-secondary"
+           href="{% if workspace_url %}{{ workspace_url }}{% else %}{% url 'processes:process-list' %}{% endif %}"
+           data-process-cancel>Cancel</a>
+      </div>
+    </fieldset>
+    <template data-process-media>
+      {{ form.media }}
+      {% for inline in inlines %}{{ inline.empty_form.media }}{% endfor %}
+    </template>
+  </form>
+{% endif %}

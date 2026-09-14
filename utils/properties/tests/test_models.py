@@ -211,3 +211,59 @@ class CustomPintDefinitionsTestCase(TestCase):
         unit = Unit.objects.create(name="meq/100 g", symbol="meq_100g")
         self.assertIsNotNone(unit.pint_unit)
         unit.delete()
+
+
+class SemanticUnitConversionTestCase(TestCase):
+    def test_semantic_unit_scaling(self):
+        for source, target, value, expected in (
+            ("NmL", "NL", "1000", "1"),
+            ("NL", "NmL", "1", "1000"),
+            ("NmL/g", "NL/kg", "1", "1"),
+            ("NL/kg", "NmL/g", "1", "1"),
+            ("volume_percent", "volume_fraction", "25", "0.25"),
+        ):
+            with self.subTest(source=source, target=target):
+                source_unit = Unit(name=source, symbol=source)
+                target_unit = Unit(name=target, symbol=target)
+                self.assertIsNotNone(source_unit.pint_unit)
+                self.assertEqual(
+                    source_unit.convert(Decimal(value), target_unit), Decimal(expected)
+                )
+
+    def test_semantically_different_units_cannot_be_converted(self):
+        for left, right in (
+            ("NL", "L"),
+            ("NmL/g", "mL/g"),
+            ("NL/kg", "L/kg"),
+            ("volume_percent", "percent"),
+            ("volume_percent", "g/kg"),
+        ):
+            for source, target in ((left, right), (right, left)):
+                with self.subTest(source=source, target=target):
+                    source_unit = Unit(name=source, symbol=source)
+                    target_unit = Unit(name=target, symbol=target)
+                    self.assertIsNotNone(source_unit.pint_unit)
+                    self.assertIsNotNone(target_unit.pint_unit)
+                    with self.assertRaises(UnitConversionError):
+                        source_unit.convert(Decimal("1"), target_unit)
+
+    def test_volume_percent_is_not_a_weight_fraction(self):
+        volume, _ = Unit.objects.update_or_create(
+            name="vol.-%", defaults={"symbol": "volume_percent", "dimensionless": True}
+        )
+        mass = Unit.objects.create(name="wt%", symbol="percent", dimensionless=True)
+        self.assertFalse(volume.is_weight_fraction)
+        self.assertTrue(mass.is_weight_fraction)
+        self.assertNotIn(volume, Unit.objects.filter(Unit.weight_fraction_q()))
+        self.assertIn(mass, Unit.objects.filter(Unit.weight_fraction_q()))
+
+    def test_mass_fraction_conversion_with_and_without_pint(self):
+        source = Unit(name="g/kg", symbol="g/kg")
+        target = Unit(name="%", symbol="percent")
+        self.assertEqual(source.convert(Decimal("100"), target), Decimal("10"))
+        with patch("utils.properties.models.get_unit_registry", return_value=None):
+            self.assertEqual(source.convert(Decimal("100"), target), Decimal("10"))
+            volume = Unit(name="vol.-%", symbol="volume_percent")
+            for left, right in ((volume, target), (target, volume)):
+                with self.assertRaises(UnitConversionError):
+                    left.convert(Decimal("1"), right)

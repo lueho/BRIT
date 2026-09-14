@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}
+    BRIT | File unavailable
+{% endblock title %}
+{% block page_chrome %}
+{% endblock page_chrome %}
+{% block content %}
+    <div class="container py-4">
+        <h1>File unavailable</h1>
+        <p>Sorry, this supporting file is currently unavailable. Please try again later or contact the record owner.</p>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ retry_url }}" class="btn btn-primary">Try again</a>
+            <a href="{{ back_url }}" class="btn btn-outline-secondary">{{ back_label }}</a>
+        </div>
+    </div>
+{% endblock content %}

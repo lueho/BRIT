@@ -225,6 +225,10 @@ class CollectionCountOptions(UserCreatedObject):
     option_2 = models.PositiveSmallIntegerField(blank=True, null=True)
     option_3 = models.PositiveSmallIntegerField(blank=True, null=True)
 
+    class Meta(UserCreatedObject.Meta):
+        verbose_name = "collection count options"
+        verbose_name_plural = "collection count options"
+
     @property
     def non_standard_options(self):
         return [

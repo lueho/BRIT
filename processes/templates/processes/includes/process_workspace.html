@@ -1,0 +1,46 @@
+{% load static %}
+<div data-process-workspace data-static-url="{% get_static_prefix %}">
+  <header class="sdv2-hero sdv2-surface sdv2-hero-no-media mb-3">
+    <div class="sdv2-hero-identity">
+      <div class="sdv2-hero-kicker">Process maintenance</div>
+      <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+        <h1 class="sdv2-hero-title mb-0" data-process-title>{{ object.name }}</h1>
+        <a class="btn btn-outline-primary btn-sm"
+           href="{{ object.update_url }}?section=overview"
+           data-process-edit="overview"
+           data-process-focus="name"
+           aria-controls="process-editor-overview"
+           aria-expanded="false">Edit title</a>
+      </div>
+      <p class="mb-0">Edit one section at a time. Each save updates only that section.</p>
+      {% if object.publication_status == 'published' %}
+        <p class="text-warning-emphasis mt-2 mb-0">This process is published. Saved changes are immediately public.</p>
+      {% else %}
+        <p class="text-muted mt-2 mb-0">Saving does not publish this process or submit it for review.</p>
+      {% endif %}
+    </div>
+  </header>
+  <p class="small text-muted mb-3" data-process-status role="status" aria-live="polite" aria-atomic="true">Choose a section to edit.</p>
+  {% for section in maintenance_sections %}
+    <section class="sdv2-section-panel mb-3"
+             id="process-section-{{ section.key }}"
+             data-process-section="{{ section.key }}"
+             aria-labelledby="process-heading-{{ section.key }}">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <h2 class="sdv2-section-title" id="process-heading-{{ section.key }}" data-process-heading>{{ section.label }}</h2>
+        <div class="text-end">
+          <a class="btn btn-outline-primary btn-sm"
+             href="{{ section.url }}"
+             data-process-edit="{{ section.key }}"
+             aria-controls="process-editor-{{ section.key }}"
+             aria-expanded="false">Edit {{ section.label|lower }}</a>
+          <div class="small mt-1"><a href="{{ section.url }}">Full-page editor<span class="visually-hidden"> for {{ section.label|lower }}</span></a></div>
+        </div>
+      </div>
+      <div data-process-summary>
+        {% include "processes/includes/process_section_summary.html" with object=object section=section material_links=section.material_links only %}
+      </div>
+      <div id="process-editor-{{ section.key }}" data-process-editor hidden></div>
+    </section>
+  {% endfor %}
+</div>

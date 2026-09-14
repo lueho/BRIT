@@ -50,6 +50,14 @@ def convert_weight_fraction_value(value, source_token, target_token):
 
 
 CUSTOM_PINT_DEFINITIONS = (
+    # Normal gas volume at 0 degrees C and 101325 Pa. A separate dimension
+    # prevents conversion to actual volume without the gas reference conditions.
+    ("normal_liter", "normal_liter = [normal_volume] = NL"),
+    ("normal_milliliter", "normal_milliliter = 0.001 * normal_liter = NmL"),
+    # Physically dimensionless, but semantically distinct from mass fractions.
+    # Do not alias to percent: Pint would then permit mass/volume conversion.
+    ("volume_fraction", "volume_fraction = [volume_fraction]"),
+    ("volume_percent", "volume_percent = 0.01 * volume_fraction = vol_percent"),
     ("percent", "percent = 0.01 * count = %"),
     ("permille", "permille = 0.001 * count = ‰"),
     ("dry_matter_basis", "dry_matter_basis = [] = DM"),

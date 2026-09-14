@@ -1,0 +1,115 @@
+{% if section.key == 'overview' %}
+  <dl class="mb-0">
+    <dt>Title</dt><dd>{{ object.name }}</dd>
+    <dt>Short description</dt><dd>{{ object.short_description|default:'Not added yet.'|linebreaksbr }}</dd>
+    <dt>Categories</dt>
+    <dd>{% for category in object.categories.all %}<a href="{{ category.get_absolute_url }}">{{ category.name }}</a>{% if not forloop.last %}, {% endif %}{% empty %}Not added yet.{% endfor %}</dd>
+    <dt>Parent process</dt>
+    <dd>{% if object.parent %}<a href="{{ object.parent.get_absolute_url }}">{{ object.parent.name }}</a>{% else %}Not added yet.{% endif %}</dd>
+  </dl>
+{% elif section.key == 'technology' %}
+  <dl class="mb-0">
+    <dt>Mechanism</dt><dd>{{ object.mechanism|default:'Not added yet.'|linebreaksbr }}</dd>
+    <dt>Description</dt><dd>{{ object.description|default:'Not added yet.'|linebreaksbr }}</dd>
+    <dt>Process technology</dt><dd>{{ object.process_technology|default:'Not added yet.'|linebreaksbr }}</dd>
+  </dl>
+{% elif section.key == 'inputs' or section.key == 'outputs' %}
+  <ul class="list-unstyled mb-0">
+    {% for link in material_links %}
+      <li class="mb-3">
+        <a class="fw-semibold" href="{{ link.material.get_absolute_url }}">{{ link.material.name }}</a>
+        {% if link.quantity_value is not None %}<span class="ms-1">{{ link.get_quantity_value_display }}{% if link.quantity_unit %} {{ link.quantity_unit.name }}{% endif %}</span>{% endif %}
+        {% if link.optional %}<span class="badge text-bg-light">Optional</span>{% endif %}
+        {% if link.stage %}<div class="small">Stage: {{ link.stage }}</div>{% endif %}
+        {% if link.stream_label %}<div class="small">Stream: {{ link.stream_label }}</div>{% endif %}
+        {% if link.notes %}<div class="text-muted small">{{ link.notes|linebreaksbr }}</div>{% endif %}
+      </li>
+    {% empty %}
+      <li class="text-muted">No {{ section.label|lower }} added yet. Use Edit to add the first entry.</li>
+    {% endfor %}
+  </ul>
+{% elif section.key == 'parameters' %}
+  <ul class="list-unstyled mb-0">
+    {% for parameter in object.operating_parameters.all %}
+      <li class="mb-3">
+        <span class="fw-semibold">{{ parameter.name|default:parameter.get_parameter_display }}</span>
+        {% if parameter.name %}<span class="small text-muted">({{ parameter.get_parameter_display }})</span>{% endif %}:
+        {% if parameter.nominal_value is not None %}
+          {{ parameter.get_nominal_value_display }}
+        {% elif parameter.value_min is not None or parameter.value_max is not None %}
+          {{ parameter.get_value_min_display|default:'—' }} – {{ parameter.get_value_max_display|default:'—' }}
+        {% else %}
+          No value added yet
+        {% endif %}
+        {% if parameter.unit %}{{ parameter.unit.name }}{% endif %}
+        {% if parameter.nominal_value is not None and parameter.value_min is not None or parameter.nominal_value is not None and parameter.value_max is not None %}
+          <span class="small">(range: {{ parameter.get_value_min_display|default:'—' }} – {{ parameter.get_value_max_display|default:'—' }})</span>
+        {% endif %}
+        {% if parameter.basis %}<div class="small">Basis: {{ parameter.basis }}</div>{% endif %}
+        {% if parameter.notes %}<div class="text-muted small">{{ parameter.notes|linebreaksbr }}</div>{% endif %}
+      </li>
+    {% empty %}
+      <li class="text-muted">No operating parameters added yet. Use Edit to add the first entry.</li>
+    {% endfor %}
+  </ul>
+{% elif section.key == 'references' %}
+  <h3 class="h6">Contributors</h3>
+  <ul class="list-unstyled">
+    {% for link in object.process_authors.all %}
+      <li class="mb-2">
+        <span class="fw-semibold">{{ link.author }}</span>
+        {% if link.author.institution %}<span>({{ link.author.institution }})</span>{% endif %}
+        {% if link.author.contact_email %}<a href="mailto:{{ link.author.contact_email }}">{{ link.author.contact_email }}</a>{% endif %}
+      </li>
+    {% empty %}
+      <li class="text-muted">No contributors added yet.</li>
+    {% endfor %}
+  </ul>
+  <h3 class="h6">Bibliography</h3>
+  <ul class="list-unstyled mb-0">
+    {% for link in object.process_sources.all %}
+      <li class="mb-2"><a href="{{ link.source.get_absolute_url }}">{{ link.source.abbreviation|default:'Source' }}</a></li>
+    {% empty %}
+      <li class="text-muted">No references added yet.</li>
+    {% endfor %}
+  </ul>
+{% elif section.key == 'image' %}
+  {% if object.image %}
+    <figure class="mb-3">
+      <img class="img-fluid rounded" src="{{ object.image.url }}" alt="{{ object.image_alt_text|default_if_none:''|default:object.name }}" loading="lazy" decoding="async">
+      {% if object.image_caption or object.image_rights_notice %}
+        <figcaption class="small text-muted mt-2">
+          {% if object.image_caption %}<div>{{ object.image_caption }}</div>{% endif %}
+          {% if object.image_rights_notice %}<div>{{ object.image_rights_notice }}</div>{% endif %}
+        </figcaption>
+      {% endif %}
+    </figure>
+  {% else %}
+    <p class="text-muted">No image added yet.</p>
+  {% endif %}
+{% elif section.key == 'resources' %}
+  {% if object.supplementary_document %}
+    <p><a href="{{ object.supplementary_document_download_url }}">Download supplementary document</a></p>
+  {% else %}
+    <p class="text-muted">No supplementary document added yet.</p>
+  {% endif %}
+  <h3 class="h6">Links</h3>
+  <ul class="list-unstyled">
+    {% for link in object.links.all %}
+      <li><a href="{{ link.url }}" {% if link.open_in_new_tab %}target="_blank" rel="noopener"{% endif %}>{{ link.label }}{% if link.open_in_new_tab %}<span class="visually-hidden"> (opens in a new tab)</span>{% endif %}</a></li>
+    {% empty %}
+      <li class="text-muted">No links added yet.</li>
+    {% endfor %}
+  </ul>
+  <h3 class="h6">Information resources</h3>
+  <ul class="list-unstyled mb-0">
+    {% for resource in object.info_resources.all %}
+      <li class="mb-3">
+        <a href="{{ resource.target_url }}">{{ resource.title }}</a> ({{ resource.get_resource_type_display }})
+        {% if resource.description %}<div class="text-muted small">{{ resource.description|linebreaksbr }}</div>{% endif %}
+      </li>
+    {% empty %}
+      <li class="text-muted">No information resources added yet.</li>
+    {% endfor %}
+  </ul>
+{% endif %}

@@ -15,9 +15,8 @@
         <dt class="col-sm-3">Supplementary PDF</dt>
         <dd class="col-sm-9">
             {% if object.supplementary_document %}
-                <a href="{{ object.supplementary_document.url }}"
-                   class="btn btn-outline-primary btn-sm"
-                   download>
+                <a href="{{ object.supplementary_document_download_url }}"
+                   class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-file-earmark-pdf"></i> Download combined process information
                 </a>
             {% else %}

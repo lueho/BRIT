@@ -9,6 +9,31 @@ from ..models import Author
 
 
 class SourceBibtexArticleImportFormTestCase(TestCase):
+    def test_form_resolves_braced_corporate_author_as_organization(self):
+        owner = User.objects.create(username="owner")
+        organization = Author.objects.create(
+            owner=owner,
+            author_type="organization",
+            organization_name="World Health Organization",
+        )
+        form = SourceBibtexArticleImportForm(
+            data={
+                "bibtex_entry": """
+                @article{Corporate2024,
+                    author = {{World Health Organization}},
+                    title = {Corporate report},
+                    journal = {Public Health Review},
+                    year = {2024}
+                }
+                """
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        source = form.create_source(owner=owner)
+
+        self.assertEqual(list(source.authors.all()), [organization])
+
     def test_form_creates_article_source_from_bibtex_with_existing_authors(self):
         owner = User.objects.create(username="owner")
         ada = Author.objects.create(

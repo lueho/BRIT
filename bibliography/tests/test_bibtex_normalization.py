@@ -20,8 +20,10 @@ class ParseBibtexArticleNormalizationTestCase(TestCase):
             parsed["authors"],
             [
                 {
+                    "author_type": "organization",
                     "first_names": "",
                     "last_names": "World Health Organization",
+                    "organization_name": "World Health Organization",
                     "suffix": "",
                 },
                 {

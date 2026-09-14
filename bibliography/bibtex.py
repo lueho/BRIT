@@ -428,9 +428,12 @@ def _split_author_chunks_best_effort(raw_value: str) -> list[str]:
 def _parse_single_author_best_effort(name: str) -> dict:
     raw_name = name.strip()
     if _is_fully_braced(raw_name):
+        organization_name = _flatten_bibtex_text(raw_name[1:-1])
         return {
+            "author_type": "organization",
             "first_names": "",
-            "last_names": _flatten_bibtex_text(raw_name[1:-1]),
+            "last_names": organization_name,
+            "organization_name": organization_name,
             "suffix": "",
         }
 

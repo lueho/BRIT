@@ -55,6 +55,53 @@ class UnitAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         result_ids = {item["id"] for item in response.json()["results"]}
         self.assertIn(self.matching_unit.pk, result_ids)
 
+    def test_search_by_name_returns_matching_unit(self):
+        """A `q` query should filter results by unit name and exclude non-matches."""
+        response = self.client.get(reverse("unit-autocomplete"), {"q": "Kilogram"})
+        self.assertEqual(response.status_code, 200)
+        result_ids = {item["id"] for item in response.json()["results"]}
+        self.assertIn(self.matching_unit.pk, result_ids)
+        # Non-matching units must be filtered out by the search query.
+        litre = Unit.objects.get(name="Litre")
+        self.assertNotIn(litre.pk, result_ids)
+
+    def test_search_by_symbol_returns_matching_unit(self):
+        """A `q` query should filter results by unit symbol."""
+        unit_with_symbol = Unit.objects.create(
+            name="Test Symbol Unit",
+            symbol="tsu_sym",
+            publication_status="published",
+        )
+        try:
+            response = self.client.get(reverse("unit-autocomplete"), {"q": "tsu_sym"})
+            self.assertEqual(response.status_code, 200)
+            result_ids = {item["id"] for item in response.json()["results"]}
+            self.assertIn(unit_with_symbol.pk, result_ids)
+            # Non-matching units must be filtered out by the search query.
+            self.assertNotIn(self.matching_unit.pk, result_ids)
+        finally:
+            unit_with_symbol.delete()
+
+    def test_search_returns_private_unit_for_owner(self):
+        """An owner should find their private unit via autocomplete search."""
+        private_unit = Unit.objects.create(
+            name="Owner Private Unit",
+            owner=self.owner,
+            publication_status="private",
+        )
+        try:
+            self.client.force_login(self.owner)
+            response = self.client.get(
+                reverse("unit-autocomplete"), {"q": "Owner Private"}
+            )
+            self.assertEqual(response.status_code, 200)
+            result_ids = {item["id"] for item in response.json()["results"]}
+            self.assertIn(private_unit.pk, result_ids)
+            # Non-matching units must be filtered out by the search query.
+            self.assertNotIn(self.matching_unit.pk, result_ids)
+        finally:
+            private_unit.delete()
+
 
 # ----------- Property CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------

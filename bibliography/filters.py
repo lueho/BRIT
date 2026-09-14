@@ -15,10 +15,11 @@ from .models import Author, Licence, Source
 class AuthorFilterSet(UserCreatedObjectScopedFilterSet):
     last_names = CharFilter(lookup_expr="icontains")
     first_names = CharFilter(lookup_expr="icontains")
+    organization_name = CharFilter(lookup_expr="icontains")
 
     class Meta:
         model = Author
-        fields = ("scope", "last_names", "first_names")
+        fields = ("scope", "last_names", "first_names", "organization_name")
 
 
 class LicenceListFilter(UserCreatedObjectScopedFilterSet):
@@ -66,6 +67,7 @@ def author_icontains(queryset, _, value):
     return queryset.filter(
         Q(authors__last_names__icontains=value)
         | Q(authors__first_names__icontains=value)
+        | Q(authors__organization_name__icontains=value)
     ).distinct()
 
 

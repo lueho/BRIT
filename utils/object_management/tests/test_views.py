@@ -5,8 +5,9 @@ from urllib.parse import urlencode
 from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages import get_messages
+from django.core.exceptions import PermissionDenied
 from django.db.models.signals import post_save, pre_save
-from django.http import HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -17,12 +18,18 @@ from factory.django import mute_signals
 from bibliography.models import Author, Source
 from distributions.models import TemporalDistribution
 from maps.models import Catchment, Region
+from maps.views import GeoDataSetPrivateGalleryView, GeoDataSetPublishedGalleryView
 from sources.waste_collection.models import (
     Collection,
     CollectionPropertyValue,
     Collector,
 )
-from sources.waste_collection.views import CollectionDetailView
+from sources.waste_collection.views import (
+    CollectionDetailView,
+    CollectionPrivateListView,
+    CollectionPublishedListView,
+    CollectionReviewFilterView,
+)
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.object_management.views import (
     ReviewDashboardView,
@@ -567,6 +574,118 @@ class FilterDefaultsMixinTest(TestCase):
         self.assertIsInstance(response, HttpResponseRedirect)
         expected_query = urlencode({"name": "Initial name"})
         self.assertTrue(expected_query in response.url)
+
+    def test_redirect_skips_filter_view_get(self):
+        request = self.factory.get("/filtered/")
+
+        with patch.object(FilterView, "get") as get:
+            response = MockFilterView.as_view()(request)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, "/filtered/?name=Initial+name")
+        get.assert_not_called()
+
+    def test_redirect_encodes_overridden_defaults(self):
+        request = self.factory.get("/filtered/")
+        defaults = {"name": "A&B / café", "scope": "private"}
+
+        with patch.object(MockFilterView, "get_default_filters", return_value=defaults):
+            response = MockFilterView.as_view()(request)
+
+        self.assertEqual(response.url, f"/filtered/?{urlencode(defaults)}")
+
+    def test_existing_query_parameters_use_filter_view(self):
+        for query in ("?name=Other+name", "?name=", "?page=2", "?scope=private"):
+            with self.subTest(query=query):
+                request = self.factory.get(f"/filtered/{query}")
+                expected_response = HttpResponse()
+                with (
+                    patch.object(
+                        FilterView, "get", return_value=expected_response
+                    ) as get,
+                    patch.object(MockFilterView, "get_default_filters") as defaults,
+                ):
+                    response = MockFilterView.as_view()(request)
+
+                self.assertIs(response, expected_response)
+                get.assert_called_once_with(request)
+                defaults.assert_not_called()
+
+    def test_no_defaults_uses_filter_view(self):
+        request = self.factory.get("/filtered/")
+        expected_response = HttpResponse()
+
+        with (
+            patch.object(MockFilterView, "get_default_filters", return_value={}),
+            patch.object(FilterView, "get", return_value=expected_response) as get,
+        ):
+            response = MockFilterView.as_view()(request)
+
+        self.assertIs(response, expected_response)
+        get.assert_called_once_with(request)
+
+    def test_head_uses_filter_view_without_default_redirect(self):
+        request = self.factory.head("/filtered/")
+        expected_response = HttpResponse()
+
+        with (
+            patch.object(FilterView, "get", return_value=expected_response) as get,
+            patch.object(MockFilterView, "get_default_filters") as defaults,
+        ):
+            response = MockFilterView.as_view()(request)
+
+        self.assertIs(response, expected_response)
+        get.assert_called_once_with(request)
+        defaults.assert_not_called()
+
+    def test_scoped_list_redirects_do_not_query_database(self):
+        for view_class, scope in (
+            (CollectionPublishedListView, "published"),
+            (CollectionPrivateListView, "private"),
+            (CollectionReviewFilterView, "review"),
+            (GeoDataSetPublishedGalleryView, "published"),
+            (GeoDataSetPrivateGalleryView, "private"),
+        ):
+            with self.subTest(view=view_class.__name__):
+                request = self.factory.get("/filtered/")
+                request.user = (
+                    AnonymousUser()
+                    if scope == "published"
+                    else User(pk=1, is_staff=True)
+                )
+
+                with self.assertNumQueries(0):
+                    response = view_class.as_view()(request)
+
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(response.url, f"/filtered/?scope={scope}")
+
+    def test_anonymous_private_and_review_requests_still_require_login(self):
+        for view_class in (CollectionPrivateListView, CollectionReviewFilterView):
+            with self.subTest(view=view_class.__name__):
+                request = self.factory.get("/filtered/")
+                request.user = AnonymousUser()
+
+                with patch.object(view_class, "get_default_filters") as defaults:
+                    response = view_class.as_view()(request)
+
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(
+                    response.url, f"{reverse('auth_login')}?next=/filtered/"
+                )
+                defaults.assert_not_called()
+
+    def test_non_moderator_review_request_is_denied_before_defaults(self):
+        request = self.factory.get("/filtered/")
+        request.user = User.objects.create_user(username="redirect-non-moderator")
+
+        with patch.object(
+            CollectionReviewFilterView, "get_default_filters"
+        ) as defaults:
+            with self.assertRaises(PermissionDenied):
+                CollectionReviewFilterView.as_view()(request)
+
+        defaults.assert_not_called()
 
 
 class PublishedObjectsFilterViewTestCase(TestCase):
