@@ -40,7 +40,6 @@ class AddComponentGroupModalModelFormTestCase(TestCase):
     def setUp(self):
         self.material = Material.objects.get(name="Test Material")
         self.group1 = MaterialComponentGroup.objects.get(name="Test Group 1")
-        self.group2 = MaterialComponentGroup.objects.get(name="Test Group 2")
 
     def test_initial_group_queryset_has_only_unused_groups(self):
         sample_series = SampleSeries.objects.create(material=self.material)
