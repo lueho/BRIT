@@ -65,7 +65,7 @@
                 this.addRow(add.closest("[data-workspace-formset]"));
             }
             const paste = event.target.closest("[data-workspace-paste-apply]");
-            if (paste && this.active && !this.active.busy) {
+            if (paste && this.active && !this.active.busy && !this.active.pasting) {
                 event.preventDefault();
                 this.applyPaste(paste.closest("[data-workspace-paste]"));
             }
@@ -363,7 +363,7 @@
             const index = Number(total.value);
             if (max?.value && index >= Number(max.value)) {
                 this.announce("The maximum number of rows has been reached.", true);
-                return;
+                return null;
             }
             const template = formset.querySelector("template[data-workspace-empty]");
             const fragment = this.fragment(template.innerHTML.replace(/__prefix__/g, String(index)));
@@ -375,7 +375,7 @@
             this.announce("Row added. Changes are not saved yet.");
             try {
                 await this.loadMedia(active.editor);
-                if (this.active !== active) return;
+                if (this.active !== active) return null;
                 this.initializeWidgets(row);
                 if (active.busy) {
                     row.querySelectorAll("select[data-workspace-select]").forEach((select) => select.tomselect?.disable());
@@ -385,6 +385,7 @@
             } catch (error) {
                 if (this.active === active) this.announce("Row added, but search could not load. Your entries are kept. You need JavaScript search to choose new entries; check your connection and retry.", true);
             }
+            return row;
         }
 
         parsePaste(text) {
@@ -398,12 +399,14 @@
         }
 
         isPasteHeader(cells, columns) {
-            const numeric = ["average", "standard_deviation", "sample_size"];
-            return numeric.some((name) => {
-                const index = columns.indexOf(name);
-                const cell = index >= 0 ? cells[index] : undefined;
-                return cell !== undefined && cell !== "" && !Number.isFinite(Number(cell.replace(",", ".")));
-            });
+            const aliases = {
+                average: ["value", "average", "mean", "avg"],
+                standard_deviation: ["standard deviation", "std", "sd", "stdev", "stddev"],
+                sample_size: ["sample size", "n", "count", "samples"],
+            };
+            const normalize = (text) => text.trim().toLowerCase().replace(/[_\-.]+/g, " ").replace(/\s+/g, " ");
+            const filled = columns.map((name, index) => [name, cells[index]]).filter(([, cell]) => cell !== undefined && cell !== "");
+            return filled.length > 0 && filled.every(([name, cell]) => (aliases[name] || [normalize(name)]).includes(normalize(cell)));
         }
 
         async resolveReference(select, name) {
@@ -425,8 +428,10 @@
 
         async applyPaste(panel) {
             const active = this.active;
+            if (!active || active.pasting) return;
             const input = panel.querySelector("[data-workspace-paste-input]");
-            const formset = this.active.editor.querySelector(`[data-workspace-formset="${input.dataset.pasteFormset}"]`);
+            const apply = panel.querySelector("[data-workspace-paste-apply]");
+            const formset = active.editor.querySelector(`[data-workspace-formset="${input.dataset.pasteFormset}"]`);
             const columns = (input.dataset.pasteColumns || "").split(",").map((name) => name.trim()).filter(Boolean);
             if (!formset || !columns.length) return;
             let lines = this.parsePaste(input.value);
@@ -435,12 +440,25 @@
                 this.announce("Nothing to add — paste one row per line.", true);
                 return;
             }
+            active.pasting = true;
+            if (apply) apply.disabled = true;
+            try {
+                await this.fillPastedRows(active, formset, input, columns, lines);
+            } finally {
+                active.pasting = false;
+                if (apply) apply.disabled = false;
+            }
+        }
+
+        async fillPastedRows(active, formset, input, columns, lines) {
             const numeric = ["average", "standard_deviation", "sample_size"];
             let unresolved = 0;
+            let added = 0;
             for (const cells of lines) {
-                await this.addRow(formset);
+                const row = await this.addRow(formset);
                 if (this.active !== active) return;
-                const row = formset.querySelector("[data-workspace-rows]").lastElementChild;
+                if (!row) break;
+                added += 1;
                 for (const [index, column] of columns.entries()) {
                     const text = cells[index];
                     if (text === undefined || text === "") continue;
@@ -457,12 +475,15 @@
                     }
                 }
             }
+            const skipped = lines.length - added;
+            if (!added) return;
             input.value = "";
             active.dirty = true;
-            this.announce(unresolved
-                ? `Added ${lines.length} rows. ${unresolved} name${unresolved === 1 ? "" : "s"} could not be matched — pick ${unresolved === 1 ? "it" : "them"} manually before saving.`
-                : `Added ${lines.length} row${lines.length === 1 ? "" : "s"}. Review them, then save the section.`,
-            unresolved > 0);
+            const parts = [`Added ${added} row${added === 1 ? "" : "s"}.`];
+            if (skipped) parts.push(`${skipped} line${skipped === 1 ? " was" : "s were"} not added because the maximum number of rows has been reached.`);
+            if (unresolved) parts.push(`${unresolved} name${unresolved === 1 ? "" : "s"} could not be matched — pick ${unresolved === 1 ? "it" : "them"} manually before saving.`);
+            if (!skipped && !unresolved) parts.push("Review them, then save the section.");
+            this.announce(parts.join(" "), skipped > 0 || unresolved > 0);
         }
 
         setExpanded(active, expanded) {
