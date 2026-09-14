@@ -6,19 +6,34 @@
             aria-label="Close"></button>
 </div>
 <div class="modal-body">
-    {% if object.last_names %}
+    {% if object.author_type == "organization" %}
         <p>
-            <strong>Last names:</strong>
+            <strong>Organization:</strong>
             <br>
-            {{ object.last_names }}
+            {{ object.organization_name }}
         </p>
-    {% endif %}
-    {% if object.first_names %}
-        <p>
-            <strong>First names:</strong>
-            <br>
-            {{ object.first_names }}
-        </p>
+        {% if object.organization_abbreviation %}
+            <p>
+                <strong>Abbreviation:</strong>
+                <br>
+                {{ object.organization_abbreviation }}
+            </p>
+        {% endif %}
+    {% else %}
+        {% if object.last_names %}
+            <p>
+                <strong>Last names:</strong>
+                <br>
+                {{ object.last_names }}
+            </p>
+        {% endif %}
+        {% if object.first_names %}
+            <p>
+                <strong>First names:</strong>
+                <br>
+                {{ object.first_names }}
+            </p>
+        {% endif %}
     {% endif %}
     {% if object.institution %}
         <p>

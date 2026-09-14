@@ -26,7 +26,6 @@ from .models import (
     MaterialCategory,
     MaterialComponent,
     MaterialComponentGroup,
-    MaterialComponentKind,
     MaterialProperty,
     MaterialPropertyAggregationKind,
     Sample,
@@ -121,12 +120,13 @@ class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
             ),
         ),
     )
-    component_kind = ChoiceFilter(
-        field_name="component_kind",
-        label="Kind",
-        choices=MaterialComponentKind.choices,
-        empty_label="All",
-    )
+
+    class Meta:
+        model = MaterialComponent
+        fields = (
+            "scope",
+            "name",
+        )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -150,14 +150,6 @@ class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
             )
 
         self.filters["name"].queryset = queryset
-
-    class Meta:
-        model = MaterialComponent
-        fields = (
-            "scope",
-            "name",
-            "component_kind",
-        )
 
 
 class MaterialComponentGroupListFilter(UserCreatedObjectScopedFilterSet):

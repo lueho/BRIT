@@ -64,8 +64,9 @@
                                    class="collection-link">
                                     <strong class="d-block">{{ object.catchment.region.name }} - {{ object.effective_waste_category }} collection</strong>
                                     <span class="text-muted small">
-                                        {{ object.collector }} · {{ object.collection_system }} · {{ object.valid_from.year }}
+                                        {{ object.collector }} · {{ object.collection_system }}
                                     </span>
+                                    {% include "waste_collection/includes/collection_valid_period.html" with collection=object only %}
                                 </a>
                             </td>
                             <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
