@@ -39,18 +39,14 @@
                             {% endif %}
                         </div>
                         <div class="small text-muted mb-3">
-                            {% if object.created_at %}
+                            {% if object.datetime %}
                                 <div>
-                                    <i class="fas fa-calendar me-1"></i>{{ object.created_at|date:"Y-m-d" }}
+                                    <i class="fas fa-calendar me-1"></i>{{ object.datetime|date:"Y-m-d" }}
                                 </div>
                             {% endif %}
                             {% if object.series %}
                                 <div>
                                     <i class="fas fa-layer-group me-1"></i>{{ object.series.name }}
-                                </div>
-                            {% elif object.standalone %}
-                                <div>
-                                    <i class="fas fa-tag me-1"></i>Standalone
                                 </div>
                             {% endif %}
                             {% if object.display_image_source == 'series' %}

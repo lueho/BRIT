@@ -29,6 +29,7 @@ from ..models import (
     MaterialProperty,
     MaterialPropertyValue,
     Sample,
+    SampleExternalRecord,
     SampleSeries,
     get_sample_substrate_category_name,
 )
@@ -1822,6 +1823,50 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("sample-gallery"))
         self.assertContains(response, self.sample.name)
+
+    def test_list_and_gallery_omit_standalone_label(self):
+        list_response = self.client.get(reverse("sample-list"), {"scope": "published"})
+        gallery_response = self.client.get(
+            reverse("sample-gallery"), {"scope": "published"}
+        )
+
+        self.assertNotContains(list_response, "Standalone")
+        self.assertNotContains(gallery_response, "Standalone")
+
+    def test_detail_shows_external_permalink_and_literature_title(self):
+        source = Source.objects.create(
+            owner=self.owner,
+            title="Phyllis2 database",
+            citation_key="Phyllis2",
+        )
+        SampleExternalRecord.objects.create(
+            sample=self.sample,
+            source=source,
+            external_id="1",
+            url="https://phyllis.nl/Biomass/View/1",
+            payload={
+                "literature": [
+                    {
+                        "title": "Reference title",
+                        "reference": "Raw reference",
+                        "url": "",
+                    }
+                ]
+            },
+        )
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+        v2_response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+            {"experience": "v2"},
+        )
+
+        for detail_response in (response, v2_response):
+            self.assertContains(detail_response, "https://phyllis.nl/Biomass/View/1")
+            self.assertContains(detail_response, "Phyllis2 #1")
+            self.assertContains(detail_response, "Reference title")
 
     def test_public_list_includes_export_button(self):
         self.client.force_login(self.owner)

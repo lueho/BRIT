@@ -9,6 +9,7 @@ from django.db.models import signals
 from django.test import TestCase
 from factory.django import mute_signals
 
+from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import (
     ComponentMeasurement,
@@ -20,6 +21,7 @@ from materials.models import (
     MaterialProperty,
     MaterialPropertyValue,
     Sample,
+    SampleExternalRecord,
     SampleSeries,
 )
 from utils.properties.models import Unit
@@ -37,6 +39,50 @@ class InitialDataTestCase(TestCase):
     def test_other_component_is_created_from_migrations(self):
         MaterialComponent.objects.get(name="Other")
         self.assertGreaterEqual(MaterialComponent.objects.count(), 2)
+
+
+class PhyllisSchemaTestCase(TestCase):
+    def test_external_record_and_measurement_metadata_are_available(self):
+        owner = User.objects.create(username="phyllis-owner")
+        material = Material.objects.create(name="Wood", owner=owner)
+        sample = Sample.objects.create(
+            name="Wood — Phyllis #1",
+            material=material,
+            owner=owner,
+        )
+        with mute_signals(signals.post_save):
+            source = Source.objects.create(title="Phyllis2", owner=owner)
+        record = SampleExternalRecord.objects.create(
+            sample=sample,
+            source=source,
+            external_id="1",
+            url="https://phyllis.nl/Biomass/View/1",
+            payload={
+                "literature": [
+                    {"title": "Reference title", "reference": "Raw", "url": ""}
+                ]
+            },
+        )
+
+        self.assertEqual(sample.external_records.get(), record)
+        self.assertEqual(record.literature[0]["title"], "Reference title")
+        for model in (ComponentMeasurement, MaterialPropertyValue):
+            for field in (
+                "raw_value",
+                "value_qualifier",
+                "detection_limit",
+                "raw_detection_limit",
+                "analysis_date",
+                "analysis_laboratory",
+                "comment",
+            ):
+                with self.subTest(model=model.__name__, field=field):
+                    model._meta.get_field(field)
+
+    def test_material_and_component_can_share_name_for_owner(self):
+        owner = User.objects.create(username="shared-name-owner")
+        Material.objects.create(name="Cellulose", owner=owner)
+        MaterialComponent.objects.create(name="Cellulose", owner=owner)
 
 
 class MaterialComponentGroupTestCase(TestCase):

@@ -142,6 +142,46 @@
                 </dd>
               {% endif %}
             {% endwith %}
+            {% with external_records=object.external_records.all %}
+              {% if external_records %}
+                <dt class="col-sm-4">Permalinks</dt>
+                <dd class="col-sm-8">
+                  <div class="d-flex flex-wrap gap-2">
+                    {% for record in external_records %}
+                      {% if record.url %}
+                        <a href="{{ record.url }}"
+                           class="badge bg-light text-dark text-decoration-none"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           title="Open external record">{{ record.source.citation_key|default:record.source.title }} #{{ record.external_id }}</a>
+                      {% else %}
+                        <span class="badge bg-light text-dark">{{ record.source.citation_key|default:record.source.title }} #{{ record.external_id }}</span>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                </dd>
+                {% for record in external_records %}
+                  {% with literature=record.literature %}
+                    {% if literature %}
+                      <dt class="col-sm-4">Literature</dt>
+                      <dd class="col-sm-8">
+                        <ul class="mb-0 ps-3">
+                          {% for reference in literature %}
+                            <li>
+                              {% if reference.url %}
+                                <a href="{{ reference.url }}" target="_blank" rel="noopener noreferrer">{{ reference.title }}</a>
+                              {% else %}
+                                {{ reference.title }}
+                              {% endif %}
+                            </li>
+                          {% endfor %}
+                        </ul>
+                      </dd>
+                    {% endif %}
+                  {% endwith %}
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
           </dl>
         </div>
       </div>
