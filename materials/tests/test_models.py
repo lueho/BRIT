@@ -84,6 +84,19 @@ class PhyllisSchemaTestCase(TestCase):
         Material.objects.create(name="Cellulose", owner=owner)
         MaterialComponent.objects.create(name="Cellulose", owner=owner)
 
+    def test_unsaved_component_validates_against_same_name_material(self):
+        owner = User.objects.create(username="shared-name-clean-owner")
+        Material.objects.create(name="Lignin", owner=owner)
+        component = MaterialComponent(name="Lignin", owner=owner)
+
+        component.full_clean()
+        component.save()
+
+        self.assertEqual(component.type, "component")
+        material = Material(name="Lignin", owner=owner)
+        with self.assertRaises(ValidationError):
+            material.full_clean()
+
 
 class MaterialComponentGroupTestCase(TestCase):
     def test_get_default_material_component_group(self):

@@ -166,24 +166,36 @@ class BaseMaterialTypeManager(UserCreatedObjectManager):
         return super().get_queryset().filter(type=self.material_type)
 
 
+class TypedMaterialMixin:
+    """Fixes ``type`` from construction on, so uniqueness validation sees the
+    correct type before ``save()``."""
+
+    material_type = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = self.material_type
+
+    def save(self, *args, **kwargs):
+        self.type = self.material_type
+        super().save(*args, **kwargs)
+
+
 class MaterialManager(BaseMaterialTypeManager):
     material_type = "material"
 
 
-class Material(BaseMaterial):
+class Material(TypedMaterialMixin, BaseMaterial):
     """
     Generic material class for many purposes. E.g. this is used as top level definition to link semantic definition of
     materials with analysis data.
     """
 
+    material_type = MaterialManager.material_type
     objects = MaterialManager()
 
     class Meta:
         proxy = True
-
-    def save(self, *args, **kwargs):
-        self.type = MaterialManager.material_type
-        super().save(*args, **kwargs)
 
 
 class MaterialComponentManager(BaseMaterialTypeManager):
@@ -200,22 +212,19 @@ class MaterialComponentManager(BaseMaterialTypeManager):
         ]
 
 
-class MaterialComponent(BaseMaterial):
+class MaterialComponent(TypedMaterialMixin, BaseMaterial):
     """
     Component class of a material for which a weight fraction can be assigned but which cannot itself be defined as a
     material (e.g. total solids, volatile solids, etc.)
     """
 
+    material_type = MaterialComponentManager.material_type
     objects = MaterialComponentManager()
 
     class Meta:
         proxy = True
         verbose_name = "component"
         ordering = ["name"]
-
-    def save(self, *args, **kwargs):
-        self.type = MaterialComponentManager.material_type
-        super().save(*args, **kwargs)
 
     @property
     def canonical_component(self):
