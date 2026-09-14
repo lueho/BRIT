@@ -253,10 +253,11 @@
             return data.results.filter((result) => result &&
                 (typeof result[valueField] === "string" || Number.isFinite(result[valueField])) &&
                 String(result[valueField]) !== "" && typeof result[labelField] === "string"
-            ).slice(0, 15).map((result) => ({
-                [valueField]: String(result[valueField]),
-                [labelField]: result[labelField],
-            }));
+            ).slice(0, 15).map((result) => {
+                const option = { [valueField]: String(result[valueField]), [labelField]: result[labelField] };
+                if (typeof result.symbol === "string" && result.symbol !== "") option.symbol = result.symbol;
+                return option;
+            });
         }
 
         async mountEditor(active, html) {
@@ -417,7 +418,8 @@
             const valueField = select.dataset.valueField || "id";
             const labelField = select.dataset.labelField === "label" ? "label" : "name";
             const results = await this.searchOptions(select, name);
-            const matches = results.filter((result) => result[labelField].trim().toLowerCase() === name.trim().toLowerCase());
+            const wanted = name.trim().toLowerCase();
+            const matches = results.filter((result) => [result[labelField], result.symbol].some((text) => typeof text === "string" && text.trim().toLowerCase() === wanted));
             if (matches.length !== 1 || !select.tomselect) return false;
             select.tomselect.addOption(matches[0]);
             select.tomselect.addItem(String(matches[0][valueField]));

@@ -527,12 +527,13 @@ function pasteFixture(fixture, { text, results = {}, maxRows = Infinity, columns
                 const byName = selector.match(/\[name\$="-(\w+)"\]/);
                 if (byName) {
                     if (!rowFields[byName[1]]) {
+                        const isSelect = ["component", "unit"].includes(byName[1]);
                         rowFields[byName[1]] = element({
                             name: `component_measurements-${created}-${byName[1]}`,
-                            matches: (s) => byName[1] === "component" && s === "select[data-workspace-select]",
+                            matches: (s) => isSelect && s === "select[data-workspace-select]",
                             dataset: { valueField: "id", labelField: "name", autocompleteUrl: "/components/" },
                         });
-                        if (byName[1] === "component") {
+                        if (isSelect) {
                             rowFields[byName[1]].tomselect = {
                                 added: [],
                                 addOption(option) { this.added.push(option); },
@@ -697,4 +698,29 @@ test("saving and cancelling are blocked while a paste is still filling rows", as
     assert.equal(fixture.workspace.cancel(), false);
     await pasting;
     assert.equal(fixture.workspace.active.pasting, false);
+});
+
+test("unit search results keep the symbol so pasted symbols resolve", async () => {
+    const fixture = setup(async () => ({ ok: true, json: async () => ({ results: [{ id: 5, name: "Percent", symbol: "%", html: "unsafe" }, { id: 6, name: "Gram per kilogram", symbol: 7 }] }) }));
+    const { config, instance } = remoteWidget(fixture, "name", "/units/autocomplete/");
+    let results;
+    await config.load.call(instance, "%", (items) => { results = items; });
+    assert.equal(JSON.stringify(results), JSON.stringify([{ id: "5", name: "Percent", symbol: "%" }, { id: "6", name: "Gram per kilogram" }]));
+});
+
+test("pasted unit symbols resolve against the symbol as well as the name", async () => {
+    const fixture = setup();
+    activate(fixture);
+    const mock = pasteFixture(fixture, {
+        text: "Ash\t12.5\t%",
+        columns: "component,average,unit",
+        results: { Ash: [{ id: 7, name: "Ash" }], "%": [{ id: 5, name: "Percent", symbol: "%" }, { id: 9, name: "Per mille", symbol: "‰" }] },
+    });
+    await fixture.workspace.applyPaste(mock.panel);
+    assert.equal(mock.created(), 1);
+    const row = mock.rowsContainer.lastElementChild.fields;
+    assert.equal(row.component.tomselect.value, "7");
+    assert.equal(row.unit.tomselect.value, "5");
+    assert.equal(row.average.value, "12.5");
+    assert.match(fixture.status.textContent, /Added 1 row\. Review them/);
 });
