@@ -3,12 +3,14 @@ import logging
 from collections import defaultdict
 from decimal import Decimal
 
+from django.contrib import messages
 from django.contrib.auth.mixins import (
     LoginRequiredMixin,
     PermissionRequiredMixin,
     UserPassesTestMixin,
 )
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.db.models import Q
 from django.db.models.aggregates import Count
 from django.http import (
@@ -17,6 +19,7 @@ from django.http import (
     JsonResponse,
 )
 from django.shortcuts import get_object_or_404
+from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.utils.translation import gettext
 from django.views.generic import RedirectView, TemplateView, View
@@ -74,6 +77,7 @@ from .filters import (
     UserOwnedSampleFilter,
 )
 from .forms import (
+    SAMPLE_SECTIONS,
     AddCompositionModalForm,
     AddSeasonalVariationForm,
     AnalyticalMethodModelForm,
@@ -95,8 +99,10 @@ from .forms import (
     MaterialPropertyValueModalModelForm,
     MaterialPropertyValueModelForm,
     SampleAddCompositionForm,
+    SampleMaintenanceForm,
     SampleModalModelForm,
     SampleModelForm,
+    SampleQuickCreateForm,
     SampleSeriesAddTemporalDistributionModalModelForm,
     SampleSeriesModalModelForm,
     SampleSeriesModelForm,
@@ -982,13 +988,27 @@ class SampleListFileExportView(GenericUserCreatedObjectExportView):
 
 
 class SampleCreateView(UserCreatedObjectCreateView):
-    form_class = SampleModelForm
+    """Quick-create a private Sample draft, then continue in the workspace."""
+
+    model = Sample
+    form_class = SampleQuickCreateForm
+    template_name = "materials/sample_form.html"
     permission_required = "materials.add_sample"
 
     def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs["request"] = self.request
-        return kwargs
+        return {**super().get_form_kwargs(), "request": self.request}
+
+    def get_context_data(self, **kwargs):
+        return {
+            **super().get_context_data(**kwargs),
+            "form_title": "New sample",
+            "submit_button_text": "Save private draft",
+            "cancel_url": reverse("sample-list"),
+            "object_label": "sample",
+        }
+
+    def get_success_url(self):
+        return f"{self.object.get_absolute_url()}?mode=edit"
 
 
 class SampleModalCreateView(UserCreatedObjectModalCreateView):
@@ -1254,7 +1274,22 @@ class SampleDetailView(UserCreatedObjectDetailView):
                 "can_add_property",
             )
         )
+        maintenance_sections = (
+            [
+                {
+                    "key": key,
+                    "label": section["label"],
+                    "url": f"{self.object.update_url}?section={key}",
+                    "summary_template": "materials/includes/sample_section_summary.html",
+                    "material_links": [],
+                }
+                for key, section in SAMPLE_SECTIONS.items()
+            ]
+            if edit_mode_enabled and sample_policy["can_edit"]
+            else []
+        )
         return {
+            "maintenance_sections": maintenance_sections,
             "display_compositions": display_compositions,
             "group_anchors": group_anchors,
             "grouped_measurements": grouped_measurements,
@@ -1357,13 +1392,87 @@ SampleReviewItemDetailView.register_for_model(Sample)
 
 
 class SampleUpdateView(UserCreatedObjectUpdateView):
+    """Update a Sample one metadata section at a time."""
+
     model = Sample
-    form_class = SampleModelForm
+    form_class = SampleMaintenanceForm
+    template_name = "materials/sample_form.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        key = request.GET.get("section", "overview")
+        if key not in SAMPLE_SECTIONS:
+            raise Http404("Unknown sample section.")
+        self.section = {**SAMPLE_SECTIONS[key], "key": key}
+        with transaction.atomic():
+            return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return (
+            queryset.select_for_update() if self.request.method == "POST" else queryset
+        )
 
     def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs["request"] = self.request
-        return kwargs
+        return {
+            **super().get_form_kwargs(),
+            "request": self.request,
+            "fields": self.section["fields"],
+        }
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "section": self.section,
+                "section_url": f"{self.object.update_url}?section={self.section['key']}",
+                "workspace_url": self.get_success_url(),
+                "cancel_url": self.get_success_url(),
+                "object_label": "sample",
+                "form_title": self.section["label"],
+                "submit_button_text": "Save section",
+                "inlines": [],
+            }
+        )
+        return context
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse(
+                {
+                    "section": self.section["key"],
+                    "saved": False,
+                    "html": render_to_string(
+                        "materials/includes/sample_section_form.html",
+                        context,
+                        request=self.request,
+                    ),
+                },
+                status=422 if self.request.method == "POST" else 200,
+            )
+        return super().render_to_response(context, **response_kwargs)
+
+    def form_valid(self, form):
+        self.object = form.save()
+        message = "Saved privately." if self.object.is_private else "Changes saved."
+        if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse(
+                {
+                    "section": self.section["key"],
+                    "saved": True,
+                    "title": self.object.name,
+                    "message": message,
+                    "html": render_to_string(
+                        "materials/includes/sample_section_summary.html",
+                        {"object": self.object, "section": self.section},
+                        request=self.request,
+                    ),
+                }
+            )
+        messages.success(self.request, message)
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_success_url(self):
+        return f"{self.object.get_absolute_url()}?mode=edit"
 
 
 class SampleModalDeleteView(UserCreatedObjectModalDeleteView):

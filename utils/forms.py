@@ -4,6 +4,7 @@ from crispy_forms.helper import FormHelper
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.forms import (
     BaseFormSet,
+    BaseInlineFormSet,
     BaseModelFormSet,
     Form,
     ModelForm,
@@ -572,8 +573,10 @@ class SourcesFieldMixin:
         # Configure the sources field
         sources_field.required = False  # Sources are optional
 
-        # Set widget if not already customized
-        if not isinstance(sources_field.widget, SourceListWidget):
+        # Set widget unless the form already declares a customized one
+        from django.forms.widgets import SelectMultiple
+
+        if type(sources_field.widget) is SelectMultiple:
             sources_field.widget = SourceListWidget(
                 autocomplete_url="source-autocomplete", label_field="label"
             )
@@ -597,3 +600,241 @@ class SourcesFieldMixin:
             sources_field.queryset = source_model.objects.filter(id__in=source_ids)
         else:
             sources_field.queryset = source_model.objects.none()
+
+
+# ==============================================================================
+# Sectioned maintenance workspace machinery
+# ==============================================================================
+
+
+def image_metadata_section():
+    """Crispy layout block for the shared image + metadata field group."""
+    from crispy_forms.layout import HTML, Div, Field
+
+    return Div(
+        HTML(
+            '<div class="card-header bg-body-tertiary">'
+            '<h6 class="mb-0">Image details</h6>'
+            '<div class="form-text mb-0">'
+            "Alt text, caption, and rights notice belong to the uploaded image."
+            "</div>"
+            "</div>"
+        ),
+        Div(
+            Field("image"),
+            Field("image_alt_text"),
+            Field("image_caption"),
+            Field("image_rights_notice"),
+            css_class="card-body",
+        ),
+        css_class="card border mb-3",
+    )
+
+
+class QuerysetTomSelectModelChoiceField(TomSelectModelChoiceField):
+    """TomSelect field that validates submitted pks against its queryset."""
+
+    def clean(self, value):
+
+        if value in self.empty_values:
+            if self.required:
+                raise ValidationError(self.error_messages["required"], code="required")
+            return None
+
+        try:
+            key = self.to_field_name or "pk"
+            return self.queryset.get(**{key: value})
+        except (TypeError, ValueError, self.queryset.model.DoesNotExist) as exc:
+            raise ValidationError(
+                self.error_messages["invalid_choice"],
+                code="invalid_choice",
+                params={"value": value},
+            ) from exc
+
+
+class QuerysetTomSelectModelMultipleChoiceField(TomSelectModelMultipleChoiceField):
+    """TomSelect multi field that validates submitted pks against its queryset."""
+
+    def clean(self, value):
+        from django import forms
+
+        return forms.ModelMultipleChoiceField.clean(self, value)
+
+    def _check_values(self, value):
+        from django import forms
+
+        return forms.ModelMultipleChoiceField._check_values(self, value)
+
+
+class WorkspaceReferenceScopeMixin:
+    """
+    Restricts UserCreatedObject reference fields to objects the request user may
+    access, and exposes selected-only options plus the autocomplete endpoint for
+    lazy workspace select rendering.
+    """
+
+    def __init__(self, *args, request=None, field_names=None, **kwargs):
+        from django import forms
+        from django.urls import reverse
+
+        from utils.object_management.models import UserCreatedObject
+        from utils.object_management.permissions import filter_queryset_for_user
+
+        super().__init__(*args, **kwargs)
+        if request is not None:
+            self.request = request
+        if field_names is not None:
+            self.fields = {name: self.fields[name] for name in field_names}
+        for name, field in self.fields.items():
+            if not isinstance(field, forms.ModelChoiceField):
+                continue
+            model = field.queryset.model
+            if request and issubclass(model, UserCreatedObject):
+                queryset = filter_queryset_for_user(field.queryset, request.user)
+                if self.instance.pk:
+                    existing = getattr(self.instance, name, None)
+                    if hasattr(existing, "all"):
+                        queryset = queryset | field.queryset.filter(
+                            pk__in=existing.all()
+                        )
+                    elif getattr(existing, "pk", None):
+                        queryset = queryset | field.queryset.filter(pk=existing.pk)
+                field.queryset = queryset.distinct()
+                field.widget.get_queryset = lambda field=field: field.queryset
+            if not getattr(field.widget, "url", None):
+                continue
+            value = self[name].value()
+            values = value if isinstance(value, (list, tuple)) else [value]
+            ids = [int(value) for value in values if str(value).isdigit()]
+            field.workspace_options = (
+                [
+                    {"value": str(obj.pk), "label": field.label_from_instance(obj)}
+                    for obj in field.queryset.filter(pk__in=ids)
+                ]
+                if ids
+                else []
+            )
+            field.workspace_autocomplete_url = reverse(field.widget.url)
+            field.workspace_label_field = field.widget.label_field or "name"
+            field.workspace_value_field = "id"
+
+
+class WorkspaceSectionFormSet(BaseInlineFormSet):
+    """
+    Inline formset for sectioned maintenance editing.
+
+    Submitted row ids are constrained to the owning parent object's queryset,
+    so a forged id belonging to another parent or section is rejected.
+    ``reference_fields`` optionally maps child models to the field that must be
+    unique across non-deleted rows (e.g. ``{ProcessAuthor: "author"}``).
+    """
+
+    reference_fields = {}
+    position_fields = {}
+
+    def __init__(self, *args, role=None, **kwargs):
+        self.role = role
+        super().__init__(*args, **kwargs)
+
+    def _construct_form(self, i, **kwargs):
+        form = super()._construct_form(i, **kwargs)
+        if self.role:
+            form.instance.role = self.role
+        return form
+
+    def add_fields(self, form, index):
+        super().add_fields(form, index)
+        form.fields[self.model._meta.pk.name].queryset = self.get_queryset()
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        allowed_ids = {obj.pk for obj in self.get_queryset()}
+        seen_ids = set()
+        seen_references = set()
+        reference_field = self.reference_fields.get(self.model)
+        for form in self.forms:
+            data = form.cleaned_data
+            row = data.get("id")
+            if row:
+                if row.pk not in allowed_ids or row.pk in seen_ids:
+                    raise ValidationError(
+                        "Each row must belong to this section and appear only once."
+                    )
+                seen_ids.add(row.pk)
+            if reference_field and data and not data.get("DELETE"):
+                reference = data.get(reference_field)
+                if reference in seen_references:
+                    raise ValidationError("Each reference can only be added once.")
+                seen_references.add(reference)
+
+    def save(self, commit=True):
+        objects = super().save(commit=commit)
+        if commit:
+            position_field = self.position_fields.get(self.model, "order")
+            if position_field not in {f.name for f in self.model._meta.fields}:
+                return objects
+            remaining = [
+                form.instance
+                for form in self.forms
+                if form.instance.pk and not form.cleaned_data.get("DELETE")
+            ]
+            for position, obj in enumerate(remaining, 1):
+                if getattr(obj, position_field) != position:
+                    setattr(obj, position_field, position)
+                    obj.save(update_fields=[position_field])
+        return objects
+
+
+def workspace_section_formsets(parent, section, request, formset_class=None):
+    """
+    Build the inline formsets declared by a maintenance ``section`` dict.
+
+    ``section["forms"]`` holds entries that are either a form class or a
+    ``(form_class, meta)`` tuple. ``meta`` may contain ``heading``,
+    ``add_label``, and ``row_template`` for the shared section-form template.
+    The parent's ``_meta.model_name`` is used as the FK lookup, matching the
+    BRIT convention (e.g. ``ProcessMaterial.process``, ``Composition.sample``).
+    """
+    from django.forms import inlineformset_factory
+
+    default_row_template = "utils/includes/workspace_row.html"
+    formsets = []
+    for entry in section.get("forms", ()):
+        form_class, meta = entry if isinstance(entry, tuple) else (entry, {})
+        model = form_class._meta.model
+        factory = inlineformset_factory(
+            parent._meta.model,
+            model,
+            form=form_class,
+            formset=formset_class or WorkspaceSectionFormSet,
+            extra=0,
+            can_delete=True,
+        )
+        parent_field = parent._meta.model_name
+        queryset = model.objects.filter(**{parent_field: parent})
+        role = section.get("role")
+        if role:
+            queryset = queryset.filter(role=role)
+        relations = [
+            field.name
+            for field in model._meta.fields
+            if field.many_to_one and field.name != parent_field
+        ]
+        formset = factory(
+            instance=parent,
+            queryset=queryset.select_related(*relations),
+            role=role,
+            data=request.POST if request.method == "POST" else None,
+            files=request.FILES if request.method == "POST" else None,
+            form_kwargs={"request": request},
+        )
+        formset.workspace_meta = {
+            "heading": section["label"],
+            "add_label": "Add row",
+            "row_template": default_row_template,
+            **meta,
+        }
+        formsets.append(formset)
+    return formsets

@@ -101,7 +101,7 @@ class ProcessMaintenanceViewsTestCase(TestCase):
 
     def test_edit_workspace_has_empty_section_actions_but_no_loaded_forms(self):
         response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
-        self.assertContains(response, "data-process-workspace")
+        self.assertContains(response, "data-workspace")
         self.assertContains(response, "Inputs")
         self.assertContains(response, "References and contributors")
         self.assertNotContains(response, "TOTAL_FORMS")
@@ -110,7 +110,7 @@ class ProcessMaintenanceViewsTestCase(TestCase):
     def test_title_has_a_direct_edit_action_and_clear_field_label(self):
         response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
         self.assertContains(response, "Edit title")
-        self.assertContains(response, 'data-process-focus="name"')
+        self.assertContains(response, 'data-workspace-focus="name"')
         response = self.client.get(self.section_url())
         self.assertEqual(response.context["form"].fields["name"].label, "Title")
 
@@ -129,10 +129,10 @@ class ProcessMaintenanceViewsTestCase(TestCase):
     def test_image_editor_is_near_the_title_and_separate_from_other_sections(self):
         response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
         content = response.content.decode()
-        self.assertIn('data-process-section="image"', content)
+        self.assertIn('data-workspace-section="image"', content)
         self.assertLess(
-            content.index('data-process-section="image"'),
-            content.index('data-process-section="technology"'),
+            content.index('data-workspace-section="image"'),
+            content.index('data-workspace-section="technology"'),
         )
         response = self.client.get(self.section_url("image"))
         self.assertEqual(response.status_code, 200)
@@ -350,7 +350,7 @@ class ProcessMaintenanceViewsTestCase(TestCase):
             403,
         )
         response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
-        self.assertNotContains(response, "data-process-workspace")
+        self.assertNotContains(response, "data-workspace")
 
     def test_fragment_get_and_save_return_only_requested_section(self):
         headers = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
@@ -1238,7 +1238,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="process-section-inputs-form"')
+        self.assertContains(response, 'id="workspace-section-inputs-form"')
         self.assertContains(response, 'name="process_materials-TOTAL_FORMS"')
         self.assertContains(response, 'name="process_materials-0-material"')
         self.assertContains(response, "Existing Material")

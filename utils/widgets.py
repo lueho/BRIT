@@ -1,4 +1,8 @@
-from django.forms.widgets import HiddenInput, SelectMultiple
+from django.forms.widgets import (
+    ClearableFileInput,
+    HiddenInput,
+    SelectMultiple,
+)
 from django_filters.widgets import SuffixedMultiWidget
 from django_tomselect.widgets import TomSelectModelMultipleWidget, TomSelectModelWidget
 
@@ -300,3 +304,15 @@ class SourceListWidget(SelectMultiple):
     class Media:
         css = {"all": ("utils/css/source_list_widget.min.css",)}
         js = ("utils/js/source_list_widget.js",)
+
+
+class WorkspaceDocumentInput(ClearableFileInput):
+    """File input that links the existing file to a protected download URL."""
+
+    template_name = "utils/widgets/document_input.html"
+    download_url = None
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context["widget"]["download_url"] = self.download_url
+        return context
