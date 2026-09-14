@@ -293,6 +293,7 @@
             const body = new FormData(active.form);
             this.setBusy(active, true);
             this.announce("Saving section…");
+            let reloading = false;
             try {
                 const data = await this.request(active.form.action, { method: "POST", body }, active.key);
                 this.setBusy(active, false);
@@ -300,6 +301,14 @@
                     active.dirty = true;
                     this.mergeErrors(active, data.html);
                     this.announce("Please correct the errors below. Your entries and selected files have been kept; nothing was saved.", true);
+                    return;
+                }
+                if ("workspaceReload" in this.root.dataset) {
+                    reloading = true;
+                    active.dirty = false;
+                    this.setBusy(active, true);
+                    this.announce(data.message || "Section saved. Refreshing…");
+                    window.location.reload();
                     return;
                 }
                 this.replaceSummary(active, data.html);
@@ -314,7 +323,7 @@
             } catch (error) {
                 this.announce("Changes were not saved or could not be confirmed. Your entries and selected files are still here. Check your connection and try again before leaving.", true);
             } finally {
-                this.setBusy(active, false);
+                if (!reloading) this.setBusy(active, false);
             }
         }
 

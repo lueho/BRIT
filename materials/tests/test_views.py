@@ -2163,6 +2163,15 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     def get_update_success_url(self, pk):
         return f"{reverse(self.view_detail_name, kwargs={'pk': pk})}?mode=edit"
 
+    def test_detail_view_unpublished_as_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(self.unpublished_object.pk))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, self.get_update_success_url(self.unpublished_object.pk)
+        )
+        self.assertContains(response, self.get_delete_url(self.unpublished_object.pk))
+
     @classmethod
     def create_related_objects(cls):
         substrate_category, _ = MaterialCategory.objects.get_or_create(
@@ -2498,6 +2507,43 @@ class SampleMaintenanceViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertFalse(response.json()["saved"])
         self.assertEqual(list(self.sample.sources.all()), [self.source])
+
+    def test_legacy_sample_without_series_or_standalone_saves_other_sections(self):
+        legacy = Sample.objects.create(
+            owner=self.owner,
+            name="Legacy sample",
+            material=self.substrate,
+            series=None,
+            standalone=False,
+        )
+        response = self.client.post(
+            self.section_url("analysis", sample=legacy),
+            {"analysis_laboratory": "Lab X"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        legacy.refresh_from_db()
+        self.assertEqual(legacy.analysis_laboratory, "Lab X")
+        self.assertIsNone(legacy.series)
+        self.assertFalse(legacy.standalone)
+
+    def test_legacy_sample_sampling_section_still_enforces_series_invariant(self):
+        legacy = Sample.objects.create(
+            owner=self.owner,
+            name="Legacy sample",
+            material=self.substrate,
+            series=None,
+            standalone=False,
+        )
+        response = self.client.post(
+            self.section_url("sampling", sample=legacy),
+            {"location": "Plot 1"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertFalse(response.json()["saved"])
+        self.assertIn("series", response.json()["html"])
 
     def test_unknown_section_returns_404(self):
         response = self.client.get(self.section_url("bogus"))
@@ -4950,6 +4996,13 @@ class EmptyStateViewsTestCase(TestCase):
             response, reverse("sample-duplicate", kwargs={"pk": sample.pk})
         )
         self.assertContains(response, "Edit sample metadata")
+        self.assertContains(
+            response,
+            f'href="{reverse("sample-detail", kwargs={"pk": sample.pk})}?mode=edit"',
+        )
+        self.assertNotContains(
+            response, reverse("sample-update", kwargs={"pk": sample.pk}) + "?next="
+        )
 
     def test_v2_anonymous_gets_no_actions_dropdown(self):
         sample = Sample.objects.create(

@@ -161,6 +161,29 @@ test("successful save updates only this summary, title and live message and retu
     assert.equal(fixture.summary.hidden, false);
 });
 
+test("workspaces that repeat section data elsewhere reload the page after a successful save", async () => {
+    const fixture = setup(async () => ({ ok: true, status: 200, json: async () => ({ section: "overview", saved: true, html: "New summary", title: "New title" }) }));
+    fixture.root.dataset.workspaceReload = "";
+    let reloaded = 0;
+    fixture.window.location.reload = () => { reloaded += 1; };
+    const { fields } = activate(fixture);
+    fixture.workspace.replaceSummary = () => { throw new Error("must not patch the summary in place"); };
+    await fixture.workspace.save();
+    assert.equal(reloaded, 1);
+    assert.equal(fixture.workspace.active.dirty, false);
+    assert.equal(fields.disabled, true);
+    const event = { preventDefault() { this.prevented = true; } };
+    fixture.window.listeners.beforeunload(event);
+    assert.equal(event.prevented, undefined);
+});
+
+test("the sample detail workspace opts into reloading while the process detail workspace does not", () => {
+    const sample = readFileSync(new URL("../../../materials/templates/materials/sample_detail_v2.html", import.meta.url), "utf8");
+    assert.match(sample, /data-workspace data-workspace-reload/);
+    const process = readFileSync(new URL("../../../processes/templates/processes/process_detail.html", import.meta.url), "utf8");
+    assert.doesNotMatch(process, /data-workspace-reload/);
+});
+
 test("cancel and switching sections cannot silently discard unsaved changes", () => {
     const fixture = setup();
     activate(fixture);

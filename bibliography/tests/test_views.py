@@ -4,6 +4,7 @@ from unittest.mock import patch
 from django.contrib.auth.models import Permission
 from django.db.models.signals import post_save
 from django.urls import reverse
+from django.utils.html import escape
 from factory.django import mute_signals
 
 from utils.object_management.models import User
@@ -172,6 +173,60 @@ class AuthorQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(author.last_names, "European Environment Agency")
         self.assertEqual(payload["label"], "European Environment Agency")
 
+    def test_post_http_201_creates_organisation_author_with_author_type(self):
+        """An explicit author_type=organization creates an organization author."""
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("author-quick-create"),
+            data=json.dumps(
+                {
+                    "author_type": "organization",
+                    "organization_name": "European Environment Agency",
+                    "organization_abbreviation": "EEA",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        author = Author.objects.get(pk=payload["id"])
+
+        self.assertEqual(author.author_type, "organization")
+        self.assertEqual(author.organization_name, "European Environment Agency")
+        self.assertEqual(author.organization_abbreviation, "EEA")
+        self.assertEqual(payload["label"], "European Environment Agency")
+
+    def test_post_http_200_returns_existing_organisation_author(self):
+        """Duplicate organization quick-create returns the existing record."""
+        self.client.force_login(self.member)
+        existing = Author.objects.create(
+            owner=self.member,
+            author_type="organization",
+            organization_name="European Environment Agency",
+        )
+
+        response = self.client.post(
+            reverse("author-quick-create"),
+            data=json.dumps(
+                {
+                    "author_type": "organization",
+                    "organization_name": "European Environment Agency",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["id"], existing.pk)
+        self.assertEqual(
+            Author.objects.filter(
+                organization_name="European Environment Agency"
+            ).count(),
+            1,
+        )
+
 
 # ----------- Licence CRUD ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -238,6 +293,50 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         "type": "website",
         "url": "https://example.org",
     }
+
+    def test_detail_context_navigation_preserves_safe_results_url(self):
+        results_url = reverse("source-list") + "?scope=published&title=compost&page=2"
+        for user in (None, self.owner_user):
+            for back in (results_url, "https://testserver" + results_url):
+                with self.subTest(user=user, back=back):
+                    self.client.logout()
+                    if user:
+                        self.client.force_login(user)
+                    response = self.client.get(
+                        self.published_object.get_absolute_url(),
+                        {"back": back},
+                        secure=True,
+                    )
+                    self.assertEqual(response.context["back_url"], back)
+                    self.assertContains(response, f'href="{escape(back)}"')
+                    self.assertContains(response, "Back to results", count=1)
+                    self.assertTemplateUsed(
+                        response, "bibliography/includes/source_context_nav.html"
+                    )
+
+    def test_detail_context_navigation_omits_unsafe_or_missing_results_url(self):
+        for back in (
+            None,
+            "",
+            "https://external.example/",
+            "//external.example/",
+            "javascript:alert(1)",
+            "data:text/html,test",
+            "http://testserver/bibliography/sources/",
+            "/\\external.example/",
+        ):
+            with self.subTest(back=back):
+                self.client.logout()
+                response = self.client.get(
+                    self.published_object.get_absolute_url(),
+                    {"back": back} if back is not None else {},
+                    secure=True,
+                )
+                self.assertEqual(response.context["back_url"], "")
+                self.assertNotContains(response, "Back to results")
+                self.assertContains(response, 'aria-label="Source navigation"')
+                self.assertContains(response, "All sources")
+                self.assertContains(response, "Bibliography explorer")
 
     @classmethod
     def setUpTestData(cls):
@@ -798,6 +897,38 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(created_author.first_names, "Ada")
         self.assertEqual(created_author.last_names, "Lovelace")
 
+    def test_post_http_201_creates_source_with_new_organisation_author(self):
+        add_author_permission = Permission.objects.get(codename="add_author")
+        self.member.user_permissions.add(add_author_permission)
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("source-quick-create"),
+            data=json.dumps(
+                {
+                    "title": "Inline source",
+                    "authors": [
+                        {
+                            "author_type": "organization",
+                            "organization_name": "European Environment Agency",
+                        }
+                    ],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        source = Source.objects.get(pk=payload["id"])
+
+        self.assertEqual(source.sourceauthors.count(), 1)
+        created_author = source.sourceauthors.first().author
+        self.assertEqual(created_author.author_type, "organization")
+        self.assertEqual(
+            created_author.organization_name, "European Environment Agency"
+        )
+
     def test_delete_http_302_redirect_to_login_for_anonymous(self):
         self.client.force_login(self.member)
         source = Source.objects.create(owner=self.member, title="To delete")
@@ -863,3 +994,38 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         )
 
         self.assertEqual(response.status_code, 400)
+
+
+class OrganizationAuthorDetailViewTestCase(ViewWithPermissionsTestCase):
+    """Organization authors must render their organization fields on detail pages."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.organization_author = Author.objects.create(
+            owner=cls.member,
+            author_type="organization",
+            organization_name="European Environment Agency",
+            organization_abbreviation="EEA",
+            publication_status="published",
+        )
+
+    def test_detail_view_shows_organization_name(self):
+        url = reverse("author-detail", kwargs={"pk": self.organization_author.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "European Environment Agency")
+        self.assertContains(response, "Organization")
+
+    def test_detail_view_shows_organization_abbreviation(self):
+        url = reverse("author-detail", kwargs={"pk": self.organization_author.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "EEA")
+
+    def test_modal_detail_view_shows_organization_name(self):
+        url = reverse("author-detail-modal", kwargs={"pk": self.organization_author.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "European Environment Agency")
+        self.assertContains(response, "Organization")
