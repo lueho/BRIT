@@ -373,11 +373,6 @@ class SampleSeries(NamedUserCreatedObject):
                 owner=self.owner, group=group, sample=sample, fractions_of=fractions_of
             )
 
-    def remove_component_group(self, group):
-        """Removes all compositions of a component group from all samples of this sample series."""
-        for sample in self.samples.all():
-            Composition.objects.filter(sample=sample, group=group).delete()
-
     def add_temporal_distribution(self, distribution):
         """
         Adds the temporal distribution to the m2m field and also creates shares for all timesteps of the distribution
@@ -412,18 +407,6 @@ class SampleSeries(NamedUserCreatedObject):
         ).values_list("component", flat=True)
         return MaterialComponent.objects.filter(
             id__in=component_ids,
-        )
-
-    @property
-    def component_groups(self):
-        return MaterialComponentGroup.objects.filter(
-            id__in=[
-                composition["group"]
-                for composition in Composition.objects.filter(sample__series=self)
-                .exclude(id=MaterialComponentGroup.objects.default().id)
-                .values("group")
-                .distinct()
-            ]
         )
 
     @property
@@ -467,16 +450,6 @@ class SampleSeries(NamedUserCreatedObject):
                 )
 
             return duplicate
-
-    @property
-    def full_name(self):
-        return f"{self.material.name} {self.name}"
-
-    @property
-    def group_settings(self):
-        return Composition.objects.filter(sample__series=self).exclude(
-            group=MaterialComponentGroup.objects.default()
-        )
 
     def clean(self):
         super().clean()
