@@ -2,12 +2,11 @@
 
 import types
 
-from crispy_forms.layout import HTML, Div, Field, Layout
+from crispy_forms.layout import Layout
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.forms import BaseInlineFormSet, inlineformset_factory
-from django.urls import reverse
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.forms import (
     TomSelectModelChoiceField,
@@ -20,11 +19,15 @@ from materials.models import Material
 from utils.forms import (
     DynamicTableInlineFormSetHelper,
     ModalModelFormMixin,
+    QuerysetTomSelectModelChoiceField,
+    QuerysetTomSelectModelMultipleChoiceField,
     SimpleModelForm,
+    WorkspaceReferenceScopeMixin,
+    WorkspaceSectionFormSet,
+    image_metadata_section,
 )
-from utils.object_management.models import UserCreatedObject
-from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.models import Unit
+from utils.widgets import WorkspaceDocumentInput
 
 from .models import (
     Process,
@@ -36,27 +39,6 @@ from .models import (
     ProcessOperatingParameter,
     ProcessSource,
 )
-
-
-def image_metadata_section():
-    return Div(
-        HTML(
-            '<div class="card-header bg-body-tertiary">'
-            '<h6 class="mb-0">Image details</h6>'
-            '<div class="form-text mb-0">'
-            "Alt text, caption, and rights notice belong to the uploaded image."
-            "</div>"
-            "</div>"
-        ),
-        Div(
-            Field("image"),
-            Field("image_alt_text"),
-            Field("image_caption"),
-            Field("image_rights_notice"),
-            css_class="card-body",
-        ),
-        css_class="card border mb-3",
-    )
 
 
 def queryset_valid_value(self, value):
@@ -72,26 +54,6 @@ def queryset_check_values(self, value):
         pks = [v for v in value if v]
         return list(self.queryset.filter(pk__in=pks))
     return []
-
-
-class QuerysetTomSelectModelChoiceField(TomSelectModelChoiceField):
-    """TomSelect field that validates submitted pks against its queryset."""
-
-    def clean(self, value):
-        if value in self.empty_values:
-            if self.required:
-                raise ValidationError(self.error_messages["required"], code="required")
-            return None
-
-        try:
-            key = self.to_field_name or "pk"
-            return self.queryset.get(**{key: value})
-        except (TypeError, ValueError, self.queryset.model.DoesNotExist) as exc:
-            raise ValidationError(
-                self.error_messages["invalid_choice"],
-                code="invalid_choice",
-                params={"value": value},
-            ) from exc
 
 
 # ==============================================================================
@@ -454,64 +416,7 @@ class ProcessInfoResourceInline(InlineFormSetFactory):
 # ==============================================================================
 
 
-class QuerysetTomSelectModelMultipleChoiceField(TomSelectModelMultipleChoiceField):
-    def clean(self, value):
-        return forms.ModelMultipleChoiceField.clean(self, value)
-
-    def _check_values(self, value):
-        return forms.ModelMultipleChoiceField._check_values(self, value)
-
-
-class ProcessReferenceScopeMixin:
-    def __init__(self, *args, request=None, field_names=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        if field_names is not None:
-            self.fields = {name: self.fields[name] for name in field_names}
-        for name, field in self.fields.items():
-            if not isinstance(field, forms.ModelChoiceField):
-                continue
-            model = field.queryset.model
-            if request and issubclass(model, UserCreatedObject):
-                queryset = filter_queryset_for_user(field.queryset, request.user)
-                if self.instance.pk:
-                    existing = getattr(self.instance, name, None)
-                    if hasattr(existing, "all"):
-                        queryset = queryset | field.queryset.filter(
-                            pk__in=existing.all()
-                        )
-                    elif getattr(existing, "pk", None):
-                        queryset = queryset | field.queryset.filter(pk=existing.pk)
-                field.queryset = queryset.distinct()
-                field.widget.get_queryset = lambda field=field: field.queryset
-            if not getattr(field.widget, "url", None):
-                continue
-            value = self[name].value()
-            values = value if isinstance(value, (list, tuple)) else [value]
-            ids = [int(value) for value in values if str(value).isdigit()]
-            field.workspace_options = (
-                [
-                    {"value": str(obj.pk), "label": field.label_from_instance(obj)}
-                    for obj in field.queryset.filter(pk__in=ids)
-                ]
-                if ids
-                else []
-            )
-            field.workspace_autocomplete_url = reverse(field.widget.url)
-            field.workspace_label_field = field.widget.label_field or "name"
-            field.workspace_value_field = "id"
-
-
-class ProcessDocumentInput(forms.ClearableFileInput):
-    template_name = "processes/widgets/document_input.html"
-    download_url = None
-
-    def get_context(self, name, value, attrs):
-        context = super().get_context(name, value, attrs)
-        context["widget"]["download_url"] = self.download_url
-        return context
-
-
-class ProcessMaintenanceForm(ProcessReferenceScopeMixin, SimpleModelForm):
+class ProcessMaintenanceForm(WorkspaceReferenceScopeMixin, SimpleModelForm):
     parent = QuerysetTomSelectModelChoiceField(
         queryset=Process.objects.all(),
         required=False,
@@ -529,7 +434,7 @@ class ProcessMaintenanceForm(ProcessReferenceScopeMixin, SimpleModelForm):
         labels = {"name": "Title"}
         widgets = {
             **ProcessModelForm.Meta.widgets,
-            "supplementary_document": ProcessDocumentInput,
+            "supplementary_document": WorkspaceDocumentInput,
         }
 
     def __init__(self, *args, fields=None, **kwargs):
@@ -551,7 +456,9 @@ class ProcessQuickCreateForm(ProcessMaintenanceForm):
         fields = ("name", "short_description", "categories")
 
 
-class ProcessMaterialSectionForm(ProcessReferenceScopeMixin, ProcessMaterialInlineForm):
+class ProcessMaterialSectionForm(
+    WorkspaceReferenceScopeMixin, ProcessMaterialInlineForm
+):
     material = QuerysetTomSelectModelChoiceField(
         queryset=Material.objects.all(),
         config=TomSelectConfig(url="material-autocomplete"),
@@ -577,7 +484,7 @@ class ProcessMaterialSectionForm(ProcessReferenceScopeMixin, ProcessMaterialInli
 
 
 class ProcessParameterSectionForm(
-    ProcessReferenceScopeMixin, ProcessOperatingParameterInlineForm
+    WorkspaceReferenceScopeMixin, ProcessOperatingParameterInlineForm
 ):
     unit = QuerysetTomSelectModelChoiceField(
         queryset=Unit.objects.all(),
@@ -604,7 +511,7 @@ class ProcessSourceChoiceField(QuerysetTomSelectModelChoiceField):
         return obj.abbreviation or f"Source #{obj.pk}"
 
 
-class ProcessSourceSectionForm(ProcessReferenceScopeMixin, ProcessSourceInlineForm):
+class ProcessSourceSectionForm(WorkspaceReferenceScopeMixin, ProcessSourceInlineForm):
     source = ProcessSourceChoiceField(
         queryset=Source.objects.all(),
         config=TomSelectConfig(url="source-autocomplete", label_field="label"),
@@ -616,24 +523,24 @@ class ProcessSourceSectionForm(ProcessReferenceScopeMixin, ProcessSourceInlineFo
         self.fields["source"].workspace_autocomplete_url += "?label=abbreviation"
 
 
-class ProcessAuthorSectionForm(ProcessReferenceScopeMixin, ProcessAuthorInlineForm):
+class ProcessAuthorSectionForm(WorkspaceReferenceScopeMixin, ProcessAuthorInlineForm):
     pass
 
 
-class ProcessLinkSectionForm(ProcessReferenceScopeMixin, forms.ModelForm):
+class ProcessLinkSectionForm(WorkspaceReferenceScopeMixin, forms.ModelForm):
     class Meta:
         model = ProcessLink
         fields = ("label", "url", "open_in_new_tab")
 
 
 class ProcessResourceSectionForm(
-    ProcessReferenceScopeMixin, ProcessInfoResourceInlineForm
+    WorkspaceReferenceScopeMixin, ProcessInfoResourceInlineForm
 ):
     class Meta(ProcessInfoResourceInlineForm.Meta):
         fields = ("title", "resource_type", "description", "url", "document")
         widgets = {
             **ProcessInfoResourceInlineForm.Meta.widgets,
-            "document": ProcessDocumentInput,
+            "document": WorkspaceDocumentInput,
         }
 
     def __init__(self, *args, **kwargs):
@@ -644,60 +551,9 @@ class ProcessResourceSectionForm(
             ].widget.download_url = self.instance.document_download_url
 
 
-class ProcessSectionFormSet(BaseInlineFormSet):
-    def __init__(self, *args, role=None, **kwargs):
-        self.role = role
-        super().__init__(*args, **kwargs)
-
-    def _construct_form(self, i, **kwargs):
-        form = super()._construct_form(i, **kwargs)
-        if self.role:
-            form.instance.role = self.role
-        return form
-
-    def add_fields(self, form, index):
-        super().add_fields(form, index)
-        form.fields[self.model._meta.pk.name].queryset = self.get_queryset()
-
-    def clean(self):
-        super().clean()
-        if any(self.errors):
-            return
-        allowed_ids = {obj.pk for obj in self.get_queryset()}
-        seen_ids = set()
-        seen_references = set()
-        reference_field = {ProcessAuthor: "author", ProcessSource: "source"}.get(
-            self.model
-        )
-        for form in self.forms:
-            data = form.cleaned_data
-            row = data.get("id")
-            if row:
-                if row.pk not in allowed_ids or row.pk in seen_ids:
-                    raise ValidationError(
-                        "Each row must belong to this process section and appear only once."
-                    )
-                seen_ids.add(row.pk)
-            if reference_field and data and not data.get("DELETE"):
-                reference = data.get(reference_field)
-                if reference in seen_references:
-                    raise ValidationError("Each reference can only be added once.")
-                seen_references.add(reference)
-
-    def save(self, commit=True):
-        objects = super().save(commit=commit)
-        if commit:
-            position_field = "position" if self.model is ProcessAuthor else "order"
-            remaining = [
-                form.instance
-                for form in self.forms
-                if form.instance.pk and not form.cleaned_data.get("DELETE")
-            ]
-            for position, obj in enumerate(remaining, 1):
-                if getattr(obj, position_field) != position:
-                    setattr(obj, position_field, position)
-                    obj.save(update_fields=[position_field])
-        return objects
+class ProcessSectionFormSet(WorkspaceSectionFormSet):
+    reference_fields = {ProcessAuthor: "author", ProcessSource: "source"}
+    position_fields = {ProcessAuthor: "position"}
 
 
 PROCESS_SECTIONS = {
@@ -715,59 +571,64 @@ PROCESS_SECTIONS = {
     },
     "inputs": {
         "label": "Inputs",
-        "forms": (ProcessMaterialSectionForm,),
+        "forms": (
+            (
+                ProcessMaterialSectionForm,
+                {
+                    "add_label": "Add input",
+                    "row_template": "processes/includes/process_material_row.html",
+                },
+            ),
+        ),
         "role": "input",
     },
     "outputs": {
         "label": "Outputs",
-        "forms": (ProcessMaterialSectionForm,),
+        "forms": (
+            (
+                ProcessMaterialSectionForm,
+                {
+                    "add_label": "Add output",
+                    "row_template": "processes/includes/process_material_row.html",
+                },
+            ),
+        ),
         "role": "output",
     },
     "parameters": {
         "label": "Conditions and performance",
-        "forms": (ProcessParameterSectionForm,),
+        "forms": (
+            (
+                ProcessParameterSectionForm,
+                {"heading": "Operating parameters", "add_label": "Add parameter"},
+            ),
+        ),
     },
     "references": {
         "label": "References and contributors",
-        "forms": (ProcessAuthorSectionForm, ProcessSourceSectionForm),
+        "forms": (
+            (
+                ProcessAuthorSectionForm,
+                {"heading": "Contributors", "add_label": "Add contributor"},
+            ),
+            (
+                ProcessSourceSectionForm,
+                {"heading": "Bibliography", "add_label": "Add reference"},
+            ),
+        ),
     },
     "resources": {
         "label": "Supporting files and links",
         "fields": ("supplementary_document",),
-        "forms": (ProcessLinkSectionForm, ProcessResourceSectionForm),
+        "forms": (
+            (ProcessLinkSectionForm, {"heading": "Links", "add_label": "Add link"}),
+            (
+                ProcessResourceSectionForm,
+                {
+                    "heading": "Information resources",
+                    "add_label": "Add information resource",
+                },
+            ),
+        ),
     },
 }
-
-
-def process_section_formsets(process, section, request):
-    formsets = []
-    for form_class in section.get("forms", ()):
-        model = form_class._meta.model
-        factory = inlineformset_factory(
-            Process,
-            model,
-            form=form_class,
-            formset=ProcessSectionFormSet,
-            extra=0,
-            can_delete=True,
-        )
-        queryset = model.objects.filter(process=process)
-        role = section.get("role")
-        if role:
-            queryset = queryset.filter(role=role)
-        relations = [
-            field.name
-            for field in model._meta.fields
-            if field.many_to_one and field.name != "process"
-        ]
-        formsets.append(
-            factory(
-                instance=process,
-                queryset=queryset.select_related(*relations),
-                role=role,
-                data=request.POST if request.method == "POST" else None,
-                files=request.FILES if request.method == "POST" else None,
-                form_kwargs={"request": request},
-            )
-        )
-    return formsets

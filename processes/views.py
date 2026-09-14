@@ -12,6 +12,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, TemplateView
 
+from utils.forms import workspace_section_formsets
 from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import get_object_policy
 from utils.object_management.views import (
@@ -42,7 +43,7 @@ from .forms import (
     ProcessMaintenanceForm,
     ProcessModalModelForm,
     ProcessQuickCreateForm,
-    process_section_formsets,
+    ProcessSectionFormSet,
 )
 from .models import (
     Process,
@@ -285,6 +286,7 @@ class ProcessCreateView(UserCreatedObjectCreateView):
             **super().get_context_data(**kwargs),
             "form_title": "New process",
             "submit_button_text": "Save private draft",
+            "cancel_url": reverse("processes:process-list"),
         }
 
     def get_success_url(self):
@@ -408,6 +410,7 @@ class ProcessDetailView(UserCreatedObjectDetailView):
                     "key": key,
                     "label": section["label"],
                     "url": f"{self.object.update_url}?section={key}",
+                    "summary_template": "processes/includes/process_section_summary.html",
                     "material_links": self.object._material_links_for_role(
                         section["role"]
                     )
@@ -566,8 +569,11 @@ class ProcessUpdateView(UserCreatedObjectUpdateView):
 
     def get_inlines(self):
         if self.inlines is None:
-            self.inlines = process_section_formsets(
-                self.object, self.section, self.request
+            self.inlines = workspace_section_formsets(
+                self.object,
+                self.section,
+                self.request,
+                formset_class=ProcessSectionFormSet,
             )
         return self.inlines
 
@@ -578,6 +584,8 @@ class ProcessUpdateView(UserCreatedObjectUpdateView):
                 "section": self.section,
                 "section_url": f"{self.object.update_url}?section={self.section['key']}",
                 "workspace_url": self.get_success_url(),
+                "cancel_url": self.get_success_url(),
+                "object_label": "process",
                 "form_title": self.section["label"],
                 "submit_button_text": "Save section",
                 "inlines": self.get_inlines(),

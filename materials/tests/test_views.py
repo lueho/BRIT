@@ -2156,6 +2156,18 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     create_object_data = {"name": "Test Sample", "standalone": True}
     update_object_data = {"name": "Updated Test Sample", "standalone": True}
 
+    def get_update_success_url(self, pk):
+        return f"{reverse(self.view_detail_name, kwargs={'pk': pk})}?mode=edit"
+
+    def test_detail_view_unpublished_as_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(self.unpublished_object.pk))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, self.get_update_success_url(self.unpublished_object.pk)
+        )
+        self.assertContains(response, self.get_delete_url(self.unpublished_object.pk))
+
     @classmethod
     def create_related_objects(cls):
         substrate_category, _ = MaterialCategory.objects.get_or_create(
@@ -2312,6 +2324,243 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.assertContains(
                 response, self.get_list_url(publication_status="published")
             )
+
+
+class SampleMaintenanceViewsTestCase(TestCase):
+    """Section-based maintenance workspace for Sample quick-create and editing."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="sample-maintainer")
+        cls.other = User.objects.create_user(username="other-maintainer")
+        permissions = Permission.objects.filter(
+            content_type__app_label="materials",
+            codename__in=["add_sample", "change_sample"],
+        )
+        cls.owner.user_permissions.add(*permissions)
+        cls.other.user_permissions.add(*permissions)
+        substrate_category, _ = MaterialCategory.objects.get_or_create(
+            name=get_sample_substrate_category_name()
+        )
+        cls.substrate = Material.objects.create(
+            name="Workshop substrate",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.substrate.categories.add(substrate_category)
+        cls.series = SampleSeries.objects.create(
+            name="Field campaign", owner=cls.owner, material=cls.substrate
+        )
+        cls.sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Pilot sample",
+            material=cls.substrate,
+            series=cls.series,
+            description="Keep this description",
+            location="Lab bench",
+        )
+        cls.source = Source.objects.create(
+            owner=cls.owner,
+            abbreviation="S-1",
+            title="Lab report 1",
+            publication_status="private",
+        )
+        cls.sample.sources.add(cls.source)
+
+    def setUp(self):
+        self.client.force_login(self.owner)
+
+    def section_url(self, section="overview", sample=None):
+        return (
+            f"{reverse('sample-update', kwargs={'pk': (sample or self.sample).pk})}"
+            f"?section={section}"
+        )
+
+    def test_create_shows_only_essential_fields(self):
+        response = self.client.get(reverse("sample-create"))
+        self.assertEqual(
+            set(response.context["form"].fields),
+            {"name", "material", "datetime", "standalone", "series"},
+        )
+        self.assertContains(response, "Save private draft")
+
+    def test_create_with_minimal_data_saves_private_owned_draft(self):
+        response = self.client.post(
+            reverse("sample-create"),
+            {
+                "name": "Workshop sample",
+                "material": str(self.substrate.pk),
+                "standalone": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        sample = Sample.objects.get(name="Workshop sample")
+        self.assertEqual(sample.owner, self.owner)
+        self.assertEqual(sample.publication_status, "private")
+        self.assertRedirects(
+            response,
+            f"{sample.get_absolute_url()}?mode=edit",
+            fetch_redirect_response=False,
+        )
+
+    def test_create_requires_series_or_standalone(self):
+        response = self.client.post(
+            reverse("sample-create"),
+            {"name": "Series-less", "material": str(self.substrate.pk)},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Sample.objects.filter(name="Series-less").exists())
+
+    def test_edit_workspace_lists_sample_sections_without_loaded_forms(self):
+        response = self.client.get(f"{self.sample.get_absolute_url()}?mode=edit")
+        self.assertContains(response, "data-workspace")
+        self.assertContains(response, 'data-workspace-section="overview"')
+        self.assertContains(response, 'data-workspace-section="sampling"')
+        self.assertContains(response, 'data-workspace-section="analysis"')
+        self.assertContains(response, 'data-workspace-section="sources"')
+        self.assertNotContains(response, "TOTAL_FORMS")
+
+    def test_edit_workspace_not_offered_to_non_owner_of_private_sample(self):
+        self.client.force_login(self.other)
+        response = self.client.get(f"{self.sample.get_absolute_url()}?mode=edit")
+        self.assertNotContains(response, "data-workspace", status_code=403)
+
+    def test_section_get_returns_editor_fragment(self):
+        response = self.client.get(
+            self.section_url("sampling"), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["section"], "sampling")
+        self.assertFalse(data["saved"])
+        self.assertIn('name="datetime"', data["html"])
+        self.assertIn('name="series"', data["html"])
+
+    def test_overview_save_updates_only_overview_fields(self):
+        response = self.client.post(
+            self.section_url("overview"),
+            {
+                "name": "Renamed sample",
+                "material": str(self.substrate.pk),
+                "description": "New description",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.name, "Renamed sample")
+        self.assertEqual(self.sample.description, "New description")
+        self.assertEqual(self.sample.series, self.series)
+        self.assertEqual(self.sample.location, "Lab bench")
+
+    def test_sampling_save_preserves_known_date_precision(self):
+        response = self.client.post(
+            self.section_url("sampling"),
+            {
+                "datetime": "2024-08-27",
+                "location": "Plot 7",
+                "standalone": "on",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.datetime_precision, "date")
+        self.assertEqual(self.sample.sampling_date_display, "27 Aug 2024")
+        self.assertEqual(self.sample.location, "Plot 7")
+
+    def test_sources_save_replaces_only_sources(self):
+        second = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-2",
+            title="Lab report 2",
+            publication_status="private",
+        )
+        response = self.client.post(
+            self.section_url("sources"),
+            {"sources": [str(second.pk)]},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        self.assertEqual(list(self.sample.sources.all()), [second])
+        self.assertEqual(self.sample.name, "Pilot sample")
+
+    def test_sources_reject_inaccessible_source(self):
+        locked = Source.objects.create(
+            owner=self.other,
+            abbreviation="S-LOCKED",
+            title="Not yours",
+            publication_status="private",
+        )
+        response = self.client.post(
+            self.section_url("sources"),
+            {"sources": [str(locked.pk)]},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertFalse(response.json()["saved"])
+        self.assertEqual(list(self.sample.sources.all()), [self.source])
+
+    def test_legacy_sample_without_series_or_standalone_saves_other_sections(self):
+        legacy = Sample.objects.create(
+            owner=self.owner,
+            name="Legacy sample",
+            material=self.substrate,
+            series=None,
+            standalone=False,
+        )
+        response = self.client.post(
+            self.section_url("analysis", sample=legacy),
+            {"analysis_laboratory": "Lab X"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        legacy.refresh_from_db()
+        self.assertEqual(legacy.analysis_laboratory, "Lab X")
+        self.assertIsNone(legacy.series)
+        self.assertFalse(legacy.standalone)
+
+    def test_legacy_sample_sampling_section_still_enforces_series_invariant(self):
+        legacy = Sample.objects.create(
+            owner=self.owner,
+            name="Legacy sample",
+            material=self.substrate,
+            series=None,
+            standalone=False,
+        )
+        response = self.client.post(
+            self.section_url("sampling", sample=legacy),
+            {"location": "Plot 1"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertFalse(response.json()["saved"])
+        self.assertIn("series", response.json()["html"])
+
+    def test_unknown_section_returns_404(self):
+        response = self.client.get(self.section_url("bogus"))
+        self.assertEqual(response.status_code, 404)
+
+    def test_private_sample_section_denied_for_non_owner(self):
+        self.client.force_login(self.other)
+        response = self.client.get(self.section_url("overview"))
+        self.assertIn(response.status_code, (403, 404))
+
+    def test_validation_error_returns_422_and_keeps_form_bound(self):
+        response = self.client.post(
+            self.section_url("overview"),
+            {"name": "", "material": str(self.substrate.pk)},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 422)
+        data = response.json()
+        self.assertFalse(data["saved"])
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.name, "Pilot sample")
 
 
 # ----------- Sample utilities -----------------------------------------------------------------------------------------
@@ -4460,6 +4709,13 @@ class EmptyStateViewsTestCase(TestCase):
             response, reverse("sample-duplicate", kwargs={"pk": sample.pk})
         )
         self.assertContains(response, "Edit sample metadata")
+        self.assertContains(
+            response,
+            f'href="{reverse("sample-detail", kwargs={"pk": sample.pk})}?mode=edit"',
+        )
+        self.assertNotContains(
+            response, reverse("sample-update", kwargs={"pk": sample.pk}) + "?next="
+        )
 
     def test_v2_anonymous_gets_no_actions_dropdown(self):
         sample = Sample.objects.create(

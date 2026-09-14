@@ -3,12 +3,12 @@
 (() => {
     const media = new Map();
 
-    class ProcessWorkspace {
+    class MaintenanceWorkspace {
         constructor(root) {
             this.root = root;
-            this.standalone = root.dataset.processStandalone !== undefined;
+            this.standalone = root.dataset.workspaceStandalone !== undefined;
             this.active = null;
-            this.status = root.querySelector("[data-process-status]");
+            this.status = root.querySelector("[data-workspace-status]");
             root.addEventListener("click", (event) => this.onClick(event));
             root.addEventListener("submit", (event) => {
                 if (!this.standalone && this.active && event.target === this.active.form) {
@@ -40,7 +40,7 @@
         }
 
         announce(message, error = false) {
-            const local = this.active?.editor.querySelector("[data-process-local-status]");
+            const local = this.active?.editor.querySelector("[data-workspace-local-status]");
             for (const status of [this.status, local]) {
                 if (!status) continue;
                 status.textContent = message;
@@ -49,20 +49,20 @@
         }
 
         onClick(event) {
-            const link = event.target.closest("[data-process-edit]");
+            const link = event.target.closest("[data-workspace-edit]");
             if (link && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && (!event.button || event.button === 0)) {
                 event.preventDefault();
                 this.open(link);
                 return;
             }
-            if (!this.standalone && event.target.closest("[data-process-cancel]") && this.active) {
+            if (!this.standalone && event.target.closest("[data-workspace-cancel]") && this.active) {
                 event.preventDefault();
                 this.cancel();
             }
-            const add = event.target.closest("[data-process-add]");
+            const add = event.target.closest("[data-workspace-add]");
             if (add && this.active && !this.active.busy) {
                 event.preventDefault();
-                this.addRow(add.closest("[data-process-formset]"));
+                this.addRow(add.closest("[data-workspace-formset]"));
             }
         }
 
@@ -83,18 +83,18 @@
 
         async open(link) {
             if (this.active?.busy) return;
-            if (this.active && (this.active.link === link || this.active.key === link.dataset.processEdit)) {
-                this.active.focusName = link.dataset.processFocus;
+            if (this.active && (this.active.link === link || this.active.key === link.dataset.workspaceEdit)) {
+                this.active.focusName = link.dataset.workspaceFocus;
                 this.focusEditor(this.active);
                 return;
             }
             if (this.active && !this.cancel()) return;
-            const card = link.closest("[data-process-section]") || this.root.querySelector(`[data-process-section="${link.dataset.processEdit}"]`);
+            const card = link.closest("[data-workspace-section]") || this.root.querySelector(`[data-workspace-section="${link.dataset.workspaceEdit}"]`);
             if (!card) return;
             const active = {
-                card, link, key: card.dataset.processSection, focusName: link.dataset.processFocus,
-                summary: card.querySelector("[data-process-summary]"),
-                editor: card.querySelector("[data-process-editor]"),
+                card, link, key: card.dataset.workspaceSection, focusName: link.dataset.workspaceFocus,
+                summary: card.querySelector("[data-workspace-summary]"),
+                editor: card.querySelector("[data-workspace-editor]"),
                 dirty: false, busy: true,
             };
             this.active = active;
@@ -162,8 +162,8 @@
         }
 
         async loadMedia(fragment) {
-            if (!fragment.querySelector("select[data-process-select]")) return;
-            for (const template of fragment.querySelectorAll("template[data-process-media]")) {
+            if (!fragment.querySelector("select[data-workspace-select]")) return;
+            for (const template of fragment.querySelectorAll("template[data-workspace-media]")) {
                 await Promise.all(Array.from(template.content.querySelectorAll('link[rel="stylesheet"]'), (link) => this.loadAsset(link, "style")));
                 for (const script of template.content.querySelectorAll("script[src]")) await this.loadAsset(script, "script");
                 template.remove();
@@ -173,7 +173,7 @@
         stripScripts(fragment) {
             fragment.querySelectorAll("script").forEach((script) => script.remove());
             fragment.querySelectorAll("template").forEach((template) => {
-                if (template.dataset.processMedia === undefined) this.stripScripts(template.content);
+                if (template.dataset.workspaceMedia === undefined) this.stripScripts(template.content);
             });
         }
 
@@ -181,11 +181,11 @@
             for (const field of container.querySelectorAll("input, select, textarea")) {
                 if (field.type === "hidden") continue;
                 field.classList.add(field.type === "checkbox" ? "form-check-input" : field.tagName === "SELECT" ? "form-select" : "form-control");
-                if (field.id && field.closest("[data-process-field]")) {
+                if (field.id && field.closest("[data-workspace-field]")) {
                     field.setAttribute("aria-describedby", `${field.id}_helptext ${field.id}_errors`);
                 }
             }
-            for (const select of container.querySelectorAll("select[data-process-select]")) {
+            for (const select of container.querySelectorAll("select[data-workspace-select]")) {
                 if (select.tomselect) continue;
                 if (!window.TomSelect) throw new Error("Select editor unavailable");
                 new window.TomSelect(select, this.autocompleteSettings(select));
@@ -254,7 +254,7 @@
             await this.loadMedia(fragment);
             this.stripScripts(fragment);
             active.editor.replaceChildren(fragment);
-            active.form = active.editor.querySelector("form[data-process-section-form]");
+            active.form = active.editor.querySelector("form[data-workspace-section-form]");
             if (!active.form) throw new Error("Missing section form");
             this.initializeWidgets(active.editor);
         }
@@ -263,15 +263,15 @@
             const field = (active.focusName && active.form?.elements?.namedItem(active.focusName)) || active.editor.querySelector('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])');
             if (field?.tomselect) field.tomselect.focus();
             else if (field) field.focus();
-            else active.editor.querySelector("[data-process-form-title]")?.focus();
+            else active.editor.querySelector("[data-workspace-form-title]")?.focus();
         }
 
         setBusy(active, busy) {
             active.busy = busy;
             active.card.setAttribute("aria-busy", String(busy));
-            const fields = active.form.querySelector("[data-process-fields]");
+            const fields = active.form.querySelector("[data-workspace-fields]");
             if (fields) fields.disabled = busy;
-            for (const select of active.form.querySelectorAll("select[data-process-select]")) {
+            for (const select of active.form.querySelectorAll("select[data-workspace-select]")) {
                 if (busy) select.tomselect?.disable();
                 else select.tomselect?.enable();
             }
@@ -283,6 +283,7 @@
             const body = new FormData(active.form);
             this.setBusy(active, true);
             this.announce("Saving section…");
+            let reloading = false;
             try {
                 const data = await this.request(active.form.action, { method: "POST", body }, active.key);
                 this.setBusy(active, false);
@@ -292,10 +293,18 @@
                     this.announce("Please correct the errors below. Your entries and selected files have been kept; nothing was saved.", true);
                     return;
                 }
+                if ("workspaceReload" in this.root.dataset) {
+                    reloading = true;
+                    active.dirty = false;
+                    this.setBusy(active, true);
+                    this.announce(data.message || "Section saved. Refreshing…");
+                    window.location.reload();
+                    return;
+                }
                 this.replaceSummary(active, data.html);
                 if (data.title) {
                     document.title = `BRIT · ${data.title}`;
-                    this.root.querySelectorAll("[data-process-title]").forEach((title) => { title.textContent = data.title; });
+                    this.root.querySelectorAll("[data-workspace-title]").forEach((title) => { title.textContent = data.title; });
                 }
                 active.dirty = false;
                 this.close(active);
@@ -304,19 +313,19 @@
             } catch (error) {
                 this.announce("Changes were not saved or could not be confirmed. Your entries and selected files are still here. Check your connection and try again before leaving.", true);
             } finally {
-                this.setBusy(active, false);
+                if (!reloading) this.setBusy(active, false);
             }
         }
 
         mergeErrors(active, html) {
             const fragment = this.fragment(html);
             this.stripScripts(fragment);
-            const returned = new Map(Array.from(fragment.querySelectorAll("[data-process-errors]"), (node) => [node.dataset.processErrors, node]));
+            const returned = new Map(Array.from(fragment.querySelectorAll("[data-workspace-errors]"), (node) => [node.dataset.workspaceErrors, node]));
             let first = null;
-            for (const node of active.form.querySelectorAll("[data-process-errors]")) {
-                const error = returned.get(node.dataset.processErrors);
+            for (const node of active.form.querySelectorAll("[data-workspace-errors]")) {
+                const error = returned.get(node.dataset.workspaceErrors);
                 node.innerHTML = error ? error.innerHTML : "";
-                const field = active.form.elements.namedItem(node.dataset.processErrors);
+                const field = active.form.elements.namedItem(node.dataset.workspaceErrors);
                 if (field?.setAttribute) {
                     if (node.textContent.trim()) field.setAttribute("aria-invalid", "true");
                     else field.removeAttribute("aria-invalid");
@@ -346,11 +355,11 @@
                 this.announce("The maximum number of rows has been reached.", true);
                 return;
             }
-            const template = formset.querySelector("template[data-process-empty]");
+            const template = formset.querySelector("template[data-workspace-empty]");
             const fragment = this.fragment(template.innerHTML.replace(/__prefix__/g, String(index)));
             this.stripScripts(fragment);
-            const row = fragment.querySelector("[data-process-row]");
-            formset.querySelector("[data-process-rows]").appendChild(fragment);
+            const row = fragment.querySelector("[data-workspace-row]");
+            formset.querySelector("[data-workspace-rows]").appendChild(fragment);
             total.value = String(index + 1);
             active.dirty = true;
             this.announce("Row added. Changes are not saved yet.");
@@ -359,7 +368,7 @@
                 if (this.active !== active) return;
                 this.initializeWidgets(row);
                 if (active.busy) {
-                    row.querySelectorAll("select[data-process-select]").forEach((select) => select.tomselect?.disable());
+                    row.querySelectorAll("select[data-workspace-select]").forEach((select) => select.tomselect?.disable());
                 } else {
                     this.focusEditor({ editor: row });
                 }
@@ -370,13 +379,13 @@
 
         setExpanded(active, expanded) {
             active.link.setAttribute("aria-expanded", String(expanded));
-            this.root.querySelectorAll(`[data-process-edit="${active.key}"]`).forEach((link) => {
+            this.root.querySelectorAll(`[data-workspace-edit="${active.key}"]`).forEach((link) => {
                 link.setAttribute("aria-expanded", String(expanded));
             });
         }
 
         close(active) {
-            for (const select of active.editor.querySelectorAll("select[data-process-select]")) select.tomselect?.destroy();
+            for (const select of active.editor.querySelectorAll("select[data-workspace-select]")) select.tomselect?.destroy();
             active.editor.innerHTML = "";
             active.editor.hidden = true;
             active.summary.hidden = false;
@@ -396,12 +405,12 @@
         }
     }
 
-    window.ProcessWorkspace = ProcessWorkspace;
+    window.MaintenanceWorkspace = MaintenanceWorkspace;
     const start = async () => {
-        for (const root of document.querySelectorAll("[data-process-workspace]")) new ProcessWorkspace(root);
-        for (const root of document.querySelectorAll("[data-process-standalone]")) {
-            const workspace = new ProcessWorkspace(root);
-            const form = root.querySelector("form[data-process-section-form]");
+        for (const root of document.querySelectorAll("[data-workspace]")) new MaintenanceWorkspace(root);
+        for (const root of document.querySelectorAll("[data-workspace-standalone]")) {
+            const workspace = new MaintenanceWorkspace(root);
+            const form = root.querySelector("form[data-workspace-section-form]");
             try {
                 await workspace.loadMedia(root);
                 workspace.initializeWidgets(root);
@@ -411,7 +420,7 @@
             workspace.active = { form, editor: root, dirty: false, busy: false };
             root.addEventListener("submit", () => { workspace.active.dirty = false; }, true);
             root.addEventListener("click", (event) => {
-                if (!event.target.closest("[data-process-cancel]")) return;
+                if (!event.target.closest("[data-workspace-cancel]")) return;
                 if (workspace.active.dirty && !window.confirm("Discard unsaved changes?")) event.preventDefault();
                 else workspace.active.dirty = false;
             }, true);

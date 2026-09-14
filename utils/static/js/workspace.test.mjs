@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
 
-const source = readFileSync(new URL("./process_workspace.js", import.meta.url), "utf8");
+const source = readFileSync(new URL("./workspace.js", import.meta.url), "utf8");
 
 function element(extra = {}) {
     return {
@@ -22,21 +22,21 @@ function setup(fetch = async () => { throw new Error("offline"); }) {
     const status = element();
     const root = element({
         dataset: { staticUrl: "/static/" },
-        querySelector(selector) { return selector === "[data-process-status]" ? status : null; },
+        querySelector(selector) { return selector === "[data-workspace-status]" ? status : null; },
     });
-    const window = element({ confirm: () => true, location: { href: "https://brit.test/processes/1/?mode=edit", origin: "https://brit.test" } });
+    const window = element({ confirm: () => true, location: { href: "https://brit.test/objects/1/?mode=edit", origin: "https://brit.test" } });
     const document = element({ readyState: "loading", title: "BRIT · Original" });
     const sandbox = { window, document, fetch, URL, console, FormData: class { constructor(form) { this.form = form; } } };
     vm.runInNewContext(source, sandbox);
-    const workspace = new window.ProcessWorkspace(root);
+    const workspace = new window.MaintenanceWorkspace(root);
     const summary = element({ innerHTML: "Original summary" });
     const editor = element({ hidden: true });
     const heading = element();
-    const link = element({ href: "https://brit.test/processes/1/update/?section=overview" });
+    const link = element({ href: "https://brit.test/objects/1/update/?section=overview" });
     const card = element({
-        dataset: { processSection: "overview" },
+        dataset: { workspaceSection: "overview" },
         querySelector(selector) {
-            return { "[data-process-summary]": summary, "[data-process-editor]": editor, "[data-process-heading]": heading }[selector] || null;
+            return { "[data-workspace-summary]": summary, "[data-workspace-editor]": editor, "[data-workspace-heading]": heading }[selector] || null;
         },
     });
     link.closest = () => card;
@@ -48,7 +48,7 @@ function activate(fixture) {
     const file = element({ name: "image", files: ["chosen.png"] });
     const form = element({
         action: fixture.link.href,
-        querySelector(selector) { return selector === "[data-process-fields]" ? fields : null; },
+        querySelector(selector) { return selector === "[data-workspace-fields]" ? fields : null; },
         querySelectorAll(selector) { return selector === 'input[type="file"]' ? [file] : []; },
     });
     fixture.workspace.active = { ...fixture, key: "overview", form, dirty: true, busy: false };
@@ -83,8 +83,8 @@ test("opening fetches only the selected fallback URL with the fragment header", 
 test("the hero title action opens the overview editor outside its card", async () => {
     const fixture = setup(async () => ({ ok: true, status: 200, json: async () => ({ section: "overview", saved: false, html: "Title editor" }) }));
     fixture.link.closest = () => null;
-    fixture.link.dataset = { processEdit: "overview", processFocus: "name" };
-    fixture.root.querySelector = (selector) => selector === '[data-process-section="overview"]' ? fixture.card : fixture.status;
+    fixture.link.dataset = { workspaceEdit: "overview", workspaceFocus: "name" };
+    fixture.root.querySelector = (selector) => selector === '[data-workspace-section="overview"]' ? fixture.card : fixture.status;
     fixture.workspace.mountEditor = async (active, html) => { active.editor.innerHTML = html; active.form = element(); };
     await fixture.workspace.open(fixture.link);
     assert.equal(fixture.workspace.active.key, "overview");
@@ -106,7 +106,7 @@ test("all title and overview controls reflect the same editor state", async () =
 test("title saves update the hero and browser title", async () => {
     const fixture = setup(async () => ({ ok: true, status: 200, json: async () => ({ section: "overview", saved: true, html: "New title summary", title: "Renamed process" }) }));
     const title = element();
-    fixture.root.querySelectorAll = (selector) => selector === "[data-process-title]" ? [title] : [];
+    fixture.root.querySelectorAll = (selector) => selector === "[data-workspace-title]" ? [title] : [];
     activate(fixture);
     fixture.workspace.replaceSummary = () => {};
     await fixture.workspace.save();
@@ -161,6 +161,29 @@ test("successful save updates only this summary, title and live message and retu
     assert.equal(fixture.summary.hidden, false);
 });
 
+test("workspaces that repeat section data elsewhere reload the page after a successful save", async () => {
+    const fixture = setup(async () => ({ ok: true, status: 200, json: async () => ({ section: "overview", saved: true, html: "New summary", title: "New title" }) }));
+    fixture.root.dataset.workspaceReload = "";
+    let reloaded = 0;
+    fixture.window.location.reload = () => { reloaded += 1; };
+    const { fields } = activate(fixture);
+    fixture.workspace.replaceSummary = () => { throw new Error("must not patch the summary in place"); };
+    await fixture.workspace.save();
+    assert.equal(reloaded, 1);
+    assert.equal(fixture.workspace.active.dirty, false);
+    assert.equal(fields.disabled, true);
+    const event = { preventDefault() { this.prevented = true; } };
+    fixture.window.listeners.beforeunload(event);
+    assert.equal(event.prevented, undefined);
+});
+
+test("the sample detail workspace opts into reloading while the process detail workspace does not", () => {
+    const sample = readFileSync(new URL("../../../materials/templates/materials/sample_detail_v2.html", import.meta.url), "utf8");
+    assert.match(sample, /data-workspace data-workspace-reload/);
+    const process = readFileSync(new URL("../../../processes/templates/processes/process_detail.html", import.meta.url), "utf8");
+    assert.doesNotMatch(process, /data-workspace-reload/);
+});
+
 test("cancel and switching sections cannot silently discard unsaved changes", () => {
     const fixture = setup();
     activate(fixture);
@@ -194,28 +217,28 @@ test("a response for another section cannot overwrite the current editor", async
 });
 
 test("quick create delegates to a small section form rather than eagerly rendering all formsets", () => {
-    const template = readFileSync(new URL("../../../templates/processes/process_form.html", import.meta.url), "utf8");
+    const template = readFileSync(new URL("../../../processes/templates/processes/process_form.html", import.meta.url), "utf8");
     assert.match(template, /process_section_form\.html/);
     assert.doesNotMatch(template, /inlines\.\d|formset_base\.html/);
 });
 
 test("detail edit mode includes a summary-only workspace and read-only mode remains available", () => {
-    const template = readFileSync(new URL("../../../templates/processes/process_detail.html", import.meta.url), "utf8");
+    const template = readFileSync(new URL("../../../processes/templates/processes/process_detail.html", import.meta.url), "utf8");
     assert.match(template, /edit_mode_enabled/);
-    assert.match(template, /process_workspace\.html/);
+    assert.match(template, /workspace\.html/);
     assert.match(template, /Done editing/);
 });
 
 test("initial summaries use each maintenance section's role-filtered material links", () => {
-    const template = readFileSync(new URL("../../../templates/processes/includes/process_workspace.html", import.meta.url), "utf8");
+    const template = readFileSync(new URL("../../../utils/templates/utils/includes/workspace_sections.html", import.meta.url), "utf8");
     assert.match(template, /material_links=section\.material_links/);
     assert.doesNotMatch(template, /input_materials|output_materials/);
 });
 
 test("standalone form submits normally instead of being intercepted by the workspace", () => {
     const fixture = setup();
-    fixture.root.dataset.processStandalone = "";
-    fixture.workspace = new fixture.window.ProcessWorkspace(fixture.root);
+    fixture.root.dataset.workspaceStandalone = "";
+    fixture.workspace = new fixture.window.MaintenanceWorkspace(fixture.root);
     const { form } = activate(fixture);
     let saved = false;
     fixture.workspace.save = () => { saved = true; };
@@ -230,7 +253,7 @@ test("validation merges messages, opens optional details and focuses the actual 
     const { form } = activate(fixture);
     const details = element();
     const field = element({ type: "text", value: "Keep my notes" });
-    const error = element({ dataset: { processErrors: "process_materials-0-notes" }, textContent: "Error", closest: () => details });
+    const error = element({ dataset: { workspaceErrors: "process_materials-0-notes" }, textContent: "Error", closest: () => details });
     const incoming = element({ dataset: error.dataset, innerHTML: "Invalid notes" });
     fixture.workspace.fragment = () => element({ querySelectorAll: () => [incoming] });
     fixture.workspace.stripScripts = () => { };
@@ -263,8 +286,8 @@ test("adding an empty Django row replaces all prefix tokens and increments the m
             return {
                 'input[name$="-TOTAL_FORMS"]': total,
                 'input[name$="-MAX_NUM_FORMS"]': max,
-                "template[data-process-empty]": template,
-                "[data-process-rows]": { appendChild(node) { appended = node; } },
+                "template[data-workspace-empty]": template,
+                "[data-workspace-rows]": { appendChild(node) { appended = node; } },
             }[selector];
         }
     });
@@ -313,14 +336,15 @@ function remoteWidget(fixture, labelField = "name", autocompleteUrl = "/material
 }
 
 test("autocomplete markup renders only supplied selected options, never bound field choices", () => {
-    const template = readFileSync(new URL("../../../templates/processes/includes/process_section_form.html", import.meta.url), "utf8");
-    assert.match(template, /for option in field\.field\.workspace_options/);
-    assert.match(template, /data-autocomplete-url="{{ field\.field\.workspace_autocomplete_url }}"/);
-    assert.match(template, /data-label-field="{{ field\.field\.workspace_label_field }}"/);
-    assert.match(template, /data-value-field="{{ field\.field\.workspace_value_field }}"/);
-    assert.match(template, /<option value="{{ option\.value }}" selected>{{ option\.label }}<\/option>/);
-    assert.doesNotMatch(template, /for option in field %|field\.queryset/);
-    assert.match(template, /<noscript>[\s\S]*JavaScript[\s\S]*search/);
+    const fieldTemplate = readFileSync(new URL("../../../utils/templates/utils/includes/workspace_field.html", import.meta.url), "utf8");
+    assert.match(fieldTemplate, /for option in field\.field\.workspace_options/);
+    assert.match(fieldTemplate, /data-autocomplete-url="{{ field\.field\.workspace_autocomplete_url }}"/);
+    assert.match(fieldTemplate, /data-label-field="{{ field\.field\.workspace_label_field }}"/);
+    assert.match(fieldTemplate, /data-value-field="{{ field\.field\.workspace_value_field }}"/);
+    assert.match(fieldTemplate, /<option value="{{ option\.value }}" selected>{{ option\.label }}<\/option>/);
+    assert.doesNotMatch(fieldTemplate, /for option in field %|field\.queryset/);
+    const formTemplate = readFileSync(new URL("../../../utils/templates/utils/includes/workspace_section_form.html", import.meta.url), "utf8");
+    assert.match(formTemplate, /<noscript>[\s\S]*JavaScript[\s\S]*search/);
 });
 
 test("remote widgets use a 15-result cap and do not preload or create unknown options", () => {
@@ -448,7 +472,7 @@ test("inert media templates survive script stripping for on-demand row initializ
     let removed = false;
     const script = element({ remove() { removed = true; } });
     const template = element({
-        dataset: { processMedia: "" },
+        dataset: { workspaceMedia: "" },
         content: element({ querySelectorAll: (selector) => selector === "script" ? [script] : [] }),
     });
     const fragment = element({ querySelectorAll: (selector) => selector === "template" ? [template] : [] });

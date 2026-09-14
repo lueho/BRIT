@@ -12,14 +12,14 @@
 {% endblock breadcrumbs %}
 {% block content %}
   <div class="row justify-content-center">
-    <div class="col-12 col-lg-9 col-xl-8" data-process-standalone data-static-url="{% get_static_prefix %}">
+    <div class="col-12 col-lg-9 col-xl-8" data-workspace-standalone data-static-url="{% get_static_prefix %}">
       <h1 class="h3 mb-4">{% if section %}{{ section.label }}{% else %}{{ form_title|default:'New process' }}{% endif %}</h1>
-      <p data-process-status role="status" aria-live="polite" aria-atomic="true"></p>
+      <p data-workspace-status role="status" aria-live="polite" aria-atomic="true"></p>
       <div class="card"><div class="card-body">{% include "processes/includes/process_section_form.html" %}</div></div>
     </div>
   </div>
 {% endblock content %}
 {% block javascript %}
   {{ block.super }}
-  <script src="{% static 'processes/js/process_workspace.js' %}" defer></script>
+  <script src="{% static 'js/workspace.min.js' %}" defer></script>
 {% endblock javascript %}
