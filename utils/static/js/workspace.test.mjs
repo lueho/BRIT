@@ -161,6 +161,29 @@ test("successful save updates only this summary, title and live message and retu
     assert.equal(fixture.summary.hidden, false);
 });
 
+test("workspaces that repeat section data elsewhere reload the page after a successful save", async () => {
+    const fixture = setup(async () => ({ ok: true, status: 200, json: async () => ({ section: "overview", saved: true, html: "New summary", title: "New title" }) }));
+    fixture.root.dataset.workspaceReload = "";
+    let reloaded = 0;
+    fixture.window.location.reload = () => { reloaded += 1; };
+    const { fields } = activate(fixture);
+    fixture.workspace.replaceSummary = () => { throw new Error("must not patch the summary in place"); };
+    await fixture.workspace.save();
+    assert.equal(reloaded, 1);
+    assert.equal(fixture.workspace.active.dirty, false);
+    assert.equal(fields.disabled, true);
+    const event = { preventDefault() { this.prevented = true; } };
+    fixture.window.listeners.beforeunload(event);
+    assert.equal(event.prevented, undefined);
+});
+
+test("the sample detail workspace opts into reloading while the process detail workspace does not", () => {
+    const sample = readFileSync(new URL("../../../materials/templates/materials/sample_detail_v2.html", import.meta.url), "utf8");
+    assert.match(sample, /data-workspace data-workspace-reload/);
+    const process = readFileSync(new URL("../../../processes/templates/processes/process_detail.html", import.meta.url), "utf8");
+    assert.doesNotMatch(process, /data-workspace-reload/);
+});
+
 test("cancel and switching sections cannot silently discard unsaved changes", () => {
     const fixture = setup();
     activate(fixture);
@@ -475,22 +498,28 @@ test("media trust is restricted to the configured static TomSelect package", () 
     assert.throws(() => workspace.trustedMediaURL("/static/django_tomselect/css/x.css", "script"));
 });
 
-function pasteFixture(fixture, { text, results = {} }) {
-    const fields = {};
+function pasteFixture(fixture, { text, results = {}, maxRows = Infinity, columns = "component,average" }) {
     const errors = {};
-    const rowsContainer = { lastElementChild: null };
+    const rowsContainer = { lastElementChild: element({ fields: {}, querySelector: () => null }) };
     const formset = element({
         querySelector(selector) { return selector === "[data-workspace-rows]" ? rowsContainer : null; },
     });
     const input = element({
         value: text,
-        dataset: { pasteFormset: "component_measurements", pasteColumns: "component,average" },
+        dataset: { pasteFormset: "component_measurements", pasteColumns: columns },
     });
+    const apply = element({ disabled: false });
     const panel = element({
-        querySelector(selector) { return selector === "[data-workspace-paste-input]" ? input : null; },
+        querySelector(selector) {
+            if (selector === "[data-workspace-paste-input]") return input;
+            if (selector === "[data-workspace-paste-apply]") return apply;
+            return null;
+        },
     });
     let created = 0;
     fixture.workspace.addRow = async () => {
+        await Promise.resolve();
+        if (created >= maxRows) return null;
         created += 1;
         const rowFields = {};
         const row = element({
@@ -520,12 +549,13 @@ function pasteFixture(fixture, { text, results = {} }) {
         });
         row.fields = rowFields;
         rowsContainer.lastElementChild = row;
+        return row;
     };
     fixture.workspace.active.editor = element({
         querySelector(selector) { return selector === '[data-workspace-formset="component_measurements"]' ? formset : null; },
     });
     fixture.workspace.searchOptions = async (select, query) => results[query] || [];
-    return { input, panel, formset, errors, rowsContainer, created: () => created };
+    return { input, panel, apply, formset, errors, rowsContainer, created: () => created };
 }
 
 test("pasted spreadsheet rows create a formset row per line and resolve names", async () => {
@@ -574,4 +604,67 @@ test("ambiguous or unknown pasted names are flagged on the row for manual choice
     assert.match(mock.errors["component_measurements-1-component"].textContent, /No match for "Lignin"/);
     assert.match(fixture.status.textContent, /1 name could not be matched/);
     assert.equal(fixture.status.className, "alert alert-danger");
+});
+
+test("paste stops at the row limit instead of overwriting the last existing row", async () => {
+    const fixture = setup();
+    activate(fixture);
+    const mock = pasteFixture(fixture, {
+        text: "Ash\t12.5\nMoisture\t4.25\nLignin\t9.9",
+        results: { Ash: [{ id: 7, name: "Ash" }] },
+        maxRows: 1,
+    });
+    const existing = mock.rowsContainer.lastElementChild;
+    await fixture.workspace.applyPaste(mock.panel);
+    assert.equal(mock.created(), 1);
+    assert.notEqual(mock.rowsContainer.lastElementChild, existing);
+    assert.equal(mock.rowsContainer.lastElementChild.fields.average.value, "12.5");
+    assert.match(fixture.status.textContent, /Added 1 row.*2 lines? (was|were) not added/);
+    assert.equal(fixture.status.className, "alert alert-danger");
+});
+
+test("a second paste while one is running is ignored and the apply button is re-enabled afterwards", async () => {
+    const fixture = setup();
+    activate(fixture);
+    const mock = pasteFixture(fixture, {
+        text: "Ash\t12.5\nMoisture\t4.25",
+        results: { Ash: [{ id: 7, name: "Ash" }], Moisture: [{ id: 8, name: "Moisture" }] },
+    });
+    const first = fixture.workspace.applyPaste(mock.panel);
+    assert.equal(mock.apply.disabled, true);
+    await fixture.workspace.applyPaste(mock.panel);
+    await first;
+    assert.equal(mock.created(), 2);
+    assert.equal(mock.apply.disabled, false);
+    assert.equal(fixture.workspace.active.pasting, false);
+});
+
+test("the paste guard is released when a paste fails", async () => {
+    const fixture = setup();
+    activate(fixture);
+    const mock = pasteFixture(fixture, { text: "Ash\t12.5" });
+    fixture.workspace.addRow = async () => { throw new Error("boom"); };
+    await assert.rejects(fixture.workspace.applyPaste(mock.panel));
+    assert.equal(mock.apply.disabled, false);
+    assert.equal(fixture.workspace.active.pasting, false);
+});
+
+test("only recognised header labels are skipped; a non-numeric first value is kept for validation", async () => {
+    const fixture = setup();
+    activate(fixture);
+    const invalid = pasteFixture(fixture, {
+        text: "Ash\tbelow detection\nMoisture\t4.25",
+        results: { Ash: [{ id: 7, name: "Ash" }], Moisture: [{ id: 8, name: "Moisture" }] },
+    });
+    await fixture.workspace.applyPaste(invalid.panel);
+    assert.equal(invalid.created(), 2);
+
+    const header = pasteFixture(fixture, {
+        text: "Group\tComponent\tValue\tUnit\tStandard deviation\tn\nMain\tAsh\t12.5\t%\t0.1\t3",
+        results: { Ash: [{ id: 7, name: "Ash" }] },
+        columns: "group,component,average,unit,standard_deviation,sample_size",
+    });
+    await fixture.workspace.applyPaste(header.panel);
+    assert.equal(header.created(), 1);
+    assert.equal(header.rowsContainer.lastElementChild.fields.average.value, "12.5");
 });
