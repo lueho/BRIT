@@ -2644,6 +2644,12 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
             unit=cls.unit,
             average=Decimal("12.5"),
         )
+        cls.source = Source.objects.create(
+            owner=cls.owner,
+            abbreviation="M-1",
+            title="Measurement report",
+            publication_status="private",
+        )
         ObjectEditorGrant.objects.create(content_object=cls.sample, editor=cls.editor)
 
     def setUp(self):
@@ -2746,6 +2752,30 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
         self.assertEqual(new.average, Decimal("8.25"))
         detailed = measurements.get(standard_deviation=Decimal("0.2"))
         self.assertEqual(detailed.sample_size, 3)
+
+    def test_measurements_post_saves_sources_of_new_and_existing_rows(self):
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        id=str(self.measurement.pk), sources=[str(self.source.pk)]
+                    ),
+                    self.measurement_row(
+                        component=str(self.moisture.pk),
+                        sources=[str(self.source.pk)],
+                    ),
+                ],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertTrue(response.json()["saved"])
+        self.measurement.refresh_from_db()
+        self.assertEqual(list(self.measurement.sources.all()), [self.source])
+        new = self.sample.component_measurements.get(component=self.moisture)
+        self.assertEqual(list(new.sources.all()), [self.source])
 
     def test_measurements_post_invalid_rows_roll_back_everything(self):
         response = self.client.post(
