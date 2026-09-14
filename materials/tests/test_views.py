@@ -6498,6 +6498,53 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, private_basis.name)
         self.assertContains(response, private_canonical.name)
 
+    def test_material_review_detail_includes_related_samples(self):
+        review_material = Material.objects.create(
+            owner=self.owner,
+            name="Material With Review Context",
+            publication_status="review",
+        )
+        review_sample = Sample.objects.create(
+            owner=self.owner,
+            name="Published Sample In Review Material",
+            material=review_material,
+            publication_status="published",
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse(
+                "object_management:review_item_detail",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(
+                        Material, for_concrete_model=False
+                    ).pk,
+                    "object_id": review_material.pk,
+                },
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, review_sample.name)
+
+    def test_component_group_review_detail_includes_related_samples(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse(
+                "object_management:review_item_detail",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(
+                        MaterialComponentGroup
+                    ).pk,
+                    "object_id": self.group.pk,
+                },
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.standalone_sample.name)
+
     def test_component_detail_shows_groups_measured_in(self):
         response = self.get_detail("materialcomponent-detail", self.component)
         self.assertContains(response, self.group.name)

@@ -1620,23 +1620,60 @@ class SampleReviewItemDetailView(ReviewItemDetailView):
     """Render sample moderation with the complete v2 sample context."""
 
     model = Sample
+    detail_view_class = SampleDetailView
 
     def _resolve_base_template(self):
         return "materials/sample_detail_v2.html"
 
-    def get_review_specific_context(self, context):
-        detail_view = SampleDetailView()
-        detail_view.request = self.request
-        detail_view.args = self.args
-        detail_view.kwargs = self.kwargs
-        detail_view.object = self.object
-        sample_context = detail_view.get_context_data(object=self.object)
-        for review_key in ("review_logs", "review_mode", "show_review_panel"):
-            sample_context.pop(review_key, None)
-        return sample_context
-
 
 SampleReviewItemDetailView.register_for_model(Sample)
+
+
+class MaterialCategoryReviewItemDetailView(ReviewItemDetailView):
+    model = MaterialCategory
+    detail_view_class = MaterialCategoryDetailView
+
+
+class MaterialReviewItemDetailView(ReviewItemDetailView):
+    model = Material
+    detail_view_class = MaterialDetailView
+
+
+class MaterialComponentReviewItemDetailView(ReviewItemDetailView):
+    model = MaterialComponent
+    detail_view_class = ComponentDetailView
+
+
+class MaterialComponentGroupReviewItemDetailView(ReviewItemDetailView):
+    model = MaterialComponentGroup
+    detail_view_class = MaterialComponentGroupDetailView
+
+
+class MaterialPropertyReviewItemDetailView(ReviewItemDetailView):
+    model = MaterialProperty
+    detail_view_class = MaterialPropertyDetailView
+
+
+class AnalyticalMethodReviewItemDetailView(ReviewItemDetailView):
+    model = AnalyticalMethod
+    detail_view_class = AnalyticalMethodDetailView
+
+
+class SampleSeriesReviewItemDetailView(ReviewItemDetailView):
+    model = SampleSeries
+    detail_view_class = SampleSeriesDetailView
+
+
+for _model, _review_view in (
+    (MaterialCategory, MaterialCategoryReviewItemDetailView),
+    (Material, MaterialReviewItemDetailView),
+    (MaterialComponent, MaterialComponentReviewItemDetailView),
+    (MaterialComponentGroup, MaterialComponentGroupReviewItemDetailView),
+    (MaterialProperty, MaterialPropertyReviewItemDetailView),
+    (AnalyticalMethod, AnalyticalMethodReviewItemDetailView),
+    (SampleSeries, SampleSeriesReviewItemDetailView),
+):
+    _review_view.register_for_model(_model)
 
 
 class SampleUpdateView(UserCreatedObjectUpdateView):
