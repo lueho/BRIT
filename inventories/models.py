@@ -556,8 +556,13 @@ class Scenario(NamedUserCreatedObject):
         if not set(required).issubset(configured):
             raise ScenarioConfigurationError("Not all required parameters are defined.")
 
-        # Is each parameter only defined once per scenario?
-        if not len(set(configured)) == len(configured):
+        # Is each parameter only defined once per feedstock and algorithm?
+        parameter_entries = list(
+            configuration.filter(inventory_parameter__isnull=False).values_list(
+                "feedstock", "inventory_algorithm", "inventory_parameter"
+            )
+        )
+        if not len(set(parameter_entries)) == len(parameter_entries):
             raise ScenarioConfigurationError(
                 "There are double defined parameters in the configuration"
             )
@@ -569,17 +574,11 @@ class Scenario(NamedUserCreatedObject):
         step.
         :return:
         """
-        for parameter in InventoryAlgorithmParameter.objects.filter(
-            inventory_algorithm__in=self.default_inventory_algorithms()
-        ):
-            config_entry = ScenarioInventoryConfiguration()
-            config_entry.scenario = self
-            config_entry.feedstock = parameter.inventory_algorithm.feedstock
-            config_entry.inventory_algorithm = parameter.inventory_algorithm
-            config_entry.geodataset = parameter.inventory_algorithm.geodataset
-            config_entry.inventory_parameter = parameter
-            config_entry.inventory_value = parameter.default_value()
-            config_entry.save()
+        for algorithm in self.default_inventory_algorithms():
+            for feedstock in SampleSeries.objects.filter(
+                material__in=algorithm.feedstocks.all()
+            ):
+                self.add_inventory_algorithm(feedstock, algorithm)
 
     def configuration(self):
         return ScenarioInventoryConfiguration.objects.filter(scenario=self)
