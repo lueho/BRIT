@@ -72,6 +72,7 @@ from .filters import (
     SampleFilter,
     SampleSeriesFilter,
     UserOwnedSampleFilter,
+    sampled_substrate_material_q,
 )
 from .forms import (
     AddCompositionModalForm,
@@ -321,6 +322,19 @@ class SampleSubstrateMaterialAutocompleteView(UserCreatedObjectAutocompleteView)
         queryset = super().get_queryset()
         substrate_category, _ = get_or_create_sample_substrate_category()
         return queryset.filter(categories=substrate_category).distinct()
+
+
+class SampleFilterSubstrateMaterialAutocompleteView(UserCreatedObjectAutocompleteView):
+    """Autocomplete for materials available in the sample filter."""
+
+    model = Material
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        substrate_category, _ = get_or_create_sample_substrate_category()
+        return queryset.filter(
+            sampled_substrate_material_q(substrate_category)
+        ).distinct()
 
 
 class SampleSubstrateMaterialQuickCreateView(

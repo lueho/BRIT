@@ -34,6 +34,10 @@ from .models import (
 )
 
 
+def sampled_substrate_material_q(substrate_category):
+    return Q(categories=substrate_category) | Q(samples__isnull=False)
+
+
 class MaterialFilterSet(rf_filters.FilterSet):
     class Meta:
         model = Material
@@ -246,7 +250,7 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
         empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
-                url="sample-substrate-material-autocomplete",
+                url="sample-filter-substrate-material-autocomplete",
                 value_field="id",
             )
         ),
@@ -343,7 +347,7 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
 
         substrate_category, _ = get_or_create_sample_substrate_category()
         substrate_queryset = Material.objects.filter(
-            Q(categories=substrate_category) | Q(samples__isnull=False)
+            sampled_substrate_material_q(substrate_category)
         ).distinct()
         parameter_queryset = MaterialProperty.objects.all()
         raw_parameter_queryset = MaterialComponent.objects.all()

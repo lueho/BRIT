@@ -67,6 +67,11 @@ urlpatterns = [
         name="sample-substrate-material-autocomplete",
     ),
     path(
+        "materials/substrates/filter-autocomplete/",
+        views.SampleFilterSubstrateMaterialAutocompleteView.as_view(),
+        name="sample-filter-substrate-material-autocomplete",
+    ),
+    path(
         "materials/substrates/quick-create/",
         views.SampleSubstrateMaterialQuickCreateView.as_view(),
         name="sample-substrate-material-quick-create",

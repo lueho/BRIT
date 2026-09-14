@@ -109,6 +109,11 @@ class SampleSubstrateMaterialAutocompleteViewTestCase(TestCase):
             name="Amino Acids",
             publication_status="published",
         )
+        Sample.objects.create(
+            name="Amino Acids sample",
+            material=non_substrate,
+            publication_status="published",
+        )
 
         component = MaterialComponent.objects.create(
             name="Carbon",
@@ -131,6 +136,19 @@ class SampleSubstrateMaterialAutocompleteViewTestCase(TestCase):
 
         self.assertIn(self.substrate_name, names)
         self.assertNotIn(self.non_substrate_name, names)
+        self.assertNotIn(self.component_name, names)
+
+    def test_filter_autocomplete_returns_published_sampled_materials(self):
+        response = self.client.get(
+            reverse("sample-filter-substrate-material-autocomplete"),
+            {"q": "a"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        names = [item["name"] for item in response.json()["results"]]
+
+        self.assertIn(self.substrate_name, names)
+        self.assertIn(self.non_substrate_name, names)
         self.assertNotIn(self.component_name, names)
 
 
