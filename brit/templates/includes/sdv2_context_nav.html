@@ -4,9 +4,11 @@
   query parameter, plus a link to the object's list view when the
   model exposes `list_url`.
 {% endcomment %}
+{% load moderation_tags %}
 <nav class="sdv2-context-nav" aria-label="Context navigation">
-  {% if request.GET.back %}
-    <a class="sdv2-btn sdv2-btn-ghost" href="{{ request.GET.back }}">
+  {% safe_back_url as back_url %}
+  {% if back_url %}
+    <a class="sdv2-btn sdv2-btn-ghost" href="{{ back_url }}">
       <i class="fas fa-arrow-left" aria-hidden="true"></i> Back to results
     </a>
   {% endif %}

@@ -20,7 +20,9 @@
 {% block detail_sections %}
     {% include "includes/sdv2_related_section.html" with section_title="Sample series" section_label="Sample series of this material" items=related_series item_url_name="sampleseries-detail" empty_title="No sample series" empty_body="No sample series are linked to this material yet." %}
     {% url 'sample-list' as samples_list_url %}
-    {% with samples_list_url|add:"?substrate_material="|add:object.pk as samples_filtered_url %}
-        {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples of this material" items=related_samples item_url_name="sample-detail" section_total=related_samples_total section_more=related_samples_more section_list_url=samples_filtered_url empty_title="No samples" empty_body="No samples are linked to this material yet." %}
+    {% with object.pk|stringformat:"s" as object_pk %}
+        {% with samples_list_url|add:"?substrate_material="|add:object_pk as samples_filtered_url %}
+            {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples of this material" items=related_samples item_url_name="sample-detail" section_total=related_samples_published_total section_more=related_samples_more section_list_url=samples_filtered_url empty_title="No samples" empty_body="No samples are linked to this material yet." %}
+        {% endwith %}
     {% endwith %}
 {% endblock detail_sections %}

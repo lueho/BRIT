@@ -9,6 +9,7 @@ from utils.properties.models import Unit
 from ..filters import MaterialListFilter, SampleFilter
 from ..models import (
     ComponentMeasurement,
+    Composition,
     Material,
     MaterialCategory,
     MaterialComponent,
@@ -259,6 +260,30 @@ class SampleFilterTestCase(TestCase):
         self.assertCountEqual(
             list(filtr.qs),
             [self.sample_substrate, self.sample_equivalent],
+        )
+
+    def test_component_group_filter_returns_samples_with_measurements_or_compositions_in_group(
+        self,
+    ):
+        composition_sample = Sample.objects.create(
+            name="Sample with composition",
+            material=self.substrate_material,
+        )
+        Composition.objects.create(
+            owner=composition_sample.owner,
+            sample=composition_sample,
+            group=self.raw_parameter_group,
+            fractions_of=self.organic_matter,
+        )
+
+        filtr = SampleFilter(
+            data={"component_group": str(self.raw_parameter_group.pk)},
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertCountEqual(
+            list(filtr.qs),
+            [self.sample_substrate, self.sample_equivalent, composition_sample],
         )
 
     def test_missing_substrate_category_is_created(self):

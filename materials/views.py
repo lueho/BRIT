@@ -276,6 +276,9 @@ class MaterialDetailView(UserCreatedObjectDetailView):
             .order_by("name", "pk")
         )
         context["related_samples_total"] = samples.count()
+        context["related_samples_published_total"] = samples.filter(
+            publication_status="published"
+        ).count()
         context["related_samples"] = samples[:DETAIL_RELATED_LIMIT]
         context["related_samples_more"] = max(
             context["related_samples_total"] - DETAIL_RELATED_LIMIT, 0
@@ -451,6 +454,9 @@ class ComponentDetailView(UserCreatedObjectDetailView):
             .order_by("name", "pk")
         )
         context["related_samples_total"] = samples.count()
+        context["related_samples_published_total"] = samples.filter(
+            publication_status="published"
+        ).count()
         context["related_samples"] = samples[:DETAIL_RELATED_LIMIT]
         context["related_samples_more"] = max(
             context["related_samples_total"] - DETAIL_RELATED_LIMIT, 0
@@ -542,6 +548,9 @@ class MaterialComponentGroupDetailView(UserCreatedObjectDetailView):
             .order_by("name", "pk")
         )
         context["related_samples_total"] = samples.count()
+        context["related_samples_published_total"] = samples.filter(
+            publication_status="published"
+        ).count()
         context["related_samples"] = samples[:DETAIL_RELATED_LIMIT]
         context["related_samples_more"] = max(
             context["related_samples_total"] - DETAIL_RELATED_LIMIT, 0
@@ -627,6 +636,9 @@ class MaterialPropertyDetailView(UserCreatedObjectDetailView):
             .order_by("name", "pk")
         )
         context["related_samples_total"] = samples.count()
+        context["related_samples_published_total"] = samples.filter(
+            publication_status="published"
+        ).count()
         context["related_samples"] = samples[:DETAIL_RELATED_LIMIT]
         context["related_samples_more"] = max(
             context["related_samples_total"] - DETAIL_RELATED_LIMIT, 0

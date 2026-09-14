@@ -66,7 +66,9 @@
     {% endif %}
     {% include "includes/sdv2_related_section.html" with section_title="Component groups" section_label="Component groups this component is measured in" items=related_groups item_url_name="materialcomponentgroup-detail" empty_title="No component groups" empty_body="This component is not part of any measured component group yet." %}
     {% url 'sample-list' as samples_list_url %}
-    {% with samples_list_url|add:"?raw_parameter="|add:object.pk as samples_filtered_url %}
-        {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples with measurements of this component" items=related_samples item_url_name="sample-detail" section_total=related_samples_total section_more=related_samples_more section_list_url=samples_filtered_url empty_title="No samples" empty_body="No samples contain measurements of this component yet." %}
+    {% with object.pk|stringformat:"s" as object_pk %}
+        {% with samples_list_url|add:"?raw_parameter="|add:object_pk as samples_filtered_url %}
+            {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples with measurements of this component" items=related_samples item_url_name="sample-detail" section_total=related_samples_published_total section_more=related_samples_more section_list_url=samples_filtered_url empty_title="No samples" empty_body="No samples contain measurements of this component yet." %}
+        {% endwith %}
     {% endwith %}
 {% endblock detail_sections %}

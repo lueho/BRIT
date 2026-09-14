@@ -1753,6 +1753,19 @@ class BackURLNavigationTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         self.assertContains(response, "Back to results")
         self.assertContains(response, f'href="{list_url}"')
 
+    def test_sampleseries_detail_ignores_external_back_url(self):
+        self.client.force_login(self.non_owner_user)
+        detail_url = (
+            f"{reverse('sampleseries-detail', kwargs={'pk': self.published_object.pk})}"
+            "?back=https://evil.example/x"
+        )
+
+        response = self.client.get(detail_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Back to results")
+        self.assertNotContains(response, "evil.example")
+
     def test_sampleseries_list_back_param_present_in_detail_links(self):
         """Sample series list links contain ?back= pointing to the current list URL."""
         self.client.force_login(self.staff_user)
@@ -6328,6 +6341,33 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
             reverse("sample-detail", kwargs={"pk": self.standalone_sample.pk}),
         )
 
+    def test_material_detail_view_all_counts_only_published_samples(self):
+        material = Material.objects.create(
+            owner=self.owner,
+            name="Material With Private Sample",
+            publication_status="published",
+        )
+        published_sample = Sample.objects.create(
+            owner=self.owner,
+            name="Published Related Sample",
+            material=material,
+            publication_status="published",
+        )
+        private_sample = Sample.objects.create(
+            owner=self.owner,
+            name="Owner Private Sample",
+            material=material,
+            publication_status="private",
+        )
+        self.client.force_login(self.owner)
+
+        response = self.get_detail("material-detail", material)
+
+        self.assertContains(response, published_sample.name)
+        self.assertContains(response, private_sample.name)
+        self.assertContains(response, "View all 1 published")
+        self.assertNotContains(response, "View all 2")
+
     def test_material_detail_hides_private_related_objects(self):
         response = self.get_detail("material-detail", self.material)
         self.assertNotContains(response, self.private_sample.name)
@@ -6378,6 +6418,11 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
             reverse("materialcomponent-detail", kwargs={"pk": self.component.pk}),
         )
         self.assertContains(response, self.standalone_sample.name)
+
+    def test_component_group_detail_links_to_filtered_sample_list(self):
+        response = self.get_detail("materialcomponentgroup-detail", self.group)
+
+        self.assertContains(response, f"?component_group={self.group.pk}")
 
     def test_componentgroup_detail_empty_state(self):
         empty_group = MaterialComponentGroup.objects.create(
