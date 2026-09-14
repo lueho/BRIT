@@ -1,3 +1,4 @@
+from rest_framework.fields import Field
 from rest_framework.serializers import (
     HyperlinkedRelatedField,
     ModelSerializer,
@@ -24,16 +25,35 @@ from .models import (
 )
 
 
+def _get_composition_shares(composition):
+    """Normalized shares belonging to a single ``Composition`` settings row."""
+    for normalized in get_sample_normalized_compositions(composition.sample):
+        if normalized.get("settings_pk") == composition.pk:
+            return normalized["shares"]
+    return []
+
+
+class NormalizedCompositionsField(Field):
+    """Read-only field rendering a sample's normalized compositions."""
+
+    def __init__(self, **kwargs):
+        kwargs["read_only"] = True
+        super().__init__(**kwargs)
+
+    def get_attribute(self, instance):
+        return instance
+
+    def to_representation(self, instance):
+        return get_sample_normalized_compositions(instance)
+
+
 class CompositionModelSerializer(ModelSerializer):
     group_name = ReadOnlyField(source="group.name")
     fractions_of_name = ReadOnlyField(source="fractions_of.name")
     shares = SerializerMethodField()
 
     def get_shares(self, obj):
-        for composition in get_sample_normalized_compositions(obj.sample):
-            if composition.get("settings_pk") == obj.pk:
-                return composition["shares"]
-        return []
+        return _get_composition_shares(obj)
 
     class Meta:
         model = Composition
@@ -62,21 +82,15 @@ class CompositionDoughnutChartSerializer(ModelSerializer):
     def get_id(self, obj):
         return f"materialCompositionChart-{obj.id}"
 
-    def get_shares(self, obj):
-        for composition in get_sample_normalized_compositions(obj.sample):
-            if composition.get("settings_pk") == obj.pk:
-                return composition["shares"]
-        return []
-
     def get_labels(self, obj):
-        return [share["component_name"] for share in self.get_shares(obj)]
+        return [share["component_name"] for share in _get_composition_shares(obj)]
 
     def get_data(self, obj):
         return [
             {
                 "label": "Fraction",
                 "unit": "%",
-                "data": [share["average"] for share in self.get_shares(obj)],
+                "data": [share["average"] for share in _get_composition_shares(obj)],
             }
         ]
 
@@ -158,12 +172,9 @@ class SampleModelSerializer(ModelSerializer):
     series_url = HyperlinkedRelatedField(
         source="series", read_only=True, view_name="sampleseries-detail"
     )
-    compositions = SerializerMethodField()
+    compositions = NormalizedCompositionsField()
     properties = SerializerMethodField()
     sources = SourceAbbreviationSerializer(many=True)
-
-    def get_compositions(self, obj):
-        return get_sample_normalized_compositions(obj)
 
     def get_properties(self, obj):
         request = self.context.get("request")
@@ -266,18 +277,14 @@ class CompositionAPISerializer(ModelSerializer):
     shares = SerializerMethodField()
 
     def get_shares(self, obj):
-        for composition in get_sample_normalized_compositions(obj.sample):
-            if composition.get("settings_pk") != obj.pk:
-                continue
-            return [
-                {
-                    "component": share["component_name"],
-                    "average": share["average"],
-                    "standard_deviation": share["standard_deviation"],
-                }
-                for share in composition["shares"]
-            ]
-        return []
+        return [
+            {
+                "component": share["component_name"],
+                "average": share["average"],
+                "standard_deviation": share["standard_deviation"],
+            }
+            for share in _get_composition_shares(obj)
+        ]
 
     class Meta:
         model = Composition
@@ -286,11 +293,8 @@ class CompositionAPISerializer(ModelSerializer):
 
 class SampleAPISerializer(ModelSerializer):
     timestep = StringRelatedField()
+    compositions = NormalizedCompositionsField()
     properties = SerializerMethodField()
-    compositions = SerializerMethodField()
-
-    def get_compositions(self, obj):
-        return get_sample_normalized_compositions(obj)
 
     def get_properties(self, obj):
         queryset = obj.get_property_values_queryset().select_related(
