@@ -116,7 +116,6 @@ from .models import (
 )
 from .serializers import (
     SampleModelSerializer,
-    SampleSeriesModelSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -124,6 +123,17 @@ logger = logging.getLogger(__name__)
 # Maximum number of related records listed on detail pages before a
 # "more" note points to the corresponding filtered list view.
 DETAIL_RELATED_LIMIT = 25
+
+
+def _capped_related(queryset):
+    """
+    Slice a related-object queryset to DETAIL_RELATED_LIMIT.
+
+    Returns (items, total, more) so detail templates can render a bounded
+    list alongside the true count and the number of records not shown.
+    """
+    total = queryset.count()
+    return queryset[:DETAIL_RELATED_LIMIT], total, max(total - DETAIL_RELATED_LIMIT, 0)
 
 
 class MaterialsExplorerView(TemplateView):
@@ -199,12 +209,27 @@ class MaterialCategoryDetailView(UserCreatedObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        context["related_materials"] = filter_queryset_for_user(
-            Material.objects.filter(categories=self.object), user
-        ).order_by("name", "pk")
-        context["related_components"] = filter_queryset_for_user(
-            MaterialComponent.objects.filter(categories=self.object), user
-        ).order_by("name", "pk")
+        (
+            context["related_materials"],
+            context["related_materials_total"],
+            context["related_materials_more"],
+        ) = _capped_related(
+            filter_queryset_for_user(
+                Material.objects.filter(categories=self.object), user
+            ).order_by("name", "pk")
+        )
+        context["related_materials_list_url"] = (
+            f"{reverse('material-list')}?category={self.object.pk}"
+        )
+        (
+            context["related_components"],
+            context["related_components_total"],
+            context["related_components_more"],
+        ) = _capped_related(
+            filter_queryset_for_user(
+                MaterialComponent.objects.filter(categories=self.object), user
+            ).order_by("name", "pk")
+        )
         return context
 
 
@@ -267,18 +292,26 @@ class MaterialDetailView(UserCreatedObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        context["related_series"] = filter_queryset_for_user(
-            self.object.sample_series.all(), user
-        ).order_by("name", "pk")
-        samples = (
+        (
+            context["related_series"],
+            context["related_series_total"],
+            context["related_series_more"],
+        ) = _capped_related(
+            filter_queryset_for_user(self.object.sample_series.all(), user).order_by(
+                "name", "pk"
+            )
+        )
+        (
+            context["related_samples"],
+            context["related_samples_total"],
+            context["related_samples_more"],
+        ) = _capped_related(
             filter_queryset_for_user(self.object.samples.all(), user)
             .select_related("series")
             .order_by("name", "pk")
         )
-        context["related_samples_total"] = samples.count()
-        context["related_samples"] = samples[:DETAIL_RELATED_LIMIT]
-        context["related_samples_more"] = max(
-            context["related_samples_total"] - DETAIL_RELATED_LIMIT, 0
+        context["related_samples_list_url"] = (
+            f"{reverse('sample-list')}?substrate_material={self.object.pk}"
         )
         return context
 
@@ -423,13 +456,29 @@ class ComponentDetailView(UserCreatedObjectDetailView):
             Q(pk=canonical.pk) | Q(comparable_component=canonical)
         ).values_list("pk", flat=True)
         context["canonical_component"] = canonical if canonical.pk != obj.pk else None
-        context["derived_components"] = filter_queryset_for_user(
-            obj.derived_components.all(), user
-        ).order_by("name", "pk")
-        context["comparable_variants"] = filter_queryset_for_user(
-            obj.comparable_variants.all(), user
-        ).order_by("name", "pk")
-        context["related_groups"] = (
+        (
+            context["derived_components"],
+            context["derived_components_total"],
+            context["derived_components_more"],
+        ) = _capped_related(
+            filter_queryset_for_user(obj.derived_components.all(), user).order_by(
+                "name", "pk"
+            )
+        )
+        (
+            context["comparable_variants"],
+            context["comparable_variants_total"],
+            context["comparable_variants_more"],
+        ) = _capped_related(
+            filter_queryset_for_user(obj.comparable_variants.all(), user).order_by(
+                "name", "pk"
+            )
+        )
+        (
+            context["related_groups"],
+            context["related_groups_total"],
+            context["related_groups_more"],
+        ) = _capped_related(
             filter_queryset_for_user(
                 MaterialComponentGroup.objects.filter(
                     component_measurements__component_id__in=comparable_ids
@@ -439,7 +488,11 @@ class ComponentDetailView(UserCreatedObjectDetailView):
             .distinct()
             .order_by("name", "pk")
         )
-        samples = (
+        (
+            context["related_samples"],
+            context["related_samples_total"],
+            context["related_samples_more"],
+        ) = _capped_related(
             filter_queryset_for_user(
                 Sample.objects.filter(
                     component_measurements__component_id__in=comparable_ids
@@ -450,10 +503,8 @@ class ComponentDetailView(UserCreatedObjectDetailView):
             .select_related("material", "series")
             .order_by("name", "pk")
         )
-        context["related_samples_total"] = samples.count()
-        context["related_samples"] = samples[:DETAIL_RELATED_LIMIT]
-        context["related_samples_more"] = max(
-            context["related_samples_total"] - DETAIL_RELATED_LIMIT, 0
+        context["related_samples_list_url"] = (
+            f"{reverse('sample-list')}?raw_parameter={self.object.pk}"
         )
         return context
 
@@ -522,7 +573,11 @@ class MaterialComponentGroupDetailView(UserCreatedObjectDetailView):
         context = super().get_context_data(**kwargs)
         user = self.request.user
         obj = self.object
-        context["related_components"] = (
+        (
+            context["related_components"],
+            context["related_components_total"],
+            context["related_components_more"],
+        ) = _capped_related(
             filter_queryset_for_user(
                 MaterialComponent.objects.filter(component_measurements__group=obj),
                 user,
@@ -530,7 +585,11 @@ class MaterialComponentGroupDetailView(UserCreatedObjectDetailView):
             .distinct()
             .order_by("name", "pk")
         )
-        samples = (
+        (
+            context["related_samples"],
+            context["related_samples_total"],
+            context["related_samples_more"],
+        ) = _capped_related(
             filter_queryset_for_user(
                 Sample.objects.filter(
                     Q(component_measurements__group=obj) | Q(compositions__group=obj)
@@ -540,11 +599,6 @@ class MaterialComponentGroupDetailView(UserCreatedObjectDetailView):
             .distinct()
             .select_related("material", "series")
             .order_by("name", "pk")
-        )
-        context["related_samples_total"] = samples.count()
-        context["related_samples"] = samples[:DETAIL_RELATED_LIMIT]
-        context["related_samples_more"] = max(
-            context["related_samples_total"] - DETAIL_RELATED_LIMIT, 0
         )
         return context
 
@@ -614,10 +668,20 @@ class MaterialPropertyDetailView(UserCreatedObjectDetailView):
             Q(pk=canonical.pk) | Q(comparable_property=canonical)
         ).values_list("pk", flat=True)
         context["canonical_property"] = canonical if canonical.pk != obj.pk else None
-        context["comparable_variants"] = filter_queryset_for_user(
-            obj.comparable_variants.all(), user
-        ).order_by("name", "pk")
-        samples = (
+        (
+            context["comparable_variants"],
+            context["comparable_variants_total"],
+            context["comparable_variants_more"],
+        ) = _capped_related(
+            filter_queryset_for_user(obj.comparable_variants.all(), user).order_by(
+                "name", "pk"
+            )
+        )
+        (
+            context["related_samples"],
+            context["related_samples_total"],
+            context["related_samples_more"],
+        ) = _capped_related(
             filter_queryset_for_user(
                 Sample.objects.filter(property_values__property_id__in=comparable_ids),
                 user,
@@ -626,10 +690,8 @@ class MaterialPropertyDetailView(UserCreatedObjectDetailView):
             .select_related("material", "series")
             .order_by("name", "pk")
         )
-        context["related_samples_total"] = samples.count()
-        context["related_samples"] = samples[:DETAIL_RELATED_LIMIT]
-        context["related_samples_more"] = max(
-            context["related_samples_total"] - DETAIL_RELATED_LIMIT, 0
+        context["related_samples_list_url"] = (
+            f"{reverse('sample-list')}?parameter={self.object.pk}"
         )
         return context
 
@@ -816,8 +878,12 @@ class AnalyticalMethodDetailView(UserCreatedObjectDetailView):
             .distinct()
             .order_by("name", "pk")
         )
-        context["related_samples"] = filter_queryset_for_user(
-            related_samples, self.request.user
+        (
+            context["related_samples"],
+            context["related_samples_total"],
+            context["related_samples_more"],
+        ) = _capped_related(
+            filter_queryset_for_user(related_samples, self.request.user)
         )
         return context
 
@@ -875,8 +941,27 @@ class SampleSeriesDetailView(UserCreatedObjectDetailView):
     model = SampleSeries
 
     def get_context_data(self, **kwargs):
-        kwargs["data"] = SampleSeriesModelSerializer(self.object).data
-        return super().get_context_data(**kwargs)
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        visible_samples = filter_queryset_for_user(
+            self.object.samples.select_related("timestep__distribution"), user
+        ).order_by("name", "pk")
+        context["samples_total"] = visible_samples.count()
+        distributions = []
+        for distribution in self.object.temporal_distributions.all():
+            dist_samples = visible_samples.filter(timestep__distribution=distribution)
+            total = dist_samples.count()
+            distributions.append(
+                {
+                    "name": distribution.name,
+                    "description": distribution.description,
+                    "total": total,
+                    "samples": dist_samples[:DETAIL_RELATED_LIMIT],
+                    "more": max(total - DETAIL_RELATED_LIMIT, 0),
+                }
+            )
+        context["distributions"] = distributions
+        return context
 
 
 class SampleSeriesModalDetailView(UserCreatedObjectModalDetailView):

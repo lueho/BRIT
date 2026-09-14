@@ -16,9 +16,9 @@
     <div class="sdv2-section-heading">
       <h2 class="sdv2-section-title">{{ section_title }}</h2>
     </div>
-    {% if section_list_url and section_total %}
+    {% if section_list_url %}
       <div class="sdv2-section-actions">
-        <a class="sdv2-btn sdv2-btn-sm" href="{{ section_list_url }}">View all {{ section_total }}</a>
+        <a class="sdv2-btn sdv2-btn-sm" href="{{ section_list_url }}">View all{% if section_more %} {{ section_total }}{% endif %}</a>
       </div>
     {% endif %}
   </div>

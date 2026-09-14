@@ -18,9 +18,6 @@
 {% endblock hero_meta_items %}
 
 {% block detail_sections %}
-    {% include "includes/sdv2_related_section.html" with section_title="Sample series" section_label="Sample series of this material" items=related_series item_url_name="sampleseries-detail" empty_title="No sample series" empty_body="No sample series are linked to this material yet." %}
-    {% url 'sample-list' as samples_list_url %}
-    {% with samples_list_url|add:"?substrate_material="|add:object.pk as samples_filtered_url %}
-        {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples of this material" items=related_samples item_url_name="sample-detail" section_total=related_samples_total section_more=related_samples_more section_list_url=samples_filtered_url empty_title="No samples" empty_body="No samples are linked to this material yet." %}
-    {% endwith %}
+    {% include "includes/sdv2_related_section.html" with section_title="Sample series" section_label="Sample series of this material" items=related_series item_url_name="sampleseries-detail" section_total=related_series_total section_more=related_series_more empty_title="No sample series" empty_body="No sample series are linked to this material yet." %}
+    {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples of this material" items=related_samples item_url_name="sample-detail" section_total=related_samples_total section_more=related_samples_more section_list_url=related_samples_list_url empty_title="No samples" empty_body="No samples are linked to this material yet." %}
 {% endblock detail_sections %}

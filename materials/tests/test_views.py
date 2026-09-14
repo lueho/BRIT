@@ -37,6 +37,7 @@ from ..models import (
     SampleSeries,
     get_sample_substrate_category_name,
 )
+from ..views import DETAIL_RELATED_LIMIT
 
 User = get_user_model()
 
@@ -6443,3 +6444,189 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
             response,
             reverse("sample-detail", kwargs={"pk": series_sample.pk}),
         )
+
+    # -- Large related collections --------------------------------------------------------
+    # Detail pages must cap related-record lists at DETAIL_RELATED_LIMIT so that
+    # objects with thousands of related records do not blow up rendering.
+
+    def test_category_detail_caps_related_materials(self):
+        for i in range(DETAIL_RELATED_LIMIT + 5):
+            material = Material.objects.create(
+                owner=self.owner,
+                name=f"Bulk Material {i:02d}",
+                publication_status="published",
+            )
+            material.categories.add(self.category)
+        response = self.get_detail("materialcategory-detail", self.category)
+        expected_total = DETAIL_RELATED_LIMIT + 6  # bulk materials + cls.material
+        self.assertEqual(response.context["related_materials_total"], expected_total)
+        self.assertEqual(
+            len(response.context["related_materials"]), DETAIL_RELATED_LIMIT
+        )
+        self.assertContains(response, f"View all {expected_total}")
+        self.assertContains(response, f"category={self.category.pk}")
+
+    def test_category_detail_caps_related_components(self):
+        for i in range(DETAIL_RELATED_LIMIT + 5):
+            component = MaterialComponent.objects.create(
+                owner=self.owner,
+                name=f"Bulk Component {i:02d}",
+                publication_status="published",
+            )
+            component.categories.add(self.category)
+        response = self.get_detail("materialcategory-detail", self.category)
+        expected_total = DETAIL_RELATED_LIMIT + 6  # bulk components + cls.component
+        self.assertEqual(response.context["related_components_total"], expected_total)
+        self.assertEqual(
+            len(response.context["related_components"]), DETAIL_RELATED_LIMIT
+        )
+        self.assertContains(response, "more not shown")
+
+    def test_material_detail_caps_related_series(self):
+        for i in range(DETAIL_RELATED_LIMIT + 5):
+            SampleSeries.objects.create(
+                owner=self.owner,
+                name=f"Bulk Series {i:02d}",
+                material=self.material,
+                publication_status="published",
+            )
+        response = self.get_detail("material-detail", self.material)
+        expected_total = DETAIL_RELATED_LIMIT + 6  # bulk series + cls.series
+        self.assertEqual(response.context["related_series_total"], expected_total)
+        self.assertEqual(len(response.context["related_series"]), DETAIL_RELATED_LIMIT)
+        self.assertContains(response, "more not shown")
+
+    def test_component_detail_caps_related_groups(self):
+        for i in range(DETAIL_RELATED_LIMIT + 5):
+            group = MaterialComponentGroup.objects.create(
+                owner=self.owner,
+                name=f"Bulk Group {i:02d}",
+                publication_status="published",
+            )
+            ComponentMeasurement.objects.create(
+                owner=self.owner,
+                sample=self.standalone_sample,
+                group=group,
+                component=self.component,
+                unit=self.percent_unit,
+                average=Decimal("1.0"),
+                publication_status="published",
+            )
+        response = self.get_detail("materialcomponent-detail", self.component)
+        expected_total = DETAIL_RELATED_LIMIT + 6  # bulk groups + cls.group
+        self.assertEqual(response.context["related_groups_total"], expected_total)
+        self.assertEqual(len(response.context["related_groups"]), DETAIL_RELATED_LIMIT)
+        self.assertContains(response, "more not shown")
+
+    def test_component_detail_caps_comparable_variants(self):
+        for i in range(DETAIL_RELATED_LIMIT + 5):
+            MaterialComponent.objects.create(
+                owner=self.owner,
+                name=f"Variant {i:02d}",
+                publication_status="published",
+                comparable_component=self.component,
+            )
+        response = self.get_detail("materialcomponent-detail", self.component)
+        self.assertEqual(
+            response.context["comparable_variants_total"], DETAIL_RELATED_LIMIT + 5
+        )
+        self.assertEqual(
+            len(response.context["comparable_variants"]), DETAIL_RELATED_LIMIT
+        )
+        self.assertContains(response, "and 5 more")
+
+    def test_componentgroup_detail_caps_related_components(self):
+        for i in range(DETAIL_RELATED_LIMIT + 5):
+            component = MaterialComponent.objects.create(
+                owner=self.owner,
+                name=f"Bulk Component {i:02d}",
+                publication_status="published",
+            )
+            ComponentMeasurement.objects.create(
+                owner=self.owner,
+                sample=self.standalone_sample,
+                group=self.group,
+                component=component,
+                unit=self.percent_unit,
+                average=Decimal("1.0"),
+                publication_status="published",
+            )
+        response = self.get_detail("materialcomponentgroup-detail", self.group)
+        expected_total = DETAIL_RELATED_LIMIT + 6  # bulk components + cls.component
+        self.assertEqual(response.context["related_components_total"], expected_total)
+        self.assertEqual(
+            len(response.context["related_components"]), DETAIL_RELATED_LIMIT
+        )
+        self.assertContains(response, "more not shown")
+
+    def test_property_detail_caps_comparable_variants(self):
+        for i in range(DETAIL_RELATED_LIMIT + 5):
+            MaterialProperty.objects.create(
+                owner=self.owner,
+                name=f"Variant {i:02d}",
+                publication_status="published",
+                comparable_property=self.material_property,
+            )
+        response = self.get_detail("materialproperty-detail", self.material_property)
+        self.assertEqual(
+            response.context["comparable_variants_total"], DETAIL_RELATED_LIMIT + 5
+        )
+        self.assertEqual(
+            len(response.context["comparable_variants"]), DETAIL_RELATED_LIMIT
+        )
+        self.assertContains(response, "and 5 more")
+
+    def test_method_detail_caps_related_samples(self):
+        for i in range(DETAIL_RELATED_LIMIT + 5):
+            sample = Sample.objects.create(
+                owner=self.owner,
+                name=f"Method Sample {i:02d}",
+                material=self.material,
+                publication_status="published",
+            )
+            MaterialPropertyValue.objects.create(
+                owner=self.owner,
+                sample=sample,
+                property=self.material_property,
+                unit=self.percent_unit,
+                analytical_method=self.method,
+                average=Decimal("1.0"),
+                publication_status="published",
+            )
+        response = self.get_detail("analyticalmethod-detail", self.method)
+        expected_total = (
+            DETAIL_RELATED_LIMIT + 6
+        )  # bulk samples + cls.standalone_sample
+        self.assertEqual(response.context["related_samples_total"], expected_total)
+        self.assertEqual(len(response.context["related_samples"]), DETAIL_RELATED_LIMIT)
+        self.assertContains(response, "more not shown")
+
+    def test_series_detail_caps_samples_per_distribution(self):
+        for i in range(DETAIL_RELATED_LIMIT + 5):
+            Sample.objects.create(
+                owner=self.owner,
+                name=f"Seasonal Sample {i:02d}",
+                material=self.material,
+                series=self.series,
+                timestep=self.timestep,
+                publication_status="published",
+            )
+        Sample.objects.create(
+            owner=self.outsider,
+            name="Hidden Private Sample",
+            material=self.material,
+            series=self.series,
+            timestep=self.timestep,
+            publication_status="private",
+        )
+        response = self.get_detail("sampleseries-detail", self.series)
+        entry = next(
+            d
+            for d in response.context["distributions"]
+            if d["name"] == self.distribution.name
+        )
+        # +1 for the sample auto-created by add_temporal_distribution
+        self.assertEqual(entry["total"], DETAIL_RELATED_LIMIT + 6)
+        self.assertEqual(len(entry["samples"]), DETAIL_RELATED_LIMIT)
+        self.assertEqual(entry["more"], 6)
+        self.assertNotContains(response, "Hidden Private Sample")

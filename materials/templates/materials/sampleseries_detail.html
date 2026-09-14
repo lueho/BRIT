@@ -19,8 +19,8 @@
         <span class="sdv2-meta-label">Material</span>
         <a href="{% url 'material-detail' object.material.pk %}">{{ object.material.name }}</a>
     </li>
-    <li><span class="sdv2-meta-label">Samples</span>{{ object.samples.count }}</li>
-    <li><span class="sdv2-meta-label">Distributions</span>{{ data.distributions|length }}</li>
+    <li><span class="sdv2-meta-label">Samples</span>{{ samples_total }}</li>
+    <li><span class="sdv2-meta-label">Distributions</span>{{ distributions|length }}</li>
     <li><span class="sdv2-meta-label">Owner</span>{{ object.owner.username|default:object.owner }}</li>
 {% endblock hero_meta_items %}
 
@@ -66,9 +66,13 @@
 {% endblock rail_dropdown_extra %}
 
 {% block detail_sections %}
-    {% for distribution in data.distributions %}
+    {% for distribution in distributions %}
         <section class="sdv2-section-panel" aria-label="{{ distribution.name }}">
-            <h2 class="sdv2-section-title">{{ distribution.name }}</h2>
+            <div class="sdv2-section-header">
+                <div class="sdv2-section-heading">
+                    <h2 class="sdv2-section-title">{{ distribution.name }}</h2>
+                </div>
+            </div>
             {% if distribution.description %}
                 <p class="sdv2-section-hint mt-1 mb-0">{{ distribution.description }}</p>
             {% endif %}
@@ -76,12 +80,15 @@
                 <ul class="sdv2-related-list mt-3">
                     {% for sample in distribution.samples %}
                         <li>
-                            <a class="sdv2-related-link" href="{% url 'sample-detail' sample.id %}">
+                            <a class="sdv2-related-link" href="{% url 'sample-detail' sample.pk %}">
                                 <span class="sdv2-related-name">{{ sample.timestep }}</span>
                             </a>
                         </li>
                     {% endfor %}
                 </ul>
+                {% if distribution.more %}
+                    <p class="sdv2-related-meta mt-2 mb-0">{{ distribution.more }} more not shown</p>
+                {% endif %}
             {% endif %}
         </section>
     {% empty %}
