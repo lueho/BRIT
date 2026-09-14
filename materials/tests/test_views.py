@@ -6516,16 +6516,48 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
             reverse(
                 "object_management:review_item_detail",
                 kwargs={
-                    "content_type_id": ContentType.objects.get_for_model(
-                        Material, for_concrete_model=False
-                    ).pk,
+                    "content_type_id": ContentType.objects.get_for_model(Material).pk,
                     "object_id": review_material.pk,
                 },
             )
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f"Material: {review_material.name}")
         self.assertContains(response, review_sample.name)
+
+    def test_component_review_detail_includes_related_samples(self):
+        review_component = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Component With Review Context",
+            publication_status="review",
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.owner,
+            sample=self.standalone_sample,
+            group=self.group,
+            component=review_component,
+            unit=self.percent_unit,
+            average=Decimal("12.5"),
+            publication_status="published",
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse(
+                "object_management:review_item_detail",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(
+                        MaterialComponent
+                    ).pk,
+                    "object_id": review_component.pk,
+                },
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f"Component: {review_component.name}")
+        self.assertContains(response, self.standalone_sample.name)
 
     def test_component_group_review_detail_includes_related_samples(self):
         self.client.force_login(self.owner)

@@ -2520,6 +2520,21 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         chosen = select_template(candidates)
         return chosen.template.name
 
+    def _resolve_model_class(self, content_type, object_id):
+        model_class = content_type.model_class()
+        if model_class in self._model_view_registry:
+            return model_class
+
+        for proxy_model in self._model_view_registry:
+            if (
+                proxy_model._meta.proxy
+                and proxy_model._meta.concrete_model is model_class
+                and proxy_model.objects.filter(pk=object_id).exists()
+            ):
+                return proxy_model
+
+        return model_class
+
     def get_object(self, queryset=None):
         """
         Support generic routing by resolving the object from content type + object id
@@ -2535,7 +2550,7 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         object_id = self.kwargs.get("object_id")
         if content_type_id and object_id:
             content_type = get_object_or_404(ContentType, pk=content_type_id)
-            model_class = content_type.model_class()
+            model_class = self._resolve_model_class(content_type, object_id)
             obj = get_object_or_404(model_class, pk=object_id)
         else:
             obj = super().get_object(queryset)
