@@ -556,11 +556,15 @@ class ScenarioTestCase(TestCase):
 
     def test_create_default_configuration_handles_m2m_parameter_algorithms(self):
         """#219: create_default_configuration() must create one entry per
-        parameter even though InventoryAlgorithmParameter.inventory_algorithm
-        is a ManyToManyField."""
+        parameter and feedstock series even though
+        InventoryAlgorithmParameter.inventory_algorithm is a ManyToManyField."""
         algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
         algorithm.default = True
         algorithm.save()
+        feedstock = SampleSeries.objects.create(
+            material=Material.objects.get(name="Feedstock 1"),
+            name="Default Feedstock Series",
+        )
 
         parameter = InventoryAlgorithmParameter.objects.create(
             short_name="test_param",
@@ -579,9 +583,92 @@ class ScenarioTestCase(TestCase):
         entry = ScenarioInventoryConfiguration.objects.get(
             scenario=self.scenario, inventory_parameter=parameter
         )
+        self.assertEqual(entry.feedstock, feedstock)
         self.assertEqual(entry.inventory_algorithm, algorithm)
         self.assertEqual(entry.geodataset, algorithm.geodataset)
         self.assertEqual(entry.inventory_value, default_value)
+        self.scenario.is_valid_configuration()
+        self.scenario.catchment = Catchment.objects.create(name="Default Catchment")
+        plan = self.scenario.inventory_execution_plan()
+        self.assertEqual(len(plan), 1)
+        self.assertEqual(plan[0]["kwargs"]["feedstock_id"], feedstock.id)
+        self.assertEqual(plan[0]["kwargs"]["test_param"]["value"], 1.0)
+
+    def test_create_default_configuration_creates_one_configuration_per_series(
+        self,
+    ):
+        algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
+        algorithm.default = True
+        algorithm.save()
+        material = Material.objects.get(name="Feedstock 1")
+        series_a = SampleSeries.objects.create(material=material, name="Series A")
+        series_b = SampleSeries.objects.create(material=material, name="Series B")
+
+        self.scenario.create_default_configuration()
+
+        self.assertQuerySetEqual(
+            self.scenario.feedstocks().order_by("name"),
+            [series_a, series_b],
+        )
+        self.assertFalse(
+            self.scenario.configuration().filter(feedstock__isnull=True).exists()
+        )
+
+    def test_create_default_configuration_with_shared_parameter_is_valid(self):
+        """A parameter shared by two default algorithms is configured once per
+        algorithm without tripping the duplicate-parameter validation."""
+        material = Material.objects.get(name="Feedstock 1")
+        SampleSeries.objects.create(material=material, name="Shared Series")
+        geodataset = GeoDataset.objects.get(name="Test Dataset")
+        algorithm_a = InventoryAlgorithm.objects.get(name="Test Algorithm")
+        algorithm_a.default = True
+        algorithm_a.save()
+        algorithm_b = InventoryAlgorithm.objects.create(
+            name="Second Default Algorithm", geodataset=geodataset, default=True
+        )
+        algorithm_b.feedstocks.add(material)
+        parameter = InventoryAlgorithmParameter.objects.create(
+            descriptive_name="Yield", short_name="yield", is_required=True
+        )
+        parameter.inventory_algorithm.add(algorithm_a, algorithm_b)
+        InventoryAlgorithmParameterValue.objects.create(
+            name="default", parameter=parameter, value=2.0, default=True
+        )
+
+        self.scenario.create_default_configuration()
+
+        self.assertEqual(
+            self.scenario.configuration().filter(inventory_parameter=parameter).count(),
+            2,
+        )
+        self.scenario.is_valid_configuration()
+
+    def test_is_valid_configuration_rejects_duplicate_parameter_for_same_algorithm(
+        self,
+    ):
+        material = Material.objects.get(name="Feedstock 1")
+        feedstock = SampleSeries.objects.create(material=material, name="Dup Series")
+        geodataset = GeoDataset.objects.get(name="Test Dataset")
+        algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
+        parameter = InventoryAlgorithmParameter.objects.create(
+            descriptive_name="Yield", short_name="yield"
+        )
+        parameter.inventory_algorithm.add(algorithm)
+        value = InventoryAlgorithmParameterValue.objects.create(
+            name="default", parameter=parameter, value=2.0, default=True
+        )
+        for _ in range(2):
+            ScenarioInventoryConfiguration.objects.create(
+                scenario=self.scenario,
+                feedstock=feedstock,
+                geodataset=geodataset,
+                inventory_algorithm=algorithm,
+                inventory_parameter=parameter,
+                inventory_value=value,
+            )
+
+        with self.assertRaises(ScenarioConfigurationError):
+            self.scenario.is_valid_configuration()
 
 
 class ScenarioResultHomogenizeTimestepsTestCase(TestCase):
