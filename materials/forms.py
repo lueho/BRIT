@@ -597,6 +597,19 @@ class SampleMaintenanceForm(WorkspaceReferenceScopeMixin, SampleModelForm):
             self.fields["sources"].workspace_autocomplete_url += "?label=abbreviation"
         self.helper.layout = Layout(*self.fields)
 
+    def _update_errors(self, errors):
+        # Sample.clean() reports the standalone/series invariant against
+        # "series"; sections that edit neither field cannot fix or display it.
+        if (
+            "standalone" not in self.fields
+            and "series" not in self.fields
+            and hasattr(errors, "error_dict")
+        ):
+            errors.error_dict.pop("series", None)
+            if not errors.error_dict:
+                return
+        super()._update_errors(errors)
+
 
 class SampleQuickCreateForm(SampleMaintenanceForm):
     """Minimal fields needed to start a private Sample draft."""

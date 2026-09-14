@@ -135,7 +135,7 @@
       </div>
     </section>
     {% endif %}
-    <div class="sdv2-canvas sdv2-canvas-fluid"{% if edit_mode_enabled %} data-workspace data-static-url="{% get_static_prefix %}"{% endif %}>
+    <div class="sdv2-canvas sdv2-canvas-fluid"{% if edit_mode_enabled %} data-workspace data-workspace-reload data-static-url="{% get_static_prefix %}"{% endif %}>
     {% if show_review_panel %}
       <section class="sdv2-review-panel sdv2-section-panel"
                aria-label="Review workspace">

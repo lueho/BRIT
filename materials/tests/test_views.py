@@ -2495,6 +2495,43 @@ class SampleMaintenanceViewsTestCase(TestCase):
         self.assertFalse(response.json()["saved"])
         self.assertEqual(list(self.sample.sources.all()), [self.source])
 
+    def test_legacy_sample_without_series_or_standalone_saves_other_sections(self):
+        legacy = Sample.objects.create(
+            owner=self.owner,
+            name="Legacy sample",
+            material=self.substrate,
+            series=None,
+            standalone=False,
+        )
+        response = self.client.post(
+            self.section_url("analysis", sample=legacy),
+            {"analysis_laboratory": "Lab X"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        legacy.refresh_from_db()
+        self.assertEqual(legacy.analysis_laboratory, "Lab X")
+        self.assertIsNone(legacy.series)
+        self.assertFalse(legacy.standalone)
+
+    def test_legacy_sample_sampling_section_still_enforces_series_invariant(self):
+        legacy = Sample.objects.create(
+            owner=self.owner,
+            name="Legacy sample",
+            material=self.substrate,
+            series=None,
+            standalone=False,
+        )
+        response = self.client.post(
+            self.section_url("sampling", sample=legacy),
+            {"location": "Plot 1"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertFalse(response.json()["saved"])
+        self.assertIn("series", response.json()["html"])
+
     def test_unknown_section_returns_404(self):
         response = self.client.get(self.section_url("bogus"))
         self.assertEqual(response.status_code, 404)
