@@ -1,0 +1,14 @@
+{% extends "detail_v2.html" %}
+
+{% block detail_page_title %}Material category: {{ object.name }}{% endblock detail_page_title %}
+
+{% block detail_kicker %}Material category{% endblock detail_kicker %}
+
+{% block hero_meta_items %}
+    <li><span class="sdv2-meta-label">Owner</span>{{ object.owner.username|default:object.owner }}</li>
+{% endblock hero_meta_items %}
+
+{% block detail_sections %}
+    {% include "includes/sdv2_related_section.html" with section_title="Materials" section_label="Materials in this category" items=related_materials item_url_name="material-detail" section_total=related_materials_published_total section_more=related_materials_more section_list_url=related_materials_list_url empty_title="No materials" empty_body="No materials are assigned to this category yet." %}
+    {% include "includes/sdv2_related_section.html" with section_title="Components" section_label="Components in this category" items=related_components item_url_name="materialcomponent-detail" section_total=related_components_total section_more=related_components_more empty_title="No components" empty_body="No components are assigned to this category yet." %}
+{% endblock detail_sections %}

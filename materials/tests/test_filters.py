@@ -9,6 +9,7 @@ from utils.properties.models import Unit
 from ..filters import MaterialListFilter, SampleFilter
 from ..models import (
     ComponentMeasurement,
+    Composition,
     Material,
     MaterialCategory,
     MaterialComponent,
@@ -191,12 +192,30 @@ class SampleFilterTestCase(TestCase):
 
         self.assertIn(sample_owned, filtr.qs)
 
-    def test_substrate_material_queryset_only_contains_complex_substrates(self):
+    def test_substrate_material_queryset_contains_complex_or_sampled_materials(self):
         filtr = SampleFilter(queryset=Sample.objects.all())
 
         substrate_queryset = filtr.filters["substrate_material"].queryset
         self.assertIn(self.substrate_material, substrate_queryset)
-        self.assertNotIn(self.non_substrate_material, substrate_queryset)
+        self.assertIn(self.non_substrate_material, substrate_queryset)
+
+    def test_substrate_material_filter_accepts_material_with_samples_outside_substrate_category(
+        self,
+    ):
+        material = Material.objects.create(name="Sampled non-substrate material")
+        sample = Sample.objects.create(
+            name="Published sampled non-substrate",
+            material=material,
+            publication_status="published",
+        )
+
+        filtr = SampleFilter(
+            data={"substrate_material": material.pk, "scope": "published"},
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertTrue(filtr.form.is_valid())
+        self.assertIn(sample, filtr.qs)
 
     def test_substrate_material_filter_filters_samples(self):
         filtr = SampleFilter(
@@ -259,6 +278,30 @@ class SampleFilterTestCase(TestCase):
         self.assertCountEqual(
             list(filtr.qs),
             [self.sample_substrate, self.sample_equivalent],
+        )
+
+    def test_component_group_filter_returns_samples_with_measurements_or_compositions_in_group(
+        self,
+    ):
+        composition_sample = Sample.objects.create(
+            name="Sample with composition",
+            material=self.substrate_material,
+        )
+        Composition.objects.create(
+            owner=composition_sample.owner,
+            sample=composition_sample,
+            group=self.raw_parameter_group,
+            fractions_of=self.organic_matter,
+        )
+
+        filtr = SampleFilter(
+            data={"component_group": str(self.raw_parameter_group.pk)},
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertCountEqual(
+            list(filtr.qs),
+            [self.sample_substrate, self.sample_equivalent, composition_sample],
         )
 
     def test_missing_substrate_category_is_created(self):

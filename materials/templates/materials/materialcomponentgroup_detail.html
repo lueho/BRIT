@@ -1,0 +1,14 @@
+{% extends "detail_v2.html" %}
+
+{% block detail_page_title %}Component group: {{ object.name }}{% endblock detail_page_title %}
+
+{% block detail_kicker %}Component group{% endblock detail_kicker %}
+
+{% block hero_meta_items %}
+    <li><span class="sdv2-meta-label">Owner</span>{{ object.owner.username|default:object.owner }}</li>
+{% endblock hero_meta_items %}
+
+{% block detail_sections %}
+    {% include "includes/sdv2_related_section.html" with section_title="Components" section_label="Components measured in this group" items=related_components item_url_name="materialcomponent-detail" section_total=related_components_total section_more=related_components_more empty_title="No components" empty_body="No components have been measured in this group yet." %}
+    {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples using this component group" items=related_samples item_url_name="sample-detail" section_total=related_samples_published_total section_more=related_samples_more section_list_url=related_samples_list_url empty_title="No samples" empty_body="No samples use this component group yet." %}
+{% endblock detail_sections %}

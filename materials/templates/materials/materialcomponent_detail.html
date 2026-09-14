@@ -1,0 +1,66 @@
+{% extends "detail_v2.html" %}
+
+{% block detail_page_title %}Component: {{ object.name }}{% endblock detail_page_title %}
+
+{% block detail_kicker %}Component{% endblock detail_kicker %}
+
+{% block hero_meta_items %}
+    {% if object.abbreviation %}
+        <li><span class="sdv2-meta-label">Abbreviation</span>{{ object.abbreviation }}</li>
+    {% endif %}
+    {% for category in object.categories.all %}
+        <li>
+            <span class="sdv2-meta-label">Category</span>
+            <a href="{% url 'materialcategory-detail' category.pk %}">{{ category.name }}</a>
+        </li>
+    {% endfor %}
+    <li><span class="sdv2-meta-label">Owner</span>{{ object.owner.username|default:object.owner }}</li>
+{% endblock hero_meta_items %}
+
+{% block detail_sections %}
+    {% if basis_component or canonical_component or derived_components or comparable_variants %}
+        <section class="sdv2-section-panel" aria-label="Component classification">
+            <h2 class="sdv2-section-title">Classification</h2>
+            <dl class="sdv2-context-details">
+                {% if basis_component %}
+                    <div>
+                        <dt>Basis component</dt>
+                        <dd>
+                            <a href="{% url 'materialcomponent-detail' basis_component.pk %}">{{ basis_component.name }}</a>
+                        </dd>
+                    </div>
+                {% endif %}
+                {% if canonical_component %}
+                    <div>
+                        <dt>Compared as</dt>
+                        <dd>
+                            <a href="{% url 'materialcomponent-detail' canonical_component.pk %}">{{ canonical_component.name }}</a>
+                        </dd>
+                    </div>
+                {% endif %}
+                {% if derived_components %}
+                    <div>
+                        <dt>Derived components</dt>
+                        <dd>
+                            {% for component in derived_components %}
+                                <a href="{% url 'materialcomponent-detail' component.pk %}">{{ component.name }}</a>{% if not forloop.last %}, {% endif %}
+                            {% endfor %}{% if derived_components_more %} and {{ derived_components_more }} more{% endif %}
+                        </dd>
+                    </div>
+                {% endif %}
+                {% if comparable_variants %}
+                    <div>
+                        <dt>Raw variants</dt>
+                        <dd>
+                            {% for component in comparable_variants %}
+                                <a href="{% url 'materialcomponent-detail' component.pk %}">{{ component.name }}</a>{% if not forloop.last %}, {% endif %}
+                            {% endfor %}{% if comparable_variants_more %} and {{ comparable_variants_more }} more{% endif %}
+                        </dd>
+                    </div>
+                {% endif %}
+            </dl>
+        </section>
+    {% endif %}
+    {% include "includes/sdv2_related_section.html" with section_title="Component groups" section_label="Component groups this component is measured in" items=related_groups item_url_name="materialcomponentgroup-detail" section_total=related_groups_total section_more=related_groups_more empty_title="No component groups" empty_body="This component is not part of any measured component group yet." %}
+    {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples with measurements of this component" items=related_samples item_url_name="sample-detail" section_total=related_samples_published_total section_more=related_samples_more section_list_url=related_samples_list_url empty_title="No samples" empty_body="No samples contain measurements of this component yet." %}
+{% endblock detail_sections %}

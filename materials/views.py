@@ -33,10 +33,11 @@ from utils.file_export.views import (
 )
 from utils.forms import workspace_section_formsets
 from utils.modal import BSModalFormView, BSModalUpdateView
-from utils.object_management.models import ReviewAction
+from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,
+    user_is_moderator_for_model,
 )
 from utils.object_management.views import (
     PrivateObjectFilterView,
@@ -76,6 +77,7 @@ from .filters import (
     SampleFilter,
     SampleSeriesFilter,
     UserOwnedSampleFilter,
+    sampled_substrate_material_q,
 )
 from .forms import (
     SAMPLE_SECTIONS,
@@ -123,10 +125,38 @@ from .models import (
 )
 from .serializers import (
     SampleModelSerializer,
-    SampleSeriesModelSerializer,
 )
 
 logger = logging.getLogger(__name__)
+
+# Maximum number of related records listed on detail pages before a
+# "more" note points to the corresponding filtered list view.
+DETAIL_RELATED_LIMIT = 25
+
+
+def _capped_related(queryset):
+    """
+    Slice a related-object queryset to DETAIL_RELATED_LIMIT.
+
+    Returns (items, total, more) so detail templates can render a bounded
+    list alongside the true count and the number of records not shown.
+    """
+    total = queryset.count()
+    return queryset[:DETAIL_RELATED_LIMIT], total, max(total - DETAIL_RELATED_LIMIT, 0)
+
+
+def _visible_or_none(model, obj, user):
+    if obj is None:
+        return None
+    queryset = model.objects.filter(pk=obj.pk)
+    visible = filter_queryset_for_user(queryset, user).first()
+    if (
+        visible is None
+        and obj.publication_status == UserCreatedObject.STATUS_PRIVATE
+        and user_is_moderator_for_model(user, model)
+    ):
+        return queryset.first()
+    return visible
 
 
 class MaterialsExplorerView(TemplateView):
@@ -199,6 +229,34 @@ class MaterialCategoryModalCreateView(UserCreatedObjectModalCreateView):
 class MaterialCategoryDetailView(UserCreatedObjectDetailView):
     model = MaterialCategory
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        materials = filter_queryset_for_user(
+            Material.objects.filter(categories=self.object), user
+        ).order_by("name", "pk")
+        (
+            context["related_materials"],
+            context["related_materials_total"],
+            context["related_materials_more"],
+        ) = _capped_related(materials)
+        context["related_materials_published_total"] = materials.filter(
+            publication_status="published"
+        ).count()
+        context["related_materials_list_url"] = (
+            f"{reverse('material-list')}?category={self.object.pk}"
+        )
+        (
+            context["related_components"],
+            context["related_components_total"],
+            context["related_components_more"],
+        ) = _capped_related(
+            filter_queryset_for_user(
+                MaterialComponent.objects.filter(categories=self.object), user
+            ).order_by("name", "pk")
+        )
+        return context
+
 
 class MaterialCategoryModalDetailView(UserCreatedObjectModalDetailView):
     template_name = "modal_detail.html"
@@ -227,18 +285,23 @@ class MaterialCategoryAutocompleteView(UserCreatedObjectAutocompleteView):
 class MaterialPublishedListView(PublishedObjectFilterView):
     model = Material
     filterset_class = MaterialListFilter
+    queryset = Material.objects.prefetch_related("categories")
+    template_name = "materials/material_list.html"
     dashboard_url = reverse_lazy("materials-explorer")
 
 
 class MaterialPrivateListView(PrivateObjectFilterView):
     model = Material
     filterset_class = MaterialListFilter
+    queryset = Material.objects.prefetch_related("categories")
+    template_name = "materials/material_list.html"
     dashboard_url = reverse_lazy("materials-explorer")
 
 
 class MaterialReviewListView(ReviewObjectFilterView):
     model = Material
     filterset_class = MaterialListFilter
+    queryset = Material.objects.prefetch_related("categories")
     template_name = "materials/material_list.html"
     dashboard_url = reverse_lazy("materials-explorer")
 
@@ -255,6 +318,36 @@ class MaterialModalCreateView(UserCreatedObjectModalCreateView):
 
 class MaterialDetailView(UserCreatedObjectDetailView):
     model = Material
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        (
+            context["related_series"],
+            context["related_series_total"],
+            context["related_series_more"],
+        ) = _capped_related(
+            filter_queryset_for_user(self.object.sample_series.all(), user).order_by(
+                "name", "pk"
+            )
+        )
+        samples = (
+            filter_queryset_for_user(self.object.samples.all(), user)
+            .select_related("series")
+            .order_by("name", "pk")
+        )
+        (
+            context["related_samples"],
+            context["related_samples_total"],
+            context["related_samples_more"],
+        ) = _capped_related(samples)
+        context["related_samples_published_total"] = samples.filter(
+            publication_status="published"
+        ).count()
+        context["related_samples_list_url"] = (
+            f"{reverse('sample-list')}?substrate_material={self.object.pk}"
+        )
+        return context
 
 
 class MaterialModalDetailView(UserCreatedObjectModalDetailView):
@@ -292,6 +385,19 @@ class SampleSubstrateMaterialAutocompleteView(UserCreatedObjectAutocompleteView)
         queryset = super().get_queryset()
         substrate_category, _ = get_or_create_sample_substrate_category()
         return queryset.filter(categories=substrate_category).distinct()
+
+
+class SampleFilterSubstrateMaterialAutocompleteView(UserCreatedObjectAutocompleteView):
+    """Autocomplete for materials available in the sample filter."""
+
+    model = Material
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        substrate_category, _ = get_or_create_sample_substrate_category()
+        return queryset.filter(
+            sampled_substrate_material_q(substrate_category)
+        ).distinct()
 
 
 class SampleSubstrateMaterialQuickCreateView(
@@ -388,6 +494,78 @@ class ComponentModalCreateView(UserCreatedObjectModalCreateView):
 class ComponentDetailView(UserCreatedObjectDetailView):
     model = MaterialComponent
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        obj = self.object
+        canonical = obj.canonical_component
+        comparable_ids = MaterialComponent.objects.filter(
+            Q(pk=canonical.pk) | Q(comparable_component=canonical)
+        ).values_list("pk", flat=True)
+        context["canonical_component"] = (
+            _visible_or_none(MaterialComponent, canonical, user)
+            if canonical.pk != obj.pk
+            else None
+        )
+        context["basis_component"] = _visible_or_none(
+            MaterialComponent, obj.basis_component, user
+        )
+        (
+            context["derived_components"],
+            context["derived_components_total"],
+            context["derived_components_more"],
+        ) = _capped_related(
+            filter_queryset_for_user(obj.derived_components.all(), user).order_by(
+                "name", "pk"
+            )
+        )
+        (
+            context["comparable_variants"],
+            context["comparable_variants_total"],
+            context["comparable_variants_more"],
+        ) = _capped_related(
+            filter_queryset_for_user(obj.comparable_variants.all(), user).order_by(
+                "name", "pk"
+            )
+        )
+        (
+            context["related_groups"],
+            context["related_groups_total"],
+            context["related_groups_more"],
+        ) = _capped_related(
+            filter_queryset_for_user(
+                MaterialComponentGroup.objects.filter(
+                    component_measurements__component_id__in=comparable_ids
+                ),
+                user,
+            )
+            .distinct()
+            .order_by("name", "pk")
+        )
+        samples = (
+            filter_queryset_for_user(
+                Sample.objects.filter(
+                    component_measurements__component_id__in=comparable_ids
+                ),
+                user,
+            )
+            .distinct()
+            .select_related("material", "series")
+            .order_by("name", "pk")
+        )
+        (
+            context["related_samples"],
+            context["related_samples_total"],
+            context["related_samples_more"],
+        ) = _capped_related(samples)
+        context["related_samples_published_total"] = samples.filter(
+            publication_status="published"
+        ).count()
+        context["related_samples_list_url"] = (
+            f"{reverse('sample-list')}?raw_parameter={self.object.pk}"
+        )
+        return context
+
 
 class ComponentModalDetailView(UserCreatedObjectModalDetailView):
     model = MaterialComponent
@@ -449,6 +627,46 @@ class MaterialComponentGroupModalCreateView(UserCreatedObjectModalCreateView):
 class MaterialComponentGroupDetailView(UserCreatedObjectDetailView):
     model = MaterialComponentGroup
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        obj = self.object
+        (
+            context["related_components"],
+            context["related_components_total"],
+            context["related_components_more"],
+        ) = _capped_related(
+            filter_queryset_for_user(
+                MaterialComponent.objects.filter(component_measurements__group=obj),
+                user,
+            )
+            .distinct()
+            .order_by("name", "pk")
+        )
+        samples = (
+            filter_queryset_for_user(
+                Sample.objects.filter(
+                    Q(component_measurements__group=obj) | Q(compositions__group=obj)
+                ),
+                user,
+            )
+            .distinct()
+            .select_related("material", "series")
+            .order_by("name", "pk")
+        )
+        (
+            context["related_samples"],
+            context["related_samples_total"],
+            context["related_samples_more"],
+        ) = _capped_related(samples)
+        context["related_samples_published_total"] = samples.filter(
+            publication_status="published"
+        ).count()
+        context["related_samples_list_url"] = (
+            f"{reverse('sample-list')}?component_group={self.object.pk}"
+        )
+        return context
+
 
 class MaterialComponentGroupModalDetailView(UserCreatedObjectModalDetailView):
     model = MaterialComponentGroup
@@ -505,6 +723,53 @@ class MaterialPropertyModalCreateView(UserCreatedObjectModalCreateView):
 
 class MaterialPropertyDetailView(UserCreatedObjectDetailView):
     model = MaterialProperty
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        obj = self.object
+        canonical = obj.canonical_property
+        comparable_ids = MaterialProperty.objects.filter(
+            Q(pk=canonical.pk) | Q(comparable_property=canonical)
+        ).values_list("pk", flat=True)
+        context["canonical_property"] = (
+            _visible_or_none(MaterialProperty, canonical, user)
+            if canonical.pk != obj.pk
+            else None
+        )
+        context["basis_component"] = _visible_or_none(
+            MaterialComponent, obj.default_basis_component, user
+        )
+        (
+            context["comparable_variants"],
+            context["comparable_variants_total"],
+            context["comparable_variants_more"],
+        ) = _capped_related(
+            filter_queryset_for_user(obj.comparable_variants.all(), user).order_by(
+                "name", "pk"
+            )
+        )
+        samples = (
+            filter_queryset_for_user(
+                Sample.objects.filter(property_values__property_id__in=comparable_ids),
+                user,
+            )
+            .distinct()
+            .select_related("material", "series")
+            .order_by("name", "pk")
+        )
+        (
+            context["related_samples"],
+            context["related_samples_total"],
+            context["related_samples_more"],
+        ) = _capped_related(samples)
+        context["related_samples_published_total"] = samples.filter(
+            publication_status="published"
+        ).count()
+        context["related_samples_list_url"] = (
+            f"{reverse('sample-list')}?parameter={self.object.pk}"
+        )
+        return context
 
 
 class MaterialPropertyModalDetailView(UserCreatedObjectModalDetailView):
@@ -689,8 +954,12 @@ class AnalyticalMethodDetailView(UserCreatedObjectDetailView):
             .distinct()
             .order_by("name", "pk")
         )
-        context["related_samples"] = filter_queryset_for_user(
-            related_samples, self.request.user
+        (
+            context["related_samples"],
+            context["related_samples_total"],
+            context["related_samples_more"],
+        ) = _capped_related(
+            filter_queryset_for_user(related_samples, self.request.user)
         )
         return context
 
@@ -748,8 +1017,27 @@ class SampleSeriesDetailView(UserCreatedObjectDetailView):
     model = SampleSeries
 
     def get_context_data(self, **kwargs):
-        kwargs["data"] = SampleSeriesModelSerializer(self.object).data
-        return super().get_context_data(**kwargs)
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        visible_samples = filter_queryset_for_user(
+            self.object.samples.select_related("timestep__distribution"), user
+        ).order_by("name", "pk")
+        context["samples_total"] = visible_samples.count()
+        distributions = []
+        for distribution in self.object.temporal_distributions.all():
+            dist_samples = visible_samples.filter(timestep__distribution=distribution)
+            total = dist_samples.count()
+            distributions.append(
+                {
+                    "name": distribution.name,
+                    "description": distribution.description,
+                    "total": total,
+                    "samples": dist_samples[:DETAIL_RELATED_LIMIT],
+                    "more": max(total - DETAIL_RELATED_LIMIT, 0),
+                }
+            )
+        context["distributions"] = distributions
+        return context
 
 
 class SampleSeriesModalDetailView(UserCreatedObjectModalDetailView):
@@ -1374,23 +1662,60 @@ class SampleReviewItemDetailView(ReviewItemDetailView):
     """Render sample moderation with the complete v2 sample context."""
 
     model = Sample
+    detail_view_class = SampleDetailView
 
     def _resolve_base_template(self):
         return "materials/sample_detail_v2.html"
 
-    def get_review_specific_context(self, context):
-        detail_view = SampleDetailView()
-        detail_view.request = self.request
-        detail_view.args = self.args
-        detail_view.kwargs = self.kwargs
-        detail_view.object = self.object
-        sample_context = detail_view.get_context_data(object=self.object)
-        for review_key in ("review_logs", "review_mode", "show_review_panel"):
-            sample_context.pop(review_key, None)
-        return sample_context
-
 
 SampleReviewItemDetailView.register_for_model(Sample)
+
+
+class MaterialCategoryReviewItemDetailView(ReviewItemDetailView):
+    model = MaterialCategory
+    detail_view_class = MaterialCategoryDetailView
+
+
+class MaterialReviewItemDetailView(ReviewItemDetailView):
+    model = Material
+    detail_view_class = MaterialDetailView
+
+
+class MaterialComponentReviewItemDetailView(ReviewItemDetailView):
+    model = MaterialComponent
+    detail_view_class = ComponentDetailView
+
+
+class MaterialComponentGroupReviewItemDetailView(ReviewItemDetailView):
+    model = MaterialComponentGroup
+    detail_view_class = MaterialComponentGroupDetailView
+
+
+class MaterialPropertyReviewItemDetailView(ReviewItemDetailView):
+    model = MaterialProperty
+    detail_view_class = MaterialPropertyDetailView
+
+
+class AnalyticalMethodReviewItemDetailView(ReviewItemDetailView):
+    model = AnalyticalMethod
+    detail_view_class = AnalyticalMethodDetailView
+
+
+class SampleSeriesReviewItemDetailView(ReviewItemDetailView):
+    model = SampleSeries
+    detail_view_class = SampleSeriesDetailView
+
+
+for _model, _review_view in (
+    (MaterialCategory, MaterialCategoryReviewItemDetailView),
+    (Material, MaterialReviewItemDetailView),
+    (MaterialComponent, MaterialComponentReviewItemDetailView),
+    (MaterialComponentGroup, MaterialComponentGroupReviewItemDetailView),
+    (MaterialProperty, MaterialPropertyReviewItemDetailView),
+    (AnalyticalMethod, AnalyticalMethodReviewItemDetailView),
+    (SampleSeries, SampleSeriesReviewItemDetailView),
+):
+    _review_view.register_for_model(_model)
 
 
 class SampleUpdateView(UserCreatedObjectUpdateView):

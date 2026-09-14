@@ -1,0 +1,44 @@
+{% load custom_tags %}
+{% comment %}
+Sortable table header for filtered_list tables.
+
+Parameters:
+- key:   sort key that must be whitelisted in the view's sortable_fields
+- label: visible header text
+- class: optional extra classes for the <th>
+
+When the key is whitelisted the header renders a link that toggles
+ascending/descending via the `ordering` GET parameter while preserving all
+other active filters. Otherwise a plain header is rendered.
+{% endcomment %}
+{% if sortable_fields and key in sortable_fields %}
+  {% with "-"|add:key as descending_key %}
+    {% if current_sort == key %}
+      <th class="{{ class }}" aria-sort="ascending" scope="col">
+        <a class="text-decoration-none"
+           href="?{% param_replace ordering=descending_key page="" %}"
+           aria-label="Sort by {{ label }} descending">{{ label }}
+          <i class="fas fa-sort-up" aria-hidden="true"></i>
+        </a>
+      </th>
+    {% elif current_sort == descending_key %}
+      <th class="{{ class }}" aria-sort="descending" scope="col">
+        <a class="text-decoration-none"
+           href="?{% param_replace ordering=key page="" %}"
+           aria-label="Sort by {{ label }}">{{ label }}
+          <i class="fas fa-sort-down" aria-hidden="true"></i>
+        </a>
+      </th>
+    {% else %}
+      <th class="{{ class }}" scope="col">
+        <a class="text-decoration-none"
+           href="?{% param_replace ordering=key page="" %}"
+           aria-label="Sort by {{ label }}">{{ label }}
+          <i class="fas fa-sort text-muted" aria-hidden="true"></i>
+        </a>
+      </th>
+    {% endif %}
+  {% endwith %}
+{% else %}
+  <th class="{{ class }}" scope="col">{{ label }}</th>
+{% endif %}
