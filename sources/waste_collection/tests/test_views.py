@@ -11,10 +11,11 @@ from unittest.mock import patch
 from urllib.parse import urlencode
 
 from celery import chord
-from django.contrib.auth.models import Group, Permission, User
+from django.contrib.auth.models import AnonymousUser, Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.db import connection
 from django.db.models import signals
 from django.db.models.signals import post_save
 from django.forms.formsets import BaseFormSet
@@ -103,7 +104,7 @@ from sources.waste_collection.waste_atlas.viewsets import (
     _amounts_for_2024,
     _resolved_population_attribute_id,
 )
-from utils.object_management.models import ReviewAction
+from utils.object_management.models import ObjectEditorGrant, ReviewAction
 from utils.properties.models import Property, Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
@@ -1199,6 +1200,154 @@ class CollectionCatchmentCRUDViewsTestCase(
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class CollectionListQueryTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="list-owner")
+        cls.other_owner = User.objects.create_user(username="other-list-owner")
+        region = Region.objects.create(name="List region", owner=cls.owner)
+        cls.catchment = CollectionCatchment.objects.create(
+            name="List catchment", region=region, owner=cls.owner
+        )
+        cls.collector = Collector.objects.create(name="List collector", owner=cls.owner)
+        cls.category = WasteCategory.objects.create(
+            name="List category", owner=cls.owner
+        )
+        cls.system = CollectionSystem.objects.create(
+            name="List system", owner=cls.owner
+        )
+        cls.published = Collection.objects.bulk_create(
+            [
+                Collection(
+                    name="Repeated name",
+                    owner=cls.owner,
+                    publication_status="published",
+                    valid_from=date(2024, 1, index + 1),
+                    catchment=cls.catchment,
+                    collector=cls.collector,
+                    waste_category=cls.category,
+                    collection_system=cls.system,
+                )
+                for index in range(25)
+            ]
+        )
+        cls.owned_private, cls.shared_private, cls.hidden_private = (
+            Collection.objects.bulk_create(
+                [
+                    Collection(
+                        name="Repeated name",
+                        owner=owner,
+                        publication_status="private",
+                        valid_from=date(2024, 1, 1),
+                    )
+                    for owner in (cls.owner, cls.other_owner, cls.other_owner)
+                ]
+            )
+        )
+        ObjectEditorGrant.objects.create(
+            content_object=cls.shared_private,
+            editor=cls.owner,
+            granted_by=cls.other_owner,
+        )
+
+    def get_page(self, view_class, *, user=None, data=None, **view_kwargs):
+        request = RequestFactory().get(
+            "/collections/", {"scope": view_class.list_type, **(data or {})}
+        )
+        request.user = user or AnonymousUser()
+        response = view_class.as_view(**view_kwargs)(request)
+        self.assertEqual(response.status_code, 200)
+        return response.context_data["page_obj"]
+
+    def test_default_ordering_has_unique_tiebreaker(self):
+        for view_class in (
+            views.CollectionPublishedListView,
+            views.CollectionPrivateListView,
+        ):
+            with self.subTest(view=view_class.__name__):
+                request = RequestFactory().get("/collections/")
+                request.user = self.owner
+                view = view_class()
+                view.setup(request)
+                self.assertEqual(view.get_queryset().query.order_by, ("name", "id"))
+
+    def test_published_pages_keep_duplicate_names_in_id_order(self):
+        actual = []
+        for number in (1, 2, 3):
+            page = self.get_page(
+                views.CollectionPublishedListView, data={"page": number}
+            )
+            self.assertEqual(page.paginator.count, 25)
+            actual.extend(obj.pk for obj in page.object_list)
+
+        self.assertEqual(actual, [obj.pk for obj in self.published])
+
+    def test_private_pages_include_owned_and_shared_not_unrelated_records(self):
+        actual = []
+        for number in (1, 2, 3):
+            page = self.get_page(
+                views.CollectionPrivateListView,
+                user=self.owner,
+                data={"page": number},
+            )
+            self.assertEqual(page.paginator.count, 27)
+            actual.extend(obj.pk for obj in page.object_list)
+
+        expected = [obj.pk for obj in self.published]
+        expected.extend([self.owned_private.pk, self.shared_private.pk])
+        self.assertEqual(actual, expected)
+        self.assertNotIn(self.hidden_private.pk, actual)
+
+    def test_filtered_pages_preserve_order_and_total(self):
+        actual = []
+        for number in (1, 2):
+            page = self.get_page(
+                views.CollectionPublishedListView,
+                data={
+                    "page": number,
+                    "valid_on": "2024-01-20",
+                    "waste_category": self.category.pk,
+                },
+            )
+            self.assertEqual(page.paginator.count, 20)
+            actual.extend(obj.pk for obj in page.object_list)
+
+        self.assertEqual(actual, [obj.pk for obj in self.published[:20]])
+
+    def test_explicit_ordering_is_preserved(self):
+        page = self.get_page(
+            views.CollectionPublishedListView, ordering=("-valid_from", "-id")
+        )
+
+        self.assertEqual(
+            [obj.pk for obj in page.object_list],
+            [obj.pk for obj in reversed(self.published[-10:])],
+        )
+
+    def test_list_row_relations_are_loaded_in_one_query(self):
+        page = self.get_page(views.CollectionPublishedListView)
+
+        with self.assertNumQueries(1):
+            for obj in page.object_list:
+                self.assertEqual(obj.owner.pk, self.owner.pk)
+                self.assertEqual(obj.catchment.region.name, "List region")
+                self.assertEqual(obj.collector.name, "List collector")
+                self.assertEqual(obj.waste_category.name, "List category")
+                self.assertEqual(obj.collection_system.name, "List system")
+
+    def test_database_has_name_id_index(self):
+        with connection.cursor() as cursor:
+            constraints = connection.introspection.get_constraints(
+                cursor, Collection._meta.db_table
+            )
+
+        self.assertIn("collection_name_id_idx", constraints)
+        self.assertTrue(constraints["collection_name_id_idx"]["index"])
+        self.assertEqual(
+            constraints["collection_name_id_idx"]["columns"], ["name", "id"]
+        )
+
+
 class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     modal_detail_view = True
 
@@ -1406,6 +1555,44 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         Returns the URL for the current list view based on the valid_on filter.
         """
         return self.get_list_url(publication_status=publication_status)
+
+    def test_collection_lists_display_complete_valid_period(self):
+        collection = self.unpublished_object
+        for scope, route, user in (
+            ("published", "collection-list", None),
+            ("private", "collection-list-owned", self.owner_user),
+            ("review", "collection-list-review", self.staff_user),
+        ):
+            for valid_until in (date(2025, 3, 14), None):
+                with self.subTest(scope=scope, valid_until=valid_until):
+                    Collection.objects.filter(pk=collection.pk).update(
+                        publication_status=scope,
+                        valid_from=date(2024, 6, 15),
+                        valid_until=valid_until,
+                    )
+                    self.client.logout()
+                    if user:
+                        self.client.force_login(user)
+                    response = self.client.get(
+                        reverse(route), {"scope": scope, "valid_on": "2024-07-01"}
+                    )
+                    end_label = (
+                        '<time datetime="2025-03-14">14.03.2025</time>'
+                        if valid_until
+                        else "No end date"
+                    )
+
+                    self.assertContains(
+                        response,
+                        '<span class="d-block text-muted small">Valid period: '
+                        '<time datetime="2024-06-15">15.06.2024</time>'
+                        f" – {end_label}</span>",
+                        html=True,
+                    )
+                    self.assertTemplateUsed(
+                        response,
+                        "waste_collection/includes/collection_valid_period.html",
+                    )
 
     def test_post_get_formset_kwargs_fetches_correct_parent_object(self):
         request = RequestFactory().post(self.get_create_url())
