@@ -1406,17 +1406,16 @@ class SampleUpdateView(UserCreatedObjectUpdateView):
             raise Http404("Unknown sample section.")
         self.section = {**SAMPLE_SECTIONS[key], "key": key}
         self.inlines = None
-        policy_key = self.section.get("policy", "can_edit")
         with transaction.atomic():
-            if request.user.is_authenticated:
-                policy = get_object_policy(
-                    request.user, self.get_object(), request=request
-                )
-                if not policy.get(policy_key, False):
-                    raise PermissionDenied(
-                        f"You do not have permission to edit the {self.section['label']} section."
-                    )
             return super().dispatch(request, *args, **kwargs)
+
+    def test_func(self):
+        if not self.request.user.is_authenticated:
+            return False
+        policy = get_object_policy(
+            self.request.user, self.get_object(), request=self.request
+        )
+        return bool(policy.get(self.section.get("policy", "can_edit"), False))
 
     def get_queryset(self):
         queryset = super().get_queryset()
