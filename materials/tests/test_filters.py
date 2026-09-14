@@ -192,12 +192,30 @@ class SampleFilterTestCase(TestCase):
 
         self.assertIn(sample_owned, filtr.qs)
 
-    def test_substrate_material_queryset_only_contains_complex_substrates(self):
+    def test_substrate_material_queryset_contains_complex_or_sampled_materials(self):
         filtr = SampleFilter(queryset=Sample.objects.all())
 
         substrate_queryset = filtr.filters["substrate_material"].queryset
         self.assertIn(self.substrate_material, substrate_queryset)
-        self.assertNotIn(self.non_substrate_material, substrate_queryset)
+        self.assertIn(self.non_substrate_material, substrate_queryset)
+
+    def test_substrate_material_filter_accepts_material_with_samples_outside_substrate_category(
+        self,
+    ):
+        material = Material.objects.create(name="Sampled non-substrate material")
+        sample = Sample.objects.create(
+            name="Published sampled non-substrate",
+            material=material,
+            publication_status="published",
+        )
+
+        filtr = SampleFilter(
+            data={"substrate_material": material.pk, "scope": "published"},
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertTrue(filtr.form.is_valid())
+        self.assertIn(sample, filtr.qs)
 
     def test_substrate_material_filter_filters_samples(self):
         filtr = SampleFilter(

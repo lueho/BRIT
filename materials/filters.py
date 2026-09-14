@@ -343,7 +343,7 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
 
         substrate_category, _ = get_or_create_sample_substrate_category()
         substrate_queryset = Material.objects.filter(
-            categories=substrate_category
+            Q(categories=substrate_category) | Q(samples__isnull=False)
         ).distinct()
         parameter_queryset = MaterialProperty.objects.all()
         raw_parameter_queryset = MaterialComponent.objects.all()
