@@ -6204,7 +6204,6 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
             abbreviation="PC",
             publication_status="published",
             description="Component description text.",
-            component_kind="aggregate",
             basis_component=cls.basis_component,
             comparable_component=cls.canonical_component,
         )
@@ -6384,7 +6383,6 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
     def test_component_detail_shows_classification_fields(self):
         response = self.get_detail("materialcomponent-detail", self.component)
         self.assertContains(response, "PC")
-        self.assertContains(response, "Aggregate component")
         self.assertContains(response, self.category.name)
         self.assertContains(response, self.basis_component.name)
         self.assertContains(

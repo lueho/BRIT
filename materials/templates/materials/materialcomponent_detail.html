@@ -5,9 +5,6 @@
 {% block detail_kicker %}Component{% endblock detail_kicker %}
 
 {% block hero_meta_items %}
-    {% if object.component_kind %}
-        <li><span class="sdv2-meta-label">Kind</span>{{ object.get_component_kind_display }}</li>
-    {% endif %}
     {% if object.abbreviation %}
         <li><span class="sdv2-meta-label">Abbreviation</span>{{ object.abbreviation }}</li>
     {% endif %}
