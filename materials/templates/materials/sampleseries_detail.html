@@ -1,134 +1,93 @@
-{% extends "detail_with_options.html" %}
-{% load static %}
-{% load moderation_tags %}
-{% block title %}
-  BRIT | Sample Series: {{ object.name }}
-{% endblock title %}
-{% block detail_header %}
-  {{ object.material.name }}: {{ object.name }}
-{% endblock detail_header %}
-{% block detail_top_image %}
-  {% if object.image %}
-    <div class="card-img-top detail-uploaded-image-frame">
-      <img class="detail-uploaded-image"
-           src="{{ object.image.url }}"
-           alt="{{ object.image_alt_text|default_if_none:''|default:object.material.name }}">
-      {% if object.image_caption or object.image_rights_notice %}
-        <div class="small text-muted px-3 py-2 bg-body-tertiary border-top w-100">
-          {% if object.image_caption %}<div>{{ object.image_caption }}</div>{% endif %}
-          {% if object.image_rights_notice %}<div>{{ object.image_rights_notice }}</div>{% endif %}
-        </div>
-      {% endif %}
-    </div>
-  {% endif %}
-{% endblock detail_top_image %}
-{% block detail_body %}
-  {% if object.name %}
-    <p class="card-text">
-      <strong>Series name:</strong>
-      <br>
-      {{ object.name }}
-    </p>
-  {% endif %}
-  <p class="card-text">
-    <strong>Material:</strong>
-    <br>
-    <a href="{% url 'material-detail-modal' object.material.pk %}"
-       class="modal-link">{{ object.material.name }}</a>
-  </p>
-  {% if object.material.description %}
-    <p class="card-text">
-      <strong>Description:</strong>
-      <br>
-      {{ object.material.description }}
-    </p>
-  {% endif %}
-{% endblock detail_body %}
-{% block detail_header_primary_actions %}
-  <div class="btn-group me-2" role="group">
-    {% with back_url=request.GET.back %}
-      {% if back_url %}
-        <a class="btn btn-sm btn-outline-secondary"
-           href="{{ back_url }}"
-           title="Back to results">
-          <i class="fas fa-arrow-left"></i>
-          <span class="d-none d-md-inline">Back to results</span>
-        </a>
-      {% endif %}
-    {% endwith %}
-    {% if object.list_url %}
-      <a class="btn btn-sm btn-outline-secondary"
-         href="{{ object.list_url }}"
-         title="List">
-        <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">List</span>
-      </a>
-    {% else %}
-      <a class="btn btn-sm btn-outline-secondary"
-         href="{% url 'sampleseries-list' %}"
-         title="List">
-        <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">List</span>
-      </a>
+{% extends "detail_v2.html" %}
+
+{% block detail_page_title %}Sample series: {{ object.material.name }}: {{ object.name }}{% endblock detail_page_title %}
+
+{% block detail_kicker %}Sample series{% endblock detail_kicker %}
+
+{% block detail_title %}{{ object.material.name }}: {{ object.name }}{% endblock detail_title %}
+
+{% block hero_lede %}
+    {% if object.description %}
+        <div class="sdv2-hero-material">{{ object.description|linebreaks }}</div>
+    {% elif object.material.description %}
+        <div class="sdv2-hero-material">{{ object.material.description|linebreaks }}</div>
     {% endif %}
-    <a class="btn btn-sm btn-outline-secondary"
-       href="{% url 'materials-explorer' %}"
-       title="Open Explorer (dashboard)">
-      <i class="fas fa-table-cells-large"></i> <span class="d-none d-md-inline">Explorer</span>
-    </a>
-  </div>
-  {{ block.super }}
-{% endblock detail_header_primary_actions %}
-{% block options_primary_actions %}
-  {% object_policy object as policy %}
-  {% if policy.can_edit %}
-    <a class="btn btn-outline-primary w-100 mb-2"
-       href="{% url 'sampleseries-update' object.pk %}?next={{ request.get_full_path|urlencode }}">
-      <i class="fas fa-pen-to-square"></i> Edit
-    </a>
-  {% endif %}
-  {% if policy.can_duplicate %}
-    <a class="btn btn-outline-secondary w-100 mb-2"
-       href="{% url 'sampleseries-duplicate' object.pk %}">
-      <i class="fas fa-copy"></i> Duplicate
-    </a>
-  {% endif %}
-  {% if policy.can_delete %}
-    <a class="btn btn-outline-danger w-100 mb-2 modal-link"
-       href="{% url 'sampleseries-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">
-      <i class="fas fa-trash"></i> Delete
-    </a>
-  {% endif %}
-{% endblock options_primary_actions %}
-{% block options_secondary_actions %}
-  {% object_policy object as policy %}
-  <hr class="my-2">
-  {% if policy.can_manage_samples %}
-    <a class="btn btn-outline-secondary w-100 mb-2 modal-link"
-       href="{% url 'sampleseries-add-distribution-modal' object.pk %}">
-      <i class="fas fa-circle-plus"></i> Add distribution
-    </a>
-  {% endif %}
-  <a class="btn btn-outline-secondary w-100 mb-2"
-     href="{% url 'materials-explorer' %}">
-    <i class="fas fa-table-cells-large"></i> Explorer
-  </a>
-{% endblock options_secondary_actions %}
-{% block second_row %}
-  {% for distribution in data.distributions %}
-    <div class="col col-12 col-md-6 col-lg-4">
-      <div class="card shadow h-100">
-        <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-          <h5 class="mb-0">{{ distribution.name }}</h5>
+{% endblock hero_lede %}
+
+{% block hero_meta_items %}
+    <li>
+        <span class="sdv2-meta-label">Material</span>
+        <a href="{% url 'material-detail' object.material.pk %}">{{ object.material.name }}</a>
+    </li>
+    <li><span class="sdv2-meta-label">Samples</span>{{ object.samples.count }}</li>
+    <li><span class="sdv2-meta-label">Distributions</span>{{ data.distributions|length }}</li>
+    <li><span class="sdv2-meta-label">Owner</span>{{ object.owner.username|default:object.owner }}</li>
+{% endblock hero_meta_items %}
+
+{% block hero_class %}{% if object.image %}sdv2-hero-with-media{% else %}sdv2-hero-no-media{% endif %}{% endblock hero_class %}
+
+{% block hero_media %}
+    {% if object.image %}
+        <figure class="sdv2-hero-media">
+            <img src="{{ object.image.url }}"
+                 alt="{{ object.image_alt_text|default_if_none:''|default:object.material.name }}"
+                 decoding="async">
+            {% if object.image_caption or object.image_rights_notice %}
+                <figcaption class="sdv2-hero-media-caption">
+                    {% if object.image_caption %}<span>{{ object.image_caption }}</span>{% endif %}
+                    {% if object.image_rights_notice %}<span class="sdv2-hero-media-rights">{{ object.image_rights_notice }}</span>{% endif %}
+                </figcaption>
+            {% endif %}
+        </figure>
+    {% endif %}
+{% endblock hero_media %}
+
+{% block rail_dropdown_extra %}
+    {% if policy.can_duplicate %}
+        <li>
+            <a class="dropdown-item" href="{% url 'sampleseries-duplicate' object.pk %}">
+                <i class="fas fa-fw fa-copy me-2" aria-hidden="true"></i>Duplicate series
+            </a>
+        </li>
+    {% endif %}
+    {% if policy.can_manage_samples %}
+        <li>
+            <a class="dropdown-item modal-link"
+               href="{% url 'sampleseries-add-distribution-modal' object.pk %}">
+                <i class="fas fa-fw fa-circle-plus me-2" aria-hidden="true"></i>Add distribution
+            </a>
+        </li>
+    {% endif %}
+    <li>
+        <a class="dropdown-item" href="{% url 'materials-explorer' %}">
+            <i class="fas fa-fw fa-table-cells-large me-2" aria-hidden="true"></i>Open explorer
+        </a>
+    </li>
+{% endblock rail_dropdown_extra %}
+
+{% block detail_sections %}
+    {% for distribution in data.distributions %}
+        <section class="sdv2-section-panel" aria-label="{{ distribution.name }}">
+            <h2 class="sdv2-section-title">{{ distribution.name }}</h2>
+            {% if distribution.description %}
+                <p class="sdv2-section-hint mt-1 mb-0">{{ distribution.description }}</p>
+            {% endif %}
+            {% if distribution.samples %}
+                <ul class="sdv2-related-list mt-3">
+                    {% for sample in distribution.samples %}
+                        <li>
+                            <a class="sdv2-related-link" href="{% url 'sample-detail' sample.id %}">
+                                <span class="sdv2-related-name">{{ sample.timestep }}</span>
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </section>
+    {% empty %}
+        <div class="sdv2-empty">
+            <div class="sdv2-empty-title">No distributions</div>
+            <div class="sdv2-empty-body">This sample series has no temporal distributions yet.</div>
         </div>
-        <div class="card-body">
-          {% if distribution.description %}<p class="card-text">{{ distribution.description }}</p>{% endif %}
-          <p class="card-text">
-            <strong>Timesteps:</strong>
-          </p>
-          {% for sample in distribution.samples %}
-            <a href="{% url 'sample-detail' sample.id %}">{{ sample.timestep }}</a>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-  {% endfor %}
-{% endblock second_row %}
+    {% endfor %}
+{% endblock detail_sections %}

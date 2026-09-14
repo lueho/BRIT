@@ -1,70 +1,55 @@
-{% extends "detail_with_options.html" %}
+{% extends "detail_v2.html" %}
 
-{% block detail_body %}
-    <p class="card-text">
-        <strong>Name:</strong>
-        <br>
-        {{ object.name }}
-    </p>
-    <p class="card-text">
-        <strong>Technique:</strong>
-        <br>
-        {% if object.technique %}
-            {{ object.technique }}
-        {% else %}
-            No entry
-        {% endif %}
-    </p>
-    <p class="card-text">
-        <strong>Standard:</strong>
-        <br>
-        {% if object.standard %}
-            {{ object.standard }}
-        {% else %}
-            No entry
-        {% endif %}
-    </p>
-    <p class="card-text">
-        <strong>Detection limit:</strong>
-        <br>
-        {% if object.lower_detection_limit %}
-            {{ object.lower_detection_limit }}
-        {% else %}
-            No entry
-        {% endif %}
-    </p>
-    {% if object.description %}
-        <p class="card-text">
-            <strong>Description:</strong>
-            <br>
-            {{ object.description }}
-        </p>
+{% block detail_page_title %}Analytical method: {{ object.name }}{% endblock detail_page_title %}
+
+{% block detail_kicker %}Analytical method{% endblock detail_kicker %}
+
+{% block hero_meta_items %}
+    {% if object.technique %}
+        <li><span class="sdv2-meta-label">Technique</span>{{ object.technique }}</li>
+    {% endif %}
+    {% if object.standard %}
+        <li><span class="sdv2-meta-label">Standard</span>{{ object.standard }}</li>
+    {% endif %}
+    {% if object.instrument_type %}
+        <li><span class="sdv2-meta-label">Instrument</span>{{ object.instrument_type }}</li>
+    {% endif %}
+    {% if object.lower_detection_limit %}
+        <li><span class="sdv2-meta-label">Detection limit</span>{{ object.lower_detection_limit }}</li>
+    {% endif %}
+    <li><span class="sdv2-meta-label">Owner</span>{{ object.owner.username|default:object.owner }}</li>
+{% endblock hero_meta_items %}
+
+{% block detail_sections %}
+    {% if object.ontology_uri %}
+        <section class="sdv2-section-panel" aria-label="Ontology reference">
+            <h2 class="sdv2-section-title">Ontology</h2>
+            <dl class="sdv2-context-details">
+                <div>
+                    <dt>Ontology URI</dt>
+                    <dd>
+                        <a href="{{ object.ontology_uri }}" target="_blank" rel="noopener">{{ object.ontology_uri }}</a>
+                    </dd>
+                </div>
+            </dl>
+        </section>
     {% endif %}
     {% if object.sources.exists %}
-        <p class="card-text">
-            <strong>Sources:</strong>
-        </p>
-        <ul>
-            {% for source in object.sources.all %}
-                <li>
-                    <a href="{% url 'source-detail' source.pk %}">{{ source.abbreviation }}</a>
-                </li>
-            {% endfor %}
-        </ul>
+        <section class="sdv2-section-panel" aria-label="Sources">
+            <h2 class="sdv2-section-title">Sources</h2>
+            <ul class="sdv2-related-list mt-3">
+                {% for source in object.sources.all %}
+                    <li>
+                        <a class="sdv2-related-link modal-link"
+                           href="{% url 'source-detail-modal' source.pk %}"
+                           title="{{ source.title|default:source.abbreviation }}">
+                            <span class="sdv2-related-name">{{ source.abbreviation }}</span>
+                            {% if source.title %}<span class="sdv2-related-meta">{{ source.title|truncatewords:12 }}</span>{% endif %}
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
     {% endif %}
-    <p class="card-text">
-        <strong>Samples:</strong>
-    </p>
-    {% if related_samples %}
-        <ul>
-            {% for sample in related_samples %}
-                <li>
-                    <a href="{% url 'sample-detail' sample.pk %}">{{ sample.name }}</a>
-                    {% if sample.material %}- {{ sample.material.name }}{% endif %}
-                </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p class="card-text">No samples connected.</p>
-    {% endif %}
-{% endblock detail_body %}
+    {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples analysed with this method" items=related_samples item_url_name="sample-detail" empty_title="No samples" empty_body="No samples reference this analytical method yet." %}
+{% endblock detail_sections %}

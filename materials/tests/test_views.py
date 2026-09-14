@@ -31,6 +31,7 @@ from ..models import (
     MaterialComponent,
     MaterialComponentGroup,
     MaterialProperty,
+    MaterialPropertyGroup,
     MaterialPropertyValue,
     Sample,
     SampleSeries,
@@ -1622,7 +1623,7 @@ class AnalyticalMethodDetailViewSamplesTestCase(ViewWithPermissionsTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Samples:")
+        self.assertContains(response, 'aria-label="Samples analysed with this method"')
         self.assertContains(response, "Published linked sample", count=1)
         self.assertContains(
             response,
@@ -5934,7 +5935,7 @@ class SampleSeriesDetailTemplateReviewUITests(TestCase):
         url = reverse("sampleseries-detail", kwargs={"pk": self.private_series.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Submit for Review")
+        self.assertContains(response, "Submit for review")
 
     def test_review_series_shows_review_view_link_for_owner(self):
         self.client.force_login(self.owner)
@@ -5943,13 +5944,13 @@ class SampleSeriesDetailTemplateReviewUITests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Review view")
 
-    def test_series_detail_extends_detail_with_options(self):
+    def test_series_detail_extends_detail_v2(self):
         self.client.force_login(self.owner)
         url = reverse("sampleseries-detail", kwargs={"pk": self.private_series.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         template_names = [t.name for t in response.templates]
-        self.assertIn("detail_with_options.html", template_names)
+        self.assertIn("detail_v2.html", template_names)
 
 
 class MaterialsReviewDashboardTests(TestCase):
@@ -6116,3 +6117,329 @@ class ReviewActionLoggingTests(TestCase):
 
         logs = ReviewAction.for_object(self.sample)
         self.assertTrue(logs.filter(action=ReviewAction.ACTION_REJECTED).exists())
+
+
+# ----------- Detail view enrichment -----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
+    """Content tests for the sectioned materials detail pages (all except Sample)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.category = MaterialCategory.objects.create(
+            owner=cls.owner,
+            name="Published Category",
+            publication_status="published",
+            description="Category description text.",
+        )
+        cls.material = Material.objects.create(
+            owner=cls.owner,
+            name="Published Material",
+            abbreviation="PM",
+            publication_status="published",
+            description="Material description text.",
+        )
+        cls.material.categories.add(cls.category)
+        cls.other_private_material = Material.objects.create(
+            owner=cls.outsider,
+            name="Outsider Private Material",
+            publication_status="private",
+        )
+        cls.other_private_material.categories.add(cls.category)
+
+        cls.series = SampleSeries.objects.create(
+            owner=cls.owner,
+            name="Published Series",
+            material=cls.material,
+            publication_status="published",
+        )
+        cls.distribution = TemporalDistribution.objects.create(
+            owner=cls.owner, name="Seasonal", publication_status="published"
+        )
+        cls.timestep = Timestep.objects.create(
+            owner=cls.owner, name="Spring", distribution=cls.distribution
+        )
+        cls.series.add_temporal_distribution(cls.distribution)
+        cls.series.samples.update(publication_status="published")
+
+        cls.standalone_sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Published Standalone Sample",
+            material=cls.material,
+            publication_status="published",
+            standalone=True,
+        )
+        cls.private_sample = Sample.objects.create(
+            owner=cls.outsider,
+            name="Outsider Private Sample",
+            material=cls.material,
+            publication_status="private",
+        )
+
+        cls.basis_component = MaterialComponent.objects.create(
+            owner=cls.owner, name="Dry Matter", publication_status="published"
+        )
+        cls.canonical_component = MaterialComponent.objects.create(
+            owner=cls.owner, name="Total Solids", publication_status="published"
+        )
+        cls.component = MaterialComponent.objects.create(
+            owner=cls.owner,
+            name="Published Component",
+            abbreviation="PC",
+            publication_status="published",
+            description="Component description text.",
+            component_kind="aggregate",
+            basis_component=cls.basis_component,
+            comparable_component=cls.canonical_component,
+        )
+        cls.component.categories.add(cls.category)
+
+        cls.group = MaterialComponentGroup.objects.create(
+            owner=cls.owner,
+            name="Published Group",
+            publication_status="published",
+            description="Group description text.",
+        )
+        cls.percent_unit = Unit.objects.filter(name="%").first()
+        if cls.percent_unit is None:
+            cls.percent_unit = Unit.objects.create(
+                owner=cls.owner, name="%", symbol="percent"
+            )
+        cls.measurement = ComponentMeasurement.objects.create(
+            owner=cls.owner,
+            sample=cls.standalone_sample,
+            group=cls.group,
+            component=cls.component,
+            unit=cls.percent_unit,
+            average=Decimal("42.5"),
+            publication_status="published",
+        )
+
+        cls.property_group = MaterialPropertyGroup.objects.create(
+            owner=cls.owner, name="Physical", publication_status="published"
+        )
+        cls.canonical_property = MaterialProperty.objects.create(
+            owner=cls.owner, name="Canonical Property", publication_status="published"
+        )
+        cls.material_property = MaterialProperty.objects.create(
+            owner=cls.owner,
+            name="Published Property",
+            abbreviation="PP",
+            publication_status="published",
+            group=cls.property_group,
+            aggregation_kind="mass_related",
+            default_basis_component=cls.basis_component,
+            comparable_property=cls.canonical_property,
+            description="Property description text.",
+        )
+        cls.material_property.allowed_units.add(cls.percent_unit)
+
+        cls.method = AnalyticalMethod.objects.create(
+            owner=cls.owner,
+            name="Published Method",
+            publication_status="published",
+            technique="ICP-OES",
+            standard="DIN EN 15936",
+            instrument_type="Spectrometer",
+            lower_detection_limit="0.5 mg/kg",
+            ontology_uri="http://example.org/ontology/CHMO_0001234",
+            description="Method description text.",
+        )
+        cls.property_value = MaterialPropertyValue.objects.create(
+            owner=cls.owner,
+            sample=cls.standalone_sample,
+            property=cls.material_property,
+            unit=cls.percent_unit,
+            analytical_method=cls.method,
+            average=Decimal("7.5"),
+            publication_status="published",
+        )
+
+    def get_detail(self, url_name, obj):
+        return self.client.get(reverse(url_name, kwargs={"pk": obj.pk}))
+
+    # -- Shared sectioned layout ---------------------------------------------------------
+
+    def test_detail_pages_use_sectioned_layout(self):
+        cases = [
+            ("materialcategory-detail", self.category),
+            ("material-detail", self.material),
+            ("materialcomponent-detail", self.component),
+            ("materialcomponentgroup-detail", self.group),
+            ("materialproperty-detail", self.material_property),
+            ("analyticalmethod-detail", self.method),
+            ("sampleseries-detail", self.series),
+        ]
+        for url_name, obj in cases:
+            with self.subTest(url_name=url_name):
+                response = self.get_detail(url_name, obj)
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "sdv2-hero-title")
+
+    # -- MaterialCategory ----------------------------------------------------------------
+
+    def test_category_detail_lists_materials_and_components(self):
+        response = self.get_detail("materialcategory-detail", self.category)
+        self.assertContains(response, self.material.name)
+        self.assertContains(
+            response, reverse("material-detail", kwargs={"pk": self.material.pk})
+        )
+        self.assertContains(response, self.component.name)
+        self.assertContains(
+            response,
+            reverse("materialcomponent-detail", kwargs={"pk": self.component.pk}),
+        )
+
+    def test_category_detail_hides_private_materials_of_other_users(self):
+        response = self.get_detail("materialcategory-detail", self.category)
+        self.assertNotContains(response, self.other_private_material.name)
+
+    def test_category_detail_empty_state(self):
+        empty_category = MaterialCategory.objects.create(
+            owner=self.owner, name="Empty Category", publication_status="published"
+        )
+        response = self.get_detail("materialcategory-detail", empty_category)
+        self.assertContains(response, "sdv2-empty")
+
+    # -- Material -------------------------------------------------------------------------
+
+    def test_material_detail_shows_abbreviation_and_categories(self):
+        response = self.get_detail("material-detail", self.material)
+        self.assertContains(response, "PM")
+        self.assertContains(response, self.category.name)
+        self.assertContains(
+            response,
+            reverse("materialcategory-detail", kwargs={"pk": self.category.pk}),
+        )
+
+    def test_material_detail_shows_related_samples_and_series(self):
+        response = self.get_detail("material-detail", self.material)
+        self.assertContains(response, self.series.name)
+        self.assertContains(
+            response,
+            reverse("sampleseries-detail", kwargs={"pk": self.series.pk}),
+        )
+        self.assertContains(response, self.standalone_sample.name)
+        self.assertContains(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.standalone_sample.pk}),
+        )
+
+    def test_material_detail_hides_private_related_objects(self):
+        response = self.get_detail("material-detail", self.material)
+        self.assertNotContains(response, self.private_sample.name)
+
+    def test_material_detail_empty_state(self):
+        empty_material = Material.objects.create(
+            owner=self.owner, name="Empty Material", publication_status="published"
+        )
+        response = self.get_detail("material-detail", empty_material)
+        self.assertContains(response, "sdv2-empty")
+
+    # -- MaterialComponent ----------------------------------------------------------------
+
+    def test_component_detail_shows_classification_fields(self):
+        response = self.get_detail("materialcomponent-detail", self.component)
+        self.assertContains(response, "PC")
+        self.assertContains(response, "Aggregate component")
+        self.assertContains(response, self.category.name)
+        self.assertContains(response, self.basis_component.name)
+        self.assertContains(
+            response,
+            reverse("materialcomponent-detail", kwargs={"pk": self.basis_component.pk}),
+        )
+        self.assertContains(response, self.canonical_component.name)
+        self.assertContains(
+            response,
+            reverse(
+                "materialcomponent-detail",
+                kwargs={"pk": self.canonical_component.pk},
+            ),
+        )
+
+    def test_component_detail_shows_groups_measured_in(self):
+        response = self.get_detail("materialcomponent-detail", self.component)
+        self.assertContains(response, self.group.name)
+        self.assertContains(
+            response,
+            reverse("materialcomponentgroup-detail", kwargs={"pk": self.group.pk}),
+        )
+
+    # -- MaterialComponentGroup -----------------------------------------------------------
+
+    def test_componentgroup_detail_shows_components_and_samples(self):
+        response = self.get_detail("materialcomponentgroup-detail", self.group)
+        self.assertContains(response, self.component.name)
+        self.assertContains(
+            response,
+            reverse("materialcomponent-detail", kwargs={"pk": self.component.pk}),
+        )
+        self.assertContains(response, self.standalone_sample.name)
+
+    def test_componentgroup_detail_empty_state(self):
+        empty_group = MaterialComponentGroup.objects.create(
+            owner=self.owner, name="Empty Group", publication_status="published"
+        )
+        response = self.get_detail("materialcomponentgroup-detail", empty_group)
+        self.assertContains(response, "sdv2-empty")
+
+    # -- MaterialProperty -----------------------------------------------------------------
+
+    def test_property_detail_shows_classification_fields(self):
+        response = self.get_detail("materialproperty-detail", self.material_property)
+        self.assertContains(response, "PP")
+        self.assertContains(response, self.property_group.name)
+        self.assertContains(response, "Mass-related")
+        self.assertContains(response, self.basis_component.name)
+        self.assertContains(
+            response,
+            reverse(
+                "materialcomponent-detail",
+                kwargs={"pk": self.basis_component.pk},
+            ),
+        )
+        self.assertContains(response, self.canonical_property.name)
+        self.assertContains(
+            response,
+            reverse(
+                "materialproperty-detail",
+                kwargs={"pk": self.canonical_property.pk},
+            ),
+        )
+        self.assertContains(response, self.percent_unit.name)
+
+    # -- AnalyticalMethod -----------------------------------------------------------------
+
+    def test_method_detail_shows_all_fields(self):
+        response = self.get_detail("analyticalmethod-detail", self.method)
+        self.assertContains(response, "ICP-OES")
+        self.assertContains(response, "DIN EN 15936")
+        self.assertContains(response, "Spectrometer")
+        self.assertContains(response, "0.5 mg/kg")
+        self.assertContains(response, self.method.ontology_uri)
+
+    def test_method_detail_shows_related_samples(self):
+        response = self.get_detail("analyticalmethod-detail", self.method)
+        self.assertContains(response, self.standalone_sample.name)
+        self.assertContains(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.standalone_sample.pk}),
+        )
+
+    # -- SampleSeries ---------------------------------------------------------------------
+
+    def test_sampleseries_detail_shows_material_and_distributions(self):
+        response = self.get_detail("sampleseries-detail", self.series)
+        self.assertContains(response, self.material.name)
+        self.assertContains(
+            response, reverse("material-detail", kwargs={"pk": self.material.pk})
+        )
+        self.assertContains(response, self.distribution.name)
+        series_sample = self.series.samples.first()
+        self.assertContains(
+            response,
+            reverse("sample-detail", kwargs={"pk": series_sample.pk}),
+        )

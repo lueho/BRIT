@@ -1,0 +1,18 @@
+{% comment %}
+  Context navigation for detail_v2.html pages.
+  Renders a "Back to results" link when the request carries a `back`
+  query parameter, plus a link to the object's list view when the
+  model exposes `list_url`.
+{% endcomment %}
+<nav class="sdv2-context-nav" aria-label="Context navigation">
+  {% if request.GET.back %}
+    <a class="sdv2-btn sdv2-btn-ghost" href="{{ request.GET.back }}">
+      <i class="fas fa-arrow-left" aria-hidden="true"></i> Back to results
+    </a>
+  {% endif %}
+  {% if object.list_url %}
+    <a class="sdv2-btn sdv2-btn-ghost" href="{{ object.list_url }}">
+      <i class="fas fa-list" aria-hidden="true"></i> All {{ object.get_verbose_name_plural|default:"records" }}
+    </a>
+  {% endif %}
+</nav>

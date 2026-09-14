@@ -1,24 +1,70 @@
-{% extends "detail_with_options.html" %}
+{% extends "detail_v2.html" %}
 
-{% block detail_body %}
-    <p class="card-text">
-        <strong>Name:</strong>
-        <br>
-        {{ object.name }}
-    </p>
-    {% with units=object.allowed_units.all %}
-        {% if units %}
-            <p class="card-text">
-                <strong>Unit:</strong>
-                {% for unit in units %}{{ unit.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
-            </p>
-        {% endif %}
-    {% endwith %}
-    {% if object.description %}
-        <p class="card-text">
-            <strong>Description:</strong>
-            <br>
-            {{ object.description }}
-        </p>
+{% block detail_page_title %}Material property: {{ object.name }}{% endblock detail_page_title %}
+
+{% block detail_kicker %}Material property{% endblock detail_kicker %}
+
+{% block hero_meta_items %}
+    {% if object.abbreviation %}
+        <li><span class="sdv2-meta-label">Abbreviation</span>{{ object.abbreviation }}</li>
     {% endif %}
-{% endblock detail_body %}
+    {% if object.group %}
+        <li><span class="sdv2-meta-label">Group</span>{{ object.group.name }}</li>
+    {% endif %}
+    <li><span class="sdv2-meta-label">Aggregation</span>{{ object.get_aggregation_kind_display }}</li>
+    <li><span class="sdv2-meta-label">Owner</span>{{ object.owner.username|default:object.owner }}</li>
+{% endblock hero_meta_items %}
+
+{% block detail_sections %}
+    <section class="sdv2-section-panel" aria-label="Property definition">
+        <h2 class="sdv2-section-title">Definition</h2>
+        <dl class="sdv2-context-details">
+            {% if object.default_basis_component %}
+                <div>
+                    <dt>Basis component</dt>
+                    <dd>
+                        <a href="{% url 'materialcomponent-detail' object.default_basis_component.pk %}">{{ object.default_basis_component.name }}</a>
+                    </dd>
+                </div>
+            {% endif %}
+            {% if canonical_property %}
+                <div>
+                    <dt>Compared as</dt>
+                    <dd>
+                        <a href="{% url 'materialproperty-detail' canonical_property.pk %}">{{ canonical_property.name }}</a>
+                    </dd>
+                </div>
+            {% endif %}
+            {% if comparable_variants %}
+                <div>
+                    <dt>Raw variants</dt>
+                    <dd>
+                        {% for variant in comparable_variants %}
+                            <a href="{% url 'materialproperty-detail' variant.pk %}">{{ variant.name }}</a>{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                    </dd>
+                </div>
+            {% endif %}
+            {% with units=object.allowed_units.all %}
+                {% if units %}
+                    <div>
+                        <dt>Allowed units</dt>
+                        <dd>
+                            {% for unit in units %}{{ unit.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                        </dd>
+                    </div>
+                {% endif %}
+            {% endwith %}
+            {% if object.unit %}
+                <div>
+                    <dt>Legacy unit</dt>
+                    <dd>{{ object.unit }}</dd>
+                </div>
+            {% endif %}
+        </dl>
+    </section>
+    {% url 'sample-list' as samples_list_url %}
+    {% with samples_list_url|add:"?parameter="|add:object.pk as samples_filtered_url %}
+        {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples with values for this property" items=related_samples item_url_name="sample-detail" section_total=related_samples_total section_more=related_samples_more section_list_url=samples_filtered_url empty_title="No samples" empty_body="No samples have values for this property yet." %}
+    {% endwith %}
+{% endblock detail_sections %}

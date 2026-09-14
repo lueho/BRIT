@@ -121,6 +121,10 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 
+# Maximum number of related records listed on detail pages before a
+# "more" note points to the corresponding filtered list view.
+DETAIL_RELATED_LIMIT = 25
+
 
 class MaterialsExplorerView(TemplateView):
     template_name = "materials_dashboard.html"
@@ -192,6 +196,17 @@ class MaterialCategoryModalCreateView(UserCreatedObjectModalCreateView):
 class MaterialCategoryDetailView(UserCreatedObjectDetailView):
     model = MaterialCategory
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        context["related_materials"] = filter_queryset_for_user(
+            Material.objects.filter(categories=self.object), user
+        ).order_by("name", "pk")
+        context["related_components"] = filter_queryset_for_user(
+            MaterialComponent.objects.filter(categories=self.object), user
+        ).order_by("name", "pk")
+        return context
+
 
 class MaterialCategoryModalDetailView(UserCreatedObjectModalDetailView):
     template_name = "modal_detail.html"
@@ -248,6 +263,24 @@ class MaterialModalCreateView(UserCreatedObjectModalCreateView):
 
 class MaterialDetailView(UserCreatedObjectDetailView):
     model = Material
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        context["related_series"] = filter_queryset_for_user(
+            self.object.sample_series.all(), user
+        ).order_by("name", "pk")
+        samples = (
+            filter_queryset_for_user(self.object.samples.all(), user)
+            .select_related("series")
+            .order_by("name", "pk")
+        )
+        context["related_samples_total"] = samples.count()
+        context["related_samples"] = samples[:DETAIL_RELATED_LIMIT]
+        context["related_samples_more"] = max(
+            context["related_samples_total"] - DETAIL_RELATED_LIMIT, 0
+        )
+        return context
 
 
 class MaterialModalDetailView(UserCreatedObjectModalDetailView):
@@ -381,6 +414,49 @@ class ComponentModalCreateView(UserCreatedObjectModalCreateView):
 class ComponentDetailView(UserCreatedObjectDetailView):
     model = MaterialComponent
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        obj = self.object
+        canonical = obj.canonical_component
+        comparable_ids = MaterialComponent.objects.filter(
+            Q(pk=canonical.pk) | Q(comparable_component=canonical)
+        ).values_list("pk", flat=True)
+        context["canonical_component"] = canonical if canonical.pk != obj.pk else None
+        context["derived_components"] = filter_queryset_for_user(
+            obj.derived_components.all(), user
+        ).order_by("name", "pk")
+        context["comparable_variants"] = filter_queryset_for_user(
+            obj.comparable_variants.all(), user
+        ).order_by("name", "pk")
+        context["related_groups"] = (
+            filter_queryset_for_user(
+                MaterialComponentGroup.objects.filter(
+                    component_measurements__component_id__in=comparable_ids
+                ),
+                user,
+            )
+            .distinct()
+            .order_by("name", "pk")
+        )
+        samples = (
+            filter_queryset_for_user(
+                Sample.objects.filter(
+                    component_measurements__component_id__in=comparable_ids
+                ),
+                user,
+            )
+            .distinct()
+            .select_related("material", "series")
+            .order_by("name", "pk")
+        )
+        context["related_samples_total"] = samples.count()
+        context["related_samples"] = samples[:DETAIL_RELATED_LIMIT]
+        context["related_samples_more"] = max(
+            context["related_samples_total"] - DETAIL_RELATED_LIMIT, 0
+        )
+        return context
+
 
 class ComponentModalDetailView(UserCreatedObjectModalDetailView):
     model = MaterialComponent
@@ -442,6 +518,36 @@ class MaterialComponentGroupModalCreateView(UserCreatedObjectModalCreateView):
 class MaterialComponentGroupDetailView(UserCreatedObjectDetailView):
     model = MaterialComponentGroup
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        obj = self.object
+        context["related_components"] = (
+            filter_queryset_for_user(
+                MaterialComponent.objects.filter(component_measurements__group=obj),
+                user,
+            )
+            .distinct()
+            .order_by("name", "pk")
+        )
+        samples = (
+            filter_queryset_for_user(
+                Sample.objects.filter(
+                    Q(component_measurements__group=obj) | Q(compositions__group=obj)
+                ),
+                user,
+            )
+            .distinct()
+            .select_related("material", "series")
+            .order_by("name", "pk")
+        )
+        context["related_samples_total"] = samples.count()
+        context["related_samples"] = samples[:DETAIL_RELATED_LIMIT]
+        context["related_samples_more"] = max(
+            context["related_samples_total"] - DETAIL_RELATED_LIMIT, 0
+        )
+        return context
+
 
 class MaterialComponentGroupModalDetailView(UserCreatedObjectModalDetailView):
     model = MaterialComponentGroup
@@ -498,6 +604,34 @@ class MaterialPropertyModalCreateView(UserCreatedObjectModalCreateView):
 
 class MaterialPropertyDetailView(UserCreatedObjectDetailView):
     model = MaterialProperty
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        obj = self.object
+        canonical = obj.canonical_property
+        comparable_ids = MaterialProperty.objects.filter(
+            Q(pk=canonical.pk) | Q(comparable_property=canonical)
+        ).values_list("pk", flat=True)
+        context["canonical_property"] = canonical if canonical.pk != obj.pk else None
+        context["comparable_variants"] = filter_queryset_for_user(
+            obj.comparable_variants.all(), user
+        ).order_by("name", "pk")
+        samples = (
+            filter_queryset_for_user(
+                Sample.objects.filter(property_values__property_id__in=comparable_ids),
+                user,
+            )
+            .distinct()
+            .select_related("material", "series")
+            .order_by("name", "pk")
+        )
+        context["related_samples_total"] = samples.count()
+        context["related_samples"] = samples[:DETAIL_RELATED_LIMIT]
+        context["related_samples_more"] = max(
+            context["related_samples_total"] - DETAIL_RELATED_LIMIT, 0
+        )
+        return context
 
 
 class MaterialPropertyModalDetailView(UserCreatedObjectModalDetailView):
