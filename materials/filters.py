@@ -26,13 +26,16 @@ from .models import (
     MaterialCategory,
     MaterialComponent,
     MaterialComponentGroup,
-    MaterialComponentKind,
     MaterialProperty,
     MaterialPropertyAggregationKind,
     Sample,
     SampleSeries,
     get_or_create_sample_substrate_category,
 )
+
+
+def sampled_substrate_material_q(substrate_category):
+    return Q(categories=substrate_category) | Q(samples__isnull=False)
 
 
 class MaterialFilterSet(rf_filters.FilterSet):
@@ -121,12 +124,13 @@ class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
             ),
         ),
     )
-    component_kind = ChoiceFilter(
-        field_name="component_kind",
-        label="Kind",
-        choices=MaterialComponentKind.choices,
-        empty_label="All",
-    )
+
+    class Meta:
+        model = MaterialComponent
+        fields = (
+            "scope",
+            "name",
+        )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -150,14 +154,6 @@ class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
             )
 
         self.filters["name"].queryset = queryset
-
-    class Meta:
-        model = MaterialComponent
-        fields = (
-            "scope",
-            "name",
-            "component_kind",
-        )
 
 
 class MaterialComponentGroupListFilter(UserCreatedObjectScopedFilterSet):
@@ -254,7 +250,7 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
         empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
-                url="sample-substrate-material-autocomplete",
+                url="sample-filter-substrate-material-autocomplete",
                 value_field="id",
             )
         ),
@@ -288,6 +284,21 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             )
         ),
     )
+    component_group = ModelChoiceFilter(
+        queryset=MaterialComponentGroup.objects.none(),
+        method="filter_component_group",
+        label="Component group",
+        help_text=(
+            "Show samples with measurements or compositions in this component group."
+        ),
+        empty_label="All",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="materialcomponentgroup-autocomplete",
+                value_field="id",
+            )
+        ),
+    )
     sample_date = DateFromToRangeFilter(
         field_name="datetime",
         label="Sample date",
@@ -313,6 +324,11 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             component_measurements__component_id__in=comparable_ids
         ).distinct()
 
+    def filter_component_group(self, queryset, name, value):
+        return queryset.filter(
+            Q(component_measurements__group=value) | Q(compositions__group=value)
+        ).distinct()
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         request = getattr(self, "request", None)
@@ -331,10 +347,11 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
 
         substrate_category, _ = get_or_create_sample_substrate_category()
         substrate_queryset = Material.objects.filter(
-            categories=substrate_category
+            sampled_substrate_material_q(substrate_category)
         ).distinct()
         parameter_queryset = MaterialProperty.objects.all()
         raw_parameter_queryset = MaterialComponent.objects.all()
+        component_group_queryset = MaterialComponentGroup.objects.all()
 
         if request and hasattr(request, "user"):
             parameter_queryset = filter_queryset_for_user(
@@ -342,6 +359,9 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             )
             raw_parameter_queryset = filter_queryset_for_user(
                 raw_parameter_queryset, request.user
+            )
+            component_group_queryset = filter_queryset_for_user(
+                component_group_queryset, request.user
             )
 
         if scope_value:
@@ -355,11 +375,17 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
                 scope_value,
                 user=getattr(request, "user", None),
             )
+            component_group_queryset = apply_scope_filter(
+                component_group_queryset,
+                scope_value,
+                user=getattr(request, "user", None),
+            )
 
         self.filters["name"].queryset = queryset
         self.filters["substrate_material"].queryset = substrate_queryset
         self.filters["parameter"].queryset = parameter_queryset
         self.filters["raw_parameter"].queryset = raw_parameter_queryset
+        self.filters["component_group"].queryset = component_group_queryset
 
     class Meta:
         model = Sample
@@ -370,6 +396,7 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             "substrate_material",
             "parameter",
             "raw_parameter",
+            "component_group",
             "sample_date",
         )
 

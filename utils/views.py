@@ -174,15 +174,13 @@ class FilterDefaultsMixin:
         Returns:
             HttpResponse: The HttpResponse object.
         """
-        response = super().get(request, *args, **kwargs)
-
         if request.method == "GET" and not request.GET:
             self.initial_values = self.get_default_filters()
             if self.initial_values:
                 params = urlencode(self.initial_values)
                 return HttpResponseRedirect(f"{request.path}?{params}")
 
-        return response
+        return super().get(request, *args, **kwargs)
 
 
 class ModelSelectOptionsView(ListView):

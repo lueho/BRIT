@@ -1,6 +1,8 @@
+{% load moderation_tags %}
 <nav class="sdv2-context-nav" aria-label="Sample navigation">
-  {% if request.GET.back %}
-    <a class="sdv2-btn sdv2-btn-ghost" href="{{ request.GET.back }}">
+  {% safe_back_url as back_url %}
+  {% if back_url %}
+    <a class="sdv2-btn sdv2-btn-ghost" href="{{ back_url }}">
       <i class="fas fa-arrow-left" aria-hidden="true"></i> Back to results
     </a>
   {% endif %}

@@ -72,6 +72,7 @@ from .filters import (
     SampleFilter,
     SampleSeriesFilter,
     UserOwnedSampleFilter,
+    sampled_substrate_material_q,
 )
 from .forms import (
     AddCompositionModalForm,
@@ -209,15 +210,17 @@ class MaterialCategoryDetailView(UserCreatedObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
+        materials = filter_queryset_for_user(
+            Material.objects.filter(categories=self.object), user
+        ).order_by("name", "pk")
         (
             context["related_materials"],
             context["related_materials_total"],
             context["related_materials_more"],
-        ) = _capped_related(
-            filter_queryset_for_user(
-                Material.objects.filter(categories=self.object), user
-            ).order_by("name", "pk")
-        )
+        ) = _capped_related(materials)
+        context["related_materials_published_total"] = materials.filter(
+            publication_status="published"
+        ).count()
         context["related_materials_list_url"] = (
             f"{reverse('material-list')}?category={self.object.pk}"
         )
@@ -301,15 +304,19 @@ class MaterialDetailView(UserCreatedObjectDetailView):
                 "name", "pk"
             )
         )
-        (
-            context["related_samples"],
-            context["related_samples_total"],
-            context["related_samples_more"],
-        ) = _capped_related(
+        samples = (
             filter_queryset_for_user(self.object.samples.all(), user)
             .select_related("series")
             .order_by("name", "pk")
         )
+        (
+            context["related_samples"],
+            context["related_samples_total"],
+            context["related_samples_more"],
+        ) = _capped_related(samples)
+        context["related_samples_published_total"] = samples.filter(
+            publication_status="published"
+        ).count()
         context["related_samples_list_url"] = (
             f"{reverse('sample-list')}?substrate_material={self.object.pk}"
         )
@@ -351,6 +358,19 @@ class SampleSubstrateMaterialAutocompleteView(UserCreatedObjectAutocompleteView)
         queryset = super().get_queryset()
         substrate_category, _ = get_or_create_sample_substrate_category()
         return queryset.filter(categories=substrate_category).distinct()
+
+
+class SampleFilterSubstrateMaterialAutocompleteView(UserCreatedObjectAutocompleteView):
+    """Autocomplete for materials available in the sample filter."""
+
+    model = Material
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        substrate_category, _ = get_or_create_sample_substrate_category()
+        return queryset.filter(
+            sampled_substrate_material_q(substrate_category)
+        ).distinct()
 
 
 class SampleSubstrateMaterialQuickCreateView(
@@ -488,11 +508,7 @@ class ComponentDetailView(UserCreatedObjectDetailView):
             .distinct()
             .order_by("name", "pk")
         )
-        (
-            context["related_samples"],
-            context["related_samples_total"],
-            context["related_samples_more"],
-        ) = _capped_related(
+        samples = (
             filter_queryset_for_user(
                 Sample.objects.filter(
                     component_measurements__component_id__in=comparable_ids
@@ -503,6 +519,14 @@ class ComponentDetailView(UserCreatedObjectDetailView):
             .select_related("material", "series")
             .order_by("name", "pk")
         )
+        (
+            context["related_samples"],
+            context["related_samples_total"],
+            context["related_samples_more"],
+        ) = _capped_related(samples)
+        context["related_samples_published_total"] = samples.filter(
+            publication_status="published"
+        ).count()
         context["related_samples_list_url"] = (
             f"{reverse('sample-list')}?raw_parameter={self.object.pk}"
         )
@@ -585,11 +609,7 @@ class MaterialComponentGroupDetailView(UserCreatedObjectDetailView):
             .distinct()
             .order_by("name", "pk")
         )
-        (
-            context["related_samples"],
-            context["related_samples_total"],
-            context["related_samples_more"],
-        ) = _capped_related(
+        samples = (
             filter_queryset_for_user(
                 Sample.objects.filter(
                     Q(component_measurements__group=obj) | Q(compositions__group=obj)
@@ -599,6 +619,17 @@ class MaterialComponentGroupDetailView(UserCreatedObjectDetailView):
             .distinct()
             .select_related("material", "series")
             .order_by("name", "pk")
+        )
+        (
+            context["related_samples"],
+            context["related_samples_total"],
+            context["related_samples_more"],
+        ) = _capped_related(samples)
+        context["related_samples_published_total"] = samples.filter(
+            publication_status="published"
+        ).count()
+        context["related_samples_list_url"] = (
+            f"{reverse('sample-list')}?component_group={self.object.pk}"
         )
         return context
 
@@ -677,11 +708,7 @@ class MaterialPropertyDetailView(UserCreatedObjectDetailView):
                 "name", "pk"
             )
         )
-        (
-            context["related_samples"],
-            context["related_samples_total"],
-            context["related_samples_more"],
-        ) = _capped_related(
+        samples = (
             filter_queryset_for_user(
                 Sample.objects.filter(property_values__property_id__in=comparable_ids),
                 user,
@@ -690,6 +717,14 @@ class MaterialPropertyDetailView(UserCreatedObjectDetailView):
             .select_related("material", "series")
             .order_by("name", "pk")
         )
+        (
+            context["related_samples"],
+            context["related_samples_total"],
+            context["related_samples_more"],
+        ) = _capped_related(samples)
+        context["related_samples_published_total"] = samples.filter(
+            publication_status="published"
+        ).count()
         context["related_samples_list_url"] = (
             f"{reverse('sample-list')}?parameter={self.object.pk}"
         )

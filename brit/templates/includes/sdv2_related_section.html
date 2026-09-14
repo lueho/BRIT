@@ -16,9 +16,9 @@
     <div class="sdv2-section-heading">
       <h2 class="sdv2-section-title">{{ section_title }}</h2>
     </div>
-    {% if section_list_url %}
+    {% if section_list_url and section_total %}
       <div class="sdv2-section-actions">
-        <a class="sdv2-btn sdv2-btn-sm" href="{{ section_list_url }}">View all{% if section_more %} {{ section_total }}{% endif %}</a>
+        <a class="sdv2-btn sdv2-btn-sm" href="{{ section_list_url }}">View all {{ section_total }} published</a>
       </div>
     {% endif %}
   </div>
@@ -37,7 +37,7 @@
     </ul>
     {% if section_more %}
       <p class="sdv2-related-meta mt-2 mb-0">
-        {{ section_more }} more not shown{% if section_list_url %} — <a href="{{ section_list_url }}">view all {{ section_total }}</a>{% endif %}
+        {{ section_more }} more not shown{% if section_list_url %} — <a href="{{ section_list_url }}">view all {{ section_total }} published</a>{% endif %}
       </p>
     {% endif %}
   {% else %}
