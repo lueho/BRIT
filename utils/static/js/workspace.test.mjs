@@ -474,3 +474,104 @@ test("media trust is restricted to the configured static TomSelect package", () 
     }
     assert.throws(() => workspace.trustedMediaURL("/static/django_tomselect/css/x.css", "script"));
 });
+
+function pasteFixture(fixture, { text, results = {} }) {
+    const fields = {};
+    const errors = {};
+    const rowsContainer = { lastElementChild: null };
+    const formset = element({
+        querySelector(selector) { return selector === "[data-workspace-rows]" ? rowsContainer : null; },
+    });
+    const input = element({
+        value: text,
+        dataset: { pasteFormset: "component_measurements", pasteColumns: "component,average" },
+    });
+    const panel = element({
+        querySelector(selector) { return selector === "[data-workspace-paste-input]" ? input : null; },
+    });
+    let created = 0;
+    fixture.workspace.addRow = async () => {
+        created += 1;
+        const rowFields = {};
+        const row = element({
+            querySelector(selector) {
+                const byName = selector.match(/\[name\$="-(\w+)"\]/);
+                if (byName) {
+                    if (!rowFields[byName[1]]) {
+                        rowFields[byName[1]] = element({
+                            name: `component_measurements-${created}-${byName[1]}`,
+                            matches: (s) => byName[1] === "component" && s === "select[data-workspace-select]",
+                            dataset: { valueField: "id", labelField: "name", autocompleteUrl: "/components/" },
+                        });
+                        if (byName[1] === "component") {
+                            rowFields[byName[1]].tomselect = {
+                                added: [],
+                                addOption(option) { this.added.push(option); },
+                                addItem(value) { this.value = value; },
+                            };
+                        }
+                    }
+                    return rowFields[byName[1]];
+                }
+                const byError = selector.match(/\[data-workspace-errors="([^"]+)"\]/);
+                if (byError) return (errors[byError[1]] ??= element());
+                return null;
+            },
+        });
+        row.fields = rowFields;
+        rowsContainer.lastElementChild = row;
+    };
+    fixture.workspace.active.editor = element({
+        querySelector(selector) { return selector === '[data-workspace-formset="component_measurements"]' ? formset : null; },
+    });
+    fixture.workspace.searchOptions = async (select, query) => results[query] || [];
+    return { input, panel, formset, errors, rowsContainer, created: () => created };
+}
+
+test("pasted spreadsheet rows create a formset row per line and resolve names", async () => {
+    const fixture = setup();
+    activate(fixture);
+    const mock = pasteFixture(fixture, {
+        text: "Ash\t12.5\nMoisture\t4,25",
+        results: { Ash: [{ id: 7, name: "Ash" }], Moisture: [{ id: 8, name: "Moisture" }] },
+    });
+    await fixture.workspace.applyPaste(mock.panel);
+    assert.equal(mock.created(), 2);
+    const row1 = mock.rowsContainer.lastElementChild.fields;
+    assert.equal(row1.component.tomselect.value, "8");
+    assert.equal(row1.component.tomselect.added[0].name, "Moisture");
+    assert.equal(row1.average.value, "4.25");
+    assert.equal(mock.input.value, "");
+    assert.equal(fixture.workspace.active.dirty, true);
+    assert.match(fixture.status.textContent, /Added 2 rows/);
+});
+
+test("a pasted header line is skipped and empty paste announces guidance", async () => {
+    const fixture = setup();
+    activate(fixture);
+    const mock = pasteFixture(fixture, {
+        text: "Component\tValue\nAsh\t12.5",
+        results: { Ash: [{ id: 7, name: "Ash" }] },
+    });
+    await fixture.workspace.applyPaste(mock.panel);
+    assert.equal(mock.created(), 1);
+
+    const empty = pasteFixture(fixture, { text: "\n  \n" });
+    await fixture.workspace.applyPaste(empty.panel);
+    assert.equal(empty.created(), 0);
+    assert.match(fixture.status.textContent, /Nothing to add/);
+});
+
+test("ambiguous or unknown pasted names are flagged on the row for manual choice", async () => {
+    const fixture = setup();
+    activate(fixture);
+    const mock = pasteFixture(fixture, {
+        text: "Lignin\t9.9",
+        results: { Lignin: [{ id: 3, name: "Lignin (Klason)" }, { id: 4, name: "Lignin (ADL)" }] },
+    });
+    await fixture.workspace.applyPaste(mock.panel);
+    assert.equal(mock.created(), 1);
+    assert.match(mock.errors["component_measurements-1-component"].textContent, /No match for "Lignin"/);
+    assert.match(fixture.status.textContent, /1 name could not be matched/);
+    assert.equal(fixture.status.className, "alert alert-danger");
+});

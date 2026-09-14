@@ -17,7 +17,11 @@ from factory.django import mute_signals
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
-from utils.object_management.models import ReviewAction, UserCreatedObject
+from utils.object_management.models import (
+    ObjectEditorGrant,
+    ReviewAction,
+    UserCreatedObject,
+)
 from utils.object_management.views import SubmitForReviewView
 from utils.properties.models import Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
@@ -2515,6 +2519,289 @@ class SampleMaintenanceViewsTestCase(TestCase):
         self.assertFalse(data["saved"])
         self.sample.refresh_from_db()
         self.assertEqual(self.sample.name, "Pilot sample")
+
+
+class SampleMeasurementWorkspaceTestCase(TestCase):
+    """Table-style measurement and property entry in the Sample workspace."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="measurement-owner")
+        cls.editor = User.objects.create_user(username="metadata-editor")
+        cls.owner.user_permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label="materials",
+                codename__in=[
+                    "add_sample",
+                    "change_sample",
+                    "add_materialpropertyvalue",
+                ],
+            )
+        )
+        cls.editor.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="materials", codename="change_sample"
+            )
+        )
+        substrate_category, _ = MaterialCategory.objects.get_or_create(
+            name=get_sample_substrate_category_name()
+        )
+        cls.substrate = Material.objects.create(
+            name="Measurement substrate",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.substrate.categories.add(substrate_category)
+        cls.sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Measurement sample",
+            material=cls.substrate,
+            standalone=True,
+        )
+        cls.other_sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Other sample",
+            material=cls.substrate,
+            standalone=True,
+        )
+        cls.group = MaterialComponentGroup.objects.create(
+            owner=cls.owner,
+            name="Proximate analysis",
+            publication_status="published",
+        )
+        cls.component = MaterialComponent.objects.create(
+            owner=cls.owner,
+            name="Ash",
+            publication_status="published",
+        )
+        cls.moisture = MaterialComponent.objects.create(
+            owner=cls.owner,
+            name="Moisture",
+            publication_status="published",
+        )
+        cls.unit = Unit.objects.create(
+            name="%",
+            symbol="percent",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.property = MaterialProperty.objects.create(
+            owner=cls.owner,
+            name="Biogas yield",
+            publication_status="published",
+        )
+        cls.measurement = ComponentMeasurement.objects.create(
+            owner=cls.owner,
+            sample=cls.sample,
+            group=cls.group,
+            component=cls.component,
+            unit=cls.unit,
+            average=Decimal("12.5"),
+        )
+        ObjectEditorGrant.objects.create(content_object=cls.sample, editor=cls.editor)
+
+    def setUp(self):
+        self.client.force_login(self.owner)
+
+    def section_url(self, section):
+        return f"{self.sample.update_url}?section={section}"
+
+    def measurement_formset(self, rows, initial=0):
+        data = {
+            "component_measurements-TOTAL_FORMS": str(len(rows)),
+            "component_measurements-INITIAL_FORMS": str(initial),
+            "component_measurements-MIN_NUM_FORMS": "0",
+            "component_measurements-MAX_NUM_FORMS": "1000",
+        }
+        for index, row in enumerate(rows):
+            for field, value in row.items():
+                data[f"component_measurements-{index}-{field}"] = value
+        return data
+
+    def measurement_row(self, **overrides):
+        return {
+            "group": str(self.group.pk),
+            "component": str(self.component.pk),
+            "unit": str(self.unit.pk),
+            "average": "8.25",
+            **overrides,
+        }
+
+    def property_formset(self, rows, initial=0):
+        data = {
+            "property_values-TOTAL_FORMS": str(len(rows)),
+            "property_values-INITIAL_FORMS": str(initial),
+            "property_values-MIN_NUM_FORMS": "0",
+            "property_values-MAX_NUM_FORMS": "1000",
+        }
+        for index, row in enumerate(rows):
+            for field, value in row.items():
+                data[f"property_values-{index}-{field}"] = value
+        return data
+
+    def test_edit_workspace_offers_measurement_and_property_sections(self):
+        response = self.client.get(f"{self.sample.get_absolute_url()}?mode=edit")
+        self.assertContains(response, 'data-workspace-section="measurements"')
+        self.assertContains(response, 'data-workspace-section="properties"')
+        self.assertNotContains(response, "component_measurements-TOTAL_FORMS")
+
+    def test_measurement_sections_hidden_without_management_rights(self):
+        self.client.force_login(self.editor)
+        response = self.client.get(f"{self.sample.get_absolute_url()}?mode=edit")
+        self.assertContains(response, 'data-workspace-section="overview"')
+        self.assertNotContains(response, 'data-workspace-section="measurements"')
+        self.assertNotContains(response, 'data-workspace-section="properties"')
+
+    def test_measurements_editor_get_returns_lazy_formset_fragment(self):
+        response = self.client.get(
+            self.section_url("measurements"), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["section"], "measurements")
+        self.assertFalse(data["saved"])
+        self.assertIn("component_measurements-TOTAL_FORMS", data["html"])
+        self.assertIn("component_measurements-0-component", data["html"])
+        self.assertIn("component_measurements-__prefix__-component", data["html"])
+
+    def test_measurements_editor_denied_for_metadata_only_editor(self):
+        self.client.force_login(self.editor)
+        response = self.client.get(
+            self.section_url("measurements"), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_measurements_post_creates_rows_owned_by_requesting_user(self):
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(id=str(self.measurement.pk)),
+                    self.measurement_row(component=str(self.moisture.pk)),
+                    self.measurement_row(
+                        component=str(self.component.pk),
+                        average="3.1",
+                        standard_deviation="0.2",
+                        sample_size="3",
+                    ),
+                ],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        measurements = self.sample.component_measurements.order_by("pk")
+        self.assertEqual(measurements.count(), 3)
+        new = measurements.get(component=self.moisture)
+        self.assertEqual(new.sample, self.sample)
+        self.assertEqual(new.owner, self.owner)
+        self.assertEqual(new.publication_status, "private")
+        self.assertEqual(new.average, Decimal("8.25"))
+        detailed = measurements.get(standard_deviation=Decimal("0.2"))
+        self.assertEqual(detailed.sample_size, 3)
+
+    def test_measurements_post_invalid_rows_roll_back_everything(self):
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(component=str(self.moisture.pk)),
+                    self.measurement_row(component="", average="4.0"),
+                ]
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertFalse(response.json()["saved"])
+        self.assertEqual(self.sample.component_measurements.count(), 1)
+
+    def test_measurements_post_blank_average_is_not_saved_as_zero(self):
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [self.measurement_row(component=str(self.moisture.pk), average="")]
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertFalse(self.sample.component_measurements.filter(average=0).exists())
+
+    def test_measurements_post_rejects_rows_of_other_samples(self):
+        foreign = ComponentMeasurement.objects.create(
+            owner=self.owner,
+            sample=self.other_sample,
+            group=self.group,
+            component=self.moisture,
+            unit=self.unit,
+            average=Decimal("1.0"),
+        )
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [self.measurement_row(id=str(foreign.pk), average="9.9")], initial=1
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 422)
+        foreign.refresh_from_db()
+        self.assertEqual(foreign.average, Decimal("1.0"))
+        self.assertEqual(foreign.sample, self.other_sample)
+
+    def test_measurements_post_rejects_inaccessible_component(self):
+        locked = MaterialComponent.objects.create(
+            owner=self.editor,
+            name="Locked component",
+            publication_status="private",
+        )
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset([self.measurement_row(component=str(locked.pk))]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(self.sample.component_measurements.count(), 1)
+
+    def test_measurements_delete_flag_removes_row(self):
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [self.measurement_row(id=str(self.measurement.pk), DELETE="on")],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        self.assertEqual(self.sample.component_measurements.count(), 0)
+
+    def test_properties_editor_denied_without_property_permission(self):
+        self.client.force_login(self.editor)
+        response = self.client.get(
+            self.section_url("properties"), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_properties_post_creates_values(self):
+        response = self.client.post(
+            self.section_url("properties"),
+            self.property_formset(
+                [
+                    {
+                        "property": str(self.property.pk),
+                        "average": "312.5",
+                        "unit": str(self.unit.pk),
+                    }
+                ]
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        value = self.sample.property_values.get()
+        self.assertEqual(value.property, self.property)
+        self.assertEqual(value.owner, self.owner)
+        self.assertEqual(value.average, Decimal("312.5"))
 
 
 # ----------- Sample utilities -----------------------------------------------------------------------------------------

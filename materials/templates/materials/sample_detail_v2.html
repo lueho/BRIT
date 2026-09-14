@@ -304,7 +304,7 @@
     {# ─── Main column + related aside ─── #}
     <div class="sdv2-layout{% if not has_related_samples %} sdv2-layout-full{% endif %}">
       <main class="sdv2-main">
-        {% if edit_mode_enabled and sample_policy.can_edit %}
+        {% if maintenance_sections %}
           {% include "materials/includes/sample_workspace.html" %}
         {% endif %}
         {% if object.description or object.lab_accreditation or object.analysis_objective %}

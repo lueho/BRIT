@@ -1,3 +1,4 @@
+{% load custom_tags %}
 {% if section.key == 'overview' %}
   <dl class="mb-0">
     <dt>Name</dt><dd>{{ object.name }}</dd>
@@ -40,6 +41,22 @@
       <li class="mb-2"><a href="{{ source.get_absolute_url }}">{{ source.abbreviation|default:source.title }}</a>{% if source.title and source.abbreviation %}<span class="text-muted small"> — {{ source.title }}</span>{% endif %}</li>
     {% empty %}
       <li class="text-muted">No sources added yet.</li>
+    {% endfor %}
+  </ul>
+{% elif section.key == 'measurements' %}
+  <ul class="list-unstyled mb-0">
+    {% for measurement in object.component_measurements.all %}
+      <li class="mb-1">{{ measurement.component.name }} — {{ measurement.average|trim_decimal:4 }} {{ measurement.unit.symbol|default:measurement.unit.name }}<span class="text-muted small"> ({{ measurement.group.name }})</span></li>
+    {% empty %}
+      <li class="text-muted">No measurements added yet.</li>
+    {% endfor %}
+  </ul>
+{% elif section.key == 'properties' %}
+  <ul class="list-unstyled mb-0">
+    {% for value in object.property_values.all %}
+      <li class="mb-1">{{ value.property.name }} — {{ value.average|trim_decimal:4 }} {{ value.unit.symbol|default:value.unit.name }}</li>
+    {% empty %}
+      <li class="text-muted">No property values added yet.</li>
     {% endfor %}
   </ul>
 {% endif %}

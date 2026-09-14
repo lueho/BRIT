@@ -64,6 +64,11 @@
                 event.preventDefault();
                 this.addRow(add.closest("[data-workspace-formset]"));
             }
+            const paste = event.target.closest("[data-workspace-paste-apply]");
+            if (paste && this.active && !this.active.busy) {
+                event.preventDefault();
+                this.applyPaste(paste.closest("[data-workspace-paste]"));
+            }
         }
 
         async request(url, options, section) {
@@ -219,26 +224,7 @@
                         return;
                     }
                     try {
-                        const url = new URL(select.dataset.autocompleteUrl, window.location.href);
-                        if (!select.dataset.autocompleteUrl || url.origin !== window.location.origin || !/^https?:$/.test(url.protocol) || url.username || url.password) throw new Error("Untrusted autocomplete endpoint");
-                        url.searchParams.set("q", query);
-                        url.searchParams.set("page", "1");
-                        const response = await fetch(url.href, {
-                            method: "GET",
-                            credentials: "same-origin",
-                            headers: { Accept: "application/json" },
-                        });
-                        if (!response.ok || response.redirected) throw new Error("Search request failed");
-                        const data = await response.json();
-                        if (!Array.isArray(data.results)) throw new Error("Unexpected search response");
-                        const results = data.results.filter((result) => result &&
-                            (typeof result[valueField] === "string" || Number.isFinite(result[valueField])) &&
-                            String(result[valueField]) !== "" && typeof result[labelField] === "string"
-                        ).slice(0, 15).map((result) => ({
-                            [valueField]: String(result[valueField]),
-                            [labelField]: result[labelField],
-                        }));
-                        callback(results);
+                        callback(await workspace.searchOptions(select, query));
                     } catch (error) {
                         if (this.loadedSearches) delete this.loadedSearches[query];
                         callback([]);
@@ -247,6 +233,30 @@
                     }
                 },
             };
+        }
+
+        async searchOptions(select, query) {
+            const valueField = select.dataset.valueField || "id";
+            const labelField = select.dataset.labelField === "label" ? "label" : "name";
+            const url = new URL(select.dataset.autocompleteUrl, window.location.href);
+            if (!select.dataset.autocompleteUrl || url.origin !== window.location.origin || !/^https?:$/.test(url.protocol) || url.username || url.password) throw new Error("Untrusted autocomplete endpoint");
+            url.searchParams.set("q", query);
+            url.searchParams.set("page", "1");
+            const response = await fetch(url.href, {
+                method: "GET",
+                credentials: "same-origin",
+                headers: { Accept: "application/json" },
+            });
+            if (!response.ok || response.redirected) throw new Error("Search request failed");
+            const data = await response.json();
+            if (!Array.isArray(data.results)) throw new Error("Unexpected search response");
+            return data.results.filter((result) => result &&
+                (typeof result[valueField] === "string" || Number.isFinite(result[valueField])) &&
+                String(result[valueField]) !== "" && typeof result[labelField] === "string"
+            ).slice(0, 15).map((result) => ({
+                [valueField]: String(result[valueField]),
+                [labelField]: result[labelField],
+            }));
         }
 
         async mountEditor(active, html) {
@@ -366,6 +376,84 @@
             } catch (error) {
                 if (this.active === active) this.announce("Row added, but search could not load. Your entries are kept. You need JavaScript search to choose new entries; check your connection and retry.", true);
             }
+        }
+
+        parsePaste(text) {
+            return text
+                .split(/\r?\n/)
+                .map((line) => {
+                    const cells = line.split("\t");
+                    return (cells.length === 1 ? cells[0].split(";") : cells).map((cell) => cell.trim());
+                })
+                .filter((cells) => cells.some((cell) => cell !== ""));
+        }
+
+        isPasteHeader(cells, columns) {
+            const numeric = ["average", "standard_deviation", "sample_size"];
+            return numeric.some((name) => {
+                const index = columns.indexOf(name);
+                const cell = index >= 0 ? cells[index] : undefined;
+                return cell !== undefined && cell !== "" && !Number.isFinite(Number(cell.replace(",", ".")));
+            });
+        }
+
+        async resolveReference(select, name) {
+            const valueField = select.dataset.valueField || "id";
+            const labelField = select.dataset.labelField === "label" ? "label" : "name";
+            const results = await this.searchOptions(select, name);
+            const matches = results.filter((result) => result[labelField].trim().toLowerCase() === name.trim().toLowerCase());
+            if (matches.length !== 1 || !select.tomselect) return false;
+            select.tomselect.addOption(matches[0]);
+            select.tomselect.addItem(String(matches[0][valueField]));
+            return true;
+        }
+
+        flagPasteField(row, column, text) {
+            const field = row.querySelector(`[name$="-${column}"]`);
+            const errors = field && row.querySelector(`[data-workspace-errors="${field.name}"]`);
+            if (errors) errors.textContent = `No match for "${text}" — pick an existing entry.`;
+        }
+
+        async applyPaste(panel) {
+            const active = this.active;
+            const input = panel.querySelector("[data-workspace-paste-input]");
+            const formset = this.active.editor.querySelector(`[data-workspace-formset="${input.dataset.pasteFormset}"]`);
+            const columns = (input.dataset.pasteColumns || "").split(",").map((name) => name.trim()).filter(Boolean);
+            if (!formset || !columns.length) return;
+            let lines = this.parsePaste(input.value);
+            if (lines.length && this.isPasteHeader(lines[0], columns)) lines = lines.slice(1);
+            if (!lines.length) {
+                this.announce("Nothing to add — paste one row per line.", true);
+                return;
+            }
+            const numeric = ["average", "standard_deviation", "sample_size"];
+            let unresolved = 0;
+            for (const cells of lines) {
+                await this.addRow(formset);
+                if (this.active !== active) return;
+                const row = formset.querySelector("[data-workspace-rows]").lastElementChild;
+                for (const [index, column] of columns.entries()) {
+                    const text = cells[index];
+                    if (text === undefined || text === "") continue;
+                    const field = row.querySelector(`[name$="-${column}"]`);
+                    if (!field) continue;
+                    if (field.matches("select[data-workspace-select]")) {
+                        try {
+                            if (await this.resolveReference(field, text)) continue;
+                        } catch (error) { /* fall through to flag */ }
+                        unresolved += 1;
+                        this.flagPasteField(row, column, text);
+                    } else {
+                        field.value = numeric.includes(column) ? text.replace(",", ".") : text;
+                    }
+                }
+            }
+            input.value = "";
+            active.dirty = true;
+            this.announce(unresolved
+                ? `Added ${lines.length} rows. ${unresolved} name${unresolved === 1 ? "" : "s"} could not be matched — pick ${unresolved === 1 ? "it" : "them"} manually before saving.`
+                : `Added ${lines.length} row${lines.length === 1 ? "" : "s"}. Review them, then save the section.`,
+            unresolved > 0);
         }
 
         setExpanded(active, expanded) {

@@ -229,6 +229,62 @@ class ComponentMeasurementModalModelForm(
     pass
 
 
+class ComponentMeasurementSectionForm(
+    WorkspaceReferenceScopeMixin, ComponentMeasurementModelForm
+):
+    """One measurement row in the Sample maintenance workspace table."""
+
+    group = QuerysetTomSelectModelChoiceField(
+        queryset=MaterialComponentGroup.objects.all(),
+        config=TomSelectConfig(
+            url="materialcomponentgroup-autocomplete",
+            label_field="name",
+        ),
+        label="Group",
+    )
+    component = QuerysetTomSelectModelChoiceField(
+        queryset=MaterialComponent.objects.all(),
+        config=TomSelectConfig(
+            url="materialcomponent-autocomplete",
+            label_field="name",
+        ),
+        label="Component",
+    )
+    basis_component = QuerysetTomSelectModelChoiceField(
+        queryset=MaterialComponent.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="materialcomponent-autocomplete",
+            label_field="name",
+        ),
+        label="Basis component",
+    )
+    analytical_method = QuerysetTomSelectModelChoiceField(
+        queryset=AnalyticalMethod.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="analyticalmethod-autocomplete",
+            label_field="name",
+        ),
+        label="Analytical method",
+    )
+    unit = QuerysetTomSelectModelChoiceField(
+        queryset=Unit.objects.filter(Unit.weight_fraction_q()),
+        config=TomSelectConfig(
+            url="unit-autocomplete-weight-fraction",
+            label_field="name",
+        ),
+        label="Unit",
+        help_text="Weight-fraction units only (e.g. %, g/kg, mg/kg).",
+    )
+    sources = QuerysetTomSelectModelMultipleChoiceField(
+        queryset=Source.objects.all(),
+        required=False,
+        config=TomSelectConfig(url="source-autocomplete", label_field="label"),
+        label="Sources",
+    )
+
+
 class MaterialPropertyValueModelForm(
     NumericMeasurementFieldsFormMixin,
     UserCreatedObjectFormMixin,
@@ -338,6 +394,54 @@ class MaterialPropertyValueModalModelForm(
     ModalModelFormMixin, MaterialPropertyValueModelForm
 ):
     pass
+
+
+class MaterialPropertyValueSectionForm(
+    WorkspaceReferenceScopeMixin, MaterialPropertyValueModelForm
+):
+    """One property value row in the Sample maintenance workspace table."""
+
+    property = QuerysetTomSelectModelChoiceField(
+        queryset=MaterialProperty.objects.all(),
+        config=TomSelectConfig(
+            url="materialproperty-autocomplete",
+            label_field="name",
+        ),
+        label="Property",
+    )
+    basis_component = QuerysetTomSelectModelChoiceField(
+        queryset=MaterialComponent.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="materialcomponent-autocomplete",
+            label_field="name",
+        ),
+        label="Basis",
+    )
+    unit = QuerysetTomSelectModelChoiceField(
+        queryset=Unit.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="unit-autocomplete",
+            label_field="name",
+        ),
+        label="Unit",
+    )
+    analytical_method = QuerysetTomSelectModelChoiceField(
+        queryset=AnalyticalMethod.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="analyticalmethod-autocomplete",
+            label_field="name",
+        ),
+        label="Analytical method",
+    )
+    sources = QuerysetTomSelectModelMultipleChoiceField(
+        queryset=Source.objects.all(),
+        required=False,
+        config=TomSelectConfig(url="source-autocomplete", label_field="label"),
+        label="Sources",
+    )
 
 
 class AnalyticalMethodModelForm(
@@ -635,6 +739,44 @@ SAMPLE_SECTIONS = {
     "sources": {
         "label": "Sources",
         "fields": ("sources",),
+    },
+    "measurements": {
+        "label": "Component measurements",
+        "policy": "can_manage_samples",
+        "forms": (
+            (
+                ComponentMeasurementSectionForm,
+                {
+                    "heading": "Component measurements",
+                    "add_label": "Add measurement",
+                    "row_template": "materials/includes/sample_measurement_row.html",
+                    "paste": {
+                        "label": "measurements",
+                        "columns": "group,component,average,unit,standard_deviation,sample_size",
+                        "hint": "One row per line: group, component, value, unit, standard deviation, sample size (tab-separated).",
+                    },
+                },
+            ),
+        ),
+    },
+    "properties": {
+        "label": "Property values",
+        "policy": "can_add_property",
+        "forms": (
+            (
+                MaterialPropertyValueSectionForm,
+                {
+                    "heading": "Property values",
+                    "add_label": "Add property value",
+                    "row_template": "materials/includes/sample_property_value_row.html",
+                    "paste": {
+                        "label": "property values",
+                        "columns": "property,average,unit,standard_deviation",
+                        "hint": "One row per line: property, value, unit, standard deviation (tab-separated).",
+                    },
+                },
+            ),
+        ),
     },
 }
 

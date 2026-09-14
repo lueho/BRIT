@@ -746,6 +746,16 @@ class WorkspaceSectionFormSet(BaseInlineFormSet):
         super().add_fields(form, index)
         form.fields[self.model._meta.pk.name].queryset = self.get_queryset()
 
+    def save_new(self, form, commit=True):
+        request = getattr(form, "request", None)
+        if (
+            request is not None
+            and getattr(form.instance, "user_created", False)
+            and request.user.is_authenticated
+        ):
+            form.instance.owner = request.user
+        return super().save_new(form, commit=commit)
+
     def clean(self):
         super().clean()
         if any(self.errors):
