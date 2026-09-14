@@ -29,10 +29,11 @@ from utils.file_export.views import (
     SingleObjectFileExportView,
 )
 from utils.modal import BSModalFormView, BSModalUpdateView
-from utils.object_management.models import ReviewAction
+from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,
+    user_is_moderator_for_model,
 )
 from utils.object_management.views import (
     PrivateObjectFilterView,
@@ -135,6 +136,20 @@ def _capped_related(queryset):
     """
     total = queryset.count()
     return queryset[:DETAIL_RELATED_LIMIT], total, max(total - DETAIL_RELATED_LIMIT, 0)
+
+
+def _visible_or_none(model, obj, user):
+    if obj is None:
+        return None
+    queryset = model.objects.filter(pk=obj.pk)
+    visible = filter_queryset_for_user(queryset, user).first()
+    if (
+        visible is None
+        and obj.publication_status == UserCreatedObject.STATUS_PRIVATE
+        and user_is_moderator_for_model(user, model)
+    ):
+        return queryset.first()
+    return visible
 
 
 class MaterialsExplorerView(TemplateView):
@@ -480,7 +495,14 @@ class ComponentDetailView(UserCreatedObjectDetailView):
         comparable_ids = MaterialComponent.objects.filter(
             Q(pk=canonical.pk) | Q(comparable_component=canonical)
         ).values_list("pk", flat=True)
-        context["canonical_component"] = canonical if canonical.pk != obj.pk else None
+        context["canonical_component"] = (
+            _visible_or_none(MaterialComponent, canonical, user)
+            if canonical.pk != obj.pk
+            else None
+        )
+        context["basis_component"] = _visible_or_none(
+            MaterialComponent, obj.basis_component, user
+        )
         (
             context["derived_components"],
             context["derived_components_total"],
@@ -703,7 +725,14 @@ class MaterialPropertyDetailView(UserCreatedObjectDetailView):
         comparable_ids = MaterialProperty.objects.filter(
             Q(pk=canonical.pk) | Q(comparable_property=canonical)
         ).values_list("pk", flat=True)
-        context["canonical_property"] = canonical if canonical.pk != obj.pk else None
+        context["canonical_property"] = (
+            _visible_or_none(MaterialProperty, canonical, user)
+            if canonical.pk != obj.pk
+            else None
+        )
+        context["basis_component"] = _visible_or_none(
+            MaterialComponent, obj.default_basis_component, user
+        )
         (
             context["comparable_variants"],
             context["comparable_variants_total"],
@@ -1596,23 +1625,60 @@ class SampleReviewItemDetailView(ReviewItemDetailView):
     """Render sample moderation with the complete v2 sample context."""
 
     model = Sample
+    detail_view_class = SampleDetailView
 
     def _resolve_base_template(self):
         return "materials/sample_detail_v2.html"
 
-    def get_review_specific_context(self, context):
-        detail_view = SampleDetailView()
-        detail_view.request = self.request
-        detail_view.args = self.args
-        detail_view.kwargs = self.kwargs
-        detail_view.object = self.object
-        sample_context = detail_view.get_context_data(object=self.object)
-        for review_key in ("review_logs", "review_mode", "show_review_panel"):
-            sample_context.pop(review_key, None)
-        return sample_context
-
 
 SampleReviewItemDetailView.register_for_model(Sample)
+
+
+class MaterialCategoryReviewItemDetailView(ReviewItemDetailView):
+    model = MaterialCategory
+    detail_view_class = MaterialCategoryDetailView
+
+
+class MaterialReviewItemDetailView(ReviewItemDetailView):
+    model = Material
+    detail_view_class = MaterialDetailView
+
+
+class MaterialComponentReviewItemDetailView(ReviewItemDetailView):
+    model = MaterialComponent
+    detail_view_class = ComponentDetailView
+
+
+class MaterialComponentGroupReviewItemDetailView(ReviewItemDetailView):
+    model = MaterialComponentGroup
+    detail_view_class = MaterialComponentGroupDetailView
+
+
+class MaterialPropertyReviewItemDetailView(ReviewItemDetailView):
+    model = MaterialProperty
+    detail_view_class = MaterialPropertyDetailView
+
+
+class AnalyticalMethodReviewItemDetailView(ReviewItemDetailView):
+    model = AnalyticalMethod
+    detail_view_class = AnalyticalMethodDetailView
+
+
+class SampleSeriesReviewItemDetailView(ReviewItemDetailView):
+    model = SampleSeries
+    detail_view_class = SampleSeriesDetailView
+
+
+for _model, _review_view in (
+    (MaterialCategory, MaterialCategoryReviewItemDetailView),
+    (Material, MaterialReviewItemDetailView),
+    (MaterialComponent, MaterialComponentReviewItemDetailView),
+    (MaterialComponentGroup, MaterialComponentGroupReviewItemDetailView),
+    (MaterialProperty, MaterialPropertyReviewItemDetailView),
+    (AnalyticalMethod, AnalyticalMethodReviewItemDetailView),
+    (SampleSeries, SampleSeriesReviewItemDetailView),
+):
+    _review_view.register_for_model(_model)
 
 
 class SampleUpdateView(UserCreatedObjectUpdateView):

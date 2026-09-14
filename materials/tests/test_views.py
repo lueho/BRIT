@@ -6417,6 +6417,166 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
             ),
         )
 
+    def test_component_detail_hides_private_basis_and_canonical_components_for_anonymous(
+        self,
+    ):
+        private_basis = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Private Basis Component",
+            publication_status="private",
+        )
+        private_canonical = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Private Canonical Component",
+            publication_status="private",
+        )
+        component = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Published Component With Private References",
+            publication_status="published",
+            basis_component=private_basis,
+            comparable_component=private_canonical,
+        )
+
+        response = self.get_detail("materialcomponent-detail", component)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, private_basis.name)
+        self.assertNotContains(response, private_canonical.name)
+
+    def test_component_detail_shows_private_basis_and_canonical_components_for_owner(
+        self,
+    ):
+        private_basis = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Owner Private Basis Component",
+            publication_status="private",
+        )
+        private_canonical = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Owner Private Canonical Component",
+            publication_status="private",
+        )
+        component = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Owner Published Component With Private References",
+            publication_status="published",
+            basis_component=private_basis,
+            comparable_component=private_canonical,
+        )
+        self.client.force_login(self.owner)
+
+        response = self.get_detail("materialcomponent-detail", component)
+
+        self.assertContains(response, private_basis.name)
+        self.assertContains(response, private_canonical.name)
+
+    def test_component_moderator_sees_private_classification_references(self):
+        private_basis = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Moderator Private Basis Component",
+            publication_status="private",
+        )
+        private_canonical = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Moderator Private Canonical Component",
+            publication_status="private",
+        )
+        component = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Moderator Published Component With Private References",
+            publication_status="published",
+            basis_component=private_basis,
+            comparable_component=private_canonical,
+        )
+        permission = Permission.objects.get(codename="can_moderate_materialcomponent")
+        self.member.user_permissions.add(permission)
+        self.client.force_login(self.member)
+
+        response = self.get_detail("materialcomponent-detail", component)
+
+        self.assertContains(response, private_basis.name)
+        self.assertContains(response, private_canonical.name)
+
+    def test_material_review_detail_includes_related_samples(self):
+        review_material = Material.objects.create(
+            owner=self.owner,
+            name="Material With Review Context",
+            publication_status="review",
+        )
+        review_sample = Sample.objects.create(
+            owner=self.owner,
+            name="Published Sample In Review Material",
+            material=review_material,
+            publication_status="published",
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse(
+                "object_management:review_item_detail",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(Material).pk,
+                    "object_id": review_material.pk,
+                },
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f"Material: {review_material.name}")
+        self.assertContains(response, review_sample.name)
+
+    def test_component_review_detail_includes_related_samples(self):
+        review_component = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Component With Review Context",
+            publication_status="review",
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.owner,
+            sample=self.standalone_sample,
+            group=self.group,
+            component=review_component,
+            unit=self.percent_unit,
+            average=Decimal("12.5"),
+            publication_status="published",
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse(
+                "object_management:review_item_detail",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(
+                        MaterialComponent
+                    ).pk,
+                    "object_id": review_component.pk,
+                },
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f"Component: {review_component.name}")
+        self.assertContains(response, self.standalone_sample.name)
+
+    def test_component_group_review_detail_includes_related_samples(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse(
+                "object_management:review_item_detail",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(
+                        MaterialComponentGroup
+                    ).pk,
+                    "object_id": self.group.pk,
+                },
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.standalone_sample.name)
+
     def test_component_detail_shows_groups_measured_in(self):
         response = self.get_detail("materialcomponent-detail", self.component)
         self.assertContains(response, self.group.name)
@@ -6472,6 +6632,60 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
             ),
         )
         self.assertContains(response, self.percent_unit.name)
+
+    def test_property_detail_hides_private_basis_and_canonical_property_for_anonymous(
+        self,
+    ):
+        private_basis = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Private Property Basis Component",
+            publication_status="private",
+        )
+        private_canonical = MaterialProperty.objects.create(
+            owner=self.owner,
+            name="Private Canonical Property",
+            publication_status="private",
+        )
+        material_property = MaterialProperty.objects.create(
+            owner=self.owner,
+            name="Published Property With Private References",
+            publication_status="published",
+            default_basis_component=private_basis,
+            comparable_property=private_canonical,
+        )
+
+        response = self.get_detail("materialproperty-detail", material_property)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, private_basis.name)
+        self.assertNotContains(response, private_canonical.name)
+
+    def test_property_detail_shows_private_basis_and_canonical_property_for_owner(
+        self,
+    ):
+        private_basis = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Owner Private Property Basis Component",
+            publication_status="private",
+        )
+        private_canonical = MaterialProperty.objects.create(
+            owner=self.owner,
+            name="Owner Private Canonical Property",
+            publication_status="private",
+        )
+        material_property = MaterialProperty.objects.create(
+            owner=self.owner,
+            name="Owner Published Property With Private References",
+            publication_status="published",
+            default_basis_component=private_basis,
+            comparable_property=private_canonical,
+        )
+        self.client.force_login(self.owner)
+
+        response = self.get_detail("materialproperty-detail", material_property)
+
+        self.assertContains(response, private_basis.name)
+        self.assertContains(response, private_canonical.name)
 
     # -- AnalyticalMethod -----------------------------------------------------------------
 
