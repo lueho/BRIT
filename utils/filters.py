@@ -4,7 +4,10 @@ from django.forms import HiddenInput
 from django_filters import CharFilter, ChoiceFilter, FilterSet, RangeFilter
 
 from utils.fields import NullablePercentageRangeField, NullableRangeField
-from utils.object_management.permissions import apply_scope_filter
+from utils.object_management.permissions import (
+    apply_scope_filter,
+    filter_queryset_for_user,
+)
 
 
 class BaseCrispyFilterSet(FilterSet):
@@ -206,6 +209,28 @@ class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
         except Exception:
             return None
         return None
+
+    def scoped_choice_queryset(self, queryset):
+        """Restrict *queryset* to what the request user may see in the active scope.
+
+        Intended for ``ModelChoiceFilter`` dropdowns of related objects:
+        ``filter_queryset_for_user`` removes objects outside the user's
+        visibility, then ``apply_scope_filter`` aligns the choices with the
+        selected list scope (published/private/review).
+
+        Reads the scope from ``self.data`` only. ``self.form`` must not be
+        touched here: accessing it inside ``__init__`` builds and caches the
+        form fields before subclasses assign their ``queryset``, which would
+        freeze the declared (usually empty) queryset on the field.
+        """
+        user = getattr(getattr(self, "request", None), "user", None)
+        if user is not None:
+            queryset = filter_queryset_for_user(queryset, user)
+        data = getattr(self, "data", None)
+        scope_value = data.get("scope") if data else None
+        if scope_value:
+            queryset = apply_scope_filter(queryset, scope_value, user=user)
+        return queryset
 
     def _apply_shared_field_visibility(self):
         if "publication_status" not in self.filters:
