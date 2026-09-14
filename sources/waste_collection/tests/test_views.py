@@ -1407,6 +1407,44 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         """
         return self.get_list_url(publication_status=publication_status)
 
+    def test_collection_lists_display_complete_valid_period(self):
+        collection = self.unpublished_object
+        for scope, route, user in (
+            ("published", "collection-list", None),
+            ("private", "collection-list-owned", self.owner_user),
+            ("review", "collection-list-review", self.staff_user),
+        ):
+            for valid_until in (date(2025, 3, 14), None):
+                with self.subTest(scope=scope, valid_until=valid_until):
+                    Collection.objects.filter(pk=collection.pk).update(
+                        publication_status=scope,
+                        valid_from=date(2024, 6, 15),
+                        valid_until=valid_until,
+                    )
+                    self.client.logout()
+                    if user:
+                        self.client.force_login(user)
+                    response = self.client.get(
+                        reverse(route), {"scope": scope, "valid_on": "2024-07-01"}
+                    )
+                    end_label = (
+                        '<time datetime="2025-03-14">14.03.2025</time>'
+                        if valid_until
+                        else "No end date"
+                    )
+
+                    self.assertContains(
+                        response,
+                        '<span class="d-block text-muted small">Valid period: '
+                        '<time datetime="2024-06-15">15.06.2024</time>'
+                        f" – {end_label}</span>",
+                        html=True,
+                    )
+                    self.assertTemplateUsed(
+                        response,
+                        "waste_collection/includes/collection_valid_period.html",
+                    )
+
     def test_post_get_formset_kwargs_fetches_correct_parent_object(self):
         request = RequestFactory().post(self.get_create_url())
         request.user = self.staff_user
