@@ -527,12 +527,13 @@ function pasteFixture(fixture, { text, results = {}, maxRows = Infinity, columns
                 const byName = selector.match(/\[name\$="-(\w+)"\]/);
                 if (byName) {
                     if (!rowFields[byName[1]]) {
+                        const isSelect = ["component", "unit"].includes(byName[1]);
                         rowFields[byName[1]] = element({
                             name: `component_measurements-${created}-${byName[1]}`,
-                            matches: (s) => byName[1] === "component" && s === "select[data-workspace-select]",
+                            matches: (s) => isSelect && s === "select[data-workspace-select]",
                             dataset: { valueField: "id", labelField: "name", autocompleteUrl: "/components/" },
                         });
-                        if (byName[1] === "component") {
+                        if (isSelect) {
                             rowFields[byName[1]].tomselect = {
                                 added: [],
                                 addOption(option) { this.added.push(option); },
@@ -602,7 +603,7 @@ test("ambiguous or unknown pasted names are flagged on the row for manual choice
     await fixture.workspace.applyPaste(mock.panel);
     assert.equal(mock.created(), 1);
     assert.match(mock.errors["component_measurements-1-component"].textContent, /No match for "Lignin"/);
-    assert.match(fixture.status.textContent, /1 name could not be matched/);
+    assert.match(fixture.status.textContent, /1 value needs attention/);
     assert.equal(fixture.status.className, "alert alert-danger");
 });
 
@@ -649,7 +650,7 @@ test("the paste guard is released when a paste fails", async () => {
     assert.equal(fixture.workspace.active.pasting, false);
 });
 
-test("only recognised header labels are skipped; a non-numeric first value is kept for validation", async () => {
+test("only recognised header labels are skipped; a non-numeric first value is kept and flagged", async () => {
     const fixture = setup();
     activate(fixture);
     const invalid = pasteFixture(fixture, {
@@ -658,6 +659,9 @@ test("only recognised header labels are skipped; a non-numeric first value is ke
     });
     await fixture.workspace.applyPaste(invalid.panel);
     assert.equal(invalid.created(), 2);
+    assert.match(invalid.errors["component_measurements-1-average"].textContent, /"below detection" is not a number/);
+    assert.match(fixture.status.textContent, /Added 2 rows\. 1 value needs attention/);
+    assert.equal(fixture.status.className, "alert alert-danger");
 
     const header = pasteFixture(fixture, {
         text: "Group\tComponent\tValue\tUnit\tStandard deviation\tn\nMain\tAsh\t12.5\t%\t0.1\t3",
@@ -667,4 +671,56 @@ test("only recognised header labels are skipped; a non-numeric first value is ke
     await fixture.workspace.applyPaste(header.panel);
     assert.equal(header.created(), 1);
     assert.equal(header.rowsContainer.lastElementChild.fields.average.value, "12.5");
+});
+
+test("a full formset reports how many pasted lines were not added", async () => {
+    const fixture = setup();
+    activate(fixture);
+    const mock = pasteFixture(fixture, { text: "Ash\t12.5\nMoisture\t4.25", maxRows: 0 });
+    const existing = mock.rowsContainer.lastElementChild;
+    await fixture.workspace.applyPaste(mock.panel);
+    assert.equal(mock.created(), 0);
+    assert.equal(mock.rowsContainer.lastElementChild, existing);
+    assert.equal(mock.input.value, "Ash\t12.5\nMoisture\t4.25");
+    assert.match(fixture.status.textContent, /Nothing was added\. 2 lines were not added because the maximum number of rows has been reached/);
+});
+
+test("saving and cancelling are blocked while a paste is still filling rows", async () => {
+    let fetched = false;
+    const fixture = setup(async () => { fetched = true; throw new Error("should not save"); });
+    activate(fixture);
+    const mock = pasteFixture(fixture, { text: "Ash\t12.5", results: { Ash: [{ id: 7, name: "Ash" }] } });
+    const pasting = fixture.workspace.applyPaste(mock.panel);
+    assert.equal(fixture.workspace.active.pasting, true);
+    await fixture.workspace.save();
+    assert.equal(fetched, false);
+    assert.match(fixture.status.textContent, /still being filled/);
+    assert.equal(fixture.workspace.cancel(), false);
+    await pasting;
+    assert.equal(fixture.workspace.active.pasting, false);
+});
+
+test("unit search results keep the symbol so pasted symbols resolve", async () => {
+    const fixture = setup(async () => ({ ok: true, json: async () => ({ results: [{ id: 5, name: "Percent", symbol: "%", html: "unsafe" }, { id: 6, name: "Gram per kilogram", symbol: 7 }] }) }));
+    const { config, instance } = remoteWidget(fixture, "name", "/units/autocomplete/");
+    let results;
+    await config.load.call(instance, "%", (items) => { results = items; });
+    assert.equal(JSON.stringify(results), JSON.stringify([{ id: "5", name: "Percent", symbol: "%" }, { id: "6", name: "Gram per kilogram" }]));
+});
+
+test("pasted unit symbols resolve against the symbol as well as the name", async () => {
+    const fixture = setup();
+    activate(fixture);
+    const mock = pasteFixture(fixture, {
+        text: "Ash\t12.5\t%",
+        columns: "component,average,unit",
+        results: { Ash: [{ id: 7, name: "Ash" }], "%": [{ id: 5, name: "Percent", symbol: "%" }, { id: 9, name: "Per mille", symbol: "‰" }] },
+    });
+    await fixture.workspace.applyPaste(mock.panel);
+    assert.equal(mock.created(), 1);
+    const row = mock.rowsContainer.lastElementChild.fields;
+    assert.equal(row.component.tomselect.value, "7");
+    assert.equal(row.unit.tomselect.value, "5");
+    assert.equal(row.average.value, "12.5");
+    assert.match(fixture.status.textContent, /Added 1 row\. Review them/);
 });

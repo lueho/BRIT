@@ -253,10 +253,11 @@
             return data.results.filter((result) => result &&
                 (typeof result[valueField] === "string" || Number.isFinite(result[valueField])) &&
                 String(result[valueField]) !== "" && typeof result[labelField] === "string"
-            ).slice(0, 15).map((result) => ({
-                [valueField]: String(result[valueField]),
-                [labelField]: result[labelField],
-            }));
+            ).slice(0, 15).map((result) => {
+                const option = { [valueField]: String(result[valueField]), [labelField]: result[labelField] };
+                if (typeof result.symbol === "string" && result.symbol !== "") option.symbol = result.symbol;
+                return option;
+            });
         }
 
         async mountEditor(active, html) {
@@ -290,6 +291,10 @@
         async save() {
             const active = this.active;
             if (!active || active.busy) return;
+            if (active.pasting) {
+                this.announce("Rows are still being filled from your paste. Wait a moment, then save.", true);
+                return;
+            }
             const body = new FormData(active.form);
             this.setBusy(active, true);
             this.announce("Saving section…");
@@ -413,17 +418,18 @@
             const valueField = select.dataset.valueField || "id";
             const labelField = select.dataset.labelField === "label" ? "label" : "name";
             const results = await this.searchOptions(select, name);
-            const matches = results.filter((result) => result[labelField].trim().toLowerCase() === name.trim().toLowerCase());
+            const wanted = name.trim().toLowerCase();
+            const matches = results.filter((result) => [result[labelField], result.symbol].some((text) => typeof text === "string" && text.trim().toLowerCase() === wanted));
             if (matches.length !== 1 || !select.tomselect) return false;
             select.tomselect.addOption(matches[0]);
             select.tomselect.addItem(String(matches[0][valueField]));
             return true;
         }
 
-        flagPasteField(row, column, text) {
+        flagPasteField(row, column, message) {
             const field = row.querySelector(`[name$="-${column}"]`);
             const errors = field && row.querySelector(`[data-workspace-errors="${field.name}"]`);
-            if (errors) errors.textContent = `No match for "${text}" — pick an existing entry.`;
+            if (errors) errors.textContent = message;
         }
 
         async applyPaste(panel) {
@@ -469,19 +475,31 @@
                             if (await this.resolveReference(field, text)) continue;
                         } catch (error) { /* fall through to flag */ }
                         unresolved += 1;
-                        this.flagPasteField(row, column, text);
+                        this.flagPasteField(row, column, `No match for "${text}" — pick an existing entry.`);
+                    } else if (numeric.includes(column)) {
+                        const value = text.replace(",", ".");
+                        if (Number.isFinite(Number(value))) {
+                            field.value = value;
+                        } else {
+                            unresolved += 1;
+                            this.flagPasteField(row, column, `"${text}" is not a number — enter a value.`);
+                        }
                     } else {
-                        field.value = numeric.includes(column) ? text.replace(",", ".") : text;
+                        field.value = text;
                     }
                 }
             }
             const skipped = lines.length - added;
-            if (!added) return;
+            const skippedMessage = `${skipped} line${skipped === 1 ? " was" : "s were"} not added because the maximum number of rows has been reached.`;
+            if (!added) {
+                this.announce(`Nothing was added. ${skippedMessage}`, true);
+                return;
+            }
             input.value = "";
             active.dirty = true;
             const parts = [`Added ${added} row${added === 1 ? "" : "s"}.`];
-            if (skipped) parts.push(`${skipped} line${skipped === 1 ? " was" : "s were"} not added because the maximum number of rows has been reached.`);
-            if (unresolved) parts.push(`${unresolved} name${unresolved === 1 ? "" : "s"} could not be matched — pick ${unresolved === 1 ? "it" : "them"} manually before saving.`);
+            if (skipped) parts.push(skippedMessage);
+            if (unresolved) parts.push(`${unresolved} value${unresolved === 1 ? "" : "s"} need${unresolved === 1 ? "s" : ""} attention — fix the marked field${unresolved === 1 ? "" : "s"} before saving.`);
             if (!skipped && !unresolved) parts.push("Review them, then save the section.");
             this.announce(parts.join(" "), skipped > 0 || unresolved > 0);
         }
@@ -505,7 +523,7 @@
         cancel() {
             const active = this.active;
             if (!active) return true;
-            if (active.busy) return false;
+            if (active.busy || active.pasting) return false;
             if (active.dirty && !window.confirm("Discard unsaved changes in this section?")) return false;
             this.close(active);
             this.announce("Editing cancelled. Saved information is unchanged.");

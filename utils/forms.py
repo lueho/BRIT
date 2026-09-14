@@ -589,9 +589,10 @@ class SourcesFieldMixin:
         if self.instance and self.instance.pk and hasattr(self.instance, "sources"):
             source_ids.update(self.instance.sources.values_list("id", flat=True))
 
-        # Add submitted sources (from POST data)
-        if data and "sources" in data:
-            submitted_ids = data.getlist("sources")
+        # Add submitted sources (from POST data, honouring formset prefixes)
+        sources_key = self.add_prefix("sources")
+        if data and sources_key in data:
+            submitted_ids = data.getlist(sources_key)
             if submitted_ids:
                 source_ids.update(int(sid) for sid in submitted_ids if sid)
 
