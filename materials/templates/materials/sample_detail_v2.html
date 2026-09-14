@@ -77,7 +77,7 @@
               {% if sample_policy.can_edit %}
                 <li>
                   <a class="dropdown-item"
-                     href="{% url 'sample-update' object.id %}?next={{ request.get_full_path|urlencode }}">
+                     href="{% url 'sample-detail' object.pk %}?mode=edit">
                     <i class="fas fa-fw fa-pen-to-square me-2" aria-hidden="true"></i>Edit sample metadata
                   </a>
                 </li>
