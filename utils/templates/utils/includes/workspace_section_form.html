@@ -36,6 +36,19 @@
         <button type="button" class="btn btn-outline-primary btn-sm" data-workspace-add>
           {{ inline.workspace_meta.add_label|default:'Add row' }}
         </button>
+        {% if inline.workspace_meta.paste %}
+          <details class="mt-2" data-workspace-paste>
+            <summary class="btn btn-outline-secondary btn-sm d-inline-block">Paste {{ inline.workspace_meta.paste.label|default:'rows' }} from a spreadsheet</summary>
+            <div class="border rounded p-2 mt-2">
+              <label class="form-label small mb-1" for="{{ inline.prefix }}-paste">{{ inline.workspace_meta.paste.hint }}</label>
+              <textarea class="form-control font-monospace" id="{{ inline.prefix }}-paste" rows="4"
+                        data-workspace-paste-input
+                        data-paste-formset="{{ inline.prefix }}"
+                        data-paste-columns="{{ inline.workspace_meta.paste.columns }}"></textarea>
+              <button type="button" class="btn btn-primary btn-sm mt-2" data-workspace-paste-apply>Fill rows</button>
+            </div>
+          </details>
+        {% endif %}
       </section>
     {% endfor %}
     <p data-workspace-local-status></p>

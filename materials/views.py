@@ -31,6 +31,7 @@ from utils.file_export.views import (
     GenericUserCreatedObjectExportView,
     SingleObjectFileExportView,
 )
+from utils.forms import workspace_section_formsets
 from utils.modal import BSModalFormView, BSModalUpdateView
 from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import (
@@ -1284,8 +1285,9 @@ class SampleDetailView(UserCreatedObjectDetailView):
                     "material_links": [],
                 }
                 for key, section in SAMPLE_SECTIONS.items()
+                if sample_policy[section.get("policy", "can_edit")]
             ]
-            if edit_mode_enabled and sample_policy["can_edit"]
+            if edit_mode_enabled
             else []
         )
         return {
@@ -1403,7 +1405,17 @@ class SampleUpdateView(UserCreatedObjectUpdateView):
         if key not in SAMPLE_SECTIONS:
             raise Http404("Unknown sample section.")
         self.section = {**SAMPLE_SECTIONS[key], "key": key}
+        self.inlines = None
+        policy_key = self.section.get("policy", "can_edit")
         with transaction.atomic():
+            if request.user.is_authenticated:
+                policy = get_object_policy(
+                    request.user, self.get_object(), request=request
+                )
+                if not policy.get(policy_key, False):
+                    raise PermissionDenied(
+                        f"You do not have permission to edit the {self.section['label']} section."
+                    )
             return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
@@ -1416,8 +1428,17 @@ class SampleUpdateView(UserCreatedObjectUpdateView):
         return {
             **super().get_form_kwargs(),
             "request": self.request,
-            "fields": self.section["fields"],
+            "fields": self.section.get("fields", ()),
         }
+
+    def get_inlines(self):
+        if self.inlines is None:
+            self.inlines = workspace_section_formsets(
+                self.object,
+                self.section,
+                self.request,
+            )
+        return self.inlines
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1430,7 +1451,7 @@ class SampleUpdateView(UserCreatedObjectUpdateView):
                 "object_label": "sample",
                 "form_title": self.section["label"],
                 "submit_button_text": "Save section",
-                "inlines": [],
+                "inlines": self.get_inlines(),
             }
         )
         return context
@@ -1452,7 +1473,12 @@ class SampleUpdateView(UserCreatedObjectUpdateView):
         return super().render_to_response(context, **response_kwargs)
 
     def form_valid(self, form):
+        validity = [inline.is_valid() for inline in self.get_inlines()]
+        if not all(validity):
+            return self.form_invalid(form)
         self.object = form.save()
+        for inline in self.get_inlines():
+            inline.save()
         message = "Saved privately." if self.object.is_private else "Changes saved."
         if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return JsonResponse(

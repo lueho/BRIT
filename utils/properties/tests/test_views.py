@@ -75,10 +75,11 @@ class UnitAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         try:
             response = self.client.get(reverse("unit-autocomplete"), {"q": "tsu_sym"})
             self.assertEqual(response.status_code, 200)
-            result_ids = {item["id"] for item in response.json()["results"]}
-            self.assertIn(unit_with_symbol.pk, result_ids)
+            results = {item["id"]: item for item in response.json()["results"]}
+            self.assertIn(unit_with_symbol.pk, results)
+            self.assertEqual(results[unit_with_symbol.pk]["symbol"], "tsu_sym")
             # Non-matching units must be filtered out by the search query.
-            self.assertNotIn(self.matching_unit.pk, result_ids)
+            self.assertNotIn(self.matching_unit.pk, results)
         finally:
             unit_with_symbol.delete()
 
