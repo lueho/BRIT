@@ -19,6 +19,13 @@ services:
 
   db:
     image: "postgis/postgis:15-3.4"
+    healthcheck:
+      # TCP excludes the temporary socket-only server used during first-run init.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-postgres}"]
+      interval: 2s
+      timeout: 5s
+      start_period: 60s
+      retries: 60
     ports:
       - "${DB_HOST_PORT:-5433}:5432"
     volumes:
@@ -43,9 +50,12 @@ services:
     volumes: 
       - ./:/app
     depends_on:
-      - db
-      - redis
-      - celery
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      celery:
+        condition: service_started
     ports:
       - "${WEB_HOST_PORT:-8000}:8000"
     env_file:
@@ -62,8 +72,10 @@ services:
     env_file:
       - brit/settings/.env
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - full
     healthcheck:
@@ -86,7 +98,8 @@ services:
     env_file:
       - brit/settings/.env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - full
     profiles: [ "db_admin" ]
