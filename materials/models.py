@@ -95,6 +95,14 @@ class BaseMaterial(NamedUserCreatedObject):
             "Canonical component this raw term should be compared as. Only used for components."
         ),
     )
+    is_aggregate = models.BooleanField(
+        default=False,
+        help_text=(
+            "Component totals its sibling components within a component group "
+            "(e.g. 'Total (with halides)'). Aggregates are excluded from "
+            "normalized compositions. Only used for components."
+        ),
+    )
 
     class Meta:
         verbose_name = "Material"
