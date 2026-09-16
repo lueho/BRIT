@@ -39,10 +39,9 @@ class ReviewDashboardFilterFormHelper(FormHelper):
 class ReviewDashboardFilterSet(BaseCrispyFilterSet):
     """FilterSet for the review dashboard supporting multi-model filtering.
 
-    IMPORTANT: This FilterSet is used ONLY for generating the filter form UI.
-    Actual filtering is performed in Python by ReviewItemFilter (review_filtering.py)
-    because we're working with heterogeneous object lists from multiple models,
-    which cannot be filtered at the database level.
+    IMPORTANT: This FilterSet generates the filter form UI using a dummy queryset.
+    ReviewDashboardView applies filters to each model queryset, sorts lightweight
+    references, and loads full objects only for the selected HTML page.
 
     Provides filter form fields for:
     - Text search across object names
@@ -51,8 +50,8 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
     - Submission date range
     - Sorting options
 
-    See: utils.object_management.review_filtering.ReviewItemFilter for the
-    actual filtering implementation.
+    See ReviewDashboardView for filtering and pagination, and ReviewItemFilter
+    for the shared Python ordering semantics.
     """
 
     search = CharFilter(
@@ -140,8 +139,7 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
     def filter_search(self, queryset, name, value):
         """Filter by object name (case-insensitive contains).
 
-        Since queryset is actually a list of heterogeneous objects,
-        this filter is applied in the view after objects are collected.
+        This is a form-only filter; the view filters each real model queryset.
         """
         # Return queryset unchanged; filtering happens in view
         return queryset
@@ -149,8 +147,7 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
     def filter_model_type(self, queryset, name, value):
         """Filter by ContentType.
 
-        Since queryset is actually a list of heterogeneous objects,
-        this filter is applied in the view after objects are collected.
+        This is a form-only filter; the view filters each real model queryset.
         """
         # Return queryset unchanged; filtering happens in view
         return queryset
@@ -158,8 +155,7 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
     def filter_owner(self, queryset, name, value):
         """Filter by owner/submitter.
 
-        Since queryset is actually a list of heterogeneous objects,
-        this filter is applied in the view after objects are collected.
+        This is a form-only filter; the view filters each real model queryset.
         """
         # Return queryset unchanged; filtering happens in view
         return queryset
@@ -167,8 +163,7 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
     def filter_ordering(self, queryset, name, value):
         """Apply sorting to the queryset.
 
-        Since queryset is actually a list of heterogeneous objects,
-        this is handled in the view after objects are collected.
+        This is a form-only filter; the view sorts lightweight references.
         """
         # Return queryset unchanged; sorting happens in view
         return queryset

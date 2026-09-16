@@ -77,12 +77,12 @@ not part of this first change.
 
 ### 4. Authenticated list and review performance
 
-- [ ] Measure anonymous, owner, moderator, and staff paths separately.
-- [ ] Batch or annotate per-row latest-submission/review-feedback indicators.
-- [ ] Preserve ownership, editor grants, and review-cycle semantics in tests.
-- [ ] Avoid materializing all heterogeneous review results before pagination;
+- [x] Measure anonymous, owner, moderator, and staff paths separately.
+- [x] Batch or annotate per-row latest-submission/review-feedback indicators.
+- [x] Preserve ownership, editor grants, and review-cycle semantics in tests.
+- [x] Avoid materializing all heterogeneous review results before pagination;
   evaluate lightweight ordered IDs or a database-level union.
-- [ ] Verify filtering, ordering, totals, and later pages with larger datasets.
+- [x] Verify filtering, ordering, totals, and later pages with larger datasets.
 
 ### 5. Map loading and repeat visits
 
@@ -312,6 +312,87 @@ Verified query budgets in isolated Django tests:
   without that extra count. The one-query checkbox regression protects this
   behavior; no lint suppression or cross-request cache is needed.
 
+### Step 4 execution (2026-09-14)
+
+- Continued in the existing isolated `collection-filter-overhead` worktree because
+  step 3 was still uncommitted. Step 3 changes were preserved, not overwritten or
+  discarded. PR #404 (step 2) was merged by the start of this step.
+- Compared anonymous, owner, non-owner moderator, and non-owner staff row-policy
+  paths at page sizes 1 and 10. With permission/content-type/editor caches warmed,
+  owner row loading plus feedback evaluation grew from 3 to 21 SQL queries;
+  anonymous/non-owner paths stayed at one. This isolates per-row feedback work,
+  not session loading, pagination, or cold authorization-cache costs.
+- Added one owner-feedback batch per model represented on the selected list page.
+  Only the page's owned IDs enter the annotation query. Scalar subqueries select
+  the latest submission and latest non-owner, non-submission action, ordered by
+  `(created_at, id)`. Comparing these pairs reproduces current review-cycle
+  semantics without fetching action objects per row. The lookups match existing
+  content-type/object/action index prefixes; no schema change is added.
+- During review, moved annotations off the full filtered queryset and into that
+  page-ID batch. This trades one extra SQL round trip for bounded feedback work,
+  avoiding evaluation across all matches when filters use DISTINCT. The batch
+  regression verifies its IDs exactly equal the selected page's owned IDs and
+  that it does not inherit the full queryset's DISTINCT operation.
+- Unpaginated map views remain lazy, and galleries that do not render feedback
+  cells skip the batch. Two extra red/green tests protect those cases. Authenticated
+  table pages now load rows/flags during context preparation; the paginator still
+  issues only one COUNT, separately asserted in the step 3 regression.
+- A SQL CASE evaluates the flag for the current owner's rows. Non-owner rows
+  receive no cached boolean, and anonymous querysets are unchanged. The model
+  property retains its original fallback, so direct access and detail/review
+  contexts keep their existing behavior. This does not grant editors owner-only
+  feedback capabilities and adds no persistent cache.
+- Kept timestamp precedence, event-ID ties, resubmission resets, current ownership,
+  and content-type isolation. A later owner comment does not hide earlier valid
+  moderator feedback. Used scalar latest-event comparisons rather than a nested
+  per-feedback-action search to avoid repeatedly locating the latest submission
+  for every historical candidate action.
+- Replaced the dashboard's eager collection loops with shared reference selection
+  and page loading, with approval to remove/update the obsolete explanations.
+  SQL applies existing per-model filters; only `(model, id, name, submitted_at)`
+  references are collected and sorted. Only the selected HTML page is loaded as
+  full model objects with the existing related-object joins.
+- Removed the heuristic cap from HTML reference selection, so paginator totals
+  and later pages cover the whole eligible queue. Kept `collect_review_items()`
+  as an unpaginated compatibility path for the JSON queue, including its previous
+  unfiltered per-model cap and filtered-result behavior. Both paths reuse the same
+  per-model filtering, ordering, and object-loading helpers.
+- Retained Python case-insensitive ordering, including Unicode, and existing
+  handling of null submission dates and models without a name field. Added a
+  primary-key tiebreaker to initial unfiltered per-model ordering. Avoided a SQL
+  UNION/name-collation rewrite in this step to limit semantic changes.
+- Object loading reuses the visibility-filtered querysets. If an item leaves
+  review between reference selection and loading, it is omitted rather than
+  rendered from stale metadata. In that race the page can be short and the total
+  reflects the reference snapshot; this is not transactionally consistent paging.
+
+Isolated regression observations:
+
+| Operation | Before | After |
+| --- | ---: | ---: |
+| Owner, load 1 row and evaluate policy | 3 queries | 2 queries |
+| Owner, load 10 rows and evaluate policies | 21 queries | 2 queries |
+| Anonymous/non-owner moderator/staff, same warmed paths | 1 query | 1 query |
+| Full objects loaded to display 5 filtered items | 100 | 5 |
+| Unfiltered eligible total in the 100-item fixture | 60 (capped) | 100 |
+| Last page in that fixture (5 items/page) | Clamped to page 12 | Page 20 |
+
+- RED: 14 tests produced 12 expected failures (including subtests), covering query
+  growth, page-object loading, truncated totals, and name sorting outside the old
+  date window. The first implementation passed all 14 tests.
+- Expanded focused verification passed 40 tests after the final batch refinement,
+  including the new step 4 tests and earlier redirect, scope-count, and
+  collection-list budgets.
+- Remaining limits: metadata collection/sorting is still O(N) in matching items;
+  only full-object loading is page-bounded. Database-native pagination remains a
+  possible follow-up for substantially larger queues. The JSON queue's existing
+  cap and per-item last-comment queries were intentionally not redesigned here.
+  No production-like latency or database-work reduction is inferred solely from
+  the SQL round-trip counts.
+- Final broader verification: 4,415 tests completed without failures, 861 skipped.
+  Ruff lint, formatting, and missing-migration checks passed. No schema or asset
+  changes were needed for step 4.
+
 ## Verification log
 
 Commands below use the BRIT-ops scripts directory as `$OPS` and the isolated
@@ -484,3 +565,62 @@ git diff --cached --check
 - Changes are not yet committed or deployed. Steps 4–8 and deployed performance
   measurements remain pending; persistent Explorer caching is a separately
   evaluated follow-up, not silently enabled here.
+
+### Step 4 (2026-09-14)
+
+```bash
+bash "$OPS/brit-tdd-preflight" "$PWD"
+
+"$OPS/brit-worktree-test" collection-filter-overhead --print-targets -- \
+  utils.object_management.tests.test_views.OwnerReviewFeedbackQueryTests \
+  utils.object_management.tests.test_views.ReviewDashboardPaginationQueryTests
+
+"$OPS/brit-worktree-test" collection-filter-overhead --parallel 1 -- \
+  utils.object_management.tests.test_views.OwnerReviewFeedbackQueryTests \
+  utils.object_management.tests.test_views.ReviewDashboardPaginationQueryTests
+
+"$OPS/brit-worktree-test" collection-filter-overhead --parallel 1 -- \
+  utils.object_management.tests.test_views.OwnerReviewFeedbackQueryTests \
+  utils.object_management.tests.test_views.ReviewDashboardPaginationQueryTests \
+  utils.object_management.tests.test_views.SharedListScopeCountTestCase \
+  utils.object_management.tests.test_views.FilterDefaultsMixinTest \
+  sources.waste_collection.tests.test_views.CollectionListQueryTestCase
+
+"$OPS/brit-worktree-test" collection-filter-overhead -- \
+  utils.object_management.tests \
+  utils.tests.test_views \
+  maps.tests.test_views \
+  materials.tests.test_views \
+  sources.waste_collection.tests.test_views \
+  sources.waste_collection.tests.test_filters \
+  sources.waste_collection.tests.test_viewsets \
+  bibliography.tests.test_views \
+  inventories.tests.test_views \
+  processes.tests.test_views
+
+"$OPS/brit-worktree-check" collection-filter-overhead --no-up
+
+git diff --check
+git diff --cached --check
+```
+
+- Initial RED: 14 tests, 12 expected failures including subtests. GREEN: all 14
+  passed. An initial broader run passed 4,412 tests before the page-batch refinement.
+- Added and ran two more failing tests for unpaginated-view laziness and galleries
+  without feedback cells; guarded the batch to fix both. Added a DISTINCT/page-ID
+  regression and verified the final expanded focused suite: 40 tests passed.
+- Re-ran the full listed broader selection against the final page-batched code:
+  4,415 tests, no failures, 861 skipped; includes permissions, editor grants, API
+  contracts, model review-cycle behavior, and representative app views.
+- The date-filter test emits the same pre-existing naive-datetime warning from the
+  form's dummy queryset in both RED and GREEN runs. Actual queue date filtering
+  continues to use the existing per-model date lookups; warning cleanup was not
+  bundled into this optimization.
+- Lint/format and missing-migration checks passed. No new migrations, assets, or
+  cross-request caches were added. The earlier anonymous nine-query render budget
+  and zero-query default redirects remain green.
+- `$OPS/brit-worktree-stop collection-filter-overhead`: completed after the final
+  gates; the isolated stack is stopped and its test volumes are preserved.
+- Steps 3 and 4 remain uncommitted together in this isolated worktree. Production
+  deployment, browser profiling, very-large-queue SQL pagination, and steps 5–8
+  remain follow-up work; the main checkout and production database were untouched.

@@ -6,6 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.functional import cached_property
 
@@ -163,6 +164,58 @@ class ObjectEditorGrant(models.Model):
             content_type=ContentType.objects.get_for_model(obj.__class__),
             object_id=obj.pk,
         )
+
+
+def annotate_owner_review_feedback(queryset, user):
+    if not user or not user.is_authenticated:
+        return queryset
+
+    content_type = ContentType.objects.get_for_model(queryset.model)
+    actions = ReviewAction.objects.filter(
+        content_type=content_type, object_id=models.OuterRef("pk")
+    ).order_by("-created_at", "-pk")
+    submission = actions.filter(action=ReviewAction.ACTION_SUBMITTED)
+    feedback = actions.exclude(user_id=user.pk).exclude(
+        action=ReviewAction.ACTION_SUBMITTED
+    )
+    queryset = queryset.alias(
+        _review_submission_at=models.Subquery(submission.values("created_at")[:1]),
+        _review_submission_id=models.Subquery(submission.values("pk")[:1]),
+        _review_feedback_at=models.Subquery(feedback.values("created_at")[:1]),
+        _review_feedback_id=models.Subquery(feedback.values("pk")[:1]),
+    )
+    has_feedback = Q(_review_feedback_at__gt=models.F("_review_submission_at")) | Q(
+        _review_feedback_at=models.F("_review_submission_at"),
+        _review_feedback_id__gt=models.F("_review_submission_id"),
+    )
+    return queryset.annotate(
+        _owner_review_feedback=models.Case(
+            models.When(
+                owner_id=user.pk, then=Coalesce(has_feedback, models.Value(False))
+            ),
+            default=models.Value(None),
+            output_field=models.BooleanField(),
+        )
+    )
+
+
+def populate_owner_review_feedback(objects, user):
+    if not user or not user.is_authenticated:
+        return
+
+    owned_by_model = {}
+    for obj in objects:
+        if obj.owner_id == user.pk:
+            owned_by_model.setdefault(type(obj), []).append(obj)
+    for model, owned_objects in owned_by_model.items():
+        queryset = model._base_manager.filter(pk__in=[obj.pk for obj in owned_objects])
+        feedback = dict(
+            annotate_owner_review_feedback(queryset, user).values_list(
+                "pk", "_owner_review_feedback"
+            )
+        )
+        for obj in owned_objects:
+            obj._owner_review_feedback = feedback.get(obj.pk)
 
 
 class UserCreatedObjectQuerySet(models.QuerySet):
@@ -505,6 +558,9 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
     @property
     def has_review_feedback(self):
         """Return whether a newer non-owner review action exists for this cycle."""
+        annotated_feedback = getattr(self, "_owner_review_feedback", None)
+        if annotated_feedback is not None:
+            return annotated_feedback
         return self.latest_review_feedback_action is not None
 
     @property
