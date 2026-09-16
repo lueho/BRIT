@@ -1,6 +1,5 @@
 from rest_framework.exceptions import PermissionDenied
 
-from utils.object_management.permissions import get_object_policy
 from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 from .filters import (
@@ -17,6 +16,7 @@ from .models import (
     Sample,
     SampleSeries,
 )
+from .permissions import can_add_data_to_sample
 from .serializers import (
     ComponentMeasurementReadSerializer,
     ComponentMeasurementWriteSerializer,
@@ -42,11 +42,14 @@ class SampleBoundMutationViewSetMixin:
 
         sample = serializer.validated_data["sample"]
         instance = serializer.instance
-        if sample is None or (instance is not None and instance.sample_id == sample.pk):
-            return
-
-        policy = get_object_policy(self.request.user, sample, request=self.request)
-        if not policy[self.sample_policy_key]:
+        previous_sample_id = instance.sample_id if instance is not None else None
+        if not can_add_data_to_sample(
+            self.request.user,
+            sample,
+            previous_sample_id,
+            self.sample_policy_key,
+            request=self.request,
+        ):
             raise PermissionDenied("You cannot add data to this sample.")
 
     def perform_create(self, serializer):

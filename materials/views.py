@@ -121,6 +121,7 @@ from .models import (
     SampleSeries,
     get_or_create_sample_substrate_category,
 )
+from .permissions import can_add_data_to_sample
 from .serializers import (
     SampleModelSerializer,
     SampleSeriesModelSerializer,
@@ -1406,17 +1407,16 @@ class SampleUpdateView(UserCreatedObjectUpdateView):
             raise Http404("Unknown sample section.")
         self.section = {**SAMPLE_SECTIONS[key], "key": key}
         self.inlines = None
-        policy_key = self.section.get("policy", "can_edit")
         with transaction.atomic():
-            if request.user.is_authenticated:
-                policy = get_object_policy(
-                    request.user, self.get_object(), request=request
-                )
-                if not policy.get(policy_key, False):
-                    raise PermissionDenied(
-                        f"You do not have permission to edit the {self.section['label']} section."
-                    )
             return super().dispatch(request, *args, **kwargs)
+
+    def test_func(self):
+        if not self.request.user.is_authenticated:
+            return False
+        policy = get_object_policy(
+            self.request.user, self.get_object(), request=self.request
+        )
+        return bool(policy.get(self.section.get("policy", "can_edit"), False))
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -1594,10 +1594,14 @@ class SampleRelationMutationPermissionMixin:
                 .values_list("sample_id", flat=True)
                 .get()
             )
-        if original_sample_id != sample.pk:
-            policy = get_object_policy(self.request.user, sample, request=self.request)
-            if not policy[self.sample_policy_key]:
-                raise PermissionDenied("You cannot add data to this sample.")
+        if not can_add_data_to_sample(
+            self.request.user,
+            sample,
+            original_sample_id,
+            self.sample_policy_key,
+            request=self.request,
+        ):
+            raise PermissionDenied("You cannot add data to this sample.")
         return super().form_valid(form)
 
 
