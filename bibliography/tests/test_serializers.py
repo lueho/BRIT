@@ -231,7 +231,7 @@ class HyperlinkedSourceSerializerTestCase(TestCase):
         )
         with mute_signals(post_save):
             source = Source.objects.create(
-                type="custom",
+                type="misc",
                 title="Test Source",
                 citation_key="TS1",
                 licence=licence,
@@ -335,7 +335,7 @@ class HyperlinkedSourceSerializerTestCase(TestCase):
         )
         with mute_signals(post_save):
             ordered_source = Source.objects.create(
-                type="custom",
+                type="misc",
                 title="Ordered Source",
                 citation_key="OS1",
                 licence=licence,

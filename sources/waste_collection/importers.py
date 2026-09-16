@@ -773,7 +773,7 @@ class CollectionImporter:
                 title = title[:500]
                 if not title or title in desired_titles:
                     continue
-                source, created = Source.objects.get_or_create_custom_by_title(
+                source, created = Source.objects.get_or_create_misc_by_title(
                     owner=self.owner,
                     title=title,
                     defaults={"publication_status": "private"},

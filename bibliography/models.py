@@ -115,16 +115,143 @@ class Licence(NamedUserCreatedObject):
 
 
 SOURCE_TYPES = (
-    ("article", "article"),
-    ("dataset", "dataset"),
-    ("book", "book"),
-    ("website", "website"),
-    ("custom", "custom"),
+    ("article", "Journal article"),
+    ("book", "Book"),
+    ("incollection", "Book chapter"),
+    ("proceedings", "Conference proceedings"),
+    ("inproceedings", "Conference paper"),
+    ("report", "Report"),
+    ("thesis", "Thesis"),
+    ("preprint", "Preprint"),
+    ("dataset", "Dataset"),
+    ("standard", "Standard"),
+    ("patent", "Patent"),
+    ("online", "Online resource"),
+    ("periodical", "Periodical"),
+    ("misc", "Miscellaneous"),
 )
+
+# Maps each internal source type to the type vocabularies used by BibTeX,
+# biblatex, CSL, Zotero, RIS, and CrossRef. Citavi and other literature
+# management systems interoperate through the BibTeX/RIS columns.
+SOURCE_TYPE_MAPPINGS = {
+    "article": {
+        "bibtex": "article",
+        "biblatex": "article",
+        "csl": "article-journal",
+        "zotero": "journalArticle",
+        "ris": "JOUR",
+        "crossref": "journal-article",
+    },
+    "book": {
+        "bibtex": "book",
+        "biblatex": "book",
+        "csl": "book",
+        "zotero": "book",
+        "ris": "BOOK",
+        "crossref": "book",
+    },
+    "incollection": {
+        "bibtex": "incollection",
+        "biblatex": "incollection",
+        "csl": "chapter",
+        "zotero": "bookSection",
+        "ris": "CHAP",
+        "crossref": "book-chapter",
+    },
+    "proceedings": {
+        "bibtex": "proceedings",
+        "biblatex": "proceedings",
+        "csl": "book",
+        "zotero": "book",
+        "ris": "CONF",
+        "crossref": "proceedings",
+    },
+    "inproceedings": {
+        "bibtex": "inproceedings",
+        "biblatex": "inproceedings",
+        "csl": "paper-conference",
+        "zotero": "conferencePaper",
+        "ris": "CPAPER",
+        "crossref": "proceedings-article",
+    },
+    "report": {
+        "bibtex": "techreport",
+        "biblatex": "report",
+        "csl": "report",
+        "zotero": "report",
+        "ris": "RPRT",
+        "crossref": "report",
+    },
+    "thesis": {
+        "bibtex": "phdthesis",
+        "biblatex": "thesis",
+        "csl": "thesis",
+        "zotero": "thesis",
+        "ris": "THES",
+        "crossref": "dissertation",
+    },
+    "preprint": {
+        "bibtex": "unpublished",
+        "biblatex": "unpublished",
+        "csl": "article",
+        "zotero": "preprint",
+        "ris": "UNPB",
+        "crossref": "posted-content",
+    },
+    "dataset": {
+        "bibtex": "misc",
+        "biblatex": "dataset",
+        "csl": "dataset",
+        "zotero": "dataset",
+        "ris": "DATA",
+        "crossref": "dataset",
+    },
+    "standard": {
+        "bibtex": "misc",
+        "biblatex": "manual",
+        "csl": "standard",
+        "zotero": "standard",
+        "ris": "STAND",
+        "crossref": "standard",
+    },
+    "patent": {
+        "bibtex": "misc",
+        "biblatex": "patent",
+        "csl": "patent",
+        "zotero": "patent",
+        "ris": "PAT",
+        "crossref": "other",
+    },
+    "online": {
+        "bibtex": "misc",
+        "biblatex": "online",
+        "csl": "webpage",
+        "zotero": "webpage",
+        "ris": "ELEC",
+        "crossref": "other",
+    },
+    "periodical": {
+        "bibtex": "misc",
+        "biblatex": "periodical",
+        "csl": "periodical",
+        "zotero": "journalArticle",
+        "ris": "JFULL",
+        "crossref": "journal-issue",
+    },
+    "misc": {
+        "bibtex": "misc",
+        "biblatex": "misc",
+        "csl": "document",
+        "zotero": "document",
+        "ris": "GEN",
+        "crossref": "other",
+    },
+}
 
 
 class SourceManager(UserCreatedObjectManager):
-    def get_or_create_custom_by_title(
+    def get_or_create_misc_by_title(
         self,
         *,
         owner,
@@ -132,13 +259,13 @@ class SourceManager(UserCreatedObjectManager):
         defaults: dict | None = None,
     ) -> tuple[object, bool]:
         source = (
-            self.filter(owner=owner, type="custom", title=title).order_by("id").first()
+            self.filter(owner=owner, type="misc", title=title).order_by("id").first()
         )
         if source is not None:
             return source, False
         return self.get_or_create(
             owner=owner,
-            type="custom",
+            type="misc",
             title=title,
             defaults=defaults or {},
         )
@@ -147,7 +274,7 @@ class SourceManager(UserCreatedObjectManager):
 class Source(UserCreatedObject):
     objects = SourceManager()
 
-    type = models.CharField(max_length=255, choices=SOURCE_TYPES, default="custom")
+    type = models.CharField(max_length=255, choices=SOURCE_TYPES, default="misc")
     authors = models.ManyToManyField(
         Author, through="SourceAuthor", related_name="sources"
     )
