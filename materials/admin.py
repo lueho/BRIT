@@ -71,11 +71,12 @@ class MaterialComponentAdmin(admin.ModelAdmin):
         "name",
         "abbreviation",
         "comparable_component",
+        "is_aggregate",
         "owner",
         "publication_status",
     )
     search_fields = ("name", "abbreviation", "description")
-    list_filter = ("publication_status",)
+    list_filter = ("publication_status", "is_aggregate")
     ordering = ("name",)
 
 
