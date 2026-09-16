@@ -7116,6 +7116,51 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, private_basis.name)
         self.assertContains(response, private_canonical.name)
 
+    def test_component_detail_hides_private_derived_and_comparable_components_for_anonymous(
+        self,
+    ):
+        private_derived = MaterialComponent.objects.create(
+            owner=self.outsider,
+            name="Outsider Private Derived Component",
+            publication_status="private",
+            basis_component=self.component,
+        )
+        private_comparable = MaterialComponent.objects.create(
+            owner=self.outsider,
+            name="Outsider Private Comparable Component",
+            publication_status="private",
+            comparable_component=self.component,
+        )
+
+        response = self.get_detail("materialcomponent-detail", self.component)
+
+        self.assertNotContains(response, private_derived.name)
+        self.assertNotContains(response, private_comparable.name)
+
+    def test_component_moderator_sees_review_derived_and_comparable_components(
+        self,
+    ):
+        review_derived = MaterialComponent.objects.create(
+            owner=self.outsider,
+            name="Moderator Outsider Review Derived Component",
+            publication_status="review",
+            basis_component=self.component,
+        )
+        review_comparable = MaterialComponent.objects.create(
+            owner=self.outsider,
+            name="Moderator Outsider Review Comparable Component",
+            publication_status="review",
+            comparable_component=self.component,
+        )
+        permission = Permission.objects.get(codename="can_moderate_materialcomponent")
+        self.member.user_permissions.add(permission)
+        self.client.force_login(self.member)
+
+        response = self.get_detail("materialcomponent-detail", self.component)
+
+        self.assertContains(response, review_derived.name)
+        self.assertContains(response, review_comparable.name)
+
     def test_material_review_detail_includes_related_samples(self):
         review_material = Material.objects.create(
             owner=self.owner,

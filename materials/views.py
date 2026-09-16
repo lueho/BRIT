@@ -516,18 +516,18 @@ class ComponentDetailView(UserCreatedObjectDetailView):
             context["derived_components_total"],
             context["derived_components_more"],
         ) = _capped_related(
-            filter_queryset_for_user(obj.derived_components.all(), user).order_by(
-                "name", "pk"
-            )
+            filter_queryset_for_user(
+                MaterialComponent.objects.filter(basis_component=obj), user
+            ).order_by("name", "pk")
         )
         (
             context["comparable_variants"],
             context["comparable_variants_total"],
             context["comparable_variants_more"],
         ) = _capped_related(
-            filter_queryset_for_user(obj.comparable_variants.all(), user).order_by(
-                "name", "pk"
-            )
+            filter_queryset_for_user(
+                MaterialComponent.objects.filter(comparable_component=obj), user
+            ).order_by("name", "pk")
         )
         (
             context["related_groups"],
@@ -746,9 +746,9 @@ class MaterialPropertyDetailView(UserCreatedObjectDetailView):
             context["comparable_variants_total"],
             context["comparable_variants_more"],
         ) = _capped_related(
-            filter_queryset_for_user(obj.comparable_variants.all(), user).order_by(
-                "name", "pk"
-            )
+            filter_queryset_for_user(
+                MaterialProperty.objects.filter(comparable_property=obj), user
+            ).order_by("name", "pk")
         )
         samples = (
             filter_queryset_for_user(
