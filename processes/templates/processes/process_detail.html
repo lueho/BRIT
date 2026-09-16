@@ -383,9 +383,8 @@
                     {% if source.title and source.citation_key or source.year %}
                       <span class="small text-muted">
                         {% if source.title and source.citation_key %}
-                          {{ source.citation_key }}{% if source.year %} · {% endif %}
+                          {{ source.citation_key }}
                         {% endif %}
-                        {% if source.year %}{{ source.year }}{% endif %}
                       </span>
                     {% endif %}
                   </a>
