@@ -236,12 +236,17 @@
         }
 
         async searchOptions(select, query) {
+            const { options } = await this.fetchOptions(select, query, 1);
+            return options.slice(0, 15);
+        }
+
+        async fetchOptions(select, query, page) {
             const valueField = select.dataset.valueField || "id";
             const labelField = select.dataset.labelField === "label" ? "label" : "name";
             const url = new URL(select.dataset.autocompleteUrl, window.location.href);
             if (!select.dataset.autocompleteUrl || url.origin !== window.location.origin || !/^https?:$/.test(url.protocol) || url.username || url.password) throw new Error("Untrusted autocomplete endpoint");
             url.searchParams.set("q", query);
-            url.searchParams.set("page", "1");
+            url.searchParams.set("page", String(page));
             const response = await fetch(url.href, {
                 method: "GET",
                 credentials: "same-origin",
@@ -250,14 +255,15 @@
             if (!response.ok || response.redirected) throw new Error("Search request failed");
             const data = await response.json();
             if (!Array.isArray(data.results)) throw new Error("Unexpected search response");
-            return data.results.filter((result) => result &&
+            const options = data.results.filter((result) => result &&
                 (typeof result[valueField] === "string" || Number.isFinite(result[valueField])) &&
                 String(result[valueField]) !== "" && typeof result[labelField] === "string"
-            ).slice(0, 15).map((result) => {
+            ).map((result) => {
                 const option = { [valueField]: String(result[valueField]), [labelField]: result[labelField] };
                 if (typeof result.symbol === "string" && result.symbol !== "") option.symbol = result.symbol;
                 return option;
             });
+            return { options, hasMore: data.has_more === true && options.length > 0 };
         }
 
         async mountEditor(active, html) {
@@ -417,9 +423,13 @@
         async resolveReference(select, name) {
             const valueField = select.dataset.valueField || "id";
             const labelField = select.dataset.labelField === "label" ? "label" : "name";
-            const results = await this.searchOptions(select, name);
             const wanted = name.trim().toLowerCase();
-            const matches = results.filter((result) => [result[labelField], result.symbol].some((text) => typeof text === "string" && text.trim().toLowerCase() === wanted));
+            const matches = [];
+            for (let page = 1; page <= 20; page += 1) {
+                const { options, hasMore } = await this.fetchOptions(select, name, page);
+                matches.push(...options.filter((option) => [option[labelField], option.symbol].some((text) => typeof text === "string" && text.trim().toLowerCase() === wanted)));
+                if (matches.length > 1 || !hasMore) break;
+            }
             if (matches.length !== 1 || !select.tomselect) return false;
             select.tomselect.addOption(matches[0]);
             select.tomselect.addItem(String(matches[0][valueField]));
