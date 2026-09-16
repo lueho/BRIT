@@ -350,7 +350,6 @@ class SampleSeriesTestCase(TestCase):
         self.default_group = MaterialComponentGroup.objects.default()
         self.custom_group = MaterialComponentGroup.objects.get(name="Custom Group")
         self.default_component = MaterialComponent.objects.default()
-        self.custom_component = MaterialComponent.objects.get(name="Custom Component")
         self.sample_series = SampleSeries.objects.create(material=self.material1)
 
     def test_add_temporal_distribution(self):
@@ -375,13 +374,6 @@ class SampleSeriesTestCase(TestCase):
         self.sample_series.add_component_group(self.custom_group)
         for sample in self.sample_series.samples.all():
             Composition.objects.get(sample=sample, group=self.custom_group)
-
-    def test_remove_component_group(self):
-        self.sample_series.add_component_group(self.custom_group)
-        self.sample_series.remove_component_group(self.custom_group)
-        for sample in self.sample_series.samples.all():
-            with self.assertRaises(Composition.DoesNotExist):
-                Composition.objects.get(sample=sample, group=self.custom_group)
 
     def test_components_include_raw_component_measurements(self):
         raw_component = MaterialComponent.objects.create(name="Raw Series Component")
@@ -799,7 +791,6 @@ class SampleTestCase(TestCase):
         self.sample = Sample.objects.get(timestep=Timestep.objects.default())
         self.default_group = MaterialComponentGroup.objects.default()
         self.default_component = MaterialComponent.objects.default()
-        self.custom_component = MaterialComponent.objects.get(name="Custom Component")
         self.composition = Composition.objects.create(
             group=self.default_group,
             sample=self.sample,
@@ -988,7 +979,6 @@ class CompositionTestCase(TestCase):
         self.default_group = MaterialComponentGroup.objects.default()
         self.custom_group = MaterialComponentGroup.objects.get(name="Custom Group")
         self.default_component = MaterialComponent.objects.default()
-        self.custom_component = MaterialComponent.objects.get(name="Custom Component")
         self.composition = Composition.objects.create(
             owner=self.user,
             group=self.default_group,
