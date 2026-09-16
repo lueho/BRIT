@@ -87,7 +87,9 @@
                     {% endfor %}
                 </ul>
                 {% if distribution.more %}
-                    <p class="sdv2-related-meta mt-2 mb-0">{{ distribution.more }} more not shown</p>
+                    <p class="sdv2-related-meta mt-2 mb-0">
+                        {{ distribution.more }} more not shown — <a href="{{ distribution.list_url }}">view all {{ distribution.published_total }} published</a>
+                    </p>
                 {% endif %}
             {% endif %}
         </section>

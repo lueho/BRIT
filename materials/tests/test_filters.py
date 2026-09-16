@@ -6,8 +6,16 @@ from django.utils import timezone
 
 from utils.properties.models import Unit
 
-from ..filters import MaterialListFilter, SampleFilter
+from ..filters import (
+    MaterialComponentGroupListFilter,
+    MaterialComponentListFilter,
+    MaterialListFilter,
+    MaterialPropertyListFilter,
+    SampleFilter,
+    SampleSeriesFilter,
+)
 from ..models import (
+    AnalyticalMethod,
     ComponentMeasurement,
     Composition,
     Material,
@@ -17,6 +25,7 @@ from ..models import (
     MaterialProperty,
     MaterialPropertyValue,
     Sample,
+    SampleSeries,
     get_sample_substrate_category_name,
 )
 
@@ -368,6 +377,201 @@ class SampleFilterTestCase(TestCase):
         )
 
         self.assertEqual(list(filtr.qs), [])
+
+
+class RelatedListFilterTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.category = MaterialCategory.objects.create(name="Target category")
+        cls.other_category = MaterialCategory.objects.create(name="Other category")
+        cls.basis_component = MaterialComponent.objects.create(
+            name="Basis component",
+            publication_status="published",
+        )
+        cls.target_component = MaterialComponent.objects.create(
+            name="Target component",
+            publication_status="published",
+            basis_component=cls.basis_component,
+            comparable_component=cls.basis_component,
+        )
+        cls.other_component = MaterialComponent.objects.create(
+            name="Other component",
+            publication_status="published",
+        )
+        cls.target_component.categories.add(cls.category)
+        cls.group = MaterialComponentGroup.objects.create(
+            name="Target group",
+            publication_status="published",
+        )
+        cls.other_group = MaterialComponentGroup.objects.create(
+            name="Other group",
+            publication_status="published",
+        )
+        cls.material = Material.objects.create(
+            name="Target material",
+            publication_status="published",
+        )
+        cls.other_material = Material.objects.create(
+            name="Other material",
+            publication_status="published",
+        )
+        cls.series = SampleSeries.objects.create(
+            name="Target series",
+            material=cls.material,
+            publication_status="published",
+        )
+        cls.other_series = SampleSeries.objects.create(
+            name="Other series",
+            material=cls.other_material,
+            publication_status="published",
+        )
+        cls.sample = Sample.objects.create(
+            name="Target sample",
+            material=cls.material,
+            series=cls.series,
+            publication_status="published",
+        )
+        cls.other_sample = Sample.objects.create(
+            name="Other sample",
+            material=cls.other_material,
+            series=cls.other_series,
+            publication_status="published",
+        )
+        unit = Unit.objects.filter(name="%").first()
+        if unit is None:
+            unit = Unit.objects.create(name="%")
+        ComponentMeasurement.objects.create(
+            sample=cls.sample,
+            group=cls.group,
+            component=cls.target_component,
+            unit=unit,
+            average=Decimal("1"),
+            publication_status="published",
+        )
+        ComponentMeasurement.objects.create(
+            sample=cls.other_sample,
+            group=cls.other_group,
+            component=cls.other_component,
+            unit=unit,
+            average=Decimal("2"),
+            publication_status="published",
+        )
+        cls.property = MaterialProperty.objects.create(
+            name="Target property",
+            publication_status="published",
+        )
+        cls.other_property = MaterialProperty.objects.create(
+            name="Other property",
+            publication_status="published",
+        )
+        cls.method = AnalyticalMethod.objects.create(
+            name="Target method",
+            publication_status="published",
+        )
+        cls.other_method = AnalyticalMethod.objects.create(
+            name="Other method",
+            publication_status="published",
+        )
+        MaterialPropertyValue.objects.create(
+            sample=cls.sample,
+            property=cls.property,
+            analytical_method=cls.method,
+            average=Decimal("1"),
+            publication_status="published",
+        )
+        MaterialPropertyValue.objects.create(
+            sample=cls.other_sample,
+            property=cls.other_property,
+            analytical_method=cls.other_method,
+            average=Decimal("2"),
+            publication_status="published",
+        )
+
+    def test_component_category_filter_matches_related_components(self):
+        filtr = MaterialComponentListFilter(
+            data={"category": self.category.pk},
+            queryset=MaterialComponent.objects.all(),
+        )
+
+        self.assertIn(self.target_component, filtr.qs)
+        self.assertNotIn(self.other_component, filtr.qs)
+
+    def test_component_basis_filter_matches_related_components(self):
+        filtr = MaterialComponentListFilter(
+            data={"basis_component": self.basis_component.pk},
+            queryset=MaterialComponent.objects.all(),
+        )
+
+        self.assertIn(self.target_component, filtr.qs)
+        self.assertNotIn(self.other_component, filtr.qs)
+
+    def test_component_comparable_filter_matches_related_components(self):
+        filtr = MaterialComponentListFilter(
+            data={"comparable_component": self.basis_component.pk},
+            queryset=MaterialComponent.objects.all(),
+        )
+
+        self.assertIn(self.target_component, filtr.qs)
+        self.assertNotIn(self.other_component, filtr.qs)
+
+    def test_component_group_filter_matches_related_components(self):
+        filtr = MaterialComponentListFilter(
+            data={"component_group": self.group.pk},
+            queryset=MaterialComponent.objects.all(),
+        )
+
+        self.assertIn(self.target_component, filtr.qs)
+        self.assertNotIn(self.other_component, filtr.qs)
+
+    def test_component_group_filter_matches_measured_component(self):
+        filtr = MaterialComponentGroupListFilter(
+            data={"component": self.target_component.pk},
+            queryset=MaterialComponentGroup.objects.all(),
+        )
+
+        self.assertIn(self.group, filtr.qs)
+        self.assertNotIn(self.other_group, filtr.qs)
+
+    def test_property_filter_matches_comparable_property(self):
+        comparable = MaterialProperty.objects.create(
+            name="Comparable property",
+            publication_status="published",
+            comparable_property=self.property,
+        )
+        filtr = MaterialPropertyListFilter(
+            data={"comparable_property": self.property.pk},
+            queryset=MaterialProperty.objects.all(),
+        )
+
+        self.assertIn(comparable, filtr.qs)
+        self.assertNotIn(self.other_property, filtr.qs)
+
+    def test_sample_analytical_method_filter_matches_related_samples(self):
+        filtr = SampleFilter(
+            data={"analytical_method": self.method.pk},
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertIn(self.sample, filtr.qs)
+        self.assertNotIn(self.other_sample, filtr.qs)
+
+    def test_sample_series_filter_matches_related_samples(self):
+        filtr = SampleFilter(
+            data={"series": self.series.pk},
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertIn(self.sample, filtr.qs)
+        self.assertNotIn(self.other_sample, filtr.qs)
+
+    def test_sample_series_filter_matches_material_by_primary_key(self):
+        filtr = SampleSeriesFilter(
+            data={"material": self.material.pk},
+            queryset=SampleSeries.objects.all(),
+        )
+
+        self.assertIn(self.series, filtr.qs)
+        self.assertNotIn(self.other_series, filtr.qs)
 
 
 class MaterialListFilterFreeTextSearchTestCase(TestCase):

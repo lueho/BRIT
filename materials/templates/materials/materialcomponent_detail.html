@@ -44,7 +44,7 @@
                         <dd>
                             {% for component in derived_components %}
                                 <a href="{% url 'materialcomponent-detail' component.pk %}">{{ component.name }}</a>{% if not forloop.last %}, {% endif %}
-                            {% endfor %}{% if derived_components_more %} and {{ derived_components_more }} more{% endif %}
+                            {% endfor %}{% if derived_components_more %} and {{ derived_components_more }} more — <a href="{{ derived_components_list_url }}">view all {{ derived_components_published_total }} published</a>{% endif %}
                         </dd>
                     </div>
                 {% endif %}
@@ -54,13 +54,13 @@
                         <dd>
                             {% for component in comparable_variants %}
                                 <a href="{% url 'materialcomponent-detail' component.pk %}">{{ component.name }}</a>{% if not forloop.last %}, {% endif %}
-                            {% endfor %}{% if comparable_variants_more %} and {{ comparable_variants_more }} more{% endif %}
+                            {% endfor %}{% if comparable_variants_more %} and {{ comparable_variants_more }} more — <a href="{{ comparable_variants_list_url }}">view all {{ comparable_variants_published_total }} published</a>{% endif %}
                         </dd>
                     </div>
                 {% endif %}
             </dl>
         </section>
     {% endif %}
-    {% include "includes/sdv2_related_section.html" with section_title="Component groups" section_label="Component groups this component is measured in" items=related_groups item_url_name="materialcomponentgroup-detail" section_total=related_groups_total section_more=related_groups_more empty_title="No component groups" empty_body="This component is not part of any measured component group yet." %}
+    {% include "includes/sdv2_related_section.html" with section_title="Component groups" section_label="Component groups this component is measured in" items=related_groups item_url_name="materialcomponentgroup-detail" section_total=related_groups_published_total section_more=related_groups_more section_list_url=related_groups_list_url empty_title="No component groups" empty_body="This component is not part of any measured component group yet." %}
     {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples with measurements of this component" items=related_samples item_url_name="sample-detail" section_total=related_samples_published_total section_more=related_samples_more section_list_url=related_samples_list_url empty_title="No samples" empty_body="No samples contain measurements of this component yet." %}
 {% endblock detail_sections %}

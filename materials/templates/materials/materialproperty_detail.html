@@ -41,7 +41,7 @@
                     <dd>
                         {% for variant in comparable_variants %}
                             <a href="{% url 'materialproperty-detail' variant.pk %}">{{ variant.name }}</a>{% if not forloop.last %}, {% endif %}
-                        {% endfor %}{% if comparable_variants_more %} and {{ comparable_variants_more }} more{% endif %}
+                        {% endfor %}{% if comparable_variants_more %} and {{ comparable_variants_more }} more — <a href="{{ comparable_variants_list_url }}">view all {{ comparable_variants_published_total }} published</a>{% endif %}
                     </dd>
                 </div>
             {% endif %}

@@ -51,5 +51,5 @@
             </ul>
         </section>
     {% endif %}
-    {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples analysed with this method" items=related_samples item_url_name="sample-detail" section_total=related_samples_total section_more=related_samples_more empty_title="No samples" empty_body="No samples reference this analytical method yet." %}
+    {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples analysed with this method" items=related_samples item_url_name="sample-detail" section_total=related_samples_published_total section_more=related_samples_more section_list_url=related_samples_list_url empty_title="No samples" empty_body="No samples reference this analytical method yet." %}
 {% endblock detail_sections %}

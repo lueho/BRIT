@@ -6942,6 +6942,17 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
             reverse("materialcomponent-detail", kwargs={"pk": self.component.pk}),
         )
 
+    def test_category_detail_links_components_to_filtered_list(self):
+        response = self.get_detail("materialcategory-detail", self.category)
+        list_url = f"{reverse('materialcomponent-list')}?category={self.category.pk}"
+
+        self.assertEqual(response.context["related_components_list_url"], list_url)
+        self.assertEqual(response.context["related_components_published_total"], 1)
+        filtered_response = self.client.get(list_url)
+
+        self.assertEqual(filtered_response.status_code, 200)
+        self.assertContains(filtered_response, self.component.name)
+
     def test_category_detail_hides_private_materials_of_other_users(self):
         response = self.get_detail("materialcategory-detail", self.category)
         self.assertNotContains(response, self.other_private_material.name)
@@ -6976,6 +6987,17 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
             response,
             reverse("sample-detail", kwargs={"pk": self.standalone_sample.pk}),
         )
+
+    def test_material_detail_links_series_to_filtered_list(self):
+        response = self.get_detail("material-detail", self.material)
+        list_url = f"{reverse('sampleseries-list')}?material={self.material.pk}"
+
+        self.assertEqual(response.context["related_series_list_url"], list_url)
+        self.assertEqual(response.context["related_series_published_total"], 1)
+        filtered_response = self.client.get(list_url)
+
+        self.assertEqual(filtered_response.status_code, 200)
+        self.assertContains(filtered_response, self.series.name)
 
     def test_material_detail_view_all_counts_only_published_samples(self):
         material = Material.objects.create(
@@ -7034,6 +7056,58 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
                 kwargs={"pk": self.canonical_component.pk},
             ),
         )
+
+    def test_component_detail_links_derived_components_to_filtered_list(self):
+        derived = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Derived Component",
+            publication_status="published",
+            basis_component=self.component,
+        )
+        response = self.get_detail("materialcomponent-detail", self.component)
+        list_url = (
+            f"{reverse('materialcomponent-list')}?basis_component={self.component.pk}"
+        )
+
+        self.assertEqual(response.context["derived_components_list_url"], list_url)
+        self.assertEqual(response.context["derived_components_published_total"], 1)
+        filtered_response = self.client.get(list_url)
+
+        self.assertEqual(filtered_response.status_code, 200)
+        self.assertContains(filtered_response, derived.name)
+
+    def test_component_detail_links_comparable_components_to_filtered_list(self):
+        comparable = MaterialComponent.objects.create(
+            owner=self.owner,
+            name="Comparable Component",
+            publication_status="published",
+            comparable_component=self.component,
+        )
+        response = self.get_detail("materialcomponent-detail", self.component)
+        list_url = (
+            f"{reverse('materialcomponent-list')}?"
+            f"comparable_component={self.component.pk}"
+        )
+
+        self.assertEqual(response.context["comparable_variants_list_url"], list_url)
+        self.assertEqual(response.context["comparable_variants_published_total"], 1)
+        filtered_response = self.client.get(list_url)
+
+        self.assertEqual(filtered_response.status_code, 200)
+        self.assertContains(filtered_response, comparable.name)
+
+    def test_component_detail_links_groups_to_filtered_list(self):
+        response = self.get_detail("materialcomponent-detail", self.component)
+        list_url = (
+            f"{reverse('materialcomponentgroup-list')}?component={self.component.pk}"
+        )
+
+        self.assertEqual(response.context["related_groups_list_url"], list_url)
+        self.assertEqual(response.context["related_groups_published_total"], 1)
+        filtered_response = self.client.get(list_url)
+
+        self.assertEqual(filtered_response.status_code, 200)
+        self.assertContains(filtered_response, self.group.name)
 
     def test_component_detail_hides_private_basis_and_canonical_components_for_anonymous(
         self,
@@ -7259,6 +7333,19 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
         )
         self.assertContains(response, self.standalone_sample.name)
 
+    def test_componentgroup_detail_links_components_to_filtered_list(self):
+        response = self.get_detail("materialcomponentgroup-detail", self.group)
+        list_url = (
+            f"{reverse('materialcomponent-list')}?component_group={self.group.pk}"
+        )
+
+        self.assertEqual(response.context["related_components_list_url"], list_url)
+        self.assertEqual(response.context["related_components_published_total"], 1)
+        filtered_response = self.client.get(list_url)
+
+        self.assertEqual(filtered_response.status_code, 200)
+        self.assertContains(filtered_response, self.component.name)
+
     def test_component_group_detail_links_to_filtered_sample_list(self):
         response = self.get_detail("materialcomponentgroup-detail", self.group)
 
@@ -7295,6 +7382,26 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
             ),
         )
         self.assertContains(response, self.percent_unit.name)
+
+    def test_property_detail_links_comparable_properties_to_filtered_list(self):
+        comparable = MaterialProperty.objects.create(
+            owner=self.owner,
+            name="Comparable Property",
+            publication_status="published",
+            comparable_property=self.material_property,
+        )
+        response = self.get_detail("materialproperty-detail", self.material_property)
+        list_url = (
+            f"{reverse('materialproperty-list')}?"
+            f"comparable_property={self.material_property.pk}"
+        )
+
+        self.assertEqual(response.context["comparable_variants_list_url"], list_url)
+        self.assertEqual(response.context["comparable_variants_published_total"], 1)
+        filtered_response = self.client.get(list_url)
+
+        self.assertEqual(filtered_response.status_code, 200)
+        self.assertContains(filtered_response, comparable.name)
 
     def test_property_detail_hides_private_basis_and_canonical_property_for_anonymous(
         self,
@@ -7367,6 +7474,17 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
             response,
             reverse("sample-detail", kwargs={"pk": self.standalone_sample.pk}),
         )
+
+    def test_method_detail_links_samples_to_filtered_list(self):
+        response = self.get_detail("analyticalmethod-detail", self.method)
+        list_url = f"{reverse('sample-list')}?analytical_method={self.method.pk}"
+
+        self.assertEqual(response.context["related_samples_list_url"], list_url)
+        self.assertEqual(response.context["related_samples_published_total"], 1)
+        filtered_response = self.client.get(list_url)
+
+        self.assertEqual(filtered_response.status_code, 200)
+        self.assertContains(filtered_response, self.standalone_sample.name)
 
     # -- SampleSeries ---------------------------------------------------------------------
 
@@ -7568,6 +7686,13 @@ class MaterialsDetailViewEnrichmentTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(len(entry["samples"]), DETAIL_RELATED_LIMIT)
         self.assertEqual(entry["more"], 6)
         self.assertNotContains(response, "Hidden Private Sample")
+        self.assertEqual(entry["published_total"], DETAIL_RELATED_LIMIT + 6)
+        self.assertEqual(
+            entry["list_url"],
+            f"{reverse('sample-list')}?series={self.series.pk}",
+        )
+        self.assertContains(response, "6 more not shown")
+        self.assertContains(response, "view all 31 published")
 
 
 class MaterialsListEnhancementsTestCase(ViewWithPermissionsTestCase):

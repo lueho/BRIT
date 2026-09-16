@@ -247,14 +247,19 @@ class MaterialCategoryDetailView(UserCreatedObjectDetailView):
         context["related_materials_list_url"] = (
             f"{reverse('material-list')}?category={self.object.pk}"
         )
+        components = filter_queryset_for_user(
+            MaterialComponent.objects.filter(categories=self.object), user
+        ).order_by("name", "pk")
         (
             context["related_components"],
             context["related_components_total"],
             context["related_components_more"],
-        ) = _capped_related(
-            filter_queryset_for_user(
-                MaterialComponent.objects.filter(categories=self.object), user
-            ).order_by("name", "pk")
+        ) = _capped_related(components)
+        context["related_components_published_total"] = components.filter(
+            publication_status="published"
+        ).count()
+        context["related_components_list_url"] = (
+            f"{reverse('materialcomponent-list')}?category={self.object.pk}"
         )
         return context
 
@@ -323,14 +328,19 @@ class MaterialDetailView(UserCreatedObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
+        series = filter_queryset_for_user(
+            self.object.sample_series.all(), user
+        ).order_by("name", "pk")
         (
             context["related_series"],
             context["related_series_total"],
             context["related_series_more"],
-        ) = _capped_related(
-            filter_queryset_for_user(self.object.sample_series.all(), user).order_by(
-                "name", "pk"
-            )
+        ) = _capped_related(series)
+        context["related_series_published_total"] = series.filter(
+            publication_status="published"
+        ).count()
+        context["related_series_list_url"] = (
+            f"{reverse('sampleseries-list')}?material={self.object.pk}"
         )
         samples = (
             filter_queryset_for_user(self.object.samples.all(), user)
@@ -511,29 +521,35 @@ class ComponentDetailView(UserCreatedObjectDetailView):
         context["basis_component"] = _visible_or_none(
             MaterialComponent, obj.basis_component, user
         )
+        derived_components = filter_queryset_for_user(
+            MaterialComponent.objects.filter(basis_component=obj), user
+        ).order_by("name", "pk")
         (
             context["derived_components"],
             context["derived_components_total"],
             context["derived_components_more"],
-        ) = _capped_related(
-            filter_queryset_for_user(
-                MaterialComponent.objects.filter(basis_component=obj), user
-            ).order_by("name", "pk")
+        ) = _capped_related(derived_components)
+        context["derived_components_published_total"] = derived_components.filter(
+            publication_status="published"
+        ).count()
+        context["derived_components_list_url"] = (
+            f"{reverse('materialcomponent-list')}?basis_component={obj.pk}"
         )
+        comparable_variants = filter_queryset_for_user(
+            MaterialComponent.objects.filter(comparable_component=obj), user
+        ).order_by("name", "pk")
         (
             context["comparable_variants"],
             context["comparable_variants_total"],
             context["comparable_variants_more"],
-        ) = _capped_related(
-            filter_queryset_for_user(
-                MaterialComponent.objects.filter(comparable_component=obj), user
-            ).order_by("name", "pk")
+        ) = _capped_related(comparable_variants)
+        context["comparable_variants_published_total"] = comparable_variants.filter(
+            publication_status="published"
+        ).count()
+        context["comparable_variants_list_url"] = (
+            f"{reverse('materialcomponent-list')}?comparable_component={obj.pk}"
         )
-        (
-            context["related_groups"],
-            context["related_groups_total"],
-            context["related_groups_more"],
-        ) = _capped_related(
+        related_groups = (
             filter_queryset_for_user(
                 MaterialComponentGroup.objects.filter(
                     component_measurements__component_id__in=comparable_ids
@@ -542,6 +558,17 @@ class ComponentDetailView(UserCreatedObjectDetailView):
             )
             .distinct()
             .order_by("name", "pk")
+        )
+        (
+            context["related_groups"],
+            context["related_groups_total"],
+            context["related_groups_more"],
+        ) = _capped_related(related_groups)
+        context["related_groups_published_total"] = related_groups.filter(
+            publication_status="published"
+        ).count()
+        context["related_groups_list_url"] = (
+            f"{reverse('materialcomponentgroup-list')}?component={obj.pk}"
         )
         samples = (
             filter_queryset_for_user(
@@ -632,17 +659,24 @@ class MaterialComponentGroupDetailView(UserCreatedObjectDetailView):
         context = super().get_context_data(**kwargs)
         user = self.request.user
         obj = self.object
-        (
-            context["related_components"],
-            context["related_components_total"],
-            context["related_components_more"],
-        ) = _capped_related(
+        related_components = (
             filter_queryset_for_user(
                 MaterialComponent.objects.filter(component_measurements__group=obj),
                 user,
             )
             .distinct()
             .order_by("name", "pk")
+        )
+        (
+            context["related_components"],
+            context["related_components_total"],
+            context["related_components_more"],
+        ) = _capped_related(related_components)
+        context["related_components_published_total"] = related_components.filter(
+            publication_status="published"
+        ).count()
+        context["related_components_list_url"] = (
+            f"{reverse('materialcomponent-list')}?component_group={obj.pk}"
         )
         samples = (
             filter_queryset_for_user(
@@ -741,14 +775,19 @@ class MaterialPropertyDetailView(UserCreatedObjectDetailView):
         context["basis_component"] = _visible_or_none(
             MaterialComponent, obj.default_basis_component, user
         )
+        comparable_variants = filter_queryset_for_user(
+            MaterialProperty.objects.filter(comparable_property=obj), user
+        ).order_by("name", "pk")
         (
             context["comparable_variants"],
             context["comparable_variants_total"],
             context["comparable_variants_more"],
-        ) = _capped_related(
-            filter_queryset_for_user(
-                MaterialProperty.objects.filter(comparable_property=obj), user
-            ).order_by("name", "pk")
+        ) = _capped_related(comparable_variants)
+        context["comparable_variants_published_total"] = comparable_variants.filter(
+            publication_status="published"
+        ).count()
+        context["comparable_variants_list_url"] = (
+            f"{reverse('materialproperty-list')}?comparable_property={obj.pk}"
         )
         samples = (
             filter_queryset_for_user(
@@ -955,12 +994,17 @@ class AnalyticalMethodDetailView(UserCreatedObjectDetailView):
             .distinct()
             .order_by("name", "pk")
         )
+        related_samples = filter_queryset_for_user(related_samples, self.request.user)
         (
             context["related_samples"],
             context["related_samples_total"],
             context["related_samples_more"],
-        ) = _capped_related(
-            filter_queryset_for_user(related_samples, self.request.user)
+        ) = _capped_related(related_samples)
+        context["related_samples_published_total"] = related_samples.filter(
+            publication_status="published"
+        ).count()
+        context["related_samples_list_url"] = (
+            f"{reverse('sample-list')}?analytical_method={self.object.pk}"
         )
         return context
 
@@ -1035,6 +1079,10 @@ class SampleSeriesDetailView(UserCreatedObjectDetailView):
                     "total": total,
                     "samples": dist_samples[:DETAIL_RELATED_LIMIT],
                     "more": max(total - DETAIL_RELATED_LIMIT, 0),
+                    "published_total": dist_samples.filter(
+                        publication_status="published"
+                    ).count(),
+                    "list_url": f"{reverse('sample-list')}?series={self.object.pk}",
                 }
             )
         context["distributions"] = distributions
