@@ -1766,7 +1766,7 @@ class UserCreatedObjectListMixin:
             )
         )
 
-        # Scope switcher context (urls, counts, active scope)
+        # Scope switcher context (urls, active scope)
         try:
             queryset = self.get_queryset()
             model = queryset.model
@@ -1853,58 +1853,6 @@ class UserCreatedObjectListMixin:
             # If anything goes wrong, keep URLs as-is (may be None)
             pass
 
-        # Compute counts conservatively; fall back to 0 on errors
-        public_count = 0
-        private_count = 0
-        review_count = 0
-        try:
-            if model is not None and hasattr(model, "objects"):
-                # Published count
-                try:
-                    public_qs = apply_scope_filter(model.objects.all(), "published")
-                    public_count = public_qs.count()
-                except Exception:
-                    public_count = 0
-
-                # Private count (owned by current user)
-                user = self.request.user
-                try:
-                    if user and user.is_authenticated and hasattr(model, "owner"):
-                        private_qs = apply_scope_filter(
-                            model.objects.all(), "private", user=user
-                        )
-                        private_count = private_qs.count()
-                except Exception:
-                    private_count = 0
-
-                # Review count (items the user can moderate)
-                try:
-                    # Prefer a custom manager/queryset method if it exists
-                    if hasattr(model.objects, "in_review"):
-                        review_qs = model.objects.in_review()
-                    else:
-                        review_qs = apply_scope_filter(model.objects.all(), "review")
-
-                    # Exclude the current user's own objects from review count
-                    user = self.request.user
-                    if user and user.is_authenticated:
-                        try:
-                            review_qs = review_qs.exclude(owner=user)
-                        except Exception:
-                            pass
-
-                    # Only count if the user is a moderator for this model
-                    can_moderate = False
-                    if self.request.user and self.request.user.is_authenticated:
-                        can_moderate = user_is_moderator_for_model(
-                            self.request.user, model
-                        )
-                    review_count = review_qs.count() if can_moderate else 0
-                except Exception:
-                    review_count = 0
-        except Exception:
-            pass
-
         # Active scope from list_type (public/private/review)
         active_scope = self.get_list_type()
 
@@ -1917,9 +1865,6 @@ class UserCreatedObjectListMixin:
                 "public_representation_url": public_url,
                 "private_representation_url": private_url,
                 "review_representation_url": review_url,
-                "public_count": public_count,
-                "private_count": private_count,
-                "review_count": review_count,
                 "representation_mode": "list",
                 "public_gallery_url": None,
                 "private_gallery_url": None,

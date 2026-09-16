@@ -1,5 +1,8 @@
+from decimal import Decimal
+
+from django.contrib.auth.models import User
 from django.db.models import Q, signals
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.utils import timezone
 from factory.django import mute_signals
 
@@ -260,6 +263,224 @@ class SpecWasteCollectedFilterTestCase(TestCase):
             pk__in=[self.collection1.pk, self.collection2.pk, self.collection4.pk]
         )
         self.assertQuerySetEqual(qs, expected, ordered=False)
+
+
+class CollectionFilterMetadataTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="filter-metadata-owner")
+        cls.collection = Collection.objects.create(
+            owner=cls.owner,
+            required_bin_capacity=Decimal("120.5"),
+            min_bin_size=Decimal("240.5"),
+        )
+        cls.connection_property, _ = Property.objects.get_or_create(
+            name="Connection rate"
+        )
+        cls.specific_property, _ = Property.objects.get_or_create(
+            name="specific waste collected"
+        )
+        CollectionPropertyValue.objects.bulk_create(
+            [
+                CollectionPropertyValue(
+                    owner=cls.owner,
+                    collection=cls.collection,
+                    property=property_,
+                    average=average,
+                    year=2024,
+                )
+                for property_, average in (
+                    (cls.connection_property, 100.1),
+                    (cls.specific_property, 1600.1),
+                )
+            ]
+        )
+        whole_year = CollectionSeason.objects.get(
+            distribution__name="Months of the year",
+            first_timestep__name="January",
+            last_timestep__name="December",
+        )
+        first_half = CollectionSeason.objects.create(
+            distribution=whole_year.distribution,
+            first_timestep=whole_year.first_timestep,
+            last_timestep=Timestep.objects.get(name="June"),
+        )
+        cls.frequency = CollectionFrequency.objects.create(owner=cls.owner)
+        other_frequency = CollectionFrequency.objects.create(owner=cls.owner)
+        CollectionCountOptions.objects.bulk_create(
+            [
+                CollectionCountOptions(
+                    owner=cls.owner,
+                    frequency=frequency,
+                    season=season,
+                    standard=standard,
+                    option_1=999,
+                )
+                for frequency, season, standard in (
+                    (cls.frequency, whole_year, 300),
+                    (cls.frequency, first_half, 300),
+                    (other_frequency, whole_year, 400),
+                )
+            ]
+        )
+        MaterialCategory.objects.get_or_create(name="Biowaste component")
+        cls.material = WasteComponent.objects.create(
+            name="Choice alpha", owner=cls.owner
+        )
+
+    def get_filters(self, data=None, **kwargs):
+        request = RequestFactory().get("/collections/", data or {})
+        request.user = self.owner
+        return CollectionFilterSet(
+            data=request.GET,
+            queryset=Collection.objects.all(),
+            request=request,
+            **kwargs,
+        )
+
+    def assert_maxima(self, filters, expected):
+        for name, maximum in expected.items():
+            with self.subTest(field=name):
+                widget = filters.form.fields[name].widget
+                self.assertEqual(widget.attrs["data-range_max"], maximum)
+
+    def test_slider_initialization_uses_three_aggregate_queries(self):
+        with self.assertNumQueries(3):
+            filters = self.get_filters({"scope": "published"})
+            self.assert_maxima(
+                filters,
+                {
+                    "connection_rate": 101,
+                    "spec_waste_collected": 1601,
+                    "collections_per_year": 600,
+                    "required_bin_capacity": Decimal("120.5"),
+                    "min_bin_size": Decimal("240.5"),
+                },
+            )
+
+    def test_slider_metadata_reaches_forms_with_and_without_scope(self):
+        for data in ({}, {"valid_on": "2024-01-01"}, {"scope": "private"}):
+            with self.subTest(data=data):
+                self.assert_maxima(
+                    self.get_filters(data),
+                    {"connection_rate": 101, "collections_per_year": 600},
+                )
+
+    def test_zero_maxima_are_not_replaced_by_defaults(self):
+        Collection.objects.update(required_bin_capacity=0, min_bin_size=0)
+        CollectionPropertyValue.objects.update(average=0)
+        CollectionCountOptions.objects.update(standard=0)
+
+        self.assert_maxima(
+            self.get_filters({"scope": "published"}),
+            dict.fromkeys(
+                (
+                    "connection_rate",
+                    "spec_waste_collected",
+                    "collections_per_year",
+                    "required_bin_capacity",
+                    "min_bin_size",
+                ),
+                0,
+            ),
+        )
+
+    def test_all_null_frequency_and_bin_values_use_defaults(self):
+        Collection.objects.update(required_bin_capacity=None, min_bin_size=None)
+        CollectionCountOptions.objects.update(standard=None)
+
+        self.assert_maxima(
+            self.get_filters({"scope": "published"}),
+            {
+                "collections_per_year": 1000,
+                "required_bin_capacity": 1000,
+                "min_bin_size": 2000,
+            },
+        )
+
+    def test_new_filtersets_see_bulk_updates_without_cache_invalidation(self):
+        first = self.get_filters({"scope": "published"})
+        Collection.objects.filter(pk=self.collection.pk).update(min_bin_size=360)
+        CollectionPropertyValue.objects.filter(
+            property=self.connection_property
+        ).update(average=150.2)
+
+        self.assert_maxima(
+            first, {"connection_rate": 101, "min_bin_size": Decimal("240.5")}
+        )
+        self.assert_maxima(
+            self.get_filters({"scope": "published"}),
+            {"connection_rate": 151, "min_bin_size": 360},
+        )
+
+    def test_explicit_property_range_configuration_is_preserved(self):
+        class FixedConnectionRateFilter(ConnectionRateFilter):
+            range_min = 5
+            range_max = 80
+            range_step = 0.5
+
+        class FixedRangeFilterSet(CollectionFilterSet):
+            connection_rate = FixedConnectionRateFilter()
+
+        filters = FixedRangeFilterSet(data={"scope": "published"})
+        widget = filters.form.fields["connection_rate"].widget
+        self.assertEqual(widget.attrs["data-range_min"], 5)
+        self.assertEqual(widget.attrs["data-range_max"], 80)
+        self.assertEqual(widget.attrs["data-step"], 0.5)
+
+    def test_api_mode_does_not_query_slider_metadata_or_choices(self):
+        with self.assertNumQueries(0):
+            filters = self.get_filters({"scope": "published"}, skip_min_max=True)
+            self.assertIn("allowed_materials", filters.form.fields)
+
+    def test_material_checkboxes_share_one_query_per_filterset(self):
+        filters = self.get_filters({"scope": "published"}, skip_min_max=True)
+
+        with self.assertNumQueries(1):
+            allowed = filters.form["allowed_materials"].as_widget()
+            forbidden = filters.form["forbidden_materials"].as_widget()
+
+        self.assertIn("Choice alpha", allowed)
+        self.assertIn("Choice alpha", forbidden)
+        with self.assertNumQueries(0):
+            self.assertEqual(filters.form["allowed_materials"].as_widget(), allowed)
+            self.assertEqual(filters.form["forbidden_materials"].as_widget(), forbidden)
+
+    def test_material_choices_are_request_local_and_do_not_change_validation(self):
+        first = self.get_filters({"scope": "published"}, skip_min_max=True)
+        first.form["allowed_materials"].as_widget()
+        material = WasteComponent.objects.create(name="Choice beta", owner=self.owner)
+
+        self.assertNotIn("Choice beta", first.form["forbidden_materials"].as_widget())
+        second = self.get_filters({"scope": "published"}, skip_min_max=True)
+        self.assertIn("Choice beta", second.form["forbidden_materials"].as_widget())
+        self.assertQuerySetEqual(
+            first.form.fields["allowed_materials"].clean([material.pk]), [material]
+        )
+        invalid = self.get_filters(
+            {"scope": "published", "allowed_materials": "not-an-id"},
+            skip_min_max=True,
+        )
+        self.assertFalse(invalid.is_valid())
+
+
+class CollectionFilterMetadataEmptyTestCase(TestCase):
+    def test_empty_property_and_bin_tables_use_defaults(self):
+        with self.assertNumQueries(3):
+            filters = CollectionFilterSet(
+                data={"scope": "published"}, queryset=Collection.objects.none()
+            )
+
+        for name, maximum in (
+            ("connection_rate", 100),
+            ("spec_waste_collected", 1000),
+            ("required_bin_capacity", 1000),
+            ("min_bin_size", 2000),
+        ):
+            with self.subTest(field=name):
+                self.assertEqual(
+                    filters.form.fields[name].widget.attrs["data-range_max"], maximum
+                )
 
 
 class CollectionFilterTestCase(TestCase):
