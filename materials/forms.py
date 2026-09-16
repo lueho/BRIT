@@ -1,6 +1,6 @@
 import re
 
-from crispy_forms.layout import HTML, Div, Field, Fieldset, Layout
+from crispy_forms.layout import Fieldset, Layout
 from django.core.exceptions import ValidationError
 from django.forms import (
     CharField,
@@ -16,16 +16,21 @@ from django_tomselect.forms import (
     TomSelectModelChoiceField,
 )
 
+from bibliography.models import Source
 from distributions.models import TemporalDistribution
 from utils.forms import (
     CreateEnabledTomSelectModelChoiceField,
     ModalForm,
     ModalModelForm,
     ModalModelFormMixin,
+    QuerysetTomSelectModelChoiceField,
+    QuerysetTomSelectModelMultipleChoiceField,
     SimpleModelForm,
     SourcesFieldMixin,
     UserCreatedObjectFormMixin,
+    WorkspaceReferenceScopeMixin,
     configure_tomselect_inline_create,
+    image_metadata_section,
 )
 from utils.properties.forms import NumericMeasurementFieldsFormMixin
 from utils.properties.models import Unit, get_default_unit_pk
@@ -44,27 +49,6 @@ from .models import (
     SampleSeries,
     get_or_create_sample_substrate_category,
 )
-
-
-def image_metadata_section():
-    return Div(
-        HTML(
-            '<div class="card-header bg-body-tertiary">'
-            '<h6 class="mb-0">Image details</h6>'
-            '<div class="form-text mb-0">'
-            "Alt text, caption, and rights notice belong to the uploaded image."
-            "</div>"
-            "</div>"
-        ),
-        Div(
-            Field("image"),
-            Field("image_alt_text"),
-            Field("image_caption"),
-            Field("image_rights_notice"),
-            css_class="card-body",
-        ),
-        css_class="card border mb-3",
-    )
 
 
 class MaterialCategoryModelForm(SimpleModelForm):
@@ -245,6 +229,62 @@ class ComponentMeasurementModalModelForm(
     pass
 
 
+class ComponentMeasurementSectionForm(
+    WorkspaceReferenceScopeMixin, ComponentMeasurementModelForm
+):
+    """One measurement row in the Sample maintenance workspace table."""
+
+    group = QuerysetTomSelectModelChoiceField(
+        queryset=MaterialComponentGroup.objects.all(),
+        config=TomSelectConfig(
+            url="materialcomponentgroup-autocomplete",
+            label_field="name",
+        ),
+        label="Group",
+    )
+    component = QuerysetTomSelectModelChoiceField(
+        queryset=MaterialComponent.objects.all(),
+        config=TomSelectConfig(
+            url="materialcomponent-autocomplete",
+            label_field="name",
+        ),
+        label="Component",
+    )
+    basis_component = QuerysetTomSelectModelChoiceField(
+        queryset=MaterialComponent.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="materialcomponent-autocomplete",
+            label_field="name",
+        ),
+        label="Basis component",
+    )
+    analytical_method = QuerysetTomSelectModelChoiceField(
+        queryset=AnalyticalMethod.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="analyticalmethod-autocomplete",
+            label_field="name",
+        ),
+        label="Analytical method",
+    )
+    unit = QuerysetTomSelectModelChoiceField(
+        queryset=Unit.objects.filter(Unit.weight_fraction_q()),
+        config=TomSelectConfig(
+            url="unit-autocomplete-weight-fraction",
+            label_field="name",
+        ),
+        label="Unit",
+        help_text="Weight-fraction units only (e.g. %, g/kg, mg/kg).",
+    )
+    sources = QuerysetTomSelectModelMultipleChoiceField(
+        queryset=Source.objects.all(),
+        required=False,
+        config=TomSelectConfig(url="source-autocomplete", label_field="label"),
+        label="Sources",
+    )
+
+
 class MaterialPropertyValueModelForm(
     NumericMeasurementFieldsFormMixin,
     UserCreatedObjectFormMixin,
@@ -354,6 +394,54 @@ class MaterialPropertyValueModalModelForm(
     ModalModelFormMixin, MaterialPropertyValueModelForm
 ):
     pass
+
+
+class MaterialPropertyValueSectionForm(
+    WorkspaceReferenceScopeMixin, MaterialPropertyValueModelForm
+):
+    """One property value row in the Sample maintenance workspace table."""
+
+    property = QuerysetTomSelectModelChoiceField(
+        queryset=MaterialProperty.objects.all(),
+        config=TomSelectConfig(
+            url="materialproperty-autocomplete",
+            label_field="name",
+        ),
+        label="Property",
+    )
+    basis_component = QuerysetTomSelectModelChoiceField(
+        queryset=MaterialComponent.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="materialcomponent-autocomplete",
+            label_field="name",
+        ),
+        label="Basis",
+    )
+    unit = QuerysetTomSelectModelChoiceField(
+        queryset=Unit.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="unit-autocomplete",
+            label_field="name",
+        ),
+        label="Unit",
+    )
+    analytical_method = QuerysetTomSelectModelChoiceField(
+        queryset=AnalyticalMethod.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="analyticalmethod-autocomplete",
+            label_field="name",
+        ),
+        label="Analytical method",
+    )
+    sources = QuerysetTomSelectModelMultipleChoiceField(
+        queryset=Source.objects.all(),
+        required=False,
+        config=TomSelectConfig(url="source-autocomplete", label_field="label"),
+        label="Sources",
+    )
 
 
 class AnalyticalMethodModelForm(
@@ -521,6 +609,8 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
 
     def clean(self):
         cleaned_data = super().clean()
+        if "standalone" not in self.fields and "series" not in self.fields:
+            return cleaned_data
         standalone = cleaned_data.get("standalone", False)
         series = cleaned_data.get("series")
         if not standalone and series is None:
@@ -569,6 +659,139 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
 
 class SampleModalModelForm(ModalModelFormMixin, SampleModelForm):
     pass
+
+
+class SampleMaintenanceForm(WorkspaceReferenceScopeMixin, SampleModelForm):
+    """Section-scoped Sample form for the maintenance workspace."""
+
+    material = QuerysetTomSelectModelChoiceField(
+        queryset=Material.objects.all(),
+        config=TomSelectConfig(
+            url="sample-substrate-material-autocomplete",
+            label_field="name",
+            value_field="id",
+        ),
+        required=True,
+        label="Substrate",
+    )
+    series = QuerysetTomSelectModelChoiceField(
+        queryset=SampleSeries.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="sampleseries-autocomplete",
+            label_field="name",
+            value_field="id",
+        ),
+        label="Series",
+    )
+    sources = QuerysetTomSelectModelMultipleChoiceField(
+        queryset=Source.objects.all(),
+        required=False,
+        config=TomSelectConfig(url="source-autocomplete", label_field="label"),
+        label="Sources",
+    )
+
+    class Meta(SampleModelForm.Meta):
+        pass
+
+    def __init__(self, *args, fields=None, **kwargs):
+        selected = fields if fields is not None else self.Meta.fields
+        super().__init__(*args, field_names=selected, **kwargs)
+        if "sources" in self.fields:
+            self.fields["sources"].workspace_autocomplete_url += "?label=abbreviation"
+        self.helper.layout = Layout(*self.fields)
+
+    def _update_errors(self, errors):
+        # Sample.clean() reports the standalone/series invariant against
+        # "series"; sections that edit neither field cannot fix or display it.
+        if (
+            "standalone" not in self.fields
+            and "series" not in self.fields
+            and hasattr(errors, "error_dict")
+        ):
+            errors.error_dict.pop("series", None)
+            if not errors.error_dict:
+                return
+        super()._update_errors(errors)
+
+
+class SampleQuickCreateForm(SampleMaintenanceForm):
+    """Minimal fields needed to start a private Sample draft."""
+
+    class Meta(SampleMaintenanceForm.Meta):
+        fields = ("name", "material", "datetime", "standalone", "series")
+
+
+SAMPLE_SECTIONS = {
+    "overview": {
+        "label": "Overview",
+        "fields": ("name", "material", "description"),
+    },
+    "sampling": {
+        "label": "Sampling",
+        "fields": ("datetime", "location", "standalone", "series", "timestep"),
+    },
+    "analysis": {
+        "label": "Analysis",
+        "fields": (
+            "analysis_date",
+            "analysis_laboratory",
+            "lab_accreditation",
+            "analysis_objective",
+        ),
+    },
+    "image": {
+        "label": "Image",
+        "fields": (
+            "image",
+            "image_alt_text",
+            "image_caption",
+            "image_rights_notice",
+        ),
+    },
+    "sources": {
+        "label": "Sources",
+        "fields": ("sources",),
+    },
+    "measurements": {
+        "label": "Component measurements",
+        "policy": "can_manage_samples",
+        "forms": (
+            (
+                ComponentMeasurementSectionForm,
+                {
+                    "heading": "Component measurements",
+                    "add_label": "Add measurement",
+                    "row_template": "materials/includes/sample_measurement_row.html",
+                    "paste": {
+                        "label": "measurements",
+                        "columns": "group,component,average,unit,standard_deviation,sample_size",
+                        "hint": "One row per line: group, component, value, unit, standard deviation, sample size (tab-separated).",
+                    },
+                },
+            ),
+        ),
+    },
+    "properties": {
+        "label": "Property values",
+        "policy": "can_add_property",
+        "forms": (
+            (
+                MaterialPropertyValueSectionForm,
+                {
+                    "heading": "Property values",
+                    "add_label": "Add property value",
+                    "row_template": "materials/includes/sample_property_value_row.html",
+                    "paste": {
+                        "label": "property values",
+                        "columns": "property,average,unit,standard_deviation",
+                        "hint": "One row per line: property, value, unit, standard deviation (tab-separated).",
+                    },
+                },
+            ),
+        ),
+    },
+}
 
 
 class CompositionModelForm(SimpleModelForm):

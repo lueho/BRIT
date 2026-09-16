@@ -12,6 +12,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from factory.django import mute_signals
 
+from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import (
     BaseMaterial,
@@ -23,6 +24,7 @@ from materials.models import (
     MaterialProperty,
     MaterialPropertyValue,
     Sample,
+    SampleExternalRecord,
     SampleSeries,
 )
 from utils.properties.models import Unit
@@ -41,6 +43,63 @@ class InitialDataTestCase(TestCase):
     def test_other_component_is_created_from_migrations(self):
         MaterialComponent.objects.get(name="Other")
         self.assertGreaterEqual(MaterialComponent.objects.count(), 2)
+
+
+class PhyllisSchemaTestCase(TestCase):
+    def test_external_record_and_measurement_metadata_are_available(self):
+        owner = User.objects.create(username="phyllis-owner")
+        material = Material.objects.create(name="Wood", owner=owner)
+        sample = Sample.objects.create(
+            name="Wood — Phyllis #1",
+            material=material,
+            owner=owner,
+        )
+        with mute_signals(signals.post_save):
+            source = Source.objects.create(title="Phyllis2", owner=owner)
+        record = SampleExternalRecord.objects.create(
+            sample=sample,
+            source=source,
+            external_id="1",
+            url="https://phyllis.nl/Biomass/View/1",
+            payload={
+                "literature": [
+                    {"title": "Reference title", "reference": "Raw", "url": ""}
+                ]
+            },
+        )
+
+        self.assertEqual(sample.external_records.get(), record)
+        self.assertEqual(record.literature[0]["title"], "Reference title")
+        for model in (ComponentMeasurement, MaterialPropertyValue):
+            for field in (
+                "raw_value",
+                "value_qualifier",
+                "detection_limit",
+                "raw_detection_limit",
+                "analysis_date",
+                "analysis_laboratory",
+                "comment",
+            ):
+                with self.subTest(model=model.__name__, field=field):
+                    model._meta.get_field(field)
+
+    def test_material_and_component_can_share_name_for_owner(self):
+        owner = User.objects.create(username="shared-name-owner")
+        Material.objects.create(name="Cellulose", owner=owner)
+        MaterialComponent.objects.create(name="Cellulose", owner=owner)
+
+    def test_unsaved_component_validates_against_same_name_material(self):
+        owner = User.objects.create(username="shared-name-clean-owner")
+        Material.objects.create(name="Lignin", owner=owner)
+        component = MaterialComponent(name="Lignin", owner=owner)
+
+        component.full_clean()
+        component.save()
+
+        self.assertEqual(component.type, "component")
+        material = Material(name="Lignin", owner=owner)
+        with self.assertRaises(ValidationError):
+            material.full_clean()
 
 
 class MaterialComponentGroupTestCase(TestCase):
@@ -291,7 +350,6 @@ class SampleSeriesTestCase(TestCase):
         self.default_group = MaterialComponentGroup.objects.default()
         self.custom_group = MaterialComponentGroup.objects.get(name="Custom Group")
         self.default_component = MaterialComponent.objects.default()
-        self.custom_component = MaterialComponent.objects.get(name="Custom Component")
         self.sample_series = SampleSeries.objects.create(material=self.material1)
 
     def test_add_temporal_distribution(self):
@@ -316,13 +374,6 @@ class SampleSeriesTestCase(TestCase):
         self.sample_series.add_component_group(self.custom_group)
         for sample in self.sample_series.samples.all():
             Composition.objects.get(sample=sample, group=self.custom_group)
-
-    def test_remove_component_group(self):
-        self.sample_series.add_component_group(self.custom_group)
-        self.sample_series.remove_component_group(self.custom_group)
-        for sample in self.sample_series.samples.all():
-            with self.assertRaises(Composition.DoesNotExist):
-                Composition.objects.get(sample=sample, group=self.custom_group)
 
     def test_components_include_raw_component_measurements(self):
         raw_component = MaterialComponent.objects.create(name="Raw Series Component")
@@ -740,7 +791,6 @@ class SampleTestCase(TestCase):
         self.sample = Sample.objects.get(timestep=Timestep.objects.default())
         self.default_group = MaterialComponentGroup.objects.default()
         self.default_component = MaterialComponent.objects.default()
-        self.custom_component = MaterialComponent.objects.get(name="Custom Component")
         self.composition = Composition.objects.create(
             group=self.default_group,
             sample=self.sample,
@@ -929,7 +979,6 @@ class CompositionTestCase(TestCase):
         self.default_group = MaterialComponentGroup.objects.default()
         self.custom_group = MaterialComponentGroup.objects.get(name="Custom Group")
         self.default_component = MaterialComponent.objects.default()
-        self.custom_component = MaterialComponent.objects.get(name="Custom Component")
         self.composition = Composition.objects.create(
             owner=self.user,
             group=self.default_group,

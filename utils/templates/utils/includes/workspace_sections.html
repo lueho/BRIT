@@ -1,0 +1,22 @@
+{% for section in maintenance_sections %}
+  <section class="sdv2-section-panel mb-3"
+           id="workspace-section-{{ section.key }}"
+           data-workspace-section="{{ section.key }}"
+           aria-labelledby="workspace-heading-{{ section.key }}">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+      <h2 class="sdv2-section-title" id="workspace-heading-{{ section.key }}" data-workspace-heading>{{ section.label }}</h2>
+      <div class="text-end">
+        <a class="btn btn-outline-primary btn-sm"
+           href="{{ section.url }}"
+           data-workspace-edit="{{ section.key }}"
+           aria-controls="workspace-editor-{{ section.key }}"
+           aria-expanded="false">Edit {{ section.label|lower }}</a>
+        <div class="small mt-1"><a href="{{ section.url }}">Full-page editor<span class="visually-hidden"> for {{ section.label|lower }}</span></a></div>
+      </div>
+    </div>
+    <div data-workspace-summary>
+      {% include section.summary_template with object=object section=section material_links=section.material_links only %}
+    </div>
+    <div id="workspace-editor-{{ section.key }}" data-workspace-editor hidden></div>
+  </section>
+{% endfor %}

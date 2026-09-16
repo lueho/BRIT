@@ -1,0 +1,62 @@
+{% load custom_tags %}
+{% if section.key == 'overview' %}
+  <dl class="mb-0">
+    <dt>Name</dt><dd>{{ object.name }}</dd>
+    <dt>Substrate</dt>
+    <dd>{% if object.material %}<a href="{{ object.material.get_absolute_url }}">{{ object.material.name }}</a>{% else %}Not added yet.{% endif %}</dd>
+    <dt>Description</dt><dd>{{ object.description|default:'Not added yet.'|linebreaksbr }}</dd>
+  </dl>
+{% elif section.key == 'sampling' %}
+  <dl class="mb-0">
+    <dt>Sampling date</dt><dd>{{ object.sampling_date_display|default:'Not added yet.' }}</dd>
+    <dt>Location</dt><dd>{{ object.location|default:'Not added yet.' }}</dd>
+    <dt>Series</dt>
+    <dd>{% if object.series %}<a href="{{ object.series.get_absolute_url }}">{{ object.series.name }}</a>{% elif object.standalone %}Standalone sample{% else %}Not added yet.{% endif %}</dd>
+    <dt>Timestep</dt><dd>{{ object.timestep|default:'Not added yet.' }}</dd>
+  </dl>
+{% elif section.key == 'analysis' %}
+  <dl class="mb-0">
+    <dt>Analysis date/time</dt><dd>{{ object.analysis_date|date:'Y-m-d H:i'|default:'Not added yet.' }}</dd>
+    <dt>Laboratory</dt><dd>{{ object.analysis_laboratory|default:'Not added yet.' }}</dd>
+    <dt>Laboratory accreditation</dt><dd>{{ object.lab_accreditation|default:'Not added yet.' }}</dd>
+    <dt>Analysis objective</dt><dd>{{ object.analysis_objective|default:'Not added yet.'|linebreaksbr }}</dd>
+  </dl>
+{% elif section.key == 'image' %}
+  {% if object.image %}
+    <figure class="mb-3">
+      <img class="img-fluid rounded" src="{{ object.image.url }}" alt="{{ object.image_alt_text|default:object.name }}" loading="lazy" decoding="async">
+      {% if object.image_caption or object.image_rights_notice %}
+        <figcaption class="small text-muted mt-2">
+          {% if object.image_caption %}<div>{{ object.image_caption }}</div>{% endif %}
+          {% if object.image_rights_notice %}<div>{{ object.image_rights_notice }}</div>{% endif %}
+        </figcaption>
+      {% endif %}
+    </figure>
+  {% else %}
+    <p class="text-muted mb-0">No image added yet.{% if object.series and object.series.image %} The detail page shows the image from the linked series.{% endif %}</p>
+  {% endif %}
+{% elif section.key == 'sources' %}
+  <ul class="list-unstyled mb-0">
+    {% for source in object.sources.all %}
+      <li class="mb-2"><a href="{{ source.get_absolute_url }}">{{ source.abbreviation|default:source.title }}</a>{% if source.title and source.abbreviation %}<span class="text-muted small"> — {{ source.title }}</span>{% endif %}</li>
+    {% empty %}
+      <li class="text-muted">No sources added yet.</li>
+    {% endfor %}
+  </ul>
+{% elif section.key == 'measurements' %}
+  <ul class="list-unstyled mb-0">
+    {% for measurement in object.component_measurements.all %}
+      <li class="mb-1">{{ measurement.component.name }} — {{ measurement.average|trim_decimal:4 }} {{ measurement.unit.symbol|default:measurement.unit.name }}<span class="text-muted small"> ({{ measurement.group.name }})</span></li>
+    {% empty %}
+      <li class="text-muted">No measurements added yet.</li>
+    {% endfor %}
+  </ul>
+{% elif section.key == 'properties' %}
+  <ul class="list-unstyled mb-0">
+    {% for value in object.property_values.all %}
+      <li class="mb-1">{{ value.property.name }} — {{ value.average|trim_decimal:4 }} {{ value.unit.symbol|default:value.unit.name }}</li>
+    {% empty %}
+      <li class="text-muted">No property values added yet.</li>
+    {% endfor %}
+  </ul>
+{% endif %}

@@ -31,6 +31,15 @@ class MaterialPropertyAggregationKind(models.TextChoices):
     NON_MASS_RELATED = "non_mass_related", "Non mass-related"
 
 
+class MeasurementValueQualifier(models.TextChoices):
+    EXACT = "exact", "Exact"
+    LESS_THAN = "less_than", "Less than"
+    GREATER_THAN = "greater_than", "Greater than"
+    BELOW_DETECTION_LIMIT = "below_detection_limit", "Below detection limit"
+    RANGE = "range", "Range"
+    ESTIMATED = "estimated", "Estimated"
+
+
 def get_sample_substrate_category_name():
     """Return the configured substrate category name used for sample filtering."""
     return getattr(settings, "SAMPLE_SUBSTRATE_CATEGORY_NAME", "Bioresource")
@@ -89,7 +98,7 @@ class BaseMaterial(NamedUserCreatedObject):
 
     class Meta:
         verbose_name = "Material"
-        unique_together = [["name", "owner"]]
+        unique_together = [["name", "owner", "type"]]
         constraints = [
             models.UniqueConstraint(
                 Lower("name"),
@@ -146,24 +155,36 @@ class BaseMaterialTypeManager(UserCreatedObjectManager):
         return super().get_queryset().filter(type=self.material_type)
 
 
+class TypedMaterialMixin:
+    """Fixes ``type`` from construction on, so uniqueness validation sees the
+    correct type before ``save()``."""
+
+    material_type = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = self.material_type
+
+    def save(self, *args, **kwargs):
+        self.type = self.material_type
+        super().save(*args, **kwargs)
+
+
 class MaterialManager(BaseMaterialTypeManager):
     material_type = "material"
 
 
-class Material(BaseMaterial):
+class Material(TypedMaterialMixin, BaseMaterial):
     """
     Generic material class for many purposes. E.g. this is used as top level definition to link semantic definition of
     materials with analysis data.
     """
 
+    material_type = MaterialManager.material_type
     objects = MaterialManager()
 
     class Meta:
         proxy = True
-
-    def save(self, *args, **kwargs):
-        self.type = MaterialManager.material_type
-        super().save(*args, **kwargs)
 
 
 class MaterialComponentManager(BaseMaterialTypeManager):
@@ -180,22 +201,19 @@ class MaterialComponentManager(BaseMaterialTypeManager):
         ]
 
 
-class MaterialComponent(BaseMaterial):
+class MaterialComponent(TypedMaterialMixin, BaseMaterial):
     """
     Component class of a material for which a weight fraction can be assigned but which cannot itself be defined as a
     material (e.g. total solids, volatile solids, etc.)
     """
 
+    material_type = MaterialComponentManager.material_type
     objects = MaterialComponentManager()
 
     class Meta:
         proxy = True
         verbose_name = "component"
         ordering = ["name"]
-
-    def save(self, *args, **kwargs):
-        self.type = MaterialComponentManager.material_type
-        super().save(*args, **kwargs)
 
     @property
     def canonical_component(self):
@@ -373,11 +391,6 @@ class SampleSeries(NamedUserCreatedObject):
                 owner=self.owner, group=group, sample=sample, fractions_of=fractions_of
             )
 
-    def remove_component_group(self, group):
-        """Removes all compositions of a component group from all samples of this sample series."""
-        for sample in self.samples.all():
-            Composition.objects.filter(sample=sample, group=group).delete()
-
     def add_temporal_distribution(self, distribution):
         """
         Adds the temporal distribution to the m2m field and also creates shares for all timesteps of the distribution
@@ -412,18 +425,6 @@ class SampleSeries(NamedUserCreatedObject):
         ).values_list("component", flat=True)
         return MaterialComponent.objects.filter(
             id__in=component_ids,
-        )
-
-    @property
-    def component_groups(self):
-        return MaterialComponentGroup.objects.filter(
-            id__in=[
-                composition["group"]
-                for composition in Composition.objects.filter(sample__series=self)
-                .exclude(id=MaterialComponentGroup.objects.default().id)
-                .values("group")
-                .distinct()
-            ]
         )
 
     @property
@@ -467,16 +468,6 @@ class SampleSeries(NamedUserCreatedObject):
                 )
 
             return duplicate
-
-    @property
-    def full_name(self):
-        return f"{self.material.name} {self.name}"
-
-    @property
-    def group_settings(self):
-        return Composition.objects.filter(sample__series=self).exclude(
-            group=MaterialComponentGroup.objects.default()
-        )
 
     def clean(self):
         super().clean()
@@ -587,7 +578,45 @@ class MaterialPropertyGroup(NamedUserCreatedObject):
         unique_together = [["name", "owner"]]
 
 
-class MaterialPropertyValue(NumericMeasurementMixin, UserCreatedObject):
+class MeasurementMetadataMixin(models.Model):
+    raw_value = models.CharField(max_length=255, blank=True)
+    value_qualifier = models.CharField(
+        max_length=32,
+        choices=MeasurementValueQualifier.choices,
+        default=MeasurementValueQualifier.EXACT,
+    )
+    detection_limit = models.DecimalField(
+        max_digits=30,
+        decimal_places=15,
+        null=True,
+        blank=True,
+    )
+    raw_detection_limit = models.CharField(max_length=255, blank=True)
+    analysis_date = models.DateTimeField(null=True, blank=True)
+    analysis_laboratory = models.CharField(max_length=255, blank=True)
+    comment = models.TextField(
+        blank=True,
+        help_text="Additional comments about the measurement.",
+    )
+
+    class Meta:
+        abstract = True
+
+    def measurement_metadata_kwargs(self):
+        return {
+            "raw_value": self.raw_value,
+            "value_qualifier": self.value_qualifier,
+            "detection_limit": self.detection_limit,
+            "raw_detection_limit": self.raw_detection_limit,
+            "analysis_date": self.analysis_date,
+            "analysis_laboratory": self.analysis_laboratory,
+            "comment": self.comment,
+        }
+
+
+class MaterialPropertyValue(
+    NumericMeasurementMixin, UserCreatedObject, MeasurementMetadataMixin
+):
     """Concrete numeric measurement record linked to ``MaterialProperty``."""
 
     sample = models.ForeignKey(
@@ -658,6 +687,7 @@ class MaterialPropertyValue(NumericMeasurementMixin, UserCreatedObject):
             analytical_method=self.analytical_method,
             average=self.average,
             standard_deviation=self.standard_deviation,
+            **self.measurement_metadata_kwargs(),
         )
         duplicate.sources.set(self.sources.all())
 
@@ -962,6 +992,48 @@ class Sample(NamedUserCreatedObject):
             return duplicate
 
 
+class SampleExternalRecord(models.Model):
+    sample = models.ForeignKey(
+        Sample,
+        related_name="external_records",
+        on_delete=models.CASCADE,
+    )
+    source = models.ForeignKey(
+        Source,
+        related_name="external_sample_records",
+        on_delete=models.PROTECT,
+    )
+    external_id = models.CharField(max_length=255)
+    url = models.URLField(max_length=2083, blank=True)
+    payload = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["source__title", "external_id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source", "external_id"],
+                name="unique_external_sample_source_id",
+            ),
+            models.UniqueConstraint(
+                fields=["sample", "source"],
+                name="unique_external_source_per_sample",
+            ),
+        ]
+
+    @property
+    def literature(self):
+        entries = self.payload.get("literature", [])
+        if entries:
+            return entries
+        return [
+            {"title": str(reference), "reference": str(reference), "url": ""}
+            for reference in self.payload.get("metadata", {}).get("Literature", [])
+        ]
+
+    def __str__(self):
+        return f"{self.source}: {self.external_id}"
+
+
 @receiver(post_save, sender=Sample)
 def add_default_composition(sender, instance, created, **kwargs):
     if created:
@@ -1080,7 +1152,9 @@ class Composition(NamedUserCreatedObject):
         return f"Composition of {self.group.name} of sample {self.sample.name}"
 
 
-class ComponentMeasurement(NumericMeasurementMixin, UserCreatedObject):
+class ComponentMeasurement(
+    NumericMeasurementMixin, MeasurementMetadataMixin, UserCreatedObject
+):
     """Raw (unnormalized) component measurements for a sample."""
 
     measurement_property_field = "component"
@@ -1142,10 +1216,6 @@ class ComponentMeasurement(NumericMeasurementMixin, UserCreatedObject):
         blank=True,
         help_text="Number of samples/replicates (n) used for the measurement.",
     )
-    comment = models.TextField(
-        blank=True,
-        help_text="Additional comments about the measurement.",
-    )
 
     class Meta:
         ordering = ["component__name", "id"]
@@ -1172,7 +1242,7 @@ class ComponentMeasurement(NumericMeasurementMixin, UserCreatedObject):
             average=self.average,
             standard_deviation=self.standard_deviation,
             sample_size=self.sample_size,
-            comment=self.comment,
+            **self.measurement_metadata_kwargs(),
         )
         duplicate.sources.set(self.sources.all())
         return duplicate

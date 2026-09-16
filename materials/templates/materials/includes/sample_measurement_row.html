@@ -1,0 +1,27 @@
+<fieldset class="border rounded p-3 mb-3" data-workspace-row>
+  <legend class="float-none w-auto px-2 fs-6">{{ row_label|default:'Measurement' }}</legend>
+  <div class="text-danger" tabindex="-1" data-workspace-errors="{{ workspace_row.prefix }}-__all__">{{ workspace_row.non_field_errors }}</div>
+  {% for field in workspace_row.hidden_fields %}
+    {% include "utils/includes/workspace_field.html" with field=field only %}
+  {% endfor %}
+  <div class="row">
+    <div class="col-md-4">{% include "utils/includes/workspace_field.html" with field=workspace_row.group only %}</div>
+    <div class="col-md-4">{% include "utils/includes/workspace_field.html" with field=workspace_row.component only %}</div>
+    <div class="col-md-4">{% include "utils/includes/workspace_field.html" with field=workspace_row.unit only %}</div>
+  </div>
+  <div class="row">
+    <div class="col-md-4">{% include "utils/includes/workspace_field.html" with field=workspace_row.average only %}</div>
+    <div class="col-md-4">{% include "utils/includes/workspace_field.html" with field=workspace_row.standard_deviation only %}</div>
+    <div class="col-md-4">{% include "utils/includes/workspace_field.html" with field=workspace_row.sample_size only %}</div>
+  </div>
+  <details class="mb-3" {% if workspace_row.basis_component.errors or workspace_row.analytical_method.errors or workspace_row.sources.errors or workspace_row.comment.errors %}open{% endif %}>
+    <summary class="mb-3">Optional measurement details</summary>
+    <div class="row">
+      <div class="col-md-6">{% include "utils/includes/workspace_field.html" with field=workspace_row.basis_component only %}</div>
+      <div class="col-md-6">{% include "utils/includes/workspace_field.html" with field=workspace_row.analytical_method only %}</div>
+    </div>
+    {% include "utils/includes/workspace_field.html" with field=workspace_row.sources only %}
+    {% include "utils/includes/workspace_field.html" with field=workspace_row.comment only %}
+  </details>
+  {% include "utils/includes/workspace_field.html" with field=workspace_row.DELETE only %}
+</fieldset>

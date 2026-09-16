@@ -1,0 +1,68 @@
+<form id="workspace-section-{{ section.key|default:'create' }}-form"
+      method="post"
+      action="{{ section_url|default:request.path }}"
+      enctype="multipart/form-data"
+      data-workspace-section-form
+      novalidate>
+  {% csrf_token %}
+  <noscript><p class="alert alert-warning">JavaScript is required to search for entries and add new rows. Only existing selections are shown. You can still edit and save other fields.</p></noscript>
+  <fieldset data-workspace-fields>
+    <legend class="fs-5" tabindex="-1" data-workspace-form-title>{% if section %}Edit {{ section.label }}{% else %}Start with the essentials{% endif %}</legend>
+    {% if object.publication_status == 'published' %}
+      <p class="alert alert-warning">This {{ object_label|default:object|default:'record' }} is published. Saving updates the published {{ object_label|default:object|default:'record' }} immediately; it does not create a private draft.</p>
+    {% elif object %}
+      <p class="small text-muted">Save this section without changing publication status. Review and publication are separate actions.</p>
+    {% else %}
+      <p class="small text-muted">Only a title is required. Save a private draft, then add details one section at a time.</p>
+    {% endif %}
+    <div class="text-danger" tabindex="-1" data-workspace-errors="object-__all__">{{ form.non_field_errors }}</div>
+    {% for field in form %}
+      {% include "utils/includes/workspace_field.html" with field=field only %}
+    {% endfor %}
+    {% for inline in inlines %}
+      <section class="mb-4" data-workspace-formset="{{ inline.prefix }}" aria-labelledby="{{ inline.prefix }}-heading">
+        <h3 class="h6" id="{{ inline.prefix }}-heading">{{ inline.workspace_meta.heading|default:section.label }}</h3>
+        {{ inline.management_form }}
+        <div class="text-danger" tabindex="-1" data-workspace-errors="{{ inline.prefix }}-management">{{ inline.management_form.errors }}</div>
+        <div class="text-danger" tabindex="-1" data-workspace-errors="{{ inline.prefix }}-__all__">{{ inline.non_form_errors }}</div>
+        <div data-workspace-rows>
+          {% for row in inline %}
+            {% include inline.workspace_meta.row_template with workspace_row=row row_label='Entry' section=section only %}
+          {% endfor %}
+        </div>
+        <template data-workspace-empty>
+          {% include inline.workspace_meta.row_template with workspace_row=inline.empty_form row_label='New entry' section=section only %}
+        </template>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-workspace-add>
+          {{ inline.workspace_meta.add_label|default:'Add row' }}
+        </button>
+        {% if inline.workspace_meta.paste %}
+          <details class="mt-2" data-workspace-paste>
+            <summary class="btn btn-outline-secondary btn-sm d-inline-block">Paste {{ inline.workspace_meta.paste.label|default:'rows' }} from a spreadsheet</summary>
+            <div class="border rounded p-2 mt-2">
+              <label class="form-label small mb-1" for="{{ inline.prefix }}-paste">{{ inline.workspace_meta.paste.hint }}</label>
+              <textarea class="form-control font-monospace" id="{{ inline.prefix }}-paste" rows="4"
+                        data-workspace-paste-input
+                        data-paste-formset="{{ inline.prefix }}"
+                        data-paste-columns="{{ inline.workspace_meta.paste.columns }}"></textarea>
+              <button type="button" class="btn btn-primary btn-sm mt-2" data-workspace-paste-apply>Fill rows</button>
+            </div>
+          </details>
+        {% endif %}
+      </section>
+    {% endfor %}
+    <p data-workspace-local-status></p>
+    <div class="d-flex flex-wrap gap-2 mt-3">
+      <button type="submit" class="btn btn-primary">
+        {% if not object %}{{ submit_button_text|default:'Save private draft' }}{% elif object.publication_status == 'published' %}Save published changes{% elif object.publication_status == 'private' %}Save privately{% else %}Save changes (keep {{ object.get_publication_status_display|lower }} status){% endif %}
+      </button>
+      <a class="btn btn-outline-secondary"
+         href="{{ cancel_url }}"
+         data-workspace-cancel>Cancel</a>
+    </div>
+  </fieldset>
+  <template data-workspace-media>
+    {{ form.media }}
+    {% for inline in inlines %}{{ inline.empty_form.media }}{% endfor %}
+  </template>
+</form>

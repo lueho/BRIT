@@ -1,0 +1,20 @@
+<fieldset class="border rounded p-3 mb-3" data-workspace-row>
+  <legend class="float-none w-auto px-2 fs-6">{{ row_label|default:'Entry' }}</legend>
+  <div class="text-danger" tabindex="-1" data-workspace-errors="{{ workspace_row.prefix }}-__all__">{{ workspace_row.non_field_errors }}</div>
+  {% for field in workspace_row.hidden_fields %}
+    {% include "utils/includes/workspace_field.html" with field=field only %}
+  {% endfor %}
+  {% include "utils/includes/workspace_field.html" with field=workspace_row.material only %}
+  <div class="row">
+    <div class="col-md-6">{% include "utils/includes/workspace_field.html" with field=workspace_row.quantity_value only %}</div>
+    <div class="col-md-6">{% include "utils/includes/workspace_field.html" with field=workspace_row.quantity_unit only %}</div>
+  </div>
+  <details class="mb-3" {% if workspace_row.stage.errors or workspace_row.stream_label.errors or workspace_row.notes.errors or workspace_row.optional.errors %}open{% endif %}>
+    <summary class="mb-3">Optional material details</summary>
+    {% include "utils/includes/workspace_field.html" with field=workspace_row.stage only %}
+    {% include "utils/includes/workspace_field.html" with field=workspace_row.stream_label only %}
+    {% include "utils/includes/workspace_field.html" with field=workspace_row.notes only %}
+    {% include "utils/includes/workspace_field.html" with field=workspace_row.optional only %}
+  </details>
+  {% include "utils/includes/workspace_field.html" with field=workspace_row.DELETE only %}
+</fieldset>

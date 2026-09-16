@@ -14,10 +14,6 @@ from utils.filters import (
     FreeTextSearchFilterMixin,
     UserCreatedObjectScopedFilterSet,
 )
-from utils.object_management.permissions import (
-    apply_scope_filter,
-    filter_queryset_for_user,
-)
 
 from .models import (
     AnalyticalMethod,
@@ -69,26 +65,9 @@ class MaterialListFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilte
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = Material.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["name"].queryset = queryset
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            Material.objects.all()
+        )
 
     class Meta:
         model = Material
@@ -137,26 +116,9 @@ class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = MaterialComponent.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["name"].queryset = queryset
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            MaterialComponent.objects.all()
+        )
 
 
 class MaterialComponentGroupListFilter(UserCreatedObjectScopedFilterSet):
@@ -338,61 +300,22 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = Sample.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        if hasattr(self, "data") and self.data:
-            scope_value = self.data.get("scope")
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
         substrate_category, _ = get_or_create_sample_substrate_category()
-        substrate_queryset = Material.objects.filter(
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            Sample.objects.all()
+        )
+        self.filters["substrate_material"].queryset = Material.objects.filter(
             sampled_substrate_material_q(substrate_category)
         ).distinct()
-        parameter_queryset = MaterialProperty.objects.all()
-        raw_parameter_queryset = MaterialComponent.objects.all()
-        component_group_queryset = MaterialComponentGroup.objects.all()
-
-        if request and hasattr(request, "user"):
-            parameter_queryset = filter_queryset_for_user(
-                parameter_queryset, request.user
-            )
-            raw_parameter_queryset = filter_queryset_for_user(
-                raw_parameter_queryset, request.user
-            )
-            component_group_queryset = filter_queryset_for_user(
-                component_group_queryset, request.user
-            )
-
-        if scope_value:
-            parameter_queryset = apply_scope_filter(
-                parameter_queryset,
-                scope_value,
-                user=getattr(request, "user", None),
-            )
-            raw_parameter_queryset = apply_scope_filter(
-                raw_parameter_queryset,
-                scope_value,
-                user=getattr(request, "user", None),
-            )
-            component_group_queryset = apply_scope_filter(
-                component_group_queryset,
-                scope_value,
-                user=getattr(request, "user", None),
-            )
-
-        self.filters["name"].queryset = queryset
-        self.filters["substrate_material"].queryset = substrate_queryset
-        self.filters["parameter"].queryset = parameter_queryset
-        self.filters["raw_parameter"].queryset = raw_parameter_queryset
-        self.filters["component_group"].queryset = component_group_queryset
+        self.filters["parameter"].queryset = self.scoped_choice_queryset(
+            MaterialProperty.objects.all()
+        )
+        self.filters["raw_parameter"].queryset = self.scoped_choice_queryset(
+            MaterialComponent.objects.all()
+        )
+        self.filters["component_group"].queryset = self.scoped_choice_queryset(
+            MaterialComponentGroup.objects.all()
+        )
 
     class Meta:
         model = Sample
