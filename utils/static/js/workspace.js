@@ -425,7 +425,7 @@
             const labelField = select.dataset.labelField === "label" ? "label" : "name";
             const wanted = name.trim().toLowerCase();
             const matches = [];
-            for (let page = 1; page <= 20; page += 1) {
+            for (let page = 1; ; page += 1) {
                 const { options, hasMore } = await this.fetchOptions(select, name, page);
                 matches.push(...options.filter((option) => [option[labelField], option.symbol].some((text) => typeof text === "string" && text.trim().toLowerCase() === wanted)));
                 if (matches.length > 1 || !hasMore) break;
