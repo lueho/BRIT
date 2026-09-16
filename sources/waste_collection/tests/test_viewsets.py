@@ -756,6 +756,39 @@ class CollectionViewSetTestCase(APITestCase):
             "Private collections should not be shared between users",
         )
 
+    def test_geojson_head_preserves_scope_visibility(self):
+        url = reverse("api-waste-collection-geojson")
+        for user in (None, self.regular_user, self.staff_user):
+            self.client.force_authenticate(user=user)
+            for scope in ("published", "private", "review"):
+                with self.subTest(user=user, scope=scope):
+                    params = {"scope": scope, "stream": "true"}
+                    get = self.client.get(url, params)
+                    with patch.object(
+                        CollectionViewSet,
+                        "get_geojson_serializer_class",
+                        side_effect=AssertionError("HEAD serialized geometry"),
+                    ):
+                        head = self.client.head(url, params)
+                    self.assertEqual(head.status_code, get.status_code)
+                    self.assertEqual(
+                        (
+                            b"".join(head.streaming_content)
+                            if head.streaming
+                            else head.content
+                        ),
+                        b"",
+                    )
+                    if get.status_code == 200:
+                        self.assertFalse(hasattr(head, "data"))
+                        self.assertEqual(
+                            head["X-Total-Count"], str(len(get.data["features"]))
+                        )
+                        self.assertEqual(head["X-Data-Version"], get["X-Data-Version"])
+                    else:
+                        self.assertNotIn("X-Data-Version", head)
+        self.client.force_authenticate(user=None)
+
 
 class CollectionReviewActionApiTestCase(APITestCase):
     """Ensure review action API endpoints trigger collection cascade behavior."""

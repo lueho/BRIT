@@ -317,7 +317,16 @@ class CachedGeoJSONMixin:
 
             if data is not None:
                 data_version = self.get_dataset_version(request)
-                response = Response(data)
+                response = (
+                    StreamingHttpResponse(
+                        (),
+                        content_type=getattr(
+                            request, "accepted_media_type", "application/json"
+                        ),
+                    )
+                    if request.method == "HEAD"
+                    else Response(data)
+                )
                 response["X-Cache-Status"] = "HIT"
                 # Add feature count for frontend progress
                 if isinstance(data, dict) and "features" in data:
@@ -343,6 +352,24 @@ class CachedGeoJSONMixin:
             return rejection_response
 
         data_version = self.get_dataset_version(request)
+
+        if request.method == "HEAD":
+            is_streaming = STREAMING_ENABLED and count > STREAMING_THRESHOLD
+            response = StreamingHttpResponse(
+                (),
+                content_type=(
+                    "application/geo+json"
+                    if is_streaming
+                    else getattr(request, "accepted_media_type", "application/json")
+                ),
+            )
+            response["X-Cache-Status"] = "STREAM" if is_streaming else "MISS"
+            response["X-Total-Count"] = str(count)
+            response["X-Data-Version"] = data_version
+            response["Access-Control-Expose-Headers"] = (
+                "X-Total-Count, X-Cache-Status, X-Data-Version"
+            )
+            return response
 
         # Use streaming for large datasets to prevent memory issues
         if STREAMING_ENABLED and count > STREAMING_THRESHOLD:
