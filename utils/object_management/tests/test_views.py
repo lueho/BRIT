@@ -32,7 +32,14 @@ from sources.waste_collection.views import (
     CollectionPublishedListView,
     CollectionReviewFilterView,
 )
-from utils.object_management.models import ReviewAction, UserCreatedObject
+from utils.object_management.models import (
+    ObjectEditorGrant,
+    ReviewAction,
+    UserCreatedObject,
+    annotate_owner_review_feedback,
+    populate_owner_review_feedback,
+)
+from utils.object_management.permissions import get_object_policy
 from utils.object_management.views import (
     ReviewDashboardView,
     UserCreatedObjectCreateView,
@@ -729,6 +736,219 @@ class PublishedObjectsFilterViewTestCase(TestCase):
         self.assertEqual(response.context_data["filter"].data, {"name": ["Other name"]})
 
 
+class OwnerReviewFeedbackQueryTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="feedback-owner")
+        cls.moderator = User.objects.create_user(username="feedback-moderator")
+        cls.staff = User.objects.create_user(username="feedback-staff", is_staff=True)
+        cls.content_type = ContentType.objects.get_for_model(Property)
+        permission, _ = Permission.objects.get_or_create(
+            content_type=cls.content_type,
+            codename="can_moderate_property",
+            defaults={"name": "Can moderate property"},
+        )
+        cls.moderator.user_permissions.add(permission)
+        cls.items = Property.objects.bulk_create(
+            [
+                Property(
+                    name=f"Feedback {index:02d}",
+                    owner=cls.owner,
+                    publication_status="published",
+                )
+                for index in range(10)
+            ]
+        )
+        ReviewAction.objects.bulk_create(
+            [
+                ReviewAction(
+                    content_type=cls.content_type,
+                    object_id=item.pk,
+                    action=action,
+                    user=user,
+                )
+                for item in cls.items
+                for action, user in (
+                    (ReviewAction.ACTION_SUBMITTED, cls.owner),
+                    (ReviewAction.ACTION_COMMENT, cls.moderator),
+                )
+            ]
+        )
+
+    def setUp(self):
+        ContentType.objects.get_for_model(Property)
+        for user in (self.owner, self.moderator, self.staff):
+            user.get_all_permissions()
+            get_object_policy(user, self.items[0])
+
+    def get_queryset(self, user, view_class=PublishedObjectFilterView):
+        request = RequestFactory().get("/properties/", {"name": "Feedback"})
+        request.user = user
+        view = view_class(model=Property, filterset_class=MockFilterSet)
+        view.setup(request)
+        return view.get_queryset().filter(name__startswith="Feedback")
+
+    def test_feedback_queries_do_not_grow_with_page_size_for_any_role(self):
+        for user in (AnonymousUser(), self.owner, self.moderator, self.staff):
+            for size in (1, 10):
+                with self.subTest(user=user.pk, size=size):
+                    queryset = self.get_queryset(user)[:size]
+                    expected_queries = 2 if user.pk == self.owner.pk else 1
+                    with self.assertNumQueries(expected_queries):
+                        items = list(queryset)
+                        populate_owner_review_feedback(items, user)
+                        policies = [get_object_policy(user, item) for item in items]
+                    self.assertEqual(
+                        [policy["has_review_feedback"] for policy in policies],
+                        [user.pk == self.owner.pk] * size,
+                    )
+
+    def test_distinct_list_batches_feedback_only_for_the_selected_page(self):
+        request = RequestFactory().get("/properties/", {"name": "Feedback"})
+        request.user = self.owner
+        with (
+            patch(
+                "utils.object_management.models.annotate_owner_review_feedback",
+                wraps=annotate_owner_review_feedback,
+            ) as annotate,
+            self.assertNumQueries(3),
+        ):
+            response = PublishedObjectFilterView.as_view(
+                model=Property,
+                queryset=Property.objects.all().distinct(),
+                filterset_class=MockFilterSet,
+                paginate_by=3,
+            )(request)
+            items = list(response.context_data["object_list"])
+            self.assertTrue(all(item.has_review_feedback for item in items))
+
+        self.assertEqual(len(items), 3)
+        self.assertEqual(response.context_data["paginator"].count, 10)
+        annotate.assert_called_once()
+        feedback_queryset = annotate.call_args.args[0]
+        self.assertFalse(feedback_queryset.query.distinct)
+        self.assertSetEqual(
+            set(feedback_queryset.values_list("pk", flat=True)),
+            {item.pk for item in items},
+        )
+
+    def test_unpaginated_views_do_not_evaluate_their_object_list(self):
+        request = RequestFactory().get("/properties/", {"name": "Feedback"})
+        request.user = self.owner
+        with self.assertNumQueries(0):
+            response = PublishedObjectFilterView.as_view(
+                model=Property, filterset_class=MockFilterSet, paginate_by=None
+            )(request)
+        self.assertEqual(response.status_code, 200)
+
+    def test_gallery_context_does_not_fetch_unused_feedback(self):
+        class GalleryView(PublishedObjectFilterView):
+            representation_mode = "gallery"
+
+        request = RequestFactory().get("/properties/", {"name": "Feedback"})
+        request.user = self.owner
+        with self.assertNumQueries(1):
+            response = GalleryView.as_view(
+                model=Property, filterset_class=MockFilterSet
+            )(request)
+        self.assertEqual(response.status_code, 200)
+
+    def create_item(self):
+        return Property.objects.create(
+            name="Feedback cycle", owner=self.owner, publication_status="published"
+        )
+
+    def action(self, item, action, user, when=None, content_type=None):
+        event = ReviewAction.objects.create(
+            content_type=content_type or self.content_type,
+            object_id=item.pk,
+            action=action,
+            user=user,
+        )
+        if when is not None:
+            ReviewAction.objects.filter(pk=event.pk).update(created_at=when)
+        return event
+
+    def assert_feedback(self, item, expected, user=None):
+        user = user or self.owner
+        raw = Property.objects.get(pk=item.pk)
+        self.assertEqual(raw.has_review_feedback, expected)
+        optimized = self.get_queryset(user).get(pk=item.pk)
+        populate_owner_review_feedback([optimized], user)
+        with self.assertNumQueries(0):
+            self.assertEqual(optimized.has_review_feedback, expected)
+
+    def test_feedback_requires_a_submission_and_a_non_owner_action(self):
+        item = self.create_item()
+        self.action(item, ReviewAction.ACTION_COMMENT, self.moderator)
+        self.assert_feedback(item, False)
+        self.action(item, ReviewAction.ACTION_SUBMITTED, self.owner)
+        self.action(item, ReviewAction.ACTION_COMMENT, self.owner)
+        self.assert_feedback(item, False)
+        self.action(item, ReviewAction.ACTION_COMMENT, self.moderator)
+        self.assert_feedback(item, True)
+
+    def test_new_submission_resets_feedback_and_equal_times_use_event_id(self):
+        item = self.create_item()
+        when = timezone.now()
+        self.action(item, ReviewAction.ACTION_SUBMITTED, self.owner, when)
+        self.action(item, ReviewAction.ACTION_REJECTED, self.moderator, when)
+        self.assert_feedback(item, True)
+        self.action(item, ReviewAction.ACTION_SUBMITTED, self.owner, when)
+        self.assert_feedback(item, False)
+        self.action(item, ReviewAction.ACTION_COMMENT, self.moderator, when)
+        self.assert_feedback(item, True)
+
+    def test_event_timestamp_takes_precedence_over_event_id(self):
+        item = self.create_item()
+        when = timezone.now()
+        self.action(item, ReviewAction.ACTION_SUBMITTED, self.owner, when)
+        self.action(
+            item, ReviewAction.ACTION_COMMENT, self.moderator, when - timedelta(days=1)
+        )
+        self.assert_feedback(item, False)
+
+    def test_feedback_does_not_cross_content_types(self):
+        item = self.create_item()
+        self.action(item, ReviewAction.ACTION_SUBMITTED, self.owner)
+        self.action(
+            item,
+            ReviewAction.ACTION_COMMENT,
+            self.moderator,
+            content_type=ContentType.objects.get_for_model(Author),
+        )
+        self.assert_feedback(item, False)
+
+    def test_later_owner_comment_does_not_hide_moderator_feedback(self):
+        item = self.create_item()
+        self.action(item, ReviewAction.ACTION_SUBMITTED, self.owner)
+        self.action(item, ReviewAction.ACTION_COMMENT, self.moderator)
+        self.action(item, ReviewAction.ACTION_COMMENT, self.owner)
+        self.assert_feedback(item, True)
+
+    def test_feedback_uses_the_current_owner(self):
+        item = self.items[0]
+        Property.objects.filter(pk=item.pk).update(owner=self.moderator)
+        self.assert_feedback(item, False, user=self.moderator)
+
+    def test_editor_visibility_does_not_grant_owner_feedback_capabilities(self):
+        item = self.items[0]
+        Property.objects.filter(pk=item.pk).update(publication_status="private")
+        ObjectEditorGrant.objects.create(
+            content_object=item, editor=self.moderator, granted_by=self.owner
+        )
+        self.moderator.__dict__.pop("_editor_grant_cache", None)
+        shared = self.get_queryset(self.moderator, PrivateObjectFilterView).get(
+            pk=item.pk
+        )
+        policy = get_object_policy(self.moderator, shared)
+        self.assertTrue(policy["is_editor"])
+        self.assertFalse(policy["is_owner"])
+        self.assertFalse(policy["has_review_feedback"])
+        self.assertFalse(policy["can_view_review_feedback"])
+        self.assertTrue(shared.has_review_feedback)
+
+
 class SharedListScopeCountTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -761,9 +981,9 @@ class SharedListScopeCountTestCase(TestCase):
         ContentType.objects.get_for_model(Property)
         for view_class, user, expected, query_budget in (
             (PublishedObjectFilterView, AnonymousUser(), 2, 1),
-            (PublishedObjectFilterView, self.staff, 2, 1),
-            (PrivateObjectFilterView, self.staff, 2, 1),
-            (ReviewObjectFilterView, self.staff, 1, 1),
+            (PublishedObjectFilterView, self.staff, 2, 3),
+            (PrivateObjectFilterView, self.staff, 2, 3),
+            (ReviewObjectFilterView, self.staff, 1, 2),
         ):
             with self.subTest(
                 view=view_class.__name__, authenticated=user.is_authenticated
@@ -1189,6 +1409,236 @@ class CollectionPropertyValueReviewDashboardTest(TestCase):
         collection_ct = ContentType.objects.get_for_model(Collection)
         self.assertNotIn(cpv_ct, model_type_choices)
         self.assertIn(collection_ct, model_type_choices)
+
+
+class ReviewDashboardPaginationQueryTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create_user(username="queue-staff", is_staff=True)
+        cls.owner = User.objects.create_user(username="queue-owner")
+        cls.now = (timezone.now() - timedelta(days=1)).replace(
+            hour=12, minute=0, second=0, microsecond=0
+        )
+        cls.properties = Property.objects.bulk_create(
+            [
+                Property(
+                    name=f"Queue {index:03d}",
+                    description="Long review description " * 100,
+                    owner=cls.owner,
+                    publication_status="review",
+                    submitted_at=cls.now - timedelta(minutes=index),
+                )
+                for index in range(90)
+            ]
+        )
+        cls.collections = Collection.objects.bulk_create(
+            [
+                Collection(
+                    name=f"queue {index:03d}",
+                    owner=cls.owner,
+                    publication_status="review",
+                    submitted_at=cls.now - timedelta(minutes=index, seconds=30),
+                )
+                for index in range(10)
+            ]
+        )
+        Property.objects.bulk_create(
+            [
+                Property(
+                    name="Excluded",
+                    owner=owner,
+                    publication_status=status,
+                    submitted_at=cls.now,
+                )
+                for owner, status in (
+                    (cls.staff, "review"),
+                    (cls.owner, "published"),
+                    (cls.owner, "private"),
+                )
+            ]
+        )
+
+    def get_view(self, params=None):
+        request = RequestFactory().get("/review/", params or {})
+        request.user = self.staff
+        view = ReviewDashboardView(paginate_by=5)
+        view.setup(request)
+        return view
+
+    def response(self, params=None, models=None):
+        view = self.get_view(params)
+        with patch.object(
+            view, "get_available_models", return_value=models or [Property, Collection]
+        ):
+            return view.get(view.request)
+
+    def identities(self, items):
+        return [(type(item), item.pk) for item in items]
+
+    def expected(self, ordering):
+        field = ordering.lstrip("-")
+        return sorted(
+            [*self.properties, *self.collections],
+            key=lambda item: (
+                item.name.lower() if field == "name" else item.submitted_at
+            ),
+            reverse=ordering.startswith("-"),
+        )
+
+    def test_unfiltered_total_and_last_page_are_not_truncated(self):
+        response = self.response({"page": 20})
+        self.assertEqual(response.context_data["paginator"].count, 100)
+        self.assertEqual(response.context_data["page_obj"].number, 20)
+        self.assertEqual(
+            self.identities(response.context_data["review_items"]),
+            self.identities(self.expected("-submitted_at")[-5:]),
+        )
+
+    def test_filtered_dashboard_only_instantiates_the_selected_page(self):
+        with (
+            patch.object(
+                Property, "from_db", wraps=Property.from_db
+            ) as properties_loaded,
+            patch.object(
+                Collection, "from_db", wraps=Collection.from_db
+            ) as collections_loaded,
+        ):
+            response = self.response({"search": "Queue", "page": 2})
+        self.assertEqual(response.context_data["paginator"].count, 100)
+        self.assertEqual(len(response.context_data["review_items"]), 5)
+        self.assertEqual(
+            properties_loaded.call_count + collections_loaded.call_count, 5
+        )
+
+    def test_all_sort_directions_and_later_pages_match_python_ordering(self):
+        for ordering in ("-submitted_at", "submitted_at", "name", "-name"):
+            expected = self.expected(ordering)
+            for number in (1, 2, 20):
+                with self.subTest(ordering=ordering, page=number):
+                    response = self.response(
+                        {"search": "Queue", "ordering": ordering, "page": number}
+                    )
+                    start = (number - 1) * 5
+                    self.assertEqual(
+                        self.identities(response.context_data["review_items"]),
+                        self.identities(expected[start : start + 5]),
+                    )
+
+    def test_name_sort_reaches_records_outside_the_old_date_window(self):
+        target = Property.objects.create(
+            name="Zulu oldest",
+            owner=self.owner,
+            publication_status="review",
+            submitted_at=self.now - timedelta(days=365),
+        )
+        response = self.response({"ordering": "-name"})
+        self.assertEqual(response.context_data["review_items"][0].pk, target.pk)
+        self.assertEqual(response.context_data["paginator"].count, 101)
+
+    def test_model_owner_and_date_filters_are_applied_before_pagination(self):
+        Property.objects.create(
+            name="Queue old",
+            owner=self.owner,
+            publication_status="review",
+            submitted_at=self.now - timedelta(days=2),
+        )
+        response = self.response(
+            {
+                "model_type": ContentType.objects.get_for_model(Property).pk,
+                "owner": self.owner.pk,
+                "submitted_after": self.now.date().isoformat(),
+                "submitted_before": self.now.date().isoformat(),
+                "ordering": "name",
+                "page": 2,
+            }
+        )
+        expected = [
+            item
+            for item in self.properties
+            if item.submitted_at.date() == self.now.date()
+        ]
+        self.assertEqual(response.context_data["paginator"].count, len(expected))
+        self.assertEqual(
+            self.identities(response.context_data["review_items"]),
+            self.identities(expected[5:10]),
+        )
+
+    def test_null_submission_and_models_without_name_keep_existing_sort_semantics(self):
+        source = Source.objects.create(
+            title="Nameless model", owner=self.owner, publication_status="review"
+        )
+        for ordering in ("-submitted_at", "name"):
+            with self.subTest(ordering=ordering):
+                response = self.response(
+                    {"ordering": ordering}, models=[Property, Source]
+                )
+                self.assertEqual(
+                    self.identities(response.context_data["review_items"])[0],
+                    (Source, source.pk),
+                )
+                self.assertEqual(response.context_data["paginator"].count, 91)
+
+    def test_unicode_name_ordering_matches_python_on_later_pages(self):
+        additional = Property.objects.bulk_create(
+            [
+                Property(
+                    name=name,
+                    owner=self.owner,
+                    publication_status="review",
+                    submitted_at=self.now,
+                )
+                for name in ("ÄPFEL", "äpfel", "Éclair", "eclair", "Ωmega", "東京")
+            ]
+        )
+        expected = sorted(
+            [*self.properties, *self.collections, *additional],
+            key=lambda item: item.name.lower(),
+        )
+        for number in (1, 21, 22):
+            with self.subTest(page=number):
+                response = self.response({"ordering": "name", "page": number})
+                start = (number - 1) * 5
+                self.assertEqual(
+                    self.identities(response.context_data["review_items"]),
+                    self.identities(expected[start : start + 5]),
+                )
+
+    def test_page_loading_rechecks_review_status_after_reference_selection(self):
+        view = self.get_view()
+        hydrate = view._hydrate_review_references
+
+        def approve_before_loading(references, querysets):
+            Property.objects.filter(pk=self.properties[0].pk).update(
+                publication_status="published"
+            )
+            return hydrate(references, querysets)
+
+        with (
+            patch.object(
+                view, "get_available_models", return_value=[Property, Collection]
+            ),
+            patch.object(
+                view, "_hydrate_review_references", side_effect=approve_before_loading
+            ),
+        ):
+            response = view.get(view.request)
+
+        self.assertNotIn(
+            (Property, self.properties[0].pk),
+            self.identities(response.context_data["review_items"]),
+        )
+        self.assertEqual(len(response.context_data["review_items"]), 4)
+
+    def test_unpaginated_collector_keeps_json_queue_limits_and_filtered_results(self):
+        for params, expected_count in (({}, 60), ({"search": "Queue"}, 100)):
+            with self.subTest(params=params):
+                view = self.get_view(params)
+                with patch.object(
+                    view, "get_available_models", return_value=[Property, Collection]
+                ):
+                    items = view.collect_review_items()
+                self.assertIsInstance(items, list)
+                self.assertEqual(len(items), expected_count)
 
 
 class ReviewDashboardViewTests(TestCase):

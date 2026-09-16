@@ -1,11 +1,8 @@
-"""Pure Python filtering for heterogeneous review item collections.
+"""Pure Python filtering and ordering for heterogeneous review items.
 
-Since the review dashboard combines multiple model types into a single list,
-database-level filtering isn't possible. This module provides Python-based
-filtering for these heterogeneous collections.
-
-The ReviewDashboardFilterSet in filters.py generates the filter form UI,
-but actual filtering is delegated to this module.
+The dashboard filters each model in SQL and reuses the ordering helpers here
+for lightweight references, preserving Python's case-insensitive name ordering.
+The form-only ReviewDashboardFilterSet does not filter the real review queue.
 """
 
 import logging

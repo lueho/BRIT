@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict, namedtuple
 from datetime import datetime
 from urllib.parse import unquote, urlparse
 
@@ -18,7 +19,7 @@ from django.core.exceptions import (
     PermissionDenied,
     ValidationError,
 )
-from django.db.models import Q
+from django.db.models import CharField, Q, Value
 from django.http import (
     Http404,
     HttpResponse,
@@ -44,7 +45,11 @@ from utils.modal import (
     BSModalUpdateView,
 )
 from utils.object_management.filters import ReviewDashboardFilterSet
-from utils.object_management.models import ReviewAction, UserCreatedObject
+from utils.object_management.models import (
+    ReviewAction,
+    UserCreatedObject,
+    populate_owner_review_feedback,
+)
 from utils.object_management.permissions import (
     UserCreatedObjectPermission,
     _resolve_status_value,
@@ -74,6 +79,10 @@ from ..views import (
 from .redirects import ReviewActionRedirectResolver
 
 logger = logging.getLogger(__name__)
+
+ReviewItemReference = namedtuple(
+    "ReviewItemReference", ("model", "pk", "name", "submitted_at")
+)
 
 
 DEFAULT_BREADCRUMB_MODULES = {
@@ -590,19 +599,20 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         filter_obj = ReviewItemFilter([], self.request.GET)
         return filter_obj._apply_ordering(list(items), ordering)
 
-    def _collect_filtered_review_items(self, available_models):
-        """Collect review items using DB filters when the user is actively filtering."""
-        review_items = []
+    def _get_review_references(self, available_models, limit_per_model=None):
+        """Filter in SQL and sort lightweight references without loading full objects."""
+        references = []
+        querysets = {}
         selected_model_type_ids = self._get_selected_model_type_ids()
+        active_filters = self._has_active_query_filters()
 
         for model_class in available_models:
             if not self._matches_selected_model_types(
                 model_class, selected_model_type_ids
             ):
                 continue
-
             try:
-                review_queryset = self._in_review_queryset_for_model(model_class)
+                queryset = self._in_review_queryset_for_model(model_class)
             except Exception as exc:
                 logger.warning(
                     "Could not build in-review queryset for %s: %s",
@@ -611,119 +621,54 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                 )
                 continue
 
+            queryset = self._apply_database_review_filters(queryset, model_class)
+            querysets[model_class] = queryset
+            if not active_filters:
+                queryset = queryset.order_by("-submitted_at", "pk")
             try:
-                select_fields = self._get_select_related_fields(model_class)
-                items = self._apply_database_review_filters(
-                    review_queryset, model_class
-                ).select_related(*select_fields)
-                review_items.extend(list(items))
-            except (FieldDoesNotExist, AttributeError) as e:
-                logger.debug(
-                    f"Could not use select_related for {model_class.__name__}: {e}. "
-                    "Trying without select_related."
-                )
-                try:
-                    items = self._apply_database_review_filters(
-                        review_queryset, model_class
-                    )
-                    review_items.extend(list(items))
-                except Exception as e2:
-                    logger.warning(
-                        f"Could not collect review items for {model_class.__name__}: {e2}"
-                    )
+                model_class._meta.get_field("name")
+                name = "name"
+            except FieldDoesNotExist:
+                name = Value("", output_field=CharField())
+            metadata = queryset.values_list("pk", name, "submitted_at")
+            if limit_per_model is not None:
+                metadata = metadata[:limit_per_model]
+            references.extend(
+                ReviewItemReference(model_class, *row) for row in metadata.iterator()
+            )
 
-        return self._apply_requested_ordering(review_items)
+        return self._apply_requested_ordering(references), querysets
+
+    def _hydrate_review_references(self, references, querysets):
+        """Load only selected objects, retaining the original visibility filters."""
+        ids_by_model = defaultdict(list)
+        for reference in references:
+            ids_by_model[reference.model].append(reference.pk)
+        objects = {}
+        for model_class, ids in ids_by_model.items():
+            queryset = (
+                querysets[model_class]
+                .filter(pk__in=ids)
+                .select_related(*self._get_select_related_fields(model_class))
+                .order_by()
+            )
+            objects.update(((model_class, obj.pk), obj) for obj in queryset)
+        return [
+            objects[(reference.model, reference.pk)]
+            for reference in references
+            if (reference.model, reference.pk) in objects
+        ]
 
     def collect_review_items(self):
-        """Collect review items from models the user can moderate.
-
-        Returns a list (not QuerySet) of heterogeneous objects since we're
-        combining multiple model types.
-
-        Performance optimization: Instead of loading ALL items into memory,
-        we use database-level ordering and limit fetching to a reasonable
-        number of items per model to reduce memory usage.
-
-        Note: For very large datasets, consider implementing per-model
-        pagination with client-side merging or database UNION queries.
-        """
-        review_items = []
+        """Keep the unpaginated JSON queue's existing result shape and fetch limits."""
         available_models = self.get_available_models()
-
-        if self._has_active_query_filters():
-            return self._collect_filtered_review_items(available_models)
-
-        # Calculate a reasonable fetch limit per model to prevent loading
-        # thousands of items into memory. Multiply by number of models
-        # to ensure we get enough items even if some models have few items.
-        # This is a heuristic - can be tuned based on actual usage.
-        max_items_per_model = self.paginate_by * max(10, len(available_models))
-
-        for model_class in available_models:
-            try:
-                review_queryset = self._in_review_queryset_for_model(model_class)
-            except Exception as exc:
-                logger.warning(
-                    "Could not build in-review queryset for %s: %s",
-                    model_class.__name__,
-                    exc,
-                )
-                continue
-
-            # Get items in review for this model, excluding current user's own items
-            try:
-                select_fields = self._get_select_related_fields(model_class)
-
-                # Apply database-level ordering and limit to reduce memory usage
-                items = (
-                    review_queryset.exclude(owner=self.request.user)
-                    .select_related(*select_fields)
-                    .order_by("-submitted_at")[:max_items_per_model]
-                )
-                review_items.extend(list(items))
-            except (FieldDoesNotExist, AttributeError) as e:
-                # Fallback if owner/approved_by fields are absent
-                logger.debug(
-                    f"Could not use select_related for {model_class.__name__}: {e}. "
-                    "Trying without select_related."
-                )
-                try:
-                    items = review_queryset.exclude(owner=self.request.user).order_by(
-                        "-submitted_at"
-                    )[:max_items_per_model]
-                    review_items.extend(list(items))
-                except (FieldDoesNotExist, AttributeError) as e2:
-                    # owner field might not exist, filter in Python
-                    logger.debug(
-                        f"Could not exclude owner for {model_class.__name__}: {e2}. "
-                        "Filtering in Python."
-                    )
-                    try:
-                        # Even in fallback, use database ordering and limit
-                        items = list(
-                            review_queryset.order_by("-submitted_at")[
-                                :max_items_per_model
-                            ]
-                        )
-                        # Filter out in Python as a last resort
-                        filtered_items = [
-                            i
-                            for i in items
-                            if getattr(i, "owner_id", None) != self.request.user.id
-                        ]
-                        review_items.extend(filtered_items)
-                    except Exception as e3:
-                        logger.warning(
-                            f"Could not collect review items for {model_class.__name__}: {e3}"
-                        )
-
-        # Apply filters using ReviewItemFilter helper
-        # Note: ReviewDashboardFilterSet generates the form UI,
-        # but filtering happens here in Python since we have heterogeneous objects
-        filter_obj = ReviewItemFilter(review_items, self.request.GET)
-        review_items = filter_obj.filter()
-
-        return review_items
+        limit = (
+            None
+            if self._has_active_query_filters()
+            else self.paginate_by * max(10, len(available_models))
+        )
+        references, querysets = self._get_review_references(available_models, limit)
+        return self._hydrate_review_references(references, querysets)
 
     def has_review_items(self):
         """Return whether the user can moderate any pending review item."""
@@ -808,15 +753,16 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # Replace the queryset-based object_list with our collected items
-        review_items = self.collect_review_items()
+        references, querysets = self._get_review_references(self.get_available_models())
 
-        # Manually paginate the list
         from django.core.paginator import Paginator
 
-        paginator = Paginator(review_items, self.paginate_by)
+        paginator = Paginator(references, self.paginate_by)
         page_number = self.request.GET.get("page")
         page_obj = paginator.get_page(page_number)
+        page_obj.object_list = self._hydrate_review_references(
+            page_obj.object_list, querysets
+        )
 
         context.update(
             {
@@ -1719,6 +1665,14 @@ class UserCreatedObjectListMixin:
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         object_list = context.get("object_list")
+        page_obj = context.get("page_obj")
+        if (
+            page_obj is not None
+            and getattr(self, "representation_mode", "list") != "gallery"
+        ):
+            populate_owner_review_feedback(
+                page_obj.object_list, getattr(self.request, "user", None)
+            )
         breadcrumb_model = getattr(object_list, "model", None) or getattr(
             self, "model", None
         )
