@@ -1,4 +1,5 @@
 import math
+from functools import cached_property
 
 from crispy_forms.bootstrap import Accordion
 from crispy_forms.helper import FormHelper
@@ -320,15 +321,8 @@ class CollectionFilterFormHelper(FormHelper):
 
 
 class CollectionsPerYearFilter(NullableRangeFilter):
-    def set_min_max(self):
-        frequencies = CollectionFrequency.objects.annotate(
-            collection_count=Sum("collectioncountoptions__standard")
-        )
-        if frequencies.exists():
-            max_value = frequencies.aggregate(Max("collection_count"))[
-                "collection_count__max"
-            ]
-        else:
+    def set_min_max(self, max_value):
+        if max_value is None:
             max_value = 1000
         self.extra["widget"] = NullableRangeSliderWidget(
             attrs={
@@ -368,19 +362,15 @@ class NullableCollectionPropertyValueRangeFilter(NullableRangeFilter):
         super().__init__(*args, **kwargs)
         self.property_name = kwargs.get("property_name", self.property_name)
 
-    def set_min_max(self):
-        values = CollectionPropertyValue.objects.filter(
-            property__name=self.property_name
-        )
+    def set_min_max(self, max_value):
         if self.range_min is None:
             self.range_min = self.default_range_min
         if self.range_max is None:
-            if values.exists():
-                self.range_max = math.ceil(
-                    values.aggregate(Max("average"))["average__max"]
-                )
-            else:
-                self.range_max = self.default_range_max
+            self.range_max = (
+                math.ceil(max_value)
+                if max_value is not None
+                else self.default_range_max
+            )
         if self.range_step is None:
             self.range_step = self.default_range_step
         self.extra["widget"] = NullableRangeSliderWidget(
@@ -433,13 +423,9 @@ class RequiredBinCapacityRangeFilter(NullableRangeFilter):
     default_include_null = True
     unit = "L"
 
-    def set_min_max(self):
+    def set_min_max(self, max_val):
         min_val = self.default_range_min
-        values = Collection.objects.exclude(required_bin_capacity__isnull=True)
-        if values.exists():
-            max_val = values.aggregate(Max("required_bin_capacity"))[
-                "required_bin_capacity__max"
-            ]
+        if max_val is not None:
             self.default_range_max = max_val
         else:
             max_val = self.default_range_max
@@ -461,13 +447,9 @@ class MinBinSizeRangeFilter(NullableRangeFilter):
     default_include_null = True
     unit = "L"
 
-    def set_min_max(self):
+    def set_min_max(self, max_val):
         min_val = self.default_range_min
-
-        values = Collection.objects.exclude(min_bin_size__isnull=True)
-        if values.exists():
-            max_val = values.aggregate(Max("min_bin_size"))["min_bin_size__max"]
-        else:
+        if max_val is None:
             max_val = self.default_range_max
         self.extra["widget"] = NullableRangeSliderWidget(
             attrs={
@@ -607,11 +589,7 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
                 kwargs["data"] = data
         super().__init__(*args, **kwargs)
         if not skip_min_max:
-            self.filters["connection_rate"].set_min_max()
-            self.filters["collections_per_year"].set_min_max()
-            self.filters["spec_waste_collected"].set_min_max()
-            self.filters["required_bin_capacity"].set_min_max()
-            self.filters["min_bin_size"].set_min_max()
+            self._set_filter_ranges()
 
         try:
             scope_val = None
@@ -629,6 +607,51 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
                 self.filters["publication_status"].extra["help_text"] = ""
             except KeyError:
                 pass
+
+    def _set_filter_ranges(self):
+        property_filters = {
+            name: self.filters[name]
+            for name in ("connection_rate", "spec_waste_collected")
+        }
+        maxima = CollectionPropertyValue.objects.filter(
+            property__name__in=[
+                filter_.property_name for filter_ in property_filters.values()
+            ]
+        ).aggregate(
+            **{
+                name: Max("average", filter=Q(property__name=filter_.property_name))
+                for name, filter_ in property_filters.items()
+            }
+        )
+        maxima.update(
+            Collection.objects.aggregate(
+                required_bin_capacity=Max("required_bin_capacity"),
+                min_bin_size=Max("min_bin_size"),
+            )
+        )
+        maxima["collections_per_year"] = CollectionFrequency.objects.annotate(
+            collection_count=Sum("collectioncountoptions__standard")
+        ).aggregate(maximum=Max("collection_count"))["maximum"]
+        for name, maximum in maxima.items():
+            filter_ = self.filters[name]
+            filter_.set_min_max(maximum)
+            filter_.field.widget = filter_.extra["widget"]
+            if hasattr(self, "_form"):
+                self._form.fields[name].widget = filter_.field.widget
+
+    @cached_property
+    def _waste_component_choices(self):
+        return list(iter(self.form.fields["allowed_materials"].choices))
+
+    def _get_waste_component_choices(self):
+        return self._waste_component_choices
+
+    @property
+    def form(self):
+        form = super().form
+        for name in ("allowed_materials", "forbidden_materials"):
+            form.fields[name].widget.choices = self._get_waste_component_choices
+        return form
 
     @staticmethod
     def catchment_filter(queryset, _, value):
