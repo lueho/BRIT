@@ -555,8 +555,14 @@ function pasteFixture(fixture, { text, results = {}, maxRows = Infinity, columns
     fixture.workspace.active.editor = element({
         querySelector(selector) { return selector === '[data-workspace-formset="component_measurements"]' ? formset : null; },
     });
-    fixture.workspace.searchOptions = async (select, query) => results[query] || [];
-    return { input, panel, apply, formset, errors, rowsContainer, created: () => created };
+    const pages = [];
+    fixture.workspace.fetchOptions = async (select, query, page) => {
+        pages.push({ query, page });
+        const found = results[query] || [];
+        const paged = Array.isArray(found[0]) ? found : [found];
+        return { options: paged[page - 1] || [], hasMore: page < paged.length };
+    };
+    return { input, panel, apply, formset, errors, rowsContainer, pages, created: () => created };
 }
 
 test("pasted spreadsheet rows create a formset row per line and resolve names", async () => {
@@ -605,6 +611,27 @@ test("ambiguous or unknown pasted names are flagged on the row for manual choice
     assert.match(mock.errors["component_measurements-1-component"].textContent, /No match for "Lignin"/);
     assert.match(fixture.status.textContent, /1 value needs attention/);
     assert.equal(fixture.status.className, "alert alert-danger");
+});
+
+test("pasted names resolve across autocomplete pages and later duplicates block a false match", async () => {
+    const fixture = setup();
+    activate(fixture);
+    const later = pasteFixture(fixture, {
+        text: "Ash\t12.5",
+        results: { Ash: [[{ id: 1, name: "Ash (volatile)" }], [{ id: 2, name: "Ash (fixed)" }], [{ id: 7, name: "Ash" }]] },
+    });
+    await fixture.workspace.applyPaste(later.panel);
+    assert.equal(later.rowsContainer.lastElementChild.fields.component.tomselect.value, "7");
+    assert.deepEqual(later.pages.map((entry) => entry.page), [1, 2, 3]);
+
+    const duplicate = pasteFixture(fixture, {
+        text: "Ash\t12.5",
+        results: { Ash: [[{ id: 7, name: "Ash" }], [{ id: 8, name: "ash" }], [{ id: 9, name: "Ash" }]] },
+    });
+    await fixture.workspace.applyPaste(duplicate.panel);
+    assert.equal(duplicate.rowsContainer.lastElementChild.fields.component.tomselect.value, undefined);
+    assert.match(duplicate.errors["component_measurements-1-component"].textContent, /No match for "Ash"/);
+    assert.deepEqual(duplicate.pages.map((entry) => entry.page), [1, 2]);
 });
 
 test("paste stops at the row limit instead of overwriting the last existing row", async () => {
