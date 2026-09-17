@@ -81,7 +81,7 @@
   {% object_policy object as policy %}
   {% if policy.can_edit %}
     <a class="btn btn-outline-primary w-100 mb-2"
-       href="{% url 'sampleseries-update' object.pk %}?next={{ request.get_full_path|urlencode }}">
+       href="{% url 'sampleseries-update' object.pk %}?next={{ request|path_without_return_params|urlencode }}">
       <i class="fas fa-pen-to-square"></i> Edit
     </a>
   {% endif %}
@@ -93,7 +93,7 @@
   {% endif %}
   {% if policy.can_delete %}
     <a class="btn btn-outline-danger w-100 mb-2 modal-link"
-       href="{% url 'sampleseries-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">
+       href="{% url 'sampleseries-delete-modal' object.pk %}?next={{ request|path_without_return_params|urlencode }}">
       <i class="fas fa-trash"></i> Delete
     </a>
   {% endif %}

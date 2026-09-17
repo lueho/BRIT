@@ -1,7 +1,7 @@
 import logging
 import re
 from importlib import import_module
-from urllib.parse import quote
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from django import template
 from django.apps import apps
@@ -292,6 +292,27 @@ def object_policy(context, obj, review_mode=False):
         return _safe_policy_fallback(user, obj, review_mode)
 
 
+# Params that carry a return path back into the app. They are stripped before
+# embedding the current path into a new back/next/return_to param so the value
+# can never nest — otherwise each list->detail->list round trip doubles the URL
+# and crawlers discover an unbounded URL space.
+_RETURN_PATH_PARAMS = frozenset({"back", "next", "return_to"})
+
+
+@register.filter
+def path_without_return_params(request):
+    """Current full path minus any return-path params."""
+    parts = urlsplit(request.get_full_path())
+    query = urlencode(
+        [
+            (key, value)
+            for key, value in parse_qsl(parts.query, keep_blank_values=True)
+            if key not in _RETURN_PATH_PARAMS
+        ]
+    )
+    return urlunsplit(("", "", parts.path, query, parts.fragment))
+
+
 @register.simple_tag(takes_context=True)
 def detail_or_review_url(context, obj, use_back=False):
     """
@@ -348,7 +369,7 @@ def detail_or_review_url(context, obj, use_back=False):
                 next_param = ""
                 try:
                     if request is not None:
-                        next_param = f"?next={quote(request.get_full_path(), safe='')}"
+                        next_param = f"?next={quote(path_without_return_params(request), safe='')}"
                 except Exception:  # pragma: no cover - defensive
                     next_param = ""
                 return f"{review_url}{next_param}"
@@ -371,9 +392,7 @@ def detail_or_review_url(context, obj, use_back=False):
                     next_param = ""
                     try:
                         if request is not None:
-                            next_param = (
-                                f"?next={quote(request.get_full_path(), safe='')}"
-                            )
+                            next_param = f"?next={quote(path_without_return_params(request), safe='')}"
                     except Exception:  # pragma: no cover - defensive
                         next_param = ""
                     return f"{review_url}{next_param}"
@@ -389,7 +408,7 @@ def detail_or_review_url(context, obj, use_back=False):
         # Optionally include ?back=<current_path> for detail pages coming from lists
         if use_back and request is not None:
             try:
-                return f"{absolute_url}?back={quote(request.get_full_path(), safe='')}"
+                return f"{absolute_url}?back={quote(path_without_return_params(request), safe='')}"
             except Exception:  # pragma: no cover - defensive
                 return absolute_url
         return absolute_url
@@ -430,7 +449,7 @@ def detail_or_review_url(context, obj, use_back=False):
                 next_param = ""
                 try:
                     if request is not None:
-                        next_param = f"?next={quote(request.get_full_path(), safe='')}"
+                        next_param = f"?next={quote(path_without_return_params(request), safe='')}"
                 except Exception:  # pragma: no cover - defensive
                     next_param = ""
                 return f"{review_url}{next_param}"
@@ -443,9 +462,7 @@ def detail_or_review_url(context, obj, use_back=False):
             # Not eligible for review view; optionally add back param
             if use_back and request is not None:
                 try:
-                    return (
-                        f"{absolute_url}?back={quote(request.get_full_path(), safe='')}"
-                    )
+                    return f"{absolute_url}?back={quote(path_without_return_params(request), safe='')}"
                 except Exception:  # pragma: no cover - defensive
                     return absolute_url
             return absolute_url
