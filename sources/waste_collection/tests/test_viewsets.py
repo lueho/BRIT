@@ -150,7 +150,7 @@ class CollectionViewSetTestCase(APITestCase):
     def test_geojson_published_scope_allows_anonymous_access(self):
         url = reverse("api-waste-collection-geojson")
 
-        response = self.client.get(url, {"scope": "published"})
+        response = self.client.get(url, {"scope": "published"}, REMOTE_ADDR="10.9.9.10")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         feature_ids = {
@@ -189,7 +189,7 @@ class CollectionViewSetTestCase(APITestCase):
     def test_geojson_non_public_scope_requires_authentication(self):
         url = reverse("api-waste-collection-geojson")
 
-        response = self.client.get(url, {"scope": "private"})
+        response = self.client.get(url, {"scope": "private"}, REMOTE_ADDR="10.9.9.11")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertIn("Authentication is required", response.data["detail"])
@@ -763,13 +763,13 @@ class CollectionViewSetTestCase(APITestCase):
             for scope in ("published", "private", "review"):
                 with self.subTest(user=user, scope=scope):
                     params = {"scope": scope, "stream": "true"}
-                    get = self.client.get(url, params)
+                    get = self.client.get(url, params, REMOTE_ADDR="10.9.9.12")
                     with patch.object(
                         CollectionViewSet,
                         "get_geojson_serializer_class",
                         side_effect=AssertionError("HEAD serialized geometry"),
                     ):
-                        head = self.client.head(url, params)
+                        head = self.client.head(url, params, REMOTE_ADDR="10.9.9.12")
                     self.assertEqual(head.status_code, get.status_code)
                     self.assertEqual(
                         (
