@@ -122,12 +122,22 @@ def active_filter_chips(context):
     if request is None or not hasattr(filterset, "filters"):
         return []
 
+    skip = {"scope", "page", "id", "ordering", "publication_status"}
+    filter_names = set(filterset.filters)
+    if not any(
+        key not in skip
+        and (
+            key in filter_names
+            or any(key.startswith(f"{name}_") for name in filter_names)
+        )
+        for key in request.GET
+    ):
+        return []
+
     form = getattr(filterset, "form", None)
     if form is None or not form.is_valid():
         return []
 
-    skip = {"scope", "page", "id", "ordering", "publication_status"}
-    filter_names = set(filterset.filters)
     chips = []
     for name, filter_ in filterset.filters.items():
         if name in skip:
