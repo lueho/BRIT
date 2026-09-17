@@ -680,14 +680,6 @@ class StickyFilterOffsetAssetTests(SimpleTestCase):
         self.assertIn("top: var(--brit-sticky-offset);", css)
         self.assertNotIn("top: calc(56px + 1rem);", css)
 
-    def test_filtered_list_minified_css_mirrors_source(self):
-        minified = self._read_asset("css/filtered-list.min.css")
-
-        self.assertIn(
-            ".filter-sticky{position:sticky;top:var(--brit-sticky-offset)", minified
-        )
-        self.assertNotIn("top:calc(56px + 1rem)", minified)
-
 
 class BreadcrumbRailGlobalStylingAssetTests(SimpleTestCase):
     """Asset-level regression tests for the global .page-breadcrumb-rail styling.

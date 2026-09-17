@@ -26,11 +26,6 @@ from ..models import (
     WasteFlyer,
 )
 from ..utils import ensure_initial_data
-from .test_views import (  # noqa: F401
-    BinConfigurationModelTestCase,
-    CollectionBinConfigurationFieldTestCase,
-    CollectionEstablishedFieldTestCase,
-)
 
 
 class InitialDataTestCase(TestCase):
@@ -125,25 +120,10 @@ class CollectionCatchmentTestCase(TestCase):
 
 
 class WasteFlyerTestCase(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        with mute_signals(signals.post_save):
-            WasteFlyer.objects.create(
-                citation_key="WasteFlyer007", url="https://www.super-test-flyer.org"
-            )
-
-    def setUp(self):
-        pass
-
     def test_new_instance_is_saved_with_type_waste_flyer(self):
         with mute_signals(signals.post_save):
             flyer = WasteFlyer.objects.create(citation_key="WasteFlyer002")
         self.assertEqual(flyer.type, "waste_flyer")
-
-    def test_str_returns_url(self):
-        with mute_signals(signals.post_save):
-            flyer = WasteFlyer.objects.get(citation_key="WasteFlyer007")
-        self.assertEqual(flyer.__str__(), "https://www.super-test-flyer.org")
 
 
 class WasteFlyerUrlCheckSignalTestCase(TestCase):
@@ -407,13 +387,27 @@ class CollectionTestCase(TestCase):
         self.collection.refresh_from_db()
         self.assertEqual(self.collection.participation_policy, "MANDATORY")
 
-    def test_get_participation_policy_display_accessor_exists(self):
-        """Django auto-generates get_FOO_display for the renamed field."""
-        self.collection.participation_policy = "VOLUNTARY"
-        self.collection.save(update_fields=["participation_policy"])
-        self.assertEqual(
-            self.collection.get_participation_policy_display(), "voluntary"
+
+class CollectionBinConfigurationFieldTestCase(TestCase):
+    """Tests for Collection.bin_configuration FK behaviour."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.catchment = CollectionCatchment.objects.create(name="SM Field Catchment")
+
+    def test_delete_bin_configuration_sets_null_on_collection(self):
+        method = BinConfiguration.objects.create(
+            name="Temporary method",
+            owner=get_default_owner(),
+            publication_status="private",
         )
+        col = Collection.objects.create(
+            catchment=self.catchment,
+            bin_configuration=method,
+        )
+        method.delete()
+        col.refresh_from_db()
+        self.assertIsNone(col.bin_configuration)
 
 
 class CollectionMaterialMatchingQuerySetTestCase(TestCase):

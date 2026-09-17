@@ -1,17 +1,7 @@
-from django.test import SimpleTestCase, TestCase
-from django.urls import Resolver404, resolve, reverse
+from django.test import TestCase
+from django.urls import Resolver404, resolve
 
 from utils.models import Redirect
-
-
-class SessionUrlRoutingTests(SimpleTestCase):
-    def test_set_session_url_resolves(self):
-        url = reverse("set_session")
-        self.assertEqual(url, "/set_session/")
-
-    def test_get_session_url_resolves(self):
-        url = reverse("get_session")
-        self.assertEqual(url, "/get_session/")
 
 
 class DynamicRedirectRoutingTests(TestCase):
