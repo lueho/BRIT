@@ -13,8 +13,10 @@ from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
 from django.core.cache import caches
 from django.core.management import call_command
+from django.db import connection
 from django.middleware.common import CommonMiddleware
 from django.test import RequestFactory, TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import serializers
@@ -2167,6 +2169,46 @@ class GeoJSONHeadTests(TestCase):
         self.assertEqual(len(get.data["features"]), 2)
         self.assert_metadata_equal(response, get)
         self.assertIsNotNone(self.cache.get("head-test-data"))
+
+    def test_cold_head_uses_single_stats_query(self):
+        with CaptureQueriesContext(connection) as queries:
+            response = self.request("head")
+        self.assertEqual(response.status_code, 200)
+        count_queries = [
+            q for q in queries.captured_queries if "COUNT(" in q["sql"].upper()
+        ]
+        self.assertEqual(len(count_queries), 1)
+
+    def test_cold_get_uses_single_stats_query(self):
+        with CaptureQueriesContext(connection) as queries:
+            response = self.request("get")
+        self.assertEqual(response.status_code, 200)
+        count_queries = [
+            q for q in queries.captured_queries if "COUNT(" in q["sql"].upper()
+        ]
+        self.assertEqual(len(count_queries), 1)
+
+    def test_cached_head_reads_meta_count_without_payload(self):
+        self.request("get")
+        with patch.object(self.cache, "get", wraps=self.cache.get) as cache_get:
+            head = self.request("head")
+        self.assertEqual(head["X-Cache-Status"], "HIT")
+        self.assertEqual(head["X-Total-Count"], "2")
+        keys = [call.args[0] for call in cache_get.call_args_list]
+        self.assertIn("head-test-data:count", keys)
+        self.assertNotIn("head-test-data", keys)
+
+    def test_cached_head_heals_missing_count_meta(self):
+        self.request("get")
+        self.cache.delete("head-test-data:count")
+        head = self.request("head")
+        self.assertEqual(head["X-Cache-Status"], "HIT")
+        self.assertEqual(head["X-Total-Count"], "2")
+        self.assertEqual(self.cache.get("head-test-data:count"), 2)
+        with patch.object(self.cache, "get", wraps=self.cache.get) as cache_get:
+            self.request("head")
+        keys = [call.args[0] for call in cache_get.call_args_list]
+        self.assertNotIn("head-test-data", keys)
 
     def test_cached_head_has_no_response_payload(self):
         self.request("get")

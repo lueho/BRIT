@@ -4,10 +4,12 @@ from django.conf import settings
 
 from brit.celery import app
 from maps.signals import get_geojson_cache
+from maps.utils import set_geojson_cache_payload
 from sources.roadside_trees.geojson import (
     HamburgRoadsideTreeGeometrySerializer,
     HamburgRoadsideTrees,
 )
+from sources.roadside_trees.viewsets import HamburgRoadsideTreeViewSet
 
 logger = logging.getLogger(__name__)
 
@@ -17,13 +19,19 @@ def warm_roadside_tree_geojson_cache(self):
     logger.info("Starting Roadside Trees GeoJSON cache warm-up")
 
     try:
+        # Capture the dataset version before serializing: if the externally
+        # managed table changes mid-task, the worst case is a fresh payload
+        # under an orphaned old key, never stale geometry under a current key.
+        dataset_version = HamburgRoadsideTreeViewSet().get_dataset_stats(None)[
+            "version"
+        ]
         qs = HamburgRoadsideTrees.objects.only("id", "geom").order_by()
         serializer = HamburgRoadsideTreeGeometrySerializer(qs, many=True)
         data = serializer.data
-        cache_key = "tree_geojson:all"
+        cache_key = f"tree_geojson:all:dv:{dataset_version}"
         cache = get_geojson_cache()
         timeout = getattr(settings, "GEOJSON_CACHE_TIMEOUT", 86400)
-        cache.set(cache_key, data, timeout=timeout)
+        set_geojson_cache_payload(cache, cache_key, data, timeout=timeout)
 
         feature_count = (
             len(data.get("features", [])) if isinstance(data, dict) else len(data)

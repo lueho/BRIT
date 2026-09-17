@@ -756,6 +756,24 @@ class CollectionViewSetTestCase(APITestCase):
             "Private collections should not be shared between users",
         )
 
+    def test_geojson_head_stats_query_skips_geometry_annotation(self):
+        url = reverse("api-waste-collection-geojson")
+        with CaptureQueriesContext(connection) as queries:
+            head = self.client.head(
+                url, {"scope": "published"}, REMOTE_ADDR="10.9.9.13"
+            )
+        self.assertEqual(head.status_code, 200)
+        # The cache key embeds a scope-level dataset version (one aggregate,
+        # shared with the warm-up task); the filtered count/version stats are
+        # the second aggregate. Neither may carry the geometry annotation.
+        stats_queries = [
+            q["sql"] for q in queries.captured_queries if "COUNT(" in q["sql"].upper()
+        ]
+        if len(stats_queries) != 2:
+            self.fail("stats queries:\n" + "\n---\n".join(stats_queries))
+        for sql in stats_queries:
+            self.assertNotIn("simplify", sql.lower())
+
     def test_geojson_head_preserves_scope_visibility(self):
         url = reverse("api-waste-collection-geojson")
         for user in (None, self.regular_user, self.staff_user):
