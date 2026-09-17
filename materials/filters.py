@@ -30,6 +30,10 @@ from .models import (
 )
 
 
+def sampled_substrate_material_q(substrate_category):
+    return Q(categories=substrate_category) | Q(samples__isnull=False)
+
+
 class MaterialFilterSet(rf_filters.FilterSet):
     class Meta:
         model = Material
@@ -37,6 +41,7 @@ class MaterialFilterSet(rf_filters.FilterSet):
 
 
 class MaterialListFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name"}
     search_fields = ("name", "abbreviation", "description")
 
     name = ModelChoiceFilter(
@@ -75,6 +80,7 @@ class MaterialListFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilte
 
 
 class MaterialCategoryListFilter(UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name"}
     name = CharFilter(
         field_name="name",
         lookup_expr="icontains",
@@ -87,6 +93,7 @@ class MaterialCategoryListFilter(UserCreatedObjectScopedFilterSet):
 
 
 class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name"}
     name = ModelChoiceFilter(
         queryset=MaterialComponent.objects.none(),
         field_name="name",
@@ -99,12 +106,52 @@ class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
             ),
         ),
     )
+    category = ModelChoiceFilter(
+        queryset=MaterialCategory.objects.all(),
+        field_name="categories",
+        label="Category",
+        empty_label="All",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(url="materialcategory-autocomplete")
+        ),
+    )
+    basis_component = ModelChoiceFilter(
+        queryset=MaterialComponent.objects.all(),
+        field_name="basis_component",
+        label="Basis component",
+        empty_label="All",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(url="materialcomponent-autocomplete")
+        ),
+    )
+    comparable_component = ModelChoiceFilter(
+        queryset=MaterialComponent.objects.all(),
+        field_name="comparable_component",
+        label="Comparable component",
+        empty_label="All",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(url="materialcomponent-autocomplete")
+        ),
+    )
+    component_group = ModelChoiceFilter(
+        queryset=MaterialComponentGroup.objects.all(),
+        method="filter_component_group",
+        label="Component group",
+        empty_label="All",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(url="materialcomponentgroup-autocomplete")
+        ),
+    )
 
     class Meta:
         model = MaterialComponent
         fields = (
             "scope",
             "name",
+            "category",
+            "basis_component",
+            "comparable_component",
+            "component_group",
         )
 
     def __init__(self, *args, **kwargs):
@@ -113,20 +160,37 @@ class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
             MaterialComponent.objects.all()
         )
 
+    def filter_component_group(self, queryset, name, value):
+        return queryset.filter(component_measurements__group=value).distinct()
+
 
 class MaterialComponentGroupListFilter(UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name"}
     name = CharFilter(
         field_name="name",
         lookup_expr="icontains",
         label="Name",
     )
+    component = ModelChoiceFilter(
+        queryset=MaterialComponent.objects.all(),
+        method="filter_component",
+        label="Component",
+        empty_label="All",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(url="materialcomponent-autocomplete")
+        ),
+    )
 
     class Meta:
         model = MaterialComponentGroup
-        fields = ("scope", "name")
+        fields = ("scope", "name", "component")
+
+    def filter_component(self, queryset, name, value):
+        return queryset.filter(component_measurements__component=value).distinct()
 
 
 class MaterialPropertyListFilter(UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name"}
     name = CharFilter(
         field_name="name",
         lookup_expr="icontains",
@@ -138,6 +202,15 @@ class MaterialPropertyListFilter(UserCreatedObjectScopedFilterSet):
         choices=MaterialPropertyAggregationKind.choices,
         empty_label="All",
     )
+    comparable_property = ModelChoiceFilter(
+        queryset=MaterialProperty.objects.all(),
+        field_name="comparable_property",
+        label="Comparable property",
+        empty_label="All",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(url="materialproperty-autocomplete")
+        ),
+    )
 
     class Meta:
         model = MaterialProperty
@@ -145,10 +218,12 @@ class MaterialPropertyListFilter(UserCreatedObjectScopedFilterSet):
             "scope",
             "name",
             "aggregation_kind",
+            "comparable_property",
         )
 
 
 class AnalyticalMethodListFilter(UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name", "technique": "technique"}
     name = CharFilter(
         field_name="name",
         lookup_expr="icontains",
@@ -179,6 +254,7 @@ class CompositionFilterSet(rf_filters.FilterSet):
 
 
 class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name", "datetime": "datetime"}
     search_fields = ("name", "description", "material__name", "location")
 
     q = CharFilter(
@@ -208,7 +284,7 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
         empty_label="All",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
-                url="sample-substrate-material-autocomplete",
+                url="sample-filter-substrate-material-autocomplete",
                 value_field="id",
             )
         ),
@@ -242,6 +318,39 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             )
         ),
     )
+    component_group = ModelChoiceFilter(
+        queryset=MaterialComponentGroup.objects.none(),
+        method="filter_component_group",
+        label="Component group",
+        help_text=(
+            "Show samples with measurements or compositions in this component group."
+        ),
+        empty_label="All",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="materialcomponentgroup-autocomplete",
+                value_field="id",
+            )
+        ),
+    )
+    analytical_method = ModelChoiceFilter(
+        queryset=AnalyticalMethod.objects.all(),
+        method="filter_analytical_method",
+        label="Analytical method",
+        empty_label="All",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(url="analyticalmethod-autocomplete")
+        ),
+    )
+    series = ModelChoiceFilter(
+        queryset=SampleSeries.objects.all(),
+        field_name="series",
+        label="Sample series",
+        empty_label="All",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(url="sampleseries-autocomplete")
+        ),
+    )
     sample_date = DateFromToRangeFilter(
         field_name="datetime",
         label="Sample date",
@@ -267,6 +376,17 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             component_measurements__component_id__in=comparable_ids
         ).distinct()
 
+    def filter_component_group(self, queryset, name, value):
+        return queryset.filter(
+            Q(component_measurements__group=value) | Q(compositions__group=value)
+        ).distinct()
+
+    def filter_analytical_method(self, queryset, name, value):
+        return queryset.filter(
+            Q(property_values__analytical_method=value)
+            | Q(component_measurements__analytical_method=value)
+        ).distinct()
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         substrate_category, _ = get_or_create_sample_substrate_category()
@@ -274,13 +394,16 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             Sample.objects.all()
         )
         self.filters["substrate_material"].queryset = Material.objects.filter(
-            categories=substrate_category
+            sampled_substrate_material_q(substrate_category)
         ).distinct()
         self.filters["parameter"].queryset = self.scoped_choice_queryset(
             MaterialProperty.objects.all()
         )
         self.filters["raw_parameter"].queryset = self.scoped_choice_queryset(
             MaterialComponent.objects.all()
+        )
+        self.filters["component_group"].queryset = self.scoped_choice_queryset(
+            MaterialComponentGroup.objects.all()
         )
 
     class Meta:
@@ -292,6 +415,9 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             "substrate_material",
             "parameter",
             "raw_parameter",
+            "component_group",
+            "analytical_method",
+            "series",
             "sample_date",
         )
 
@@ -325,9 +451,10 @@ class UserOwnedSampleFilter(SampleFilter):
 
 
 class SampleSeriesFilter(UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name"}
     material = ModelChoiceFilter(
         queryset=Material.objects.all(),
-        field_name="material__name",
+        field_name="material",
         label="Material",
         empty_label="All",
         widget=TomSelectModelWidget(

@@ -28,7 +28,7 @@
                   {% block detail_header_review_actions %}
                     {% if policy.can_view_review_feedback %}
                       <a class="btn btn-sm {% if policy.is_declined %}btn-outline-danger{% else %}btn-outline-info{% endif %}"
-                         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
                          title="{{ policy.review_feedback_label }}">
                         <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">{{ policy.review_feedback_label }}</span>
                       </a>
@@ -36,7 +36,7 @@
                       {% if policy.is_in_review %}
                         {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
                           <a class="btn btn-sm btn-outline-secondary"
-                             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
                              title="Review view">
                             <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
                           </a>
@@ -44,7 +44,7 @@
                       {% elif policy.is_declined %}
                         {% if policy.is_staff or policy.is_moderator %}
                           <a class="btn btn-sm btn-outline-secondary"
-                             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
                              title="Review view">
                             <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
                           </a>
@@ -151,7 +151,7 @@
                   {% if policy.can_edit %}
                     {% if object.update_url %}
                       <a class="btn btn-outline-primary w-100 mb-2"
-                         href="{{ object.update_url }}?next={{ request.get_full_path|urlencode }}">
+                         href="{{ object.update_url }}?next={{ request|path_without_return_params|urlencode }}">
                         <i class="fas fa-pen-to-square"></i> {% trans "Edit" %}
                       </a>
                     {% endif %}
@@ -161,13 +161,13 @@
                   {% if policy.can_delete %}
                     {% if object.delete_url %}
                       <a class="btn btn-outline-danger w-100 mb-2"
-                         href="{{ object.delete_url }}?next={{ request.get_full_path|urlencode }}">
+                         href="{{ object.delete_url }}?next={{ request|path_without_return_params|urlencode }}">
                         <i class="fas fa-trash"></i> {% trans "Delete" %}
                       </a>
                     {% else %}
                       {% if object.modal_delete_url %}
                         <a class="btn btn-outline-danger w-100 mb-2 modal-link"
-                           href="{{ object.modal_delete_url }}?next={{ request.get_full_path|urlencode }}">
+                           href="{{ object.modal_delete_url }}?next={{ request|path_without_return_params|urlencode }}">
                           <i class="fas fa-trash"></i> {% trans "Delete" %}
                         </a>
                       {% endif %}

@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% load static %}
+{% load moderation_tags %}
+{% comment %}
+  Shared sectioned detail layout ("sdv2" design language) for detail views of
+  user-created objects. Child templates fill the blocks below; the layout
+  provides the sticky action rail (authenticated users), hero, review banner,
+  and a single-column section flow by default. Set `layout_class` to
+  "sdv2-layout" and fill `detail_aside` (including the <aside> wrapper) to add
+  a related-content sidebar.
+{% endcomment %}
+{% block title %}
+  BRIT | {% block detail_page_title %}{{ object }}{% endblock detail_page_title %}
+{% endblock title %}
+{% block style_sheets %}
+  {{ block.super }}
+  <link href="{% static 'css/sample_detail_v2.min.css' %}" rel="stylesheet">
+{% endblock style_sheets %}
+{% block content %}
+  {% object_policy object as policy %}
+  <div class="sdv2" data-has-action-rail="{% if user.is_authenticated %}1{% else %}0{% endif %}">
+    {% if user.is_authenticated %}
+      <section class="sdv2-rail" aria-label="{% block rail_aria_label %}Object toolbar{% endblock rail_aria_label %}">
+        <div class="sdv2-rail-nav">{% block rail_nav %}{% include "includes/sdv2_context_nav.html" %}{% endblock rail_nav %}</div>
+        <div class="sdv2-rail-workspace">
+          <div class="sdv2-rail-status" role="group" aria-label="Publication status">
+            <span class="sdv2-status-pill sdv2-status-{{ object.publication_status|default:'private' }}"
+                  title="Publication status">
+              <i class="fas fa-circle sdv2-status-dot" aria-hidden="true"></i>
+              {{ object.get_publication_status_display }}
+            </span>
+          </div>
+          <div class="sdv2-rail-actions" role="group" aria-label="Object actions">
+            {% block detail_header_review_actions %}
+              {% if object.publication_status == 'private' and policy.can_submit_review %}
+                <form method="post"
+                      action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
+                      class="sdv2-rail-submit">
+                  {% csrf_token %}
+                  <button type="submit" class="sdv2-btn">
+                    <i class="fas fa-paper-plane" aria-hidden="true"></i> Submit for review
+                  </button>
+                </form>
+              {% elif policy.can_view_review_feedback and not review_mode %}
+                <a class="sdv2-btn sdv2-btn-ghost"
+                   href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+                  <i class="fas fa-clipboard-check" aria-hidden="true"></i> {{ policy.review_feedback_label }}
+                </a>
+              {% elif policy.is_in_review and not review_mode %}
+                {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
+                  <a class="sdv2-btn sdv2-btn-ghost"
+                     href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+                    <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view
+                  </a>
+                {% endif %}
+              {% endif %}
+            {% endblock detail_header_review_actions %}
+            {% block rail_extra_actions %}{% endblock rail_extra_actions %}
+            {% block rail_more_actions %}
+              {% if policy.can_edit or policy.can_manage_editors or policy.can_delete or policy.can_duplicate or policy.can_manage_samples %}
+                <div class="dropdown sdv2-actions-menu">
+                  <button class="sdv2-btn sdv2-actions-trigger"
+                          type="button"
+                          data-bs-toggle="dropdown"
+                          aria-expanded="false"
+                          aria-label="More actions">
+                    <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
+                    <span>More actions</span>
+                    <i class="fas fa-chevron-down sdv2-actions-chevron" aria-hidden="true"></i>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    {% block rail_dropdown_items %}
+                      {% block rail_dropdown_extra %}{% endblock rail_dropdown_extra %}
+                      {% if policy.can_manage_editors %}
+                        <li>
+                          <a class="dropdown-item modal-link"
+                             href="{% url 'object_management:manage_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
+                            <i class="fas fa-fw fa-user-group me-2" aria-hidden="true"></i>Manage access
+                          </a>
+                        </li>
+                      {% endif %}
+                      {% if policy.can_delete %}
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                          {% if object.delete_url %}
+                            <a class="dropdown-item text-danger"
+                               href="{{ object.delete_url }}?next={{ request|path_without_return_params|urlencode }}">
+                              <i class="fas fa-fw fa-trash me-2" aria-hidden="true"></i>Delete
+                            </a>
+                          {% elif object.modal_delete_url %}
+                            <a class="dropdown-item text-danger modal-link"
+                               href="{{ object.modal_delete_url }}?next={{ request|path_without_return_params|urlencode }}">
+                              <i class="fas fa-fw fa-trash me-2" aria-hidden="true"></i>Delete
+                            </a>
+                          {% endif %}
+                        </li>
+                      {% endif %}
+                    {% endblock rail_dropdown_items %}
+                  </ul>
+                </div>
+              {% endif %}
+            {% endblock rail_more_actions %}
+            {% block rail_primary %}
+              {% if policy.can_edit and object.update_url %}
+                <a class="sdv2-btn sdv2-btn-primary"
+                   href="{{ object.update_url }}?next={{ request|path_without_return_params|urlencode }}">
+                  <i class="fas fa-pen-to-square" aria-hidden="true"></i> Edit
+                </a>
+              {% endif %}
+            {% endblock rail_primary %}
+          </div>
+        </div>
+      </section>
+    {% endif %}
+    <div class="sdv2-canvas">
+      {% if not user.is_authenticated %}
+        {% block anon_nav %}{% include "includes/sdv2_context_nav.html" %}{% endblock anon_nav %}
+      {% endif %}
+      {% if show_review_panel %}
+        <section class="sdv2-review-panel sdv2-section-panel" aria-label="Review workspace">
+          {% include "object_management/review_panel.html" with object=object %}
+        </section>
+      {% endif %}
+      <header class="sdv2-hero sdv2-surface {% block hero_class %}sdv2-hero-no-media{% endblock hero_class %}">
+        <div class="sdv2-hero-identity">
+          <div class="sdv2-hero-kicker">{% block detail_kicker %}{{ object.verbose_name|capfirst }}{% endblock detail_kicker %}</div>
+          <h1 class="sdv2-hero-title">{% block detail_title %}{{ object.name|default:object }}{% endblock detail_title %}</h1>
+          {% block hero_lede %}
+            {% if object.description %}
+              <div class="sdv2-hero-material">{{ object.description|linebreaks }}</div>
+            {% endif %}
+          {% endblock hero_lede %}
+          {% block hero_meta_wrapper %}
+            <ul class="sdv2-hero-meta" aria-label="{% block hero_meta_label %}Object metadata{% endblock hero_meta_label %}">
+              {% block hero_meta_items %}{% endblock hero_meta_items %}
+            </ul>
+          {% endblock hero_meta_wrapper %}
+        </div>
+        {% block hero_media %}{% endblock hero_media %}
+      </header>
+      {% if object.publication_status == 'review' or object.publication_status == 'declined' %}
+        <div class="sdv2-review-banner sdv2-review-banner-{{ object.publication_status }}"
+             role="status">
+          <div class="sdv2-review-banner-icon" aria-hidden="true">
+            <i class="fas fa-{% if object.publication_status == 'review' %}hourglass-half{% else %}triangle-exclamation{% endif %}"></i>
+          </div>
+          <div class="sdv2-review-banner-body">
+            <div class="sdv2-review-banner-title">
+              {% if object.publication_status == 'review' %}In review{% else %}Review declined{% endif %}
+            </div>
+            <div class="sdv2-review-banner-text">
+              {% if object.publication_status == 'review' %}
+                This {{ object.verbose_name }} is awaiting moderation.
+              {% else %}
+                The submission of this {{ object.verbose_name }} was declined.
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+      <div class="{% block layout_class %}sdv2-layout sdv2-layout-full{% endblock layout_class %}">
+        <main class="sdv2-main">
+          {% block detail_sections %}{% endblock detail_sections %}
+        </main>
+        {% block detail_aside %}{% endblock detail_aside %}
+      </div>
+    </div>
+  </div>
+{% endblock content %}
