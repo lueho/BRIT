@@ -20,12 +20,14 @@ from maps.registry import get_source_domain_geojson_cache_warmers
 logger = logging.getLogger(__name__)
 
 
-def _warm_base_geojson_caches(nuts_levels, regions_limit):
+def _warm_base_geojson_caches(nuts_levels, regions_limit, nuts_limit=None):
     """Warm the base-map GeoJSON caches (NUTS regions and largest Regions)."""
     results = {}
     if nuts_levels is not None:
         try:
-            results["nuts"] = warm_nuts_geojson_cache(nuts_levels=nuts_levels)
+            results["nuts"] = warm_nuts_geojson_cache(
+                nuts_levels=nuts_levels, limit=nuts_limit
+            )
         except Exception as e:
             logger.exception("Failed to warm NUTS GeoJSON cache: %s", e)
             results["nuts"] = {"status": "error", "error": str(e)}
@@ -39,20 +41,29 @@ def _warm_base_geojson_caches(nuts_levels, regions_limit):
 
 
 @shared_task(bind=True, name="warm_base_geojson_caches")
-def warm_base_geojson_caches(self, nuts_levels=None, regions_limit=None):
+def warm_base_geojson_caches(
+    self, nuts_levels=None, regions_limit=None, nuts_limit=None
+):
     """
     Warm the base-map GeoJSON caches (NUTS regions and the largest Regions).
 
     Pass ``nuts_levels=None`` or ``regions_limit=None`` to skip the
     corresponding cache; passing both ``None`` makes the task a no-op.
+    ``nuts_limit`` caps the number of NUTS regions warmed per level.
     """
-    return _warm_base_geojson_caches(nuts_levels, regions_limit)
+    return _warm_base_geojson_caches(nuts_levels, regions_limit, nuts_limit)
 
 
 @shared_task(bind=True, name="warm_all_geojson_caches")
-def warm_all_geojson_caches(self):
+def warm_all_geojson_caches(
+    self, nuts_levels=None, regions_limit=None, nuts_limit=None
+):
     """
     Warm all GeoJSON caches. Called periodically or after major data changes.
+
+    ``nuts_levels``, ``regions_limit``, and ``nuts_limit`` override the
+    defaults for the base caches; ``None`` means "use the default" (not
+    "skip") — use ``warm_base_geojson_caches`` for selective warming.
 
     Sub-warmers are invoked synchronously via ``apply()``. Their results are
     read from the returned ``EagerResult`` attributes instead of ``.get()``,
@@ -63,8 +74,13 @@ def warm_all_geojson_caches(self):
 
     try:
         results["maps"] = _warm_base_geojson_caches(
-            nuts_levels=list(DEFAULT_NUTS_LEVELS),
-            regions_limit=DEFAULT_REGIONS_LIMIT,
+            nuts_levels=(
+                list(DEFAULT_NUTS_LEVELS) if nuts_levels is None else nuts_levels
+            ),
+            regions_limit=(
+                DEFAULT_REGIONS_LIMIT if regions_limit is None else regions_limit
+            ),
+            nuts_limit=nuts_limit,
         )
     except Exception as e:
         logger.exception("Failed to warm base GeoJSON caches: %s", e)

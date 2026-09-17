@@ -106,6 +106,20 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
 
     @patch("maps.tasks._warm_base_geojson_caches")
     @patch("maps.tasks.get_source_domain_geojson_cache_warmers")
+    def test_warm_all_geojson_caches_forwards_cli_overrides(
+        self, mock_get_source_domain_geojson_cache_warmers, mock_base_warmup
+    ):
+        mock_get_source_domain_geojson_cache_warmers.return_value = ()
+        mock_base_warmup.return_value = {"status": "success"}
+
+        warm_all_geojson_caches.run(nuts_levels=[0], nuts_limit=10, regions_limit=5)
+
+        mock_base_warmup.assert_called_once_with(
+            nuts_levels=[0], regions_limit=5, nuts_limit=10
+        )
+
+    @patch("maps.tasks._warm_base_geojson_caches")
+    @patch("maps.tasks.get_source_domain_geojson_cache_warmers")
     def test_warm_all_geojson_caches_never_calls_result_get_inside_task(
         self, mock_get_source_domain_geojson_cache_warmers, mock_base_warmup
     ):
@@ -184,3 +198,18 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
             self.geojson_cache.get(get_region_cache_key(region_id=self.region.id))
         )
         self.assertNotIn("regions", result)
+
+    def test_nuts_limit_slices_per_level_queryset(self):
+        NutsRegion.objects.create(
+            name="Luxembourg",
+            nuts_id="LU",
+            levl_code=0,
+            cntr_code="LU",
+            version=self.vintage,
+        )
+
+        result = warm_base_geojson_caches.run(
+            nuts_levels=[0], regions_limit=None, nuts_limit=1
+        )
+
+        self.assertEqual(result["nuts"]["features_count"], 1)
