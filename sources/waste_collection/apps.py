@@ -13,11 +13,6 @@ class WasteCollectionConfig(AppConfig):
 
     def ready(self):
         try:
-            import_module("sources.waste_collection.patches.disable_research_metrics")
-        except Exception:
-            pass
-
-        try:
             exports = import_module("sources.waste_collection.exports")
             exports.register_exports()
         except Exception:
