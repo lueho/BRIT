@@ -126,6 +126,13 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(ids, {self.tree.pk})
         self.assertNotIn(outside.pk, ids)
 
+    def test_geojson_version_changes_when_tree_data_changes(self):
+        url = reverse("api-hamburg-roadside-trees-version")
+        before = self.client.get(url, REMOTE_ADDR="10.9.8.1").json()["version"]
+        HamburgRoadsideTrees.objects.create(geom=Point(2, 2, srid=4326))
+        after = self.client.get(url, REMOTE_ADDR="10.9.8.1").json()["version"]
+        self.assertNotEqual(before, after)
+
 
 class HamburgRoadsideTreeCatchmentAutocompleteViewTests(ViewWithPermissionsTestCase):
     member_permissions = ["view_geodataset"]
