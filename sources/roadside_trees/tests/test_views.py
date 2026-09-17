@@ -110,6 +110,22 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(len(data["features"]), 1)
         self.assertEqual(data["features"][0]["id"], other_tree.pk)
 
+    def test_geojson_head_preserves_bbox_metadata(self):
+        outside = HamburgRoadsideTrees.objects.create(geom=Point(20, 20, srid=4326))
+        url = reverse("api-hamburg-roadside-trees-geojson")
+        params = {"bbox": "-1,-1,1,1", "stream": "true"}
+        head = self.client.head(url, params, REMOTE_ADDR="10.9.9.9")
+        get = self.client.get(url, params, REMOTE_ADDR="10.9.9.9")
+        self.assertEqual(head.status_code, 200)
+        self.assertEqual(get.status_code, 200)
+        self.assertEqual(b"".join(head.streaming_content), b"")
+        self.assertFalse(hasattr(head, "data"))
+        self.assertEqual(head["X-Total-Count"], "1")
+        self.assertEqual(head["X-Data-Version"], get["X-Data-Version"])
+        ids = {feature["id"] for feature in get.data["features"]}
+        self.assertEqual(ids, {self.tree.pk})
+        self.assertNotIn(outside.pk, ids)
+
 
 class HamburgRoadsideTreeCatchmentAutocompleteViewTests(ViewWithPermissionsTestCase):
     member_permissions = ["view_geodataset"]
