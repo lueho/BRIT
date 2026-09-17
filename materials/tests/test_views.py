@@ -44,6 +44,7 @@ from ..models import (
     SampleSeries,
     get_sample_substrate_category_name,
 )
+from ..serializers import SampleAPISerializer, SampleModelSerializer
 from ..views import DETAIL_RELATED_LIMIT
 
 User = get_user_model()
@@ -8021,3 +8022,152 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
         )
         self.assertIn("&lt;0.25", html)
         self.assertIn("Detection limit: 6.57", html)
+
+
+class SampleCompositionSafetyViewTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(
+            username="composition-safety-owner", password="test123"
+        )
+        cls.material = Material.objects.create(
+            owner=cls.owner,
+            name="Safety material",
+            publication_status="published",
+        )
+        cls.sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Safety sample",
+            material=cls.material,
+            publication_status="published",
+        )
+        cls.sample.compositions.all().delete()
+        cls.unit = Unit.objects.filter(name="%").first() or Unit.objects.create(
+            name="%", owner=cls.owner
+        )
+        cls.blocked_group = MaterialComponentGroup.objects.create(
+            owner=cls.owner,
+            name="Safety blocked group",
+            is_compositional=False,
+            publication_status="published",
+        )
+        cls.mixed_group = MaterialComponentGroup.objects.create(
+            owner=cls.owner,
+            name="Safety mixed group",
+            publication_status="published",
+        )
+        cls.valid_group = MaterialComponentGroup.objects.create(
+            owner=cls.owner,
+            name="Safety valid group",
+            publication_status="published",
+        )
+        dm = MaterialComponent.objects.create(
+            owner=cls.owner, name="Dry matter", publication_status="published"
+        )
+        fm = MaterialComponent.objects.create(
+            owner=cls.owner, name="Fresh matter", publication_status="published"
+        )
+        ComponentMeasurement.objects.create(
+            owner=cls.owner,
+            sample=cls.sample,
+            group=cls.blocked_group,
+            component=MaterialComponent.objects.create(
+                owner=cls.owner,
+                name="Safety blocked component",
+                publication_status="published",
+            ),
+            unit=cls.unit,
+            average=Decimal("40"),
+            publication_status="private",
+        )
+        ComponentMeasurement.objects.create(
+            owner=cls.owner,
+            sample=cls.sample,
+            group=cls.mixed_group,
+            component=MaterialComponent.objects.create(
+                owner=cls.owner,
+                name="Safety mixed carbon",
+                publication_status="published",
+            ),
+            basis_component=dm,
+            unit=cls.unit,
+            average=Decimal("40"),
+            publication_status="private",
+        )
+        ComponentMeasurement.objects.create(
+            owner=cls.owner,
+            sample=cls.sample,
+            group=cls.mixed_group,
+            component=MaterialComponent.objects.create(
+                owner=cls.owner,
+                name="Safety mixed nitrogen",
+                publication_status="published",
+            ),
+            basis_component=fm,
+            unit=cls.unit,
+            average=Decimal("10"),
+            publication_status="private",
+        )
+        ComponentMeasurement.objects.create(
+            owner=cls.owner,
+            sample=cls.sample,
+            group=cls.valid_group,
+            component=MaterialComponent.objects.create(
+                owner=cls.owner,
+                name="Safety valid component",
+                publication_status="published",
+            ),
+            unit=cls.unit,
+            average=Decimal("40"),
+            publication_status="private",
+        )
+
+    def setUp(self):
+        self.client.force_login(self.owner)
+
+    def test_detail_view_shows_blocked_groups_without_charts(self):
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Safety blocked component")
+        self.assertContains(response, "non-compositional")
+        self.assertContains(response, "Raw measurements only")
+        self.assertNotContains(
+            response,
+            'aria-label="Safety blocked group composition chart"',
+        )
+        self.assertContains(response, "Safety mixed carbon")
+        self.assertContains(response, "different or missing bases")
+        self.assertNotContains(
+            response,
+            'aria-label="Safety mixed group composition chart"',
+        )
+        self.assertContains(
+            response,
+            'aria-label="Safety valid group composition chart"',
+        )
+        self.assertContains(response, "contribute zero to aggregation")
+
+    def test_api_serializers_report_blocked_groups_with_empty_shares(self):
+        request = RequestFactory().get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+        for serializer_class in (SampleModelSerializer, SampleAPISerializer):
+            with self.subTest(serializer=serializer_class.__name__):
+                data = serializer_class(self.sample, context={"request": request}).data
+                compositions = {
+                    composition["group"]: composition
+                    for composition in data["compositions"]
+                }
+                blocked = compositions[self.blocked_group.pk]
+                self.assertEqual(blocked["shares"], [])
+                self.assertEqual(blocked["warning_codes"], ["non_compositional_group"])
+                self.assertEqual(blocked["normalization_status"], "unavailable")
+                mixed = compositions[self.mixed_group.pk]
+                self.assertEqual(mixed["shares"], [])
+                self.assertEqual(mixed["warning_codes"], ["multiple_basis_components"])
+                valid = compositions[self.valid_group.pk]
+                self.assertNotEqual(valid["shares"], [])
+                self.assertEqual(valid["normalization_status"], "normalized")
