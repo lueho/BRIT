@@ -3,7 +3,7 @@ import json
 import os
 import re
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from urllib.parse import urlencode, urlparse, urlunparse
@@ -13,9 +13,12 @@ from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
 from django.core.cache import caches
 from django.core.management import call_command
+from django.middleware.common import CommonMiddleware
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import serializers
+from rest_framework.renderers import JSONRenderer
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory, force_authenticate
 from rest_framework.viewsets import ModelViewSet
@@ -49,6 +52,7 @@ from ..models import (
 )
 from ..utils import get_region_cache_key
 from ..views import MapMixin
+from ..viewsets import RegionViewSet
 
 
 class DummyBaseView:
@@ -420,6 +424,16 @@ class GeoDataSetRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         )
         self.assertContains(response, reverse("api-nuts-region-geojson"))
 
+    def test_dataset_map_overlay_is_dismissible(self):
+        response = self.client.get(
+            reverse("geodataset-map", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="map-overlay"')
+        self.assertContains(response, "map-overlay-dismiss")
+        self.assertContains(response, 'aria-label="Dismiss map warning"')
+
     def test_dataset_map_route_works_without_legacy_model_name(self):
         dataset = GeoDataset.objects.create(
             name="Runtime-only dataset",
@@ -648,7 +662,7 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         self.skipTest("Post method is not implemented for this view.")
 
     def test_create_view_post_as_authenticated_with_permission(self):
-        self.skipTest("Get method is not implemented for this view.")
+        self.skipTest("Post method is not implemented for this view.")
 
     def test_create_view_post_as_staff_user(self):
         self.skipTest("Post method is not implemented for this view.")
@@ -2093,3 +2107,187 @@ class StreamingGeoJSONTests(TestCase):
             or "application/geo+json" in content_type,
             f"Unexpected content type: {content_type}",
         )
+
+
+@override_settings(
+    GEOJSON_CACHE="geojson",
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "geojson-head-default",
+        },
+        "geojson": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "geojson-head-data",
+        },
+    },
+)
+class GeoJSONHeadTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.first = Region.objects.create(name="Head first")
+        cls.second = Region.objects.create(name="Head second")
+
+    def setUp(self):
+        self.cache = caches["geojson"]
+        self.cache.clear()
+        self.addCleanup(self.cache.clear)
+        self.view = RegionViewSet()
+        self.view.action = "geojson"
+        self.view.queryset = Region.objects.filter(
+            pk__in=[self.first.pk, self.second.pk]
+        ).select_related("borders")
+        self.view.get_cache_key = Mock(return_value="head-test-data")
+        self.factory = APIRequestFactory()
+
+    def request(self, method, params=None):
+        request = Request(getattr(self.factory, method)("/", params or {}))
+        self.view.request = request
+        return self.view.geojson(request)
+
+    def assert_metadata_equal(self, head, get):
+        self.assertEqual(head.status_code, get.status_code)
+        for header in (
+            "X-Cache-Status",
+            "X-Total-Count",
+            "X-Data-Version",
+            "Access-Control-Expose-Headers",
+        ):
+            self.assertEqual(head[header], get[header])
+
+    def test_cold_head_does_not_materialize_regions_or_warm_cache(self):
+        with patch.object(Region, "from_db", wraps=Region.from_db) as materialize:
+            response = self.request("head")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Total-Count"], "2")
+        self.assertEqual(materialize.call_count, 0)
+        self.assertFalse(hasattr(response, "data"))
+        self.assertIsNone(self.cache.get("head-test-data"))
+        get = self.request("get")
+        self.assertEqual(len(get.data["features"]), 2)
+        self.assert_metadata_equal(response, get)
+        self.assertIsNotNone(self.cache.get("head-test-data"))
+
+    def test_cached_head_has_no_response_payload(self):
+        self.request("get")
+        with patch.object(
+            self.view,
+            "get_geojson_serializer_class",
+            side_effect=AssertionError("HEAD serialized geometry"),
+        ):
+            head = self.request("head")
+        self.assertEqual(head["X-Cache-Status"], "HIT")
+        self.assertFalse(hasattr(head, "data"))
+        self.assert_metadata_equal(head, self.request("get"))
+
+    def test_streaming_head_does_not_build_stream(self):
+        with (
+            patch("maps.mixins.STREAMING_THRESHOLD", 0),
+            patch.object(
+                self.view,
+                "_stream_geojson",
+                side_effect=AssertionError("HEAD built stream"),
+            ),
+        ):
+            head = self.request("head", {"stream": "true"})
+        self.assertTrue(head.streaming)
+        self.assertFalse(hasattr(head, "data"))
+        self.assertEqual(head["X-Cache-Status"], "STREAM")
+        self.assertEqual(head["Content-Type"], "application/geo+json")
+        with patch("maps.mixins.STREAMING_THRESHOLD", 0):
+            get = self.request("get", {"stream": "true"})
+            self.assert_metadata_equal(head, get)
+            self.assertEqual(
+                len(json.loads(b"".join(get.streaming_content))["features"]), 2
+            )
+
+    def test_streaming_disabled_head_reports_miss_without_serializing(self):
+        with (
+            patch("maps.mixins.STREAMING_ENABLED", False),
+            patch("maps.mixins.STREAMING_THRESHOLD", 0),
+            patch.object(
+                self.view,
+                "get_geojson_serializer_class",
+                side_effect=AssertionError("HEAD serialized geometry"),
+            ),
+        ):
+            head = self.request("head", {"stream": "true"})
+        self.assertTrue(head.streaming)
+        self.assertFalse(hasattr(head, "data"))
+        self.assertEqual(head["X-Cache-Status"], "MISS")
+        with (
+            patch("maps.mixins.STREAMING_ENABLED", False),
+            patch("maps.mixins.STREAMING_THRESHOLD", 0),
+        ):
+            self.assert_metadata_equal(head, self.request("get", {"stream": "true"}))
+
+    def test_head_uses_same_filtered_metadata_as_get(self):
+        for params in (
+            {"id": self.first.pk},
+            {"id": [self.first.pk, self.second.pk]},
+            {"id": 0},
+        ):
+            with self.subTest(params=params):
+                self.cache.clear()
+                head = self.request("head", params)
+                get = self.request("get", params)
+                self.assertFalse(hasattr(head, "data"))
+                self.assert_metadata_equal(head, get)
+                self.assertEqual(int(head["X-Total-Count"]), len(get.data["features"]))
+
+    def test_head_preserves_unbounded_rejection(self):
+        self.view.max_unbounded_geojson_features = 0
+        head = self.request("head")
+        get = self.request("get")
+        self.assertEqual(head.status_code, 400)
+        self.assertEqual(head["X-Cache-Status"], "REJECT")
+        self.assertEqual(head.data, get.data)
+        self.assertEqual(head["X-Total-Count"], get["X-Total-Count"])
+
+    def test_head_version_changes_when_visible_records_change(self):
+        before = self.request("head", {"stream": "true"})
+        self.view.queryset.update(lastmodified_at=timezone.now() + timedelta(days=1))
+        after = self.request("head", {"stream": "true"})
+        self.assertNotEqual(before["X-Data-Version"], after["X-Data-Version"])
+        self.assert_metadata_equal(after, self.request("get", {"stream": "true"}))
+
+    def test_head_omits_unknown_content_length_with_common_middleware(self):
+        for warm in (False, True):
+            with self.subTest(warm=warm):
+                self.cache.clear()
+                if warm:
+                    self.request("get")
+                head = self.request("head")
+                if not head.streaming:
+                    head.accepted_renderer = JSONRenderer()
+                    head.accepted_media_type = "application/json"
+                    head.renderer_context = {}
+                    head.render()
+                head = CommonMiddleware(lambda request, response=head: response)(
+                    self.factory.head("/")
+                )
+                self.assertNotIn("Content-Length", head)
+
+    def test_invalid_id_head_matches_get_validation_error(self):
+        url = reverse("api-region-geojson")
+        get = self.client.get(url, {"id": "invalid"})
+        head = self.client.head(url, {"id": "invalid"})
+        self.assertEqual(get.status_code, 400)
+        self.assertEqual(head.status_code, 400)
+        self.assertEqual(head.content, b"")
+        self.assertNotIn("X-Data-Version", head)
+
+    def test_head_over_http_returns_no_body_but_get_metadata(self):
+        url = reverse("api-region-geojson")
+        params = {"id": self.first.pk}
+        with patch.object(
+            RegionViewSet,
+            "get_geojson_serializer_class",
+            side_effect=AssertionError("HEAD serialized geometry"),
+        ):
+            head = self.client.head(url, params)
+        self.assertEqual(head.status_code, 200)
+        self.assertEqual(b"".join(head.streaming_content), b"")
+        self.assertFalse(hasattr(head, "data"))
+        get = self.client.get(url, params)
+        self.assertEqual(head["X-Data-Version"], get["X-Data-Version"])

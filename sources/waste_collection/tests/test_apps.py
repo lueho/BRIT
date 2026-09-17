@@ -154,7 +154,7 @@ class WasteCollectionConfigReadyTests(SimpleTestCase):
             self.app_config.ready()
 
         imported_modules = [call.args[0] for call in import_module_mock.call_args_list]
-        self.assertIn(
+        self.assertNotIn(
             "sources.waste_collection.patches.disable_research_metrics",
             imported_modules,
         )

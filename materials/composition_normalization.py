@@ -1,9 +1,9 @@
-from collections import Counter, defaultdict
+from collections import defaultdict
 from decimal import Decimal
 
 from utils.properties.units import UnitConversionError, convert_weight_fraction_value
 
-from .models import MaterialComponent
+from .models import MaterialComponent, MeasurementValueQualifier
 
 WARNING_MULTIPLE_BASIS_COMPONENTS = "multiple_basis_components"
 WARNING_AGGREGATE_COMPONENTS_EXCLUDED = "aggregate_components_excluded"
@@ -53,11 +53,16 @@ def get_sorted_component_measurements(
         component_measurements,
         key=lambda measurement: (
             get_group_sort_key(measurement.group, composition_settings_by_group),
-            -Decimal(measurement.average),
+            _measurement_sort_value(measurement),
             measurement.component.name.lower(),
             measurement.pk,
         ),
     )
+
+
+def _measurement_sort_value(measurement):
+    value = Decimal(str(measurement.average))
+    return -value if value.is_finite() else Decimal("0")
 
 
 def get_sample_normalized_compositions(
@@ -113,20 +118,138 @@ def get_sample_normalized_compositions(
     return compositions
 
 
+def _unavailable_group_composition(sample, group, composition_setting, code, message):
+    return {
+        "id": f"derived-{group.pk}",
+        "group": group.pk,
+        "group_name": group.name,
+        "sample": sample.pk,
+        "fractions_of": None,
+        "fractions_of_name": None,
+        "shares": [],
+        "share_total_percent": None,
+        "is_derived": True,
+        "origin": "raw_derived",
+        "normalization_status": "unavailable",
+        "warnings": [message],
+        "warning_codes": [code],
+        "warning_count": 1,
+        "settings_pk": composition_setting.pk
+        if composition_setting is not None
+        else None,
+    }
+
+
 def _build_raw_derived_group_composition(
     *, sample, group, measurements, composition_setting
 ):
+    measurements = list(measurements)
+    if not measurements:
+        return None
+    other_component = MaterialComponent.objects.other()
+    excluded_aggregate_names = set()
+    observations = []
+    for measurement in measurements:
+        if measurement.component_id == other_component.pk:
+            continue
+        if measurement.component.is_aggregate:
+            excluded_aggregate_names.add(measurement.component.name)
+            continue
+        observations.append(measurement)
+    if not observations:
+        return None
+
+    def unavailable(code, message):
+        return _unavailable_group_composition(
+            sample, group, composition_setting, code, message
+        )
+
+    if not group.is_compositional:
+        return unavailable(
+            "non_compositional_group",
+            "This analytical group is non-compositional. Raw measurements are shown without normalization.",
+        )
+    bases = {measurement.basis_component_id for measurement in observations}
+    if len(bases) > 1:
+        return unavailable(
+            WARNING_MULTIPLE_BASIS_COMPONENTS,
+            "Measurements have different or missing bases. Separate them into compatible analytical groups before normalization.",
+        )
+    observed_basis = next(iter(bases))
+    if (
+        composition_setting is not None
+        and composition_setting.fractions_of_id
+        and observed_basis is not None
+        and composition_setting.fractions_of_id != observed_basis
+    ):
+        return unavailable(
+            "configured_basis_mismatch",
+            "The configured composition basis differs from the measurement basis. No basis conversion has been applied.",
+        )
+    if len({measurement.component_id for measurement in observations}) != len(
+        observations
+    ):
+        return unavailable(
+            "repeated_component_measurements",
+            "This group contains repeated component observations. Resolve their analytical context or select observations before normalization.",
+        )
+    zero_qualifiers = {
+        MeasurementValueQualifier.LESS_THAN,
+        MeasurementValueQualifier.BELOW_DETECTION_LIMIT,
+    }
+    censored_count = 0
+    for measurement in observations:
+        if measurement.value_qualifier not in {
+            MeasurementValueQualifier.EXACT,
+            *zero_qualifiers,
+        }:
+            return unavailable(
+                "unsupported_value_qualifier",
+                "This group contains qualified values without an agreed aggregation policy. Raw measurements remain unchanged.",
+            )
+        numbers = (
+            measurement.average,
+            measurement.standard_deviation,
+            measurement.detection_limit,
+        )
+        if any(
+            value is not None
+            and (not Decimal(str(value)).is_finite() or Decimal(str(value)) < 0)
+            for value in numbers
+        ):
+            return unavailable(
+                "invalid_measurement_value",
+                "This group contains a negative or non-finite concentration, uncertainty, or detection limit. Review the raw measurements before normalization.",
+            )
+        try:
+            percentage = to_weight_percent(
+                Decimal(str(measurement.average)), measurement.unit
+            )
+        except UnitConversionError:
+            return unavailable(
+                WARNING_INVALID_UNITS,
+                "This group contains a unit that is not a mass fraction. Such observations belong in property measurements.",
+            )
+        if percentage > 100:
+            return unavailable(
+                "invalid_mass_fraction",
+                "This group contains an individual mass fraction above 100%. Review the raw measurements before normalization.",
+            )
+        censored_count += measurement.value_qualifier in zero_qualifiers
+
     positive_measurements = []
     basis_components = []
     is_dm_basis = True
     grouped_components = defaultdict(list)
     invalid_unit_names = set()
-    other_component = MaterialComponent.objects.other()
     legacy_other_count = 0
-    excluded_aggregate_names = set()
 
     for measurement in measurements:
-        average = Decimal(measurement.average)
+        average = (
+            Decimal("0")
+            if measurement.value_qualifier in zero_qualifiers
+            else Decimal(measurement.average)
+        )
         if average <= 0:
             continue
         if measurement.component_id == other_component.pk:
@@ -143,32 +266,28 @@ def _build_raw_derived_group_composition(
         grouped_components[measurement.component].append(measurement)
 
     if not positive_measurements:
+        if censored_count:
+            return unavailable(
+                "censored_values_approximated_as_zero",
+                "Detection-limit observations are approximated as zero for aggregation; no positive exact measurements remain. Raw values are unchanged.",
+            )
         return None
 
     if composition_setting is not None and composition_setting.fractions_of_id:
         reference_component = composition_setting.fractions_of
     elif basis_components:
-        basis_counts = Counter(component.pk for component in basis_components)
-        reference_component_id = max(
-            basis_counts,
-            key=lambda component_id: basis_counts[component_id],
-        )
-        reference_component = next(
-            component
-            for component in basis_components
-            if component.pk == reference_component_id
-        )
+        reference_component = basis_components[0]
     else:
         reference_component = MaterialComponent.objects.default()
     display_unit = "% of DM" if is_dm_basis else "%"
 
     warnings = []
     warning_codes = []
-    if len({component.pk for component in basis_components}) > 1:
+    if censored_count:
         warnings.append(
-            "Multiple basis components were present; using the most common reference component."
+            f"{censored_count} detection-limit observation(s) were approximated as zero for aggregation; their stored values are unchanged."
         )
-        warning_codes.append(WARNING_MULTIPLE_BASIS_COMPONENTS)
+        warning_codes.append("censored_values_approximated_as_zero")
     if excluded_aggregate_names:
         warnings.append(
             "Aggregate components were excluded from the normalized shares: "
@@ -261,6 +380,7 @@ def _build_raw_derived_group_composition(
         "share_total_percent": share_total_percent,
         "is_derived": True,
         "origin": "raw_derived",
+        "normalization_status": "normalized",
         "warnings": warnings,
         "warning_codes": warning_codes,
         "warning_count": len(warnings),

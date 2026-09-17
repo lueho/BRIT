@@ -10,7 +10,7 @@
   {% endif %}
   {% if list_type == 'private' and policy.has_review_feedback %}
     <a class="badge rounded-pill {% if policy.is_declined %}text-bg-danger{% else %}text-bg-info{% endif %} text-decoration-none me-2"
-       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
       <i class="fas fa-clipboard-check"></i> {{ policy.review_feedback_label }}
     </a>
   {% endif %}
@@ -50,7 +50,7 @@
       {# Edit via policy #}
       {% if policy.can_edit %}
         <a class="dropdown-item"
-           href="{{ object.update_url }}?next={{ request.get_full_path|urlencode }}">
+           href="{{ object.update_url }}?next={{ request|path_without_return_params|urlencode }}">
           <i class="fas fa-pen-to-square"></i> Edit
         </a>
       {% endif %}
@@ -58,7 +58,7 @@
       {# Manage access: transfer ownership and shared edit access (owner or staff) #}
       {% if policy.can_manage_editors %}
         <a class="dropdown-item modal-link"
-           href="{% url 'object_management:manage_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+           href="{% url 'object_management:manage_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
           <i class="fas fa-user-group"></i> Manage access
         </a>
       {% endif %}
@@ -89,7 +89,7 @@
       {% if list_type == 'private' %}
         {% if policy.can_submit_review %}
           <form method="post"
-                action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
                 class="m-0 p-0">
             {% csrf_token %}
             <button type="submit" class="dropdown-item text-start text-primary">
@@ -101,7 +101,7 @@
         {% if policy.is_in_review %}
           {% if policy.can_withdraw_review %}
             <form method="post"
-                  action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                  action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
                   class="m-0 p-0">
               {% csrf_token %}
               <button type="submit" class="dropdown-item text-start text-warning">
@@ -112,7 +112,7 @@
 
           {% if policy.can_approve %}
             <form method="post"
-                  action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                  action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
                   class="m-0 p-0">
               {% csrf_token %}
               <button type="submit" class="dropdown-item text-start text-success">
@@ -122,7 +122,7 @@
           {% endif %}
           {% if policy.can_reject %}
             <form method="post"
-                  action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                  action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
                   class="m-0 p-0">
               {% csrf_token %}
               <button type="submit" class="dropdown-item w-100 text-start text-danger">
@@ -136,7 +136,7 @@
         {% if policy.is_in_review %}
           {% if policy.can_withdraw_review %}
             <form method="post"
-                  action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={% if policy.is_owner %}{{ object.get_absolute_url }}{% else %}{{ request.get_full_path|urlencode }}{% endif %}"
+                  action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={% if policy.is_owner %}{{ object.get_absolute_url }}{% else %}{{ request|path_without_return_params|urlencode }}{% endif %}"
                   class="m-0 p-0">
               {% csrf_token %}
               <button type="submit" class="dropdown-item text-start text-warning">
@@ -146,7 +146,7 @@
           {% endif %}
           {% if policy.can_approve %}
             <form method="post"
-                  action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                  action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
                   class="m-0 p-0">
               {% csrf_token %}
               <button type="submit" class="dropdown-item text-start text-success">
@@ -156,7 +156,7 @@
           {% endif %}
           {% if policy.can_reject %}
             <form method="post"
-                  action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                  action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
                   class="m-0 p-0">
               {% csrf_token %}
               <button type="submit" class="dropdown-item w-100 text-start text-danger">

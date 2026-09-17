@@ -248,6 +248,8 @@ class MaterialComponentGroup(NamedUserCreatedObject):
     model: Composition. This is a container that allows to identify comparable compositions.
     """
 
+    is_compositional = models.BooleanField(default=True)
+
     objects = MaterialComponentGroupManager()
 
     class Meta:

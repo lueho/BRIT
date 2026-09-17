@@ -81,6 +81,23 @@
                 </p>
               {% endif %}
             {% endblock list_result_count %}
+            {% block active_filters %}
+              {% active_filter_chips as active_filter_chips %}
+              {% if active_filter_chips %}
+                <div class="active-filters d-flex flex-wrap align-items-center gap-1 mb-2">
+                  <span class="text-muted small me-1">Active filters:</span>
+                  {% for chip in active_filter_chips %}
+                    <a class="filter-chip badge text-bg-light border text-decoration-none"
+                       href="{{ chip.remove_url }}"
+                       aria-label="Remove filter {{ chip.label }}">{{ chip.label }}: {{ chip.value }}
+                      <i class="fas fa-xmark ms-1" aria-hidden="true"></i>
+                    </a>
+                  {% endfor %}
+                  <a class="small ms-1"
+                     href="{% if list_type == 'private' %}{{ private_representation_url }}?scope=private{% elif list_type == 'review' %}{{ review_representation_url }}?scope=review{% else %}{{ public_representation_url }}?scope=published{% endif %}">Clear all</a>
+                </div>
+              {% endif %}
+            {% endblock active_filters %}
             {% block list_table %}
               {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
                 {% include "object_management/bulk_access_toolbar.html" %}
@@ -91,7 +108,7 @@
                     <thead>
                       <tr>
                         {% include "object_management/bulk_select_th.html" %}
-                        <th>Name</th>
+                        {% include "partials/sortable_th.html" with key="name" label="Name" %}
                         {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
                       </tr>
                     </thead>

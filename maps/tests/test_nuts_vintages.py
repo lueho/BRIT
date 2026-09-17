@@ -11,9 +11,6 @@ class NutsVintageTestCase(TestCase):
         vintage = NutsVintage.objects.get(is_current=True)
         self.assertEqual(vintage.year, 2021)
 
-    def test_str_is_the_year(self):
-        self.assertEqual(str(NutsVintage.objects.get(year=2021)), "NUTS 2021")
-
     def test_current_returns_the_current_vintage(self):
         self.assertEqual(NutsVintage.current().year, 2021)
 

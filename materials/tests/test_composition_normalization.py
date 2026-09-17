@@ -11,6 +11,7 @@ from ..composition_normalization import (
     WARNING_REMAINING_FRACTION_ASSIGNED_TO_OTHER,
     WARNING_SHARES_SCALED_TO_100,
     get_sample_normalized_compositions,
+    get_sorted_component_measurements,
 )
 from ..models import (
     ComponentMeasurement,
@@ -123,14 +124,16 @@ class SampleCompositionNormalizationTestCase(TestCase):
         )
         return sample, group
 
-    def _measure(self, sample, group, component, average, unit=None, basis=None):
+    def _measure(
+        self, sample, group, component, average, unit=None, basis=None, **kwargs
+    ):
         if isinstance(component, str):
             component = MaterialComponent.objects.create(
                 name=component,
                 publication_status="published",
                 owner=self.owner,
             )
-        ComponentMeasurement.objects.create(
+        return ComponentMeasurement.objects.create(
             sample=sample,
             group=group,
             component=component,
@@ -138,6 +141,7 @@ class SampleCompositionNormalizationTestCase(TestCase):
             unit=unit or self.percent_unit,
             average=Decimal(average),
             owner=self.owner,
+            **kwargs,
         )
 
     def test_converts_weight_fraction_units_to_percent_before_normalizing(self):
@@ -365,3 +369,234 @@ class SampleCompositionNormalizationTestCase(TestCase):
             [composition["origin"] for composition in compositions],
             ["raw_derived", "raw_derived"],
         )
+
+    def test_non_compositional_group_is_not_normalized(self):
+        sample, group = self._sample_with_group("Non Compositional")
+        group.is_compositional = False
+        group.save(update_fields=["is_compositional"])
+        measurement = self._measure(sample, group, "Carbon", "40")
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(composition["shares"], [])
+        self.assertEqual(composition["normalization_status"], "unavailable")
+        self.assertEqual(composition["warning_codes"], ["non_compositional_group"])
+        self.assertIsNone(composition["fractions_of"])
+        measurement.refresh_from_db()
+        self.assertEqual(measurement.average, Decimal("40"))
+        self.assertEqual(measurement.value_qualifier, "exact")
+
+    def test_mixed_basis_components_are_blocked(self):
+        sample, group = self._sample_with_group("Mixed Bases")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        fm = MaterialComponent.objects.create(name="Fresh matter", owner=self.owner)
+        self._measure(sample, group, "Carbon", "40", basis=dm)
+        self._measure(sample, group, "Nitrogen", "10", basis=fm)
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(composition["shares"], [])
+        self.assertEqual(composition["normalization_status"], "unavailable")
+        self.assertEqual(composition["warning_codes"], ["multiple_basis_components"])
+
+    def test_mixed_basis_with_missing_basis_is_blocked(self):
+        sample, group = self._sample_with_group("Mixed Missing Basis")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        self._measure(sample, group, "Carbon", "40", basis=dm)
+        self._measure(sample, group, "Nitrogen", "10")
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(composition["shares"], [])
+        self.assertEqual(composition["warning_codes"], ["multiple_basis_components"])
+
+    def test_same_basis_components_remain_normalized(self):
+        sample, group = self._sample_with_group("Same Basis")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        self._measure(sample, group, "Carbon", "40", basis=dm)
+        self._measure(sample, group, "Nitrogen", "10", basis=dm)
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(composition["normalization_status"], "normalized")
+        self.assertEqual(
+            [share["percent"] for share in composition["shares"]],
+            [40.0, 10.0, 50.0],
+        )
+        self.assertEqual(composition["fractions_of"], dm.pk)
+
+    def test_configured_basis_mismatch_is_blocked(self):
+        sample, group = self._sample_with_group("Basis Mismatch")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        fm = MaterialComponent.objects.create(name="Fresh matter", owner=self.owner)
+        Composition.objects.create(
+            sample=sample, group=group, fractions_of=fm, owner=self.owner
+        )
+        self._measure(sample, group, "Carbon", "40", basis=dm)
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(composition["shares"], [])
+        self.assertEqual(composition["warning_codes"], ["configured_basis_mismatch"])
+
+    def test_repeated_component_observations_are_blocked(self):
+        sample, group = self._sample_with_group("Repeated Component")
+        carbon = MaterialComponent.objects.create(name="Carbon", owner=self.owner)
+        self._measure(sample, group, carbon, "40")
+        self._measure(sample, group, carbon, "42")
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(composition["shares"], [])
+        self.assertEqual(
+            composition["warning_codes"], ["repeated_component_measurements"]
+        )
+
+    def test_censored_measurements_are_approximated_as_zero(self):
+        sample, group = self._sample_with_group("Censored")
+        self._measure(sample, group, "Carbon", "40")
+        censored = self._measure(
+            sample,
+            group,
+            "Nitrogen",
+            "0.1",
+            raw_value="<0.1",
+            value_qualifier="less_than",
+        )
+        below_dl = self._measure(
+            sample,
+            group,
+            "Sulfur",
+            "0.2",
+            value_qualifier="below_detection_limit",
+        )
+        trace = self._measure(
+            sample,
+            group,
+            "Trace element",
+            "0",
+            raw_value="<0",
+            value_qualifier="less_than",
+        )
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(composition["normalization_status"], "normalized")
+        self.assertEqual(
+            [(s["component_name"], s["percent"]) for s in composition["shares"]],
+            [("Carbon", 40.0), ("Other", 60.0)],
+        )
+        self.assertIn(
+            "censored_values_approximated_as_zero", composition["warning_codes"]
+        )
+        for measurement, qualifier in (
+            (censored, "less_than"),
+            (below_dl, "below_detection_limit"),
+            (trace, "less_than"),
+        ):
+            measurement.refresh_from_db()
+            self.assertEqual(measurement.value_qualifier, qualifier)
+        self.assertEqual(censored.average, Decimal("0.1"))
+        self.assertEqual(below_dl.average, Decimal("0.2"))
+        self.assertEqual(trace.average, Decimal("0"))
+
+    def test_censored_only_group_is_unavailable_without_fabricated_other(self):
+        sample, group = self._sample_with_group("Censored Only")
+        self._measure(
+            sample,
+            group,
+            "Carbon",
+            "0.1",
+            raw_value="<0.1",
+            value_qualifier="less_than",
+        )
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(composition["shares"], [])
+        self.assertEqual(composition["normalization_status"], "unavailable")
+        self.assertEqual(
+            composition["warning_codes"], ["censored_values_approximated_as_zero"]
+        )
+        self.assertIsNone(composition["share_total_percent"])
+
+    def test_unsupported_qualifiers_are_blocked(self):
+        for qualifier in ("greater_than", "range", "estimated"):
+            with self.subTest(qualifier=qualifier):
+                sample, group = self._sample_with_group(f"Qualifier {qualifier}")
+                self._measure(
+                    sample,
+                    group,
+                    f"Carbon {qualifier}",
+                    "40",
+                    value_qualifier=qualifier,
+                )
+                composition = get_sample_normalized_compositions(sample)[0]
+                self.assertEqual(composition["shares"], [])
+                self.assertEqual(
+                    composition["warning_codes"], ["unsupported_value_qualifier"]
+                )
+
+    def test_invalid_measurement_values_are_blocked(self):
+        cases = (
+            {"average": "-1"},
+            {"average": "40", "standard_deviation": Decimal("-0.5")},
+            {"average": "40", "detection_limit": Decimal("-0.5")},
+        )
+        for kwargs in cases:
+            with self.subTest(kwargs=kwargs):
+                sample, group = self._sample_with_group(f"Invalid {sorted(kwargs)}")
+                self._measure(sample, group, f"Carbon {sorted(kwargs)}", **kwargs)
+                composition = get_sample_normalized_compositions(sample)[0]
+                self.assertEqual(composition["shares"], [])
+                self.assertEqual(
+                    composition["warning_codes"], ["invalid_measurement_value"]
+                )
+
+    def test_individual_mass_fraction_above_100_is_blocked(self):
+        sample, group = self._sample_with_group("Over 100 Percent")
+        self._measure(sample, group, "Carbon", "101")
+        composition = get_sample_normalized_compositions(sample)[0]
+        self.assertEqual(composition["shares"], [])
+        self.assertEqual(composition["warning_codes"], ["invalid_mass_fraction"])
+
+        sample, group = self._sample_with_group("Over 100 MgKg")
+        mg_per_kg = Unit.objects.create(name="mg/kg", symbol="mg/kg", owner=self.owner)
+        self._measure(sample, group, "Zinc", "1000001", unit=mg_per_kg)
+        composition = get_sample_normalized_compositions(sample)[0]
+        self.assertEqual(composition["shares"], [])
+        self.assertEqual(composition["warning_codes"], ["invalid_mass_fraction"])
+
+    def test_non_finite_measurement_values_do_not_crash_sorting(self):
+        for non_finite in (
+            Decimal("NaN"),
+            Decimal("Infinity"),
+            Decimal("-Infinity"),
+        ):
+            with self.subTest(average=non_finite):
+                sample, group = self._sample_with_group(f"Non Finite {non_finite}")
+                first = self._measure(sample, group, f"Carbon {non_finite}", "40")
+                second = self._measure(sample, group, f"Nitrogen {non_finite}", "10")
+                first.average = non_finite
+
+                sorted_measurements = get_sorted_component_measurements(
+                    sample, component_measurements=[first, second]
+                )
+                composition = get_sample_normalized_compositions(
+                    sample, component_measurements=sorted_measurements
+                )[0]
+
+                self.assertEqual(composition["shares"], [])
+                self.assertEqual(
+                    composition["warning_codes"], ["invalid_measurement_value"]
+                )
+
+    def test_non_weight_fraction_unit_is_blocked(self):
+        sample, group = self._sample_with_group("Becquerel")
+        bq_per_kg = Unit.objects.create(name="Bq/kg", symbol="Bq/kg", owner=self.owner)
+        self._measure(sample, group, "Cesium-137", "40", unit=bq_per_kg)
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(composition["shares"], [])
+        self.assertEqual(composition["warning_codes"], ["invalid_units"])

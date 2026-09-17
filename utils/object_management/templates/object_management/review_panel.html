@@ -101,7 +101,7 @@
               role="group"
               onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
           {% csrf_token %}
-          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <input type="hidden" name="next" value="{{ request|path_without_return_params }}">
           <input type="hidden" name="message" value="">
           <button class="btn btn-sm btn-outline-primary" type="submit">
             <i class="fas fa-paper-plane"></i> {% trans "Comment" %}
@@ -133,7 +133,7 @@
                 role="group"
                 onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
             {% csrf_token %}
-            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <input type="hidden" name="next" value="{{ request|path_without_return_params }}">
             <input type="hidden" name="message" value="">
             {% if policy.is_declined %}
               <button type="submit" class="btn btn-sm btn-secondary">
@@ -154,7 +154,7 @@
                   role="group"
                   onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
               {% csrf_token %}
-              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <input type="hidden" name="next" value="{{ request|path_without_return_params }}">
               <input type="hidden" name="message" value="">
               <button type="submit" class="btn btn-sm btn-primary">
                 <i class="fas fa-paper-plane"></i> {% trans "Submit for Review" %}
@@ -167,13 +167,13 @@
       {% if policy.is_in_review %}
         {% if policy.can_approve %}
           <a class="btn btn-sm btn-success modal-link"
-             href="{% url 'object_management:approve_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+             href="{% url 'object_management:approve_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
             <i class="fas fa-check"></i> {% trans "Approve" %}
           </a>
         {% endif %}
         {% if policy.can_reject %}
           <a class="btn btn-sm btn-danger modal-link"
-             href="{% url 'object_management:reject_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+             href="{% url 'object_management:reject_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
             <i class="fas fa-xmark"></i> {% trans "Reject" %}
           </a>
         {% endif %}

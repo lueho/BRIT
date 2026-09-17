@@ -124,6 +124,8 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             "owner",
             "catchment",
             "catchment__region",
+            "catchment__region__nutsregion",
+            "catchment__region__lauregion",
             "collector",
             "collection_system",
             "waste_category",

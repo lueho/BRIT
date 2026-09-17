@@ -109,7 +109,7 @@ class ComponentModalModelForm(ModalModelFormMixin, ComponentModelForm):
 class ComponentGroupModelForm(SimpleModelForm):
     class Meta:
         model = MaterialComponentGroup
-        fields = ("name", "description")
+        fields = ("name", "description", "is_compositional")
 
 
 class ComponentGroupModalModelForm(ModalModelFormMixin, ComponentGroupModelForm):

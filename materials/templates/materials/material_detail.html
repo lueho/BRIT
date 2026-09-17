@@ -1,25 +1,23 @@
-{% extends "detail_with_options.html" %}
+{% extends "detail_v2.html" %}
 
-{% block detail_body %}
-    <p class="card-text">
-        <strong>Name:</strong>
-        <br>
-        {{ object.name }}
-    </p>
-    {% if object.categories.exists %}
-        <p class="card-text">
-            <strong>Categories:</strong>
-        </p>
-        {% for category in object.categories.all %}
-            <a href="{{ category.get_absolute_url }}">{{ category.name }}</a>
-            {% if not forloop.last %},{% endif %}
-        {% endfor %}
+{% block detail_page_title %}Material: {{ object.name }}{% endblock detail_page_title %}
+
+{% block detail_kicker %}Material{% endblock detail_kicker %}
+
+{% block hero_meta_items %}
+    {% if object.abbreviation %}
+        <li><span class="sdv2-meta-label">Abbreviation</span>{{ object.abbreviation }}</li>
     {% endif %}
-    {% if object.description %}
-        <p class="card-text">
-            <strong>Description:</strong>
-            <br>
-            {{ object.description }}
-        </p>
-    {% endif %}
-{% endblock detail_body %}
+    {% for category in object.categories.all %}
+        <li>
+            <span class="sdv2-meta-label">Category</span>
+            <a href="{% url 'materialcategory-detail' category.pk %}">{{ category.name }}</a>
+        </li>
+    {% endfor %}
+    <li><span class="sdv2-meta-label">Owner</span>{{ object.owner.username|default:object.owner }}</li>
+{% endblock hero_meta_items %}
+
+{% block detail_sections %}
+    {% include "includes/sdv2_related_section.html" with section_title="Sample series" section_label="Sample series of this material" items=related_series item_url_name="sampleseries-detail" section_total=related_series_published_total section_more=related_series_more section_list_url=related_series_list_url empty_title="No sample series" empty_body="No sample series are linked to this material yet." %}
+    {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples of this material" items=related_samples item_url_name="sample-detail" section_total=related_samples_published_total section_more=related_samples_more section_list_url=related_samples_list_url empty_title="No samples" empty_body="No samples are linked to this material yet." %}
+{% endblock detail_sections %}

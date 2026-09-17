@@ -70,6 +70,101 @@ def trim_decimal(value, places=10):
     return "0" if text == "-0" else text
 
 
+def _chip_format_temporal(value):
+    """Format date/datetime range bounds without noisy time components."""
+    if value is None:
+        return ""
+    if hasattr(value, "date"):
+        return value.date().isoformat()
+    return value.isoformat() if hasattr(value, "isoformat") else str(value)
+
+
+def _chip_display_value(filter_, value):
+    """Render a human-readable label for an active filter value."""
+    if isinstance(value, slice):
+        start = _chip_format_temporal(value.start)
+        stop = _chip_format_temporal(value.stop)
+        if start and stop:
+            return f"{start} – {stop}"
+        if start:
+            return f"from {start}"
+        if stop:
+            return f"until {stop}"
+        return ""
+    if hasattr(value, "pk"):
+        return str(value)
+    field = getattr(filter_, "field", None)
+    choices = getattr(field, "choices", None)
+    if choices:
+        try:
+            label = dict(choices).get(value)
+        except TypeError:
+            label = None
+        if label is not None:
+            return str(label)
+    if isinstance(value, (list, tuple)) or hasattr(value, "all"):
+        return ", ".join(str(item) for item in value)
+    return str(value)
+
+
+@register.simple_tag(takes_context=True)
+def active_filter_chips(context):
+    """
+    Return removable chips for the currently active django-filter filters.
+
+    Reads the FilterSet from ``context["filter"]`` and the current request and
+    returns a list of dicts with ``name``, ``label``, ``value`` and
+    ``remove_url`` keys. Structural parameters (scope, pagination, ordering)
+    are not treated as filters and never produce chips.
+    """
+    request = context.get("request")
+    filterset = context.get("filter")
+    if request is None or not hasattr(filterset, "filters"):
+        return []
+
+    skip = {"scope", "page", "id", "ordering", "publication_status"}
+    filter_names = set(filterset.filters)
+    if not any(
+        key not in skip
+        and (
+            key in filter_names
+            or any(key.startswith(f"{name}_") for name in filter_names)
+        )
+        for key in request.GET
+    ):
+        return []
+
+    form = getattr(filterset, "form", None)
+    if form is None or not form.is_valid():
+        return []
+
+    chips = []
+    for name, filter_ in filterset.filters.items():
+        if name in skip:
+            continue
+        value = form.cleaned_data.get(name)
+        if value in (None, "", [], (), {}):
+            continue
+        display = _chip_display_value(filter_, value)
+        if not display:
+            continue
+        params = request.GET.copy()
+        for key in list(params.keys()):
+            if key == name or (key.startswith(f"{name}_") and key not in filter_names):
+                del params[key]
+        params.pop("page", None)
+        query = params.urlencode()
+        chips.append(
+            {
+                "name": name,
+                "label": filter_.label or name.replace("_", " ").title(),
+                "value": display,
+                "remove_url": (f"{request.path}?{query}" if query else request.path),
+            }
+        )
+    return chips
+
+
 # Solution from: https://www.caktusgroup.com/blog/2018/10/18/filtering-and-pagination-django/
 @register.simple_tag(takes_context=True)
 def param_replace(context, **kwargs):
