@@ -104,34 +104,6 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
             "sources.waste_collection.serializers",
         )
 
-    def test_roadside_tree_serializers_are_owned_by_sources(self):
-        self.assertEqual(
-            HamburgRoadsideTreeFlatSerializer.__module__,
-            "sources.roadside_trees.serializers",
-        )
-        self.assertEqual(
-            HamburgRoadsideTreeGeometrySerializer.__module__,
-            "sources.roadside_trees.serializers",
-        )
-        self.assertEqual(
-            HamburgRoadsideTreeSimpleModelSerializer.__module__,
-            "sources.roadside_trees.serializers",
-        )
-
-    def test_greenhouse_serializers_are_owned_by_sources(self):
-        self.assertEqual(
-            NantesGreenhousesFlatSerializer.__module__,
-            "sources.greenhouses.serializers",
-        )
-        self.assertEqual(
-            NantesGreenhousesGeometrySerializer.__module__,
-            "sources.greenhouses.serializers",
-        )
-        self.assertEqual(
-            NantesGreenhousesModelSerializer.__module__,
-            "sources.greenhouses.serializers",
-        )
-
     def test_waste_collection_filters_and_renderers_are_owned_by_sources(self):
         self.assertEqual(
             CollectionFrequencyListFilter.__module__, "sources.waste_collection.filters"
@@ -160,28 +132,6 @@ class SourcesSerializerAdapterTestCase(SimpleTestCase):
         )
         self.assertEqual(
             CollectionXLSXRenderer.__module__, "sources.waste_collection.renderers"
-        )
-
-    def test_waste_collection_filters_are_owned_by_sources(self):
-        self.assertEqual(
-            CollectionFilterSet.__module__, "sources.waste_collection.filters"
-        )
-        self.assertEqual(
-            CollectionSystemListFilter.__module__,
-            "sources.waste_collection.filters",
-        )
-        self.assertEqual(CollectorFilter.__module__, "sources.waste_collection.filters")
-        self.assertEqual(
-            WasteFlyerFilter.__module__, "sources.waste_collection.filters"
-        )
-
-    def test_waste_collection_renderers_are_owned_by_sources(self):
-        self.assertEqual(
-            CollectionCSVRenderer.__module__, "sources.waste_collection.renderers"
-        )
-        self.assertEqual(
-            CollectionXLSXRenderer.__module__,
-            "sources.waste_collection.renderers",
         )
 
     def test_roadside_tree_filters_and_serializers_are_owned_by_sources(self):

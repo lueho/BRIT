@@ -115,9 +115,6 @@ class InputMaterialTestCase(TestCase):
     def test_property_composition_returns_correct_composition(self):
         self.assertEqual(self.input.composition.group.name, "Biochemical Composition")
 
-    def test_property_carbohydrates_returns_valid_value(self):
-        self.assertEqual(self.input.carbohydrates, Decimal("0.1"))
-
     def test_property_carbohydrates_uses_raw_derived_share_with_updated_measurements(
         self,
     ):
@@ -147,26 +144,17 @@ class InputMaterialTestCase(TestCase):
 
         self.assertEqual(self.input.carbohydrates, Decimal("0.4"))
 
-    def test_property_amino_acids_returns_valid_value(self):
-        self.assertEqual(self.input.amino_acids, Decimal("0.1"))
-
-    def test_property_starch_returns_valid_value(self):
-        self.assertEqual(self.input.starch, Decimal("0.1"))
-
-    def test_property_hemicellulose_returns_valid_value(self):
-        self.assertEqual(self.input.hemicellulose, Decimal("0.1"))
-
-    def test_property_fats_returns_valid_value(self):
-        self.assertEqual(self.input.fats, Decimal("0.1"))
-
-    def test_property_waxs_returns_valid_value(self):
-        self.assertEqual(self.input.waxs, Decimal("0.1"))
-
-    def test_property_proteins_returns_valid_value(self):
-        self.assertEqual(self.input.proteins, Decimal("0.1"))
-
-    def test_property_cellulose_returns_valid_value(self):
-        self.assertEqual(self.input.cellulose, Decimal("0.1"))
-
-    def test_property_lignin_returns_valid_value(self):
-        self.assertEqual(self.input.lignin, Decimal("0.1"))
+    def test_component_properties_return_valid_values(self):
+        for prop in (
+            "carbohydrates",
+            "amino_acids",
+            "starch",
+            "hemicellulose",
+            "fats",
+            "waxs",
+            "proteins",
+            "cellulose",
+            "lignin",
+        ):
+            with self.subTest(prop=prop):
+                self.assertEqual(getattr(self.input, prop), Decimal("0.1"))

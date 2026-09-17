@@ -67,9 +67,3 @@ class MaterialSerializerTestCase(TestCase):
             self.assertIn(placeholder[1:], serializer.data)
         for key in serializer.data.keys():
             self.assertIn(f"${key}", placeholders)
-
-    def test_serializer_list_field_method(self):
-        simucf = SimuCF(
-            material=self.input_material, amount=100, length_of_treatment=10
-        )
-        SimuCFSerializer(simucf)

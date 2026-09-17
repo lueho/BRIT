@@ -662,7 +662,7 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         self.skipTest("Post method is not implemented for this view.")
 
     def test_create_view_post_as_authenticated_with_permission(self):
-        self.skipTest("Get method is not implemented for this view.")
+        self.skipTest("Post method is not implemented for this view.")
 
     def test_create_view_post_as_staff_user(self):
         self.skipTest("Post method is not implemented for this view.")
