@@ -21,14 +21,19 @@ from ..models import (
     MaterialComponentGroup,
     MaterialProperty,
     MaterialPropertyValue,
+    MeasurementValueQualifier,
     Sample,
     SampleSeries,
 )
 from ..serializers import (
+    ComponentMeasurementReadSerializer,
     ComponentMeasurementWriteSerializer,
     CompositionDoughnutChartSerializer,
     CompositionModelSerializer,
+    MaterialPropertyAPISerializer,
     MaterialPropertyValueModelSerializer,
+    MaterialPropertyValueReadSerializer,
+    SampleAPISerializer,
     SampleFlatSerializer,
     SampleModelSerializer,
     SampleSeriesModelSerializer,
@@ -543,3 +548,163 @@ class CompositionDoughnutChartSerializerTestCase(TestCase):
         self.assertIsInstance(data["data"], list)
         self.assertIsInstance(data["data"][0]["data"], list)
         self.assertListEqual(data["data"][0]["data"], [0.2, 0.1, 0.7])
+
+
+class MeasurementQualifierSerializerTestCase(TestCase):
+    METADATA_FIELDS = (
+        "display_value",
+        "value_qualifier",
+        "raw_value",
+        "detection_limit",
+        "raw_detection_limit",
+    )
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create_user(
+            username="qualifier-serializer-owner", password="test123"
+        )
+        cls.material = Material.objects.create(
+            name="Qualifier material", owner=cls.owner
+        )
+        cls.sample = Sample.objects.create(
+            name="Qualifier sample", material=cls.material, owner=cls.owner
+        )
+        cls.group = MaterialComponentGroup.objects.create(
+            name="Qualifier group", owner=cls.owner
+        )
+        cls.component = MaterialComponent.objects.create(
+            name="Qualifier component", owner=cls.owner
+        )
+        cls.prop = MaterialProperty.objects.create(
+            name="Qualifier property", unit="%", owner=cls.owner
+        )
+        cls.unit = Unit.objects.filter(name="%").first() or Unit.objects.create(
+            name="%", symbol="percent", owner=cls.owner
+        )
+        cls.measurement = ComponentMeasurement.objects.create(
+            owner=cls.owner,
+            sample=cls.sample,
+            group=cls.group,
+            component=cls.component,
+            unit=cls.unit,
+            average=Decimal("0.1"),
+            raw_value="0.1",
+            value_qualifier=MeasurementValueQualifier.LESS_THAN,
+            detection_limit=Decimal("6.57"),
+            raw_detection_limit="6,57",
+        )
+        cls.property_value = MaterialPropertyValue.objects.create(
+            owner=cls.owner,
+            sample=cls.sample,
+            property=cls.prop,
+            unit=cls.unit,
+            average=Decimal("0.1"),
+            raw_value="0.1",
+            value_qualifier=MeasurementValueQualifier.LESS_THAN,
+            detection_limit=Decimal("6.57"),
+            raw_detection_limit="6,57",
+        )
+
+    def _assert_metadata(self, data):
+        for field in self.METADATA_FIELDS:
+            self.assertIn(field, data)
+        self.assertEqual(data["display_value"], "<0.1")
+        self.assertEqual(Decimal(str(data["average"])), Decimal("0.1"))
+        self.assertEqual(data["value_qualifier"], "less_than")
+        self.assertEqual(data["raw_value"], "0.1")
+        self.assertEqual(Decimal(str(data["detection_limit"])), Decimal("6.57"))
+        self.assertEqual(data["raw_detection_limit"], "6,57")
+
+    def test_component_measurement_read_serializer_includes_qualifier_metadata(self):
+        data = ComponentMeasurementReadSerializer(self.measurement).data
+
+        self._assert_metadata(data)
+
+    def test_property_value_read_serializer_includes_qualifier_metadata(self):
+        data = MaterialPropertyValueReadSerializer(self.property_value).data
+
+        self._assert_metadata(data)
+
+    def test_property_value_model_serializer_includes_qualifier_metadata(self):
+        request = RequestFactory().get(reverse("home"))
+        data = MaterialPropertyValueModelSerializer(
+            self.property_value, context={"request": request}
+        ).data
+
+        self.assertIn("property_url", data)
+        self._assert_metadata(data)
+
+    def test_property_api_serializer_includes_qualifier_metadata(self):
+        data = MaterialPropertyAPISerializer(self.property_value).data
+
+        self._assert_metadata(data)
+
+    def test_sample_model_serializer_includes_metadata_in_nested_properties(self):
+        request = RequestFactory().get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+        data = SampleModelSerializer(self.sample, context={"request": request}).data
+
+        self.assertEqual(len(data["properties"]), 1)
+        self._assert_metadata(data["properties"][0])
+
+    def test_sample_api_serializer_includes_metadata_in_nested_properties(self):
+        data = SampleAPISerializer(self.sample).data
+
+        self.assertEqual(len(data["properties"]), 1)
+        self._assert_metadata(data["properties"][0])
+
+    def test_exact_zero_display_value_stays_numeric(self):
+        value = MaterialPropertyValue.objects.create(
+            owner=self.owner,
+            sample=self.sample,
+            property=self.prop,
+            unit=self.unit,
+            average=Decimal("0"),
+        )
+
+        data = MaterialPropertyValueReadSerializer(value).data
+
+        self.assertEqual(data["display_value"], Decimal("0"))
+        self.assertEqual(Decimal(str(data["average"])), Decimal("0"))
+        self.assertEqual(data["value_qualifier"], "exact")
+        self.assertEqual(data["raw_value"], "")
+        self.assertIsNone(data["detection_limit"])
+        self.assertEqual(data["raw_detection_limit"], "")
+
+    def test_below_detection_limit_without_limit(self):
+        measurement = ComponentMeasurement.objects.create(
+            owner=self.owner,
+            sample=self.sample,
+            group=self.group,
+            component=self.component,
+            unit=self.unit,
+            average=Decimal("0"),
+            value_qualifier=MeasurementValueQualifier.BELOW_DETECTION_LIMIT,
+        )
+
+        data = ComponentMeasurementReadSerializer(measurement).data
+
+        self.assertEqual(data["display_value"], "Below detection limit")
+        self.assertIsNone(data["detection_limit"])
+        self.assertEqual(data["raw_detection_limit"], "")
+
+    def test_hostile_raw_value_serializes_as_text(self):
+        raw = '<img src=x onerror="alert(31337)">'
+        measurement = ComponentMeasurement.objects.create(
+            owner=self.owner,
+            sample=self.sample,
+            group=self.group,
+            component=self.component,
+            unit=self.unit,
+            average=Decimal("0.1"),
+            raw_value=raw,
+            value_qualifier=MeasurementValueQualifier.LESS_THAN,
+        )
+
+        data = ComponentMeasurementReadSerializer(measurement).data
+
+        self.assertEqual(data["raw_value"], raw)
+        self.assertEqual(data["display_value"], raw)
+        self.assertIsInstance(data["display_value"], str)

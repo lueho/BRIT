@@ -23,6 +23,7 @@ from materials.models import (
     MaterialComponentGroup,
     MaterialProperty,
     MaterialPropertyValue,
+    MeasurementValueQualifier,
     Sample,
     SampleExternalRecord,
     SampleSeries,
@@ -1093,3 +1094,158 @@ class CompositionTestCase(TestCase):
         second_composition.refresh_from_db()
         self.assertEqual(second_composition.order, original_first)
         self.assertEqual(self.composition.order, original_second)
+
+
+class MeasurementQualifierDisplayTestCase(SimpleTestCase):
+    @staticmethod
+    def _instances(**kwargs):
+        return (
+            ComponentMeasurement(owner=None, unit=None, **kwargs),
+            MaterialPropertyValue(owner=None, unit=None, **kwargs),
+        )
+
+    def test_exact_returns_numeric_average(self):
+        for instance in self._instances(
+            average=Decimal("0"),
+            raw_value="<9",
+            value_qualifier=MeasurementValueQualifier.EXACT,
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertIsInstance(instance.display_value, Decimal)
+                self.assertEqual(instance.display_value, Decimal("0"))
+
+    def test_exact_ignores_raw_value(self):
+        for instance in self._instances(
+            average=Decimal("123.450"),
+            raw_value="<123",
+            value_qualifier=MeasurementValueQualifier.EXACT,
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(instance.display_value, Decimal("123.450"))
+
+    def test_less_than_prefers_raw_value(self):
+        for instance in self._instances(
+            average=Decimal("0"),
+            raw_value="<0,1",
+            value_qualifier=MeasurementValueQualifier.LESS_THAN,
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(instance.display_value, "<0,1")
+
+    def test_greater_than_prefers_raw_value(self):
+        for instance in self._instances(
+            average=Decimal("1450"),
+            raw_value="> 1450",
+            value_qualifier=MeasurementValueQualifier.GREATER_THAN,
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(instance.display_value, "> 1450")
+
+    def test_less_than_falls_back_to_formatted_average(self):
+        for average in (Decimal("0.000000001"), 1e-9):
+            for instance in self._instances(
+                average=average,
+                value_qualifier=MeasurementValueQualifier.LESS_THAN,
+            ):
+                with self.subTest(model=type(instance).__name__, average=average):
+                    self.assertEqual(instance.display_value, "<0.000000001")
+
+    def test_greater_than_falls_back_to_formatted_average(self):
+        for instance in self._instances(
+            average=Decimal("1450"),
+            value_qualifier=MeasurementValueQualifier.GREATER_THAN,
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(instance.display_value, ">1450")
+
+    def test_less_than_prefixes_bare_raw_value(self):
+        for instance in self._instances(
+            average=Decimal("0.1"),
+            raw_value="0.1",
+            value_qualifier=MeasurementValueQualifier.LESS_THAN,
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(instance.display_value, "<0.1")
+
+    def test_below_detection_limit_wraps_raw_value(self):
+        for instance in self._instances(
+            average=Decimal("0"),
+            raw_value="(5,63)<LD=6,57",
+            value_qualifier=MeasurementValueQualifier.BELOW_DETECTION_LIMIT,
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(
+                    instance.display_value,
+                    "Below detection limit ((5,63)<LD=6,57)",
+                )
+
+    def test_below_detection_limit_without_raw_value(self):
+        for instance in self._instances(
+            average=Decimal("0"),
+            value_qualifier=MeasurementValueQualifier.BELOW_DETECTION_LIMIT,
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(instance.display_value, "Below detection limit")
+
+    def test_range_uses_label_and_raw_value(self):
+        for instance in self._instances(
+            average=Decimal("2"),
+            raw_value="1–3",
+            value_qualifier=MeasurementValueQualifier.RANGE,
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(instance.display_value, "Range: 1–3")
+
+    def test_estimated_falls_back_to_formatted_average(self):
+        for instance in self._instances(
+            average=Decimal("2"),
+            value_qualifier=MeasurementValueQualifier.ESTIMATED,
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(instance.display_value, "Estimated: 2")
+
+    def test_unknown_qualifier_keeps_its_label(self):
+        for instance in self._instances(
+            average=Decimal("2"),
+            value_qualifier="mystery",
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(instance.display_value, "mystery: 2")
+
+    def test_display_detection_limit(self):
+        cases = (
+            ({"detection_limit": None}, ""),
+            ({"detection_limit": Decimal("0")}, "0"),
+            ({"detection_limit": Decimal("6.570")}, "6.57"),
+            ({"detection_limit": 1e-9}, "0.000000001"),
+            (
+                {
+                    "detection_limit": Decimal("6.570"),
+                    "raw_detection_limit": "6,57",
+                },
+                "6,57",
+            ),
+        )
+        for kwargs, expected in cases:
+            for instance in self._instances(**kwargs):
+                with self.subTest(model=type(instance).__name__, kwargs=kwargs):
+                    self.assertEqual(instance.display_detection_limit, expected)
+
+    def test_display_helpers_do_not_change_stored_values(self):
+        for instance in self._instances(
+            average=Decimal("1450"),
+            raw_value=">1450",
+            value_qualifier=MeasurementValueQualifier.GREATER_THAN,
+            detection_limit=Decimal("6.570"),
+            raw_detection_limit="6,57",
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(instance.display_value, ">1450")
+                self.assertEqual(instance.display_detection_limit, "6,57")
+                self.assertEqual(instance.average, Decimal("1450"))
+                self.assertEqual(
+                    instance.value_qualifier, MeasurementValueQualifier.GREATER_THAN
+                )
+                self.assertEqual(instance.raw_value, ">1450")
+                self.assertEqual(instance.detection_limit, Decimal("6.570"))
+                self.assertEqual(instance.raw_detection_limit, "6,57")

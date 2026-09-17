@@ -548,11 +548,14 @@
                                 <td>{{ measurement.component.abbreviation|default:"—" }}</td>
                                 <td>{{ measurement.basis_component.name|default:"—" }}</td>
                                 <td class="sdv2-num">
-                                  <strong>{{ measurement.average|trim_decimal:4 }}</strong>
+                                  <strong>{{ measurement.display_value|trim_decimal:4 }}</strong>
                                   {% if measurement.display_standard_deviation != None %}
                                     <span class="sdv2-sd">± {{ measurement.display_standard_deviation|trim_decimal:2 }}</span>
                                   {% endif %}
                                   <span class="sdv2-unit">{{ measurement.unit }}</span>
+                                  {% if measurement.display_detection_limit %}
+                                    <span class="sdv2-sd">Detection limit: {{ measurement.display_detection_limit }} {{ measurement.unit }}</span>
+                                  {% endif %}
                                 </td>
                                 <td class="sdv2-num">{{ measurement.sample_size|default:"—" }}</td>
                                 <td>
@@ -701,11 +704,14 @@
                       {% endif %}
                     </td>
                     <td class="sdv2-num">
-                      <strong>{{ prop.average|trim_decimal:6 }}</strong>
+                      <strong>{{ prop.display_value|trim_decimal:6 }}</strong>
                       {% if prop.display_standard_deviation != None %}
                         <span class="sdv2-sd">± {{ prop.display_standard_deviation|trim_decimal:6 }}</span>
                       {% endif %}
                       <span class="sdv2-unit">{{ prop.unit }}</span>
+                      {% if prop.display_detection_limit %}
+                        <span class="sdv2-sd">Detection limit: {{ prop.display_detection_limit }} {{ prop.unit }}</span>
+                      {% endif %}
                     </td>
                     <td>{{ prop.basis_component.name|default:"—" }}</td>
                     <td>
