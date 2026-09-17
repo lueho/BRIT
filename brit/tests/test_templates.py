@@ -9,6 +9,52 @@ from django.urls import reverse
 from brit.sitemap_items import SITEMAP_ITEMS
 
 
+class ListEmptyStateTemplateTests(SimpleTestCase):
+    """``includes/list_empty_state.html`` must distinguish an empty list caused
+    by applied filters from a genuinely empty scope (issue #150)."""
+
+    def _render(self, query=None, **context):
+        request = RequestFactory().get("/processes/list/", query or {})
+        return render_to_string(
+            "includes/list_empty_state.html",
+            {"request": request, "colspan": 2, **context},
+        )
+
+    def test_scope_only_renders_creation_hint_without_filter_message(self):
+        html = self._render(
+            {"scope": "published"},
+            hint="Create your first process to get started.",
+        )
+
+        self.assertNotIn("No items match your current filters.", html)
+        self.assertNotIn("Reset filters", html)
+        self.assertIn("Create your first process to get started.", html)
+
+    def test_applied_filter_renders_filter_message_with_reset(self):
+        html = self._render(
+            {"scope": "published", "name": "compost"},
+            hint="Create your first process to get started.",
+        )
+
+        self.assertIn("No items match your current filters.", html)
+        self.assertIn("Reset filters", html)
+        self.assertIn("Create your first process to get started.", html)
+
+    def test_internal_and_empty_params_do_not_count_as_filters(self):
+        html = self._render(
+            {
+                "scope": "published",
+                "page": "2",
+                "csrfmiddlewaretoken": "abc123",
+                "name": "",
+            },
+            hint="Create your first process to get started.",
+        )
+
+        self.assertNotIn("No items match your current filters.", html)
+        self.assertIn("Create your first process to get started.", html)
+
+
 class DeleteConfirmationTemplateTests(SimpleTestCase):
     def test_confirmation_uses_object_display_without_requiring_name_field(self):
         html = render_to_string(

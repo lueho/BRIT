@@ -1,12 +1,20 @@
 {% load user_created_object_tags %}
+{% load custom_tags %}
 <tr>
   <td colspan="{% if colspan %}{{ colspan }}{% elif object_list.model|is_user_created %}2{% else %}1{% endif %}"
       class="text-center text-muted py-4">
-    <div class="mb-2">
-      <i class="fas fa-filter me-1"></i> No items match your current filters.
-      <a href="{% if list_type == 'private' %}{{ private_representation_url }}?scope=private{% elif list_type == 'review' %}{{ review_representation_url }}?scope=review{% else %}{{ public_representation_url }}?scope=published{% endif %}"
-         class="ms-2">Reset filters</a>
-    </div>
+    {% has_active_filters as filters_active %}
+    {% if filters_active %}
+      <div class="mb-2">
+        <i class="fas fa-filter me-1"></i> No items match your current filters.
+        <a href="{% if list_type == 'private' %}{{ private_representation_url }}?scope=private{% elif list_type == 'review' %}{{ review_representation_url }}?scope=review{% else %}{{ public_representation_url }}?scope=published{% endif %}"
+           class="ms-2">Reset filters</a>
+      </div>
+    {% else %}
+      <div class="mb-2">
+        <i class="fas fa-inbox me-1"></i> Nothing here yet.
+      </div>
+    {% endif %}
     {% if hint %}<div class="small">{{ hint }}</div>{% endif %}
   </td>
 </tr>

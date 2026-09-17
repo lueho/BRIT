@@ -98,3 +98,33 @@ def param_replace(context, **kwargs):
     for k in [k for k, v in d.items() if not v]:
         del d[k]
     return d.urlencode()
+
+
+# Query parameters that control list presentation rather than constrain the
+# result set: scope switching, pagination, ordering, and fields that leak into
+# GET URLs (e.g. csrfmiddlewaretoken, see issue #153).
+NON_FILTER_QUERY_PARAMS = frozenset(
+    {
+        "scope",
+        "page",
+        "id",
+        "list_type",
+        "ordering",
+        "sort",
+        "next",
+        "csrfmiddlewaretoken",
+    }
+)
+
+
+@register.simple_tag(takes_context=True)
+def has_active_filters(context):
+    """Return True when the request carries at least one constraining filter value."""
+    request = context.get("request")
+    if request is None:
+        return False
+    return any(
+        value
+        for key, value in request.GET.items()
+        if key not in NON_FILTER_QUERY_PARAMS
+    )
