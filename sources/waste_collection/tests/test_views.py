@@ -3528,6 +3528,66 @@ class CollectionFilterWithCatchmentAndPropertiesRegressionTest(
         )
 
 
+class CollectionFilterChipTestCase(ViewWithPermissionsTestCase):
+    """Range-slider values must render as readable, removable filter chips."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        Collection.objects.create(
+            name="Chip Collection",
+            publication_status="published",
+        )
+        cls.list_url = reverse("collection-list")
+
+    def get(self, params):
+        return self.client.get(self.list_url, {"scope": "published", **params})
+
+    def test_slider_chip_shows_readable_range(self):
+        response = self.get(
+            {
+                "connection_rate_min": "10",
+                "connection_rate_max": "50",
+                "connection_rate_is_null": "false",
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Connection rate: 10 – 50 %")
+        self.assertNotContains(response, "Connection rate: slice(")
+
+    def test_slider_chip_marks_included_unknowns(self):
+        response = self.get(
+            {
+                "connection_rate_min": "10",
+                "connection_rate_max": "50",
+                "connection_rate_is_null": "true",
+            }
+        )
+        self.assertContains(response, "Connection rate: 10 – 50 % (incl. unknown)")
+
+    def test_full_range_slider_including_unknowns_shows_no_chip(self):
+        # min_bin_size has no data in this test, so the slider spans its
+        # default 0-2000 range; including unknowns makes it a no-op filter.
+        response = self.get(
+            {
+                "min_bin_size_min": "0",
+                "min_bin_size_max": "2000",
+                "min_bin_size_is_null": "true",
+            }
+        )
+        self.assertNotContains(response, "filter-chip")
+
+    def test_full_range_slider_excluding_unknowns_keeps_chip(self):
+        response = self.get(
+            {
+                "min_bin_size_min": "0",
+                "min_bin_size_max": "2000",
+                "min_bin_size_is_null": "false",
+            }
+        )
+        self.assertContains(response, "Smallest available bin size (L): 0 – 2000 L")
+
+
 class CollectionAddPropertyValueAnchoringTestCase(ViewWithPermissionsTestCase):
     member_permissions = ["add_collectionpropertyvalue"]
     url_name = "collection-add-property"
