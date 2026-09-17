@@ -420,6 +420,16 @@ class GeoDataSetRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         )
         self.assertContains(response, reverse("api-nuts-region-geojson"))
 
+    def test_dataset_map_overlay_is_dismissible(self):
+        response = self.client.get(
+            reverse("geodataset-map", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="map-overlay"')
+        self.assertContains(response, "map-overlay-dismiss")
+        self.assertContains(response, 'aria-label="Dismiss map warning"')
+
     def test_dataset_map_route_works_without_legacy_model_name(self):
         dataset = GeoDataset.objects.create(
             name="Runtime-only dataset",
