@@ -678,6 +678,37 @@ class ComponentMeasurementTestCase(TestCase):
                 average=Decimal("1"),
             ).full_clean()
 
+    def test_clean_rejects_negative_average(self):
+        material = Material.objects.create(name="Digestate")
+        sample = Sample.objects.create(name="Sample", material=material)
+        group = MaterialComponentGroup.objects.create(name="Chemical elements")
+        component = MaterialComponent.objects.create(name="Carbon")
+        unit, _ = Unit.objects.get_or_create(name="%", defaults={"symbol": "%"})
+        measurement = ComponentMeasurement(
+            sample=sample,
+            group=group,
+            component=component,
+            unit=unit,
+            average=Decimal("-0.5"),
+        )
+        with self.assertRaises(ValidationError) as ctx:
+            measurement.full_clean()
+        self.assertIn("average", ctx.exception.message_dict)
+
+    def test_clean_accepts_zero_average(self):
+        material = Material.objects.create(name="Digestate")
+        sample = Sample.objects.create(name="Sample", material=material)
+        group = MaterialComponentGroup.objects.create(name="Chemical elements")
+        component = MaterialComponent.objects.create(name="Carbon")
+        unit, _ = Unit.objects.get_or_create(name="%", defaults={"symbol": "%"})
+        ComponentMeasurement(
+            sample=sample,
+            group=group,
+            component=component,
+            unit=unit,
+            average=Decimal("0"),
+        ).full_clean()
+
 
 @override_settings(TIME_ZONE="Europe/Berlin", USE_TZ=True)
 class SampleSamplingDateTestCase(SimpleTestCase):
