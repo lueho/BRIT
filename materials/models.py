@@ -95,6 +95,14 @@ class BaseMaterial(NamedUserCreatedObject):
             "Canonical component this raw term should be compared as. Only used for components."
         ),
     )
+    is_aggregate = models.BooleanField(
+        default=False,
+        help_text=(
+            "Component totals its sibling components within a component group "
+            "(e.g. 'Total (with halides)'). Aggregates are excluded from "
+            "normalized compositions. Only used for components."
+        ),
+    )
 
     class Meta:
         verbose_name = "Material"
@@ -612,6 +620,44 @@ class MeasurementMetadataMixin(models.Model):
             "analysis_laboratory": self.analysis_laboratory,
             "comment": self.comment,
         }
+
+    @staticmethod
+    def _format_measurement_number(value):
+        if value is None:
+            return ""
+        text = format(Decimal(str(value)), "f")
+        return text.rstrip("0").rstrip(".") if "." in text else text
+
+    @builtin_property
+    def display_value(self):
+        if self.value_qualifier == MeasurementValueQualifier.EXACT:
+            return self.average
+        raw_value = (self.raw_value or "").strip()
+        if self.value_qualifier == MeasurementValueQualifier.BELOW_DETECTION_LIMIT:
+            return (
+                f"Below detection limit ({raw_value})"
+                if raw_value
+                else "Below detection limit"
+            )
+        value = raw_value or self._format_measurement_number(self.average)
+        if self.value_qualifier in (
+            MeasurementValueQualifier.RANGE,
+            MeasurementValueQualifier.ESTIMATED,
+        ):
+            return f"{self.get_value_qualifier_display()}: {value}"
+        prefix = {
+            MeasurementValueQualifier.LESS_THAN: "<",
+            MeasurementValueQualifier.GREATER_THAN: ">",
+        }.get(self.value_qualifier)
+        if prefix is None:
+            return f"{self.value_qualifier}: {value}"
+        return value if value.startswith(prefix) else f"{prefix}{value}"
+
+    @builtin_property
+    def display_detection_limit(self):
+        return (
+            self.raw_detection_limit or ""
+        ).strip() or self._format_measurement_number(self.detection_limit)
 
 
 class MaterialPropertyValue(

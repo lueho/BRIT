@@ -66,23 +66,23 @@ not part of this first change.
 
 ### 3. Filter metadata and unnecessary counts
 
-- [ ] Replace slider `exists()` plus aggregate pairs with nullable aggregates.
-- [ ] Combine compatible aggregates and reuse duplicate choice queries.
-- [ ] Decide whether stable slider ranges should be cached; specify invalidation,
+- [x] Replace slider `exists()` plus aggregate pairs with nullable aggregates.
+- [x] Combine compatible aggregates and reuse duplicate choice queries.
+- [x] Decide whether stable slider ranges should be cached; specify invalidation,
   scope handling, empty-data defaults, and acceptable freshness first.
-- [ ] Audit consumers of `public_count`, `private_count`, and `review_count`.
-- [ ] Remove unused scope counts without removing the paginator's result count.
-- [ ] Audit Explorer counts for appropriate caching separately.
-- [ ] Add query budgets and empty/zero/null/filter correctness tests.
+- [x] Audit consumers of `public_count`, `private_count`, and `review_count`.
+- [x] Remove unused scope counts without removing the paginator's result count.
+- [x] Audit Explorer counts for appropriate caching separately.
+- [x] Add query budgets and empty/zero/null/filter correctness tests.
 
 ### 4. Authenticated list and review performance
 
-- [ ] Measure anonymous, owner, moderator, and staff paths separately.
-- [ ] Batch or annotate per-row latest-submission/review-feedback indicators.
-- [ ] Preserve ownership, editor grants, and review-cycle semantics in tests.
-- [ ] Avoid materializing all heterogeneous review results before pagination;
+- [x] Measure anonymous, owner, moderator, and staff paths separately.
+- [x] Batch or annotate per-row latest-submission/review-feedback indicators.
+- [x] Preserve ownership, editor grants, and review-cycle semantics in tests.
+- [x] Avoid materializing all heterogeneous review results before pagination;
   evaluate lightweight ordered IDs or a database-level union.
-- [ ] Verify filtering, ordering, totals, and later pages with larger datasets.
+- [x] Verify filtering, ordering, totals, and later pages with larger datasets.
 
 ### 5. Map loading and repeat visits
 
@@ -95,6 +95,8 @@ not part of this first change.
   caches must remain permission-aware and isolated across users/sessions.
 - [ ] Test filtering, cancellation, empty layers, stale data, logout, and permission
   changes. Do not weaken current visibility checks to improve caching.
+- [x] Make repeat-visit GeoJSON HEAD validation metadata-only (step 5a); retain
+  the same endpoint, version calculation, filters, and access checks.
 
 ### 6. Browser assets
 
@@ -249,6 +251,150 @@ Three-run medians from the paired candidate experiment, in milliseconds:
 - Related verification: 1,573 tests completed without failures, 379 skipped.
   Ruff lint/format and the missing-migration gate passed.
 
+### Step 3 execution (2026-09-14)
+
+- Worktree/branch: `collection-filter-overhead` / `fix/collection-filter-overhead`.
+  Started from step 2 (`0992b926` on `fix/collection-list-query`) because PR #404
+  was still open. The preceding worktree and PR branch were left unchanged.
+- Consolidated five slider-range calculations into three fresh aggregate queries:
+  property maxima share a filtered aggregate, bin capacities/sizes share another,
+  and frequency maxima aggregate the per-frequency sum of standard counts.
+  Optional frequency counts remain excluded, as before.
+- Range-setting helpers now receive computed maxima rather than querying the
+  database independently. Missing aggregates use field defaults, zero remains a
+  valid maximum, property maxima retain upward rounding, and explicit property
+  range settings remain respected. Existing global range scope is unchanged.
+- The regression tests also exposed an existing initialization-order problem:
+  requests without `scope` can construct the form before ranges are assigned.
+  Range setup now updates the actual filter/form widgets as well as widget
+  configuration, so the computed metadata is not silently discarded.
+- Material checkbox choices are evaluated lazily and shared only within one
+  filterset instance. Both widgets reuse one result, while field validation still
+  checks the queryset. New instances observe new materials, and API-only filter
+  construction (`skip_min_max=True`) still performs no metadata/choice queries.
+- **No cross-request slider cache was added.** Three fresh queries avoid an
+  invalidation contract spanning model saves, imports, and bulk updates. A bulk
+  update regression test verifies that a new filterset immediately sees changes.
+- Searched all repository consumers of the three scope-count context variables.
+  Their only template consumer was the unreferenced legacy scope-switcher partial.
+  With explicit approval, removed the calculations, obsolete explanatory comments,
+  context variables, and `brit/templates/partials/scope_switcher.html` together.
+  Active buttons in `filtered_list.html` and paginator result totals are retained.
+- Explorer audit: `sources.registry` already caches its public card counts for
+  one hour. Collection and Materials Explorers calculate visible counts on each
+  request. Those are not unused counts; left them intact. A separate cache change
+  would need an agreed freshness/invalidation policy, rather than silently making
+  displayed totals stale as part of this cleanup.
+
+Verified query budgets in isolated Django tests:
+
+| Operation | Before | After |
+| --- | ---: | ---: |
+| Populated slider metadata | 10 | 3 |
+| Empty property/bin metadata, seeded frequency data | 6 | 3 |
+| Both material checkbox widgets, first render | 2 | 1 |
+| Re-rendering those widgets in the same instance | 2 | 0 |
+| Anonymous shared-list context including paginator | 2 | 1 |
+| Staff published/private/review context including paginator | 4 | 1 |
+
+- A complete anonymous collection-list render with 25 fixture rows is guarded by
+  a nine-query regression test (analytics disabled; RequestFactory excludes
+  middleware/session loading). This is not a production timing benchmark. The
+  audit's earlier 18-query observation used populated production-like metadata;
+  do not equate the two datasets or infer a precise end-to-end speedup.
+- RED: 11 tests reported 9 expected assertion failures and 4 missing-widget-limit
+  errors, exposing duplicate work and the initialization-order defect. The same
+  11 tests passed after implementation. Expanded focused coverage then passed all
+  20 tests, including custom bounds and full collection-list rendering.
+- Broader verification: 4,169 tests completed without failures, 861 skipped.
+  After the final lint adjustment, all 20 focused tests passed again. Ruff lint,
+  formatting, and missing-migration checks passed.
+- Iterator detail: `list(ModelChoiceIterator)` can call its length hint and issue
+  a `COUNT()` before fetching rows. `list(iter(choices))` materializes the iterator
+  without that extra count. The one-query checkbox regression protects this
+  behavior; no lint suppression or cross-request cache is needed.
+
+### Step 4 execution (2026-09-14)
+
+- Continued in the existing isolated `collection-filter-overhead` worktree because
+  step 3 was still uncommitted. Step 3 changes were preserved, not overwritten or
+  discarded. PR #404 (step 2) was merged by the start of this step.
+- Compared anonymous, owner, non-owner moderator, and non-owner staff row-policy
+  paths at page sizes 1 and 10. With permission/content-type/editor caches warmed,
+  owner row loading plus feedback evaluation grew from 3 to 21 SQL queries;
+  anonymous/non-owner paths stayed at one. This isolates per-row feedback work,
+  not session loading, pagination, or cold authorization-cache costs.
+- Added one owner-feedback batch per model represented on the selected list page.
+  Only the page's owned IDs enter the annotation query. Scalar subqueries select
+  the latest submission and latest non-owner, non-submission action, ordered by
+  `(created_at, id)`. Comparing these pairs reproduces current review-cycle
+  semantics without fetching action objects per row. The lookups match existing
+  content-type/object/action index prefixes; no schema change is added.
+- During review, moved annotations off the full filtered queryset and into that
+  page-ID batch. This trades one extra SQL round trip for bounded feedback work,
+  avoiding evaluation across all matches when filters use DISTINCT. The batch
+  regression verifies its IDs exactly equal the selected page's owned IDs and
+  that it does not inherit the full queryset's DISTINCT operation.
+- Unpaginated map views remain lazy, and galleries that do not render feedback
+  cells skip the batch. Two extra red/green tests protect those cases. Authenticated
+  table pages now load rows/flags during context preparation; the paginator still
+  issues only one COUNT, separately asserted in the step 3 regression.
+- A SQL CASE evaluates the flag for the current owner's rows. Non-owner rows
+  receive no cached boolean, and anonymous querysets are unchanged. The model
+  property retains its original fallback, so direct access and detail/review
+  contexts keep their existing behavior. This does not grant editors owner-only
+  feedback capabilities and adds no persistent cache.
+- Kept timestamp precedence, event-ID ties, resubmission resets, current ownership,
+  and content-type isolation. A later owner comment does not hide earlier valid
+  moderator feedback. Used scalar latest-event comparisons rather than a nested
+  per-feedback-action search to avoid repeatedly locating the latest submission
+  for every historical candidate action.
+- Replaced the dashboard's eager collection loops with shared reference selection
+  and page loading, with approval to remove/update the obsolete explanations.
+  SQL applies existing per-model filters; only `(model, id, name, submitted_at)`
+  references are collected and sorted. Only the selected HTML page is loaded as
+  full model objects with the existing related-object joins.
+- Removed the heuristic cap from HTML reference selection, so paginator totals
+  and later pages cover the whole eligible queue. Kept `collect_review_items()`
+  as an unpaginated compatibility path for the JSON queue, including its previous
+  unfiltered per-model cap and filtered-result behavior. Both paths reuse the same
+  per-model filtering, ordering, and object-loading helpers.
+- Retained Python case-insensitive ordering, including Unicode, and existing
+  handling of null submission dates and models without a name field. Added a
+  primary-key tiebreaker to initial unfiltered per-model ordering. Avoided a SQL
+  UNION/name-collation rewrite in this step to limit semantic changes.
+- Object loading reuses the visibility-filtered querysets. If an item leaves
+  review between reference selection and loading, it is omitted rather than
+  rendered from stale metadata. In that race the page can be short and the total
+  reflects the reference snapshot; this is not transactionally consistent paging.
+
+Isolated regression observations:
+
+| Operation | Before | After |
+| --- | ---: | ---: |
+| Owner, load 1 row and evaluate policy | 3 queries | 2 queries |
+| Owner, load 10 rows and evaluate policies | 21 queries | 2 queries |
+| Anonymous/non-owner moderator/staff, same warmed paths | 1 query | 1 query |
+| Full objects loaded to display 5 filtered items | 100 | 5 |
+| Unfiltered eligible total in the 100-item fixture | 60 (capped) | 100 |
+| Last page in that fixture (5 items/page) | Clamped to page 12 | Page 20 |
+
+- RED: 14 tests produced 12 expected failures (including subtests), covering query
+  growth, page-object loading, truncated totals, and name sorting outside the old
+  date window. The first implementation passed all 14 tests.
+- Expanded focused verification passed 40 tests after the final batch refinement,
+  including the new step 4 tests and earlier redirect, scope-count, and
+  collection-list budgets.
+- Remaining limits: metadata collection/sorting is still O(N) in matching items;
+  only full-object loading is page-bounded. Database-native pagination remains a
+  possible follow-up for substantially larger queues. The JSON queue's existing
+  cap and per-item last-comment queries were intentionally not redesigned here.
+  No production-like latency or database-work reduction is inferred solely from
+  the SQL round-trip counts.
+- Final broader verification: 4,415 tests completed without failures, 861 skipped.
+  Ruff lint, formatting, and missing-migration checks passed. No schema or asset
+  changes were needed for step 4.
+
 ## Verification log
 
 Commands below use the BRIT-ops scripts directory as `$OPS` and the isolated
@@ -361,3 +507,212 @@ git diff --check
   and the snapshot/test volumes are preserved for the next step.
 - Verification completed before PR creation. Production deployment, end-to-end
   latency measurements, and steps 3–8 remain separate follow-up work.
+
+### Step 3 (2026-09-14)
+
+```bash
+bash "$OPS/brit-tdd-preflight" "$PWD"
+
+"$OPS/brit-worktree-test" collection-filter-overhead \
+  --base fix/collection-list-query --print-targets -- \
+  sources.waste_collection.tests.test_filters.CollectionFilterMetadataTestCase \
+  sources.waste_collection.tests.test_filters.CollectionFilterMetadataEmptyTestCase \
+  utils.object_management.tests.test_views.SharedListScopeCountTestCase
+
+"$OPS/brit-worktree-test" collection-filter-overhead --parallel 1 -- \
+  sources.waste_collection.tests.test_filters.CollectionFilterMetadataTestCase \
+  sources.waste_collection.tests.test_filters.CollectionFilterMetadataEmptyTestCase \
+  utils.object_management.tests.test_views.SharedListScopeCountTestCase
+
+"$OPS/brit-worktree-test" collection-filter-overhead --parallel 1 -- \
+  sources.waste_collection.tests.test_filters.CollectionFilterMetadataTestCase \
+  sources.waste_collection.tests.test_filters.CollectionFilterMetadataEmptyTestCase \
+  utils.object_management.tests.test_views.SharedListScopeCountTestCase \
+  sources.waste_collection.tests.test_views.CollectionListQueryTestCase
+
+"$OPS/brit-worktree-test" collection-filter-overhead -- \
+  utils.tests.test_views \
+  utils.object_management.tests.test_views \
+  maps.tests.test_views \
+  materials.tests.test_views \
+  sources.waste_collection.tests.test_views \
+  sources.waste_collection.tests.test_filters \
+  sources.waste_collection.tests.test_viewsets \
+  bibliography.tests.test_views \
+  inventories.tests.test_views \
+  processes.tests.test_views
+
+"$OPS/brit-worktree-check" collection-filter-overhead --no-up
+
+git diff --check
+git diff --cached --check
+```
+
+- Preflight and explicit target inspection passed. Tests ran against this new
+  worktree's isolated test database, not the main database or the step 2 snapshot.
+- Initial RED run: 11 tests, 9 expected assertion failures and 4 expected widget
+  metadata errors. GREEN: all 11 passed; expanded focused suite: all 20 passed.
+- Broader suite: 4,169 tests, no failures, 861 skipped. API coverage includes the
+  existing lightweight `skip_min_max` paths and filter validation.
+- The first lint run flagged C416 on a deliberate choice-materialization list
+  comprehension. Replaced it with `list(iter(choices))`, retaining the no-count
+  behavior. Gates then passed (679 Python files formatted, no missing migrations)
+  and the 20 focused tests passed again against the final implementation.
+- Confirmed no remaining runtime references to the removed scope-count values or
+  template. Active scope controls and filtered result totals are exercised in
+  rendered-response tests. No assets or migrations were added by step 3.
+- `$OPS/brit-worktree-stop collection-filter-overhead`: completed; isolated
+  services stopped and test database volumes preserved. The main checkout and
+  preceding worktrees remain unchanged.
+- Changes are not yet committed or deployed. Steps 4–8 and deployed performance
+  measurements remain pending; persistent Explorer caching is a separately
+  evaluated follow-up, not silently enabled here.
+
+### Step 4 (2026-09-14)
+
+```bash
+bash "$OPS/brit-tdd-preflight" "$PWD"
+
+"$OPS/brit-worktree-test" collection-filter-overhead --print-targets -- \
+  utils.object_management.tests.test_views.OwnerReviewFeedbackQueryTests \
+  utils.object_management.tests.test_views.ReviewDashboardPaginationQueryTests
+
+"$OPS/brit-worktree-test" collection-filter-overhead --parallel 1 -- \
+  utils.object_management.tests.test_views.OwnerReviewFeedbackQueryTests \
+  utils.object_management.tests.test_views.ReviewDashboardPaginationQueryTests
+
+"$OPS/brit-worktree-test" collection-filter-overhead --parallel 1 -- \
+  utils.object_management.tests.test_views.OwnerReviewFeedbackQueryTests \
+  utils.object_management.tests.test_views.ReviewDashboardPaginationQueryTests \
+  utils.object_management.tests.test_views.SharedListScopeCountTestCase \
+  utils.object_management.tests.test_views.FilterDefaultsMixinTest \
+  sources.waste_collection.tests.test_views.CollectionListQueryTestCase
+
+"$OPS/brit-worktree-test" collection-filter-overhead -- \
+  utils.object_management.tests \
+  utils.tests.test_views \
+  maps.tests.test_views \
+  materials.tests.test_views \
+  sources.waste_collection.tests.test_views \
+  sources.waste_collection.tests.test_filters \
+  sources.waste_collection.tests.test_viewsets \
+  bibliography.tests.test_views \
+  inventories.tests.test_views \
+  processes.tests.test_views
+
+"$OPS/brit-worktree-check" collection-filter-overhead --no-up
+
+git diff --check
+git diff --cached --check
+```
+
+- Initial RED: 14 tests, 12 expected failures including subtests. GREEN: all 14
+  passed. An initial broader run passed 4,412 tests before the page-batch refinement.
+- Added and ran two more failing tests for unpaginated-view laziness and galleries
+  without feedback cells; guarded the batch to fix both. Added a DISTINCT/page-ID
+  regression and verified the final expanded focused suite: 40 tests passed.
+- Re-ran the full listed broader selection against the final page-batched code:
+  4,415 tests, no failures, 861 skipped; includes permissions, editor grants, API
+  contracts, model review-cycle behavior, and representative app views.
+- The date-filter test emits the same pre-existing naive-datetime warning from the
+  form's dummy queryset in both RED and GREEN runs. Actual queue date filtering
+  continues to use the existing per-model date lookups; warning cleanup was not
+  bundled into this optimization.
+- Lint/format and missing-migration checks passed. No new migrations, assets, or
+  cross-request caches were added. The earlier anonymous nine-query render budget
+  and zero-query default redirects remain green.
+- `$OPS/brit-worktree-stop collection-filter-overhead`: completed after the final
+  gates; the isolated stack is stopped and its test volumes are preserved.
+- Steps 3 and 4 remain uncommitted together in this isolated worktree. Production
+  deployment, browser profiling, very-large-queue SQL pagination, and steps 5–8
+  remain follow-up work; the main checkout and production database were untouched.
+
+## Step 5a: metadata-only map cache validation (2026-09-16)
+
+### Finding and implementation
+
+- The active feature loader in `streaming-geojson.js` validates IndexedDB entries
+  with HEAD against the original GeoJSON URL. `filtered_map.html`, its iframe
+  variant, and GeoDataset detail templates enable this loader. The separate
+  region/catchment loader in `maps.js` already uses a version endpoint.
+- The shared GeoJSON action previously constructed serializer data on small
+  cache-miss HEAD requests, even though the HTTP body is discarded. Cache-hit
+  HEAD responses also carried the full cached payload through response rendering.
+- HEAD now returns only metadata through an empty streaming HTTP response after
+  the existing filtering, count, rejection, and version checks. The empty
+  iterator yields no features; the streaming response type keeps production
+  `CommonMiddleware` from injecting an incorrect `Content-Length: 0` header.
+  Cache hits retain their headers without response data; would-be streams do
+  not build a generator. GET remains unchanged.
+- A cold HEAD intentionally no longer warms the geometry cache. A subsequent GET
+  still serializes and stores the actual data. On a cache hit, fetching/deserializing
+  the Redis payload is still required for the existing cached feature count.
+- No frontend, asset, schema, version-token, cross-request caching, permission,
+  or throttling changes. The client still validates before displaying cached data.
+
+### Evidence and verification
+
+- The controlled two-region regression reproduced two full Region instances
+  being loaded by cold HEAD before the change, versus zero afterward. This is
+  an object-materialization measurement, not an end-to-end latency benchmark.
+- Initial RED failures included full response data on HEAD, serializer invocation,
+  and stream construction. Initial GREEN: 13 tests passed. A second RED showed
+  `CommonMiddleware` adding a `Content-Length` header to the rendered empty HEAD
+  body on cold and warm requests; green returned after successful HEAD switched
+  to an empty streaming response.
+- Affected gate: 773 tests initially, re-run at 776 tests after the streaming-HEAD
+  revision; no failures, 104 skipped. Covered map views/throttling, NUTS vintage
+  scoping, collection API behavior, and roadside-tree consumers.
+- Ruff lint, formatting, missing-migration checks, and both staged/unstaged
+  whitespace checks passed after implementation.
+
+Commands (OPS=/home/phillipp/projects/BRIT-ops/scripts):
+
+```bash
+"$OPS/brit-worktree-test" collection-filter-overhead -- \
+  maps.tests.test_views.GeoJSONHeadTests \
+  sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_geojson_head_preserves_scope_visibility \
+  maps.tests.test_throttling.GeoJSONThrottleTests
+
+"$OPS/brit-worktree-test" collection-filter-overhead -- \
+  maps.tests.test_views maps.tests.test_throttling maps.tests.test_vintage_scoping \
+  sources.waste_collection.tests.test_viewsets sources.roadside_trees.tests
+
+"$OPS/brit-worktree-check" collection-filter-overhead --no-up
+git diff --check
+git diff --cached --check
+```
+
+### Remaining work and limitations
+
+- First visible geometry, interaction readiness, bytes transferred, browser long
+  tasks, and production-like version-check timings have not been measured here.
+  No browser or production-latency improvement is claimed by this change.
+- Progressive rendering, cancellation, logout/permission-change browser scenarios,
+  and permission-isolated cached-first rendering remain unchecked roadmap work.
+- Cheaper version tokens need a separate dependency audit. Existing implementations
+  differ: Catchment includes Region timestamps; the default uses dataset aggregates
+  or a cache-key fallback. This change preserves those mechanisms, not a claim
+  that their existing invalidation coverage is complete.
+- Direct Region bbox testing exposed an existing FieldError: the generic bbox
+  helper selects the Python `geom` property as though it were a database field.
+  Production impact was not tested, and no bbox implementation was changed here.
+  A working spatial-field consumer is covered separately by the roadside-tree test.
+- Steps 3, 4, and 5a remain uncommitted in the same isolated worktree. No production
+  database, main-checkout file, or secret was changed. Full step 5 remains open.
+
+Final verification after the CommonMiddleware `Content-Length` fix:
+
+- New RED before the fix: `test_head_omits_unknown_content_length_with_common_middleware`
+  failed on both cold and warm subtests (`Content-Length` present in the
+  middleware-processed response). Green after successful HEAD switched to an
+  empty streaming response.
+- `"$OPS/brit-worktree-test" collection-filter-overhead -- maps.tests.test_views.GeoJSONHeadTests sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_geojson_head_preserves_scope_visibility maps.tests.test_throttling.GeoJSONThrottleTests sources.roadside_trees.tests.test_views.HamburgRoadsideTreesMapViewTestCase.test_geojson_head_preserves_bbox_metadata`
+  — 16 tests, no failures.
+- `"$OPS/brit-worktree-test" collection-filter-overhead -- maps.tests.test_views maps.tests.test_throttling maps.tests.test_vintage_scoping sources.waste_collection.tests.test_viewsets sources.roadside_trees.tests`
+  — 776 tests, no failures, 104 skipped.
+- `"$OPS/brit-worktree-check" collection-filter-overhead --no-up`: Ruff lint,
+  Ruff format check, and missing-migration checks passed.
+- `git diff --check` and `git diff --cached --check` passed.
+- `$OPS/brit-worktree-stop collection-filter-overhead`: completed after the final
+  gates; the isolated stack is stopped and its test volumes are preserved.

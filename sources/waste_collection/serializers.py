@@ -400,18 +400,8 @@ def _get_nuts_hierarchy(region):
     return hierarchy
 
 
-class CollectionFlatSerializer(serializers.ModelSerializer):
-    """
-    Creates a flat, human-readable representation of Collections, suitable for file exports.
-    """
-
-    include_collection_metrics = True
-    include_region_attributes = True
-    collection_metric_property_names = (
-        "specific waste collected",
-        "total waste collected",
-        "Connection rate",
-    )
+class CollectionDisplayFieldsMixin(serializers.Serializer):
+    """Shared human-readable display fields for collection list and export serializers."""
 
     catchment = serializers.StringRelatedField(label="Catchment")
     nuts_or_lau_id = serializers.StringRelatedField(
@@ -422,7 +412,6 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     )
     collector = serializers.StringRelatedField(label="Collector")
     collection_system = serializers.StringRelatedField(label="Collection System")
-    bin_configuration = serializers.StringRelatedField(label="Bin configuration")
     waste_category = serializers.SerializerMethodField(label="Waste Category")
     allowed_materials = serializers.SerializerMethodField(label="Allowed Materials")
     forbidden_materials = serializers.SerializerMethodField(label="Forbidden Materials")
@@ -449,44 +438,12 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     participation_policy = serializers.SerializerMethodField(
         label="Participation policy"
     )
-    access_control_bp = serializers.BooleanField(required=False, allow_null=True)
-    access_control_pap = serializers.BooleanField(required=False, allow_null=True)
     comments = serializers.SerializerMethodField(source="description", label="Comments")
     flyer_urls = serializers.SerializerMethodField(label="Flyer URLs")
     bibliography_sources = serializers.SerializerMethodField(
         label="Bibliography Sources"
     )
     created_at = serializers.DateTimeField(label="Created at")
-
-    class Meta:
-        model = models.Collection
-        fields = (
-            "catchment",
-            "nuts_or_lau_id",
-            "country",
-            "collector",
-            "collection_system",
-            "bin_configuration",
-            "waste_category",
-            "participation_policy",
-            "access_control_bp",
-            "access_control_pap",
-            "allowed_materials",
-            "forbidden_materials",
-            "fee_system",
-            "frequency",
-            "min_bin_size",
-            "required_bin_capacity",
-            "required_bin_capacity_reference",
-            "established",
-            "comments",
-            "flyer_urls",
-            "bibliography_sources",
-            "valid_from",
-            "valid_until",
-            "created_at",
-            "lastmodified_at",
-        )
 
     @staticmethod
     def get_allowed_materials(obj):
@@ -532,6 +489,56 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
             return ""
         choices = dict(models.REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES)
         return choices.get(value, value)
+
+
+class CollectionFlatSerializer(
+    CollectionDisplayFieldsMixin, serializers.ModelSerializer
+):
+    """
+    Creates a flat, human-readable representation of Collections, suitable for file exports.
+    """
+
+    include_collection_metrics = True
+    include_region_attributes = True
+    collection_metric_property_names = (
+        "specific waste collected",
+        "total waste collected",
+        "Connection rate",
+    )
+
+    bin_configuration = serializers.StringRelatedField(label="Bin configuration")
+    access_control_bp = serializers.BooleanField(required=False, allow_null=True)
+    access_control_pap = serializers.BooleanField(required=False, allow_null=True)
+
+    class Meta:
+        model = models.Collection
+        fields = (
+            "catchment",
+            "nuts_or_lau_id",
+            "country",
+            "collector",
+            "collection_system",
+            "bin_configuration",
+            "waste_category",
+            "participation_policy",
+            "access_control_bp",
+            "access_control_pap",
+            "allowed_materials",
+            "forbidden_materials",
+            "fee_system",
+            "frequency",
+            "min_bin_size",
+            "required_bin_capacity",
+            "required_bin_capacity_reference",
+            "established",
+            "comments",
+            "flyer_urls",
+            "bibliography_sources",
+            "valid_from",
+            "valid_until",
+            "created_at",
+            "lastmodified_at",
+        )
 
     def get_collection_metric_properties(self):
         properties = getattr(self, "_collection_metric_properties", None)
@@ -630,16 +637,24 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
 
 
 class CollectionResearchSerializer(
-    CollectionReferenceFieldsMixin, CollectionFlatSerializer
+    CollectionReferenceFieldsMixin,
+    CollectionDisplayFieldsMixin,
+    serializers.ModelSerializer,
 ):
-    include_collection_metrics = False
-    include_region_attributes = False
+    """Lean list serializer for the collection API.
+
+    Shares the human-readable display fields with CollectionFlatSerializer but
+    skips its export-only dynamic columns (NUTS hierarchy, region attributes,
+    collection metrics), which would otherwise run per-row queries on list
+    responses.
+    """
 
     id = serializers.IntegerField(read_only=True)
     owner_id = serializers.IntegerField(source="owner.id", read_only=True)
     publication_status = serializers.CharField(read_only=True)
 
-    class Meta(CollectionFlatSerializer.Meta):
+    class Meta:
+        model = models.Collection
         fields = (
             "id",
             "owner_id",

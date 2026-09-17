@@ -578,7 +578,7 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
             source = Source.objects.create(
                 owner=request.user,
                 title=title,
-                type="custom",
+                type="misc",
                 year=year,
             )
             for position, author in enumerate(authors, start=1):
@@ -755,7 +755,7 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
             authors_by_source.setdefault(sa.source_id, []).append(sa.author)
 
         for result in results:
-            source_type = result.get("type", "custom")
+            source_type = result.get("type", "misc")
 
             if source_type == "waste_flyer":
                 url = result.get("url", "")

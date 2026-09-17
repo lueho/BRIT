@@ -23,7 +23,7 @@ class SourceFilterTestCase(TestCase):
         )
         with mute_signals(post_save):
             cls.source = Source.objects.create(
-                type="custom",
+                type="misc",
                 title="Test Custom Source",
                 abbreviation="TS1",
                 licence=cls.licence,
@@ -146,7 +146,7 @@ class SourceModelFilterSetOrganizationTestCase(TestCase):
         )
         with mute_signals(post_save):
             cls.source = Source.objects.create(
-                type="custom", title="EEA Report", abbreviation="EEA1"
+                type="misc", title="EEA Report", abbreviation="EEA1"
             )
         SourceAuthor.objects.create(
             source=cls.source, author=cls.org_author, position=1

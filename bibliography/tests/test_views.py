@@ -284,13 +284,13 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     create_object_data = {
         "title": "Test source",
         "citation_key": "TEST",
-        "type": "website",
+        "type": "online",
         "url": "https://example.com",
     }
     update_object_data = {
         "title": "Updated source",
         "citation_key": "UPD",
-        "type": "website",
+        "type": "online",
         "url": "https://example.org",
     }
 
@@ -815,7 +815,7 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
 
         self.assertEqual(source.title, "Inline source")
         self.assertEqual(source.owner, self.member)
-        self.assertEqual(source.type, "custom")
+        self.assertEqual(source.type, "misc")
         self.assertEqual(payload["title"], "Inline source")
 
     def test_post_http_400_when_year_is_invalid(self):

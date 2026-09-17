@@ -295,14 +295,14 @@
               <div class="mt-1 d-flex flex-wrap gap-2">
                 {% if val_policy.can_submit_review %}
                   <a class="btn btn-xs btn-outline-primary modal-link"
-                     href="{% url 'object_management:submit_for_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request.get_full_path|urlencode }}">
+                     href="{% url 'object_management:submit_for_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request|path_without_return_params|urlencode }}">
                     <i class="fas fa-paper-plane"></i>
                     Submit for review
                   </a>
                 {% endif %}
                 {% if val_policy.can_withdraw_review %}
                   <a class="btn btn-xs btn-outline-warning modal-link"
-                     href="{% url 'object_management:withdraw_from_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request.get_full_path|urlencode }}">
+                     href="{% url 'object_management:withdraw_from_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request|path_without_return_params|urlencode }}">
                     <i class="fas fa-rotate-left"></i>
                     Withdraw
                   </a>
@@ -354,14 +354,14 @@
               <div class="mt-1 d-flex flex-wrap gap-2">
                 {% if agg_policy.can_submit_review %}
                   <a class="btn btn-xs btn-outline-primary modal-link"
-                     href="{% url 'object_management:submit_for_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request.get_full_path|urlencode }}">
+                     href="{% url 'object_management:submit_for_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request|path_without_return_params|urlencode }}">
                     <i class="fas fa-paper-plane"></i>
                     Submit for review
                   </a>
                 {% endif %}
                 {% if agg_policy.can_withdraw_review %}
                   <a class="btn btn-xs btn-outline-warning modal-link"
-                     href="{% url 'object_management:withdraw_from_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request.get_full_path|urlencode }}">
+                     href="{% url 'object_management:withdraw_from_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request|path_without_return_params|urlencode }}">
                     <i class="fas fa-rotate-left"></i>
                     Withdraw
                   </a>
@@ -522,7 +522,7 @@
       </a>
     {% else %}
       <a class="btn btn-primary w-100 mb-2"
-         href="{{ object.update_url }}?next={{ request.get_full_path|urlencode }}">
+         href="{{ object.update_url }}?next={{ request|path_without_return_params|urlencode }}">
         <i class="fas fa-pen-to-square"></i> Edit
       </a>
     {% endif %}
@@ -576,19 +576,19 @@
   {% if object.is_in_review %}
     {% if policy.can_withdraw_review %}
       <a class="btn btn-outline-warning w-100 mb-2 modal-link"
-         href="{% url 'object_management:withdraw_from_review_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={% if review_mode %}{{ object.get_absolute_url }}{% else %}{{ request.get_full_path|urlencode }}{% endif %}">
+         href="{% url 'object_management:withdraw_from_review_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={% if review_mode %}{{ object.get_absolute_url }}{% else %}{{ request|path_without_return_params|urlencode }}{% endif %}">
         <i class="fas fa-rotate-left"></i> {% trans "Withdraw from Review" %}
       </a>
     {% endif %}
     {% if policy.can_approve %}
       <a class="btn btn-outline-success w-100 mb-2 modal-link"
-         href="{% url 'object_management:approve_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+         href="{% url 'object_management:approve_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
         <i class="fas fa-check"></i> {% trans "Approve" %}
       </a>
     {% endif %}
     {% if policy.can_reject %}
       <a class="btn btn-outline-danger w-100 mb-2 modal-link"
-         href="{% url 'object_management:reject_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+         href="{% url 'object_management:reject_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
         <i class="fas fa-xmark"></i> {% trans "Reject" %}
       </a>
     {% endif %}

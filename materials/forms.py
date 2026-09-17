@@ -99,7 +99,7 @@ class ComponentModelForm(SimpleModelForm):
 
     class Meta:
         model = MaterialComponent
-        fields = ("name", "description", "comparable_component")
+        fields = ("name", "description", "comparable_component", "is_aggregate")
 
 
 class ComponentModalModelForm(ModalModelFormMixin, ComponentModelForm):

@@ -1147,7 +1147,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
             f'<a href="{reverse("source-detail-modal", kwargs={"pk": source.pk})}" '
             'class="modal-link text-break">'
             f'<strong class="d-block">{escape(source.title)}</strong>'
-            '<span class="small text-muted">Ref01 · 2024</span></a>',
+            '<span class="small text-muted">Ref01</span></a>',
             html=True,
         )
 
@@ -1163,8 +1163,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
             (
                 "",
                 2020,
-                '<strong class="d-block">LegacyRef</strong>'
-                '<span class="small text-muted">2020</span>',
+                '<strong class="d-block">LegacyRef</strong>',
             ),
             ("", None, '<strong class="d-block">LegacyRef</strong>'),
         ):

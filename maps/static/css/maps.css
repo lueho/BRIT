@@ -70,6 +70,12 @@
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
+.map-overlay-dismiss {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+}
+
 #map-overlay .overlay-content p {
     margin: 0;
     font-size: 16px;
