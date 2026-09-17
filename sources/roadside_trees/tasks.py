@@ -9,6 +9,7 @@ from sources.roadside_trees.geojson import (
     HamburgRoadsideTreeGeometrySerializer,
     HamburgRoadsideTrees,
 )
+from sources.roadside_trees.viewsets import HamburgRoadsideTreeViewSet
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,10 @@ def warm_roadside_tree_geojson_cache(self):
         qs = HamburgRoadsideTrees.objects.only("id", "geom").order_by()
         serializer = HamburgRoadsideTreeGeometrySerializer(qs, many=True)
         data = serializer.data
-        cache_key = "tree_geojson:all"
+        dataset_version = HamburgRoadsideTreeViewSet().get_dataset_stats(None)[
+            "version"
+        ]
+        cache_key = f"tree_geojson:all:dv:{dataset_version}"
         cache = get_geojson_cache()
         timeout = getattr(settings, "GEOJSON_CACHE_TIMEOUT", 86400)
         set_geojson_cache_payload(cache, cache_key, data, timeout=timeout)

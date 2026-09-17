@@ -266,6 +266,9 @@ class CachedGeoJSONMixin:
         transaction id (xmin), so inserts, deletes, in-place updates, and
         reimports preserving the ID range still rotate the token.
         """
+        cached = getattr(self, "_dataset_stats", None)
+        if cached is not None and cached[0] is request:
+            return cached[1]
         queryset = self.get_stats_queryset(request)
         model = queryset.model
         field_names = [f.name for f in model._meta.get_fields()]
@@ -285,7 +288,11 @@ class CachedGeoJSONMixin:
                 ),
             }
         agg = queryset.aggregate(**aggregates)
-        return {"count": agg.get("cnt") or 0, "version": self._version_token(agg)}
+        stats = {"count": agg.get("cnt") or 0, "version": self._version_token(agg)}
+        # Memoize per request: get_cache_key() implementations that embed the
+        # dataset version and the geojson() stats path share one aggregate.
+        self._dataset_stats = (request, stats)
+        return stats
 
     def get_dataset_version(self, request):
         """Return a short hash representing the current dataset state.

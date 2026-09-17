@@ -4,6 +4,7 @@ from importlib import import_module
 
 from django.conf import settings
 from django.core.cache import caches
+from django.core.cache.backends.base import DEFAULT_TIMEOUT
 
 INITIALIZATION_DEPENDENCIES = ["users", "utils.properties"]
 
@@ -320,13 +321,17 @@ def build_collection_cache_key(
     return f"collection_geojson:filter:{filter_part}:dv:{dv}"
 
 
-def set_geojson_cache_payload(cache, cache_key, data, timeout=None):
+def set_geojson_cache_payload(cache, cache_key, data, timeout=DEFAULT_TIMEOUT):
     """Cache a GeoJSON payload together with its feature-count metadata.
 
     The ``<cache_key>:count`` companion entry lets HEAD requests answer
     ``X-Total-Count`` without fetching and deserializing the payload. It shares
     the payload's ``*_geojson:*`` namespace, so the existing pattern-based
     invalidation removes both entries together.
+
+    ``timeout`` defaults to the ``DEFAULT_TIMEOUT`` sentinel, preserving the
+    backend's configured default; passing ``None`` explicitly would cache
+    without expiry.
     """
     cache.set(cache_key, data, timeout=timeout)
     if isinstance(data, dict) and "features" in data:
