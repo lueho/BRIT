@@ -9,9 +9,17 @@ release:
   command:
     - python manage.py migrate --noinput
     - python manage.py collectstatic --noinput
+    # Queue GeoJSON cache warmup on the worker so first requests after a
+    # deploy hit warm caches instead of timing out (H12/H27). Async because
+    # the release phase has its own time limit; the worker picks the task
+    # up once it boots.
+    - python manage.py warm_geojson_cache --async
 run:
   web: gunicorn $DJANGO_WSGI --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
   worker:
     image: web
     command:
-      - celery --app=brit worker --loglevel=info --concurrency=1
+      # --beat embeds the scheduler so CELERY_BEAT_SCHEDULE entries (e.g.
+      # periodic GeoJSON cache warmup) actually fire. Only valid while a
+      # single worker dyno runs; split beat out if workers scale beyond one.
+      - celery --app=brit worker --loglevel=info --concurrency=1 --beat --schedule /tmp/celerybeat-schedule

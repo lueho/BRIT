@@ -322,6 +322,13 @@ CELERY_BEAT_SCHEDULE = {
         "task": "utils.file_export.generic_tasks.cleanup_expired_exports",
         "schedule": timedelta(hours=24),
     },
+    # Safety net for the GeoJSON caches: data changes already trigger warmup
+    # via signals, and deploys queue a warmup in the release phase, but a
+    # periodic pass covers cache evictions/flushes that no signal observes.
+    "warm-geojson-caches": {
+        "task": "warm_all_geojson_caches",
+        "schedule": timedelta(hours=24),
+    },
 }
 
 GEO_BORDER_TOLERANCE = 0.005  # Tolerance for border detection in degrees for EPSG 4326

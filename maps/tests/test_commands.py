@@ -205,6 +205,43 @@ class WarmGeojsonCacheCommandTests(TestCase):
         warmer.apply.assert_called_once_with()
         self.assertIn("Roadside Trees: 2 features cached", out.getvalue())
 
+    @patch("maps.tasks.warm_base_geojson_caches")
+    @patch("maps.tasks.warm_all_geojson_caches")
+    def test_async_flag_queues_umbrella_task_for_all_caches(
+        self, mock_warm_all, mock_warm_base
+    ):
+        out = io.StringIO()
+
+        call_command("warm_geojson_cache", run_async=True, stdout=out)
+
+        mock_warm_all.delay.assert_called_once_with()
+        mock_warm_base.delay.assert_not_called()
+        self.assertIn("queued", out.getvalue().lower())
+
+    @patch("maps.tasks.warm_base_geojson_caches")
+    def test_async_flag_queues_base_task_for_nuts(self, mock_warm_base):
+        out = io.StringIO()
+
+        call_command("warm_geojson_cache", nuts=True, run_async=True, stdout=out)
+
+        mock_warm_base.delay.assert_called_once_with(
+            nuts_levels=[0, 1, 2], regions_limit=None
+        )
+
+    @patch("maps.tasks.warm_base_geojson_caches")
+    def test_async_flag_queues_base_task_for_regions(self, mock_warm_base):
+        out = io.StringIO()
+
+        call_command(
+            "warm_geojson_cache",
+            regions=True,
+            regions_limit=5,
+            run_async=True,
+            stdout=out,
+        )
+
+        mock_warm_base.delay.assert_called_once_with(nuts_levels=None, regions_limit=5)
+
 
 class WarmGeojsonCacheRegionsTests(TestCase):
     def setUp(self):
