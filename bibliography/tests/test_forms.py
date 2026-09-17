@@ -55,7 +55,7 @@ class SourceModelFormLastAccessedTestCase(TestCase):
         form = SourceModelForm(
             data={
                 "title": "Test Source",
-                "type": "custom",
+                "type": "misc",
                 "url": "https://example.com",
             }
         )
@@ -65,7 +65,7 @@ class SourceModelFormLastAccessedTestCase(TestCase):
         self.assertEqual(source.last_accessed, date.today())
 
     def test_create_without_url_leaves_last_accessed_null(self):
-        form = SourceModelForm(data={"title": "Test Source", "type": "custom"})
+        form = SourceModelForm(data={"title": "Test Source", "type": "misc"})
         self.assertTrue(form.is_valid(), form.errors)
         source = form.save()
         source.refresh_from_db()
@@ -76,7 +76,7 @@ class SourceModelFormLastAccessedTestCase(TestCase):
         form = SourceModelForm(
             data={
                 "title": "Test Source",
-                "type": "custom",
+                "type": "misc",
                 "url": "https://example.com",
                 "last_accessed": manual_date.isoformat(),
             }
@@ -90,7 +90,7 @@ class SourceModelFormLastAccessedTestCase(TestCase):
         with mute_signals(post_save):
             source = Source.objects.create(
                 title="Test Source",
-                type="custom",
+                type="misc",
                 url="https://old.example.com",
                 last_accessed=date(2024, 1, 15),
             )
@@ -98,7 +98,7 @@ class SourceModelFormLastAccessedTestCase(TestCase):
             instance=source,
             data={
                 "title": "Test Source",
-                "type": "custom",
+                "type": "misc",
                 "url": "https://new.example.com",
                 "last_accessed": "2024-01-15",
             },
@@ -112,7 +112,7 @@ class SourceModelFormLastAccessedTestCase(TestCase):
         with mute_signals(post_save):
             source = Source.objects.create(
                 title="Test Source",
-                type="custom",
+                type="misc",
                 url="https://example.com",
                 last_accessed=date(2024, 1, 15),
             )
@@ -120,7 +120,7 @@ class SourceModelFormLastAccessedTestCase(TestCase):
             instance=source,
             data={
                 "title": "Updated Title",
-                "type": "custom",
+                "type": "misc",
                 "url": "https://example.com",
                 "last_accessed": "2024-01-15",
             },
@@ -134,14 +134,14 @@ class SourceModelFormLastAccessedTestCase(TestCase):
         with mute_signals(post_save):
             source = Source.objects.create(
                 title="Test Source",
-                type="custom",
+                type="misc",
                 url="https://example.com",
             )
         form = SourceModelForm(
             instance=source,
             data={
                 "title": "Updated Title",
-                "type": "custom",
+                "type": "misc",
                 "url": "https://example.com",
             },
         )

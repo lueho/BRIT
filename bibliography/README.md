@@ -26,7 +26,12 @@ Represents a license under which a reference is published:
 
 ### Source
 Represents a bibliographic reference with fields for:
-- Type (article, dataset, book, website, custom)
+- Type: a bibliography vocabulary aligned with BibTeX/biblatex entry types
+  (article, book, incollection, proceedings, inproceedings, report, thesis,
+  preprint, dataset, standard, patent, online, periodical, misc). The
+  `SOURCE_TYPE_MAPPINGS` constant maps each type to BibTeX, biblatex, CSL,
+  Zotero, RIS, and CrossRef type names so that exports stay compatible with
+  literature management systems such as Citavi and Zotero.
 - Title
 - Authors (many-to-many relationship)
 - Publisher

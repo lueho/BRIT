@@ -15,6 +15,8 @@ from ..models import (
     Material,
     MaterialComponent,
     MaterialComponentGroup,
+    MaterialProperty,
+    MaterialPropertyValue,
     Sample,
 )
 from ..renderers import (
@@ -138,3 +140,175 @@ class SampleMeasurementsXLSXRendererTestCase(TestCase):
 
         self.assertIn("Raw Export Component", exported_values)
         self.assertIn(42, exported_values)
+
+    def test_export_includes_qualifier_metadata_and_keeps_raw_text_literal(self):
+        material = Material.objects.create(name="Qualifier Material")
+        sample = Sample.objects.create(name="Qualifier Sample", material=material)
+        group = MaterialComponentGroup.objects.create(name="Qualifier Group")
+        unit = Unit.objects.filter(name="%").first() or Unit.objects.create(name="%")
+        basis = MaterialComponent.objects.create(name="Qualifier Basis")
+
+        def add_measurement(name, **kwargs):
+            return ComponentMeasurement.objects.create(
+                sample=sample,
+                group=group,
+                component=MaterialComponent.objects.create(name=name),
+                basis_component=basis,
+                unit=unit,
+                **kwargs,
+            )
+
+        add_measurement("Exact Zero", average=Decimal("0"))
+        add_measurement("Exact Formula", average=Decimal("42"), raw_value="=1+1")
+        add_measurement(
+            "Censored Less",
+            average=Decimal("0.1"),
+            raw_value="0.1",
+            value_qualifier="less_than",
+            detection_limit=Decimal("0"),
+        )
+        add_measurement(
+            "Censored Greater",
+            average=Decimal("1450"),
+            raw_value=">1450",
+            value_qualifier="greater_than",
+            detection_limit=Decimal("6.57"),
+            raw_detection_limit="=2+2",
+        )
+        add_measurement(
+            "Below Limit",
+            average=Decimal("0"),
+            raw_value="(5,63)<LD=6,57",
+            value_qualifier="below_detection_limit",
+        )
+        add_measurement(
+            "Censored Formula",
+            average=Decimal("1"),
+            raw_value="=1+1",
+            value_qualifier="less_than",
+        )
+
+        exact_property = MaterialProperty.objects.create(
+            name="Exact Property", unit="%"
+        )
+        censored_property = MaterialProperty.objects.create(
+            name="Censored Property", unit="%"
+        )
+        MaterialPropertyValue.objects.create(
+            sample=sample,
+            property=exact_property,
+            unit=unit,
+            average=Decimal("42"),
+            raw_value="=1+1",
+        )
+        MaterialPropertyValue.objects.create(
+            sample=sample,
+            property=censored_property,
+            unit=unit,
+            average=Decimal("0.5"),
+            raw_value="0.5",
+            value_qualifier="less_than",
+            detection_limit=Decimal("0"),
+            raw_detection_limit="=3+3",
+        )
+
+        buffer = SampleMeasurementsXLSXRenderer(
+            sample=sample,
+            measurements=sample.component_measurements.all(),
+        ).render()
+        workbook = load_workbook(buffer, data_only=False)
+
+        metadata_headers = [
+            "Value qualifier",
+            "Raw value",
+            "Detection limit",
+            "Raw detection limit",
+        ]
+
+        sheet = workbook["Measurements"]
+        headers = [cell.value for cell in sheet[15]]
+        self.assertEqual(headers[-4:], metadata_headers)
+        value_col = headers.index("Value") + 1
+        qualifier_col = headers.index("Value qualifier") + 1
+        raw_col = headers.index("Raw value") + 1
+        limit_col = headers.index("Detection limit") + 1
+        raw_limit_col = headers.index("Raw detection limit") + 1
+        rows = {
+            sheet.cell(row=row, column=1).value: row
+            for row in range(16, sheet.max_row + 1)
+        }
+
+        row = rows["Exact Zero"]
+        value_cell = sheet.cell(row=row, column=value_col)
+        self.assertEqual(value_cell.value, 0)
+        self.assertNotIsInstance(value_cell.value, str)
+        self.assertEqual(sheet.cell(row=row, column=qualifier_col).value, "exact")
+        self.assertFalse(sheet.cell(row=row, column=raw_col).value)
+        self.assertFalse(sheet.cell(row=row, column=limit_col).value)
+
+        row = rows["Exact Formula"]
+        self.assertEqual(sheet.cell(row=row, column=value_col).value, 42)
+        raw_cell = sheet.cell(row=row, column=raw_col)
+        self.assertEqual(raw_cell.value, "=1+1")
+        self.assertEqual(raw_cell.data_type, "s")
+
+        row = rows["Censored Less"]
+        value_cell = sheet.cell(row=row, column=value_col)
+        self.assertEqual(value_cell.value, "<0.1")
+        self.assertEqual(value_cell.data_type, "s")
+        self.assertEqual(sheet.cell(row=row, column=qualifier_col).value, "less_than")
+        self.assertEqual(sheet.cell(row=row, column=raw_col).value, "0.1")
+        self.assertEqual(sheet.cell(row=row, column=limit_col).value, 0)
+
+        row = rows["Censored Greater"]
+        self.assertEqual(sheet.cell(row=row, column=value_col).value, ">1450")
+        self.assertEqual(sheet.cell(row=row, column=limit_col).value, 6.57)
+        raw_limit_cell = sheet.cell(row=row, column=raw_limit_col)
+        self.assertEqual(raw_limit_cell.value, "=2+2")
+        self.assertEqual(raw_limit_cell.data_type, "s")
+
+        row = rows["Below Limit"]
+        self.assertEqual(
+            sheet.cell(row=row, column=value_col).value,
+            "Below detection limit ((5,63)<LD=6,57)",
+        )
+        self.assertEqual(
+            sheet.cell(row=row, column=qualifier_col).value, "below_detection_limit"
+        )
+        self.assertFalse(sheet.cell(row=row, column=limit_col).value)
+        self.assertFalse(sheet.cell(row=row, column=raw_limit_col).value)
+
+        row = rows["Censored Formula"]
+        value_cell = sheet.cell(row=row, column=value_col)
+        self.assertEqual(value_cell.value, "<=1+1")
+        self.assertEqual(value_cell.data_type, "s")
+
+        sheet = workbook["Sample Properties"]
+        headers = [cell.value for cell in sheet[15]]
+        self.assertEqual(headers[-4:], metadata_headers)
+        value_col = headers.index("Value") + 1
+        qualifier_col = headers.index("Value qualifier") + 1
+        raw_col = headers.index("Raw value") + 1
+        limit_col = headers.index("Detection limit") + 1
+        raw_limit_col = headers.index("Raw detection limit") + 1
+        rows = {
+            sheet.cell(row=row, column=1).value: row
+            for row in range(16, sheet.max_row + 1)
+        }
+
+        row = rows["Exact Property"]
+        self.assertEqual(sheet.cell(row=row, column=value_col).value, 42)
+        raw_cell = sheet.cell(row=row, column=raw_col)
+        self.assertEqual(raw_cell.value, "=1+1")
+        self.assertEqual(raw_cell.data_type, "s")
+        self.assertEqual(sheet.cell(row=row, column=qualifier_col).value, "exact")
+
+        row = rows["Censored Property"]
+        value_cell = sheet.cell(row=row, column=value_col)
+        self.assertEqual(value_cell.value, "<0.5")
+        self.assertEqual(value_cell.data_type, "s")
+        self.assertEqual(sheet.cell(row=row, column=qualifier_col).value, "less_than")
+        self.assertEqual(sheet.cell(row=row, column=limit_col).value, 0)
+        raw_limit_cell = sheet.cell(row=row, column=raw_limit_col)
+        self.assertEqual(raw_limit_cell.value, "=3+3")
+        self.assertEqual(raw_limit_cell.data_type, "s")
