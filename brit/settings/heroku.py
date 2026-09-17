@@ -58,9 +58,16 @@ MIDDLEWARE.append("brit.middleware.ExceptionLoggingMiddleware")
 
 # Per-IP fixed-window throttle for anonymous traffic. Scraper bursts saturate
 # the single web dyno and queue requests past the router timeout (H12).
-# Runs last so request.user is populated; 0 disables limiting.
+# Runs last so request.user is populated; PER_MINUTE=0 disables limiting.
+# The burst window stops a client front-loading the minute budget into one
+# worker-saturating spike: 5 requests per 5s equals the sustained 60/min
+# rate, so it only flattens burst shape. BURST=0 disables the burst check.
 ANONYMOUS_RATE_LIMIT_PER_MINUTE = int(
     os.environ.get("ANONYMOUS_RATE_LIMIT_PER_MINUTE", "60")
+)
+ANONYMOUS_RATE_LIMIT_BURST = int(os.environ.get("ANONYMOUS_RATE_LIMIT_BURST", "5"))
+ANONYMOUS_RATE_LIMIT_BURST_SECONDS = int(
+    os.environ.get("ANONYMOUS_RATE_LIMIT_BURST_SECONDS", "5")
 )
 MIDDLEWARE.append("brit.middleware.AnonymousRateLimitMiddleware")
 

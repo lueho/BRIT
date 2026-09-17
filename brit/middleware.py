@@ -42,13 +42,20 @@ class AnonymousRateLimitMiddleware:
 
     Scraper traffic saturates the single web dyno and queues requests past
     the router timeout; the limit caps how much work one anonymous client IP
-    can create per minute. Place after AuthenticationMiddleware so
-    authenticated users are not limited.
+    can create. Two windows apply: a per-minute cap
+    (``ANONYMOUS_RATE_LIMIT_PER_MINUTE``) and a short burst cap
+    (``ANONYMOUS_RATE_LIMIT_BURST`` per
+    ``ANONYMOUS_RATE_LIMIT_BURST_SECONDS``) so a client cannot front-load
+    the whole minute budget into one worker-saturating burst. With the
+    production defaults (60/min, 5/5s) the sustained rate is identical —
+    the burst window only flattens the shape. Place after
+    AuthenticationMiddleware so session users are not limited; requests
+    carrying a valid DRF token are exempt too, because DRF authenticates
+    only inside the view.
 
-    Controlled by ``ANONYMOUS_RATE_LIMIT_PER_MINUTE``: 0/unset disables
-    limiting entirely, so development and tests are unaffected. ``/health/``
-    is exempt. Cache failures fail open — a broken cache must not take the
-    site down.
+    ``ANONYMOUS_RATE_LIMIT_PER_MINUTE`` 0/unset disables limiting entirely,
+    so development and tests are unaffected. ``/health/`` is exempt. Cache
+    failures fail open — a broken cache must not take the site down.
     """
 
     EXEMPT_PATHS = frozenset({"/health/"})
@@ -59,34 +66,76 @@ class AnonymousRateLimitMiddleware:
 
     def __call__(self, request):
         limit = getattr(settings, "ANONYMOUS_RATE_LIMIT_PER_MINUTE", 0)
-        user = getattr(request, "user", None)
         if (
             not limit
             or request.path in self.EXEMPT_PATHS
-            or (user is not None and user.is_authenticated)
+            or self._is_authenticated(request)
         ):
             return self.get_response(request)
 
-        window = int(time.time() // self.WINDOW_SECONDS)
-        key = f"anon-rl:{self._client_ip(request)}:{window}"
-        try:
-            cache.add(key, 0, timeout=self.WINDOW_SECONDS * 2)
-            count = cache.incr(key)
-        except Exception:
-            return self.get_response(request)
-        if count and count > limit:
+        client_ip = self._client_ip(request)
+        retry_after = self._limited(client_ip, "min", self.WINDOW_SECONDS, limit)
+        burst = getattr(settings, "ANONYMOUS_RATE_LIMIT_BURST", 0)
+        if not retry_after and burst:
+            burst_seconds = getattr(settings, "ANONYMOUS_RATE_LIMIT_BURST_SECONDS", 5)
+            retry_after = self._limited(client_ip, "burst", burst_seconds, burst)
+        if retry_after:
             return HttpResponse(
                 "Too Many Requests",
                 status=429,
-                headers={"Retry-After": str(self.WINDOW_SECONDS)},
+                headers={"Retry-After": str(retry_after)},
             )
         return self.get_response(request)
 
     @staticmethod
+    def _limited(client_ip, namespace, window_seconds, limit):
+        """Increment this window's counter; return the window length as
+        Retry-After when ``limit`` is exceeded, else 0. Fails open on
+        cache errors."""
+        window = int(time.time() // window_seconds)
+        key = f"anon-rl:{namespace}:{client_ip}:{window}"
+        try:
+            cache.add(key, 0, timeout=window_seconds * 2)
+            count = cache.incr(key)
+        except Exception:
+            return 0
+        return window_seconds if count and count > limit else 0
+
+    @staticmethod
+    def _is_authenticated(request):
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated:
+            return True
+        if "HTTP_AUTHORIZATION" not in request.META:
+            return False
+        # DRF resolves TokenAuthentication inside the API view, after this
+        # middleware runs. Check the header here so valid API clients are
+        # exempt; invalid tokens stay anonymous and IP-limited.
+        try:
+            from rest_framework.authentication import TokenAuthentication
+
+            return TokenAuthentication().authenticate(request) is not None
+        except Exception:
+            return False
+
+    @staticmethod
     def _client_ip(request):
+        """Client identity for rate limiting.
+
+        Cloudflare-fronted traffic: Cloudflare overwrites any
+        client-supplied ``CF-Connecting-IP`` with the real client IP, so it
+        is trusted when ``CF-RAY`` is also present — required anyway, since
+        the rightmost XFF entry on that path is a shared CF edge IP.
+        Direct traffic: Heroku's router appends the observed peer IP on the
+        right of ``X-Forwarded-For``, so the LAST entry is the only one the
+        client cannot control; earlier entries can be forged per request.
+        """
+        cf_ip = request.META.get("HTTP_CF_CONNECTING_IP", "")
+        if cf_ip and request.META.get("HTTP_CF_RAY"):
+            return cf_ip.strip()
         forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
         if forwarded:
-            return forwarded.split(",")[0].strip()
+            return forwarded.split(",")[-1].strip()
         return request.META.get("REMOTE_ADDR", "")
 
 
