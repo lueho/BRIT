@@ -380,13 +380,8 @@
                   <a href="{% url 'source-detail-modal' source.pk %}"
                      class="modal-link text-break">
                     <strong class="d-block">{{ source.title|default:source.citation_key|default:"Source" }}</strong>
-                    {% if source.title and source.citation_key or source.year %}
-                      <span class="small text-muted">
-                        {% if source.title and source.citation_key %}
-                          {{ source.citation_key }}{% if source.year %} · {% endif %}
-                        {% endif %}
-                        {% if source.year %}{{ source.year }}{% endif %}
-                      </span>
+                    {% if source.title and source.citation_key %}
+                      <span class="small text-muted">{{ source.citation_key }}</span>
                     {% endif %}
                   </a>
                 </li>

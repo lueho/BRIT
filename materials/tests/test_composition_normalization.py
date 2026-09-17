@@ -6,6 +6,7 @@ from django.test import TestCase
 from utils.properties.models import Unit
 
 from ..composition_normalization import (
+    WARNING_AGGREGATE_COMPONENTS_EXCLUDED,
     WARNING_LEGACY_OTHER_IGNORED,
     WARNING_REMAINING_FRACTION_ASSIGNED_TO_OTHER,
     WARNING_SHARES_SCALED_TO_100,
@@ -249,6 +250,41 @@ class SampleCompositionNormalizationTestCase(TestCase):
             [share["percent"] for share in composition["shares"]], [33.3, 33.3, 33.3]
         )
         self.assertEqual(composition["share_total_percent"], 100.0)
+
+    def test_aggregate_components_are_excluded_from_shares(self):
+        sample, group = self._sample_with_group("Aggregate Total")
+        total = MaterialComponent.objects.create(
+            name="Total (with halides)",
+            publication_status="published",
+            owner=self.owner,
+            is_aggregate=True,
+        )
+        self._measure(sample, group, "Carbon", "40")
+        self._measure(sample, group, "Oxygen", "30")
+        self._measure(sample, group, total, "100")
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(
+            [(s["component_name"], s["percent"]) for s in composition["shares"]],
+            [("Carbon", 40.0), ("Oxygen", 30.0), ("Other", 30.0)],
+        )
+        self.assertIn(
+            WARNING_AGGREGATE_COMPONENTS_EXCLUDED, composition["warning_codes"]
+        )
+        self.assertIn("Total (with halides)", composition["warnings"][0])
+
+    def test_aggregate_only_group_yields_no_derived_composition(self):
+        sample, group = self._sample_with_group("Only Total")
+        total = MaterialComponent.objects.create(
+            name="Total (with halides)",
+            publication_status="published",
+            owner=self.owner,
+            is_aggregate=True,
+        )
+        self._measure(sample, group, total, "100")
+
+        self.assertEqual(get_sample_normalized_compositions(sample), [])
 
     def test_other_only_group_yields_no_derived_composition(self):
         sample, group = self._sample_with_group("Only Other")

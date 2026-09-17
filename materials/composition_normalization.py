@@ -6,6 +6,7 @@ from utils.properties.units import UnitConversionError, convert_weight_fraction_
 from .models import MaterialComponent
 
 WARNING_MULTIPLE_BASIS_COMPONENTS = "multiple_basis_components"
+WARNING_AGGREGATE_COMPONENTS_EXCLUDED = "aggregate_components_excluded"
 WARNING_INVALID_UNITS = "invalid_units"
 WARNING_REMAINING_FRACTION_ASSIGNED_TO_OTHER = "remaining_fraction_assigned_to_other"
 WARNING_SHARES_SCALED_TO_100 = "shares_scaled_to_100"
@@ -122,6 +123,7 @@ def _build_raw_derived_group_composition(
     invalid_unit_names = set()
     other_component = MaterialComponent.objects.other()
     legacy_other_count = 0
+    excluded_aggregate_names = set()
 
     for measurement in measurements:
         average = Decimal(measurement.average)
@@ -129,6 +131,9 @@ def _build_raw_derived_group_composition(
             continue
         if measurement.component_id == other_component.pk:
             legacy_other_count += 1
+            continue
+        if measurement.component.is_aggregate:
+            excluded_aggregate_names.add(measurement.component.name)
             continue
         if not _is_dry_matter_basis(measurement):
             is_dm_basis = False
@@ -164,6 +169,13 @@ def _build_raw_derived_group_composition(
             "Multiple basis components were present; using the most common reference component."
         )
         warning_codes.append(WARNING_MULTIPLE_BASIS_COMPONENTS)
+    if excluded_aggregate_names:
+        warnings.append(
+            "Aggregate components were excluded from the normalized shares: "
+            + ", ".join(sorted(excluded_aggregate_names))
+            + "."
+        )
+        warning_codes.append(WARNING_AGGREGATE_COMPONENTS_EXCLUDED)
     if legacy_other_count:
         warning_codes.append(WARNING_LEGACY_OTHER_IGNORED)
 
