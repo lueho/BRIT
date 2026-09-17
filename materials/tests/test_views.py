@@ -9,6 +9,7 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models.signals import post_save, pre_save
+from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -37,6 +38,7 @@ from ..models import (
     MaterialProperty,
     MaterialPropertyGroup,
     MaterialPropertyValue,
+    MeasurementValueQualifier,
     Sample,
     SampleExternalRecord,
     SampleSeries,
@@ -7876,3 +7878,135 @@ class MaterialsListEnhancementsTestCase(ViewWithPermissionsTestCase):
         names = [obj.name for obj in response.context["object_list"]]
         self.assertIn("Aardvark Private", names)
         self.assertEqual(names, sorted(names, reverse=True))
+
+
+class SampleMeasurementQualifierViewTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(
+            username="qualifier-view-owner", password="test123"
+        )
+        cls.material = Material.objects.create(
+            owner=cls.owner,
+            name="Qualifier material",
+            publication_status="published",
+        )
+        cls.sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Qualifier sample",
+            material=cls.material,
+            publication_status="published",
+        )
+        cls.group = MaterialComponentGroup.objects.create(
+            owner=cls.owner,
+            name="Qualifier group",
+            publication_status="published",
+        )
+        cls.unit = Unit.objects.filter(name="%").first() or Unit.objects.create(
+            name="%", owner=cls.owner
+        )
+        cls.unit.symbol = "percent"
+        cls.unit.save(update_fields=["symbol"])
+        cls.prop = MaterialProperty.objects.create(
+            owner=cls.owner,
+            name="Qualifier property",
+            unit="%",
+            publication_status="published",
+        )
+        cls.hostile_raw = '<img src=x onerror="alert(31337)">'
+        for name, kwargs in (
+            (
+                "Censored less",
+                {
+                    "average": Decimal("0.1"),
+                    "raw_value": "0.1",
+                    "value_qualifier": MeasurementValueQualifier.LESS_THAN,
+                },
+            ),
+            (
+                "Censored greater",
+                {
+                    "average": Decimal("1450"),
+                    "raw_value": ">1450",
+                    "value_qualifier": MeasurementValueQualifier.GREATER_THAN,
+                },
+            ),
+            (
+                "Below limit",
+                {
+                    "average": Decimal("0"),
+                    "value_qualifier": MeasurementValueQualifier.BELOW_DETECTION_LIMIT,
+                    "detection_limit": Decimal("6.57"),
+                },
+            ),
+            ("Exact zero", {"average": Decimal("0")}),
+            (
+                "Hostile raw",
+                {
+                    "average": Decimal("1"),
+                    "raw_value": cls.hostile_raw,
+                    "value_qualifier": MeasurementValueQualifier.LESS_THAN,
+                },
+            ),
+        ):
+            ComponentMeasurement.objects.create(
+                owner=cls.owner,
+                sample=cls.sample,
+                group=cls.group,
+                component=MaterialComponent.objects.create(
+                    owner=cls.owner,
+                    name=name,
+                    publication_status="published",
+                ),
+                unit=cls.unit,
+                publication_status="private",
+                **kwargs,
+            )
+        cls.property_value = MaterialPropertyValue.objects.create(
+            owner=cls.owner,
+            sample=cls.sample,
+            property=cls.prop,
+            unit=cls.unit,
+            average=Decimal("0.25"),
+            raw_value="0.25",
+            value_qualifier=MeasurementValueQualifier.LESS_THAN,
+            detection_limit=Decimal("6.57"),
+            publication_status="private",
+        )
+
+    def setUp(self):
+        self.client.force_login(self.owner)
+
+    def test_detail_view_labels_and_escapes_censored_values(self):
+        url = reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        for params in ({}, {"experience": "v2"}):
+            with self.subTest(params=params):
+                response = self.client.get(url, params)
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "<strong>&lt;0.1</strong>")
+                self.assertContains(response, "<strong>&gt;1450</strong>")
+                self.assertContains(response, "Below detection limit")
+                self.assertContains(response, "Detection limit: 6.57 %")
+                self.assertContains(response, "<strong>0</strong>")
+                self.assertContains(response, "<strong>&lt;0.25</strong>")
+                self.assertNotContains(response, '<img src=x onerror="alert(31337)">')
+                self.assertContains(response, escape(self.hostile_raw))
+
+    def test_section_summary_include_labels_and_escapes_censored_values(self):
+        html = render_to_string(
+            "materials/includes/sample_section_summary.html",
+            {"object": self.sample, "section": {"key": "measurements"}},
+        )
+        self.assertIn("&lt;0.1", html)
+        self.assertIn("&gt;1450", html)
+        self.assertIn("Below detection limit", html)
+        self.assertIn("Detection limit: 6.57", html)
+        self.assertIn(escape(self.hostile_raw), html)
+        self.assertNotIn('<img src=x onerror="alert(31337)">', html)
+
+        html = render_to_string(
+            "materials/includes/sample_section_summary.html",
+            {"object": self.sample, "section": {"key": "properties"}},
+        )
+        self.assertIn("&lt;0.25", html)
+        self.assertIn("Detection limit: 6.57", html)

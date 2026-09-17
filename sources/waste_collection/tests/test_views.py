@@ -1335,6 +1335,17 @@ class CollectionListQueryTestCase(TestCase):
                 self.assertEqual(obj.waste_category.name, "List category")
                 self.assertEqual(obj.collection_system.name, "List system")
 
+    @override_settings(GOOGLE_ANALYTICS_KEY="")
+    def test_anonymous_list_renders_with_nine_queries(self):
+        request = RequestFactory().get("/collections/", {"scope": "published"})
+        request.user = AnonymousUser()
+
+        with self.assertNumQueries(9):
+            response = views.CollectionPublishedListView.as_view()(request)
+            response.render()
+
+        self.assertContains(response, "of 25 results")
+
     def test_database_has_name_id_index(self):
         with connection.cursor() as cursor:
             constraints = connection.introspection.get_constraints(
