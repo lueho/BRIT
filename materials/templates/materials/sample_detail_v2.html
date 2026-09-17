@@ -42,7 +42,7 @@
         <div class="sdv2-rail-actions" role="group" aria-label="Sample actions">
           {% if object.publication_status == 'private' and sample_policy.can_submit_review %}
             <form method="post"
-                  action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                  action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
                   class="sdv2-rail-submit">
               {% csrf_token %}
               <button type="submit" class="sdv2-btn">
@@ -93,7 +93,7 @@
               {% if sample_policy.can_manage_editors %}
                 <li>
                   <a class="dropdown-item modal-link"
-                     href="{% url 'object_management:manage_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                     href="{% url 'object_management:manage_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
                     <i class="fas fa-fw fa-user-group me-2" aria-hidden="true"></i>Manage access
                   </a>
                 </li>
@@ -111,7 +111,7 @@
                 <li><hr class="dropdown-divider"></li>
                 <li>
                   <a class="dropdown-item text-danger modal-link"
-                     href="{% url 'sample-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">
+                     href="{% url 'sample-delete-modal' object.pk %}?next={{ request|path_without_return_params|urlencode }}">
                     <i class="fas fa-fw fa-trash me-2" aria-hidden="true"></i>Delete sample
                   </a>
                 </li>
@@ -371,7 +371,7 @@
                     {% endif %}
                     {% if perms.materials.add_composition %}
                       <a class="sdv2-btn"
-                         href="{% url 'sample-add-composition' object.id %}?next={{ request.get_full_path|urlencode }}">
+                         href="{% url 'sample-add-composition' object.id %}?next={{ request|path_without_return_params|urlencode }}">
                         <i class="fas fa-plus"></i> Add composition
                       </a>
                     {% endif %}
@@ -424,7 +424,7 @@
                             {% if composition.settings_pk %}
                               <li>
                                 <a class="dropdown-item"
-                                   href="{% url 'composition-update' composition.settings_pk %}?next={{ request.get_full_path|urlencode }}">
+                                   href="{% url 'composition-update' composition.settings_pk %}?next={{ request|path_without_return_params|urlencode }}">
                                   <i class="fas fa-fw fa-pen-to-square me-2" aria-hidden="true"></i>Edit group settings
                                 </a>
                               </li>
@@ -432,13 +432,13 @@
                             <li><hr class="dropdown-divider"></li>
                             <li>
                               <a class="dropdown-item"
-                                 href="{% url 'derived-composition-order-down' sample_pk=object.pk group_pk=group_pk %}?next={{ request.get_full_path|urlencode }}">
+                                 href="{% url 'derived-composition-order-down' sample_pk=object.pk group_pk=group_pk %}?next={{ request|path_without_return_params|urlencode }}">
                                 <i class="fas fa-fw fa-arrow-up me-2" aria-hidden="true"></i>Move earlier
                               </a>
                             </li>
                             <li>
                               <a class="dropdown-item"
-                                 href="{% url 'derived-composition-order-up' sample_pk=object.pk group_pk=group_pk %}?next={{ request.get_full_path|urlencode }}">
+                                 href="{% url 'derived-composition-order-up' sample_pk=object.pk group_pk=group_pk %}?next={{ request|path_without_return_params|urlencode }}">
                                 <i class="fas fa-fw fa-arrow-down me-2" aria-hidden="true"></i>Move later
                               </a>
                             </li>
@@ -446,7 +446,7 @@
                               <li><hr class="dropdown-divider"></li>
                               <li>
                                 <a class="dropdown-item text-danger modal-link"
-                                   href="{% url 'composition-delete-modal' composition.settings_pk %}?next={{ request.get_full_path|urlencode }}">
+                                   href="{% url 'composition-delete-modal' composition.settings_pk %}?next={{ request|path_without_return_params|urlencode }}">
                                   <i class="fas fa-fw fa-trash me-2" aria-hidden="true"></i>Delete group settings
                                 </a>
                               </li>
@@ -655,7 +655,7 @@
                   {% endif %}
                   {% if perms.materials.add_composition %}
                     <a class="sdv2-btn"
-                       href="{% url 'sample-add-composition' object.id %}?next={{ request.get_full_path|urlencode }}">
+                       href="{% url 'sample-add-composition' object.id %}?next={{ request|path_without_return_params|urlencode }}">
                       <i class="fas fa-plus"></i> Add composition
                     </a>
                   {% endif %}
@@ -747,7 +747,7 @@
                           {% endif %}
                           {% if pp.can_delete %}
                             <a class="sdv2-btn sdv2-btn-danger sdv2-btn-icon sdv2-btn-sm modal-link"
-                               href="{% url 'materialpropertyvalue-delete-modal' prop.id %}?next={{ request.get_full_path|urlencode }}"
+                               href="{% url 'materialpropertyvalue-delete-modal' prop.id %}?next={{ request|path_without_return_params|urlencode }}"
                                title="Delete property value">
                               <i class="fas fa-trash" aria-hidden="true"></i>
                               <span class="visually-hidden">Delete</span>

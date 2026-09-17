@@ -16,6 +16,19 @@ Disallow: /*check_urls/
 Disallow: /*summaries/
 Disallow: /*.json
 Disallow: /*?*csrfmiddlewaretoken=
+# Return-path params nest recursively (each URL embeds the previous one) and
+# create an unbounded crawl space
+Disallow: /*?*back=
+Disallow: /*?*next=
+Disallow: /*?*return_to=
+# View-state params render expensive non-content pages for crawlers
+Disallow: /*?*load_features=
+Disallow: /*?*page=
+Disallow: /*?*scope=
+# Interactive geodataset views and per-feature pages are crawl bait
+Disallow: /maps/geodatasets/*/map/
+Disallow: /maps/geodatasets/*/table/
+Disallow: /maps/geodatasets/*/features/
 
 # Block specific aggressive crawlers
 User-agent: Googlebot-Image
@@ -41,5 +54,14 @@ Allow: /about/
 Allow: /learning/
 Disallow: /*/api/
 Disallow: /*geojson/
+Disallow: /*?*back=
+Disallow: /*?*next=
+Disallow: /*?*return_to=
+Disallow: /*?*load_features=
+Disallow: /*?*page=
+Disallow: /*?*scope=
+Disallow: /maps/geodatasets/*/map/
+Disallow: /maps/geodatasets/*/table/
+Disallow: /maps/geodatasets/*/features/
 
 Sitemap: {{ request.scheme }}://{{ request.get_host }}/sitemap.xml

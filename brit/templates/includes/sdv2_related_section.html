@@ -1,0 +1,49 @@
+{% comment %}
+  Related-records section for detail_v2.html pages.
+  Expected context (pass via include-with):
+    section_title    - heading text
+    section_label    - aria-label for the section
+    items            - iterable of related objects (already visibility-filtered)
+    item_url_name    - url name of the related object's detail view
+    section_total    - optional total count (when items are truncated)
+    section_more     - optional count of records not shown
+    section_list_url - optional "view all" url for truncated lists
+    empty_title      - empty-state heading
+    empty_body       - empty-state guidance text
+{% endcomment %}
+<section class="sdv2-section-panel" aria-label="{{ section_label|default:section_title }}">
+  <div class="sdv2-section-header">
+    <div class="sdv2-section-heading">
+      <h2 class="sdv2-section-title">{{ section_title }}</h2>
+    </div>
+    {% if section_list_url and section_total %}
+      <div class="sdv2-section-actions">
+        <a class="sdv2-btn sdv2-btn-sm" href="{{ section_list_url }}">View all {{ section_total }} published</a>
+      </div>
+    {% endif %}
+  </div>
+  {% if items %}
+    <ul class="sdv2-related-list">
+      {% for item in items %}
+        <li>
+          <a class="sdv2-related-link" href="{% url item_url_name item.pk %}">
+            <span class="sdv2-related-name">{{ item }}</span>
+            {% if item.series %}
+              <span class="sdv2-related-meta">{{ item.series.name }}</span>
+            {% endif %}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+    {% if section_more %}
+      <p class="sdv2-related-meta mt-2 mb-0">
+        {{ section_more }} more not shown{% if section_list_url %} — <a href="{{ section_list_url }}">view all {{ section_total }} published</a>{% endif %}
+      </p>
+    {% endif %}
+  {% else %}
+    <div class="sdv2-empty">
+      <div class="sdv2-empty-title">{{ empty_title|default:"No records" }}</div>
+      <div class="sdv2-empty-body">{{ empty_body }}</div>
+    </div>
+  {% endif %}
+</section>

@@ -1,17 +1,19 @@
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.parse import quote, unquote
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db.models.signals import post_save, pre_save
 from django.template import Context, Template
-from django.test import TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
 from factory.django import mute_signals
 
 from sources.waste_collection.models import Collection
 from utils.object_management.models import UserCreatedObject
 from utils.object_management.templatetags.moderation_tags import (
     collection_description_to_html,
+    detail_or_review_url,
     has_pending_review_items_for_user,
     markdown_to_html,
 )
@@ -73,6 +75,59 @@ class PendingReviewSignalTagTests(TestCase):
         rendered = template.render(Context({"obj": obj, "policy": policy}))
 
         self.assertIn("fa-lock", rendered)
+
+
+class DetailOrReviewUrlTagTests(SimpleTestCase):
+    """Regression tests for the recursive ?back=/?next= crawler trap.
+
+    Embedding request.get_full_path() into a ``back``/``next`` param must not
+    carry over return-path params that are already present on the current URL.
+    Otherwise every list->detail->list round trip nests the parameter deeper
+    and crawlers discover an unbounded URL space.
+    """
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.obj = SimpleNamespace(
+            get_absolute_url=lambda: "/materials/samples/9/",
+            publication_status="published",
+        )
+
+    def tag_url(self, path):
+        request = self.factory.get(path)
+        return detail_or_review_url({"request": request}, self.obj, use_back=True)
+
+    def test_back_param_contains_current_path(self):
+        url = self.tag_url("/materials/samples/?scope=published")
+
+        self.assertEqual(
+            url,
+            "/materials/samples/9/?back="
+            + quote("/materials/samples/?scope=published", safe=""),
+        )
+
+    def test_existing_back_param_is_stripped_from_target(self):
+        url = self.tag_url("/materials/samples/?scope=published&back=/other/")
+
+        self.assertEqual(
+            unquote(url),
+            "/materials/samples/9/?back=/materials/samples/?scope=published",
+        )
+
+    def test_next_and_return_to_params_are_stripped(self):
+        url = self.tag_url("/things/?next=/y/&return_to=/z/&page=2")
+
+        self.assertEqual(unquote(url), "/materials/samples/9/?back=/things/?page=2")
+
+    def test_repeated_back_params_are_all_stripped(self):
+        url = self.tag_url("/things/?back=/a/&back=/b/")
+
+        self.assertEqual(unquote(url), "/materials/samples/9/?back=/things/")
+
+    def test_without_request_returns_plain_url(self):
+        url = detail_or_review_url({}, self.obj, use_back=True)
+
+        self.assertEqual(url, "/materials/samples/9/")
 
 
 class MarkdownToHtmlFilterTests(TestCase):
