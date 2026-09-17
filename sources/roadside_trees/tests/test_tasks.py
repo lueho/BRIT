@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, call, patch
 
 from django.test import SimpleTestCase
 
@@ -29,4 +29,10 @@ class RoadsideTreesGeoJSONWarmTaskTestCase(SimpleTestCase):
         mock_trees.objects.only.assert_called_once_with("id", "geom")
         only_qs.order_by.assert_called_once_with()
         mock_serializer.assert_called_once_with(ordered_qs, many=True)
-        mock_get_cache.return_value.set.assert_called_once()
+        self.assertEqual(
+            mock_get_cache.return_value.set.call_args_list,
+            [
+                call("tree_geojson:all", {"features": [1, 2]}, timeout=ANY),
+                call("tree_geojson:all:count", 2, timeout=ANY),
+            ],
+        )

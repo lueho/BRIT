@@ -1,6 +1,6 @@
 """Tests for sources.waste_collection.tasks."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, call, patch
 
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase
@@ -65,4 +65,14 @@ class WasteCollectionGeoJSONWarmTaskTestCase(SimpleTestCase):
         )
         mock_serializer.assert_called_once_with(annotated_qs, many=True)
         mock_build_cache_key.assert_called_once_with(scope="published")
-        mock_get_cache.return_value.set.assert_called_once()
+        self.assertEqual(
+            mock_get_cache.return_value.set.call_args_list,
+            [
+                call(
+                    "collection_geojson:key",
+                    {"features": [1, 2, 3]},
+                    timeout=ANY,
+                ),
+                call("collection_geojson:key:count", 3, timeout=ANY),
+            ],
+        )

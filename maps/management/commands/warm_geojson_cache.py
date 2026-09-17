@@ -32,7 +32,11 @@ from maps.serializers import (
     NutsRegionGeometrySerializer,
     RegionGeoFeatureModelSerializer,
 )
-from maps.utils import get_nuts_region_cache_key, get_region_cache_key
+from maps.utils import (
+    get_nuts_region_cache_key,
+    get_region_cache_key,
+    set_geojson_cache_payload,
+)
 
 # Number of largest regions to warm by default. The H27 "Client Request
 # Interrupted" warnings come almost entirely from crawlers fetching the few
@@ -212,12 +216,12 @@ class Command(BaseCommand):
             for region in queryset:
                 cache_key = get_nuts_region_cache_key(nuts_id=region.id, version=year)
                 serializer = NutsRegionGeometrySerializer([region], many=True)
-                geojson_cache.set(cache_key, serializer.data)
+                set_geojson_cache_payload(geojson_cache, cache_key, serializer.data)
 
             # Also cache the collection
             cache_key = get_nuts_region_cache_key(level=level, version=year)
             serializer = NutsRegionGeometrySerializer(queryset, many=True)
-            geojson_cache.set(cache_key, serializer.data)
+            set_geojson_cache_payload(geojson_cache, cache_key, serializer.data)
 
         self.stdout.write("NUTS cache warmup complete!")
 
@@ -250,7 +254,9 @@ class Command(BaseCommand):
         for region in queryset:
             cache_key = get_region_cache_key(region_id=region.id)
             serializer = RegionGeoFeatureModelSerializer([region], many=True)
-            geojson_cache.set(cache_key, serializer.data, timeout=timeout)
+            set_geojson_cache_payload(
+                geojson_cache, cache_key, serializer.data, timeout=timeout
+            )
             warmed += 1
 
         self.stdout.write(

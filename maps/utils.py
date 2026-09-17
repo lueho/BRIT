@@ -320,6 +320,19 @@ def build_collection_cache_key(
     return f"collection_geojson:filter:{filter_part}:dv:{dv}"
 
 
+def set_geojson_cache_payload(cache, cache_key, data, timeout=None):
+    """Cache a GeoJSON payload together with its feature-count metadata.
+
+    The ``<cache_key>:count`` companion entry lets HEAD requests answer
+    ``X-Total-Count`` without fetching and deserializing the payload. It shares
+    the payload's ``*_geojson:*`` namespace, so the existing pattern-based
+    invalidation removes both entries together.
+    """
+    cache.set(cache_key, data, timeout=timeout)
+    if isinstance(data, dict) and "features" in data:
+        cache.set(f"{cache_key}:count", len(data["features"]), timeout=timeout)
+
+
 def get_or_set_cache(cache_key, data_generator_func, timeout=None):
     """
     Helper function to abstract the cache get/set pattern.

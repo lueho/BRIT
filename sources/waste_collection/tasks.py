@@ -11,7 +11,7 @@ from bibliography.utils import check_url, find_wayback_snapshot_for_year
 from brit.celery import app
 from maps.db_functions import SimplifyPreserveTopology
 from maps.signals import get_geojson_cache
-from maps.utils import build_collection_cache_key
+from maps.utils import build_collection_cache_key, set_geojson_cache_payload
 from sources.waste_collection.filters import WasteFlyerFilter
 from sources.waste_collection.geojson import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
@@ -50,7 +50,7 @@ def warm_collection_geojson_cache(self):
         cache_key = build_collection_cache_key(scope="published")
         cache = get_geojson_cache()
         timeout = getattr(settings, "GEOJSON_CACHE_TIMEOUT", 86400)
-        cache.set(cache_key, data, timeout=timeout)
+        set_geojson_cache_payload(cache, cache_key, data, timeout=timeout)
 
         feature_count = (
             len(data.get("features", [])) if isinstance(data, dict) else len(data)

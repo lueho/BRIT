@@ -4,6 +4,7 @@ from django.conf import settings
 
 from brit.celery import app
 from maps.signals import get_geojson_cache
+from maps.utils import set_geojson_cache_payload
 from sources.roadside_trees.geojson import (
     HamburgRoadsideTreeGeometrySerializer,
     HamburgRoadsideTrees,
@@ -23,7 +24,7 @@ def warm_roadside_tree_geojson_cache(self):
         cache_key = "tree_geojson:all"
         cache = get_geojson_cache()
         timeout = getattr(settings, "GEOJSON_CACHE_TIMEOUT", 86400)
-        cache.set(cache_key, data, timeout=timeout)
+        set_geojson_cache_payload(cache, cache_key, data, timeout=timeout)
 
         feature_count = (
             len(data.get("features", [])) if isinstance(data, dict) else len(data)

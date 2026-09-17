@@ -5,11 +5,14 @@ from django.conf import settings
 from django.contrib.gis.geos import Polygon
 from django.core.cache import caches
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import Count, Max, Min
+from django.db.models import BigIntegerField, Count, Max, Min
+from django.db.models.expressions import RawSQL
 from django.http import StreamingHttpResponse
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
+from .utils import set_geojson_cache_payload
 
 # Threshold for switching to streaming response (number of features)
 STREAMING_THRESHOLD = 1000
@@ -236,9 +239,17 @@ class CachedGeoJSONMixin:
         }
 
     def _version_timestamp(self, agg):
-        """Epoch seconds used in the version token for an aggregate result."""
+        """Change indicator used in the version token for an aggregate result.
+
+        Epoch seconds of ``max_mod`` normally; for models without
+        ``lastmodified_at``, ``max_xmin`` holds the newest PostgreSQL
+        transaction id instead, which rotates on inserts, updates, and
+        reimports no matter which client writes the table.
+        """
         max_mod = agg.get("max_mod")
-        return int(max_mod.timestamp()) if max_mod else 0
+        if max_mod:
+            return int(max_mod.timestamp())
+        return agg.get("max_xmin") or 0
 
     def _version_token(self, agg):
         cnt = agg.get("cnt") or 0
@@ -251,8 +262,9 @@ class CachedGeoJSONMixin:
         """Return ``{"count": int, "version": str}`` from one aggregate query.
 
         Models with lastmodified_at use count, max modification time, and ID
-        range as version inputs. Models without it still detect inserts,
-        deletes, and reimports through count and ID range.
+        range as version inputs. Models without it add the newest row
+        transaction id (xmin), so inserts, deletes, in-place updates, and
+        reimports preserving the ID range still rotate the token.
         """
         queryset = self.get_stats_queryset(request)
         model = queryset.model
@@ -264,6 +276,13 @@ class CachedGeoJSONMixin:
                 "cnt": Count("pk"),
                 "min_id": Min("pk"),
                 "max_id": Max("pk"),
+                "max_xmin": Max(
+                    RawSQL(
+                        "xmin::text::bigint",
+                        [],
+                        output_field=BigIntegerField(),
+                    )
+                ),
             }
         agg = queryset.aggregate(**aggregates)
         return {"count": agg.get("cnt") or 0, "version": self._version_token(agg)}
@@ -467,11 +486,7 @@ class CachedGeoJSONMixin:
         # Cache the result if no bbox filter
         if not bbox:
             timeout = getattr(self, "cache_timeout", None)
-            geojson_cache.set(cache_key, data, timeout=timeout)
-            if isinstance(data, dict) and "features" in data:
-                geojson_cache.set(
-                    f"{cache_key}:count", len(data["features"]), timeout=timeout
-                )
+            set_geojson_cache_payload(geojson_cache, cache_key, data, timeout=timeout)
 
         response = Response(data)
         response["X-Cache-Status"] = "MISS"
