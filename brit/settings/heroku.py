@@ -27,6 +27,12 @@ if not SECRET_KEY:
     raise ImproperlyConfigured("SECRET_KEY must be set in production.")
 
 ALLOWED_HOSTS = list(os.environ.get("ALLOWED_HOSTS", "").split(","))
+
+# Requests arriving on any other allowed host (e.g. the herokuapp.com domain,
+# which bypasses the CDN/WAF in front of the canonical domain) are
+# 301-redirected to CANONICAL_HOST. Empty means no redirect.
+CANONICAL_HOST = os.environ.get("CANONICAL_HOST", "")
+MIDDLEWARE.insert(0, "brit.middleware.CanonicalHostRedirectMiddleware")
 # Heroku Redis uses self-signed certificates, so certificate verification
 # must be disabled for TLS connections.
 CELERY_BROKER_USE_SSL = _redis_ssl_settings(REDIS_URL, ssl.CERT_NONE)
