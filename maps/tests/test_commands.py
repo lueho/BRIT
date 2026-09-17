@@ -10,6 +10,7 @@ from django.test import TestCase
 
 from utils.object_management.models import get_default_owner
 from utils.properties.models import Unit
+from utils.tests.testrunner import serial_test
 
 from ..models import (
     NutsRegion,
@@ -206,6 +207,7 @@ class WarmGeojsonCacheCommandTests(TestCase):
         self.assertIn("Roadside Trees: 2 features cached", out.getvalue())
 
 
+@serial_test
 class WarmGeojsonCacheRegionsTests(TestCase):
     def setUp(self):
         self.geojson_cache = caches[getattr(settings, "GEOJSON_CACHE", "default")]
@@ -249,6 +251,7 @@ class WarmGeojsonCacheRegionsTests(TestCase):
         )
 
 
+@serial_test
 class WarmGeojsonCacheNutsTests(TestCase):
     """Warmed NUTS entries must land where the viewset looks for them."""
 
