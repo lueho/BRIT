@@ -1,6 +1,6 @@
 """Tests for sources.waste_collection.tasks."""
 
-from unittest.mock import ANY, Mock, call, patch
+from unittest.mock import ANY, Mock, PropertyMock, call, patch
 
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase
@@ -74,5 +74,45 @@ class WasteCollectionGeoJSONWarmTaskTestCase(SimpleTestCase):
                     timeout=ANY,
                 ),
                 call("collection_geojson:key:count", 3, timeout=ANY),
+            ],
+        )
+
+    @patch("sources.waste_collection.tasks.get_geojson_cache")
+    @patch(
+        "sources.waste_collection.tasks.build_collection_cache_key",
+        return_value="collection_geojson:key",
+    )
+    @patch("sources.waste_collection.tasks.WasteCollectionGeometrySerializer")
+    @patch("sources.waste_collection.tasks.Collection")
+    def test_warm_computes_versioned_key_before_serializing(
+        self,
+        mock_collection,
+        mock_serializer,
+        mock_build_cache_key,
+        mock_get_cache,
+    ):
+        """The versioned key must be computed before the queryset is serialized.
+
+        Otherwise a write landing between serialization and the version query
+        stores stale geometry under the current dataset version.
+        """
+        filtered_qs = Mock()
+        filtered_qs.select_related.return_value.annotate.return_value = Mock()
+        mock_collection.objects.filter.return_value = filtered_qs
+        data_access = PropertyMock(return_value={"features": []})
+        type(mock_serializer.return_value).data = data_access
+
+        order = Mock()
+        order.attach_mock(mock_build_cache_key, "build_collection_cache_key")
+        order.attach_mock(data_access, "data")
+
+        result = warm_collection_geojson_cache.run()
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(
+            order.mock_calls,
+            [
+                call.build_collection_cache_key(scope="published"),
+                call.data(),
             ],
         )

@@ -19,12 +19,15 @@ def warm_roadside_tree_geojson_cache(self):
     logger.info("Starting Roadside Trees GeoJSON cache warm-up")
 
     try:
-        qs = HamburgRoadsideTrees.objects.only("id", "geom").order_by()
-        serializer = HamburgRoadsideTreeGeometrySerializer(qs, many=True)
-        data = serializer.data
+        # Capture the dataset version before serializing: if the externally
+        # managed table changes mid-task, the worst case is a fresh payload
+        # under an orphaned old key, never stale geometry under a current key.
         dataset_version = HamburgRoadsideTreeViewSet().get_dataset_stats(None)[
             "version"
         ]
+        qs = HamburgRoadsideTrees.objects.only("id", "geom").order_by()
+        serializer = HamburgRoadsideTreeGeometrySerializer(qs, many=True)
+        data = serializer.data
         cache_key = f"tree_geojson:all:dv:{dataset_version}"
         cache = get_geojson_cache()
         timeout = getattr(settings, "GEOJSON_CACHE_TIMEOUT", 86400)

@@ -1,4 +1,4 @@
-from unittest.mock import ANY, Mock, call, patch
+from unittest.mock import ANY, Mock, PropertyMock, call, patch
 
 from django.test import SimpleTestCase
 
@@ -43,4 +43,39 @@ class RoadsideTreesGeoJSONWarmTaskTestCase(SimpleTestCase):
                 ),
                 call("tree_geojson:all:dv:dv123:count", 2, timeout=ANY),
             ],
+        )
+
+    @patch("sources.roadside_trees.tasks.HamburgRoadsideTreeViewSet")
+    @patch("sources.roadside_trees.tasks.get_geojson_cache")
+    @patch("sources.roadside_trees.tasks.HamburgRoadsideTreeGeometrySerializer")
+    @patch("sources.roadside_trees.tasks.HamburgRoadsideTrees")
+    def test_warm_captures_dataset_version_before_serializing(
+        self,
+        mock_trees,
+        mock_serializer,
+        mock_get_cache,
+        mock_viewset,
+    ):
+        """The version must be read before the queryset is serialized.
+
+        Otherwise an external write landing between serialization and the
+        stats query stores stale geometry under the current versioned key.
+        """
+        mock_trees.objects.only.return_value.order_by.return_value = Mock()
+        data_access = PropertyMock(return_value={"features": []})
+        type(mock_serializer.return_value).data = data_access
+        mock_viewset.return_value.get_dataset_stats.return_value = {"version": "dv123"}
+
+        order = Mock()
+        order.attach_mock(
+            mock_viewset.return_value.get_dataset_stats, "get_dataset_stats"
+        )
+        order.attach_mock(data_access, "data")
+
+        result = warm_roadside_tree_geojson_cache.run()
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(
+            order.mock_calls,
+            [call.get_dataset_stats(None), call.data()],
         )

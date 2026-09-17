@@ -45,9 +45,12 @@ def warm_collection_geojson_cache(self):
     logger.info("Starting Collection GeoJSON cache warm-up")
 
     try:
+        # Compute the versioned key before serializing: a write landing
+        # mid-task then produces a fresh payload under an orphaned old key,
+        # never stale geometry under a current key.
+        cache_key = build_collection_cache_key(scope="published")
         serializer = WasteCollectionGeometrySerializer(qs, many=True)
         data = serializer.data
-        cache_key = build_collection_cache_key(scope="published")
         cache = get_geojson_cache()
         timeout = getattr(settings, "GEOJSON_CACHE_TIMEOUT", 86400)
         set_geojson_cache_payload(cache, cache_key, data, timeout=timeout)

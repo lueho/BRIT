@@ -2,6 +2,7 @@ import json
 from unittest.mock import patch
 
 from django.contrib.gis.geos import Point
+from django.test import override_settings
 from django.urls import reverse
 
 from maps.models import (
@@ -154,9 +155,9 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
         self.assertNotEqual(before, after)
 
     def test_geojson_get_returns_fresh_geometry_after_tree_change(self):
-        cache = get_geojson_cache()
-        cache.clear()
-        self.addCleanup(cache.clear)
+        # No cache clearing: the shared test cache is used by parallel
+        # workers. Versioned keys make the assertions deterministic anyway —
+        # a stale entry under the old version is simply never looked up.
         url = reverse("api-hamburg-roadside-trees-geojson")
 
         first = self.client.get(url, REMOTE_ADDR="10.9.8.5")
@@ -180,12 +181,25 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
             [5.0, 5.0],
         )
 
+    @override_settings(
+        GEOJSON_CACHE="geojson",
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "tree-warm-default",
+            },
+            "geojson": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "tree-warm-geojson",
+            },
+        },
+    )
     def test_warmed_cache_head_never_reads_payload(self):
+        # Isolated cache backend: the real geojson cache is shared across
+        # parallel test workers, so clearing or relying on it would flake.
         from ..tasks import warm_roadside_tree_geojson_cache
 
         cache = get_geojson_cache()
-        cache.clear()
-        self.addCleanup(cache.clear)
 
         result = warm_roadside_tree_geojson_cache.run()
         self.assertEqual(result["status"], "success")
