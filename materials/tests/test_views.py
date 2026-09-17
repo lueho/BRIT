@@ -1809,6 +1809,17 @@ class BackURLNavigationTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         expected_back_fragment = quote(list_url, safe="")
         self.assertContains(response, f"back={expected_back_fragment}")
 
+    def test_back_param_is_not_nested_in_detail_links(self):
+        """A list page reached via ?back= must not nest that param in links."""
+        self.client.force_login(self.staff_user)
+        list_url = reverse("sampleseries-list")
+        response = self.client.get(f"{list_url}?back=/somewhere/&scope=published")
+        self.assertEqual(response.status_code, 200)
+        expected_back_fragment = quote(f"{list_url}?scope=published", safe="")
+        self.assertContains(response, f"back={expected_back_fragment}")
+        # A nested back param would appear percent-encoded inside the value.
+        self.assertNotContains(response, "back%3D")
+
     def test_review_objects_use_next_parameter_not_back(self):
         """Objects in review status use ?next= for review flow, not ?back=."""
         review_object = SampleSeries.objects.create(

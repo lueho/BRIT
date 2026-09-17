@@ -4,13 +4,14 @@ Bulk access management form. Context:
   checkboxes required); otherwise checkboxes elsewhere in the page reference
   this form via form="bulk-access-form".
 {% endcomment %}
+{% load moderation_tags %}
 <form id="bulk-access-form"
       method="post"
       action="{% url 'object_management:bulk_manage_access' %}"
       class="d-flex flex-wrap align-items-center gap-2 {% if not all_owned %}mb-3{% endif %}"
       onsubmit="return this.bulk_action.value !== 'transfer_ownership' || confirm('Transfer ownership of the affected items? This cannot be undone from your side.')">
   {% csrf_token %}
-  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+  <input type="hidden" name="next" value="{{ request|path_without_return_params }}">
   {% if all_owned %}<input type="hidden" name="all_owned" value="1">{% endif %}
   <select name="bulk_action"
           class="form-select form-select-sm w-auto"

@@ -95,6 +95,8 @@ not part of this first change.
   caches must remain permission-aware and isolated across users/sessions.
 - [ ] Test filtering, cancellation, empty layers, stale data, logout, and permission
   changes. Do not weaken current visibility checks to improve caching.
+- [x] Make repeat-visit GeoJSON HEAD validation metadata-only (step 5a); retain
+  the same endpoint, version calculation, filters, and access checks.
 
 ### 6. Browser assets
 
@@ -624,3 +626,93 @@ git diff --cached --check
 - Steps 3 and 4 remain uncommitted together in this isolated worktree. Production
   deployment, browser profiling, very-large-queue SQL pagination, and steps 5–8
   remain follow-up work; the main checkout and production database were untouched.
+
+## Step 5a: metadata-only map cache validation (2026-09-16)
+
+### Finding and implementation
+
+- The active feature loader in `streaming-geojson.js` validates IndexedDB entries
+  with HEAD against the original GeoJSON URL. `filtered_map.html`, its iframe
+  variant, and GeoDataset detail templates enable this loader. The separate
+  region/catchment loader in `maps.js` already uses a version endpoint.
+- The shared GeoJSON action previously constructed serializer data on small
+  cache-miss HEAD requests, even though the HTTP body is discarded. Cache-hit
+  HEAD responses also carried the full cached payload through response rendering.
+- HEAD now returns only metadata through an empty streaming HTTP response after
+  the existing filtering, count, rejection, and version checks. The empty
+  iterator yields no features; the streaming response type keeps production
+  `CommonMiddleware` from injecting an incorrect `Content-Length: 0` header.
+  Cache hits retain their headers without response data; would-be streams do
+  not build a generator. GET remains unchanged.
+- A cold HEAD intentionally no longer warms the geometry cache. A subsequent GET
+  still serializes and stores the actual data. On a cache hit, fetching/deserializing
+  the Redis payload is still required for the existing cached feature count.
+- No frontend, asset, schema, version-token, cross-request caching, permission,
+  or throttling changes. The client still validates before displaying cached data.
+
+### Evidence and verification
+
+- The controlled two-region regression reproduced two full Region instances
+  being loaded by cold HEAD before the change, versus zero afterward. This is
+  an object-materialization measurement, not an end-to-end latency benchmark.
+- Initial RED failures included full response data on HEAD, serializer invocation,
+  and stream construction. Initial GREEN: 13 tests passed. A second RED showed
+  `CommonMiddleware` adding a `Content-Length` header to the rendered empty HEAD
+  body on cold and warm requests; green returned after successful HEAD switched
+  to an empty streaming response.
+- Affected gate: 773 tests initially, re-run at 776 tests after the streaming-HEAD
+  revision; no failures, 104 skipped. Covered map views/throttling, NUTS vintage
+  scoping, collection API behavior, and roadside-tree consumers.
+- Ruff lint, formatting, missing-migration checks, and both staged/unstaged
+  whitespace checks passed after implementation.
+
+Commands (OPS=/home/phillipp/projects/BRIT-ops/scripts):
+
+```bash
+"$OPS/brit-worktree-test" collection-filter-overhead -- \
+  maps.tests.test_views.GeoJSONHeadTests \
+  sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_geojson_head_preserves_scope_visibility \
+  maps.tests.test_throttling.GeoJSONThrottleTests
+
+"$OPS/brit-worktree-test" collection-filter-overhead -- \
+  maps.tests.test_views maps.tests.test_throttling maps.tests.test_vintage_scoping \
+  sources.waste_collection.tests.test_viewsets sources.roadside_trees.tests
+
+"$OPS/brit-worktree-check" collection-filter-overhead --no-up
+git diff --check
+git diff --cached --check
+```
+
+### Remaining work and limitations
+
+- First visible geometry, interaction readiness, bytes transferred, browser long
+  tasks, and production-like version-check timings have not been measured here.
+  No browser or production-latency improvement is claimed by this change.
+- Progressive rendering, cancellation, logout/permission-change browser scenarios,
+  and permission-isolated cached-first rendering remain unchecked roadmap work.
+- Cheaper version tokens need a separate dependency audit. Existing implementations
+  differ: Catchment includes Region timestamps; the default uses dataset aggregates
+  or a cache-key fallback. This change preserves those mechanisms, not a claim
+  that their existing invalidation coverage is complete.
+- Direct Region bbox testing exposed an existing FieldError: the generic bbox
+  helper selects the Python `geom` property as though it were a database field.
+  Production impact was not tested, and no bbox implementation was changed here.
+  A working spatial-field consumer is covered separately by the roadside-tree test.
+- Steps 3, 4, and 5a remain uncommitted in the same isolated worktree. No production
+  database, main-checkout file, or secret was changed. Full step 5 remains open.
+
+Final verification after the CommonMiddleware `Content-Length` fix:
+
+- New RED before the fix: `test_head_omits_unknown_content_length_with_common_middleware`
+  failed on both cold and warm subtests (`Content-Length` present in the
+  middleware-processed response). Green after successful HEAD switched to an
+  empty streaming response.
+- `"$OPS/brit-worktree-test" collection-filter-overhead -- maps.tests.test_views.GeoJSONHeadTests sources.waste_collection.tests.test_viewsets.CollectionViewSetTestCase.test_geojson_head_preserves_scope_visibility maps.tests.test_throttling.GeoJSONThrottleTests sources.roadside_trees.tests.test_views.HamburgRoadsideTreesMapViewTestCase.test_geojson_head_preserves_bbox_metadata`
+  — 16 tests, no failures.
+- `"$OPS/brit-worktree-test" collection-filter-overhead -- maps.tests.test_views maps.tests.test_throttling maps.tests.test_vintage_scoping sources.waste_collection.tests.test_viewsets sources.roadside_trees.tests`
+  — 776 tests, no failures, 104 skipped.
+- `"$OPS/brit-worktree-check" collection-filter-overhead --no-up`: Ruff lint,
+  Ruff format check, and missing-migration checks passed.
+- `git diff --check` and `git diff --cached --check` passed.
+- `$OPS/brit-worktree-stop collection-filter-overhead`: completed after the final
+  gates; the isolated stack is stopped and its test volumes are preserved.

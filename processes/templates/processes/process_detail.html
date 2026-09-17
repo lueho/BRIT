@@ -33,7 +33,7 @@
         <div class="sdv2-rail-actions" role="group" aria-label="Process actions">
           {% if object.publication_status == 'private' and process_policy.can_submit_review %}
             <form method="post"
-                  action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                  action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
                   class="sdv2-rail-submit">
               {% csrf_token %}
               <button type="submit" class="sdv2-btn">
@@ -69,7 +69,7 @@
                 {% if process_policy.can_manage_editors %}
                   <li>
                     <a class="dropdown-item modal-link"
-                       href="{% url 'object_management:manage_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                       href="{% url 'object_management:manage_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
                       <i class="fas fa-fw fa-user-group me-2" aria-hidden="true"></i>Manage access
                     </a>
                   </li>
@@ -78,7 +78,7 @@
                   <li><hr class="dropdown-divider"></li>
                   <li>
                     <a class="dropdown-item text-danger modal-link"
-                       href="{% url 'processes:process-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">
+                       href="{% url 'processes:process-delete-modal' object.pk %}?next={{ request|path_without_return_params|urlencode }}">
                       <i class="fas fa-fw fa-trash me-2" aria-hidden="true"></i>Delete process
                     </a>
                   </li>
