@@ -7,11 +7,13 @@ logger = logging.getLogger(__name__)
 
 
 class CanonicalHostRedirectMiddleware:
-    """301-redirect requests on non-canonical hosts to ``CANONICAL_HOST``.
+    """308-redirect requests on non-canonical hosts to ``CANONICAL_HOST``.
 
-    No-ops when ``CANONICAL_HOST`` is unset, so development and tests are
-    unaffected. ``/health/`` is exempt so load-balancer and container health
-    checks keep working on any host.
+    Uses ``preserve_request=True`` (308 Permanent Redirect) so non-GET
+    requests keep method and body — a 301 could silently downgrade a POST
+    to GET. No-ops when ``CANONICAL_HOST`` is unset, so development and
+    tests are unaffected. ``/health/`` is exempt so load-balancer and
+    container health checks keep working on any host.
     """
 
     EXEMPT_PATHS = frozenset({"/health/"})
@@ -27,7 +29,8 @@ class CanonicalHostRedirectMiddleware:
             and request.get_host().split(":")[0].lower() != canonical.lower()
         ):
             return HttpResponsePermanentRedirect(
-                f"https://{canonical}{request.get_full_path()}"
+                f"https://{canonical}{request.get_full_path()}",
+                preserve_request=True,
             )
         return self.get_response(request)
 

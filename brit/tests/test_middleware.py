@@ -9,10 +9,12 @@ HOSTS = [CANONICAL, "bri-tool.herokuapp.com", "localhost", "testserver"]
 
 @override_settings(CANONICAL_HOST=CANONICAL, ALLOWED_HOSTS=HOSTS)
 class CanonicalHostRedirectMiddlewareTests(SimpleTestCase):
-    """Requests on non-canonical hosts are 301-redirected to CANONICAL_HOST.
+    """Requests on non-canonical hosts are 308-redirected to CANONICAL_HOST.
 
     Bots hammering the herokuapp.com domain bypass the Cloudflare layer in
-    front of the canonical domain; the redirect moves them onto it.
+    front of the canonical domain; the redirect moves them onto it. 308
+    (preserve_request=True) keeps method and body so a POST is not silently
+    downgraded to GET.
     """
 
     def setUp(self):
@@ -28,10 +30,24 @@ class CanonicalHostRedirectMiddlewareTests(SimpleTestCase):
         )
         response = self.middleware(request)
 
-        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response.status_code, 308)
         self.assertEqual(
             response["Location"],
             f"https://{CANONICAL}/maps/geodatasets/3/table/?id=1&page=2",
+        )
+
+    def test_post_redirect_preserves_method_and_body(self):
+        request = self.factory.post(
+            "/api/materials/samples/",
+            data={"name": "x"},
+            HTTP_HOST="bri-tool.herokuapp.com",
+        )
+        response = self.middleware(request)
+
+        self.assertEqual(response.status_code, 308)
+        self.assertEqual(
+            response["Location"],
+            f"https://{CANONICAL}/api/materials/samples/",
         )
 
     def test_canonical_host_passes_through(self):
