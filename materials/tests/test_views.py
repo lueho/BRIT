@@ -1538,6 +1538,137 @@ class ComponentMeasurementCreateAndDetailViewTestCase(ViewWithPermissionsTestCas
         )
 
 
+class ComponentMeasurementModalDeleteViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = "delete_componentmeasurement"
+    url_name = "componentmeasurement-delete-modal"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.unit = Unit.objects.filter(name="%").first()
+        if cls.unit is None:
+            cls.unit = Unit.objects.create(
+                name="%",
+                symbol="percent",
+                owner=cls.member,
+                publication_status="published",
+            )
+        elif not cls.unit.symbol or cls.unit.publication_status != "published":
+            cls.unit.symbol = "percent"
+            cls.unit.publication_status = "published"
+            cls.unit.save(update_fields=["symbol", "publication_status"])
+
+        cls.group = MaterialComponentGroup.objects.create(
+            owner=cls.member,
+            name="Composition group",
+            publication_status="published",
+        )
+        cls.component = MaterialComponent.objects.create(
+            owner=cls.member,
+            name="Carbon",
+            publication_status="published",
+        )
+        cls.material = Material.objects.create(
+            owner=cls.member,
+            name="Digestate",
+            publication_status="published",
+        )
+        cls.sample = Sample.objects.create(
+            owner=cls.member,
+            name="Sample for measurement deletion",
+            material=cls.material,
+            publication_status="private",
+        )
+        cls.measurement = ComponentMeasurement.objects.create(
+            owner=cls.member,
+            sample=cls.sample,
+            group=cls.group,
+            component=cls.component,
+            unit=cls.unit,
+            average=Decimal("12.5"),
+            standard_deviation=Decimal("0.5"),
+            publication_status="private",
+        )
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse(self.url_name, kwargs={"pk": self.measurement.pk})
+        response = self.client.get(url)
+        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(
+            reverse(self.url_name, kwargs={"pk": self.measurement.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse(self.url_name, kwargs={"pk": self.measurement.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse(self.url_name, kwargs={"pk": self.measurement.pk})
+        )
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse(self.url_name, kwargs={"pk": self.measurement.pk})
+        response = self.client.post(url)
+        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(
+            reverse(self.url_name, kwargs={"pk": self.measurement.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_success_and_http_302_redirect_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse(self.url_name, kwargs={"pk": self.measurement.pk})
+        )
+        self.assertRedirects(
+            response, reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+        with self.assertRaises(ComponentMeasurement.DoesNotExist):
+            ComponentMeasurement.objects.get(pk=self.measurement.pk)
+
+    def test_sample_detail_shows_measurement_delete_link_for_owner(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+            {"mode": "edit"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse(self.url_name, kwargs={"pk": self.measurement.pk}),
+        )
+
+    def test_sample_detail_hides_measurement_delete_link_for_outsider(self):
+        self.sample.publication_status = "published"
+        self.sample.save(update_fields=["publication_status"])
+        self.client.force_login(self.outsider)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(
+            response,
+            reverse(self.url_name, kwargs={"pk": self.measurement.pk}),
+        )
+
+
 # ----------- Analytical Method CRUD -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
