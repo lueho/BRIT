@@ -548,6 +548,11 @@ urlpatterns = [
         name="componentmeasurement-update-modal",
     ),
     path(
+        "component_measurements/<int:pk>/delete/modal/",
+        views.ComponentMeasurementModalDeleteView.as_view(),
+        name="componentmeasurement-delete-modal",
+    ),
+    path(
         "compositions/create/",
         views.CompositionCreateView.as_view(),
         name="composition-create",

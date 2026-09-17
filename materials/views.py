@@ -954,6 +954,13 @@ class ComponentMeasurementModalUpdateView(UserCreatedObjectModalUpdateView):
         return self.object.get_absolute_url()
 
 
+class ComponentMeasurementModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = ComponentMeasurement
+
+    def get_success_url(self):
+        return reverse("sample-detail", kwargs={"pk": self.object.sample.pk})
+
+
 # ----------- Analytical Method CRUD -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
