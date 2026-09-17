@@ -50,6 +50,14 @@ TEMPLATES[0]["OPTIONS"]["context_processors"].append(
 # This middleware is added only in production because it triggers too many logging events during testing in development.
 MIDDLEWARE.append("brit.middleware.ExceptionLoggingMiddleware")
 
+# Per-IP fixed-window throttle for anonymous traffic. Scraper bursts saturate
+# the single web dyno and queue requests past the router timeout (H12).
+# Runs last so request.user is populated; 0 disables limiting.
+ANONYMOUS_RATE_LIMIT_PER_MINUTE = int(
+    os.environ.get("ANONYMOUS_RATE_LIMIT_PER_MINUTE", "60")
+)
+MIDDLEWARE.append("brit.middleware.AnonymousRateLimitMiddleware")
+
 AWS_S3_ORIGIN = f"https://{AWS_S3_CUSTOM_DOMAIN}"
 
 SECURE_CSP_REPORT_ONLY = {
