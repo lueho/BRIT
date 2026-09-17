@@ -3514,8 +3514,10 @@ class CollectionFilterWithCatchmentAndPropertiesRegressionTest(
         }
 
         self.client.force_login(self.member)
-        response = self.client.get(self.list_url, query_params)
+        response = self.client.get(self.list_url, query_params, follow=True)
         self.assertEqual(response.status_code, 200)
+        redirect_url = response.redirect_chain[0][0]
+        self.assertNotIn("csrfmiddlewaretoken", redirect_url)
 
         self.assertEqual(
             response.context["filter"].data["catchment"], str(self.catchment.pk)

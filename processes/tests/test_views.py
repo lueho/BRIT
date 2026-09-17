@@ -3,6 +3,7 @@
 Comprehensive tests for all CRUD views following BRIT testing patterns.
 """
 
+import re
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -1458,6 +1459,56 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
                 process=self.unpublished_object, source=private_source
             ).exists()
         )
+
+
+class ProcessFilterUrlTestCase(TestCase):
+    """Filter URLs must not leak CSRF tokens or stale parameters (issue #153)."""
+
+    def _get_form_html(self, response):
+        content = response.content.decode()
+        return re.findall(
+            r'<form[^>]*method="get"[^>]*>.*?</form>',
+            content,
+            re.DOTALL | re.IGNORECASE,
+        )
+
+    def test_get_filter_form_renders_no_csrf_token(self):
+        response = self.client.get(
+            reverse("processes:process-list"), {"scope": "published"}
+        )
+        self.assertEqual(response.status_code, 200)
+        get_forms = self._get_form_html(response)
+        self.assertTrue(get_forms, "Expected a GET filter form on the list page")
+        for form_html in get_forms:
+            self.assertNotIn("csrfmiddlewaretoken", form_html)
+
+    def test_stale_csrf_param_redirects_to_clean_url(self):
+        response = self.client.get(
+            reverse("processes:process-list"),
+            {
+                "scope": "published",
+                "csrfmiddlewaretoken": "stale-token",
+                "name": "compost",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"], "/processes/list/?scope=published&name=compost"
+        )
+
+    def test_csrf_only_params_redirect_to_default_filters(self):
+        response = self.client.get(
+            reverse("processes:process-list"), {"csrfmiddlewaretoken": "stale-token"}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/processes/list/?scope=published")
+
+    def test_filter_url_without_csrf_is_not_redirected(self):
+        response = self.client.get(
+            reverse("processes:process-list"),
+            {"scope": "published", "name": "compost"},
+        )
+        self.assertEqual(response.status_code, 200)
 
 
 class ProcessAutocompleteViewTestCase(ViewWithPermissionsTestCase):

@@ -23,6 +23,7 @@ class BaseCrispyFilterSet(FilterSet):
         if not hasattr(form, "helper"):
             form.helper = self.get_form_helper()
         form.helper.form_tag = False
+        form.helper.disable_csrf = True
         return form
 
 
