@@ -11,11 +11,31 @@ from django.core.cache import cache
 from django.test import RequestFactory
 from django.urls import reverse
 from django.utils.html import escape, mark_safe
+from django.utils.http import url_has_allowed_host_and_scheme
 
 register = template.Library()
 
 _BOLD_PATTERN = re.compile(r"\*\*(.+?)\*\*")
 _LEGACY_SECTION_SEPARATOR_RE = re.compile(r"(?:\s*;\s*){2,}")
+
+
+@register.simple_tag(takes_context=True)
+def safe_back_url(context):
+    request = context.get("request")
+    if request is None:
+        return ""
+
+    back = request.GET.get("back")
+    if not back:
+        return ""
+
+    if url_has_allowed_host_and_scheme(
+        back,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return back
+    return ""
 
 
 @register.filter
