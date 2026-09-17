@@ -680,6 +680,39 @@ class ProcessCategoryCRUDViewsTestCase(
         self.assertContains(response, "Private category process")
 
 
+class ProcessListEmptyStateTestCase(ViewWithPermissionsTestCase):
+    """Regression tests for issue #150: the shared empty state must not claim
+    "No items match your current filters" on an unfiltered empty scope."""
+
+    def test_empty_published_scope_shows_creation_hint_only(self):
+        self.client.force_login(self.staff)
+
+        response = self.client.get(
+            reverse("processes:process-list"), {"scope": "published"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Create your first process to get started.")
+        self.assertNotContains(response, "No items match your current filters.")
+
+    def test_filtered_empty_list_shows_filter_message_and_reset(self):
+        Process.objects.create(
+            name="Existing process",
+            owner=self.staff,
+            publication_status="published",
+        )
+        self.client.force_login(self.staff)
+
+        response = self.client.get(
+            reverse("processes:process-list"),
+            {"scope": "published", "name": "no-match-token"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No items match your current filters.")
+        self.assertContains(response, ">Reset filters</a>")
+
+
 class ProcessCategoryAutocompleteViewTestCase(ViewWithPermissionsTestCase):
     """Test ProcessCategory autocomplete view."""
 
