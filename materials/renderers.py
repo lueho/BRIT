@@ -8,6 +8,14 @@ from openpyxl.utils import get_column_letter
 
 from utils.file_export.renderers import BaseCSVRenderer, BaseXLSXRenderer
 
+QUALIFIER_HEADERS = [
+    "Value qualifier",
+    "Raw value",
+    "Detection limit",
+    "Raw detection limit",
+]
+QUALIFIER_COLUMN_WIDTHS = [24, 28, 18, 28]
+
 # Excel column headers matching the import format (order matches input files)
 MEASUREMENT_HEADERS = [
     "Parameter",
@@ -21,7 +29,7 @@ MEASUREMENT_HEADERS = [
     "Method",
     "Source",
     "Comments",
-]
+] + QUALIFIER_HEADERS
 
 METADATA_LABELS = [
     "Material type",
@@ -118,7 +126,7 @@ FALLBACK_COLORS = [
 ]
 
 # Column widths for the measurements table (matches header order)
-COLUMN_WIDTHS = [30, 15, 25, 12, 18, 6, 10, 25, 30, 40, 40]
+COLUMN_WIDTHS = [30, 15, 25, 12, 18, 6, 10, 25, 30, 40, 40] + QUALIFIER_COLUMN_WIDTHS
 
 # Sample-property worksheet definition. Captures non-mass sample properties
 # such as moisture, density, pH that live on MaterialPropertyValue rather
@@ -132,8 +140,8 @@ PROPERTY_HEADERS = [
     "Method",
     "Source",
     "Comments",
-]
-PROPERTY_COLUMN_WIDTHS = [30, 12, 18, 10, 25, 30, 40, 40]
+] + QUALIFIER_HEADERS
+PROPERTY_COLUMN_WIDTHS = [30, 12, 18, 10, 25, 30, 40, 40] + QUALIFIER_COLUMN_WIDTHS
 
 
 class SampleMeasurementsXLSXRenderer:
@@ -258,7 +266,7 @@ class SampleMeasurementsXLSXRenderer:
             (1, measurement.component.name if measurement.component else ""),
             (2, measurement.component.abbreviation if measurement.component else ""),
             (3, group_name),
-            (4, float(measurement.average) if measurement.average is not None else ""),
+            (4, self._measurement_value(measurement)),
             (
                 5,
                 float(measurement.standard_deviation)
@@ -280,9 +288,15 @@ class SampleMeasurementsXLSXRenderer:
             (10, source_value),
             (11, measurement.comment or ""),
         ]
+        cells_data.extend(
+            (col, value)
+            for col, value in enumerate(self._qualifier_values(measurement), start=12)
+        )
 
         for col, value in cells_data:
             cell = ws.cell(row=row_num, column=col, value=value)
+            if isinstance(value, str):
+                cell.data_type = "s"
             if row_fill:
                 cell.fill = row_fill
 
@@ -308,6 +322,23 @@ class SampleMeasurementsXLSXRenderer:
         )
 
     @staticmethod
+    def _measurement_value(measurement):
+        if measurement.value_qualifier != "exact":
+            return measurement.display_value
+        return float(measurement.average) if measurement.average is not None else ""
+
+    @staticmethod
+    def _qualifier_values(measurement):
+        return (
+            measurement.value_qualifier,
+            measurement.raw_value,
+            float(measurement.detection_limit)
+            if measurement.detection_limit is not None
+            else "",
+            measurement.raw_detection_limit,
+        )
+
+    @staticmethod
     def _format_sources(sources):
         if not sources:
             return ""
@@ -327,10 +358,7 @@ class SampleMeasurementsXLSXRenderer:
         sources = list(value.sources.all())
         cells_data = [
             (1, value.property.name if value.property else ""),
-            (
-                2,
-                float(value.average) if value.average is not None else "",
-            ),
+            (2, self._measurement_value(value)),
             (
                 3,
                 float(value.standard_deviation)
@@ -346,8 +374,14 @@ class SampleMeasurementsXLSXRenderer:
             (7, self._format_sources(sources)),
             (8, getattr(value, "comment", "") or ""),
         ]
+        cells_data.extend(
+            (col, cell_value)
+            for col, cell_value in enumerate(self._qualifier_values(value), start=9)
+        )
         for col, cell_value in cells_data:
-            ws.cell(row=row_num, column=col, value=cell_value)
+            cell = ws.cell(row=row_num, column=col, value=cell_value)
+            if isinstance(cell_value, str):
+                cell.data_type = "s"
 
     def _set_property_column_widths(self, ws):
         for col_num, width in enumerate(PROPERTY_COLUMN_WIDTHS, start=1):

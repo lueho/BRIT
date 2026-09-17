@@ -4,6 +4,7 @@ from rest_framework.serializers import (
     ModelSerializer,
     PrimaryKeyRelatedField,
     ReadOnlyField,
+    Serializer,
     SerializerMethodField,
     StringRelatedField,
     ValidationError,
@@ -95,8 +96,27 @@ class CompositionDoughnutChartSerializer(ModelSerializer):
         ]
 
 
+MEASUREMENT_METADATA_FIELDS = (
+    "display_value",
+    "value_qualifier",
+    "raw_value",
+    "detection_limit",
+    "raw_detection_limit",
+)
+
+
+class MeasurementMetadataSerializerMixin(Serializer):
+    display_value = ReadOnlyField()
+    value_qualifier = ReadOnlyField()
+    raw_value = ReadOnlyField()
+    detection_limit = ReadOnlyField()
+    raw_detection_limit = ReadOnlyField()
+
+
 class MaterialPropertyValueModelSerializer(
-    NumericMeasurementSerializerMixin, ModelSerializer
+    MeasurementMetadataSerializerMixin,
+    NumericMeasurementSerializerMixin,
+    ModelSerializer,
 ):
     property_name = ReadOnlyField(source="property.name")
     property_url = HyperlinkedRelatedField(
@@ -119,7 +139,7 @@ class MaterialPropertyValueModelSerializer(
             "average",
             "standard_deviation",
             "unit",
-        )
+        ) + MEASUREMENT_METADATA_FIELDS
 
 
 class SampleTimestepsSerializer(ModelSerializer):
@@ -256,13 +276,21 @@ class MaterialAPISerializer(ModelSerializer):
         fields = ("name", "categories")
 
 
-class BaseMaterialPropertyAPISerializer(ModelSerializer):
+class BaseMaterialPropertyAPISerializer(
+    MeasurementMetadataSerializerMixin, ModelSerializer
+):
     name = StringRelatedField(source="property")
     basis_component = ReadOnlyField(source="basis_component.name")
 
     class Meta:
         model = MaterialPropertyValue
-        fields = ("name", "basis_component", "unit", "average", "standard_deviation")
+        fields = (
+            "name",
+            "basis_component",
+            "unit",
+            "average",
+            "standard_deviation",
+        ) + MEASUREMENT_METADATA_FIELDS
 
 
 class MaterialPropertyAPISerializer(
@@ -409,7 +437,9 @@ class CompositionWriteSerializer(ModelSerializer):
         )
 
 
-class ComponentMeasurementReadSerializer(ModelSerializer):
+class ComponentMeasurementReadSerializer(
+    MeasurementMetadataSerializerMixin, ModelSerializer
+):
     component = StringRelatedField()
     group = StringRelatedField()
     basis_component = StringRelatedField()
@@ -432,7 +462,7 @@ class ComponentMeasurementReadSerializer(ModelSerializer):
             "standard_deviation",
             "sample_size",
             "comment",
-        )
+        ) + MEASUREMENT_METADATA_FIELDS
 
 
 class ComponentMeasurementWriteSerializer(ModelSerializer):
@@ -462,7 +492,9 @@ class ComponentMeasurementWriteSerializer(ModelSerializer):
         return unit
 
 
-class MaterialPropertyValueReadSerializer(ModelSerializer):
+class MaterialPropertyValueReadSerializer(
+    MeasurementMetadataSerializerMixin, ModelSerializer
+):
     property = StringRelatedField()
     basis_component = StringRelatedField()
     analytical_method = StringRelatedField()
@@ -481,7 +513,7 @@ class MaterialPropertyValueReadSerializer(ModelSerializer):
             "unit",
             "average",
             "standard_deviation",
-        )
+        ) + MEASUREMENT_METADATA_FIELDS
 
 
 class MaterialPropertyValueWriteSerializer(ModelSerializer):

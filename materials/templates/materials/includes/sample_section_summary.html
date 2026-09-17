@@ -46,7 +46,7 @@
 {% elif section.key == 'measurements' %}
   <ul class="list-unstyled mb-0">
     {% for measurement in object.component_measurements.all %}
-      <li class="mb-1">{{ measurement.component.name }} — {{ measurement.average|trim_decimal:4 }} {{ measurement.unit.symbol|default:measurement.unit.name }}<span class="text-muted small"> ({{ measurement.group.name }})</span></li>
+      <li class="mb-1">{{ measurement.component.name }} — {{ measurement.display_value|trim_decimal:4 }} {{ measurement.unit.symbol|default:measurement.unit.name }}{% if measurement.display_detection_limit %} <span class="text-muted small">Detection limit: {{ measurement.display_detection_limit }} {{ measurement.unit.symbol|default:measurement.unit.name }}</span>{% endif %}<span class="text-muted small"> ({{ measurement.group.name }})</span></li>
     {% empty %}
       <li class="text-muted">No measurements added yet.</li>
     {% endfor %}
@@ -54,7 +54,7 @@
 {% elif section.key == 'properties' %}
   <ul class="list-unstyled mb-0">
     {% for value in object.property_values.all %}
-      <li class="mb-1">{{ value.property.name }} — {{ value.average|trim_decimal:4 }} {{ value.unit.symbol|default:value.unit.name }}</li>
+      <li class="mb-1">{{ value.property.name }} — {{ value.display_value|trim_decimal:4 }} {{ value.unit.symbol|default:value.unit.name }}{% if value.display_detection_limit %} <span class="text-muted small">Detection limit: {{ value.display_detection_limit }} {{ value.unit.symbol|default:value.unit.name }}</span>{% endif %}</li>
     {% empty %}
       <li class="text-muted">No property values added yet.</li>
     {% endfor %}
