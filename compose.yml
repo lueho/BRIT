@@ -67,7 +67,11 @@ services:
     image: brit-web
     volumes: 
       - ./:/app
-    command: celery --app=brit worker --loglevel=info --pool=solo --concurrency=1 --without-gossip --without-mingle -E
+    # --beat embeds the scheduler so CELERY_BEAT_SCHEDULE entries (e.g.
+    # periodic GeoJSON cache warmup) actually fire. Safe here because only
+    # one worker container runs per stack; remove it before scaling workers.
+    # --schedule keeps the beat state file off the bind-mounted worktree.
+    command: celery --app=brit worker --loglevel=info --pool=solo --concurrency=1 --without-gossip --without-mingle --beat --schedule /tmp/celerybeat-schedule -E
     stop_grace_period: 5s
     env_file:
       - brit/settings/.env
