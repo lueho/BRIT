@@ -1,12 +1,17 @@
 from unittest.mock import Mock, patch
 
+from celery.result import EagerResult
 from django.conf import settings
 from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.core.cache import caches
 from django.test import SimpleTestCase, TestCase
 
 from maps.models import NutsRegion, NutsVintage, Region
-from maps.tasks import warm_all_geojson_caches, warm_base_geojson_caches
+from maps.tasks import (
+    warm_all_geojson_caches,
+    warm_base_geojson_caches,
+    warm_geojson_caches_on_worker_ready,
+)
 from maps.utils import (
     compute_collection_dataset_version,
     get_nuts_region_cache_key,
@@ -50,24 +55,26 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
 
         self.assertEqual(len(version), 12)
 
-    @patch("maps.tasks.warm_base_geojson_caches")
+    @patch("maps.tasks._warm_base_geojson_caches")
     @patch("maps.tasks.get_source_domain_geojson_cache_warmers")
     def test_warm_all_geojson_caches_uses_plugin_declared_warmers(
-        self, mock_get_source_domain_geojson_cache_warmers, mock_base_warmer
+        self, mock_get_source_domain_geojson_cache_warmers, mock_base_warmup
     ):
-        base_result = Mock()
-        base_result.get.return_value = {"status": "success"}
-        mock_base_warmer.apply.return_value = base_result
+        mock_base_warmup.return_value = {"status": "success"}
 
-        collection_result = Mock()
-        collection_result.get.return_value = {"status": "success", "features_count": 3}
         collection_warmer = Mock()
-        collection_warmer.apply.return_value = collection_result
+        collection_warmer.apply.return_value = EagerResult(
+            "collection-task",
+            {"status": "success", "features_count": 3},
+            "SUCCESS",
+        )
 
-        tree_result = Mock()
-        tree_result.get.return_value = {"status": "success", "features_count": 2}
         tree_warmer = Mock()
-        tree_warmer.apply.return_value = tree_result
+        tree_warmer.apply.return_value = EagerResult(
+            "tree-task",
+            {"status": "success", "features_count": 2},
+            "SUCCESS",
+        )
 
         mock_get_source_domain_geojson_cache_warmers.return_value = (
             ("roadside_trees", tree_warmer),
@@ -81,23 +88,51 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
         tree_warmer.apply.assert_called_once_with()
         collection_warmer.apply.assert_called_once_with()
 
-    @patch("maps.tasks.warm_base_geojson_caches")
+    @patch("maps.tasks._warm_base_geojson_caches")
     @patch("maps.tasks.get_source_domain_geojson_cache_warmers")
     def test_warm_all_geojson_caches_includes_base_caches(
-        self, mock_get_source_domain_geojson_cache_warmers, mock_base_warmer
+        self, mock_get_source_domain_geojson_cache_warmers, mock_base_warmup
     ):
         mock_get_source_domain_geojson_cache_warmers.return_value = ()
-        base_result = Mock()
-        base_result.get.return_value = {
+        mock_base_warmup.return_value = {
             "nuts": {"status": "success"},
             "regions": {"status": "success"},
         }
-        mock_base_warmer.apply.return_value = base_result
 
         result = warm_all_geojson_caches.run()
 
         self.assertEqual(result["maps"]["nuts"]["status"], "success")
-        mock_base_warmer.apply.assert_called_once()
+        mock_base_warmup.assert_called_once()
+
+    @patch("maps.tasks._warm_base_geojson_caches")
+    @patch("maps.tasks.get_source_domain_geojson_cache_warmers")
+    def test_warm_all_geojson_caches_never_calls_result_get_inside_task(
+        self, mock_get_source_domain_geojson_cache_warmers, mock_base_warmup
+    ):
+        """Inside a running task, EagerResult.get() raises RuntimeError.
+
+        The umbrella task must read sub-results without ``get()``; this test
+        simulates a real worker context where blocking calls are forbidden.
+        """
+        mock_base_warmup.return_value = {"status": "success"}
+        warmer = Mock()
+        warmer.apply.return_value = EagerResult(
+            "task", {"status": "success", "features_count": 1}, "SUCCESS"
+        )
+        mock_get_source_domain_geojson_cache_warmers.return_value = (
+            ("roadside_trees", warmer),
+        )
+
+        with patch("celery.result.task_join_will_block", return_value=True):
+            result = warm_all_geojson_caches.run()
+
+        self.assertEqual(result["roadside_trees"]["features_count"], 1)
+
+    @patch("maps.tasks.warm_all_geojson_caches")
+    def test_worker_ready_queues_full_geojson_warmup(self, mock_warm_all):
+        warm_geojson_caches_on_worker_ready()
+
+        mock_warm_all.apply_async.assert_called_once_with(countdown=30)
 
 
 class WarmBaseGeojsonCachesTaskTests(TestCase):
