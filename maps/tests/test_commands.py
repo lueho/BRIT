@@ -214,9 +214,37 @@ class WarmGeojsonCacheCommandTests(TestCase):
 
         call_command("warm_geojson_cache", run_async=True, stdout=out)
 
-        mock_warm_all.delay.assert_called_once_with()
+        mock_warm_all.delay.assert_called_once_with(
+            nuts_levels=[0, 1, 2], nuts_limit=None, regions_limit=50
+        )
         mock_warm_base.delay.assert_not_called()
         self.assertIn("queued", out.getvalue().lower())
+
+    @patch("maps.tasks.warm_all_geojson_caches")
+    def test_limit_and_nuts_levels_reach_umbrella_task(self, mock_warm_all):
+        out = io.StringIO()
+
+        call_command(
+            "warm_geojson_cache",
+            limit=10,
+            nuts_levels="0",
+            run_async=True,
+            stdout=out,
+        )
+
+        mock_warm_all.delay.assert_called_once_with(
+            nuts_levels=[0], nuts_limit=10, regions_limit=10
+        )
+
+    @patch("maps.tasks.warm_all_geojson_caches")
+    def test_regions_limit_reaches_umbrella_task(self, mock_warm_all):
+        out = io.StringIO()
+
+        call_command("warm_geojson_cache", regions_limit=5, run_async=True, stdout=out)
+
+        mock_warm_all.delay.assert_called_once_with(
+            nuts_levels=[0, 1, 2], nuts_limit=None, regions_limit=5
+        )
 
     @patch("maps.tasks.warm_base_geojson_caches")
     def test_async_flag_queues_base_task_for_nuts(self, mock_warm_base):
@@ -225,7 +253,23 @@ class WarmGeojsonCacheCommandTests(TestCase):
         call_command("warm_geojson_cache", nuts=True, run_async=True, stdout=out)
 
         mock_warm_base.delay.assert_called_once_with(
-            nuts_levels=[0, 1, 2], regions_limit=None
+            nuts_levels=[0, 1, 2], regions_limit=None, nuts_limit=None
+        )
+
+    @patch("maps.tasks.warm_base_geojson_caches")
+    def test_async_flag_forwards_limit_for_nuts(self, mock_warm_base):
+        out = io.StringIO()
+
+        call_command(
+            "warm_geojson_cache",
+            nuts=True,
+            limit=10,
+            run_async=True,
+            stdout=out,
+        )
+
+        mock_warm_base.delay.assert_called_once_with(
+            nuts_levels=[0, 1, 2], regions_limit=None, nuts_limit=10
         )
 
     @patch("maps.tasks.warm_base_geojson_caches")
@@ -240,7 +284,9 @@ class WarmGeojsonCacheCommandTests(TestCase):
             stdout=out,
         )
 
-        mock_warm_base.delay.assert_called_once_with(nuts_levels=None, regions_limit=5)
+        mock_warm_base.delay.assert_called_once_with(
+            nuts_levels=None, regions_limit=5, nuts_limit=None
+        )
 
 
 class WarmGeojsonCacheRegionsTests(TestCase):

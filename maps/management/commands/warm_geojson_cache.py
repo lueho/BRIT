@@ -107,30 +107,38 @@ class Command(BaseCommand):
 
         warm_all = warm_trees and warm_collections and warm_nuts and warm_regions
 
+        nuts_levels = [int(level) for level in options["nuts_levels"].split(",")]
+        nuts_limit = options["limit"]
+        regions_limit = options["limit"] or options["regions_limit"]
+
         # "Warm all" maps onto the umbrella task in both modes so that
         # synchronous and asynchronous runs warm exactly the same caches.
         if warm_all:
+            task_kwargs = {
+                "nuts_levels": nuts_levels,
+                "nuts_limit": nuts_limit,
+                "regions_limit": regions_limit,
+            }
             if run_async:
                 self.stdout.write("Warming all GeoJSON caches (async via Celery)...")
-                warm_all_geojson_caches.delay()
+                warm_all_geojson_caches.delay(**task_kwargs)
                 self.stdout.write(
                     self.style.SUCCESS("Tasks queued. Check Celery logs for progress.")
                 )
             else:
                 self.stdout.write("Warming all GeoJSON caches (synchronous)...")
-                results = warm_all_geojson_caches.apply().get()
+                results = warm_all_geojson_caches.apply(kwargs=task_kwargs).get()
                 self._report_results(results)
             return
 
         # Individual cache warming
         if warm_nuts or warm_regions:
-            nuts_levels = [int(level) for level in options["nuts_levels"].split(",")]
-            regions_limit = options["limit"] or options["regions_limit"]
             if run_async:
                 self.stdout.write("Queuing base GeoJSON cache warm-up (async)...")
                 warm_base_geojson_caches.delay(
                     nuts_levels=nuts_levels if warm_nuts else None,
                     regions_limit=regions_limit if warm_regions else None,
+                    nuts_limit=nuts_limit if warm_nuts else None,
                 )
                 self.stdout.write(self.style.SUCCESS("Task queued. Check Celery logs."))
             else:
