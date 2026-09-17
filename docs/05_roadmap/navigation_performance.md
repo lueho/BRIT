@@ -66,14 +66,14 @@ not part of this first change.
 
 ### 3. Filter metadata and unnecessary counts
 
-- [ ] Replace slider `exists()` plus aggregate pairs with nullable aggregates.
-- [ ] Combine compatible aggregates and reuse duplicate choice queries.
-- [ ] Decide whether stable slider ranges should be cached; specify invalidation,
+- [x] Replace slider `exists()` plus aggregate pairs with nullable aggregates.
+- [x] Combine compatible aggregates and reuse duplicate choice queries.
+- [x] Decide whether stable slider ranges should be cached; specify invalidation,
   scope handling, empty-data defaults, and acceptable freshness first.
-- [ ] Audit consumers of `public_count`, `private_count`, and `review_count`.
-- [ ] Remove unused scope counts without removing the paginator's result count.
-- [ ] Audit Explorer counts for appropriate caching separately.
-- [ ] Add query budgets and empty/zero/null/filter correctness tests.
+- [x] Audit consumers of `public_count`, `private_count`, and `review_count`.
+- [x] Remove unused scope counts without removing the paginator's result count.
+- [x] Audit Explorer counts for appropriate caching separately.
+- [x] Add query budgets and empty/zero/null/filter correctness tests.
 
 ### 4. Authenticated list and review performance
 
@@ -249,6 +249,69 @@ Three-run medians from the paired candidate experiment, in milliseconds:
 - Related verification: 1,573 tests completed without failures, 379 skipped.
   Ruff lint/format and the missing-migration gate passed.
 
+### Step 3 execution (2026-09-14)
+
+- Worktree/branch: `collection-filter-overhead` / `fix/collection-filter-overhead`.
+  Started from step 2 (`0992b926` on `fix/collection-list-query`) because PR #404
+  was still open. The preceding worktree and PR branch were left unchanged.
+- Consolidated five slider-range calculations into three fresh aggregate queries:
+  property maxima share a filtered aggregate, bin capacities/sizes share another,
+  and frequency maxima aggregate the per-frequency sum of standard counts.
+  Optional frequency counts remain excluded, as before.
+- Range-setting helpers now receive computed maxima rather than querying the
+  database independently. Missing aggregates use field defaults, zero remains a
+  valid maximum, property maxima retain upward rounding, and explicit property
+  range settings remain respected. Existing global range scope is unchanged.
+- The regression tests also exposed an existing initialization-order problem:
+  requests without `scope` can construct the form before ranges are assigned.
+  Range setup now updates the actual filter/form widgets as well as widget
+  configuration, so the computed metadata is not silently discarded.
+- Material checkbox choices are evaluated lazily and shared only within one
+  filterset instance. Both widgets reuse one result, while field validation still
+  checks the queryset. New instances observe new materials, and API-only filter
+  construction (`skip_min_max=True`) still performs no metadata/choice queries.
+- **No cross-request slider cache was added.** Three fresh queries avoid an
+  invalidation contract spanning model saves, imports, and bulk updates. A bulk
+  update regression test verifies that a new filterset immediately sees changes.
+- Searched all repository consumers of the three scope-count context variables.
+  Their only template consumer was the unreferenced legacy scope-switcher partial.
+  With explicit approval, removed the calculations, obsolete explanatory comments,
+  context variables, and `brit/templates/partials/scope_switcher.html` together.
+  Active buttons in `filtered_list.html` and paginator result totals are retained.
+- Explorer audit: `sources.registry` already caches its public card counts for
+  one hour. Collection and Materials Explorers calculate visible counts on each
+  request. Those are not unused counts; left them intact. A separate cache change
+  would need an agreed freshness/invalidation policy, rather than silently making
+  displayed totals stale as part of this cleanup.
+
+Verified query budgets in isolated Django tests:
+
+| Operation | Before | After |
+| --- | ---: | ---: |
+| Populated slider metadata | 10 | 3 |
+| Empty property/bin metadata, seeded frequency data | 6 | 3 |
+| Both material checkbox widgets, first render | 2 | 1 |
+| Re-rendering those widgets in the same instance | 2 | 0 |
+| Anonymous shared-list context including paginator | 2 | 1 |
+| Staff published/private/review context including paginator | 4 | 1 |
+
+- A complete anonymous collection-list render with 25 fixture rows is guarded by
+  a nine-query regression test (analytics disabled; RequestFactory excludes
+  middleware/session loading). This is not a production timing benchmark. The
+  audit's earlier 18-query observation used populated production-like metadata;
+  do not equate the two datasets or infer a precise end-to-end speedup.
+- RED: 11 tests reported 9 expected assertion failures and 4 missing-widget-limit
+  errors, exposing duplicate work and the initialization-order defect. The same
+  11 tests passed after implementation. Expanded focused coverage then passed all
+  20 tests, including custom bounds and full collection-list rendering.
+- Broader verification: 4,169 tests completed without failures, 861 skipped.
+  After the final lint adjustment, all 20 focused tests passed again. Ruff lint,
+  formatting, and missing-migration checks passed.
+- Iterator detail: `list(ModelChoiceIterator)` can call its length hint and issue
+  a `COUNT()` before fetching rows. `list(iter(choices))` materializes the iterator
+  without that extra count. The one-query checkbox regression protects this
+  behavior; no lint suppression or cross-request cache is needed.
+
 ## Verification log
 
 Commands below use the BRIT-ops scripts directory as `$OPS` and the isolated
@@ -361,3 +424,63 @@ git diff --check
   and the snapshot/test volumes are preserved for the next step.
 - Verification completed before PR creation. Production deployment, end-to-end
   latency measurements, and steps 3–8 remain separate follow-up work.
+
+### Step 3 (2026-09-14)
+
+```bash
+bash "$OPS/brit-tdd-preflight" "$PWD"
+
+"$OPS/brit-worktree-test" collection-filter-overhead \
+  --base fix/collection-list-query --print-targets -- \
+  sources.waste_collection.tests.test_filters.CollectionFilterMetadataTestCase \
+  sources.waste_collection.tests.test_filters.CollectionFilterMetadataEmptyTestCase \
+  utils.object_management.tests.test_views.SharedListScopeCountTestCase
+
+"$OPS/brit-worktree-test" collection-filter-overhead --parallel 1 -- \
+  sources.waste_collection.tests.test_filters.CollectionFilterMetadataTestCase \
+  sources.waste_collection.tests.test_filters.CollectionFilterMetadataEmptyTestCase \
+  utils.object_management.tests.test_views.SharedListScopeCountTestCase
+
+"$OPS/brit-worktree-test" collection-filter-overhead --parallel 1 -- \
+  sources.waste_collection.tests.test_filters.CollectionFilterMetadataTestCase \
+  sources.waste_collection.tests.test_filters.CollectionFilterMetadataEmptyTestCase \
+  utils.object_management.tests.test_views.SharedListScopeCountTestCase \
+  sources.waste_collection.tests.test_views.CollectionListQueryTestCase
+
+"$OPS/brit-worktree-test" collection-filter-overhead -- \
+  utils.tests.test_views \
+  utils.object_management.tests.test_views \
+  maps.tests.test_views \
+  materials.tests.test_views \
+  sources.waste_collection.tests.test_views \
+  sources.waste_collection.tests.test_filters \
+  sources.waste_collection.tests.test_viewsets \
+  bibliography.tests.test_views \
+  inventories.tests.test_views \
+  processes.tests.test_views
+
+"$OPS/brit-worktree-check" collection-filter-overhead --no-up
+
+git diff --check
+git diff --cached --check
+```
+
+- Preflight and explicit target inspection passed. Tests ran against this new
+  worktree's isolated test database, not the main database or the step 2 snapshot.
+- Initial RED run: 11 tests, 9 expected assertion failures and 4 expected widget
+  metadata errors. GREEN: all 11 passed; expanded focused suite: all 20 passed.
+- Broader suite: 4,169 tests, no failures, 861 skipped. API coverage includes the
+  existing lightweight `skip_min_max` paths and filter validation.
+- The first lint run flagged C416 on a deliberate choice-materialization list
+  comprehension. Replaced it with `list(iter(choices))`, retaining the no-count
+  behavior. Gates then passed (679 Python files formatted, no missing migrations)
+  and the 20 focused tests passed again against the final implementation.
+- Confirmed no remaining runtime references to the removed scope-count values or
+  template. Active scope controls and filtered result totals are exercised in
+  rendered-response tests. No assets or migrations were added by step 3.
+- `$OPS/brit-worktree-stop collection-filter-overhead`: completed; isolated
+  services stopped and test database volumes preserved. The main checkout and
+  preceding worktrees remain unchanged.
+- Changes are not yet committed or deployed. Steps 4–8 and deployed performance
+  measurements remain pending; persistent Explorer caching is a separately
+  evaluated follow-up, not silently enabled here.

@@ -6,9 +6,11 @@ from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages import get_messages
 from django.core.exceptions import PermissionDenied
+from django.db import connection
 from django.db.models.signals import post_save, pre_save
 from django.http import HttpResponse, HttpResponseRedirect
 from django.test import RequestFactory, TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from django_filters import CharFilter, FilterSet
@@ -37,7 +39,12 @@ from utils.object_management.views import (
 )
 from utils.properties.models import Property, Unit
 
-from ..views import FilterDefaultsMixin, PublishedObjectFilterView
+from ..views import (
+    FilterDefaultsMixin,
+    PrivateObjectFilterView,
+    PublishedObjectFilterView,
+    ReviewObjectFilterView,
+)
 
 
 class ReviewWorkflowViewTests(TestCase):
@@ -720,6 +727,67 @@ class PublishedObjectsFilterViewTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context_data["filter"].data, {"name": ["Other name"]})
+
+
+class SharedListScopeCountTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create_user(
+            username="scope-count-staff", is_staff=True
+        )
+        cls.other = User.objects.create_user(username="scope-count-other")
+        Property.objects.bulk_create(
+            [
+                Property(name=name, owner=owner, publication_status=status)
+                for name, owner, status in (
+                    ("Selected public 1", cls.staff, "published"),
+                    ("Selected public 2", cls.other, "published"),
+                    ("Excluded public", cls.other, "published"),
+                    ("Selected mine", cls.staff, "private"),
+                    ("Selected review", cls.other, "review"),
+                    ("Selected hidden", cls.other, "private"),
+                )
+            ]
+        )
+
+    def get_response(self, view_class, user):
+        request = RequestFactory().get("/properties/", {"name": "Selected"})
+        request.user = user
+        return view_class.as_view(model=Property, filterset_class=MockFilterSet)(
+            request
+        )
+
+    def test_lists_only_count_the_filtered_paginator_results(self):
+        ContentType.objects.get_for_model(Property)
+        for view_class, user, expected, query_budget in (
+            (PublishedObjectFilterView, AnonymousUser(), 2, 1),
+            (PublishedObjectFilterView, self.staff, 2, 1),
+            (PrivateObjectFilterView, self.staff, 2, 1),
+            (ReviewObjectFilterView, self.staff, 1, 1),
+        ):
+            with self.subTest(
+                view=view_class.__name__, authenticated=user.is_authenticated
+            ):
+                with CaptureQueriesContext(connection) as queries:
+                    response = self.get_response(view_class, user)
+                    self.assertEqual(response.context_data["paginator"].count, expected)
+
+                self.assertEqual(len(queries), query_budget)
+                self.assertEqual(
+                    sum("COUNT(" in query["sql"].upper() for query in queries), 1
+                )
+                self.assertEqual(response.status_code, 200)
+                for key in ("public_count", "private_count", "review_count"):
+                    self.assertNotIn(key, response.context_data)
+
+    def test_result_total_and_active_scope_buttons_still_render(self):
+        response = self.get_response(PublishedObjectFilterView, self.staff)
+        response.render()
+
+        self.assertContains(response, "of 2 results")
+        self.assertContains(response, 'aria-label="Scope toggle"')
+        self.assertContains(response, "scope=private")
+        self.assertContains(response, "scope=review")
 
 
 class BreadcrumbContractViewTests(TestCase):
